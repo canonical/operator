@@ -493,6 +493,16 @@ class BoundStoredState:
         self._data.framework.save_snapshot(self._data)
         self.on.changed.emit()
 
+        # TODO Saving a snapshot on every change is not efficient. Instead, the
+        # the framework should offer a pre-commit event that the state can monitor
+        # and save itself at the right time if changes are pending.
+
+        # TODO Values that can be mutated, such as dicts, lists, sets, won't work well
+        # as stored state. We'll likely need StoredDict, StoredList, and StoredSet to
+        # fix that. Those objects will emit their own events, which must be caught by
+        # the parent stored state and reemited to notify observers that the overall
+        # state is also changing.
+
 
 class StoredState:
 
