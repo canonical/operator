@@ -89,8 +89,8 @@ class TestFramework(unittest.TestCase):
             bar = Event(MyEvent)
 
         class MyObserver(Object):
-            def __init__(self, context):
-                super().__init__(context)
+            def __init__(self, parent):
+                super().__init__(parent)
                 self.seen = []
 
             def on_any(self, event):
@@ -125,8 +125,8 @@ class TestFramework(unittest.TestCase):
             c = Event(MyEvent)
 
         class MyObserver(Object):
-            def __init__(self, context, key):
-                super().__init__(context, key)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
                 self.seen = []
                 self.done = {}
 
@@ -195,8 +195,8 @@ class TestFramework(unittest.TestCase):
             foo = Event(MyEvent)
 
         class MyObserver(Object):
-            def __init__(self, context):
-                super().__init__(context)
+            def __init__(self, parent):
+                super().__init__(parent)
                 self.seen = []
 
             def on_foo(self, event):
@@ -237,8 +237,8 @@ class TestFramework(unittest.TestCase):
             on = MyEvents()
 
         class MyObserver(Object):
-            def __init__(self, context):
-                super().__init__(context)
+            def __init__(self, parent):
+                super().__init__(parent)
                 self.seen = []
 
             def on_foo(self, event):
@@ -275,8 +275,8 @@ class TestFramework(unittest.TestCase):
             bar = event
 
         class MyObserver(Object):
-            def __init__(self, context):
-                super().__init__(context)
+            def __init__(self, parent):
+                super().__init__(parent)
                 self.seen = []
 
             def on_foo(self, event): self.seen.append(f"on_foo:{event.handle.kind}")

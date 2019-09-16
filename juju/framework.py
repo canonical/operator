@@ -7,21 +7,21 @@ import sqlite3
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
 
-    The handle context is the handle for the parent object that this handle
-    sits under, or None if the object identified by this handle stands by
-    itself.
+    The provided parent is the object (or that object's handle) that this handle
+    sits under, or None if the object identified by this handle stands by itself
+    as the root of its own hierarchy.
 
     The handle kind is a string that defines a namespace so objects with the
-    same context and kind will have unique keys.
+    same parent and kind will have unique keys.
 
     The handle key is a string uniquely identifying the object. No other objects
-    under the same context and kind may have the same key.
+    under the same parent and kind may have the same key.
     """
 
-    def __init__(self, context, kind, key):
-        if context and not isinstance(context, Handle):
-            context = context.handle
-        self.context = context
+    def __init__(self, parent, kind, key):
+        if parent and not isinstance(parent, Handle):
+            parent = parent.handle
+        self.parent = parent
         self.kind = kind
         self.key = key
 
@@ -29,10 +29,10 @@ class Handle:
         return Handle(self, kind, key)
 
     def __hash__(self):
-        return hash((self.context, self.kind, self.key))
+        return hash((self.parent, self.kind, self.key))
 
     def __eq__(self, other):
-        return (self.context, self.kind, self.key) == (other.context, other.kind, other.key)
+        return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
 
     def __str__(self):
         return self.path
@@ -40,11 +40,11 @@ class Handle:
     @property
     def path(self):
         # TODO Cache result and either clear cache when attributes change, or make it read-only.
-        if self.context:
+        if self.parent:
             if self.key:
-                return f"{self.context}/{self.kind}.{self.key}"
+                return f"{self.parent}/{self.kind}.{self.key}"
             else:
-                return f"{self.context}/{self.kind}"
+                return f"{self.parent}/{self.kind}"
         else:
             if self.key:
                 return f"{self.kind}.{self.key}"
@@ -165,14 +165,14 @@ class Object:
 
     handle_kind = HandleKind()
 
-    def __init__(self, context=None, key=None):
+    def __init__(self, parent=None, key=None):
         kind = self.handle_kind
-        if isinstance(context, Framework):
-            self.framework = context
+        if isinstance(parent, Framework):
+            self.framework = parent
             self.handle = Handle(None, kind, key)
         else:
-            self.framework = context.framework
-            self.handle = Handle(context, kind, key)
+            self.framework = parent.framework
+            self.handle = Handle(parent, kind, key)
 
         # TODO Detect conflicting handles here.
 
@@ -184,9 +184,9 @@ class EventsBase(Object):
 
     handle_kind = "on"
 
-    def __init__(self, context=None):
-        if context != None:
-            super().__init__(context)
+    def __init__(self, parent=None):
+        if parent != None:
+            super().__init__(parent)
 
     def __get__(self, emitter, emitter_type):
         # Same type, different instance, more data (http://j.mp/mgc1111).
@@ -268,9 +268,9 @@ class Framework:
     def __init__(self, data_path):
         self._data_path = data_path
         self._event_count = 0
-        self._observers = [] # [(observer, method_name, context_path, event_key)]
+        self._observers = [] # [(observer, method_name, parent_path, event_key)]
         self._observer = {}  # {observer_path: observer}
-        self._type_registry = {} # {(context_path, kind): cls}
+        self._type_registry = {} # {(parent_path, kind): cls}
         self._type_known = set() # {cls}
 
         self._storage = SQLiteStorage(data_path)
@@ -281,16 +281,16 @@ class Framework:
     def commit(self):
         self._storage.commit()
 
-    def register_type(self, cls, context, kind=None):
-        if context and not isinstance(context, Handle):
-            context = context.handle
-        if context:
-            context_path = context.path
+    def register_type(self, cls, parent, kind=None):
+        if parent and not isinstance(parent, Handle):
+            parent = parent.handle
+        if parent:
+            parent_path = parent.path
         else:
-            context_path = None
+            parent_path = None
         if not kind:
             kind = cls.handle_kind
-        self._type_registry[(context_path, kind)] = cls
+        self._type_registry[(parent_path, kind)] = cls
         self._type_known.add(cls)
 
     def save_snapshot(self, value):
@@ -312,10 +312,10 @@ class Framework:
         self._storage.save_snapshot(value.handle.path, raw_data)
 
     def load_snapshot(self, handle):
-        context_path = None
-        if handle.context:
-            context_path = handle.context.path
-        cls = self._type_registry.get((context_path, handle.kind))
+        parent_path = None
+        if handle.parent:
+            parent_path = handle.parent.path
+        cls = self._type_registry.get((parent_path, handle.kind))
         if not cls:
             # TODO Proper exception type here.
             raise RuntimeError(f"cannot restore {handle.path} since no class was registered for it")
@@ -387,10 +387,10 @@ class Framework:
         self.save_snapshot(event)
         event_path = event.handle.path
         event_kind = event.handle.kind
-        context_path = event.handle.context.path
+        parent_path = event.handle.parent.path
         notices = []
-        for observer_path, method_name, _context_path, _event_kind in self._observers:
-            if _context_path != context_path:
+        for observer_path, method_name, _parent_path, _event_kind in self._observers:
+            if _parent_path != parent_path:
                 continue
             if _event_kind and _event_kind != event_kind:
                 continue
@@ -439,8 +439,8 @@ class Framework:
 
 class StoredStateData(Object):
 
-    def __init__(self, context, attr_name):
-        super().__init__(context, attr_name)
+    def __init__(self, parent, attr_name):
+        super().__init__(parent, attr_name)
         self._cache = {}
 
     def __getitem__(self, key):
@@ -466,14 +466,14 @@ class StoredStateEvents(EventsBase):
 
 class BoundStoredState:
 
-    def __init__(self, context, attr_name):
-        context.framework.register_type(StoredStateData, context)
+    def __init__(self, parent, attr_name):
+        parent.framework.register_type(StoredStateData, parent)
 
-        handle = Handle(context, StoredStateData.handle_kind, attr_name)
+        handle = Handle(parent, StoredStateData.handle_kind, attr_name)
         try:
-            data = context.framework.load_snapshot(handle)
+            data = parent.framework.load_snapshot(handle)
         except NoSnapshotError:
-            data = StoredStateData(context, attr_name)
+            data = StoredStateData(parent, attr_name)
 
         self.__dict__["_data"] = data
         self.__dict__["_attr_name"] = attr_name
@@ -483,12 +483,12 @@ class BoundStoredState:
 
     def __getattr__(self, key):
         if key not in self._data:
-            raise AttributeError(f"{self._data.handle.context}.{self._data.handle.key} has no '{key}' attribute stored")
+            raise AttributeError(f"{self._data.handle.parent}.{self._data.handle.key} has no '{key}' attribute stored")
         return self._data[key]
 
     def __setattr__(self, key, value):
         if key == "on":
-            raise AttributeError(f"{self._data.handle.context}.{self._data.handle.key} attempting to set reserved 'on' attribute")
+            raise AttributeError(f"{self._data.handle.parent}.{self._data.handle.key} attempting to set reserved 'on' attribute")
         self._data[key] = value
         self._data.framework.save_snapshot(self._data)
         self.on.changed.emit()
@@ -497,30 +497,30 @@ class BoundStoredState:
 class StoredState:
 
     def __init__(self):
-        self.context_type = None
+        self.parent_type = None
         self.attr_name = None
 
-    def __get__(self, context, context_type=None):
-        if self.context_type is None:
-            self.context_type = context_type
-        elif self.context_type is not context_type:
-            raise RuntimeError("StoredState shared by {} and {}".format(self.context_type.__name__, context_type.__name__))
+    def __get__(self, parent, parent_type=None):
+        if self.parent_type is None:
+            self.parent_type = parent_type
+        elif self.parent_type is not parent_type:
+            raise RuntimeError("StoredState shared by {} and {}".format(self.parent_type.__name__, parent_type.__name__))
 
-        if context is None:
+        if parent is None:
             return self
 
-        bound = context.__dict__.get(self.attr_name)
+        bound = parent.__dict__.get(self.attr_name)
         if bound is None:
-            for attr_name, attr_value in context_type.__dict__.items():
+            for attr_name, attr_value in parent_type.__dict__.items():
                 if attr_value is self:
                     if self.attr_name and attr_name != self.attr_name:
-                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(context_type.__name__, self.attr_name, context_type.__name__, attr_name))
+                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(parent_type.__name__, self.attr_name, parent_type.__name__, attr_name))
                     self.attr_name = attr_name
-                    bound = BoundStoredState(context, attr_name)
-                    context.__dict__[attr_name] = bound
+                    bound = BoundStoredState(parent, attr_name)
+                    parent.__dict__[attr_name] = bound
                     break
             else:
-                raise RuntimeError("Cannot find StoredVariable attribute in type {}".format(context_type.__name__))
+                raise RuntimeError("Cannot find StoredVariable attribute in type {}".format(parent_type.__name__))
 
         return bound
 
