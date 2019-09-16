@@ -176,7 +176,7 @@ class Object:
 
         # TODO Detect conflicting handles here.
 
-        # TODO Register all events found in 'self' or 'self.on' into the framework upfront.
+        # TODO Register all event types found in 'self' or 'self.on' into the framework upfront.
 
 
 class EventsBase(Object):
@@ -375,6 +375,8 @@ class Framework:
                 raise RuntimeError(f'Observer method not provided explicitly and {type(observer).__name__} type has no "on_{method_name}" method')
 
         # TODO Validate that the method has the right signature here.
+
+        # TODO Prevent the exact same parameters from being registered more than once.
 
         self._observer[observer.handle.path] = observer
         self._observers.append((observer.handle.path, method_name, emitter_path, event_kind))
