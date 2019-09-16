@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 
 from juju.framework import Framework, Handle, Event, EventsBase, EventBase
-from juju.framework import Object, NoSnapshotError, StoredState
+from juju.framework import Object, NoSnapshotError, StoredState, StoredDict
 
 
 class TestFramework(unittest.TestCase):
@@ -378,6 +378,63 @@ class TestStoredState(unittest.TestCase):
         # But if we ask for the events to be sent again, it will get them:
         framework_copy.reemit()
         self.assertEqual(obj_copy.changes, 3)
+
+    def test_mutable_types(self):
+        framework = self.create_framework()
+
+        class SomeObject(Object):
+            state = StoredState()
+            changes = 0
+
+            def __init__(self, framework):
+                super().__init__(framework)
+                framework.observe(self.state.on.changed, self.on_state_changed)
+
+            def on_state_changed(self, event):
+                self.changes += 1
+
+        obj = SomeObject(framework)
+
+        try:
+            class CustomObject: pass
+            obj.state.foo = CustomObject()
+        except AttributeError as e:
+            self.assertEqual(str(e), "SomeObject.state.foo cannot be a CustomObject: must be int/dict/list/etc")
+        else:
+            self.fail("AttributeError not raised")
+
+        obj.state.dict = {}
+        obj.state.dict["a"] = {}
+        obj.state.dict["a"]["b"] = "c"
+        obj.state.dict["a"]["d"] = "e"
+        del obj.state.dict["a"]["d"]
+
+        self.assertEqual(dict(obj.state.dict), {"a": {"b": "c"}})
+
+        self.assertEqual(obj.changes, 5)
+
+        obj.changes = 0
+
+        obj.state.list = []
+        obj.state.list.append("a")
+        obj.state.list.append("c")
+        obj.state.list.insert(1, "b")
+        obj.state.list.insert(2, "d")
+        del obj.state.list[2]
+
+        self.assertEqual(list(obj.state.list), ["a", "b", "c"])
+        self.assertEqual(obj.changes, 6)
+
+        obj.changes = 0
+
+        obj.state.set = set()
+        obj.state.set.add("a")
+        obj.state.set.add("b")
+        obj.state.set.add("c")
+        obj.state.set.discard("c")
+
+        self.assertEqual(set(obj.state.set), {"a", "b"})
+        self.assertEqual(obj.changes, 5)
 
 
 if __name__ == "__main__":

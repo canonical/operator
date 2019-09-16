@@ -2,6 +2,7 @@ import pickle
 import marshal
 import types
 import sqlite3
+import collections
 
 
 class Handle:
@@ -439,7 +440,15 @@ class Framework:
             self._storage.drop_snapshot(last_event_path)
 
 
+class StoredStateChanged(EventBase):
+    pass
+
+class StoredStateEvents(EventsBase):
+    changed = Event(StoredStateChanged)
+
 class StoredStateData(Object):
+
+    on = StoredStateEvents()
 
     def __init__(self, parent, attr_name):
         super().__init__(parent, attr_name)
@@ -460,12 +469,6 @@ class StoredStateData(Object):
     def restore(self, snapshot):
         self._cache = snapshot
 
-class StoredStateChanged(EventBase):
-    pass
-
-class StoredStateEvents(EventsBase):
-    changed = Event(StoredStateChanged)
-
 class BoundStoredState:
 
     def __init__(self, parent, attr_name):
@@ -480,30 +483,30 @@ class BoundStoredState:
         self.__dict__["_data"] = data
         self.__dict__["_attr_name"] = attr_name
 
-        # "on" is the only reserved key that can't be used in the data map.
-        self.__dict__["on"] = StoredStateEvents(self._data)
-
     def __getattr__(self, key):
+        # "on" is the only reserved key that can't be used in the data map.
+        if key == "on":
+            return self._data.on
         if key not in self._data:
             raise AttributeError(f"{self._data.handle.parent}.{self._data.handle.key} has no '{key}' attribute stored")
-        return self._data[key]
+        return _wrap_stored(self._data, self._data[key])
 
     def __setattr__(self, key, value):
         if key == "on":
             raise AttributeError(f"{self._data.handle.parent}.{self._data.handle.key} attempting to set reserved 'on' attribute")
-        self._data[key] = value
+
+        value = _unwrap_stored(self._data, value)
+
+        if not isinstance(value, (type(None), int, str, bytes, list, dict, set)):
+            raise AttributeError(f"{self._data.handle.parent}.{self._data.handle.key}.{key} cannot be a {type(value).__name__}: must be int/dict/list/etc")
+
+        self._data[key] = _unwrap_stored(self._data, value)
         self._data.framework.save_snapshot(self._data)
         self.on.changed.emit()
 
         # TODO Saving a snapshot on every change is not efficient. Instead, the
         # the framework should offer a pre-commit event that the state can monitor
         # and save itself at the right time if changes are pending.
-
-        # TODO Values that can be mutated, such as dicts, lists, sets, won't work well
-        # as stored state. We'll likely need StoredDict, StoredList, and StoredSet to
-        # fix that. Those objects will emit their own events, which must be caught by
-        # the parent stored state and reemited to notify observers that the overall
-        # state is also changing.
 
 
 class StoredState:
@@ -536,3 +539,96 @@ class StoredState:
 
         return bound
 
+
+def _wrap_stored(parent_data, value):
+    t = type(value)
+    if t is dict:
+        return StoredDict(parent_data, value)
+    if t is list:
+        return StoredList(parent_data, value)
+    if t is set:
+        return StoredSet(parent_data, value)
+    return value
+
+def _unwrap_stored(parent_data, value):
+    t = type(value)
+    if t is StoredDict or t is StoredList or t is StoredSet:
+        return value._under
+    return value
+
+
+class StoredDict(collections.MutableMapping):
+
+    def __init__(self, stored_data, under):
+        self._stored_data = stored_data
+        self._under = under
+
+    def __getitem__(self, key):
+        return _wrap_stored(self._stored_data, self._under[key])
+
+    def __setitem__(self, key, value):
+        self._under[key] = _unwrap_stored(self._stored_data, value)
+        self._stored_data.on.changed.emit()
+
+    def __delitem__(self, key):
+        del self._under[key]
+        self._stored_data.on.changed.emit()
+
+    def __iter__(self):
+        return self._under.__iter__()
+
+    def __len__(self):
+        return len(self._under)
+
+
+class StoredList(collections.MutableSequence):
+
+    def __init__(self, stored_data, under):
+        self._stored_data = stored_data
+        self._under = under
+
+    def __getitem__(self, index):
+        return _wrap_stored(self._stored_data, self._under[index])
+
+    def __setitem__(self, index, value):
+        self._under[index] = _unwrap_stored(self._stored_data, value)
+        self._stored_data.on.changed.emit()
+
+    def __delitem__(self, index):
+        del self._under[index]
+        self._stored_data.on.changed.emit()
+
+    def __len__(self):
+        return len(self._under)
+
+    def insert(self, index, value):
+        self._under.insert(index, value)
+        self._stored_data.on.changed.emit()
+
+    def append(self, value):
+        self._under.append(value)
+        self._stored_data.on.changed.emit()
+
+
+class StoredSet(collections.MutableSet):
+
+    def __init__(self, stored_data, under):
+        self._stored_data = stored_data
+        self._under = under
+
+    def add(self, key):
+        self._under.add(key)
+        self._stored_data.on.changed.emit()
+
+    def discard(self, key):
+        self._under.discard(key)
+        self._stored_data.on.changed.emit()
+
+    def __contains__(self, key):
+        return key in self._under
+
+    def __iter__(self):
+        return self._under.__iter__()
+
+    def __len__(self):
+        return len(self._under)
