@@ -42,12 +42,12 @@ class Handle:
         # TODO Cache result and either clear cache when attributes change, or make it read-only.
         if self.context:
             if self.key:
-                return f"{self.context}/{self.kind}:{self.key}"
+                return f"{self.context}/{self.kind}.{self.key}"
             else:
                 return f"{self.context}/{self.kind}"
         else:
             if self.key:
-                return f"{self.kind}:{self.key}"
+                return f"{self.kind}.{self.key}"
             else:
                 return f"{self.kind}"
 
@@ -55,7 +55,7 @@ class Handle:
     def from_path(cls, path):
         handle = None
         for pair in path.split("/"):
-            pair = pair.split(":")
+            pair = pair.split(".")
             if len(pair) == 1:
                 kind, key = pair[0], None
             elif len(pair) == 2:
@@ -102,29 +102,30 @@ class Event:
     attribute which is a BoundEvent and may be used to emit and observe the event.
     """
 
-    emitter_type = None
-    event_kind = None
-
     def __init__(self, event_type):
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
             raise RuntimeError(f"Event requires a subclass of EventBase as an argument, got {event_type}")
         self.event_type = event_type
+        self.event_kind = {}
 
     def __get__(self, emitter, emitter_type=None):
-        if self.emitter_type is None:
-            for attr_name, attr_value in emitter_type.__dict__.items():
-                if attr_value is self:
-                    self.event_kind = attr_name
-                    break
-            else:
+        event_kind = self.event_kind.get(emitter_type)
+        if not event_kind:
+            found_cls = None
+            for cls in emitter_type.__mro__:
+                for attr_name, attr_value in cls.__dict__.items():
+                    if attr_value is self:
+                        if event_kind:
+                            raise RuntimeError("Event({}) shared between {}.{} and {}.{}".format(
+                                self.event_type.__name__, found_cls.__name__, event_kind, cls.__name__, attr_name))
+                        found_cls = cls
+                        event_kind = attr_name
+                        self.event_kind[emitter_type] = event_kind
+            if not event_kind:
                 raise RuntimeError("Cannot find Event({}) attribute in type {}".format(self.event_type.__name__, emitter_type.__name__))
-            self.emitter_type = emitter_type
-        elif self.emitter_type is not emitter_type:
-            raise RuntimeError("Event field for {} shared by {} and {}".format(self.event_type.__name__, self.emitter_type.__name__, emitter_type.__name__))
-
         if emitter is None:
             return self
-        return BoundEvent(emitter, self.event_type, self.event_kind)
+        return BoundEvent(emitter, self.event_type, event_kind)
 
 
 class BoundEvent:
@@ -146,17 +147,50 @@ class BoundEvent:
         framework._emit(event)
 
 
+class HandleKind:
+    """Helper descriptor to define the Object.handle_kind field.
+
+    The handle_kind for an object defaults to its type name, but it may
+    be explicitly overriden if desired.
+    """
+
+    def __get__(self, obj, obj_type):
+        kind = obj_type.__dict__.get("handle_kind")
+        if kind:
+            return kind
+        return obj_type.__name__
+
+
 class Object:
 
+    handle_kind = HandleKind()
+
     def __init__(self, context=None, key=None):
+        kind = self.handle_kind
         if isinstance(context, Framework):
             self.framework = context
-            self.handle = Handle(None, type(self).__name__, key)
+            self.handle = Handle(None, kind, key)
         else:
             self.framework = context.framework
-            self.handle = Handle(context, type(self).__name__, key)
+            self.handle = Handle(context, kind, key)
 
         # TODO Detect conflicting handles here.
+
+        # TODO Register all events found in 'self' or 'self.on' into the framework upfront.
+
+
+class EventsBase(Object):
+    """Convenience type to allow defining .on attributes at class level."""
+
+    handle_kind = "on"
+
+    def __init__(self, context=None):
+        if context != None:
+            super().__init__(context)
+
+    def __get__(self, emitter, emitter_type):
+        # Same type, different instance, more data (http://j.mp/mgc1111).
+        return type(self)(emitter)
 
 
 class NoSnapshotError(Exception):
@@ -197,7 +231,7 @@ class SQLiteStorage:
     # This is doable but will increase significantly the chances for mistakes.
 
     def save_snapshot(self, handle_path, snapshot_data):
-        self._db.execute("INSERT INTO snapshot VALUES (?, ?)", (handle_path, snapshot_data))
+        self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, snapshot_data))
 
     def load_snapshot(self, handle_path):
         c = self._db.cursor()
@@ -247,13 +281,15 @@ class Framework:
     def commit(self):
         self._storage.commit()
 
-    def register_type(self, cls, context, kind):
+    def register_type(self, cls, context, kind=None):
         if context and not isinstance(context, Handle):
             context = context.handle
         if context:
             context_path = context.path
         else:
             context_path = None
+        if not kind:
+            kind = cls.handle_kind
         self._type_registry[(context_path, kind)] = cls
         self._type_known.add(cls)
 
@@ -288,6 +324,7 @@ class Framework:
             raise NoSnapshotError(handle.path)
         data = pickle.loads(raw_data)
         obj = cls.__new__(cls)
+        obj.framework = self
         obj.handle = handle
         obj.restore(data)
         return obj
@@ -337,6 +374,8 @@ class Framework:
             if not hasattr(observer, method_name):
                 raise RuntimeError(f'Observer method not provided explicitly and {type(observer).__name__} type has no "on_{method_name}" method')
 
+        # TODO Validate that the method has the right signature here.
+
         self._observer[observer.handle.path] = observer
         self._observers.append((observer.handle.path, method_name, emitter_path, event_kind))
 
@@ -373,7 +412,6 @@ class Framework:
         last_event_path = None
         deferred = True
         for event_path, observer_path, method_name in self._storage.notices(single_event_path):
-            self.commit()
             event_handle = Handle.from_path(event_path)
 
             if last_event_path != event_path:
@@ -397,4 +435,92 @@ class Framework:
 
         if not deferred:
             self._storage.drop_snapshot(last_event_path)
-        self.commit()
+
+
+class StoredStateData(Object):
+
+    def __init__(self, context, attr_name):
+        super().__init__(context, attr_name)
+        self._cache = {}
+
+    def __getitem__(self, key):
+        return self._cache.get(key)
+
+    def __setitem__(self, key, value):
+        self._cache[key] = value
+
+    def __contains__(self, key):
+        return key in self._cache
+
+    def snapshot(self):
+        return self._cache
+
+    def restore(self, snapshot):
+        self._cache = snapshot
+
+class StoredStateChanged(EventBase):
+    pass
+
+class StoredStateEvents(EventsBase):
+    changed = Event(StoredStateChanged)
+
+class BoundStoredState:
+
+    def __init__(self, context, attr_name):
+        context.framework.register_type(StoredStateData, context)
+
+        handle = Handle(context, StoredStateData.handle_kind, attr_name)
+        try:
+            data = context.framework.load_snapshot(handle)
+        except NoSnapshotError:
+            data = StoredStateData(context, attr_name)
+
+        self.__dict__["_data"] = data
+        self.__dict__["_attr_name"] = attr_name
+
+        # "on" is the only reserved key that can't be used in the data map.
+        self.__dict__["on"] = StoredStateEvents(self._data)
+
+    def __getattr__(self, key):
+        if key not in self._data:
+            raise AttributeError(f"{self._data.handle.context}.{self._data.handle.key} has no '{key}' attribute stored")
+        return self._data[key]
+
+    def __setattr__(self, key, value):
+        if key == "on":
+            raise AttributeError(f"{self._data.handle.context}.{self._data.handle.key} attempting to set reserved 'on' attribute")
+        self._data[key] = value
+        self._data.framework.save_snapshot(self._data)
+        self.on.changed.emit()
+
+
+class StoredState:
+
+    def __init__(self):
+        self.context_type = None
+        self.attr_name = None
+
+    def __get__(self, context, context_type=None):
+        if self.context_type is None:
+            self.context_type = context_type
+        elif self.context_type is not context_type:
+            raise RuntimeError("StoredState shared by {} and {}".format(self.context_type.__name__, context_type.__name__))
+
+        if context is None:
+            return self
+
+        bound = context.__dict__.get(self.attr_name)
+        if bound is None:
+            for attr_name, attr_value in context_type.__dict__.items():
+                if attr_value is self:
+                    if self.attr_name and attr_name != self.attr_name:
+                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(context_type.__name__, self.attr_name, context_type.__name__, attr_name))
+                    self.attr_name = attr_name
+                    bound = BoundStoredState(context, attr_name)
+                    context.__dict__[attr_name] = bound
+                    break
+            else:
+                raise RuntimeError("Cannot find StoredVariable attribute in type {}".format(context_type.__name__))
+
+        return bound
+
