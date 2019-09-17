@@ -90,7 +90,7 @@ class EventBase:
 class Event:
     """Event creates class descriptors to operate with events.
 
-    It generally used as:
+    It is generally used as:
 
         class SomethingHappened(EventBase):
             pass
@@ -175,9 +175,17 @@ class Object:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
 
-        # TODO Detect conflicting handles here.
+        # This can probably be dropped, because the event type is only really relevant
+        # if someone is either emitting the event or observing it.
+        for cls in type(self).__mro__:
+            for attr_name, attr_value in cls.__dict__.items():
+                if isinstance(attr_value, Event):
+                    event_type = attr_value.event_type
+                    event_kind = attr_name
+                    emitter = self
+                    self.framework.register_type(event_type, emitter, event_kind)
 
-        # TODO Register all event types found in 'self' or 'self.on' into the framework upfront.
+        # TODO Detect conflicting handles here.
 
 
 class EventsBase(Object):
@@ -201,6 +209,15 @@ class NoSnapshotError(Exception):
 
     def __str__(self):
         return f'no snapshot data found for {self.handle_path} object'
+
+
+class NoTypeError(Exception):
+
+    def __init__(self, handle_path):
+        self.handle_path = handle_path
+
+    def __str__(self):
+        return f"cannot restore {self.handle_path} since no class was registered for it"
 
 
 class SQLiteStorage:
@@ -318,8 +335,7 @@ class Framework:
             parent_path = handle.parent.path
         cls = self._type_registry.get((parent_path, handle.kind))
         if not cls:
-            # TODO Proper exception type here.
-            raise RuntimeError(f"cannot restore {handle.path} since no class was registered for it")
+            raise NoTypeError(handle.path)
         raw_data = self._storage.load_snapshot(handle.path)
         if not raw_data:
             raise NoSnapshotError(handle.path)
@@ -423,7 +439,12 @@ class Framework:
                 last_event_path = event_path
                 deferred = False
 
-            event = self.load_snapshot(event_handle)
+            try:
+                event = self.load_snapshot(event_handle)
+            except NoTypeError:
+                self._storage.drop_notice(event_path, observer_path, method_name)
+                continue
+
             event.deferred = False
             observer = self._observer.get(observer_path)
             if observer:

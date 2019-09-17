@@ -6,8 +6,8 @@ import shutil
 
 from pathlib import Path
 
-from juju.framework import Framework, Handle, Event, EventsBase, EventBase
-from juju.framework import Object, NoSnapshotError, StoredState, StoredDict
+from juju.framework import Framework, Handle, Event, EventsBase, EventBase, Object
+from juju.framework import NoTypeError, NoSnapshotError, StoredState, StoredDict
 
 
 class TestFramework(unittest.TestCase):
@@ -307,6 +307,92 @@ class TestFramework(unittest.TestCase):
             self.assertEqual(str(e), "Event(MyEvent) shared between SubAmbiguous.two and Ambiguous.one")
         else:
             self.fail("RuntimeError not raised")
+
+    def test_reemit_ignores_unknown_event_type(self):
+        # The event type may have been gone for good, and nobody cares,
+        # so this shouldn't be an error scenario.
+
+        framework = self.create_framework()
+
+        class MyEvent(EventBase):
+            pass
+
+        class MyNotifier(Object):
+            foo = Event(MyEvent)
+
+        class MyObserver(Object):
+            def __init__(self, parent):
+                super().__init__(parent)
+                self.seen = []
+
+            def on_foo(self, event):
+                self.seen.append(event.handle)
+                event.defer()
+
+        pub = MyNotifier(framework)
+        obs = MyObserver(framework)
+
+        framework.observe(pub.foo, obs)
+        pub.foo.emit()
+
+        event_handle = obs.seen[0]
+        self.assertEqual(event_handle.kind, "foo")
+
+        framework.commit()
+        framework.close()
+
+        framework_copy = self.create_framework()
+
+        # No errors on missing event types here.
+        framework_copy.reemit()
+
+        # Register the type and check that the event is gone from storage.
+        framework_copy.register_type(MyEvent, event_handle.parent, event_handle.kind)
+        self.assertRaises(NoSnapshotError, framework_copy.load_snapshot, event_handle)
+
+
+    def test_auto_register_event_types(self):
+        framework = self.create_framework()
+
+        class MyFoo(EventBase):
+            pass
+
+        class MyBar(EventBase):
+            pass
+
+        class MyEvents(EventsBase):
+            foo = Event(MyFoo)
+
+        class MyNotifier(Object):
+            on = MyEvents()
+            bar = Event(MyBar)
+
+        class MyObserver(Object):
+            def __init__(self, parent):
+                super().__init__(parent)
+                self.seen = []
+
+            def on_foo(self, event):
+                self.seen.append(f"on_foo:{type(event).__name__}:{event.handle.kind}")
+                event.defer()
+
+            def on_bar(self, event):
+                self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
+                event.defer()
+
+        pub = MyNotifier(framework)
+        obs = MyObserver(framework)
+
+        pub.on.foo.emit()
+        pub.bar.emit()
+
+        framework.observe(pub.on.foo, obs)
+        framework.observe(pub.bar, obs)
+
+        pub.on.foo.emit()
+        pub.bar.emit()
+
+        self.assertEqual(obs.seen, ["on_foo:MyFoo:foo", "on_bar:MyBar:bar"])
 
 
 class TestStoredState(unittest.TestCase):
