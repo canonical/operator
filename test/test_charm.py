@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 from juju.charm import CharmBase
+from juju.charm import CharmEvents
 from juju.framework import Framework
 
 
@@ -15,8 +16,16 @@ class TestCharm(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
 
+        class TestCharmEvents(CharmEvents):
+            pass
+        # Relations events are defined dynamically and modify the class attributes.
+        # We use a subclass temporarily to prevent these side effects from leaking.
+        CharmBase.on = TestCharmEvents()
+
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
+
+        CharmBase.on = CharmEvents()
 
     def create_framework(self):
         return Framework(self.tmpdir / "framework.data")
