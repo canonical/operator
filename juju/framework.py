@@ -43,12 +43,12 @@ class Handle:
         # TODO Cache result and either clear cache when attributes change, or make it read-only.
         if self.parent:
             if self.key:
-                return f"{self.parent}/{self.kind}.{self.key}"
+                return f"{self.parent}/{self.kind}[{self.key}]"
             else:
                 return f"{self.parent}/{self.kind}"
         else:
             if self.key:
-                return f"{self.kind}.{self.key}"
+                return f"{self.kind}[{self.key}]"
             else:
                 return f"{self.kind}"
 
@@ -56,12 +56,17 @@ class Handle:
     def from_path(cls, path):
         handle = None
         for pair in path.split("/"):
-            pair = pair.split(".")
+            pair = pair.split("[")
+            good = False
             if len(pair) == 1:
                 kind, key = pair[0], None
+                good = True
             elif len(pair) == 2:
                 kind, key = pair
-            else:
+                if key and key[-1] == ']':
+                    key = key[:-1]
+                    good = True
+            if not good:
                 raise RuntimeError("attempted to restore invalid handle path {path}")
             handle = Handle(handle, kind, key)
         return handle
@@ -110,6 +115,10 @@ class Event:
         self.event_kind = {}
 
     def __get__(self, emitter, emitter_type=None):
+        # This looks magic and is sort of magic, but it's also simple if
+        # you understand what it does. The single goal here is to find
+        # the attribute name that points to this Event, so that we can use
+        # that as the event_kind. :)  (and thus on_<name>, etc).
         event_kind = self.event_kind.get(emitter_type)
         if not event_kind:
             found_cls = None
@@ -142,6 +151,7 @@ class BoundEvent:
         The current storage state is committed before and after each observer is notified.
         """
         framework = self.emitter.framework
+        # TODO This needs to be persisted.
         framework._event_count += 1
         key = str(framework._event_count)
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
@@ -166,7 +176,7 @@ class Object:
 
     handle_kind = HandleKind()
 
-    def __init__(self, parent=None, key=None):
+    def __init__(self, parent, key):
         kind = self.handle_kind
         if isinstance(parent, Framework):
             self.framework = parent
@@ -175,8 +185,9 @@ class Object:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
 
-        # This can probably be dropped, because the event type is only really relevant
-        # if someone is either emitting the event or observing it.
+        # TODO This can probably be dropped, because the event type is only
+        # really relevant if someone is either emitting the event or observing
+        # it.
         for cls in type(self).__mro__:
             for attr_name, attr_value in cls.__dict__.items():
                 if isinstance(attr_value, Event):
@@ -193,12 +204,13 @@ class EventsBase(Object):
 
     handle_kind = "on"
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, key=None):
         if parent != None:
-            super().__init__(parent)
+            super().__init__(parent, key)
 
     def __get__(self, emitter, emitter_type):
-        # Same type, different instance, more data (http://j.mp/mgc1111).
+        # Same type, different instance, more data. Doing this unusual construct
+        # means people can subclass just this one class to have their own 'on'.
         return type(self)(emitter)
 
 
@@ -389,7 +401,7 @@ class Framework:
         else:
             method_name = "on_" + event_kind
             if not hasattr(observer, method_name):
-                raise RuntimeError(f'Observer method not provided explicitly and {type(observer).__name__} type has no "on_{method_name}" method')
+                raise RuntimeError(f'Observer method not provided explicitly and {type(observer).__name__} type has no "{method_name}" method')
 
         # TODO Validate that the method has the right signature here.
 
@@ -509,17 +521,17 @@ class BoundStoredState:
         if key == "on":
             return self._data.on
         if key not in self._data:
-            raise AttributeError(f"{self._data.handle.parent}.{self._data.handle.key} has no '{key}' attribute stored")
+            raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])
 
     def __setattr__(self, key, value):
         if key == "on":
-            raise AttributeError(f"{self._data.handle.parent}.{self._data.handle.key} attempting to set reserved 'on' attribute")
+            raise AttributeError(f"attribute 'on' is reserved and cannot be set")
 
         value = _unwrap_stored(self._data, value)
 
         if not isinstance(value, (type(None), int, str, bytes, list, dict, set)):
-            raise AttributeError(f"{self._data.handle.parent}.{self._data.handle.key}.{key} cannot be a {type(value).__name__}: must be int/dict/list/etc")
+            raise AttributeError(f"attribute '{key}' cannot be set to {type(value).__name__}: must be int/dict/list/etc")
 
         self._data[key] = _unwrap_stored(self._data, value)
         self._data.framework.save_snapshot(self._data)

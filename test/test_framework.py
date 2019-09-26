@@ -21,6 +21,17 @@ class TestFramework(unittest.TestCase):
     def create_framework(self):
         return Framework(self.tmpdir / "framework.data")
 
+    def test_handle_path(self):
+        cases = [
+            (Handle(None, "root", None), "root"),
+            (Handle(None, "root", "1"), "root[1]"),
+            (Handle(Handle(None, "root", None), "child", None), "root/child"),
+            (Handle(Handle(None, "root", "1"), "child", "2"), "root[1]/child[2]"),
+        ]
+        for handle, path in cases:
+            self.assertEqual(str(handle), path)
+            self.assertEqual(Handle.from_path(path), handle)
+
     def test_restore_unknown(self):
         framework = self.create_framework()
 
@@ -35,7 +46,7 @@ class TestFramework(unittest.TestCase):
             framework.load_snapshot(handle)
         except NoSnapshotError as e:
             self.assertEqual(e.handle_path, str(handle))
-            self.assertEqual(str(e), "no snapshot data found for a_foo.some_key object")
+            self.assertEqual(str(e), "no snapshot data found for a_foo[some_key] object")
         else:
             self.fail("exception NoSnapshotError not raised")
 
@@ -51,7 +62,7 @@ class TestFramework(unittest.TestCase):
             def restore(self, snapshot):
                 self.my_n = snapshot["My N!"] + 1
 
-        handle = Handle(None, "a_foo", "some_key")
+        handle  = Handle(None, "a_foo", "some_key")
         event = Foo(handle, 1)
 
         framework1 = self.create_framework()
@@ -87,10 +98,11 @@ class TestFramework(unittest.TestCase):
         class MyNotifier(Object):
             foo = Event(MyEvent)
             bar = Event(MyEvent)
+            baz = Event(MyEvent)
 
         class MyObserver(Object):
-            def __init__(self, parent):
-                super().__init__(parent)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
                 self.seen = []
 
             def on_any(self, event):
@@ -99,12 +111,19 @@ class TestFramework(unittest.TestCase):
             def on_foo(self, event):
                 self.seen.append("on_foo:" + event.handle.kind)
 
-        pub = MyNotifier(framework)
-        obs = MyObserver(framework)
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "1")
 
         framework.observe(pub.foo, obs.on_any)
         framework.observe(pub.bar, obs.on_any)
         framework.observe(pub.foo, obs) # Method name defaults to on_<event kind>.
+
+        try:
+            framework.observe(pub.baz, obs)
+        except RuntimeError as e:
+            self.assertEqual(str(e), 'Observer method not provided explicitly and MyObserver type has no "on_baz" method')
+        else:
+            self.fail("RuntimeError not raised")
 
         pub.foo.emit()
         pub.bar.emit()
@@ -135,8 +154,8 @@ class TestFramework(unittest.TestCase):
                 if not self.done.get(event.handle.kind):
                     event.defer()
 
-        pub1 = MyNotifier1(framework)
-        pub2 = MyNotifier2(framework)
+        pub1 = MyNotifier1(framework, "1")
+        pub2 = MyNotifier2(framework, "1")
         obs1 = MyObserver(framework, "1")
         obs2 = MyObserver(framework, "2")
 
@@ -195,16 +214,16 @@ class TestFramework(unittest.TestCase):
             foo = Event(MyEvent)
 
         class MyObserver(Object):
-            def __init__(self, parent):
-                super().__init__(parent)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
                 self.seen = []
 
             def on_foo(self, event):
                 self.seen.append(f"on_foo:{event.handle.kind}={event.my_n}")
                 event.defer()
 
-        pub = MyNotifier(framework)
-        obs = MyObserver(framework)
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "1")
 
         framework.observe(pub.foo, obs)
 
@@ -237,16 +256,16 @@ class TestFramework(unittest.TestCase):
             on = MyEvents()
 
         class MyObserver(Object):
-            def __init__(self, parent):
-                super().__init__(parent)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
                 self.seen = []
 
             def on_foo(self, event):
                 self.seen.append(f"on_foo:{event.handle.kind}")
                 event.defer()
 
-        pub = MyNotifier(framework)
-        obs = MyObserver(framework)
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "1")
 
         framework.observe(pub.on.foo, obs)
 
@@ -275,15 +294,15 @@ class TestFramework(unittest.TestCase):
             bar = event
 
         class MyObserver(Object):
-            def __init__(self, parent):
-                super().__init__(parent)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
                 self.seen = []
 
             def on_foo(self, event): self.seen.append(f"on_foo:{event.handle.kind}")
             def on_bar(self, event): self.seen.append(f"on_bar:{event.handle.kind}")
 
-        pub = MyNotifier(framework)
-        obs = MyObserver(framework)
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "1")
 
         framework.observe(pub.on.foo, obs)
         framework.observe(pub.bar, obs)
@@ -321,16 +340,16 @@ class TestFramework(unittest.TestCase):
             foo = Event(MyEvent)
 
         class MyObserver(Object):
-            def __init__(self, parent):
-                super().__init__(parent)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
                 self.seen = []
 
             def on_foo(self, event):
                 self.seen.append(event.handle)
                 event.defer()
 
-        pub = MyNotifier(framework)
-        obs = MyObserver(framework)
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "1")
 
         framework.observe(pub.foo, obs)
         pub.foo.emit()
@@ -368,8 +387,8 @@ class TestFramework(unittest.TestCase):
             bar = Event(MyBar)
 
         class MyObserver(Object):
-            def __init__(self, parent):
-                super().__init__(parent)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
                 self.seen = []
 
             def on_foo(self, event):
@@ -380,8 +399,8 @@ class TestFramework(unittest.TestCase):
                 self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
                 event.defer()
 
-        pub = MyNotifier(framework)
-        obs = MyObserver(framework)
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "1")
 
         pub.on.foo.emit()
         pub.bar.emit()
@@ -413,28 +432,28 @@ class TestStoredState(unittest.TestCase):
             state = StoredState()
             changes = 0
 
-            def __init__(self, framework):
-                super().__init__(framework)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
 
-                framework.observe(self.state.on.changed, self.on_state_changed)
+                self.framework.observe(self.state.on.changed, self.on_state_changed)
 
             def on_state_changed(self, event):
                 self.changes += 1
                 event.defer()
 
-        obj = SomeObject(framework)
+        obj = SomeObject(framework, "1")
 
         try:
             obj.state.foo
         except AttributeError as e:
-            self.assertEqual(str(e), "SomeObject.state has no 'foo' attribute stored")
+            self.assertEqual(str(e), "attribute 'foo' is not stored")
         else:
             self.fail("AttributeError not raised")
 
         try:
             obj.state.on = "nonono"
         except AttributeError as e:
-            self.assertEqual(str(e), "SomeObject.state attempting to set reserved 'on' attribute")
+            self.assertEqual(str(e), "attribute 'on' is reserved and cannot be set")
         else:
             self.fail("AttributeError not raised")
 
@@ -454,7 +473,7 @@ class TestStoredState(unittest.TestCase):
 
         # Since this has the same absolute object handle, it will get its state back.
         framework_copy = self.create_framework()
-        obj_copy = SomeObject(framework_copy)
+        obj_copy = SomeObject(framework_copy, "1")
         self.assertEqual(obj_copy.state.foo, 42)
         self.assertEqual(obj_copy.state.bar, "s")
 
@@ -472,20 +491,20 @@ class TestStoredState(unittest.TestCase):
             state = StoredState()
             changes = 0
 
-            def __init__(self, framework):
-                super().__init__(framework)
+            def __init__(self, framework, key):
+                super().__init__(framework, key)
                 framework.observe(self.state.on.changed, self.on_state_changed)
 
             def on_state_changed(self, event):
                 self.changes += 1
 
-        obj = SomeObject(framework)
+        obj = SomeObject(framework, "1")
 
         try:
             class CustomObject: pass
             obj.state.foo = CustomObject()
         except AttributeError as e:
-            self.assertEqual(str(e), "SomeObject.state.foo cannot be a CustomObject: must be int/dict/list/etc")
+            self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/dict/list/etc")
         else:
             self.fail("AttributeError not raised")
 
