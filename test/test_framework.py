@@ -413,6 +413,56 @@ class TestFramework(unittest.TestCase):
 
         self.assertEqual(obs.seen, ["on_foo:MyFoo:foo", "on_bar:MyBar:bar"])
 
+    def test_dynamic_event_types(self):
+        framework = self.create_framework()
+
+        class MyEventsA(EventsBase):
+            pass
+
+        class MyEventsB(EventsBase):
+            pass
+
+        class MyNotifier(Object):
+            on_a = MyEventsA()
+            on_b = MyEventsB()
+
+        class MyObserver(Object):
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self.seen = []
+
+            def on_foo(self, event):
+                self.seen.append(f"on_foo:{type(event).__name__}:{event.handle.kind}")
+                event.defer()
+
+            def on_bar(self, event):
+                self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
+                event.defer()
+
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "1")
+
+        class MyFoo(EventBase):
+            pass
+
+        class MyBar(EventBase):
+            pass
+
+        pub.on_a.define_event("foo", MyFoo)
+        pub.on_b.define_event("bar", MyBar)
+
+        framework.observe(pub.on_a.foo, obs)
+        framework.observe(pub.on_b.bar, obs)
+
+        pub.on_a.foo.emit()
+        pub.on_b.bar.emit()
+
+        self.assertEqual(obs.seen, ["on_foo:MyFoo:foo", "on_bar:MyBar:bar"])
+
+        # Definitions remained local to the specific type.
+        self.assertRaises(AttributeError, lambda: pub.on_a.bar)
+        self.assertRaises(AttributeError, lambda: pub.on_b.foo)
+
 
 class TestStoredState(unittest.TestCase):
 

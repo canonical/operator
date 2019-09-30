@@ -211,7 +211,13 @@ class EventsBase(Object):
     def __get__(self, emitter, emitter_type):
         # Same type, different instance, more data. Doing this unusual construct
         # means people can subclass just this one class to have their own 'on'.
+        if emitter is None:
+            return self
         return type(self)(emitter)
+
+    @classmethod
+    def define_event(cls, event_kind, event_type):
+        setattr(cls, event_kind, Event(event_type))
 
 
 class NoSnapshotError(Exception):
@@ -242,7 +248,7 @@ class SQLiteStorage:
         c = self._db.execute("BEGIN")
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:
-            # Keep it mind what might happen if the process dies somewhere below.
+            # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
             self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data TEXT)")
             self._db.execute("CREATE TABLE notice (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_path TEXT, observer_path TEXT, method_name TEXT)")
