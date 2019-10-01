@@ -6,8 +6,8 @@ import shutil
 
 from pathlib import Path
 
-from juju.framework import Framework, Handle, Event, EventsBase, EventBase, Object
-from juju.framework import NoTypeError, NoSnapshotError, StoredState, StoredDict
+from juju.framework import Framework, Handle, EventsBase, EventBase, Object
+from juju.framework import NoSnapshotError, StoredState
 
 
 class TestFramework(unittest.TestCase):
@@ -96,9 +96,9 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
-            bar = Event(MyEvent)
-            baz = Event(MyEvent)
+            foo = MyEvent
+            bar = MyEvent
+            baz = MyEvent
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -137,11 +137,11 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier1(Object):
-            a = Event(MyEvent)
-            b = Event(MyEvent)
+            a = MyEvent
+            b = MyEvent
 
         class MyNotifier2(Object):
-            c = Event(MyEvent)
+            c = MyEvent
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -211,7 +211,7 @@ class TestFramework(unittest.TestCase):
                 self.my_n = snapshot["My N!"] + 1
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
+            foo = MyEvent
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -250,7 +250,7 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyEvents(EventsBase):
-            foo = Event(MyEvent)
+            foo = MyEvent
 
         class MyNotifier(Object):
             on = MyEvents()
@@ -284,13 +284,17 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
-        event = Event(MyEvent)
+        event = MyEvent
 
         class MyEvents(EventsBase):
             foo = event
 
+        class MySubEvents(MyEvents):
+            qux = event
+
         class MyNotifier(Object):
             on = MyEvents()
+            on_sub = MySubEvents()
             bar = event
 
         class MyObserver(Object):
@@ -298,34 +302,32 @@ class TestFramework(unittest.TestCase):
                 super().__init__(parent, key)
                 self.seen = []
 
-            def on_foo(self, event): self.seen.append(f"on_foo:{event.handle.kind}")
-            def on_bar(self, event): self.seen.append(f"on_bar:{event.handle.kind}")
+            def on_foo(self, event):
+                self.seen.append(f"on_foo:{event.handle.kind}")
+
+            def on_bar(self, event):
+                self.seen.append(f"on_bar:{event.handle.kind}")
+
+            def on_qux(self, event):
+                self.seen.append(f"on_qux:{event.handle.kind}")
 
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
 
+        assert pub.on.foo.emitter_type != pub.on_sub.qux.emitter_type
+        assert pub.on.foo.emitter_type != pub.bar.emitter_type
+        assert pub.on.foo.event_kind != pub.on_sub.qux.event_kind
+        assert pub.on.foo.event_kind != pub.bar.event_kind
+
         framework.observe(pub.on.foo, obs)
         framework.observe(pub.bar, obs)
+        framework.observe(pub.on_sub.qux, obs)
 
         pub.on.foo.emit()
         pub.bar.emit()
+        pub.on_sub.qux.emit()
 
-        self.assertEqual(obs.seen, ["on_foo:foo", "on_bar:bar"])
-
-        # The case where the same value is part of the same hierarchy is completely
-        # unsupported, though, and is detected to prevent awkward bugs.
-
-        class Ambiguous(EventsBase):
-            one = event
-        class SubAmbiguous(Ambiguous):
-            two = event
-
-        try:
-            SubAmbiguous.two
-        except RuntimeError as e:
-            self.assertEqual(str(e), "Event(MyEvent) shared between SubAmbiguous.two and Ambiguous.one")
-        else:
-            self.fail("RuntimeError not raised")
+        self.assertEqual(obs.seen, ["on_foo:foo", "on_bar:bar", "on_qux:qux"])
 
     def test_reemit_ignores_unknown_event_type(self):
         # The event type may have been gone for good, and nobody cares,
@@ -337,7 +339,7 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
+            foo = MyEvent
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -369,7 +371,6 @@ class TestFramework(unittest.TestCase):
         framework_copy.register_type(MyEvent, event_handle.parent, event_handle.kind)
         self.assertRaises(NoSnapshotError, framework_copy.load_snapshot, event_handle)
 
-
     def test_auto_register_event_types(self):
         framework = self.create_framework()
 
@@ -380,11 +381,11 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyEvents(EventsBase):
-            foo = Event(MyFoo)
+            foo = MyFoo
 
         class MyNotifier(Object):
             on = MyEvents()
-            bar = Event(MyBar)
+            bar = MyBar
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -473,7 +474,8 @@ class TestStoredState(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def create_framework(self):
-        return Framework(self.tmpdir / "framework.data")
+        framework = Framework(self.tmpdir / "framework.data")
+        return framework
 
     def test_basic_state_storage(self):
         framework = self.create_framework()
