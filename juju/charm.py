@@ -17,7 +17,7 @@ class CharmEvents(EventsBase):
 
     install = Event(InstallEvent)
     start = Event(StartEvent)
-    stop = Event(StartEvent)
+    stop = Event(StopEvent)
     update_status = Event(UpdateStatusEvent)
     config_changed = Event(ConfigChangedEvent)
     upgrade_charm = Event(UpgradeCharmEvent)
