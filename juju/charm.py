@@ -27,6 +27,6 @@ class CharmEvents(EventsBase):
     leader_settings_changed = Event(LeaderSettingsChangedEvent)
 
 
-class Charm(Object):
+class CharmBase(Object):
 
     on = CharmEvents()
