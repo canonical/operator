@@ -1,4 +1,4 @@
-from juju.framework import Object, EventBase, EventsBase
+from juju.framework import Object, Event, EventBase, EventsBase
 
 
 class InstallEvent(EventBase): pass
@@ -15,16 +15,16 @@ class LeaderSettingsChangedEvent(EventBase): pass
 
 class CharmEvents(EventsBase):
 
-    install = InstallEvent
-    start = StartEvent
-    stop = StopEvent
-    update_status = UpdateStatusEvent
-    config_changed = ConfigChangedEvent
-    upgrade_charm = UpgradeCharmEvent
-    pre_series_upgrade = PreSeriesUpgradeEvent
-    post_series_upgrade = PostSeriesUpgradeEvent
-    leader_elected = LeaderElectedEvent
-    leader_settings_changed = LeaderSettingsChangedEvent
+    install = Event(InstallEvent)
+    start = Event(StartEvent)
+    stop = Event(StopEvent)
+    update_status = Event(UpdateStatusEvent)
+    config_changed = Event(ConfigChangedEvent)
+    upgrade_charm = Event(UpgradeCharmEvent)
+    pre_series_upgrade = Event(PreSeriesUpgradeEvent)
+    post_series_upgrade = Event(PostSeriesUpgradeEvent)
+    leader_elected = Event(LeaderElectedEvent)
+    leader_settings_changed = Event(LeaderSettingsChangedEvent)
 
 
 class Charm(Object):

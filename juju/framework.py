@@ -72,24 +72,8 @@ class Handle:
         return handle
 
 
-class EventMeta(type):
-    """Metaclass to enable descriptor protocol on class rather than instance.
+class EventBase:
 
-    This ensures that instances of EventBase subclasses are always actual
-    emitted events, but that we can still be informed of the event_kind
-    from the attribute name.
-    """
-    def __set_name__(event_type, emitter_type, event_kind):
-        """Replace the raw event type with a BoundEvent.
-
-        This ensures that the same event type can be reused for multiple
-        events.
-        """
-        bound_event = BoundEvent(emitter_type, event_type, event_kind)
-        setattr(emitter_type, event_kind, bound_event)
-
-
-class EventBase(metaclass=EventMeta):
     def __init__(self, handle):
         self.handle = handle
         self.deferred = False
@@ -108,42 +92,69 @@ class EventBase(metaclass=EventMeta):
         self.deferred = False
 
 
+class Event:
+    """Event creates class descriptors to operate with events.
+
+    It is generally used as:
+
+        class SomethingHappened(EventBase):
+            pass
+
+        class SomeObject:
+            something_happened = Event(SomethingHappened)
+
+
+    With that, instances of that type will offer the someobj.something_happened
+    attribute which is a BoundEvent and may be used to emit and observe the event.
+    """
+
+    def __init__(self, event_type):
+        if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
+            raise RuntimeError(f"Event requires a subclass of EventBase as an argument, got {event_type}")
+        self.event_type = event_type
+        self.event_kind = {}
+
+    def __get__(self, emitter, emitter_type=None):
+        # This looks magic and is sort of magic, but it's also simple if
+        # you understand what it does. The single goal here is to find
+        # the attribute name that points to this Event, so that we can use
+        # that as the event_kind. :)  (and thus on_<name>, etc).
+        event_kind = self.event_kind.get(emitter_type)
+        if not event_kind:
+            found_cls = None
+            for cls in emitter_type.__mro__:
+                for attr_name, attr_value in cls.__dict__.items():
+                    if attr_value is self:
+                        if event_kind:
+                            raise RuntimeError("Event({}) shared between {}.{} and {}.{}".format(
+                                self.event_type.__name__, found_cls.__name__, event_kind, cls.__name__, attr_name))
+                        found_cls = cls
+                        event_kind = attr_name
+                        self.event_kind[emitter_type] = event_kind
+            if not event_kind:
+                raise RuntimeError("Cannot find Event({}) attribute in type {}".format(self.event_type.__name__, emitter_type.__name__))
+        if emitter is None:
+            return self
+        return BoundEvent(emitter, self.event_type, event_kind)
+
+
 class BoundEvent:
-    def __init__(self, emitter_type, event_type, event_kind):
+
+    def __init__(self, emitter, event_type, event_kind):
+        self.emitter = emitter
         self.event_type = event_type
         self.event_kind = event_kind
-        self.emitter_type = emitter_type
-        self.emitter = None
-
-    def __get__(self, emitter, emitter_type):
-        if emitter is not None and emitter is not self.emitter:
-            # new or changed emitter, so register our event
-            # (the emitter will only really change during tests, when we're
-            # recreating Framework instances multiple times; also, emitter may
-            # be None if accessed as a class attribute instead of by instance)
-            emitter.framework.register_type(self.event_type,
-                                            emitter,
-                                            self.event_kind)
-        self.emitter = emitter
-        return self
 
     def emit(self, *args, **kwargs):
         """Emit event to all registered observers.
 
-        The current storage state is committed before and after each observer
-        is notified.
+        The current storage state is committed before and after each observer is notified.
         """
-        if self.emitter is None or not hasattr(self.emitter, 'framework'):
-            # mainly to protect against accessing as class attribute and then
-            # calling emit
-            raise RuntimeError('Events must be attached to emitter instances '
-                               'with access to the framework')
         framework = self.emitter.framework
         # TODO This needs to be persisted.
         framework._event_count += 1
         key = str(framework._event_count)
-        event = self.event_type(Handle(self.emitter, self.event_kind, key),
-                                *args, **kwargs)
+        event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         framework._emit(event)
 
 
@@ -174,6 +185,17 @@ class Object:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
 
+        # TODO This can probably be dropped, because the event type is only
+        # really relevant if someone is either emitting the event or observing
+        # it.
+        for cls in type(self).__mro__:
+            for attr_name, attr_value in cls.__dict__.items():
+                if isinstance(attr_value, Event):
+                    event_type = attr_value.event_type
+                    event_kind = attr_name
+                    emitter = self
+                    self.framework.register_type(event_type, emitter, event_kind)
+
         # TODO Detect conflicting handles here.
 
 
@@ -183,7 +205,7 @@ class EventsBase(Object):
     handle_kind = "on"
 
     def __init__(self, parent=None, key=None):
-        if parent is not None:
+        if parent != None:
             super().__init__(parent, key)
 
     def __get__(self, emitter, emitter_type):
@@ -195,8 +217,7 @@ class EventsBase(Object):
 
     @classmethod
     def define_event(cls, event_kind, event_type):
-        setattr(cls, event_kind, event_type)
-        event_type.__set_name__(cls, event_kind)
+        setattr(cls, event_kind, Event(event_type))
 
 
 class NoSnapshotError(Exception):
@@ -368,10 +389,11 @@ class Framework:
         if not isinstance(bound_event, BoundEvent):
             raise RuntimeError(f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}')
 
+        event_type = bound_event.event_type
         event_kind = bound_event.event_kind
         emitter = bound_event.emitter
 
-        self.register_type(bound_event.event_type, emitter, event_kind)
+        self.register_type(event_type, emitter, event_kind)
 
         if hasattr(emitter, "handle"):
             emitter_path = emitter.handle.path
@@ -460,10 +482,8 @@ class Framework:
 class StoredStateChanged(EventBase):
     pass
 
-
 class StoredStateEvents(EventsBase):
-    changed = StoredStateChanged
-
+    changed = Event(StoredStateChanged)
 
 class StoredStateData(Object):
 
