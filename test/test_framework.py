@@ -274,13 +274,6 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(obs.seen, ["on_foo:foo"])
 
     def test_conflicting_event_attributes(self):
-        framework = self.create_framework()
-
-        # The reuse of event attributes across different type hierarchies as done here
-        # is strongly discouraged and might eventually be unsupported altogether, but
-        # we handle it correctly since the bug might go unnoticed and create very
-        # awkward behavior.
-
         class MyEvent(EventBase):
             pass
 
@@ -289,43 +282,20 @@ class TestFramework(unittest.TestCase):
         class MyEvents(EventsBase):
             foo = event
 
-        class MyNotifier(Object):
-            on = MyEvents()
-            bar = event
+        with self.assertRaises(RuntimeError) as cm:
+            class OtherEvents(EventsBase):
+                foo = event
+        self.assertEqual(
+            str(cm.exception.__cause__),
+            "Event(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
-        class MyObserver(Object):
-            def __init__(self, parent, key):
-                super().__init__(parent, key)
-                self.seen = []
-
-            def on_foo(self, event): self.seen.append(f"on_foo:{event.handle.kind}")
-            def on_bar(self, event): self.seen.append(f"on_bar:{event.handle.kind}")
-
-        pub = MyNotifier(framework, "1")
-        obs = MyObserver(framework, "1")
-
-        framework.observe(pub.on.foo, obs)
-        framework.observe(pub.bar, obs)
-
-        pub.on.foo.emit()
-        pub.bar.emit()
-
-        self.assertEqual(obs.seen, ["on_foo:foo", "on_bar:bar"])
-
-        # The case where the same value is part of the same hierarchy is completely
-        # unsupported, though, and is detected to prevent awkward bugs.
-
-        class Ambiguous(EventsBase):
-            one = event
-        class SubAmbiguous(Ambiguous):
-            two = event
-
-        try:
-            SubAmbiguous.two
-        except RuntimeError as e:
-            self.assertEqual(str(e), "Event(MyEvent) shared between SubAmbiguous.two and Ambiguous.one")
-        else:
-            self.fail("RuntimeError not raised")
+        with self.assertRaises(RuntimeError) as cm:
+            class MyNotifier(Object):
+                on = MyEvents()
+                bar = event
+        self.assertEqual(
+            str(cm.exception.__cause__),
+            "Event(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
 
     def test_reemit_ignores_unknown_event_type(self):
         # The event type may have been gone for good, and nobody cares,
