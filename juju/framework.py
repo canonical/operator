@@ -125,6 +125,8 @@ class Event:
         self.emitter_type = emitter_type
 
     def __get__(self, emitter, emitter_type=None):
+        if emitter is None:
+            return self
         return BoundEvent(emitter, self.event_type, self.event_kind)
 
 
