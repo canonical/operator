@@ -82,6 +82,10 @@ class EventBase:
         self.deferred = True
 
     def snapshot(self):
+        """Return the snapshot data that should be persisted.
+
+        Subclasses must override to save any custom state.
+        """
         return None
 
     def restore(self, snapshot):
@@ -217,6 +221,15 @@ class EventsBase(Object):
         event_descriptor = Event(event_type)
         event_descriptor.__set_name__(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
+
+    def events(self):
+        """Iterate over pairs of `(event_kind, bound_event)` for each available event.
+        """
+        for event_kind in dir(self):
+            bound_event = getattr(self, event_kind)
+            if not isinstance(bound_event, BoundEvent):
+                continue
+            yield (event_kind, bound_event)
 
 
 class NoSnapshotError(Exception):
