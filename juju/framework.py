@@ -112,33 +112,30 @@ class Event:
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
             raise RuntimeError(f"Event requires a subclass of EventBase as an argument, got {event_type}")
         self.event_type = event_type
-        self.event_kind = {}
+        self.event_kind = None
+        self.emitter_type = None
+
+    def __set_name__(self, emitter_type, event_kind):
+        if self.event_kind is not None:
+            raise RuntimeError(
+                f'Event({self.event_type.__name__}) reused as '
+                f'{self.emitter_type.__name__}.{self.event_kind} and '
+                f'{emitter_type.__name__}.{event_kind}')
+        self.event_kind = event_kind
+        self.emitter_type = emitter_type
 
     def __get__(self, emitter, emitter_type=None):
-        # This looks magic and is sort of magic, but it's also simple if
-        # you understand what it does. The single goal here is to find
-        # the attribute name that points to this Event, so that we can use
-        # that as the event_kind. :)  (and thus on_<name>, etc).
-        event_kind = self.event_kind.get(emitter_type)
-        if not event_kind:
-            found_cls = None
-            for cls in emitter_type.__mro__:
-                for attr_name, attr_value in cls.__dict__.items():
-                    if attr_value is self:
-                        if event_kind:
-                            raise RuntimeError("Event({}) shared between {}.{} and {}.{}".format(
-                                self.event_type.__name__, found_cls.__name__, event_kind, cls.__name__, attr_name))
-                        found_cls = cls
-                        event_kind = attr_name
-                        self.event_kind[emitter_type] = event_kind
-            if not event_kind:
-                raise RuntimeError("Cannot find Event({}) attribute in type {}".format(self.event_type.__name__, emitter_type.__name__))
         if emitter is None:
             return self
-        return BoundEvent(emitter, self.event_type, event_kind)
+        return BoundEvent(emitter, self.event_type, self.event_kind)
 
 
 class BoundEvent:
+
+    def __repr__(self):
+        return (f'<BoundEvent {self.event_type.__name__} bound to '
+                f'{type(self.emitter).__name__}.{self.event_kind} '
+                f'at {hex(id(self))}>')
 
     def __init__(self, emitter, event_type, event_kind):
         self.emitter = emitter
@@ -217,7 +214,9 @@ class EventsBase(Object):
 
     @classmethod
     def define_event(cls, event_kind, event_type):
-        setattr(cls, event_kind, Event(event_type))
+        event_descriptor = Event(event_type)
+        event_descriptor.__set_name__(cls, event_kind)
+        setattr(cls, event_kind, event_descriptor)
 
 
 class NoSnapshotError(Exception):
