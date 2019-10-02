@@ -47,10 +47,27 @@ class TestCharm(unittest.TestCase):
                 super().__init__(metadata, framework, key)
                 self.seen = []
                 for event_kind, bound_event in self.on.events():
-                    framework.observe(bound_event, self.on_any)
+                    # hook up relation events to generic handler
+                    if 'relation' in event_kind:
+                        framework.observe(bound_event, self.on_any_relation)
+                    # hook up storage events to specific handlers
+                    elif 'storage' in event_kind:
+                        framework.observe(bound_event, self)
 
-            def on_any(self, event):
-                self.seen.append(f'{type(event).__name__} on {event.name}')
+            def on_any_relation(self, event):
+                self.seen.append(f'r: {type(event).__name__} on {event.name}')
+
+            def on_stor1_storage_attached(self, event):
+                self.seen.append(f's: {type(event).__name__} on {event.name}')
+
+            def on_stor1_storage_detaching(self, event):
+                self.seen.append(f's: {type(event).__name__} on {event.name}')
+
+            def on_stor2_storage_attached(self, event):
+                self.seen.append(f's: {type(event).__name__} on {event.name}')
+
+            def on_stor2_storage_detaching(self, event):
+                self.seen.append(f's: {type(event).__name__} on {event.name}')
 
         metadata = {
             'name': 'my-charm',
@@ -82,13 +99,13 @@ class TestCharm(unittest.TestCase):
         charm.on.stor2_storage_detaching.emit('stor2')
 
         self.assertEqual(charm.seen, [
-            'RelationJoinedEvent on req1',
-            'RelationChangedEvent on req1',
-            'RelationChangedEvent on req2',
-            'RelationDepartedEvent on pro1',
-            'RelationBrokenEvent on peer1',
-            'StorageAttachedEvent on stor1',
-            'StorageDetachingEvent on stor2',
+            'r: RelationJoinedEvent on req1',
+            'r: RelationChangedEvent on req1',
+            'r: RelationChangedEvent on req2',
+            'r: RelationDepartedEvent on pro1',
+            'r: RelationBrokenEvent on peer1',
+            's: StorageAttachedEvent on stor1',
+            's: StorageDetachingEvent on stor2',
         ])
 
 
