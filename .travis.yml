@@ -12,4 +12,4 @@ before_install:
 
 script:
     - python3 -m unittest
-    - python3 -m flake8
+    - flake8
