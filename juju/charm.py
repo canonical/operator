@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from juju.framework import Object, Event, EventBase, EventsBase
 
 
@@ -72,6 +73,40 @@ class CharmEvents(EventsBase):
     post_series_upgrade = Event(PostSeriesUpgradeEvent)
     leader_elected = Event(LeaderElectedEvent)
     leader_settings_changed = Event(LeaderSettingsChangedEvent)
+
+    @property
+    def relation(self):
+        """Convenience accessor for accessing relation events by relation name.
+
+        Example usage::
+
+            framework.observe(charm.on.relation["db"].joined, charm)
+            charm.on.relation["db"].broken.emit()
+        """
+        groups = {}
+        for event_kind, bound_event in self.events().items():
+            if '_relation_' in event_kind:
+                relation_name, _, event_name = event_kind.split('_')
+                ns = groups.setdefault(relation_name, SimpleNamespace())
+                setattr(ns, event_name, bound_event)
+        return groups
+
+    @property
+    def storage(self):
+        """Convenience accessor for accessing storage events by storage name.
+
+        Example usage::
+
+            framework.observe(charm.on.storage["cache"].attached, charm)
+            charm.on.storage["cache"].detaching.emit()
+        """
+        groups = {}
+        for event_kind, bound_event in self.events().items():
+            if '_storage_' in event_kind:
+                storage_name, _, event_name = event_kind.split('_')
+                ns = groups.setdefault(storage_name, SimpleNamespace())
+                setattr(ns, event_name, bound_event)
+        return groups
 
 
 class CharmBase(Object):

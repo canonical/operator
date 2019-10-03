@@ -226,9 +226,13 @@ class EventsBase(Object):
         """Return a mapping of event_kinds to bound_events for all available events.
         """
         events_map = {}
-        for event_kind in dir(self):
-            bound_event = getattr(self, event_kind)
-            if isinstance(bound_event, BoundEvent):
+        for event_kind in dir(type(self)):
+            # filter based on class attr value in case there are properties
+            # defined on subclasses to access sets of events, which could
+            # cause infinite recursion
+            unbound_event = getattr(type(self), event_kind)
+            if isinstance(unbound_event, Event):
+                bound_event = getattr(self, event_kind)
                 events_map[event_kind] = bound_event
         return events_map
 
