@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 
 from juju.framework import Framework, Handle, Event, EventsBase, EventBase, Object
-from juju.framework import NoTypeError, NoSnapshotError, StoredState, StoredDict
+from juju.framework import NoSnapshotError, StoredState
 
 
 class TestFramework(unittest.TestCase):
@@ -62,7 +62,7 @@ class TestFramework(unittest.TestCase):
             def restore(self, snapshot):
                 self.my_n = snapshot["My N!"] + 1
 
-        handle  = Handle(None, "a_foo", "some_key")
+        handle = Handle(None, "a_foo", "some_key")
         event = Foo(handle, 1)
 
         framework1 = self.create_framework()
@@ -116,7 +116,7 @@ class TestFramework(unittest.TestCase):
 
         framework.observe(pub.foo, obs.on_any)
         framework.observe(pub.bar, obs.on_any)
-        framework.observe(pub.foo, obs) # Method name defaults to on_<event kind>.
+        framework.observe(pub.foo, obs)  # Method name defaults to on_<event kind>.
 
         try:
             framework.observe(pub.baz, obs)
@@ -232,7 +232,7 @@ class TestFramework(unittest.TestCase):
         framework.reemit()
 
         # Two things being checked here:
-        # 
+        #
         # 1. There's a restore roundtrip before the event is first observed.
         #    That means the data is safe before it's ever seen, and the
         #    roundtrip logic is tested under normal circumstances.
@@ -338,7 +338,6 @@ class TestFramework(unittest.TestCase):
         # Register the type and check that the event is gone from storage.
         framework_copy.register_type(MyEvent, event_handle.parent, event_handle.kind)
         self.assertRaises(NoSnapshotError, framework_copy.load_snapshot, event_handle)
-
 
     def test_auto_register_event_types(self):
         framework = self.create_framework()
@@ -521,7 +520,8 @@ class TestStoredState(unittest.TestCase):
         obj = SomeObject(framework, "1")
 
         try:
-            class CustomObject: pass
+            class CustomObject:
+                pass
             obj.state.foo = CustomObject()
         except AttributeError as e:
             self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/dict/list/etc")

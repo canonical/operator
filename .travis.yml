@@ -1,7 +1,15 @@
+dist: bionic
+
 language: python
+
 python:
-  - "3.6"
-  - "3.7"
+    - "3.6"
+    - "3.7"
+
+before_install:
+    - sudo apt update
+    - sudo apt install flake8
 
 script:
-  - python3 -m unittest
+    - python3 -m unittest
+    - flake8

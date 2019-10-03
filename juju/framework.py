@@ -206,7 +206,7 @@ class EventsBase(Object):
     handle_kind = "on"
 
     def __init__(self, parent=None, key=None):
-        if parent != None:
+        if parent is not None:
             super().__init__(parent, key)
 
     def __get__(self, emitter, emitter_type):
@@ -316,10 +316,10 @@ class Framework:
     def __init__(self, data_path):
         self._data_path = data_path
         self._event_count = 0
-        self._observers = [] # [(observer, method_name, parent_path, event_key)]
-        self._observer = {}  # {observer_path: observer}
-        self._type_registry = {} # {(parent_path, kind): cls}
-        self._type_known = set() # {cls}
+        self._observers = []      # [(observer, method_name, parent_path, event_key)]
+        self._observer = {}       # {observer_path: observer}
+        self._type_registry = {}  # {(parent_path, kind): cls}
+        self._type_known = set()  # {cls}
 
         self._storage = SQLiteStorage(data_path)
 
@@ -354,7 +354,7 @@ class Framework:
             raise RuntimeError(f"cannot save {type(value).__name__} values before registering that type")
         data = value.snapshot()
         # Use marshal as a validator, enforcing the use of simple types.
-        _ = marshal.dumps(data)
+        marshal.dumps(data)
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(data)
         self._storage.save_snapshot(value.handle.path, raw_data)
@@ -437,7 +437,6 @@ class Framework:
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent_path = event.handle.parent.path
-        notices = []
         for observer_path, method_name, _parent_path, _event_kind in self._observers:
             if _parent_path != parent_path:
                 continue
@@ -580,7 +579,8 @@ class StoredState:
             for attr_name, attr_value in parent_type.__dict__.items():
                 if attr_value is self:
                     if self.attr_name and attr_name != self.attr_name:
-                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(parent_type.__name__, self.attr_name, parent_type.__name__, attr_name))
+                        parent_tname = parent_type.__name__
+                        raise RuntimeError(f"StoredState shared by {parent_tname}.{self.attr_name} and {parent_tname}.{attr_name}")
                     self.attr_name = attr_name
                     bound = BoundStoredState(parent, attr_name)
                     parent.__dict__[attr_name] = bound
