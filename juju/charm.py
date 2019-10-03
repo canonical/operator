@@ -1,16 +1,35 @@
 from juju.framework import Object, Event, EventBase, EventsBase
 
 
-class InstallEvent(EventBase): pass
-class StartEvent(EventBase): pass
-class StopEvent(EventBase): pass
-class ConfigChangedEvent(EventBase): pass
-class UpdateStatusEvent(EventBase): pass
-class UpgradeCharmEvent(EventBase): pass
-class PreSeriesUpgradeEvent(EventBase): pass
-class PostSeriesUpgradeEvent(EventBase): pass
-class LeaderElectedEvent(EventBase): pass
-class LeaderSettingsChangedEvent(EventBase): pass
+class InstallEvent(EventBase):
+    pass
+
+class StartEvent(EventBase):
+    pass
+
+class StopEvent(EventBase):
+    pass
+
+class ConfigChangedEvent(EventBase):
+    pass
+
+class UpdateStatusEvent(EventBase):
+    pass
+
+class UpgradeCharmEvent(EventBase):
+    pass
+
+class PreSeriesUpgradeEvent(EventBase):
+    pass
+
+class PostSeriesUpgradeEvent(EventBase):
+    pass
+
+class LeaderElectedEvent(EventBase):
+    pass
+
+class LeaderSettingsChangedEvent(EventBase):
+    pass
 
 
 class RelationEventBase(EventBase):
@@ -25,10 +44,17 @@ class RelationEventBase(EventBase):
         self.relation_name = snapshot['relation_name']
 
 
-class RelationJoinedEvent(RelationEventBase): pass
-class RelationChangedEvent(RelationEventBase): pass
-class RelationDepartedEvent(RelationEventBase): pass
-class RelationBrokenEvent(RelationEventBase): pass
+class RelationJoinedEvent(RelationEventBase):
+    pass
+
+class RelationChangedEvent(RelationEventBase):
+    pass
+
+class RelationDepartedEvent(RelationEventBase):
+    pass
+
+class RelationBrokenEvent(RelationEventBase):
+    pass
 
 
 class StorageEventBase(EventBase):
@@ -43,8 +69,11 @@ class StorageEventBase(EventBase):
         self.storage_name = snapshot['storage_name']
 
 
-class StorageAttachedEvent(StorageEventBase): pass
-class StorageDetachingEvent(StorageEventBase): pass
+class StorageAttachedEvent(StorageEventBase):
+    pass
+
+class StorageDetachingEvent(StorageEventBase):
+    pass
 
 
 class CharmEvents(EventsBase):
