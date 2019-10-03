@@ -6,7 +6,7 @@ import shutil
 
 from pathlib import Path
 
-from juju.charm import CharmBase
+from juju.charm import CharmBase, CharmMetadata
 from juju.charm import CharmEvents
 from juju.framework import Framework
 
@@ -44,7 +44,7 @@ class TestCharm(unittest.TestCase):
                 self.started = True
 
         framework = self.create_framework()
-        charm = MyCharm(framework, None, {})
+        charm = MyCharm(framework, None, CharmMetadata())
         charm.on.start.emit()
 
         self.assertEqual(charm.started, True)
@@ -63,7 +63,7 @@ class TestCharm(unittest.TestCase):
             def on_any_relation(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        metadata = {
+        metadata = CharmMetadata({
             'name': 'my-charm',
             'requires': {
                 'req1': {'interface': 'req1'},
@@ -76,7 +76,7 @@ class TestCharm(unittest.TestCase):
             'peers': {
                 'peer1': {'interface': 'peer1'},
             },
-        }
+        })
 
         charm = MyCharm(self.create_framework(), None, metadata)
 
@@ -109,13 +109,13 @@ class TestCharm(unittest.TestCase):
             def on_stor2_storage_detaching(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        metadata = {
+        metadata = CharmMetadata({
             'name': 'my-charm',
             'storage': {
                 'stor1': {'type': 'filesystem'},
                 'stor2': {'type': 'filesystem'},
             },
-        }
+        })
 
         charm = MyCharm(self.create_framework(), None, metadata)
 
