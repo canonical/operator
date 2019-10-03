@@ -25,8 +25,8 @@ class TestCharm(unittest.TestCase):
 
         class MyCharm(CharmBase):
 
-            def __init__(self, metadata, framework, key):
-                super().__init__(metadata, framework, key)
+            def __init__(self, framework, key, metadata):
+                super().__init__(framework, key, metadata)
 
                 self.started = False
                 framework.observe(self.on.start, self)
@@ -35,39 +35,25 @@ class TestCharm(unittest.TestCase):
                 self.started = True
 
         framework = self.create_framework()
-        charm = MyCharm({}, framework, None)
+        charm = MyCharm(framework, None, {})
         charm.on.start.emit()
 
         self.assertEqual(charm.started, True)
 
-    def test_dynamic(self):
+    def test_relation_events(self):
 
         class MyCharm(CharmBase):
-            def __init__(self, metadata, framework, key):
-                super().__init__(metadata, framework, key)
+            def __init__(self, framework, key, metadata):
+                super().__init__(framework, key, metadata)
                 self.seen = []
                 for event_kind, bound_event in self.on.events():
                     # hook up relation events to generic handler
                     if 'relation' in event_kind:
                         framework.observe(bound_event, self.on_any_relation)
-                    # hook up storage events to specific handlers
-                    elif 'storage' in event_kind:
-                        framework.observe(bound_event, self)
 
             def on_any_relation(self, event):
-                self.seen.append(f'r: {type(event).__name__} on {event.name}')
-
-            def on_stor1_storage_attached(self, event):
-                self.seen.append(f's: {type(event).__name__} on {event.name}')
-
-            def on_stor1_storage_detaching(self, event):
-                self.seen.append(f's: {type(event).__name__} on {event.name}')
-
-            def on_stor2_storage_attached(self, event):
-                self.seen.append(f's: {type(event).__name__} on {event.name}')
-
-            def on_stor2_storage_detaching(self, event):
-                self.seen.append(f's: {type(event).__name__} on {event.name}')
+                self.seen.append(f'{type(event).__name__} on '
+                                 f'{event.relation_name}')
 
         metadata = {
             'name': 'my-charm',
@@ -82,30 +68,57 @@ class TestCharm(unittest.TestCase):
             'peers': {
                 'peer1': {'interface': 'peer1'},
             },
-            'storage': {
-                'stor1': {'type': 'filesystem'},
-                'stor2': {'type': 'filesystem'},
-            },
         }
 
-        charm = MyCharm(metadata, self.create_framework(), None)
+        charm = MyCharm(self.create_framework(), None, metadata)
 
         charm.on.req1_relation_joined.emit('req1')
         charm.on.req1_relation_changed.emit('req1')
         charm.on.req2_relation_changed.emit('req2')
         charm.on.pro1_relation_departed.emit('pro1')
         charm.on.peer1_relation_broken.emit('peer1')
+
+        self.assertEqual(charm.seen, [
+            'RelationJoinedEvent on req1',
+            'RelationChangedEvent on req1',
+            'RelationChangedEvent on req2',
+            'RelationDepartedEvent on pro1',
+            'RelationBrokenEvent on peer1',
+        ])
+
+    def test_storage_events(self):
+
+        class MyCharm(CharmBase):
+            def __init__(self, framework, key, metadata):
+                super().__init__(framework, key, metadata)
+                self.seen = []
+                framework.observe(self.on.stor1_storage_attached, self)
+                framework.observe(self.on.stor2_storage_detaching, self)
+
+            def on_stor1_storage_attached(self, event):
+                self.seen.append(f'{type(event).__name__} on '
+                                 f'{event.storage_name}')
+
+            def on_stor2_storage_detaching(self, event):
+                self.seen.append(f'{type(event).__name__} on '
+                                 f'{event.storage_name}')
+
+        metadata = {
+            'name': 'my-charm',
+            'storage': {
+                'stor1': {'type': 'filesystem'},
+                'stor2': {'type': 'filesystem'},
+            },
+        }
+
+        charm = MyCharm(self.create_framework(), None, metadata)
+
         charm.on.stor1_storage_attached.emit('stor1')
         charm.on.stor2_storage_detaching.emit('stor2')
 
         self.assertEqual(charm.seen, [
-            'r: RelationJoinedEvent on req1',
-            'r: RelationChangedEvent on req1',
-            'r: RelationChangedEvent on req2',
-            'r: RelationDepartedEvent on pro1',
-            'r: RelationBrokenEvent on peer1',
-            's: StorageAttachedEvent on stor1',
-            's: StorageDetachingEvent on stor2',
+            'StorageAttachedEvent on stor1',
+            'StorageDetachingEvent on stor2',
         ])
 
 
