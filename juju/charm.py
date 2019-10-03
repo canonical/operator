@@ -33,15 +33,7 @@ class LeaderSettingsChangedEvent(EventBase):
 
 
 class RelationEventBase(EventBase):
-    def __init__(self, handle, relation_name):
-        super().__init__(handle)
-        self.relation_name = relation_name
-
-    def snapshot(self):
-        return {'relation_name': self.relation_name}
-
-    def restore(self, snapshot):
-        self.relation_name = snapshot['relation_name']
+    pass
 
 
 class RelationJoinedEvent(RelationEventBase):
@@ -58,15 +50,7 @@ class RelationBrokenEvent(RelationEventBase):
 
 
 class StorageEventBase(EventBase):
-    def __init__(self, handle, storage_name):
-        super().__init__(handle)
-        self.storage_name = storage_name
-
-    def snapshot(self):
-        return {'storage_name': self.storage_name}
-
-    def restore(self, snapshot):
-        self.storage_name = snapshot['storage_name']
+    pass
 
 
 class StorageAttachedEvent(StorageEventBase):
