@@ -52,8 +52,7 @@ class TestCharm(unittest.TestCase):
                         framework.observe(bound_event, self.on_any_relation)
 
             def on_any_relation(self, event):
-                self.seen.append(f'{type(event).__name__} on '
-                                 f'{event.relation_name}')
+                self.seen.append(f'{type(event).__name__}')
 
         metadata = {
             'name': 'my-charm',
@@ -72,18 +71,18 @@ class TestCharm(unittest.TestCase):
 
         charm = MyCharm(self.create_framework(), None, metadata)
 
-        charm.on.req1_relation_joined.emit('req1')
-        charm.on.req1_relation_changed.emit('req1')
-        charm.on.req2_relation_changed.emit('req2')
-        charm.on.pro1_relation_departed.emit('pro1')
-        charm.on.peer1_relation_broken.emit('peer1')
+        charm.on.req1_relation_joined.emit()
+        charm.on.req1_relation_changed.emit()
+        charm.on.req2_relation_changed.emit()
+        charm.on.pro1_relation_departed.emit()
+        charm.on.peer1_relation_broken.emit()
 
         self.assertEqual(charm.seen, [
-            'RelationJoinedEvent on req1',
-            'RelationChangedEvent on req1',
-            'RelationChangedEvent on req2',
-            'RelationDepartedEvent on pro1',
-            'RelationBrokenEvent on peer1',
+            'RelationJoinedEvent',
+            'RelationChangedEvent',
+            'RelationChangedEvent',
+            'RelationDepartedEvent',
+            'RelationBrokenEvent',
         ])
 
     def test_storage_events(self):
@@ -96,12 +95,10 @@ class TestCharm(unittest.TestCase):
                 framework.observe(self.on.stor2_storage_detaching, self)
 
             def on_stor1_storage_attached(self, event):
-                self.seen.append(f'{type(event).__name__} on '
-                                 f'{event.storage_name}')
+                self.seen.append(f'{type(event).__name__}')
 
             def on_stor2_storage_detaching(self, event):
-                self.seen.append(f'{type(event).__name__} on '
-                                 f'{event.storage_name}')
+                self.seen.append(f'{type(event).__name__}')
 
         metadata = {
             'name': 'my-charm',
@@ -113,12 +110,12 @@ class TestCharm(unittest.TestCase):
 
         charm = MyCharm(self.create_framework(), None, metadata)
 
-        charm.on.stor1_storage_attached.emit('stor1')
-        charm.on.stor2_storage_detaching.emit('stor2')
+        charm.on.stor1_storage_attached.emit()
+        charm.on.stor2_storage_detaching.emit()
 
         self.assertEqual(charm.seen, [
-            'StorageAttachedEvent on stor1',
-            'StorageDetachingEvent on stor2',
+            'StorageAttachedEvent',
+            'StorageDetachingEvent',
         ])
 
 
