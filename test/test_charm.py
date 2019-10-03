@@ -46,7 +46,7 @@ class TestCharm(unittest.TestCase):
             def __init__(self, framework, key, metadata):
                 super().__init__(framework, key, metadata)
                 self.seen = []
-                for event_kind, bound_event in self.on.events():
+                for event_kind, bound_event in self.on.events().items():
                     # hook up relation events to generic handler
                     if 'relation' in event_kind:
                         framework.observe(bound_event, self.on_any_relation)

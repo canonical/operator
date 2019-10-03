@@ -223,13 +223,14 @@ class EventsBase(Object):
         setattr(cls, event_kind, event_descriptor)
 
     def events(self):
-        """Iterate over pairs of `(event_kind, bound_event)` for each available event.
+        """Return a mapping of event_kinds to bound_events for all available events.
         """
+        events_map = {}
         for event_kind in dir(self):
             bound_event = getattr(self, event_kind)
-            if not isinstance(bound_event, BoundEvent):
-                continue
-            yield (event_kind, bound_event)
+            if isinstance(bound_event, BoundEvent):
+                events_map[event_kind] = bound_event
+        return events_map
 
 
 class NoSnapshotError(Exception):
