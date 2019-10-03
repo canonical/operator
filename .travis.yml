@@ -6,8 +6,9 @@ python:
     - "3.6"
     - "3.7"
 
-install:
-    - sudo apt install python3-flake8
+before_install:
+    - sudo apt update
+    - sudo apt install flake8
 
 script:
     - python3 -m unittest
