@@ -580,7 +580,7 @@ class StoredState:
                 if attr_value is self:
                     if self.attr_name and attr_name != self.attr_name:
                         parent_tname = parent_type.__name__
-                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(parent_tname, self.attr_name, parent_tname, attr_name))
+                        raise RuntimeError(f"StoredState shared by {parent_tname}.{self.attr_name} and {parent_tname}.{attr_name}")
                     self.attr_name = attr_name
                     bound = BoundStoredState(parent, attr_name)
                     parent.__dict__[attr_name] = bound

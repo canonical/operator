@@ -4,7 +4,7 @@ python:
     - "3.7"
 
 install:
-    - apt install flake8
+    - sudo apt install flake8
 
 script:
     - python3 -m unittest
