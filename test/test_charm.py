@@ -86,12 +86,15 @@ class TestCharm(unittest.TestCase):
         charm.on.pro1_relation_departed.emit()
         charm.on.peer1_relation_broken.emit()
 
+        charm.on.relation['req1'].joined.emit()
+
         self.assertEqual(charm.seen, [
             'RelationJoinedEvent',
             'RelationChangedEvent',
             'RelationChangedEvent',
             'RelationDepartedEvent',
             'RelationBrokenEvent',
+            'RelationJoinedEvent',
         ])
 
     def test_storage_events(self):
@@ -144,9 +147,12 @@ class TestCharm(unittest.TestCase):
         charm.on.stor1_storage_attached.emit()
         charm.on.stor2_storage_detaching.emit()
 
+        charm.on.storage['stor1'].attached.emit()
+
         self.assertEqual(charm.seen, [
             'StorageAttachedEvent',
             'StorageDetachingEvent',
+            'StorageAttachedEvent',
         ])
 
 
