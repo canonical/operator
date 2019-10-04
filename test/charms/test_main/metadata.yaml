@@ -1,0 +1,25 @@
+name: main
+summary: A charm used for testing the basic operation of the entrypoint code.
+maintainer: Dmitrii Shcherbakov <dmitrii.shcherbakov@canonical.com>
+description: A charm used for testing the basic operation of the entrypoint code.
+tags:
+    - misc
+series:
+    - bionic
+    - cosmic
+    - disco
+provides:
+    db:
+        interface: db
+requires:
+    mon:
+        interface: monitoring
+peers:
+    ha:
+        interface: cluster
+subordinate: false
+storage:
+    disks:
+        type: block
+        multiple:
+        range: 0-
