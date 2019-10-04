@@ -226,9 +226,15 @@ class EventsBase(Object):
         """Return a mapping of event_kinds to bound_events for all available events.
         """
         events_map = {}
-        for event_kind in dir(self):
-            bound_event = getattr(self, event_kind)
-            if isinstance(bound_event, BoundEvent):
+        for event_kind, unbound_event in type(self).__dict__.items():
+            # We have to filter based on the unbound_event (class attribute)
+            # rather than the bound_event (instance attribute) to allow for
+            # any instance properties which rely on this method (e.g., to
+            # present groups of events) which would lead to infinite recursion.
+            if isinstance(unbound_event, Event):
+                # We actually care about the bound_event, however, since it
+                # provides the most info for users of this method.
+                bound_event = getattr(self, event_kind)
                 events_map[event_kind] = bound_event
         return events_map
 
