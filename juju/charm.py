@@ -110,15 +110,14 @@ class CharmMeta:
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
-        maintainers = []
+        self.maintainers = []
         if 'maintainer' in raw:
-            maintainers.append(raw['maintainer'])
+            self.maintainers.append(raw['maintainer'])
         if 'maintainers' in raw:
-            maintainers.extend(raw['maintainers'])
-        self.maintainers = tuple(maintainers)
-        self.tags = tuple(raw.get('tags', []))
-        self.terms = tuple(raw.get('terms', []))
-        self.series = tuple(raw.get('series', []))
+            self.maintainers.extend(raw['maintainers'])
+        self.tags = raw.get('tags', [])
+        self.terms = raw.get('terms', [])
+        self.series = raw.get('series', [])
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
         self.requires = {name: RelationMeta('requires', name, rel)
@@ -137,7 +136,7 @@ class CharmMeta:
                           for name, res in raw.get('resources', {}).items()}
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
-        self.extra_bindings = tuple(raw.get('extra-bindings', {}))
+        self.extra_bindings = raw.get('extra-bindings', [])
 
 
 class RelationMeta:
