@@ -83,31 +83,28 @@ class CharmBase(Object):
         super().__init__(framework, key)
         self.metadata = metadata
 
-        # These are a per-relation group views of events, which are used for more programmatic access.
+        # These are a per-relation/storage group views of events, which are used for more programmatic access.
         # For example: framework.observe(self.on.relation[db_rel].joined, self)
-        type(self.on).relation = {}
-        type(self.on).storage = {}
-
-        def _create_event_and_add_to_group(event_group_name, group_member_name, event_name, event_type):
-            event_group = getattr(self.on, event_group_name)
-            event_kind = f'{group_member_name}_{event_group_name}_{event_name}'
-            self.on.define_event(event_kind, event_type)
-            bound_event = getattr(self.on, event_kind)
-            setattr(event_group[group_member_name], event_name, bound_event)
+        type(self.on).relation = {relation_name: SimpleNamespace() for relation_name in self.metadata.relations}
+        type(self.on).storage = {storage_name: SimpleNamespace() for storage_name in self.metadata.storage}
 
         for relation_name in self.metadata.relations:
-            self.on.relation[relation_name] = SimpleNamespace()
-            for event_name, event_type in {'joined': RelationJoinedEvent,
-                                           'changed': RelationChangedEvent,
-                                           'departed': RelationDepartedEvent,
-                                           'broken': RelationBrokenEvent}.items():
-                _create_event_and_add_to_group('relation', relation_name, event_name, event_type)
+            self.on.define_event(f'{relation_name}_relation_joined', RelationJoinedEvent)
+            self.on.define_event(f'{relation_name}_relation_changed', RelationChangedEvent)
+            self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
+            self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
+            # Populate the group view for this relation.
+            self.on.relation[relation_name].joined = getattr(self.on, f'{relation_name}_relation_joined')
+            self.on.relation[relation_name].changed = getattr(self.on, f'{relation_name}_relation_changed')
+            self.on.relation[relation_name].departed = getattr(self.on, f'{relation_name}_relation_departed')
+            self.on.relation[relation_name].broken = getattr(self.on, f'{relation_name}_relation_broken')
 
         for storage_name in metadata.storage:
-            self.on.storage[storage_name] = SimpleNamespace()
-            for event_name, event_type in {'attached': StorageAttachedEvent,
-                                           'detaching': StorageDetachingEvent}.items():
-                    _create_event_and_add_to_group('storage', storage_name, event_name, event_type)
+            self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
+            self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
+            # Populate the group view for this storage.
+            self.on.storage[storage_name].attached = getattr(self.on, f'{storage_name}_storage_attached')
+            self.on.storage[storage_name].detaching = getattr(self.on, f'{storage_name}_storage_detaching')
 
 
 class CharmMeta:
