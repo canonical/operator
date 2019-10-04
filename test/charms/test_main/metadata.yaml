@@ -22,4 +22,4 @@ storage:
     disks:
         type: block
         multiple:
-        range: 0-
+            range: 0-
