@@ -128,40 +128,17 @@ class CharmBase(Object):
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
 
 
-class CharmMetadata:
+class CharmMeta:
     """Object containing the metadata for the charm.
 
-    Supported fields are:
+    The maintainers, tags, terms, series, and extra_bindings attributes are all
+    lists of strings.  The requires, provides, peers, relations, storage,
+    resources, and payloads attributes are all mappings of names to instances
+    of the respective RelationMeta, StorageMeta, ResourceMeta, or PayloadMeta.
 
-        * ``name``
-        * ``summary``
-        * ``description``
-        * ``maintainers``
-        * ``tags``
-        * ``terms``
-        * ``series``
-        * ``subordinate``
-        * ``min_juju_version``
-        * ``requires``
-        * ``provides``
-        * ``peers``
-        * ``relations``
-        * ``storage``
-        * ``resources``
-        * ``payloads``
-        * ``extra_bindings``
-
-    The ``maintainers``, ``tags``, ``terms``, ``series``, and ``extra_bindings``
-    attributes are all tuples of strings.  The ``requires``, ``provides``,
-    `peers``, ``relations``, ``storage``, ``resources``, and ``payloads``
-    attributes are all mappings of names to instances of the respective
-    :class:`RelationDefinition`, :class:`StorageDefinition`, :class:`ResourceDefinition`,
-    or :class:`PayloadDefinition`.
-
-    The ``relations`` attribute is a convenience accessor which includes all of
-    the ``requires``, ``provides``, and ``peers`` :class:`RelationDefinition`_
-    items.  If needed, the role of the relation definition can be obtained from
-    its ``role`` attribute.
+    The relations attribute is a convenience accessor which includes all of the
+    requires, provides, and peers RelationMeta items.  If needed, the role of
+    the relation definition can be obtained from its role attribute.
     """
     def __init__(self, raw=None):
         raw = raw or {}
@@ -179,34 +156,28 @@ class CharmMetadata:
         self.series = tuple(raw.get('series', []))
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
-        self.requires = {name: RelationDefinition('requires', name, rel)
+        self.requires = {name: RelationMeta('requires', name, rel)
                          for name, rel in raw.get('requires', {}).items()}
-        self.provides = {name: RelationDefinition('provides', name, rel)
+        self.provides = {name: RelationMeta('provides', name, rel)
                          for name, rel in raw.get('provides', {}).items()}
-        self.peers = {name: RelationDefinition('peers', name, rel)
+        self.peers = {name: RelationMeta('peers', name, rel)
                       for name, rel in raw.get('peers', {}).items()}
         self.relations = {}
         self.relations.update(self.requires)
         self.relations.update(self.provides)
         self.relations.update(self.peers)
-        self.storage = {name: StorageDefinition(name, store)
+        self.storage = {name: StorageMeta(name, store)
                         for name, store in raw.get('storage', {}).items()}
-        self.resources = {name: ResourceDefinition(name, res)
+        self.resources = {name: ResourceMeta(name, res)
                           for name, res in raw.get('resources', {}).items()}
-        self.payloads = {name: PayloadDefinition(name, payload)
+        self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = tuple(raw.get('extra-bindings', {}))
 
 
-class RelationDefinition:
+class RelationMeta:
     """Object containing metadata about a relation definition.
 
-    Supported fields are:
-
-        * ``role``
-        * ``relation_name``
-        * ``interface_name``
-        * ``scope``
     """
     def __init__(self, role, relation_name, raw):
         self.role = role
@@ -215,10 +186,9 @@ class RelationDefinition:
         self.scope = raw.get('scope')
 
 
-class StorageDefinition:
+class StorageMeta:
     """Object containing metadata about a storage definition.
 
-    Supported fields are:
     """
     def __init__(self, name, raw):
         self.storage_name = name
@@ -228,21 +198,19 @@ class StorageDefinition:
         self.read_only = raw.get('read-only', False)
         self.minimum_size = raw.get('minimum-size')
         self.location = raw.get('location')
-        self.is_multiple = 'multiple' in raw
-        self.range = None
-        if self.is_multiple:
+        self.multiple_range = None
+        if 'multiple' in raw:
             range = raw['multiple']['range']
             if '-' not in range:
-                self.range = (int(range), int(range))
+                self.multiple_range = (int(range), int(range))
             else:
                 range = range.split('-')
-                self.range = (int(range[0]), int(range[1]) if range[1] else None)
+                self.multiple_range = (int(range[0]), int(range[1]) if range[1] else None)
 
 
-class ResourceDefinition:
+class ResourceMeta:
     """Object containing metadata about a resource definition.
 
-    Supported fields are:
     """
     def __init__(self, name, raw):
         self.resource_name = name
@@ -251,10 +219,9 @@ class ResourceDefinition:
         self.description = raw.get('description', '')
 
 
-class PayloadDefinition:
+class PayloadMeta:
     """Object containing metadata about a payload definition.
 
-    Supported fields are:
     """
     def __init__(self, name, raw):
         self.payload_name = name
