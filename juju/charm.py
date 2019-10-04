@@ -140,9 +140,7 @@ class CharmMeta:
 
 
 class RelationMeta:
-    """Object containing metadata about a relation definition.
-
-    """
+    """Object containing metadata about a relation definition."""
     def __init__(self, role, relation_name, raw):
         self.role = role
         self.relation_name = relation_name
@@ -151,9 +149,7 @@ class RelationMeta:
 
 
 class StorageMeta:
-    """Object containing metadata about a storage definition.
-
-    """
+    """Object containing metadata about a storage definition."""
     def __init__(self, name, raw):
         self.storage_name = name
         self.type = raw['type']
@@ -173,9 +169,7 @@ class StorageMeta:
 
 
 class ResourceMeta:
-    """Object containing metadata about a resource definition.
-
-    """
+    """Object containing metadata about a resource definition."""
     def __init__(self, name, raw):
         self.resource_name = name
         self.type = raw['type']
@@ -184,9 +178,7 @@ class ResourceMeta:
 
 
 class PayloadMeta:
-    """Object containing metadata about a payload definition.
-
-    """
+    """Object containing metadata about a payload definition."""
     def __init__(self, name, raw):
         self.payload_name = name
         self.type = raw['type']
