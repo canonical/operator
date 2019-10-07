@@ -78,9 +78,10 @@ class CharmBase(Object):
 
     on = CharmEvents()
 
-    def __init__(self, framework, key, metadata):
+    def __init__(self, framework, key, metadata, charm_dir):
         super().__init__(framework, key)
         self.metadata = metadata
+        self.charm_dir = charm_dir
 
         for relation_name in self.metadata.relations:
             relation_name = relation_name.replace('-', '_')

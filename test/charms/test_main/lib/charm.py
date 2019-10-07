@@ -13,8 +13,8 @@ logger = logging.getLogger()
 
 class Charm(CharmBase):
 
-    def __init__(self, framework, key, metadata):
-        super().__init__(framework, key, metadata)
+    def __init__(self, *args):
+        super().__init__(*args)
 
         # This environment variable controls the test charm behavior.
         charm_config = os.environ.get('CHARM_CONFIG')

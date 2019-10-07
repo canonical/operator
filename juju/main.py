@@ -120,7 +120,7 @@ def main():
     charm_state_path = charm_dir / CHARM_STATE_FILE
     framework = juju.framework.Framework(data_path=charm_state_path)
     try:
-        charm = charm_module.Charm(framework, None, juju.charm.CharmMeta(_load_metadata()))
+        charm = charm_module.Charm(framework, None, juju.charm.CharmMeta(_load_metadata()), charm_dir)
 
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading

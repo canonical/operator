@@ -38,8 +38,8 @@ class TestCharm(unittest.TestCase):
 
         class MyCharm(CharmBase):
 
-            def __init__(self, framework, key, metadata):
-                super().__init__(framework, key, metadata)
+            def __init__(self, *args):
+                super().__init__(*args)
 
                 self.started = False
                 framework.observe(self.on.start, self)
@@ -52,7 +52,7 @@ class TestCharm(unittest.TestCase):
         self.assertIn('custom', events)
 
         framework = self.create_framework()
-        charm = MyCharm(framework, None, CharmMeta())
+        charm = MyCharm(framework, None, CharmMeta(), self.tmpdir)
         charm.on.start.emit()
 
         self.assertEqual(charm.started, True)
@@ -60,13 +60,13 @@ class TestCharm(unittest.TestCase):
     def test_relation_events(self):
 
         class MyCharm(CharmBase):
-            def __init__(self, framework, key, metadata):
-                super().__init__(framework, key, metadata)
+            def __init__(self, *args):
+                super().__init__(*args)
                 self.seen = []
                 for event_kind, bound_event in self.on.events().items():
                     # hook up relation events to generic handler
                     if 'relation' in event_kind:
-                        framework.observe(bound_event, self.on_any_relation)
+                        self.framework.observe(bound_event, self.on_any_relation)
 
             def on_any_relation(self, event):
                 self.seen.append(f'{type(event).__name__}')
@@ -87,7 +87,7 @@ class TestCharm(unittest.TestCase):
             },
         })
 
-        charm = MyCharm(self.create_framework(), None, metadata)
+        charm = MyCharm(self.create_framework(), None, metadata, self.tmpdir)
 
         charm.on.req1_relation_joined.emit()
         charm.on.req1_relation_changed.emit()
@@ -110,13 +110,13 @@ class TestCharm(unittest.TestCase):
     def test_storage_events(self):
 
         class MyCharm(CharmBase):
-            def __init__(self, framework, key, metadata):
-                super().__init__(framework, key, metadata)
+            def __init__(self, *args):
+                super().__init__(*args)
                 self.seen = []
-                framework.observe(self.on.stor1_storage_attached, self)
-                framework.observe(self.on.stor2_storage_detaching, self)
-                framework.observe(self.on.stor3_storage_attached, self)
-                framework.observe(self.on.stor_4_storage_attached, self)
+                self.framework.observe(self.on.stor1_storage_attached, self)
+                self.framework.observe(self.on.stor2_storage_detaching, self)
+                self.framework.observe(self.on.stor3_storage_attached, self)
+                self.framework.observe(self.on.stor_4_storage_attached, self)
 
             def on_stor1_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
@@ -160,7 +160,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(metadata.storage['stor3'].multiple_range, (2, None))
         self.assertEqual(metadata.storage['stor-4'].multiple_range, (2, 4))
 
-        charm = MyCharm(self.create_framework(), None, metadata)
+        charm = MyCharm(self.create_framework(), None, metadata, self.tmpdir)
 
         charm.on.stor1_storage_attached.emit()
         charm.on.stor2_storage_detaching.emit()
