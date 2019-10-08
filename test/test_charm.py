@@ -8,7 +8,7 @@ from pathlib import Path
 
 from juju.charm import CharmBase, CharmMeta
 from juju.charm import CharmEvents
-from juju.framework import Framework
+from juju.framework import Framework, Event, EventBase
 
 
 class TestCharm(unittest.TestCase):
@@ -16,8 +16,12 @@ class TestCharm(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
 
-        class TestCharmEvents(CharmEvents):
+        class CustomEvent(EventBase):
             pass
+
+        class TestCharmEvents(CharmEvents):
+            custom = Event(CustomEvent)
+
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
         CharmBase.on = TestCharmEvents()
@@ -62,6 +66,10 @@ class TestCharm(unittest.TestCase):
 
             def on_any_relation(self, event):
                 self.seen.append(f'{type(event).__name__}')
+
+        events = list(MyCharm.on.events())
+        self.assertIn('install', events)
+        self.assertIn('custom', events)
 
         metadata = CharmMeta({
             'name': 'my-charm',

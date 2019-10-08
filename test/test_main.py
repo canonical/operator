@@ -212,7 +212,6 @@ class TestMain(unittest.TestCase):
             self.assertTrue(event_name in files)
 
             for event_hook in event_hooks:
-                print(f'event_hook: {event_hook}')
                 self.assertTrue(os.path.exists(event_hook))
                 self.assertEqual(os.readlink(event_hook), 'install')
                 self.assertEqual(os.readlink('hooks/install'),
