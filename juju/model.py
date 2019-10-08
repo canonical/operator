@@ -4,8 +4,11 @@ from subprocess import run, PIPE
 
 class Model:
     def __init__(self, data):
-        self.app = Application(data['application_name'], [Unit(unit_name)
-                                                          for unit_name in data['units']])
+        if 'units' in data:
+            units = [Unit(unit_name) for unit_name in data['units']]
+        else:
+            units = self._lazy_load_peer_units()
+        self.app = Application(data['application_name'], units)
         self.unit = Unit(data['unit_name'])
         self.relations = RelationMap(data['relations'])
 
@@ -25,6 +28,15 @@ class Model:
             return None
         else:
             return self.relations[relation_name][0]
+
+    def _lazy_load_peer_units(self):
+        """Return a generator which lazy-loads the list of peer units."""
+        # In lieu of an implicit peer relation, goal-state seems to be the only way to find out
+        # what our peer units are. The information it returns, however, is rather limited.
+        output = run(['goal-state'], stdout=PIPE, check=True).stdout
+        data = yaml.safe_load(output.decode('utf8'))
+        for unit_name in data['units']:
+            yield Unit(unit_name)
 
 
 class Application:

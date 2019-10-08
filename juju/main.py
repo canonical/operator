@@ -106,6 +106,7 @@ def main():
     import charm as charm_module
     import juju.charm
     import juju.framework
+    import juju.model
 
     charm_dir = _get_charm_dir()
 
@@ -114,13 +115,22 @@ def main():
     # of events from debugging sessions.
     juju_event_name = Path(sys.argv[0]).name
 
+    metadata = juju.charm.CharmMeta(_load_metadata())
+    unit_name = os.environ['JUJU_UNIT_NAME']
+    app_name = unit_name.split('/')[0]
+    model = juju.model.Model({
+        'application_name': app_name,
+        'unit_name': unit_name,
+        'relations': {relation_name: None for relation_name in metadata.relations},
+    })
+
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
-    framework = juju.framework.Framework(data_path=charm_state_path)
+    framework = juju.framework.Framework(data_path=charm_state_path, model=model)
     try:
-        charm = charm_module.Charm(framework, None, juju.charm.CharmMeta(_load_metadata()), charm_dir)
+        charm = charm_module.Charm(framework, None, metadata, charm_dir)
 
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading

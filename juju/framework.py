@@ -335,8 +335,9 @@ class SQLiteStorage:
 
 class Framework:
 
-    def __init__(self, data_path):
+    def __init__(self, data_path, model):
         self._data_path = data_path
+        self.model = model
         self._event_count = 0
         self._observers = []      # [(observer, method_name, parent_path, event_key)]
         self._observer = {}       # {observer_path: observer}
