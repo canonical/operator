@@ -1,16 +1,15 @@
-import yaml
+import json
+from collections.abc import Mapping
+from functools import lru_cache
 from subprocess import run, PIPE
 
 
 class Model:
-    def __init__(self, data):
-        if 'units' in data:
-            units = [Unit(unit_name) for unit_name in data['units']]
-        else:
-            units = self._lazy_load_peer_units()
-        self.app = Application(data['application_name'], units)
-        self.unit = Unit(data['unit_name'])
-        self.relations = RelationMap(data['relations'])
+    def __init__(self, app_name, unit_name, relation_names, backend=None):
+        self.app = Application(app_name, self._lazy_load_peer_units)
+        self.unit = Unit(unit_name)
+        self._backend = backend or ModelBackend()
+        self.relations = RelationMap(relation_names, self.app, self.unit, self._backend)
 
     def relation(self, relation_name):
         """Return the first Relation object for the named relation, or None.
@@ -30,23 +29,26 @@ class Model:
             return self.relations[relation_name][0]
 
     def _lazy_load_peer_units(self):
-        """Return a generator which lazy-loads the list of peer units."""
         # In lieu of an implicit peer relation, goal-state seems to be the only way to find out
-        # what our peer units are. The information it returns, however, is rather limited.
-        output = run(['goal-state'], stdout=PIPE, check=True).stdout
-        data = yaml.safe_load(output.decode('utf8'))
-        for unit_name in data['units']:
-            yield Unit(unit_name)
+        # what our peer units are. The information it returns is rather limited, but is enough
+        # for our purposes here.
+        return [Unit(unit_name) for unit_name in self._backend.goal_state()['units']]
 
 
 class Application:
     def __init__(self, name, units):
-        # TODO Do we want to move to UUIDs? Is that even possible with the number of
-        # places that rely on unit names being of the form {app_name}/{unit_number}?
-        # Note that CMRs don't expose the actual unit name, but still follow the form,
-        # using someething like remote-56a0f163eb4e4f2e88d50983dca7be02/0.
         self.name = name
-        self.units = units
+        self._units = units
+
+    def __repr__(self):
+        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
+
+    @property
+    def units(self):
+        # This property allows for the list of units to be lazy-loaded by passing in a function instead of a list.
+        if callable(self._units):
+            self._units = self._units()
+        return self._units
 
     def __hash__(self):
         # An Application instance from one relation will not be identical to one from another relation,
@@ -57,17 +59,16 @@ class Application:
 
     def __eq__(self, other):
         if not isinstance(other, Application):
-            raise TypeError(f"'==' not supported between instances of '{type(self).__name__}' and '{type(other).__name__}'")
+            return False
         return self.name == other.name
 
 
 class Unit:
     def __init__(self, name):
-        # TODO Do we want to move to UUIDs? Is that even possible with the number of
-        # places that rely on unit names being of the form {app_name}/{unit_number}?
-        # Note that CMRs don't expose the actual unit name, but still follow the form,
-        # using someething like remote-56a0f163eb4e4f2e88d50983dca7be02/0.
         self.name = name
+
+    def __repr__(self):
+        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
     def __hash__(self):
         # A Unit instance from one relation will not be identical to one from another relation.
@@ -78,92 +79,105 @@ class Unit:
 
     def __eq__(self, other):
         if not isinstance(other, Unit):
-            raise TypeError(f"'==' not supported between instances of '{type(self).__name__}' and '{type(other).__name__}'")
+            return False
         return self.name == other.name
 
 
-class RelationMap(dict):
-    """Map of relation names to lists of Relation instances.
+class RelationMap(Mapping):
+    """Map of relation names to lists of Relation instances."""
+    def __init__(self, relation_names, local_app, local_unit, backend=None):
+        self._relation_names = relation_names
+        self._local_app = local_app
+        self._local_unit = local_unit
+        self._backend = backend or ModelBackend()
 
-    The data for each relation name may be lazy-loaded.
-    """
-    def __init__(self, data):
-        super().__init__()
-        for relation_name, relations in data.items():
-            if relations is not None:
-                relations = [Relation(relation_id, relation_data)
-                             for relation_id, relation_data in sorted(relations.items())]
-            self[relation_name] = relations
+    def __hash__(self):
+        return id(self)
 
+    def __eq__(self, other):
+        return self is other
+
+    def __iter__(self):
+        return iter(self._relation_names)
+
+    def __len__(self):
+        return len(self._relation_names)
+
+    @lru_cache(maxsize=None)
     def __getitem__(self, relation_name):
-        value = super().__getitem__(relation_name)
-        if value is None:
-            # Lazy-load the list of relations for this relation name.
-            output = run(['relation-ids', relation_name, '--format=yaml'], stdout=PIPE, check=True).stdout
-            value = [Relation(relation_id) for relation_id in yaml.safe_load(output.decode('utf8'))]
-            self[relation_name] = value
-        return value
+        # Lazy-load the list of relations for this relation name.
+        relation_ids = self._backend.relation_ids(relation_name)
+        return [Relation(relation_name, relation_id, self._local_app, self._local_unit, self._backend) for relation_id in relation_ids]
 
 
 class Relation:
-    def __init__(self, relation_id, data=None):
+    def __init__(self, relation_name, relation_id, local_app, local_unit, backend=None):
+        self.relation_name = relation_name
         self.relation_id = relation_id
-        self.data = RelationData(relation_id, data)
-        if data is not None:
-            self._apps = [key for key in self.data if isinstance(key, Application)]
-        else:
-            self._apps = None
+        self._backend = backend or ModelBackend()
+        self.data = RelationData(self.relation_name, relation_id, local_app, local_unit, self._backend)
 
     @property
+    @lru_cache(maxsize=None)
     def apps(self):
-        if self._apps is None:
-            # Lazy-load the apps on this relation.
-            output = run(['relation-list', '-r', self.relation_id, '--format=yaml'], stdout=PIPE, check=True).stdout
-            member_names = yaml.safe_load(output.decode('utf8'))
-            units_by_app = {}
-            for member_name in sorted(member_names):
-                if '/' not in member_name:
-                    # Handle possible future support from Juju for application relation data.
-                    continue
-                app_name = member_name.split('/')[0]
-                units_by_app.setdefault(app_name, []).append(Unit(member_name))
-            self._apps = [Application(app_name, units) for app_name, units in sorted(units_by_app.items())]
-        return self._apps
+        # Lazy-load the apps on this relation.
+        unit_names = self._backend.relation_list(self.relation_id)
+        apps = {}
+        for unit_name in unit_names:
+            app_name = unit_name.split('/')[0]
+            app = apps.get(app_name)
+            if not app:
+                app = apps[app_name] = Application(app_name, [])
+            app.units.append(Unit(unit_name))
+        return list(apps.values())
 
 
-class RelationData(dict):
-    def __init__(self, relation_id, relation_data=None):
-        super().__init__()
+class RelationData(Mapping):
+    def __init__(self, relation_name, relation_id, local_app, local_unit, backend=None):
+        self.relation_name = relation_name
         self.relation_id = relation_id
-        if relation_data is not None:
-            app_units = {}
-            for app_or_unit_name, member_data in sorted(relation_data.items()):
-                # Apps and units are represented in the same data structure to match the expected
-                # pattern for interacting with Juju and how we present it to the charm code. However,
-                # this means we have to distinguish them by the presence or lack of a / in the name.
-                if '/' not in app_or_unit_name:
-                    # Skip the apps until we have all of the info about which
-                    # of its units are available on the relation.
-                    continue
-                unit = Unit(app_or_unit_name)
-                app_name = unit.name.split('/')[0]
-                app_units.setdefault(app_name, []).append(unit)
-                self[unit] = member_data
-            for app_name, units in app_units.items():
-                app = Application(app_name, units)
-                self[app] = relation_data[app.name]
+        self._local_app = local_app
+        self._local_unit = local_unit
+        self._backend = backend or ModelBackend()
 
-    def __getitem__(self, app_or_unit):
-        if app_or_unit not in self:
-            # Lazy-load the data for this relation member.
-            # TODO: We should also lazy-load the list of members so that
-            # KeyErrors can be raised if invalid members are accessed.
-            output = run(['relation-get', '-r', self.relation_id, '-', app_or_unit.name, '--format=yaml'], stdout=PIPE, check=True).stdout
-            value = yaml.safe_load(output.decode('utf8'))
-            self[app_or_unit] = value
-        else:
-            value = super().__getitem__(app_or_unit)
-        return value
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return self is other
+
+    @property
+    @lru_cache(maxsize=None)
+    def _members(self):
+        # Lazy-load the list of members for this relation.
+        members = set()
+        members.add(self._local_app)
+        members.add(self._local_unit)
+        unit_names = self._backend.relation_list(self.relation_id)
+        apps = {}
+        for unit_name in unit_names:
+            app_name = unit_name.split('/')[0]
+            app = apps.get(app_name)
+            if not app:
+                app = apps[app_name] = Application(app_name, [])
+                members.add(app)
+            unit = Unit(unit_name)
+            members.add(unit)
+            app.units.append(unit)
+        return members
+
+    def __iter__(self):
+        return iter(self._members)
+
+    def __len__(self):
+        return len(self._members)
+
+    @lru_cache(maxsize=None)
+    def __getitem__(self, member):
+        # Lazy-load the data for this relation member.
+        if member not in self._members:
+            raise KeyError(member)
+        return self._backend.relation_get(self.relation_id, member.name)
 
 
 class ModelError(Exception):
@@ -176,3 +190,21 @@ class TooManyRelatedApps(ModelError):
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
+
+
+class ModelBackend:
+    def goal_state(self):
+        output = run(['goal-state', '--format=json'], stdout=PIPE, check=True).stdout
+        return json.loads(output.decode('utf8'))
+
+    def relation_ids(self, relation_name):
+        output = run(['relation-ids', relation_name, '--format=json'], stdout=PIPE, check=True).stdout
+        return json.loads(output.decode('utf8'))
+
+    def relation_list(self, relation_id):
+        output = run(['relation-list', '-r', relation_id, '--format=json'], stdout=PIPE, check=True).stdout
+        return json.loads(output.decode('utf8'))
+
+    def relation_get(self, relation_id, member_name):
+        output = run(['relation-get', '-r', relation_id, '-', member_name, '--format=json'], stdout=PIPE, check=True).stdout
+        return json.loads(output.decode('utf8'))

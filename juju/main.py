@@ -118,11 +118,7 @@ def main():
     metadata = juju.charm.CharmMeta(_load_metadata())
     unit_name = os.environ['JUJU_UNIT_NAME']
     app_name = unit_name.split('/')[0]
-    model = juju.model.Model({
-        'application_name': app_name,
-        'unit_name': unit_name,
-        'relations': {relation_name: None for relation_name in metadata.relations},
-    })
+    model = juju.model.Model(app_name, unit_name, list(metadata.relations))
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
