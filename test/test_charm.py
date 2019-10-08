@@ -47,6 +47,10 @@ class TestCharm(unittest.TestCase):
             def on_start(self, event):
                 self.started = True
 
+        events = list(MyCharm.on.events())
+        self.assertIn('install', events)
+        self.assertIn('custom', events)
+
         framework = self.create_framework()
         charm = MyCharm(framework, None, CharmMeta())
         charm.on.start.emit()
@@ -66,10 +70,6 @@ class TestCharm(unittest.TestCase):
 
             def on_any_relation(self, event):
                 self.seen.append(f'{type(event).__name__}')
-
-        events = list(MyCharm.on.events())
-        self.assertIn('install', events)
-        self.assertIn('custom', events)
 
         metadata = CharmMeta({
             'name': 'my-charm',
