@@ -218,6 +218,13 @@ class EventsBase(Object):
 
     @classmethod
     def define_event(cls, event_kind, event_type):
+        """Define an event on this type at runtime.
+
+        cls -- a type to define an event on.
+        event_kind -- an attribute name that will be used to access the event. Dashes will be converted to underscores.
+        event_type -- a type of the event to define.
+        """
+        event_kind = event_kind.replace('-', '_')
         event_descriptor = Event(event_type)
         event_descriptor.__set_name__(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
