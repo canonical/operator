@@ -83,12 +83,14 @@ class CharmBase(Object):
         self.metadata = metadata
 
         for relation_name in self.metadata.relations:
+            relation_name = relation_name.replace('-', '_')
             self.on.define_event(f'{relation_name}_relation_joined', RelationJoinedEvent)
             self.on.define_event(f'{relation_name}_relation_changed', RelationChangedEvent)
             self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
             self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
 
         for storage_name in metadata.storage:
+            storage_name = storage_name.replace('-', '_')
             self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
 

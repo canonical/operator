@@ -3,7 +3,7 @@ import marshal
 import types
 import sqlite3
 import collections
-
+import keyword
 
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
@@ -218,6 +218,22 @@ class EventsBase(Object):
 
     @classmethod
     def define_event(cls, event_kind, event_type):
+        """Define an event on this type at runtime.
+
+        cls -- a type to define an event on.
+        event_kind -- an attribute name that will be used to access the event. Must be a valid python identifier, not be a keyword or an existing attribute.
+        event_type -- a type of the event to define.
+        """
+        if not event_kind.isidentifier():
+            raise RuntimeError(f'unable to define an event with event_kind that is not a valid python identifier: {event_kind}')
+        elif keyword.iskeyword(event_kind):
+            raise RuntimeError(f'unable to define an event with event_kind that is a python keyword: {event_kind}')
+        try:
+            getattr(cls, event_kind)
+            raise RuntimeError(f'unable to define an event with event_kind that overlaps with an existing type {cls} attribute: {event_kind}')
+        except AttributeError:
+            pass
+
         event_descriptor = Event(event_type)
         event_descriptor.__set_name__(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)

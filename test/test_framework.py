@@ -417,6 +417,12 @@ class TestFramework(unittest.TestCase):
         class MyBar(EventBase):
             pass
 
+        class DeadBeefEvent(EventBase):
+            pass
+
+        class NoneEvent(EventBase):
+            pass
+
         pub.on_a.define_event("foo", MyFoo)
         pub.on_b.define_event("bar", MyBar)
 
@@ -431,6 +437,18 @@ class TestFramework(unittest.TestCase):
         # Definitions remained local to the specific type.
         self.assertRaises(AttributeError, lambda: pub.on_a.bar)
         self.assertRaises(AttributeError, lambda: pub.on_b.foo)
+
+        # Try to use an event name which is not a valid python identifier.
+        with self.assertRaises(RuntimeError):
+            pub.on_a.define_event("dead-beef", DeadBeefEvent)
+
+        # Try to use a python keyword for an event name.
+        with self.assertRaises(RuntimeError):
+            pub.on_a.define_event("None", NoneEvent)
+
+        # Try to override an existing attribute.
+        with self.assertRaises(RuntimeError):
+            pub.on_a.define_event("foo", MyFoo)
 
 
 class TestStoredState(unittest.TestCase):
