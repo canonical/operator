@@ -28,13 +28,20 @@ def _load_metadata():
     return metadata
 
 
-def _handle_event_link(charm_dir, event_name):
+def _handle_event_link(charm_dir, bound_event):
     """Create a symlink for a particular event.
 
     charm_dir -- A root directory of the charm
     event_name -- A name of the event for which to create a symlink.
     """
-    event_hook_path = charm_dir / 'hooks' / event_name.replace('_', '-')
+    from juju.charm import InstallEvent
+
+    if issubclass(bound_event.event_type, InstallEvent):
+        # We don't set up the link for install events, since we assume it's already in place
+        # (otherwise, we would never have been called).
+        return
+
+    event_hook_path = charm_dir / 'hooks' / bound_event.event_kind.replace('_', '-')
     create_link = True
     # Remove incorrect symlinks or files.
     if event_hook_path.exists():
@@ -73,9 +80,13 @@ def _setup_hooks(charm_dir, charm):
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
     """
-    for event_name in charm.on.events().keys():
-        if event_name != 'install':
-            _handle_event_link(charm_dir, event_name)
+    from juju.charm import JujuHookEvent
+
+    def is_hook_event(bound_event):
+        return issubclass(bound_event.event_type, JujuHookEvent)
+
+    for bound_event in filter(is_hook_event, charm.on.events().values()):
+        _handle_event_link(charm_dir, bound_event)
 
 
 def _emit_charm_event(charm, event_name):
