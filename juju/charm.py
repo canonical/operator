@@ -1,70 +1,62 @@
 from juju.framework import Object, Event, EventBase, EventsBase
 
 
-class JujuEvent(EventBase):
+class InstallEvent(EventBase):
+    pass
+
+class StartEvent(EventBase):
+    pass
+
+class StopEvent(EventBase):
+    pass
+
+class ConfigChangedEvent(EventBase):
+    pass
+
+class UpdateStatusEvent(EventBase):
+    pass
+
+class UpgradeCharmEvent(EventBase):
+    pass
+
+class PreSeriesUpgradeEvent(EventBase):
+    pass
+
+class PostSeriesUpgradeEvent(EventBase):
+    pass
+
+class LeaderElectedEvent(EventBase):
+    pass
+
+class LeaderSettingsChangedEvent(EventBase):
     pass
 
 
-class JujuHookEvent(JujuEvent):
+class RelationEventBase(EventBase):
     pass
 
 
-class InstallEvent(JujuHookEvent):
+class RelationJoinedEvent(RelationEventBase):
     pass
 
-class StartEvent(JujuHookEvent):
+class RelationChangedEvent(RelationEventBase):
     pass
 
-class StopEvent(JujuHookEvent):
+class RelationDepartedEvent(RelationEventBase):
     pass
 
-class ConfigChangedEvent(JujuHookEvent):
-    pass
-
-class UpdateStatusEvent(JujuHookEvent):
-    pass
-
-class UpgradeCharmEvent(JujuHookEvent):
-    pass
-
-class PreSeriesUpgradeEvent(JujuHookEvent):
-    pass
-
-class PostSeriesUpgradeEvent(JujuHookEvent):
-    pass
-
-class LeaderElectedEvent(JujuHookEvent):
-    pass
-
-class LeaderSettingsChangedEvent(JujuHookEvent):
+class RelationBrokenEvent(RelationEventBase):
     pass
 
 
-class RelationEvent(JujuHookEvent):
+class StorageEventBase(EventBase):
     pass
 
 
-class RelationJoinedEvent(RelationEvent):
+class StorageAttachedEvent(StorageEventBase):
     pass
 
-class RelationChangedEvent(RelationEvent):
-    pass
-
-class RelationDepartedEvent(RelationEvent):
-    pass
-
-class RelationBrokenEvent(RelationEvent):
-    pass
-
-
-class StorageEvent(JujuHookEvent):
-    pass
-
-
-class StorageAttachedEvent(StorageEvent):
-    pass
-
-class StorageDetachingEvent(StorageEvent):
+class StorageDetachingEvent(StorageEventBase):
     pass
 
 

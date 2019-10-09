@@ -73,12 +73,8 @@ def _setup_hooks(charm_dir, charm):
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
     """
-    import juju.charm
-
-    for event_name, bound_event in charm.on.events().items():
-        is_juju_event = issubclass(bound_event.event_type, juju.charm.JujuEvent)
-        is_install_event = issubclass(bound_event.event_type, juju.charm.InstallEvent)
-        if is_juju_event and not is_install_event:
+    for event_name in charm.on.events().keys():
+        if event_name != 'install':
             _handle_event_link(charm_dir, event_name)
 
 
