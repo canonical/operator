@@ -146,9 +146,8 @@ class RelationData(Mapping):
     def __eq__(self, other):
         return self is other
 
-    @property
     @lru_cache(maxsize=None)
-    def _members(self):
+    def keys(self):
         # Lazy-load the list of members for this relation.
         members = set()
         members.add(self._local_app)
@@ -175,7 +174,7 @@ class RelationData(Mapping):
     @lru_cache(maxsize=None)
     def __getitem__(self, member):
         # Lazy-load the data for this relation member.
-        if member not in self._members:
+        if member not in self.keys():
             raise KeyError(member)
         return self._backend.relation_get(self.relation_id, member.name)
 
