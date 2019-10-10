@@ -5,34 +5,7 @@ import unittest
 import juju.model
 
 
-class TestModelBackend:
-    app_name = 'myapp'
-    unit_name = 'myapp/0'
-    relation_names = ['db0', 'db1', 'db2']
-
-    @classmethod
-    def get_model(cls):
-        return juju.model.Model(cls.app_name, cls.unit_name, cls.relation_names, cls())
-
-    model_data = {
-        'application_name': 'myapp',
-        'unit_name': 'myapp/0',
-        'units': [
-            'myapp/0',
-            'myapp/1',
-        ],
-        'relations': {
-            'db0': {},
-            'db1': {
-            },
-            'db2': {
-            },
-        },
-    }
-
-    def goal_state(self):
-        return {'units': ['myapp/0', 'myapp/1']}
-
+class TestModelBackend(juju.model.ModelBackend):
     def relation_ids(self, relation_name):
         return {
             'db0': [],
@@ -50,61 +23,37 @@ class TestModelBackend:
     def relation_get(self, relation_id, member_name):
         return {
             'db1:1': {
-                'myapp': {'uri': 'jdbc:pgsql://my-app-0/mydb'},
                 'myapp/0': {'host': 'myapp-0'},
-                'remoteapp1': {'db-name': 'mydb'},
                 'remoteapp1/0': {'host': 'remoteapp1-0'},
             },
             'db2:1': {
-                'myapp': {'uri': 'jdbc:pgsql://my-app-0/mydb'},
                 'myapp/0': {'host': 'myapp-0'},
-                'remoteapp1': {'db-name': 'mydb'},
                 'remoteapp1/0': {'host': 'remoteapp1-0'},
             },
             'db2:2': {
-                'myapp': {'uri': 'jdbc:pgsql://my-app-0/mydb'},
                 'myapp/0': {'host': 'myapp-0'},
-                'remoteapp2': {'db-name': 'mydb'},
                 'remoteapp2/0': {'host': 'remoteapp2-0'},
             },
         }[relation_id][member_name]
 
 
 class TestModel(unittest.TestCase):
-    def test_apps(self):
-        model = TestModelBackend.get_model()
-        myapp = juju.model.Application('myapp', [])
-        otherapp = juju.model.Application('otherapp', [])
-        self.assertIsNot(model.app, myapp)
-        self.assertIsNot(model.app, otherapp)
-        self.assertEqual(model.app, myapp)
-        self.assertNotEqual(model.app, otherapp)
-        d = {model.app: 'myapp',
-             myapp: 'myapp',
-             otherapp: 'remoteapp'}
-        self.assertEqual(d, {myapp: 'myapp', otherapp: 'remoteapp'})
-        self.assertEqual(model.app.units, [model.unit, juju.model.Unit('myapp/1')])
+    def setUp(self):
+        self.model = juju.model.Model(['db0', 'db1', 'db2'], TestModelBackend('myapp/0'))
 
-    def test_units(self):
-        model = TestModelBackend.get_model()
-        myunit = juju.model.Unit('myapp/0')
-        otherunit = juju.model.Unit('myapp/1')
-        self.assertIsNot(model.unit, myunit)
-        self.assertIsNot(model.unit, otherunit)
-        self.assertEqual(model.unit, myunit)
-        self.assertNotEqual(model.unit, otherunit)
-        d = {model.unit: 'myapp/0',
-             myunit: 'myapp/0',
-             otherunit: 'remoteapp/0'}
-        self.assertEqual(d, {myunit: 'myapp/0', otherunit: 'remoteapp/0'})
-
-    def test_relations(self):
-        model = TestModelBackend.get_model()
-        self.assertIsNone(model.relation('db0'))
-        self.assertIsInstance(model.relation('db1'), juju.model.Relation)
+    def test_model(self):
+        self.assertIs(self.model.app, self.model.unit.app)
+        for relation in self.model.relations['db2']:
+            self.assertIn(self.model.app, relation.apps)
+            self.assertIn(self.model.unit, relation.units)
+            self.assertIn(self.model.unit, relation.data)
+            unit_from_rel = next(filter(lambda u: u.name == 'myapp/0', relation.units))
+            self.assertIs(self.model.unit, unit_from_rel)
+        self.assertIsNone(self.model.relation('db0'))
+        self.assertIsInstance(self.model.relation('db1'), juju.model.Relation)
         with self.assertRaises(juju.model.TooManyRelatedApps):
-            model.relation('db2')
-        self.assertEqual(model.relations['db2'][1].apps, [juju.model.Application('remoteapp2', [])])
-        self.assertEqual(model.relation('db1').data[model.app], {'uri': 'jdbc:pgsql://my-app-0/mydb'})
+            self.model.relation('db2')
         with self.assertRaises(KeyError):
-            model.relation('db1').data[juju.model.Unit('randomunit/0')]
+            self.model.relation('db1').data[juju.model.Unit('randomunit/0', None)]
+        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
+        self.assertEqual(self.model.relation('db1').data[remoteapp1_0], {'host': 'remoteapp1-0'})
