@@ -105,7 +105,6 @@ class RelationMap(Mapping):
 
     @lru_cache(maxsize=None)
     def __getitem__(self, relation_name):
-        # Lazy-load the list of relations for this relation name.
         relation_ids = self._backend.relation_ids(relation_name)
         return [Relation(relation_name, relation_id, self._local_app, self._local_unit, self._backend) for relation_id in relation_ids]
 
@@ -120,7 +119,6 @@ class Relation:
     @property
     @lru_cache(maxsize=None)
     def apps(self):
-        # Lazy-load the apps on this relation.
         unit_names = self._backend.relation_list(self.relation_id)
         apps = {}
         for unit_name in unit_names:
@@ -148,7 +146,6 @@ class RelationData(Mapping):
 
     @lru_cache(maxsize=None)
     def keys(self):
-        # Lazy-load the list of members for this relation.
         members = set()
         members.add(self._local_app)
         members.add(self._local_unit)
@@ -173,7 +170,6 @@ class RelationData(Mapping):
 
     @lru_cache(maxsize=None)
     def __getitem__(self, member):
-        # Lazy-load the data for this relation member.
         if member not in self.keys():
             raise KeyError(member)
         return self._backend.relation_get(self.relation_id, member.name)
