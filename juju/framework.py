@@ -723,3 +723,14 @@ class StoredSet(collections.MutableSet):
 
     def __len__(self):
         return len(self._under)
+
+    @classmethod
+    def _from_iterable(cls, it):
+        """Construct an instance of the class from any iterable input.
+
+        Per https://docs.python.org/3/library/collections.abc.html
+        if the Set mixin is being used in a class with a different constructor signature,
+        you will need to override _from_iterable() with a classmethod that can construct
+        new instances from an iterable argument.
+        """
+        return set(it)
