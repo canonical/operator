@@ -85,11 +85,11 @@ class Unit:
 
 class RelationMap(Mapping):
     """Map of relation names to lists of Relation instances."""
-    def __init__(self, relation_names, local_app, local_unit, backend=None):
+    def __init__(self, relation_names, local_app, local_unit, backend):
         self._relation_names = relation_names
         self._local_app = local_app
         self._local_unit = local_unit
-        self._backend = backend or ModelBackend()
+        self._backend = backend
 
     def __hash__(self):
         return id(self)
@@ -111,10 +111,10 @@ class RelationMap(Mapping):
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, local_app, local_unit, backend=None):
+    def __init__(self, relation_name, relation_id, local_app, local_unit, backend):
         self.relation_name = relation_name
         self.relation_id = relation_id
-        self._backend = backend or ModelBackend()
+        self._backend = backend
         self.data = RelationData(self.relation_name, relation_id, local_app, local_unit, self._backend)
 
     @property
@@ -133,12 +133,12 @@ class Relation:
 
 
 class RelationData(Mapping):
-    def __init__(self, relation_name, relation_id, local_app, local_unit, backend=None):
+    def __init__(self, relation_name, relation_id, local_app, local_unit, backend):
         self.relation_name = relation_name
         self.relation_id = relation_id
         self._local_app = local_app
         self._local_unit = local_unit
-        self._backend = backend or ModelBackend()
+        self._backend = backend
 
     def __hash__(self):
         return id(self)
