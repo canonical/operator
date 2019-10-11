@@ -32,7 +32,7 @@ def _handle_event_link(charm_dir, bound_event):
     """Create a symlink for a particular event.
 
     charm_dir -- A root directory of the charm
-    event_name -- A name of the event for which to create a symlink.
+    bound_event -- An event for which to create a symlink.
     """
     from juju.charm import InstallEvent
 
