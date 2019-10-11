@@ -5,7 +5,7 @@ import unittest
 import juju.model
 
 
-class TestModelBackend(juju.model.ModelBackend):
+class TestModelBackend:
     def relation_ids(self, relation_name):
         return {
             'db0': [],
@@ -39,7 +39,7 @@ class TestModelBackend(juju.model.ModelBackend):
 
 class TestModel(unittest.TestCase):
     def setUp(self):
-        self.model = juju.model.Model(['db0', 'db1', 'db2'], TestModelBackend('myapp/0'))
+        self.model = juju.model.Model('myapp/0', ['db0', 'db1', 'db2'], TestModelBackend())
 
     def test_model(self):
         self.assertIs(self.model.app, self.model.unit.app)
@@ -53,7 +53,8 @@ class TestModel(unittest.TestCase):
         self.assertIsInstance(self.model.relation('db1'), juju.model.Relation)
         with self.assertRaises(juju.model.TooManyRelatedApps):
             self.model.relation('db2')
+        random_unit = self.model._entity_cache.get(juju.model.Unit, 'randomunit/0')
         with self.assertRaises(KeyError):
-            self.model.relation('db1').data[juju.model.Unit('randomunit/0', None)]
+            self.model.relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
         self.assertEqual(self.model.relation('db1').data[remoteapp1_0], {'host': 'remoteapp1-0'})

@@ -1,42 +1,50 @@
 import json
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from functools import lru_cache
 from subprocess import run, PIPE
+from weakref import WeakValueDictionary
 
 
 class Model:
-    def __init__(self, relation_names, backend):
-        self.relations = RelationMap(relation_names, backend)
+    def __init__(self, local_unit_name, relation_names, backend):
+        self._entity_cache = ModelEntityCache(local_unit_name)
         self._backend = backend
-
-    @property
-    def app(self):
-        return self._backend.local_app
-
-    @property
-    def unit(self):
-        return self._backend.local_unit
+        self.relations = RelationMap(relation_names, self._backend, self._entity_cache)
+        self.unit = self._entity_cache.get(Unit, local_unit_name)
+        self.app = self.unit.app
 
     def relation(self, relation_name):
-        """Return the first Relation object for the named relation, or None.
+        """Return the single Relation object for the named relation, or None.
 
-        This is a convenience method for the case where only a single related
-        app is supported. If there are more than one remote apps on the relation,
-        it will raise a TooManyRelatedApps model error. If no there are no remote
-        apps on the relation, it will return None. Otherwise, it is equivalent
-        to self.relations[relation_name][0].
+        This convenience method returns None if the relation is not established, or the
+        single Relation if the relation is established only once. If this same relation
+        is established multiple times the error TooManyRelatedApps is raised.
         """
         num_related = len(self.relations[relation_name])
-        if num_related > 1:
-            raise TooManyRelatedApps(relation_name, num_related, 1)
-        elif num_related == 0:
+        if num_related == 0:
             return None
-        else:
+        elif num_related == 1:
             return self.relations[relation_name][0]
+        else:
+            raise TooManyRelatedApps(relation_name, num_related, 1)
+
+
+class ModelEntityCache(WeakValueDictionary):
+    def __init__(self, local_unit_name):
+        super().__init__()
+        self.local_unit_name = local_unit_name
+
+    def get(self, entity_type, entity_name):
+        key = (entity_type, entity_name)
+        entity = super().get(key)
+        if entity is None:
+            entity = entity_type(entity_name, self)
+            self[key] = entity
+        return entity
 
 
 class Application:
-    def __init__(self, name):
+    def __init__(self, name, entity_cache):
         self.name = name
 
     def __repr__(self):
@@ -44,36 +52,60 @@ class Application:
 
 
 class Unit:
-    def __init__(self, name, app):
+    def __init__(self, name, entity_cache):
         self.name = name
-        self.app = app
+        self.app = entity_cache.get(Application, name.split('/')[0])
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
 
-class RelationMap(Mapping):
-    """Map of relation names to lists of Relation instances."""
-    def __init__(self, relation_names, backend):
-        self._relation_names = relation_names
-        self._backend = backend
+class LazyMapping(Mapping, ABC):
+    @abstractmethod
+    def _load(self):
+        raise NotImplementedError()
 
-    def __iter__(self):
-        return iter(self._relation_names)
+    @property
+    def _data(self):
+        if not hasattr(self, '_lazy_data'):
+            self._lazy_data = self._load()
+        return self._lazy_data
+
+    def __contains__(self, key):
+        return key in self._data
 
     def __len__(self):
-        return len(self._relation_names)
+        return len(self._data)
 
-    def __getitem__(self, relation_name):
-        return self._backend.get_relations(relation_name)
+    def __iter__(self):
+        return iter(self._data)
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+
+class RelationMap(LazyMapping):
+    """Map of relation names to lists of Relation instances."""
+    def __init__(self, relation_names, backend, entity_cache):
+        self._relation_names = relation_names
+        self._backend = backend
+        self._entity_cache = entity_cache
+
+    def _load(self):
+        data = {}
+        for relation_name in self._relation_names:
+            relations = data[relation_name] = []
+            for relation_id in self._backend.relation_ids(relation_name):
+                relations.append(Relation(relation_name, relation_id, self._backend, self._entity_cache))
+        return data
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, backend):
+    def __init__(self, relation_name, relation_id, backend, entity_cache):
         self.relation_name = relation_name
         self.relation_id = relation_id
         self._backend = backend
-        self.data = RelationData(self.relation_name, relation_id, self._backend)
+        self.data = RelationData(self.relation_name, relation_id, self._backend, entity_cache)
 
     @property
     def apps(self):
@@ -84,29 +116,34 @@ class Relation:
         return list(self.data.keys())
 
 
-class RelationData(Mapping):
-    def __init__(self, relation_name, relation_id, backend):
+class RelationData(LazyMapping):
+    def __init__(self, relation_name, relation_id, backend, entity_cache):
         self.relation_name = relation_name
         self.relation_id = relation_id
         self._backend = backend
-        self._keys = self._backend.get_relation_members(self.relation_id)
+        self._entity_cache = entity_cache
 
-    def keys(self):
-        return self._keys
+    def _load(self):
+        data = {}
+        for unit_name in self._backend.relation_list(self.relation_id):
+            unit = self._entity_cache.get(Unit, unit_name)
+            data[unit] = RelationDataBag(self.relation_id, unit, self._backend)
+        # Juju's relation-list doesn't include the local unit(s), even though they are part of
+        # the relation. Technically, you can also call relation-get for your peers' data, but
+        # we don't want to support that, so we only manually add this local unit.
+        local_unit = self._entity_cache.get(Unit, self._entity_cache.local_unit_name)
+        data[local_unit] = RelationDataBag(self.relation_id, local_unit, self._backend)
+        return data
 
-    def __contains__(self, key):
-        return key in self._keys
 
-    def __iter__(self):
-        return iter(self._keys)
+class RelationDataBag(LazyMapping):
+    def __init__(self, relation_id, unit, backend):
+        self.relation_id = relation_id
+        self.unit = unit
+        self._backend = backend
 
-    def __len__(self):
-        return len(self._keys)
-
-    def __getitem__(self, member):
-        if member not in self._keys:
-            raise KeyError(member)
-        return self._backend.relation_get(self.relation_id, member.name)
+    def _load(self):
+        return self._backend.relation_get(self.relation_id, self.unit.name)
 
 
 class ModelError(Exception):
@@ -122,46 +159,14 @@ class TooManyRelatedApps(ModelError):
 
 
 class ModelBackend:
-    def __init__(self, local_unit_name):
-        local_app_name = local_unit_name.split('/')[0]
-        self.local_app = Application(local_app_name)
-        self.local_unit = Unit(local_unit_name, self.local_app)
-        self._apps = {local_app_name: self.local_app}
-        self._units = {local_unit_name: self.local_unit}
+    def _run(self, *args):
+        return json.loads(run(args + ('--format=json',), stdout=PIPE, check=True).stdout.decode('utf8'))
 
     def relation_ids(self, relation_name):
-        output = run(['relation-ids', relation_name, '--format=json'], stdout=PIPE, check=True).stdout
-        return json.loads(output.decode('utf8'))
+        return self._run('relation-ids', relation_name)
 
     def relation_list(self, relation_id):
-        output = run(['relation-list', '-r', relation_id, '--format=json'], stdout=PIPE, check=True).stdout
-        return json.loads(output.decode('utf8'))
+        return self._run('relation-list', '-r', relation_id)
 
-    @lru_cache(maxsize=None)
     def relation_get(self, relation_id, member_name):
-        output = run(['relation-get', '-r', relation_id, '-', member_name, '--format=json'], stdout=PIPE, check=True).stdout
-        return json.loads(output.decode('utf8'))
-
-    @lru_cache(maxsize=None)
-    def get_relations(self, relation_name):
-        relation_ids = self.relation_ids(relation_name)
-        return [Relation(relation_name, relation_id, self) for relation_id in relation_ids]
-
-    @lru_cache(maxsize=None)
-    def get_relation_members(self, relation_id):
-        # The local unit is always a member of this charm's relations.
-        # TODO: Juju will add support for application-level relation data, at
-        # which point the local app will also become a member of all relations.
-        members = {self.local_unit}
-        for remote_unit_name in self.relation_list(relation_id):
-            remote_app_name = remote_unit_name.split('/')[0]
-            remote_app = self._apps.get(remote_app_name)
-            if remote_app is None:
-                remote_app = self._apps[remote_app_name] = Application(remote_app_name)
-            remote_unit = self._units.get(remote_unit_name)
-            if remote_unit is None:
-                remote_unit = self._units[remote_unit_name] = Unit(remote_unit_name, remote_app)
-            # TODO: When Juju adds support for application-level relation data, the
-            # remote app will also be a member of the relation.
-            members.add(remote_unit)
-        return list(members)
+        return self._run('relation-get', '-r', relation_id, '-', member_name)
