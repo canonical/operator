@@ -174,10 +174,6 @@ class HandleKind:
         return obj_type.__name__
 
 
-def _is_unbound_event(obj):
-    return isinstance(obj, Event)
-
-
 class Object:
 
     handle_kind = HandleKind()
@@ -194,8 +190,12 @@ class Object:
         # TODO This can probably be dropped, because the event type is only
         # really relevant if someone is either emitting the event or observing
         # it.
-        for event_kind, unbound_event in inspect.getmembers(type(self), _is_unbound_event):
-            self.framework.register_type(unbound_event.event_type, self, event_kind)
+        for attr_name, attr_value in inspect.getmembers(type(self)):
+            if isinstance(attr_value, Event):
+                event_type = attr_value.event_type
+                event_kind = attr_name
+                emitter = self
+                self.framework.register_type(event_type, emitter, event_kind)
 
         # TODO Detect conflicting handles here.
 
@@ -228,11 +228,13 @@ class EventsBase(Object):
         events_map = {}
         # We have to iterate over the class rather than instance to allow for properties which
         # might call this method (e.g., event views), leading to infinite recursion.
-        for event_kind, unbound_event in inspect.getmembers(type(self), _is_unbound_event):
-            # We actually care about the bound_event, however, since it
-            # provides the most info for users of this method.
-            bound_event = getattr(self, event_kind)
-            events_map[event_kind] = bound_event
+        for attr_name, attr_value in inspect.getmembers(type(self)):
+            if isinstance(attr_value, Event):
+                # We actually care about the bound_event, however, since it
+                # provides the most info for users of this method.
+                event_kind = attr_name
+                bound_event = getattr(self, event_kind)
+                events_map[event_kind] = bound_event
         return events_map
 
 
