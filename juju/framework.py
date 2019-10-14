@@ -1,3 +1,4 @@
+import inspect
 import pickle
 import marshal
 import types
@@ -189,13 +190,12 @@ class Object:
         # TODO This can probably be dropped, because the event type is only
         # really relevant if someone is either emitting the event or observing
         # it.
-        for cls in type(self).__mro__:
-            for attr_name, attr_value in cls.__dict__.items():
-                if isinstance(attr_value, Event):
-                    event_type = attr_value.event_type
-                    event_kind = attr_name
-                    emitter = self
-                    self.framework.register_type(event_type, emitter, event_kind)
+        for attr_name, attr_value in inspect.getmembers(type(self)):
+            if isinstance(attr_value, Event):
+                event_type = attr_value.event_type
+                event_kind = attr_name
+                emitter = self
+                self.framework.register_type(event_type, emitter, event_kind)
 
         # TODO Detect conflicting handles here.
 
@@ -242,14 +242,13 @@ class EventsBase(Object):
         """Return a mapping of event_kinds to bound_events for all available events.
         """
         events_map = {}
-        for event_kind, unbound_event in type(self).__dict__.items():
-            # We have to filter based on the unbound_event (class attribute)
-            # rather than the bound_event (instance attribute) to allow for
-            # any instance properties which rely on this method (e.g., to
-            # present groups of events) which would lead to infinite recursion.
-            if isinstance(unbound_event, Event):
+        # We have to iterate over the class rather than instance to allow for properties which
+        # might call this method (e.g., event views), leading to infinite recursion.
+        for attr_name, attr_value in inspect.getmembers(type(self)):
+            if isinstance(attr_value, Event):
                 # We actually care about the bound_event, however, since it
                 # provides the most info for users of this method.
+                event_kind = attr_name
                 bound_event = getattr(self, event_kind)
                 events_map[event_kind] = bound_event
         return events_map
