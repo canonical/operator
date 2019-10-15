@@ -6,6 +6,9 @@ import juju.model
 
 
 class TestModelBackend:
+    _is_leader = False
+    _leader_set_called = False
+
     def relation_ids(self, relation_name):
         return {
             'db0': [],
@@ -36,6 +39,20 @@ class TestModelBackend:
             },
         }[relation_id][member_name]
 
+    def is_leader(self):
+        return self._is_leader
+
+    def leader_get(self):
+        return {
+            'foo': 'foo',
+            'bar': 1,
+            'qux': True,
+        }
+
+    def leader_set(self, key, value):
+        assert self._is_leader, 'leader_set called when not leader'
+        self._leader_set_called = True
+
 
 class TestModel(unittest.TestCase):
     def setUp(self):
@@ -56,3 +73,35 @@ class TestModel(unittest.TestCase):
             self.model.relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
         self.assertEqual(self.model.relation('db1').data[remoteapp1_0], {'host': 'remoteapp1-0'})
+
+    def test_leadership(self):
+        self.assertFalse(self.model.leadership.is_leader)
+        self.assertEqual(self.model.leadership.data, {
+            'foo': 'foo',
+            'bar': 1,
+            'qux': True,
+        })
+        with self.assertRaises(TypeError):
+            self.model.leadership.data['foo'] = 'bar'
+        assert not self.model._backend._leader_set_called
+
+        # Reset leadership for testing as leader.
+        self.model._backend._is_leader = True
+        self.model.leadership = juju.model.LeaderInfo(self.model._backend)
+
+        self.assertTrue(self.model.leadership.is_leader)
+        self.assertEqual(self.model.leadership.data, {
+            'foo': 'foo',
+            'bar': 1,
+            'qux': True,
+        })
+        self.model.leadership.data['foo'] = 'bar'
+        assert self.model._backend._leader_set_called
+        self.assertEqual(self.model.leadership.data['foo'], 'bar')
+
+        # Reset backend to test __delitem__.
+        self.model._backend._leader_set_called = False
+
+        del self.model.leadership.data['foo']
+        self.assertNotIn('foo', self.model.leadership.data)
+        assert self.model._backend._leader_set_called

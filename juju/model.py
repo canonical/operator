@@ -12,6 +12,7 @@ class Model:
         self.unit = self._cache.get(Unit, local_unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
+        self.leadership = LeaderInfo(self._backend)
 
     def relation(self, relation_name):
         """Return the single Relation object for the named relation, or None.
@@ -85,6 +86,24 @@ class LazyMapping(Mapping, ABC):
         return self._data[key]
 
 
+class MutableLazyMapping(ABC):
+    @abstractmethod
+    def _store(self, key, value):
+        raise NotImplementedError()
+
+    def __setitem__(self, key, value):
+        if self._lazy_data is not None:
+            # Don't load data unnecessarily if we're only updating.
+            self._data[key] = value
+        self._store(key, value)
+
+    def __delitem__(self, key):
+        if self._lazy_data is not None:
+            # Don't load data unnecessarily if we're only updating.
+            del self._data[key]
+        self._store(key, None)
+
+
 class RelationMapping(LazyMapping):
     """Map of relation names to lists of Relation instances."""
     def __init__(self, relation_names, local_unit, backend, cache):
@@ -151,6 +170,41 @@ class RelationUnitData(LazyMapping):
         return self._backend.relation_get(self.relation_id, self.unit.name)
 
 
+class LeaderInfo:
+    def __init__(self, backend):
+        self._backend = backend
+        self._is_leader = None
+        self._data = None
+
+    @property
+    def is_leader(self):
+        if self._is_leader is None:
+            self._is_leader = self._backend.is_leader()
+        return self._is_leader
+
+    @property
+    def data(self):
+        if self._data is None:
+            if self.is_leader:
+                self._data = MutableLeaderData(self._backend)
+            else:
+                self._data = LeaderData(self._backend)
+        return self._data
+
+
+class LeaderData(LazyMapping):
+    def __init__(self, backend):
+        self._backend = backend
+
+    def _load(self):
+        return self._backend.leader_get()
+
+
+class MutableLeaderData(LeaderData, MutableLazyMapping):
+    def _store(self, key, value):
+        self._backend.leader_set(key, value)
+
+
 class ModelError(Exception):
     pass
 
@@ -167,6 +221,9 @@ class ModelBackend:
     def _run(self, *args):
         return json.loads(run(args + ('--format=json',), stdout=PIPE, check=True).stdout.decode('utf8'))
 
+    def _run_no_output(self, *args):
+        run(args, check=True)
+
     def relation_ids(self, relation_name):
         return self._run('relation-ids', relation_name)
 
@@ -175,3 +232,12 @@ class ModelBackend:
 
     def relation_get(self, relation_id, member_name):
         return self._run('relation-get', '-r', relation_id, '-', member_name)
+
+    def is_leader(self):
+        return self._run('is-leader')
+
+    def leader_get(self):
+        return self._run('leader-get')
+
+    def leader_set(self, key, value):
+        self._run_no_output('leader-set', f'{key}={value}')
