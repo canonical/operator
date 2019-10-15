@@ -7,10 +7,10 @@ from weakref import WeakValueDictionary
 
 class Model:
     def __init__(self, local_unit_name, relation_names, backend):
-        self._entity_cache = ModelEntityCache(local_unit_name)
+        self._cache = ModelCache(local_unit_name)
         self._backend = backend
-        self.relations = RelationMap(relation_names, self._backend, self._entity_cache)
-        self.unit = self._entity_cache.get(Unit, local_unit_name)
+        self.relations = RelationMap(relation_names, self._backend, self._cache)
+        self.unit = self._cache.get(Unit, local_unit_name)
         self.app = self.unit.app
 
     def relation(self, relation_name):
@@ -29,7 +29,7 @@ class Model:
             raise TooManyRelatedApps(relation_name, num_related, 1)
 
 
-class ModelEntityCache(WeakValueDictionary):
+class ModelCache(WeakValueDictionary):
     def __init__(self, local_unit_name):
         super().__init__()
         self.local_unit_name = local_unit_name
@@ -44,7 +44,7 @@ class ModelEntityCache(WeakValueDictionary):
 
 
 class Application:
-    def __init__(self, name, entity_cache):
+    def __init__(self, name, cache):
         self.name = name
 
     def __repr__(self):
@@ -52,9 +52,9 @@ class Application:
 
 
 class Unit:
-    def __init__(self, name, entity_cache):
+    def __init__(self, name, cache):
         self.name = name
-        self.app = entity_cache.get(Application, name.split('/')[0])
+        self.app = cache.get(Application, name.split('/')[0])
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -86,26 +86,26 @@ class LazyMapping(Mapping, ABC):
 
 class RelationMap(LazyMapping):
     """Map of relation names to lists of Relation instances."""
-    def __init__(self, relation_names, backend, entity_cache):
+    def __init__(self, relation_names, backend, cache):
         self._relation_names = relation_names
         self._backend = backend
-        self._entity_cache = entity_cache
+        self._cache = cache
 
     def _load(self):
         data = {}
         for relation_name in self._relation_names:
             relations = data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
-                relations.append(Relation(relation_name, relation_id, self._backend, self._entity_cache))
+                relations.append(Relation(relation_name, relation_id, self._backend, self._cache))
         return data
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, backend, entity_cache):
+    def __init__(self, relation_name, relation_id, backend, cache):
         self.relation_name = relation_name
         self.relation_id = relation_id
         self._backend = backend
-        self.data = RelationData(self.relation_name, relation_id, self._backend, entity_cache)
+        self.data = RelationData(self.relation_name, relation_id, self._backend, cache)
 
     @property
     def apps(self):
@@ -117,21 +117,21 @@ class Relation:
 
 
 class RelationData(LazyMapping):
-    def __init__(self, relation_name, relation_id, backend, entity_cache):
+    def __init__(self, relation_name, relation_id, backend, cache):
         self.relation_name = relation_name
         self.relation_id = relation_id
         self._backend = backend
-        self._entity_cache = entity_cache
+        self._cache = cache
 
     def _load(self):
         data = {}
         for unit_name in self._backend.relation_list(self.relation_id):
-            unit = self._entity_cache.get(Unit, unit_name)
+            unit = self._cache.get(Unit, unit_name)
             data[unit] = RelationDataBag(self.relation_id, unit, self._backend)
         # Juju's relation-list doesn't include the local unit(s), even though they are part of
         # the relation. Technically, you can also call relation-get for your peers' data, but
         # we don't want to support that, so we only manually add this local unit.
-        local_unit = self._entity_cache.get(Unit, self._entity_cache.local_unit_name)
+        local_unit = self._cache.get(Unit, self._cache.local_unit_name)
         data[local_unit] = RelationDataBag(self.relation_id, local_unit, self._backend)
         return data
 

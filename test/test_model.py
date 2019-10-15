@@ -53,7 +53,7 @@ class TestModel(unittest.TestCase):
         self.assertIsInstance(self.model.relation('db1'), juju.model.Relation)
         with self.assertRaises(juju.model.TooManyRelatedApps):
             self.model.relation('db2')
-        random_unit = self.model._entity_cache.get(juju.model.Unit, 'randomunit/0')
+        random_unit = self.model._cache.get(juju.model.Unit, 'randomunit/0')
         with self.assertRaises(KeyError):
             self.model.relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
