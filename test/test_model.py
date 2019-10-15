@@ -44,10 +44,8 @@ class TestModel(unittest.TestCase):
     def test_model(self):
         self.assertIs(self.model.app, self.model.unit.app)
         for relation in self.model.relations['db2']:
-            self.assertIn(self.model.app, relation.apps)
-            self.assertIn(self.model.unit, relation.units)
             self.assertIn(self.model.unit, relation.data)
-            unit_from_rel = next(filter(lambda u: u.name == 'myapp/0', relation.units))
+            unit_from_rel = next(filter(lambda u: u.name == 'myapp/0', relation.data.keys()))
             self.assertIs(self.model.unit, unit_from_rel)
         self.assertIsNone(self.model.relation('db0'))
         self.assertIsInstance(self.model.relation('db1'), juju.model.Relation)

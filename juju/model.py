@@ -118,7 +118,7 @@ class Relation:
     @property
     def apps(self):
         if self._apps is None:
-            self.apps = list({unit.app for unit in self.units})
+            self._apps = list({unit.app for unit in self.units})
         return self._apps
 
     @property
