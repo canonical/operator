@@ -7,11 +7,11 @@ from weakref import WeakValueDictionary
 
 class Model:
     def __init__(self, local_unit_name, relation_names, backend):
-        self._cache = ModelCache(local_unit_name)
+        self._cache = ModelCache()
         self._backend = backend
-        self.relations = RelationMapping(relation_names, self._backend, self._cache)
         self.unit = self._cache.get(Unit, local_unit_name)
         self.app = self.unit.app
+        self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
 
     def relation(self, relation_name):
         """Return the single Relation object for the named relation, or None.
@@ -30,10 +30,6 @@ class Model:
 
 
 class ModelCache(WeakValueDictionary):
-    def __init__(self, local_unit_name):
-        super().__init__()
-        self.local_unit_name = local_unit_name
-
     def get(self, entity_type, *args):
         key = (entity_type,) + args
         entity = super().get(key)
@@ -89,8 +85,9 @@ class LazyMapping(Mapping, ABC):
 
 class RelationMapping(LazyMapping):
     """Map of relation names to lists of Relation instances."""
-    def __init__(self, relation_names, backend, cache):
+    def __init__(self, relation_names, local_unit, backend, cache):
         self._relation_names = relation_names
+        self._local_unit = local_unit
         self._backend = backend
         self._cache = cache
 
@@ -99,16 +96,19 @@ class RelationMapping(LazyMapping):
         for relation_name in self._relation_names:
             relations = data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
-                relations.append(Relation(relation_name, relation_id, self._backend, self._cache))
+                relations.append(Relation(relation_name, relation_id, self._local_unit, self._backend, self._cache))
         return data
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, backend, cache):
+    def __init__(self, relation_name, relation_id, local_unit, backend, cache):
         self.relation_name = relation_name
         self.relation_id = relation_id
+        self._local_unit = local_unit
         self._backend = backend
-        self.data = RelationData(self.relation_name, relation_id, self._backend, cache)
+        self._cache = cache
+        self._units = None
+        self._data = None
 
     @property
     def apps(self):
@@ -116,27 +116,17 @@ class Relation:
 
     @property
     def units(self):
-        return list(self.data.keys())
+        if self._units is None:
+            self._units = [self._local_unit]
+            for unit_name in self._backend.relation_list(self.relation_id):
+                self._units.append(self._cache.get(Unit, unit_name))
+        return self._units
 
-
-class RelationData(LazyMapping):
-    def __init__(self, relation_name, relation_id, backend, cache):
-        self.relation_name = relation_name
-        self.relation_id = relation_id
-        self._backend = backend
-        self._cache = cache
-
-    def _load(self):
-        data = {}
-        for unit_name in self._backend.relation_list(self.relation_id):
-            unit = self._cache.get(Unit, unit_name)
-            data[unit] = RelationUnitData(self.relation_id, unit, self._backend)
-        # Juju's relation-list doesn't include the local unit(s), even though they are part of
-        # the relation. Technically, you can also call relation-get for your peers' data, but
-        # we don't want to support that, so we only manually add this local unit.
-        local_unit = self._cache.get(Unit, self._cache.local_unit_name)
-        data[local_unit] = RelationUnitData(self.relation_id, local_unit, self._backend)
-        return data
+    @property
+    def data(self):
+        if self._data is None:
+            self._data = {unit: RelationUnitData(self.relation_id, unit, self._backend) for unit in self.units}
+        return self._data
 
 
 class RelationUnitData(LazyMapping):
