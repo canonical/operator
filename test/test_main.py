@@ -108,6 +108,7 @@ class TestMain(unittest.TestCase):
             [sys.executable, event_hook],
             env={
                 'JUJU_CHARM_DIR': JUJU_CHARM_DIR,
+                'JUJU_UNIT_NAME': 'test_main/0',
                 'CHARM_CONFIG': charm_config,
             })
         return self._read_and_clear_state()
