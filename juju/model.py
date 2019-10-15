@@ -12,6 +12,7 @@ class Model:
         self.unit = self._cache.get(Unit, local_unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
+        self.config = ConfigData(self._backend)
 
     def relation(self, relation_name):
         """Return the single Relation object for the named relation, or None.
@@ -151,6 +152,14 @@ class RelationUnitData(LazyMapping):
         return self._backend.relation_get(self.relation_id, self.unit.name)
 
 
+class ConfigData(LazyMapping):
+    def __init__(self, backend):
+        self._backend = backend
+
+    def _load(self):
+        return self._backend.config_get()
+
+
 class ModelError(Exception):
     pass
 
@@ -175,3 +184,6 @@ class ModelBackend:
 
     def relation_get(self, relation_id, member_name):
         return self._run('relation-get', '-r', relation_id, '-', member_name)
+
+    def config_get(self):
+        return self._run('config-get')

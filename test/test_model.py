@@ -36,6 +36,13 @@ class TestModelBackend:
             },
         }[relation_id][member_name]
 
+    def config_get(self):
+        return {
+            'foo': 'foo',
+            'bar': 1,
+            'qux': True,
+        }
+
 
 class TestModel(unittest.TestCase):
     def setUp(self):
@@ -56,3 +63,13 @@ class TestModel(unittest.TestCase):
             self.model.relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
         self.assertEqual(self.model.relation('db1').data[remoteapp1_0], {'host': 'remoteapp1-0'})
+
+    def test_config(self):
+        self.assertEqual(self.model.config, {
+            'foo': 'foo',
+            'bar': 1,
+            'qux': True,
+        })
+        with self.assertRaises(TypeError):
+            # Confirm that we cannot modify config values.
+            self.model.config['foo'] = 'bar'
