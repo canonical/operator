@@ -83,6 +83,10 @@ class LazyMapping(Mapping, ABC):
         return self._data[key]
 
 
+# TODO: Replace RelationMapping with non-lazy mapping with LazyList values instead.
+# Specifically, we want to avoid calling relation-ids for every relation and instead
+# only do it on demand for relations that are accessed. That will also allow us to
+# get rid of this extra layer of wrapping and just use a plain dict.
 class RelationMapping(LazyMapping):
     """Map of relation names to lists of Relation instances."""
     def __init__(self, relation_names, local_unit, backend, cache):
@@ -107,17 +111,20 @@ class Relation:
         self._local_unit = local_unit
         self._backend = backend
         self._cache = cache
+        self._apps = None
         self._units = None
         self._data = None
 
     @property
     def apps(self):
-        return [unit.app for unit in self.units]
+        if self._apps is None:
+            self.apps = list({unit.app for unit in self.units})
+        return self._apps
 
     @property
     def units(self):
         if self._units is None:
-            self._units = [self._local_unit]
+            self._units = []
             for unit_name in self._backend.relation_list(self.relation_id):
                 self._units.append(self._cache.get(Unit, unit_name))
         return self._units
@@ -125,7 +132,8 @@ class Relation:
     @property
     def data(self):
         if self._data is None:
-            self._data = {unit: RelationUnitData(self.relation_id, unit, self._backend) for unit in self.units}
+            units = [self._local_unit] + self.units
+            self._data = {unit: RelationUnitData(self.relation_id, unit, self._backend) for unit in units}
         return self._data
 
 
