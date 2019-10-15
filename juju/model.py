@@ -34,11 +34,11 @@ class ModelCache(WeakValueDictionary):
         super().__init__()
         self.local_unit_name = local_unit_name
 
-    def get(self, entity_type, entity_name):
-        key = (entity_type, entity_name)
+    def get(self, entity_type, *args):
+        key = (entity_type,) + args
         entity = super().get(key)
         if entity is None:
-            entity = entity_type(entity_name, self)
+            entity = entity_type(*args, cache=self)
             self[key] = entity
         return entity
 
