@@ -1,45 +1,42 @@
 from juju.framework import Object, Event, EventBase, EventsBase
 
 
-class JujuEvent(EventBase):
-    pass
-
-class JujuHookEvent(EventBase):
+class HookEvent(EventBase):
     pass
 
 
-class InstallEvent(JujuHookEvent):
+class InstallEvent(HookEvent):
     pass
 
-class StartEvent(JujuHookEvent):
+class StartEvent(HookEvent):
     pass
 
-class StopEvent(JujuHookEvent):
+class StopEvent(HookEvent):
     pass
 
-class ConfigChangedEvent(JujuHookEvent):
+class ConfigChangedEvent(HookEvent):
     pass
 
-class UpdateStatusEvent(JujuHookEvent):
+class UpdateStatusEvent(HookEvent):
     pass
 
-class UpgradeCharmEvent(JujuHookEvent):
+class UpgradeCharmEvent(HookEvent):
     pass
 
-class PreSeriesUpgradeEvent(JujuHookEvent):
+class PreSeriesUpgradeEvent(HookEvent):
     pass
 
-class PostSeriesUpgradeEvent(JujuHookEvent):
+class PostSeriesUpgradeEvent(HookEvent):
     pass
 
-class LeaderElectedEvent(JujuHookEvent):
+class LeaderElectedEvent(HookEvent):
     pass
 
-class LeaderSettingsChangedEvent(JujuHookEvent):
+class LeaderSettingsChangedEvent(HookEvent):
     pass
 
 
-class RelationEvent(JujuHookEvent):
+class RelationEvent(HookEvent):
     pass
 
 
@@ -56,7 +53,7 @@ class RelationBrokenEvent(RelationEvent):
     pass
 
 
-class StorageEvent(JujuHookEvent):
+class StorageEvent(HookEvent):
     pass
 
 

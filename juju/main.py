@@ -80,13 +80,11 @@ def _setup_hooks(charm_dir, charm):
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
     """
-    from juju.charm import JujuHookEvent
+    from juju.charm import HookEvent
 
-    def is_hook_event(bound_event):
-        return issubclass(bound_event.event_type, JujuHookEvent)
-
-    for bound_event in filter(is_hook_event, charm.on.events().values()):
-        _handle_event_link(charm_dir, bound_event)
+    for bound_event in charm.on.events().values():
+        if issubclass(bound_event.event_type, HookEvent):
+            _handle_event_link(charm_dir, bound_event)
 
 
 def _emit_charm_event(charm, event_name):
