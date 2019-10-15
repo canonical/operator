@@ -9,7 +9,7 @@ class Model:
     def __init__(self, local_unit_name, relation_names, backend):
         self._cache = ModelCache(local_unit_name)
         self._backend = backend
-        self.relations = RelationMap(relation_names, self._backend, self._cache)
+        self.relations = RelationMapping(relation_names, self._backend, self._cache)
         self.unit = self._cache.get(Unit, local_unit_name)
         self.app = self.unit.app
 
@@ -84,7 +84,7 @@ class LazyMapping(Mapping, ABC):
         return self._data[key]
 
 
-class RelationMap(LazyMapping):
+class RelationMapping(LazyMapping):
     """Map of relation names to lists of Relation instances."""
     def __init__(self, relation_names, backend, cache):
         self._relation_names = relation_names
