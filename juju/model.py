@@ -61,15 +61,18 @@ class Unit:
 
 
 class LazyMapping(Mapping, ABC):
+    _lazy_data = None
+
     @abstractmethod
     def _load(self):
         raise NotImplementedError()
 
     @property
     def _data(self):
-        if not hasattr(self, '_lazy_data'):
-            self._lazy_data = self._load()
-        return self._lazy_data
+        data = self._lazy_data
+        if data is None:
+            data = self._lazy_data = self._load()
+        return data
 
     def __contains__(self, key):
         return key in self._data
