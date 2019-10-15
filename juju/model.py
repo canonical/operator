@@ -127,16 +127,16 @@ class RelationData(LazyMapping):
         data = {}
         for unit_name in self._backend.relation_list(self.relation_id):
             unit = self._cache.get(Unit, unit_name)
-            data[unit] = RelationDataBag(self.relation_id, unit, self._backend)
+            data[unit] = RelationUnitData(self.relation_id, unit, self._backend)
         # Juju's relation-list doesn't include the local unit(s), even though they are part of
         # the relation. Technically, you can also call relation-get for your peers' data, but
         # we don't want to support that, so we only manually add this local unit.
         local_unit = self._cache.get(Unit, self._cache.local_unit_name)
-        data[local_unit] = RelationDataBag(self.relation_id, local_unit, self._backend)
+        data[local_unit] = RelationUnitData(self.relation_id, local_unit, self._backend)
         return data
 
 
-class RelationDataBag(LazyMapping):
+class RelationUnitData(LazyMapping):
     def __init__(self, relation_id, unit, backend):
         self.relation_id = relation_id
         self.unit = unit
