@@ -115,6 +115,9 @@ def main():
     # of events from debugging sessions.
     juju_event_name = Path(sys.argv[0]).name
 
+    # TODO: Depending on how we address the comment below about args to Charm.__init__, we will need
+    # to address the Model needing the list of relation names from the metadata in order to initialize
+    # the relation attributes.
     metadata = juju.charm.CharmMeta(_load_metadata())
     unit_name = os.environ['JUJU_UNIT_NAME']
     model = juju.model.Model(unit_name, list(metadata.relations), juju.model.ModelBackend())
@@ -125,6 +128,10 @@ def main():
     charm_state_path = charm_dir / CHARM_STATE_FILE
     framework = juju.framework.Framework(data_path=charm_state_path, model=model)
     try:
+        # TODO: The Charm itself sholud probably receive no other argument than the framework, because
+        # this will be code that the user will need to implement on their end. In other words, their
+        # Charm subclass will have an __init__, which needs to take parameters, and this needs to be
+        # simple and elegant so it doesn't feel hackish.
         charm = charm_module.Charm(framework, None, metadata, charm_dir)
 
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and

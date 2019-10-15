@@ -26,6 +26,8 @@ class Model:
         elif num_related == 1:
             return self.relations[relation_name][0]
         else:
+            # TODO: We need something in the framework to catch and gracefully handle errors,
+            # ideally integrating the error catching with Juju's mechanisms.
             raise TooManyRelatedApps(relation_name, num_related, 1)
 
 
@@ -83,10 +85,6 @@ class LazyMapping(Mapping, ABC):
         return self._data[key]
 
 
-# TODO: Replace RelationMapping with non-lazy mapping with LazyList values instead.
-# Specifically, we want to avoid calling relation-ids for every relation and instead
-# only do it on demand for relations that are accessed. That will also allow us to
-# get rid of this extra layer of wrapping and just use a plain dict.
 class RelationMapping(LazyMapping):
     """Map of relation names to lists of Relation instances."""
     def __init__(self, relation_names, local_unit, backend, cache):
@@ -97,6 +95,7 @@ class RelationMapping(LazyMapping):
 
     def _load(self):
         data = {}
+        # TODO: Make this more lazy. We don't want to call relation-ids for relations that we don't access.
         for relation_name in self._relation_names:
             relations = data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
@@ -133,6 +132,8 @@ class Relation:
     def data(self):
         if self._data is None:
             units = [self._local_unit] + self.units
+            # TODO: Restore the RelationData wrapping class. This will prevent unintended side-effects if the
+            # charm code tries to do something unexpected with the return value of this property.
             self._data = {unit: RelationUnitData(self.relation_id, unit, self._backend) for unit in units}
         return self._data
 
@@ -144,6 +145,9 @@ class RelationUnitData(LazyMapping):
         self._backend = backend
 
     def _load(self):
+        # TODO: We will need to ensure we properly handle modifications when support for those are added.
+        # Specifically, if we're caching relation data in memory, modifications need to affect both the
+        # in-memory cache as well as calling out to relation-set.
         return self._backend.relation_get(self.relation_id, self.unit.name)
 
 
