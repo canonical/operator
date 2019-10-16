@@ -19,7 +19,9 @@ class TestFramework(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def create_framework(self):
-        return Framework(self.tmpdir / "framework.data", model=None)
+        framework = Framework(self.tmpdir / "framework.data", model=None)
+        self.addCleanup(framework.close)
+        return framework
 
     def test_handle_path(self):
         cases = [
@@ -504,7 +506,9 @@ class TestStoredState(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def create_framework(self):
-        return Framework(self.tmpdir / "framework.data", model=None)
+        framework = Framework(self.tmpdir / "framework.data", model=None)
+        self.addCleanup(framework.close)
+        return framework
 
     def test_basic_state_storage(self):
         framework = self.create_framework()
