@@ -254,7 +254,7 @@ class ModelBackend:
         return self._run('relation-get', '-r', relation_id, '-', member_name)
 
     def relation_set(self, relation_id, key, value):
-        return self._run_no_output('relation-set', '-r', relation_id, f'{key}={value or ""}')
+        return self._run_no_output('relation-set', '-r', relation_id, f'{key}={value}')
 
     def config_get(self):
         return self._run('config-get')
