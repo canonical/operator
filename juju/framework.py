@@ -254,6 +254,17 @@ class EventsBase(Object):
         return events_map
 
 
+class PreCommitEvent(EventBase):
+    pass
+
+class CommitEvent(EventBase):
+    pass
+
+class FrameworkEvents(EventsBase):
+    pre_commit = Event(PreCommitEvent)
+    commit = Event(CommitEvent)
+
+
 class NoSnapshotError(Exception):
 
     def __init__(self, handle_path):
@@ -284,7 +295,7 @@ class SQLiteStorage:
         if c.fetchone()[0] == 0:
             # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
-            self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data TEXT)")
+            self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)")
             self._db.execute("CREATE TABLE notice (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_path TEXT, observer_path TEXT, method_name TEXT)")
             self._db.commit()
 
@@ -333,9 +344,14 @@ class SQLiteStorage:
                 yield tuple(row)
 
 
-class Framework:
+class Framework(Object):
+
+    on = FrameworkEvents()
 
     def __init__(self, data_path, model):
+
+        super().__init__(self, None)
+
         self._data_path = data_path
         self.model = model
         self._event_count = 0
@@ -350,6 +366,11 @@ class Framework:
         self._storage.close()
 
     def commit(self):
+        # Give a chance for objects to persist data they want to before a commit is made.
+        self.on.pre_commit.emit()
+        # Make sure snapshots are saved by instances of StoredStateData. Any possible state
+        # modifications in on_commit handlers of instances of other classes will not be persisted.
+        self.on.commit.emit()
         self._storage.commit()
 
     def register_type(self, cls, parent, kind=None):
@@ -542,6 +563,9 @@ class StoredStateData(Object):
     def restore(self, snapshot):
         self._cache = snapshot
 
+    def on_commit(self, event):
+        self.framework.save_snapshot(self)
+
 class BoundStoredState:
 
     def __init__(self, parent, attr_name):
@@ -553,8 +577,14 @@ class BoundStoredState:
         except NoSnapshotError:
             data = StoredStateData(parent, attr_name)
 
+        # __dict__ is used to avoid infinite recursion.
         self.__dict__["_data"] = data
         self.__dict__["_attr_name"] = attr_name
+
+        # TODO: Use weak references to make sure observers are garbage collected as a new observer will
+        # be created every time an instance of BoundStoredState is created.
+
+        parent.framework.observe(parent.framework.on.commit, self._data)
 
     def __getattr__(self, key):
         # "on" is the only reserved key that can't be used in the data map.
@@ -574,12 +604,7 @@ class BoundStoredState:
             raise AttributeError(f"attribute '{key}' cannot be set to {type(value).__name__}: must be int/dict/list/etc")
 
         self._data[key] = _unwrap_stored(self._data, value)
-        self._data.framework.save_snapshot(self._data)
         self.on.changed.emit()
-
-        # TODO Saving a snapshot on every change is not efficient. Instead, the
-        # the framework should offer a pre-commit event that the state can monitor
-        # and save itself at the right time if changes are pending.
 
 
 class StoredState:
@@ -642,11 +667,9 @@ class StoredDict(collections.MutableMapping):
 
     def __setitem__(self, key, value):
         self._under[key] = _unwrap_stored(self._stored_data, value)
-        self._stored_data.on.changed.emit()
 
     def __delitem__(self, key):
         del self._under[key]
-        self._stored_data.on.changed.emit()
 
     def __iter__(self):
         return self._under.__iter__()
@@ -666,22 +689,18 @@ class StoredList(collections.MutableSequence):
 
     def __setitem__(self, index, value):
         self._under[index] = _unwrap_stored(self._stored_data, value)
-        self._stored_data.on.changed.emit()
 
     def __delitem__(self, index):
         del self._under[index]
-        self._stored_data.on.changed.emit()
 
     def __len__(self):
         return len(self._under)
 
     def insert(self, index, value):
         self._under.insert(index, value)
-        self._stored_data.on.changed.emit()
 
     def append(self, value):
         self._under.append(value)
-        self._stored_data.on.changed.emit()
 
 
 class StoredSet(collections.MutableSet):
@@ -692,11 +711,9 @@ class StoredSet(collections.MutableSet):
 
     def add(self, key):
         self._under.add(key)
-        self._stored_data.on.changed.emit()
 
     def discard(self, key):
         self._under.discard(key)
-        self._stored_data.on.changed.emit()
 
     def __contains__(self, key):
         return key in self._under

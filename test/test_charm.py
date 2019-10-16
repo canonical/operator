@@ -32,7 +32,9 @@ class TestCharm(unittest.TestCase):
         CharmBase.on = CharmEvents()
 
     def create_framework(self):
-        return Framework(self.tmpdir / "framework.data", model=None)
+        framework = Framework(self.tmpdir / "framework.data", model=None)
+        self.addCleanup(framework.close)
+        return framework
 
     def test_basic(self):
 

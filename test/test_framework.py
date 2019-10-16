@@ -6,7 +6,7 @@ import shutil
 
 from pathlib import Path
 
-from juju.framework import Framework, Handle, Event, EventsBase, EventBase, Object
+from juju.framework import Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent
 from juju.framework import NoSnapshotError, StoredState
 
 
@@ -19,7 +19,9 @@ class TestFramework(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def create_framework(self):
-        return Framework(self.tmpdir / "framework.data", model=None)
+        framework = Framework(self.tmpdir / "framework.data", model=None)
+        self.addCleanup(framework.close)
+        return framework
 
     def test_handle_path(self):
         cases = [
@@ -129,6 +131,50 @@ class TestFramework(unittest.TestCase):
         pub.bar.emit()
 
         self.assertEqual(obs.seen, ["on_any:foo", "on_foo:foo", "on_any:bar"])
+
+    def test_on_pre_commit_emitted(self):
+        framework = self.create_framework()
+
+        class PreCommitObserver(Object):
+
+            state = StoredState()
+
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self.seen = []
+                self.state.myinitdata = 40
+
+            def on_pre_commit(self, event):
+                self.state.myinitdata = 41
+                self.state.mydata = 42
+                self.seen.append(type(event))
+
+            def on_commit(self, event):
+                # Modifications made here will not be persisted.
+                self.state.myinitdata = 42
+                self.state.mydata = 43
+                self.state.myotherdata = 43
+                self.seen.append(type(event))
+
+        obs = PreCommitObserver(framework, None)
+
+        framework.observe(framework.on.pre_commit, obs.on_pre_commit)
+
+        framework.commit()
+
+        self.assertEqual(obs.state.myinitdata, 41)
+        self.assertEqual(obs.state.mydata, 42)
+        self.assertTrue(obs.seen, [PreCommitEvent, CommitEvent])
+
+        other_framework = self.create_framework()
+
+        new_obs = PreCommitObserver(other_framework, None)
+
+        self.assertEqual(obs.state.myinitdata, 41)
+        self.assertEqual(new_obs.state.mydata, 42)
+
+        with self.assertRaises(AttributeError):
+            new_obs.state.myotherdata
 
     def test_defer_and_reemit(self):
         framework = self.create_framework()
@@ -460,23 +506,18 @@ class TestStoredState(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def create_framework(self):
-        return Framework(self.tmpdir / "framework.data", model=None)
+        framework = Framework(self.tmpdir / "framework.data", model=None)
+        self.addCleanup(framework.close)
+        return framework
 
     def test_basic_state_storage(self):
         framework = self.create_framework()
 
         class SomeObject(Object):
             state = StoredState()
-            changes = 0
 
             def __init__(self, parent, key):
                 super().__init__(parent, key)
-
-                self.framework.observe(self.state.on.changed, self.on_state_changed)
-
-            def on_state_changed(self, event):
-                self.changes += 1
-                event.defer()
 
         obj = SomeObject(framework, "1")
 
@@ -499,7 +540,6 @@ class TestStoredState(unittest.TestCase):
         obj.state.bar = "s"
 
         self.assertEqual(obj.state.foo, 42)
-        self.assertEqual(obj.changes, 3)
 
         framework.commit()
 
@@ -514,29 +554,16 @@ class TestStoredState(unittest.TestCase):
         self.assertEqual(obj_copy.state.foo, 42)
         self.assertEqual(obj_copy.state.bar, "s")
 
-        # But it has observed no changes since instantiation:
-        self.assertEqual(obj_copy.changes, 0)
-
-        # But if we ask for the events to be sent again, it will get them:
-        framework_copy.reemit()
-        self.assertEqual(obj_copy.changes, 3)
-
     def test_mutable_types(self):
         framework = self.create_framework()
 
         class SomeObject(Object):
             state = StoredState()
-            changes = 0
 
             def __init__(self, framework, key):
                 super().__init__(framework, key)
-                framework.observe(self.state.on.changed, self.on_state_changed)
-
-            def on_state_changed(self, event):
-                self.changes += 1
 
         obj = SomeObject(framework, "1")
-
         try:
             class CustomObject:
                 pass
@@ -546,38 +573,44 @@ class TestStoredState(unittest.TestCase):
         else:
             self.fail("AttributeError not raised")
 
-        obj.state.dict = {}
-        obj.state.dict["a"] = {}
-        obj.state.dict["a"]["b"] = "c"
-        obj.state.dict["a"]["d"] = "e"
-        del obj.state.dict["a"]["d"]
+        framework.commit()
 
-        self.assertEqual(dict(obj.state.dict), {"a": {"b": "c"}})
+        # Test and validation functions in a list of 2-tuples.
+        # Assignment and keywords like del are not supported in lambdas so functions are used instead.
+        test_funcs = [(
+            lambda: setattr(obj.state, 'dict', {}),
+            lambda: self.assertEqual(dict(obj.state.dict), {})
+        ), (
+            lambda: obj.state.dict.update({"a": {}}),
+            lambda: self.assertEqual(dict(obj.state.dict), {"a": {}})
+        ), (
+            lambda: obj.state.dict["a"].update({"b": "c"}),
+            lambda: self.assertEqual(dict(obj.state.dict), {"a": {"b": "c"}})
+        ), (
+            lambda: obj.state.dict["a"].update({"d": "e"}),
+            lambda: self.assertEqual(dict(obj.state.dict), {"a": {"b": "c", "d": "e"}})
+        ), (
+            lambda: obj.state.dict["a"].pop('d'),
+            lambda: self.assertEqual(dict(obj.state.dict), {"a": {"b": "c"}})
+        )]
 
-        self.assertEqual(obj.changes, 5)
+        for do, validate in test_funcs:
+            framework = self.create_framework()
 
-        obj.changes = 0
+            obj = SomeObject(framework, "1")
 
-        obj.state.list = []
-        obj.state.list.append("a")
-        obj.state.list.append("c")
-        obj.state.list.insert(1, "b")
-        obj.state.list.insert(2, "d")
-        del obj.state.list[2]
+            do()
+            validate()
 
-        self.assertEqual(list(obj.state.list), ["a", "b", "c"])
-        self.assertEqual(obj.changes, 6)
+            framework.commit()
 
-        obj.changes = 0
+            framework_copy = self.create_framework()
 
-        obj.state.set = set()
-        obj.state.set.add("a")
-        obj.state.set.add("b")
-        obj.state.set.add("c")
-        obj.state.set.discard("c")
+            obj = SomeObject(framework_copy, "1")
 
-        self.assertEqual(set(obj.state.set), {"a", "b"})
-        self.assertEqual(obj.changes, 5)
+            validate()
+
+            framework_copy.commit()
 
 
 if __name__ == "__main__":
