@@ -86,6 +86,32 @@ class LazyMapping(Mapping, ABC):
         return self._data[key]
 
 
+class MutableLazyMapping(ABC):
+    @abstractmethod
+    def _store(self, key, value):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def _remove(self, key):
+        raise NotImplementedError()
+
+    def __setitem__(self, key, value):
+        # We make the external call first on the off chance that it raises an error which is subsequently caught
+        # and handled. This way, we don't end up modifying the in-memory value if the external call failed.
+        self._store(key, value)
+        if self._lazy_data is not None:
+            # Don't load data unnecessarily if we're only updating.
+            self._data[key] = value
+
+    def __delitem__(self, key):
+        # We make the external call first on the off chance that it raises an error which is subsequently caught
+        # and handled. This way, we don't end up modifying the in-memory value if the external call failed.
+        self._remove(key)
+        if self._lazy_data is not None:
+            # Don't load data unnecessarily if we're only updating.
+            del self._data[key]
+
+
 class RelationMapping(LazyMapping):
     """Map of relation names to lists of Relation instances."""
     def __init__(self, relation_names, local_unit, backend, cache):
@@ -132,11 +158,28 @@ class Relation:
     @property
     def data(self):
         if self._data is None:
-            units = [self._local_unit] + self.units
-            # TODO: Restore the RelationData wrapping class. This will prevent unintended side-effects if the
-            # charm code tries to do something unexpected with the return value of this property.
-            self._data = {unit: RelationUnitData(self.relation_id, unit, self._backend) for unit in units}
+            self._data = RelationData(self.relation_name, self.relation_id, self._local_unit, self.units, self._backend)
         return self._data
+
+
+class RelationData(Mapping):
+    def __init__(self, relation_name, relation_id, local_unit, remote_units, backend):
+        self.relation_name = relation_name
+        self.relation_id = relation_id
+        self._data = {local_unit: MutableRelationUnitData(relation_id, local_unit, backend)}
+        self._data.update({unit: RelationUnitData(relation_id, unit, backend) for unit in remote_units})
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __len__(self):
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __getitem__(self, key):
+        return self._data[key]
 
 
 class RelationUnitData(LazyMapping):
@@ -150,6 +193,28 @@ class RelationUnitData(LazyMapping):
         # Specifically, if we're caching relation data in memory, modifications need to affect both the
         # in-memory cache as well as calling out to relation-set.
         return self._backend.relation_get(self.relation_id, self.unit.name)
+
+
+class MutableRelationUnitData(RelationUnitData, MutableLazyMapping):
+    def _store(self, key, value):
+        self._backend.relation_set(self.relation_id, key, value)
+
+    def _remove(self, key):
+        # Relation values are simple strings only, and setting the value to an empty string will actually
+        # remove the key from the relation. Note that this implies that there is no way to distinguish
+        # between a missing key, an empty string, or an explicit None value without some form of encoding,
+        # such as JSON.
+        self._store(key, '')
+
+    def __setitem__(self, key, value):
+        if not isinstance(value, str):
+            raise TypeError('Relation data values must be strings')
+        if value == '':
+            # Setting a relation data value to an empty string will actually remove the key from the relation.
+            # We need to ensure that this is reflected in-memory as well.
+            del self[key]
+        else:
+            super().__setitem__(key, value)
 
 
 class ConfigData(LazyMapping):
@@ -176,6 +241,9 @@ class ModelBackend:
     def _run(self, *args):
         return json.loads(run(args + ('--format=json',), stdout=PIPE, check=True).stdout.decode('utf8'))
 
+    def _run_no_output(self, *args):
+        run(args, check=True)
+
     def relation_ids(self, relation_name):
         return self._run('relation-ids', relation_name)
 
@@ -184,6 +252,9 @@ class ModelBackend:
 
     def relation_get(self, relation_id, member_name):
         return self._run('relation-get', '-r', relation_id, '-', member_name)
+
+    def relation_set(self, relation_id, key, value):
+        return self._run_no_output('relation-set', '-r', relation_id, f'{key}={value or ""}')
 
     def config_get(self):
         return self._run('config-get')
