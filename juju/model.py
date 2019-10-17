@@ -1,6 +1,6 @@
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from subprocess import run, PIPE
 from weakref import WeakValueDictionary
 
@@ -86,32 +86,6 @@ class LazyMapping(Mapping, ABC):
         return self._data[key]
 
 
-class MutableLazyMapping(ABC):
-    @abstractmethod
-    def _store(self, key, value):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def _remove(self, key):
-        raise NotImplementedError()
-
-    def __setitem__(self, key, value):
-        # We make the external call first on the off chance that it raises an error which is subsequently caught
-        # and handled. This way, we don't end up modifying the in-memory value if the external call failed.
-        self._store(key, value)
-        if self._lazy_data is not None:
-            # Don't load data unnecessarily if we're only updating.
-            self._data[key] = value
-
-    def __delitem__(self, key):
-        # We make the external call first on the off chance that it raises an error which is subsequently caught
-        # and handled. This way, we don't end up modifying the in-memory value if the external call failed.
-        self._remove(key)
-        if self._lazy_data is not None:
-            # Don't load data unnecessarily if we're only updating.
-            del self._data[key]
-
-
 class RelationMapping(LazyMapping):
     """Map of relation names to lists of Relation instances."""
     def __init__(self, relation_names, local_unit, backend, cache):
@@ -166,8 +140,8 @@ class RelationData(Mapping):
     def __init__(self, relation_name, relation_id, local_unit, remote_units, backend):
         self.relation_name = relation_name
         self.relation_id = relation_id
-        self._data = {local_unit: MutableRelationUnitData(relation_id, local_unit, backend)}
-        self._data.update({unit: RelationUnitData(relation_id, unit, backend) for unit in remote_units})
+        self._data = {local_unit: RelationUnitData(relation_id, local_unit, True, backend)}
+        self._data.update({unit: RelationUnitData(relation_id, unit, False, backend) for unit in remote_units})
 
     def __contains__(self, key):
         return key in self._data
@@ -182,10 +156,13 @@ class RelationData(Mapping):
         return self._data[key]
 
 
-class RelationUnitData(LazyMapping):
-    def __init__(self, relation_id, unit, backend):
+# We mix in MutableMapping here to get some convenience implementations, but whether it's actually
+# mutable or not is controlled by the flag.
+class RelationUnitData(LazyMapping, MutableMapping):
+    def __init__(self, relation_id, unit, is_mutable, backend):
         self.relation_id = relation_id
         self.unit = unit
+        self._is_mutable = is_mutable
         self._backend = backend
 
     def _load(self):
@@ -194,27 +171,25 @@ class RelationUnitData(LazyMapping):
         # in-memory cache as well as calling out to relation-set.
         return self._backend.relation_get(self.relation_id, self.unit.name)
 
-
-class MutableRelationUnitData(RelationUnitData, MutableLazyMapping):
-    def _store(self, key, value):
-        self._backend.relation_set(self.relation_id, key, value)
-
-    def _remove(self, key):
-        # Relation values are simple strings only, and setting the value to an empty string will actually
-        # remove the key from the relation. Note that this implies that there is no way to distinguish
-        # between a missing key, an empty string, or an explicit None value without some form of encoding,
-        # such as JSON.
-        self._store(key, '')
-
     def __setitem__(self, key, value):
+        if not self._is_mutable:
+            raise TypeError(f'Cannot set relation data for {self.unit.name}')
         if not isinstance(value, str):
             raise TypeError('Relation data values must be strings')
-        if value == '':
-            # Setting a relation data value to an empty string will actually remove the key from the relation.
-            # We need to ensure that this is reflected in-memory as well.
-            del self[key]
-        else:
-            super().__setitem__(key, value)
+        self._backend.relation_set(self.relation_id, key, value)
+        # Don't load data unnecessarily if we're only updating.
+        if self._lazy_data is not None:
+            if value == '':
+                # Match the behavior of Juju, which is that setting the value to an empty string will
+                # remove the key entirely from the relation data.
+                del self._data[key]
+            else:
+                self._data[key] = value
+
+    def __delitem__(self, key):
+        # Match the behavior of Juju, which is that setting the value to an empty string will
+        # remove the key entirely from the relation data.
+        self.__setitem__(key, '')
 
 
 class ConfigData(LazyMapping):

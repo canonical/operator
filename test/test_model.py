@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import unittest
+from unittest.mock import Mock
 
 import juju.model
 
@@ -79,13 +80,17 @@ class TestModel(unittest.TestCase):
         rel_db1 = self.model.relation('db1')
         backend = self.model._backend
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
+        # Force memory cache to be loaded.
+        self.assertIn('host', rel_db1.data[remoteapp1_0])
         with self.assertRaises(TypeError):
             rel_db1.data[remoteapp1_0]['foo'] = 'bar'
         self.assertFalse(backend.relation_set_called)
+        self.assertNotIn('foo', rel_db1.data[remoteapp1_0])
 
     def test_relation_data_modify_local(self):
         rel_db1 = self.model.relation('db1')
         backend = self.model._backend
+        # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         rel_db1.data[self.model.unit]['host'] = 'bar'
         self.assertTrue(backend.relation_set_called)
@@ -94,10 +99,24 @@ class TestModel(unittest.TestCase):
     def test_relation_data_del_key(self):
         rel_db1 = self.model.relation('db1')
         backend = self.model._backend
+        # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         del rel_db1.data[self.model.unit]['host']
         self.assertTrue(backend.relation_set_called)
         self.assertNotIn('host', rel_db1.data[self.model.unit])
+
+    def test_relation_set_fail(self):
+        rel_db1 = self.model.relation('db1')
+        backend = self.model._backend
+        backend.relation_set = Mock(side_effect=ValueError)
+        # Force memory cache to be loaded.
+        self.assertIn('host', rel_db1.data[self.model.unit])
+        with self.assertRaises(ValueError):
+            rel_db1.data[self.model.unit]['host'] = 'bar'
+        self.assertEqual(rel_db1.data[self.model.unit]['host'], 'myapp-0')
+        with self.assertRaises(ValueError):
+            del rel_db1.data[self.model.unit]['host']
+        self.assertIn('host', rel_db1.data[self.model.unit])
 
     def test_relation_data_type_check(self):
         rel_db1 = self.model.relation('db1')
