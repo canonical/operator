@@ -108,32 +108,21 @@ class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
         self.relation_name = relation_name
         self.relation_id = relation_id
-        self._local_unit = local_unit
-        self._backend = backend
-        self._cache = cache
-        self._apps = None
-        self._units = None
-        self._data = None
+        self._apps = set()
+        self._units = []
+        for unit_name in backend.relation_list(relation_id):
+            unit = cache.get(Unit, unit_name)
+            self._units.append(unit)
+            self._apps.add(unit.app)
+        self.data = RelationData(relation_name, relation_id, local_unit, self.units, backend)
 
     @property
     def apps(self):
-        if self._apps is None:
-            self._apps = list({unit.app for unit in self.units})
-        return self._apps
+        return list(self._apps)
 
     @property
     def units(self):
-        if self._units is None:
-            self._units = []
-            for unit_name in self._backend.relation_list(self.relation_id):
-                self._units.append(self._cache.get(Unit, unit_name))
-        return self._units
-
-    @property
-    def data(self):
-        if self._data is None:
-            self._data = RelationData(self.relation_name, self.relation_id, self._local_unit, self.units, self._backend)
-        return self._data
+        return list(self._units)
 
 
 class RelationData(Mapping):
