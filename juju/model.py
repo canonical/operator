@@ -1,6 +1,6 @@
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from subprocess import run, PIPE
 from weakref import WeakValueDictionary
 
