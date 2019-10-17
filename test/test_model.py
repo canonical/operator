@@ -5,6 +5,8 @@ import unittest
 import juju.model
 
 
+# TODO: It would be better if this implemented these as executables that were called
+# via the actual juju.model.ModelBackend implementation.
 class TestModelBackend:
     def __init__(self):
         self.relation_set_calls = []
