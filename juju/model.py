@@ -59,38 +59,6 @@ class Unit:
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
 
-class LazyList(Sequence, ABC):
-    _lazy_data = None
-
-    @abstractmethod
-    def _load(self):
-        raise NotImplementedError()
-
-    @property
-    def _data(self):
-        if self._lazy_data is None:
-            self._lazy_data = self._load()
-        return self._lazy_data
-
-    def __getitem__(self, index):
-        return self._data[index]
-
-    def __len__(self):
-        return len(self._data)
-
-    def __contains__(self, key):
-        return key in self._data
-
-    def __iter__(self):
-        return iter(self._data)
-
-    def __reversed__(self):
-        return reversed(self._data)
-
-    def index(self, value, start=0, stop=None):
-        return self._data.index(value, start, stop)
-
-
 class LazyMapping(Mapping, ABC):
     _lazy_data = None
 
@@ -121,9 +89,10 @@ class LazyMapping(Mapping, ABC):
 class RelationMapping(Mapping):
     """Map of relation names to lists of Relation instances."""
     def __init__(self, relation_names, local_unit, backend, cache):
-        self._data = {}
-        for relation_name in relation_names:
-            self._data[relation_name] = RelationList(relation_name, local_unit, backend, cache)
+        self._local_unit = local_unit
+        self._backend = backend
+        self._cache = cache
+        self._data = {relation_name: None for relation_name in relation_names}
 
     def __contains__(self, key):
         return key in self._data
@@ -134,22 +103,13 @@ class RelationMapping(Mapping):
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key):
-        return self._data[key]
-
-
-class RelationList(LazyList):
-    def __init__(self, relation_name, local_unit, backend, cache):
-        self.relation_name = relation_name
-        self._local_unit = local_unit
-        self._backend = backend
-        self._cache = cache
-
-    def _load(self):
-        relations = []
-        for relation_id in self._backend.relation_ids(self.relation_name):
-            relations.append(Relation(self.relation_name, relation_id, self._local_unit, self._backend, self._cache))
-        return relations
+    def __getitem__(self, relation_name):
+        relation_list = self._data[relation_name]
+        if relation_list is None:
+            relation_list = self._data[relation_name] = []
+            for relation_id in self._backend.relation_ids(relation_name):
+                relation_list.append(Relation(relation_name, relation_id, self._local_unit, self._backend, self._cache))
+        return list(relation_list)  # Return a copy so our copy cannot be modified.
 
 
 class Relation:
