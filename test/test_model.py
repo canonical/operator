@@ -82,7 +82,7 @@ class TestModel(unittest.TestCase):
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[remoteapp1_0])
-        with self.assertRaises(TypeError):
+        with self.assertRaises(juju.model.RelationDataError):
             rel_db1.data[remoteapp1_0]['foo'] = 'bar'
         self.assertFalse(self.backend.relation_set_called)
         self.assertNotIn('foo', rel_db1.data[remoteapp1_0])
@@ -117,11 +117,11 @@ class TestModel(unittest.TestCase):
 
     def test_relation_data_type_check(self):
         rel_db1 = self.model.relation('db1')
-        with self.assertRaises(TypeError):
+        with self.assertRaises(juju.model.RelationDataError):
             rel_db1.data[self.model.unit]['foo'] = 1
-        with self.assertRaises(TypeError):
+        with self.assertRaises(juju.model.RelationDataError):
             rel_db1.data[self.model.unit]['foo'] = {'foo': 'bar'}
-        with self.assertRaises(TypeError):
+        with self.assertRaises(juju.model.RelationDataError):
             rel_db1.data[self.model.unit]['foo'] = None
         self.assertFalse(self.backend.relation_set_called)
 

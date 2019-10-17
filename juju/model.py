@@ -162,9 +162,9 @@ class RelationUnitData(LazyMapping, MutableMapping):
 
     def __setitem__(self, key, value):
         if not self._is_mutable:
-            raise TypeError(f'Cannot set relation data for {self.unit.name}')
+            raise RelationDataError(f'cannot set relation data for {self.unit.name}')
         if not isinstance(value, str):
-            raise TypeError('Relation data values must be strings')
+            raise RelationDataError('relation data values must be strings')
         self._backend.relation_set(self.relation_id, key, value)
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
@@ -199,6 +199,10 @@ class TooManyRelatedApps(ModelError):
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
+
+
+class RelationDataError(ModelError):
+    pass
 
 
 class ModelBackend:
