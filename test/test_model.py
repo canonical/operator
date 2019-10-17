@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 
 import unittest
-from unittest.mock import Mock
 
 import juju.model
 
 
 class TestModelBackend:
-    relation_set_called = False
+    def __init__(self):
+        self.relation_set_calls = []
 
     def relation_ids(self, relation_name):
         return {
@@ -40,7 +40,9 @@ class TestModelBackend:
         }[relation_id][member_name]
 
     def relation_set(self, relation_id, key, value):
-        self.relation_set_called = True
+        if relation_id == 'db2:1':
+            raise ValueError()
+        self.relation_set_calls.append((relation_id, key, value))
 
     def config_get(self):
         return {
@@ -84,7 +86,7 @@ class TestModel(unittest.TestCase):
         self.assertIn('host', rel_db1.data[remoteapp1_0])
         with self.assertRaises(juju.model.RelationDataError):
             rel_db1.data[remoteapp1_0]['foo'] = 'bar'
-        self.assertFalse(self.backend.relation_set_called)
+        self.assertEqual(self.backend.relation_set_calls, [])
         self.assertNotIn('foo', rel_db1.data[remoteapp1_0])
 
     def test_relation_data_modify_local(self):
@@ -92,7 +94,7 @@ class TestModel(unittest.TestCase):
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         rel_db1.data[self.model.unit]['host'] = 'bar'
-        self.assertTrue(self.backend.relation_set_called)
+        self.assertEqual(self.backend.relation_set_calls, [('db1:1', 'host', 'bar')])
         self.assertEqual(rel_db1.data[self.model.unit]['host'], 'bar')
 
     def test_relation_data_del_key(self):
@@ -100,20 +102,19 @@ class TestModel(unittest.TestCase):
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         del rel_db1.data[self.model.unit]['host']
-        self.assertTrue(self.backend.relation_set_called)
+        self.assertEqual(self.backend.relation_set_calls, [('db1:1', 'host', '')])
         self.assertNotIn('host', rel_db1.data[self.model.unit])
 
     def test_relation_set_fail(self):
-        rel_db1 = self.model.relation('db1')
-        self.backend.relation_set = Mock(side_effect=ValueError)
+        rel_db2 = self.model.relations['db2'][0]
         # Force memory cache to be loaded.
-        self.assertIn('host', rel_db1.data[self.model.unit])
+        self.assertIn('host', rel_db2.data[self.model.unit])
         with self.assertRaises(ValueError):
-            rel_db1.data[self.model.unit]['host'] = 'bar'
-        self.assertEqual(rel_db1.data[self.model.unit]['host'], 'myapp-0')
+            rel_db2.data[self.model.unit]['host'] = 'bar'
+        self.assertEqual(rel_db2.data[self.model.unit]['host'], 'myapp-0')
         with self.assertRaises(ValueError):
-            del rel_db1.data[self.model.unit]['host']
-        self.assertIn('host', rel_db1.data[self.model.unit])
+            del rel_db2.data[self.model.unit]['host']
+        self.assertIn('host', rel_db2.data[self.model.unit])
 
     def test_relation_data_type_check(self):
         rel_db1 = self.model.relation('db1')
@@ -123,7 +124,7 @@ class TestModel(unittest.TestCase):
             rel_db1.data[self.model.unit]['foo'] = {'foo': 'bar'}
         with self.assertRaises(juju.model.RelationDataError):
             rel_db1.data[self.model.unit]['foo'] = None
-        self.assertFalse(self.backend.relation_set_called)
+        self.assertEqual(self.backend.relation_set_calls, [])
 
     def test_config(self):
         self.assertEqual(self.model.config, {
