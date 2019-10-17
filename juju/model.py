@@ -207,7 +207,10 @@ class RelationDataError(ModelError):
 
 class ModelBackend:
     def _run(self, *args):
-        return json.loads(run(args + ('--format=json',), stdout=PIPE, check=True).stdout.decode('utf8'))
+        result = run(args + ('--format=json',), stdout=PIPE, check=True)
+        text = result.stdout.decode('utf8')
+        data = json.loads(text)
+        return data
 
     def _run_no_output(self, *args):
         run(args, check=True)
