@@ -124,7 +124,7 @@ def main():
         # this will be code that the user will need to implement on their end. In other words, their
         # Charm subclass will have an __init__, which needs to take parameters, and this needs to be
         # simple and elegant so it doesn't feel hackish.
-        charm = charm_module.Charm(framework)
+        charm = charm_module.Charm(framework, None)
 
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading

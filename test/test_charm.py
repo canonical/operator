@@ -56,7 +56,7 @@ class TestCharm(unittest.TestCase):
         self.assertIn('custom', events)
 
         framework = self.create_framework()
-        charm = MyCharm(framework)
+        charm = MyCharm(framework, None)
         charm.on.start.emit()
 
         self.assertEqual(charm.started, True)
@@ -91,7 +91,7 @@ class TestCharm(unittest.TestCase):
             },
         })
 
-        charm = MyCharm(self.create_framework())
+        charm = MyCharm(self.create_framework(), None)
 
         charm.on.req1_relation_joined.emit()
         charm.on.req1_relation_changed.emit()
@@ -164,7 +164,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.metadata.storage['stor3'].multiple_range, (2, None))
         self.assertEqual(self.metadata.storage['stor-4'].multiple_range, (2, 4))
 
-        charm = MyCharm(self.create_framework())
+        charm = MyCharm(self.create_framework(), None)
 
         charm.on.stor1_storage_attached.emit()
         charm.on.stor2_storage_detaching.emit()
