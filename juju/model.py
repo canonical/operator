@@ -109,7 +109,7 @@ class RelationMapping(Mapping):
             relation_list = self._data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
                 relation_list.append(Relation(relation_name, relation_id, self._local_unit, self._backend, self._cache))
-        return list(relation_list)  # Return a copy so our copy cannot be modified.
+        return relation_list
 
 
 class Relation:
