@@ -6,11 +6,12 @@ from weakref import WeakValueDictionary
 
 
 class Model:
-    def __init__(self, local_unit_name, relation_names, backend):
+    def __init__(self, charm_env, backend):
         self._cache = ModelCache()
         self._backend = backend
-        self.unit = self._cache.get(Unit, local_unit_name)
+        self.unit = self._cache.get(Unit, charm_env.unit_name)
         self.app = self.unit.app
+        relation_names = list(charm_env.metadata.relations)
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
 

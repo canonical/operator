@@ -8,6 +8,7 @@ from pathlib import Path
 
 from juju.framework import Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent
 from juju.framework import NoSnapshotError, StoredState
+from juju.charm import CharmEnv
 
 
 class TestFramework(unittest.TestCase):
@@ -19,7 +20,7 @@ class TestFramework(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", model=None)
+        framework = Framework(self.tmpdir / "framework.data", model=None, charm_env=CharmEnv())
         self.addCleanup(framework.close)
         return framework
 
@@ -506,7 +507,7 @@ class TestStoredState(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", model=None)
+        framework = Framework(self.tmpdir / "framework.data", model=None, charm_env=CharmEnv())
         self.addCleanup(framework.close)
         return framework
 

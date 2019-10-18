@@ -6,7 +6,7 @@ import shutil
 
 from pathlib import Path
 
-from juju.charm import CharmBase, CharmMeta
+from juju.charm import CharmBase, CharmEnv, CharmMeta
 from juju.charm import CharmEvents
 from juju.framework import Framework, Event, EventBase
 
@@ -15,6 +15,7 @@ class TestCharm(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
+        self.metadata = CharmMeta()
 
         class CustomEvent(EventBase):
             pass
@@ -32,7 +33,8 @@ class TestCharm(unittest.TestCase):
         CharmBase.on = CharmEvents()
 
     def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", model=None)
+        charm_env = CharmEnv(metadata=self.metadata)
+        framework = Framework(self.tmpdir / "framework.data", model=None, charm_env=charm_env)
         self.addCleanup(framework.close)
         return framework
 
@@ -54,7 +56,7 @@ class TestCharm(unittest.TestCase):
         self.assertIn('custom', events)
 
         framework = self.create_framework()
-        charm = MyCharm(framework, None, CharmMeta(), self.tmpdir)
+        charm = MyCharm(framework)
         charm.on.start.emit()
 
         self.assertEqual(charm.started, True)
@@ -73,7 +75,7 @@ class TestCharm(unittest.TestCase):
             def on_any_relation(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        metadata = CharmMeta({
+        self.metadata = CharmMeta({
             'name': 'my-charm',
             'requires': {
                 'req1': {'interface': 'req1'},
@@ -89,7 +91,7 @@ class TestCharm(unittest.TestCase):
             },
         })
 
-        charm = MyCharm(self.create_framework(), None, metadata, self.tmpdir)
+        charm = MyCharm(self.create_framework())
 
         charm.on.req1_relation_joined.emit()
         charm.on.req1_relation_changed.emit()
@@ -132,7 +134,7 @@ class TestCharm(unittest.TestCase):
             def on_stor_4_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        metadata = CharmMeta({
+        self.metadata = CharmMeta({
             'name': 'my-charm',
             'storage': {
                 'stor1': {'type': 'filesystem'},
@@ -157,12 +159,12 @@ class TestCharm(unittest.TestCase):
             },
         })
 
-        self.assertIsNone(metadata.storage['stor1'].multiple_range)
-        self.assertEqual(metadata.storage['stor2'].multiple_range, (2, 2))
-        self.assertEqual(metadata.storage['stor3'].multiple_range, (2, None))
-        self.assertEqual(metadata.storage['stor-4'].multiple_range, (2, 4))
+        self.assertIsNone(self.metadata.storage['stor1'].multiple_range)
+        self.assertEqual(self.metadata.storage['stor2'].multiple_range, (2, 2))
+        self.assertEqual(self.metadata.storage['stor3'].multiple_range, (2, None))
+        self.assertEqual(self.metadata.storage['stor-4'].multiple_range, (2, 4))
 
-        charm = MyCharm(self.create_framework(), None, metadata, self.tmpdir)
+        charm = MyCharm(self.create_framework())
 
         charm.on.stor1_storage_attached.emit()
         charm.on.stor2_storage_detaching.emit()

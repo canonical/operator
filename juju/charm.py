@@ -1,3 +1,8 @@
+import sys
+from pathlib import Path
+
+import yaml
+
 from juju.framework import Object, Event, EventBase, EventsBase
 
 
@@ -82,10 +87,8 @@ class CharmBase(Object):
 
     on = CharmEvents()
 
-    def __init__(self, framework, key, metadata, charm_dir):
-        super().__init__(framework, key)
-        self.metadata = metadata
-        self.charm_dir = charm_dir
+    def __init__(self, framework):
+        super().__init__(framework, None)
 
         for relation_name in self.metadata.relations:
             relation_name = relation_name.replace('-', '_')
@@ -94,10 +97,54 @@ class CharmBase(Object):
             self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
             self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
 
-        for storage_name in metadata.storage:
+        for storage_name in self.metadata.storage:
             storage_name = storage_name.replace('-', '_')
             self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
+
+    @property
+    def charm_env(self):
+        return self.framework.charm_env
+
+    @property
+    def metadata(self):
+        return self.charm_env.metadata
+
+    @property
+    def charm_dir(self):
+        return self.charm_env.charm_dir
+
+
+class CharmEnv:
+    def __init__(self, env=None, **overrides):
+        """Object containing info about the operating environment of the charm.
+
+        Information will be extracted from the given environment variables, but can also be overridden
+        via keyword arguments.
+
+        See https://jaas.ai/docs/charm-writing/hook-env#heading--environment-variables for more info.
+        """
+        env = env or {}
+        self.charm_dir = overrides.get('charm_dir', env.get('JUJU_CHARM_DIR'))
+        if self.charm_dir is not None:
+            self.charm_dir = Path(self.charm_dir)
+        self.metadata = overrides.get('metadata')
+        if not self.metadata:
+            if self.charm_dir:
+                with open(self.charm_dir / 'metadata.yaml') as f:
+                    self.metadata = CharmMeta(yaml.safe_load(f))
+            else:
+                self.metadata = CharmMeta()
+        # Note: JUJU_HOOK_NAME is not reliably available, only being set during debug-hooks.
+        self.hook_name = overrides.get('hook_name', Path(sys.argv[0]).name)
+        self.unit_name = overrides.get('unit_name', env.get('JUJU_UNIT_NAME'))
+        self.app_name = self.unit_name.split('/')[0] if self.unit_name else ''
+        self.relation_name = overrides.get('relation_name', env.get('JUJU_RELATION'))
+        self.relation_id = overrides.get('relation_id', env.get('JUJU_RELATION_ID'))
+        self.remote_unit_name = overrides.get('remote_unit_name', env.get('JUJU_REMOTE_UNIT'))
+        self.availability_zone = overrides.get('availability_zone', env.get('JUJU_AVAILABILITY_ZONE'))
+        self.api_addresses = overrides.get('api_addresses', env.get('JUJU_API_ADDRESSES', '').split())
+        self.juju_version = overrides.get('juju_version', env.get('JUJU_VERSION'))
 
 
 class CharmMeta:

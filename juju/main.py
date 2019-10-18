@@ -2,7 +2,6 @@
 
 import os
 import sys
-import yaml
 from pathlib import Path
 
 CHARM_STATE_FILE = '.unit-state.db'
@@ -20,12 +19,6 @@ def _get_charm_dir():
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
-
-
-def _load_metadata():
-    with open('metadata.yaml') as f:
-        metadata = yaml.load(f, Loader=yaml.SafeLoader)
-    return metadata
 
 
 def _handle_event_link(charm_dir, bound_event):
@@ -117,37 +110,27 @@ def main():
     import juju.framework
     import juju.model
 
-    charm_dir = _get_charm_dir()
-
-    # Process the Juju event relevant to the current hook execution
-    # JUJU_HOOK_NAME or JUJU_ACTION_NAME are not used to support simulation
-    # of events from debugging sessions.
-    juju_event_name = Path(sys.argv[0]).name
-
-    # TODO: Depending on how we address the comment below about args to Charm.__init__, we will need
-    # to address the Model needing the list of relation names from the metadata in order to initialize
-    # the relation attributes.
-    metadata = juju.charm.CharmMeta(_load_metadata())
-    unit_name = os.environ['JUJU_UNIT_NAME']
-    model = juju.model.Model(unit_name, list(metadata.relations), juju.model.ModelBackend())
+    charm_env = juju.charm.CharmEnv(os.environ, charm_dir=_get_charm_dir())
+    model = juju.model.Model(charm_env, juju.model.ModelBackend())
+    juju_event_name = charm_env.hook_name
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
-    charm_state_path = charm_dir / CHARM_STATE_FILE
-    framework = juju.framework.Framework(data_path=charm_state_path, model=model)
+    charm_state_path = charm_env.charm_dir / CHARM_STATE_FILE
+    framework = juju.framework.Framework(data_path=charm_state_path, model=model, charm_env=charm_env)
     try:
         # TODO: The Charm itself sholud probably receive no other argument than the framework, because
         # this will be code that the user will need to implement on their end. In other words, their
         # Charm subclass will have an __init__, which needs to take parameters, and this needs to be
         # simple and elegant so it doesn't feel hackish.
-        charm = charm_module.Charm(framework, None, metadata, charm_dir)
+        charm = charm_module.Charm(framework)
 
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading
         # the hook setup code is not triggered on config-changed.
         if (juju_event_name in ('install', 'upgrade-charm') or juju_event_name.endswith('-storage-attached')):
-            _setup_hooks(charm_dir, charm)
+            _setup_hooks(charm_env.charm_dir, charm)
 
         framework.reemit()
 

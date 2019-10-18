@@ -348,12 +348,13 @@ class Framework(Object):
 
     on = FrameworkEvents()
 
-    def __init__(self, data_path, model):
+    def __init__(self, data_path, model, charm_env):
 
         super().__init__(self, None)
 
         self._data_path = data_path
         self.model = model
+        self.charm_env = charm_env
         self._event_count = 0
         self._observers = []      # [(observer, method_name, parent_path, event_key)]
         self._observer = {}       # {observer_path: observer}
