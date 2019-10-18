@@ -5,8 +5,10 @@ import unittest
 import juju.model
 
 
-# TODO: It would be better if this implemented these as executables that were called
-# via the actual juju.model.ModelBackend implementation.
+# TODO: We need some manner of test to validate the actual ModelBackend implementation, round-tripped
+# through the actual subprocess calls. Either this class could implement these functions as executables
+# that were called via subprocess, or more simple tests that just test through ModelBackend while leaving
+# these tests alone, depending on what proves easier.
 class TestModelBackend:
     def __init__(self):
         self.relation_set_calls = []
