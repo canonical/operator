@@ -86,22 +86,30 @@ class LazyMapping(Mapping, ABC):
         return self._data[key]
 
 
-class RelationMapping(LazyMapping):
+class RelationMapping(Mapping):
     """Map of relation names to lists of Relation instances."""
     def __init__(self, relation_names, local_unit, backend, cache):
-        self._relation_names = relation_names
         self._local_unit = local_unit
         self._backend = backend
         self._cache = cache
+        self._data = {relation_name: None for relation_name in relation_names}
 
-    def _load(self):
-        data = {}
-        # TODO: Make this more lazy. We don't want to call relation-ids for relations that we don't access.
-        for relation_name in self._relation_names:
-            relations = data[relation_name] = []
+    def __contains__(self, key):
+        return key in self._data
+
+    def __len__(self):
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __getitem__(self, relation_name):
+        relation_list = self._data[relation_name]
+        if relation_list is None:
+            relation_list = self._data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
-                relations.append(Relation(relation_name, relation_id, self._local_unit, self._backend, self._cache))
-        return data
+                relation_list.append(Relation(relation_name, relation_id, self._local_unit, self._backend, self._cache))
+        return relation_list
 
 
 class Relation:
