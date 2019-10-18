@@ -1,6 +1,6 @@
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from subprocess import run, PIPE
 from weakref import WeakValueDictionary
 
@@ -108,41 +108,50 @@ class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
         self.relation_name = relation_name
         self.relation_id = relation_id
-        self._local_unit = local_unit
-        self._backend = backend
-        self._cache = cache
-        self._apps = None
-        self._units = None
-        self._data = None
+        self._apps = set()
+        self._units = []
+        for unit_name in backend.relation_list(relation_id):
+            unit = cache.get(Unit, unit_name)
+            self._units.append(unit)
+            self._apps.add(unit.app)
+        self.data = RelationData(relation_name, relation_id, local_unit, self.units, backend)
 
     @property
     def apps(self):
-        if self._apps is None:
-            self._apps = list({unit.app for unit in self.units})
         return self._apps
 
     @property
     def units(self):
-        if self._units is None:
-            self._units = []
-            for unit_name in self._backend.relation_list(self.relation_id):
-                self._units.append(self._cache.get(Unit, unit_name))
         return self._units
 
-    @property
-    def data(self):
-        if self._data is None:
-            units = [self._local_unit] + self.units
-            # TODO: Restore the RelationData wrapping class. This will prevent unintended side-effects if the
-            # charm code tries to do something unexpected with the return value of this property.
-            self._data = {unit: RelationUnitData(self.relation_id, unit, self._backend) for unit in units}
-        return self._data
+
+class RelationData(Mapping):
+    def __init__(self, relation_name, relation_id, local_unit, remote_units, backend):
+        self.relation_name = relation_name
+        self.relation_id = relation_id
+        self._data = {local_unit: RelationUnitData(relation_id, local_unit, True, backend)}
+        self._data.update({unit: RelationUnitData(relation_id, unit, False, backend) for unit in remote_units})
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __len__(self):
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __getitem__(self, key):
+        return self._data[key]
 
 
-class RelationUnitData(LazyMapping):
-    def __init__(self, relation_id, unit, backend):
+# We mix in MutableMapping here to get some convenience implementations, but whether it's actually
+# mutable or not is controlled by the flag.
+class RelationUnitData(LazyMapping, MutableMapping):
+    def __init__(self, relation_id, unit, is_mutable, backend):
         self.relation_id = relation_id
         self.unit = unit
+        self._is_mutable = is_mutable
         self._backend = backend
 
     def _load(self):
@@ -150,6 +159,26 @@ class RelationUnitData(LazyMapping):
         # Specifically, if we're caching relation data in memory, modifications need to affect both the
         # in-memory cache as well as calling out to relation-set.
         return self._backend.relation_get(self.relation_id, self.unit.name)
+
+    def __setitem__(self, key, value):
+        if not self._is_mutable:
+            raise RelationDataError(f'cannot set relation data for {self.unit.name}')
+        if not isinstance(value, str):
+            raise RelationDataError('relation data values must be strings')
+        self._backend.relation_set(self.relation_id, key, value)
+        # Don't load data unnecessarily if we're only updating.
+        if self._lazy_data is not None:
+            if value == '':
+                # Match the behavior of Juju, which is that setting the value to an empty string will
+                # remove the key entirely from the relation data.
+                del self._data[key]
+            else:
+                self._data[key] = value
+
+    def __delitem__(self, key):
+        # Match the behavior of Juju, which is that setting the value to an empty string will
+        # remove the key entirely from the relation data.
+        self.__setitem__(key, '')
 
 
 class ConfigData(LazyMapping):
@@ -172,9 +201,19 @@ class TooManyRelatedApps(ModelError):
         self.max_supported = max_supported
 
 
+class RelationDataError(ModelError):
+    pass
+
+
 class ModelBackend:
     def _run(self, *args):
-        return json.loads(run(args + ('--format=json',), stdout=PIPE, check=True).stdout.decode('utf8'))
+        result = run(args + ('--format=json',), stdout=PIPE, check=True)
+        text = result.stdout.decode('utf8')
+        data = json.loads(text)
+        return data
+
+    def _run_no_output(self, *args):
+        run(args, check=True)
 
     def relation_ids(self, relation_name):
         return self._run('relation-ids', relation_name)
@@ -184,6 +223,9 @@ class ModelBackend:
 
     def relation_get(self, relation_id, member_name):
         return self._run('relation-get', '-r', relation_id, '-', member_name)
+
+    def relation_set(self, relation_id, key, value):
+        return self._run_no_output('relation-set', '-r', relation_id, f'{key}={value}')
 
     def config_get(self):
         return self._run('config-get')
