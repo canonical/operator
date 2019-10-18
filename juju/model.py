@@ -118,11 +118,11 @@ class Relation:
 
     @property
     def apps(self):
-        return list(self._apps)
+        return self._apps
 
     @property
     def units(self):
-        return list(self._units)
+        return self._units
 
 
 class RelationData(Mapping):
