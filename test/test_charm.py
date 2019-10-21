@@ -6,7 +6,7 @@ import shutil
 
 from pathlib import Path
 
-from juju.charm import CharmBase, CharmEnv, CharmMeta
+from juju.charm import CharmBase, CharmMeta
 from juju.charm import CharmEvents
 from juju.framework import Framework, Event, EventBase
 
@@ -15,7 +15,7 @@ class TestCharm(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-        self.metadata = CharmMeta()
+        self.meta = CharmMeta()
 
         class CustomEvent(EventBase):
             pass
@@ -33,8 +33,7 @@ class TestCharm(unittest.TestCase):
         CharmBase.on = CharmEvents()
 
     def create_framework(self):
-        charm_env = CharmEnv(metadata=self.metadata)
-        framework = Framework(self.tmpdir / "framework.data", model=None, charm_env=charm_env)
+        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.meta, None)
         self.addCleanup(framework.close)
         return framework
 
@@ -75,7 +74,7 @@ class TestCharm(unittest.TestCase):
             def on_any_relation(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        self.metadata = CharmMeta({
+        self.meta = CharmMeta({
             'name': 'my-charm',
             'requires': {
                 'req1': {'interface': 'req1'},
@@ -134,7 +133,7 @@ class TestCharm(unittest.TestCase):
             def on_stor_4_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        self.metadata = CharmMeta({
+        self.meta = CharmMeta({
             'name': 'my-charm',
             'storage': {
                 'stor1': {'type': 'filesystem'},
@@ -159,10 +158,10 @@ class TestCharm(unittest.TestCase):
             },
         })
 
-        self.assertIsNone(self.metadata.storage['stor1'].multiple_range)
-        self.assertEqual(self.metadata.storage['stor2'].multiple_range, (2, 2))
-        self.assertEqual(self.metadata.storage['stor3'].multiple_range, (2, None))
-        self.assertEqual(self.metadata.storage['stor-4'].multiple_range, (2, 4))
+        self.assertIsNone(self.meta.storage['stor1'].multiple_range)
+        self.assertEqual(self.meta.storage['stor2'].multiple_range, (2, 2))
+        self.assertEqual(self.meta.storage['stor3'].multiple_range, (2, None))
+        self.assertEqual(self.meta.storage['stor-4'].multiple_range, (2, 4))
 
         charm = MyCharm(self.create_framework(), None)
 

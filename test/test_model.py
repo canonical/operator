@@ -3,7 +3,6 @@
 import unittest
 
 import juju.model
-import juju.charm
 
 
 class TestModelBackend:
@@ -47,9 +46,7 @@ class TestModelBackend:
 
 class TestModel(unittest.TestCase):
     def setUp(self):
-        self.charm_env = juju.charm.CharmEnv(unit_name='myapp/0')
-        self.charm_env.metadata.relations = ['db0', 'db1', 'db2']
-        self.model = juju.model.Model(self.charm_env, TestModelBackend())
+        self.model = juju.model.Model('myapp/0', ['db0', 'db1', 'db2'], TestModelBackend())
 
     def test_model(self):
         self.assertIs(self.model.app, self.model.unit.app)

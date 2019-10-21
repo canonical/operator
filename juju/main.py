@@ -4,6 +4,8 @@ import os
 import sys
 from pathlib import Path
 
+import yaml
+
 CHARM_STATE_FILE = '.unit-state.db'
 
 
@@ -19,6 +21,12 @@ def _get_charm_dir():
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
+
+
+def _load_metadata(charm_dir):
+    with open(charm_dir / 'metadata.yaml') as f:
+        metadata = yaml.load(f, Loader=yaml.SafeLoader)
+    return metadata
 
 
 def _handle_event_link(charm_dir, bound_event):
@@ -110,15 +118,22 @@ def main():
     import juju.framework
     import juju.model
 
-    charm_env = juju.charm.CharmEnv(os.environ, charm_dir=_get_charm_dir())
-    model = juju.model.Model(charm_env, juju.model.ModelBackend())
-    juju_event_name = charm_env.hook_name
+    charm_dir = _get_charm_dir()
+
+    # Process the Juju event relevant to the current hook execution
+    # JUJU_HOOK_NAME or JUJU_ACTION_NAME are not used to support simulation
+    # of events from debugging sessions.
+    juju_event_name = Path(sys.argv[0]).name
+
+    meta = juju.charm.CharmMeta(_load_metadata(charm_dir))
+    unit_name = os.environ['JUJU_UNIT_NAME']
+    model = juju.model.Model(unit_name, list(meta.relations), juju.model.ModelBackend())
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
-    charm_state_path = charm_env.charm_dir / CHARM_STATE_FILE
-    framework = juju.framework.Framework(data_path=charm_state_path, model=model, charm_env=charm_env)
+    charm_state_path = charm_dir / CHARM_STATE_FILE
+    framework = juju.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
         # TODO: The Charm itself sholud probably receive no other argument than the framework, because
         # this will be code that the user will need to implement on their end. In other words, their
@@ -130,7 +145,7 @@ def main():
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading
         # the hook setup code is not triggered on config-changed.
         if (juju_event_name in ('install', 'upgrade-charm') or juju_event_name.endswith('-storage-attached')):
-            _setup_hooks(charm_env.charm_dir, charm)
+            _setup_hooks(charm_dir, charm)
 
         framework.reemit()
 
