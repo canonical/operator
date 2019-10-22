@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 
 from juju.framework import Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent
-from juju.framework import NoSnapshotError, StoredState
+from juju.framework import NoSnapshotError, StoredState, StoredList
 
 
 class TestFramework(unittest.TestCase):
@@ -557,52 +557,143 @@ class TestStoredState(unittest.TestCase):
         class SomeObject(Object):
             state = StoredState()
 
-        obj = SomeObject(framework, "1")
+        obj = SomeObject(framework, '1')
         try:
             class CustomObject:
                 pass
             obj.state.foo = CustomObject()
         except AttributeError as e:
-            self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/dict/list/etc")
+            self.assertEqual(str(e), 'attribute \'foo\' cannot be set to CustomObject: must be int/dict/list/etc')
         else:
-            self.fail("AttributeError not raised")
+            self.fail('AttributeError not raised')
 
         framework.commit()
 
         # Test and validation functions in a list of 2-tuples.
         # Assignment and keywords like del are not supported in lambdas so functions are used instead.
-        test_funcs = [(
-            lambda: setattr(obj.state, 'dict', {}),
-            lambda: self.assertEqual(dict(obj.state.dict), {})
+        test_operations = [(
+            {},                                                            # Operand A.
+            None,                                                          # Operand B.
+            {},                                                            # Expected result.
+            lambda a, b: None,                                             # Operation to perform.
+            lambda res, expected_res: self.assertEqual(res, expected_res)  # Validation to perform.
         ), (
-            lambda: obj.state.dict.update({"a": {}}),
-            lambda: self.assertEqual(dict(obj.state.dict), {"a": {}})
+            {},
+            {'a': {}},
+            {'a': {}},
+            lambda a, b: a.update(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            lambda: obj.state.dict["a"].update({"b": "c"}),
-            lambda: self.assertEqual(dict(obj.state.dict), {"a": {"b": "c"}})
+            {'a': {}},
+            {'b': 'c'},
+            {'a': {'b': 'c'}},
+            lambda a, b: a['a'].update(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            lambda: obj.state.dict["a"].update({"d": "e"}),
-            lambda: self.assertEqual(dict(obj.state.dict), {"a": {"b": "c", "d": "e"}})
+            {'a': {'b': 'c'}},
+            {'d': 'e'},
+            {'a': {'b': 'c', 'd': 'e'}},
+            lambda a, b: a['a'].update(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            lambda: obj.state.dict["a"].pop('d'),
-            lambda: self.assertEqual(dict(obj.state.dict), {"a": {"b": "c"}})
+            {'a': {'b': 'c', 'd': 'e'}},
+            'd',
+            {'a': {'b': 'c'}},
+            lambda a, b: a['a'].pop(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            [],
+            None,
+            [],
+            lambda a, b: None,
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            [],
+            'a',
+            ['a'],
+            lambda a, b: a.append(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            ['a'],
+            ['c'],
+            ['a', ['c']],
+            lambda a, b: a.append(b),
+            lambda res, expected_res: (
+                self.assertEqual(res, expected_res),
+                self.assertIsInstance(res[1], StoredList),
+            )
+        ), (
+            ['a', ['c']],
+            'b',
+            ['b', 'a', ['c']],
+            lambda a, b: a.insert(0, b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            ['b', 'a', ['c']],
+            ['d'],
+            ['b', ['d'], 'a', ['c']],
+            lambda a, b: a.insert(1, b),
+            lambda res, expected_res: (
+                self.assertEqual(res, expected_res),
+                self.assertIsInstance(res[1], StoredList)
+            ),
+        ), (
+            ['b', ['d'], 'a', ['c']],
+            0,
+            [['d'], 'a', ['c']],
+            lambda a, b: a.pop(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            [['d'], 'a', ['c']],
+            ['d'],
+            ['a', ['c']],
+            lambda a, b: a.remove(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            set(),
+            None,
+            set(),
+            lambda a, b: None,
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            set(),
+            'a',
+            set(['a']),
+            lambda a, b: a.add(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            set(['a']),
+            'a',
+            set(),
+            lambda a, b: a.discard(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            set(),
+            {'a'},
+            set(),
+            # Nested sets are not allowed as sets themselves are not hashable.
+            lambda a, b: self.assertRaises(TypeError, a.add, b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         )]
 
-        for do, validate in test_funcs:
+        class SomeObject(Object):
+            state = StoredState()
+
+        for a, b, expected_res, op, validate_op in test_operations:
             framework = self.create_framework()
+            obj = SomeObject(framework, '1')
+            obj.state.a = a
 
-            obj = SomeObject(framework, "1")
-
-            do()
-            validate()
+            op(obj.state.a, b)
+            validate_op(obj.state.a, expected_res)
 
             framework.commit()
 
             framework_copy = self.create_framework()
 
-            obj = SomeObject(framework_copy, "1")
+            obj = SomeObject(framework_copy, '1')
 
-            validate()
+            validate_op(obj.state.a, expected_res)
 
             framework_copy.commit()
 
@@ -686,12 +777,6 @@ class TestStoredState(unittest.TestCase):
             lambda a, b: a >= b,
             True,
             False
-        ), (
-            [1, 2, 5, 8],
-            [1, 2, 5, 6, 10],
-            lambda a, b: a <= b,
-            False,
-            True
         )]
 
         class SomeObject(Object):
