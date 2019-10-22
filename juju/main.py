@@ -2,8 +2,9 @@
 
 import os
 import sys
-import yaml
 from pathlib import Path
+
+import yaml
 
 CHARM_STATE_FILE = '.unit-state.db'
 
@@ -22,8 +23,8 @@ def _get_charm_dir():
     return charm_dir
 
 
-def _load_metadata():
-    with open('metadata.yaml') as f:
+def _load_metadata(charm_dir):
+    with open(charm_dir / 'metadata.yaml') as f:
         metadata = yaml.load(f, Loader=yaml.SafeLoader)
     return metadata
 
@@ -124,24 +125,21 @@ def main():
     # of events from debugging sessions.
     juju_event_name = Path(sys.argv[0]).name
 
-    # TODO: Depending on how we address the comment below about args to Charm.__init__, we will need
-    # to address the Model needing the list of relation names from the metadata in order to initialize
-    # the relation attributes.
-    metadata = juju.charm.CharmMeta(_load_metadata())
+    meta = juju.charm.CharmMeta(_load_metadata(charm_dir))
     unit_name = os.environ['JUJU_UNIT_NAME']
-    model = juju.model.Model(unit_name, list(metadata.relations), juju.model.ModelBackend())
+    model = juju.model.Model(unit_name, list(meta.relations), juju.model.ModelBackend())
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
-    framework = juju.framework.Framework(data_path=charm_state_path, model=model)
+    framework = juju.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
         # TODO: The Charm itself sholud probably receive no other argument than the framework, because
         # this will be code that the user will need to implement on their end. In other words, their
         # Charm subclass will have an __init__, which needs to take parameters, and this needs to be
         # simple and elegant so it doesn't feel hackish.
-        charm = charm_module.Charm(framework, None, metadata, charm_dir)
+        charm = charm_module.Charm(framework, None)
 
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading

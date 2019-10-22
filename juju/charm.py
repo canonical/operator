@@ -82,19 +82,17 @@ class CharmBase(Object):
 
     on = CharmEvents()
 
-    def __init__(self, framework, key, metadata, charm_dir):
+    def __init__(self, framework, key):
         super().__init__(framework, key)
-        self.metadata = metadata
-        self.charm_dir = charm_dir
 
-        for relation_name in self.metadata.relations:
+        for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
             self.on.define_event(f'{relation_name}_relation_joined', RelationJoinedEvent)
             self.on.define_event(f'{relation_name}_relation_changed', RelationChangedEvent)
             self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
             self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
 
-        for storage_name in metadata.storage:
+        for storage_name in self.framework.meta.storage:
             storage_name = storage_name.replace('-', '_')
             self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
