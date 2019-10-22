@@ -549,12 +549,14 @@ class StoredStateData(Object):
     def __init__(self, parent, attr_name):
         super().__init__(parent, attr_name)
         self._cache = {}
+        self.dirty = False
 
     def __getitem__(self, key):
         return self._cache.get(key)
 
     def __setitem__(self, key, value):
         self._cache[key] = value
+        self.dirty = True
 
     def __contains__(self, key):
         return key in self._cache
@@ -564,9 +566,12 @@ class StoredStateData(Object):
 
     def restore(self, snapshot):
         self._cache = snapshot
+        self.dirty = False
 
     def on_commit(self, event):
-        self.framework.save_snapshot(self)
+        if self.dirty:
+            self.framework.save_snapshot(self)
+            self.dirty = False
 
 class BoundStoredState:
 
@@ -669,9 +674,11 @@ class StoredDict(collections.MutableMapping):
 
     def __setitem__(self, key, value):
         self._under[key] = _unwrap_stored(self._stored_data, value)
+        self._stored_data.dirty = True
 
     def __delitem__(self, key):
         del self._under[key]
+        self._stored_data.dirty = True
 
     def __iter__(self):
         return self._under.__iter__()
@@ -699,18 +706,22 @@ class StoredList(collections.MutableSequence):
 
     def __setitem__(self, index, value):
         self._under[index] = _unwrap_stored(self._stored_data, value)
+        self._stored_data.dirty = True
 
     def __delitem__(self, index):
         del self._under[index]
+        self._stored_data.dirty = True
 
     def __len__(self):
         return len(self._under)
 
     def insert(self, index, value):
         self._under.insert(index, value)
+        self._stored_data.dirty = True
 
     def append(self, value):
         self._under.append(value)
+        self._stored_data.dirty = True
 
     def __eq__(self, other):
         if isinstance(other, StoredList):
@@ -761,9 +772,11 @@ class StoredSet(collections.MutableSet):
 
     def add(self, key):
         self._under.add(key)
+        self._stored_data.dirty = True
 
     def discard(self, key):
         self._under.discard(key)
+        self._stored_data.dirty = True
 
     def __contains__(self, key):
         return key in self._under
