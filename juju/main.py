@@ -104,8 +104,26 @@ def _emit_charm_event(charm, event_name):
     # If the event is not supported by the charm implementation, do
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
+        args, kwargs = _get_event_args(charm, event_to_emit)
         debugf(f'Emitting Juju event {event_name}')
-        event_to_emit.emit()
+        event_to_emit.emit(*args, **kwargs)
+
+
+def _get_event_args(charm, bound_event):
+    import juju.charm
+    event_type = bound_event.event_type
+    model = charm.framework.model
+    if issubclass(event_type, juju.charm.RelationEvent):
+        relation_name = os.environ['JUJU_RELATION']
+        relation_id = os.environ['JUJU_RELATION_ID']
+        relation = model.relation_by_id(relation_name, relation_id)
+        if issubclass(event_type, juju.charm.RelationUnitEvent):
+            remote_unit_name = os.environ['JUJU_REMOTE_UNIT']
+            remote_unit = model.get_unit(remote_unit_name)
+            return [relation, remote_unit], {}
+        else:
+            return [relation], {}
+    return [], {}
 
 
 def main():

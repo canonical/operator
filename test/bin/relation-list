@@ -1,0 +1,8 @@
+#!/bin/bash
+
+case $2 in
+    db1:1) echo '["remoteapp1/0"]' ;;
+    db2:1) echo '["remoteapp1/0"]' ;;
+    db2:2) echo '["remoteapp2/0"]' ;;
+    *) echo '[]' ;;
+esac

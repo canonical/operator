@@ -9,7 +9,7 @@ class Model:
     def __init__(self, local_unit_name, relation_names, backend):
         self._cache = ModelCache()
         self._backend = backend
-        self.unit = self._cache.get(Unit, local_unit_name)
+        self.unit = self.get_unit(local_unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
@@ -30,6 +30,22 @@ class Model:
             # TODO: We need something in the framework to catch and gracefully handle errors,
             # ideally integrating the error catching with Juju's mechanisms.
             raise TooManyRelatedApps(relation_name, num_related, 1)
+
+    def relation_by_id(self, relation_name, relation_id):
+        def _norm(relation_id):
+            # Relation IDs can be in the form '{relation_name}:{id}', so we need to
+            # normalize them to just '{id}' for comparison.
+            return relation_id.split(':')[-1]
+
+        for relation in self.relations[relation_name]:
+            if _norm(relation.relation_id) == _norm(relation_id):
+                return relation
+        else:
+            # The relation may be dead, but it is not forgotten.
+            return DeadRelation(relation_name, relation_id)
+
+    def get_unit(self, unit_name):
+        return self._cache.get(Unit, unit_name)
 
 
 class ModelCache(WeakValueDictionary):
@@ -116,29 +132,35 @@ class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
         self.relation_name = relation_name
         self.relation_id = relation_id
-        self._apps = set()
-        self._units = []
+        self.apps = set()
+        self.units = set()
         for unit_name in backend.relation_list(relation_id):
             unit = cache.get(Unit, unit_name)
-            self._units.append(unit)
-            self._apps.add(unit.app)
+            self.units.add(unit)
+            self.apps.add(unit.app)
         self.data = RelationData(relation_name, relation_id, local_unit, self.units, backend)
 
-    @property
-    def apps(self):
-        return self._apps
 
-    @property
-    def units(self):
-        return self._units
+class DeadRelation(Relation):
+    def __init__(self, relation_name, relation_id):
+        self.relation_name = relation_name
+        self.relation_id = relation_id
+        self.apps = set()
+        self.units = set()
+        self.data = RelationData(relation_name, relation_id, None, None, None)
 
 
 class RelationData(Mapping):
     def __init__(self, relation_name, relation_id, local_unit, remote_units, backend):
         self.relation_name = relation_name
         self.relation_id = relation_id
-        self._data = {local_unit: RelationUnitData(relation_id, local_unit, True, backend)}
-        self._data.update({unit: RelationUnitData(relation_id, unit, False, backend) for unit in remote_units})
+        if local_unit:
+            self._data = {local_unit: RelationUnitData(relation_id, local_unit, True, backend)}
+            self._data.update({unit: RelationUnitData(relation_id, unit, False, backend) for unit in remote_units})
+        else:
+            # If we don't have even a local unit, then we're dealing with a dead relation;
+            # and dead relations tell no tales.
+            self._data = {}
 
     def __contains__(self, key):
         return key in self._data
