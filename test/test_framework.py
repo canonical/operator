@@ -612,6 +612,62 @@ class TestStoredState(unittest.TestCase):
 
             framework_copy.commit()
 
+    def test_set_operations(self):
+        class SomeObject(Object):
+            state = StoredState()
+
+            def __init__(self, framework, key):
+                super().__init__(framework, key)
+
+        test_operations = [(
+            {"1"},  # A set to test an operation against (other_set).
+            lambda a, b: a | b,  # An operation to test.
+            {"1", "a", "b"},  # The expected result of operation(obj.state.set, other_set).
+            {"1", "a", "b"}  # The expected result of operation(other_set, obj.state.set).
+        ), (
+            {"a", "c"},
+            lambda a, b: a - b,
+            {"b"},
+            {"c"}
+        ), (
+            {"a", "c"},
+            lambda a, b: a & b,
+            {"a"},
+            {"a"}
+        ), (
+            {"a", "c", "d"},
+            lambda a, b: a ^ b,
+            {"b", "c", "d"},
+            {"b", "c", "d"}
+        ), (
+            set(),
+            lambda a, b: set(a),
+            {"a", "b"},
+            set()
+        )]
+
+        framework = self.create_framework()
+
+        # Validate that operations between StoredSet and built-in sets only result in built-in sets being returned.
+        # Make sure that commutativity is preserved and that the original sets are not changed or used as a result.
+        for variable_operand, operation, ab_res, ba_res in test_operations:
+            obj = SomeObject(framework, "2")
+            obj.state.set = {"a", "b"}
+
+            for a, b, expected in [(obj.state.set, variable_operand, ab_res), (variable_operand, obj.state.set, ba_res)]:
+                old_a = set(a)
+                old_b = set(b)
+
+                result = operation(a, b)
+                self.assertEqual(result, expected)
+
+                # Common sanity checks
+                self.assertIsNot(obj.state.set._under, result)
+                self.assertIsNot(result, a)
+                self.assertIsNot(result, b)
+                self.assertEqual(a, old_a)
+                self.assertEqual(b, old_b)
+
 
 if __name__ == "__main__":
     unittest.main()
