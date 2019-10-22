@@ -679,6 +679,14 @@ class StoredDict(collections.MutableMapping):
     def __len__(self):
         return len(self._under)
 
+    def __eq__(self, other):
+        if isinstance(other, StoredDict):
+            return self._under == other._under
+        elif isinstance(other, collections.abc.Mapping):
+            return self._under == other
+        else:
+            return NotImplemented
+
 
 class StoredList(collections.MutableSequence):
 
@@ -703,6 +711,46 @@ class StoredList(collections.MutableSequence):
 
     def append(self, value):
         self._under.append(value)
+
+    def __eq__(self, other):
+        if isinstance(other, StoredList):
+            return self._under == other._under
+        elif isinstance(other, collections.abc.Sequence):
+            return self._under == other
+        else:
+            return NotImplemented
+
+    def __lt__(self, other):
+        if isinstance(other, StoredList):
+            return self._under < other._under
+        elif isinstance(other, collections.abc.Sequence):
+            return self._under < other
+        else:
+            return NotImplemented
+
+    def __le__(self, other):
+        if isinstance(other, StoredList):
+            return self._under <= other._under
+        elif isinstance(other, collections.abc.Sequence):
+            return self._under <= other
+        else:
+            return NotImplemented
+
+    def __gt__(self, other):
+        if isinstance(other, StoredList):
+            return self._under > other._under
+        elif isinstance(other, collections.abc.Sequence):
+            return self._under > other
+        else:
+            return NotImplemented
+
+    def __ge__(self, other):
+        if isinstance(other, StoredList):
+            return self._under >= other._under
+        elif isinstance(other, collections.abc.Sequence):
+            return self._under >= other
+        else:
+            return NotImplemented
 
 
 class StoredSet(collections.MutableSet):
@@ -736,3 +784,27 @@ class StoredSet(collections.MutableSet):
         new instances from an iterable argument.
         """
         return set(it)
+
+    def __le__(self, other):
+        if isinstance(other, StoredSet):
+            return self._under <= other._under
+        elif isinstance(other, collections.abc.Set):
+            return self._under <= other
+        else:
+            return NotImplemented
+
+    def __ge__(self, other):
+        if isinstance(other, StoredSet):
+            return self._under >= other._under
+        elif isinstance(other, collections.abc.Set):
+            return self._under >= other
+        else:
+            return NotImplemented
+
+    def __eq__(self, other):
+        if isinstance(other, StoredSet):
+            return self._under == other._under
+        elif isinstance(other, collections.abc.Set):
+            return self._under == other
+        else:
+            return NotImplemented

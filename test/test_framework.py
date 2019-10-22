@@ -516,9 +516,6 @@ class TestStoredState(unittest.TestCase):
         class SomeObject(Object):
             state = StoredState()
 
-            def __init__(self, parent, key):
-                super().__init__(parent, key)
-
         obj = SomeObject(framework, "1")
 
         try:
@@ -559,9 +556,6 @@ class TestStoredState(unittest.TestCase):
 
         class SomeObject(Object):
             state = StoredState()
-
-            def __init__(self, framework, key):
-                super().__init__(framework, key)
 
         obj = SomeObject(framework, "1")
         try:
@@ -612,13 +606,106 @@ class TestStoredState(unittest.TestCase):
 
             framework_copy.commit()
 
-    def test_set_operations(self):
+    def test_comparison_operations(self):
+        test_operations = [(
+            {"1"},               # Operand A.
+            {"1", "2"},          # Operand B.
+            lambda a, b: a < b,  # Operation to test.
+            True,                # Result of op(A, B).
+            False,               # Result of op(B, A).
+        ), (
+            {"1"},
+            {"1", "2"},
+            lambda a, b: a > b,
+            False,
+            True
+        ), (
+            # Empty set comparison.
+            set(),
+            set(),
+            lambda a, b: a == b,
+            True,
+            True
+        ), (
+            {"a", "c"},
+            {"c", "a"},
+            lambda a, b: a == b,
+            True,
+            True
+        ), (
+            dict(),
+            dict(),
+            lambda a, b: a == b,
+            True,
+            True
+        ), (
+            {"1": "2"},
+            {"1": "2"},
+            lambda a, b: a == b,
+            True,
+            True
+        ), (
+            {"1": "2"},
+            {"1": "3"},
+            lambda a, b: a == b,
+            False,
+            False
+        ), (
+            [],
+            [],
+            lambda a, b: a == b,
+            True,
+            True
+        ), (
+            [1, 2],
+            [1, 2],
+            lambda a, b: a == b,
+            True,
+            True
+        ), (
+            [1, 2, 5, 6],
+            [1, 2, 5, 8, 10],
+            lambda a, b: a <= b,
+            True,
+            False
+        ), (
+            [1, 2, 5, 6],
+            [1, 2, 5, 8, 10],
+            lambda a, b: a < b,
+            True,
+            False
+        ), (
+            [1, 2, 5, 8],
+            [1, 2, 5, 6, 10],
+            lambda a, b: a > b,
+            True,
+            False
+        ), (
+            [1, 2, 5, 8],
+            [1, 2, 5, 6, 10],
+            lambda a, b: a >= b,
+            True,
+            False
+        ), (
+            [1, 2, 5, 8],
+            [1, 2, 5, 6, 10],
+            lambda a, b: a <= b,
+            False,
+            True
+        )]
+
         class SomeObject(Object):
             state = StoredState()
 
-            def __init__(self, framework, key):
-                super().__init__(framework, key)
+        framework = self.create_framework()
 
+        for a, b, op, op_ab, op_ba in test_operations:
+            obj = SomeObject(framework, "1")
+            obj.state.a = a
+            self.assertEqual(op(obj.state.a, b), op_ab)
+            self.assertEqual(op(b, obj.state.a), op_ba)
+
+    def test_set_operations(self):
         test_operations = [(
             {"1"},  # A set to test an operation against (other_set).
             lambda a, b: a | b,  # An operation to test.
@@ -645,6 +732,9 @@ class TestStoredState(unittest.TestCase):
             {"a", "b"},
             set()
         )]
+
+        class SomeObject(Object):
+            state = StoredState()
 
         framework = self.create_framework()
 
