@@ -71,21 +71,21 @@ class TestModel(unittest.TestCase):
             self.assertIs(self.model.unit, unit_from_rel)
 
     def test_relation_helper(self):
-        self.assertIsNone(self.model.relation('db0'))
-        self.assertIsInstance(self.model.relation('db1'), juju.model.Relation)
+        self.assertIsNone(self.model.get_relation('db0'))
+        self.assertIsInstance(self.model.get_relation('db1'), juju.model.Relation)
         with self.assertRaises(juju.model.TooManyRelatedApps):
-            self.model.relation('db2')
+            self.model.get_relation('db2')
 
     def test_relation_data(self):
         random_unit = self.model._cache.get(juju.model.Unit, 'randomunit/0')
         with self.assertRaises(KeyError):
-            self.model.relation('db1').data[random_unit]
-        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
-        self.assertEqual(self.model.relation('db1').data[remoteapp1_0], {'host': 'remoteapp1-0'})
+            self.model.get_relation('db1').data[random_unit]
+        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
+        self.assertEqual(self.model.get_relation('db1').data[remoteapp1_0], {'host': 'remoteapp1-0'})
 
     def test_relation_data_modify_remote(self):
-        rel_db1 = self.model.relation('db1')
-        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.relation('db1').units))
+        rel_db1 = self.model.get_relation('db1')
+        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[remoteapp1_0])
         with self.assertRaises(juju.model.RelationDataError):
@@ -94,7 +94,7 @@ class TestModel(unittest.TestCase):
         self.assertNotIn('foo', rel_db1.data[remoteapp1_0])
 
     def test_relation_data_modify_local(self):
-        rel_db1 = self.model.relation('db1')
+        rel_db1 = self.model.get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         rel_db1.data[self.model.unit]['host'] = 'bar'
@@ -102,7 +102,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(rel_db1.data[self.model.unit]['host'], 'bar')
 
     def test_relation_data_del_key(self):
-        rel_db1 = self.model.relation('db1')
+        rel_db1 = self.model.get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         del rel_db1.data[self.model.unit]['host']
@@ -121,7 +121,7 @@ class TestModel(unittest.TestCase):
         self.assertIn('host', rel_db2.data[self.model.unit])
 
     def test_relation_data_type_check(self):
-        rel_db1 = self.model.relation('db1')
+        rel_db1 = self.model.get_relation('db1')
         with self.assertRaises(juju.model.RelationDataError):
             rel_db1.data[self.model.unit]['foo'] = 1
         with self.assertRaises(juju.model.RelationDataError):

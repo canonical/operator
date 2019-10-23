@@ -14,7 +14,7 @@ class Model:
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
 
-    def relation(self, relation_name):
+    def get_relation(self, relation_name):
         """Return the single Relation object for the named relation, or None.
 
         This convenience method returns None if the relation is not established, or the
@@ -31,7 +31,7 @@ class Model:
             # ideally integrating the error catching with Juju's mechanisms.
             raise TooManyRelatedApps(relation_name, num_related, 1)
 
-    def relation_by_id(self, relation_name, relation_id):
+    def get_relation_by_id(self, relation_name, relation_id):
         def _norm(relation_id):
             # Relation IDs can be in the form '{relation_name}:{id}', so we need to
             # normalize them to just '{id}' for comparison.

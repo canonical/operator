@@ -48,7 +48,7 @@ class RelationEvent(HookEvent):
         }
 
     def restore(self, snapshot):
-        self.relation = self.framework.model.relation_by_id(snapshot['relation_name'], snapshot['relation_id'])
+        self.relation = self.framework.model.get_relation_by_id(snapshot['relation_name'], snapshot['relation_id'])
 
 class RelationUnitEvent(RelationEvent):
     def __init__(self, handle, relation, unit):
