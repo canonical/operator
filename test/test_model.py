@@ -16,8 +16,8 @@ class TestModelBackend:
     def relation_ids(self, relation_name):
         return {
             'db0': [],
-            'db1': ['db1:4'],
-            'db2': ['db2:5', 'db2:6'],
+            'db1': [4],
+            'db2': [5, 6],
         }[relation_name]
 
     def relation_list(self, relation_id):
@@ -70,9 +70,14 @@ class TestModel(unittest.TestCase):
             unit_from_rel = next(filter(lambda u: u.name == 'myapp/0', relation.data.keys()))
             self.assertIs(self.model.unit, unit_from_rel)
 
-    def test_relation_helper(self):
+    def test_get_relation(self):
+        with self.assertRaises(juju.model.ModelError):
+            self.model.get_relation('db1', 'db1:4')
+        db1_4 = self.model.get_relation('db1', 4)
+        self.assertIsInstance(db1_4, juju.model.Relation)
+        self.assertIsInstance(self.model.get_relation('db1', 7), juju.model.DeadRelation)
         self.assertIsNone(self.model.get_relation('db0'))
-        self.assertIsInstance(self.model.get_relation('db1'), juju.model.Relation)
+        self.assertIs(self.model.get_relation('db1'), db1_4)
         with self.assertRaises(juju.model.TooManyRelatedApps):
             self.model.get_relation('db2')
 

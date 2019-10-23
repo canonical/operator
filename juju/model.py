@@ -14,32 +14,34 @@ class Model:
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
 
-    def get_relation(self, relation_name):
-        """Return the single Relation object for the named relation, or None.
+    def get_relation(self, relation_name, relation_id=None):
+        """Get a specific Relation instance.
 
-        This convenience method returns None if the relation is not established, or the
-        single Relation if the relation is established only once. If this same relation
-        is established multiple times the error TooManyRelatedApps is raised.
+        If relation_id is given, this will return that Relation instance.
+
+        If relation_id is not given, this will return the Relation instance if the
+        relation is established only once or None if it is not established. If this
+        same relation is established multiple times the error TooManyRelatedApps is raised.
         """
-        num_related = len(self.relations[relation_name])
-        if num_related == 0:
-            return None
-        elif num_related == 1:
-            return self.relations[relation_name][0]
+        if relation_id is not None:
+            if not isinstance(relation_id, int):
+                raise ModelError(f'relation id {relation_id} must be an integer')
+            for relation in self.relations[relation_name]:
+                if relation.id == relation_id:
+                    return relation
+            else:
+                # The relation may be dead, but it is not forgotten.
+                return DeadRelation(relation_name, relation_id)
         else:
-            # TODO: We need something in the framework to catch and gracefully handle errors,
-            # ideally integrating the error catching with Juju's mechanisms.
-            raise TooManyRelatedApps(relation_name, num_related, 1)
-
-    def get_relation_by_id(self, relation_name, relation_id):
-        if isinstance(relation_id, str):
-            relation_id = int(relation_id.split(':')[-1])
-        for relation in self.relations[relation_name]:
-            if relation.id == relation_id:
-                return relation
-        else:
-            # The relation may be dead, but it is not forgotten.
-            return DeadRelation(relation_name, relation_id)
+            num_related = len(self.relations[relation_name])
+            if num_related == 0:
+                return None
+            elif num_related == 1:
+                return self.relations[relation_name][0]
+            else:
+                # TODO: We need something in the framework to catch and gracefully handle
+                # errors, ideally integrating the error catching with Juju's mechanisms.
+                raise TooManyRelatedApps(relation_name, num_related, 1)
 
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
@@ -128,7 +130,7 @@ class RelationMapping(Mapping):
 class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
         self.name = relation_name
-        self.id = int(relation_id.split(':')[-1]) if isinstance(relation_id, str) else relation_id
+        self.id = relation_id
         self.apps = set()
         self.units = set()
         for unit_name in backend.relation_list(self.id):
@@ -242,7 +244,8 @@ class ModelBackend:
         run(args, check=True)
 
     def relation_ids(self, relation_name):
-        return self._run('relation-ids', relation_name)
+        relation_ids = self._run('relation-ids', relation_name)
+        return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id):
         return self._run('relation-list', '-r', str(relation_id))

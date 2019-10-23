@@ -115,8 +115,8 @@ def _get_event_args(charm, bound_event):
     model = charm.framework.model
     if issubclass(event_type, juju.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
-        relation_id = os.environ['JUJU_RELATION_ID']
-        relation = model.get_relation_by_id(relation_name, relation_id)
+        relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+        relation = model.get_relation(relation_name, relation_id)
         if issubclass(event_type, juju.charm.RelationUnitEvent):
             remote_unit_name = os.environ['JUJU_REMOTE_UNIT']
             remote_unit = model.get_unit(remote_unit_name)
