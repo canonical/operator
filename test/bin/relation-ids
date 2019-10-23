@@ -1,11 +1,11 @@
 #!/bin/bash
 
 case $1 in
-    db) echo '["db:0"]' ;;
-    mon) echo '["mon:0"]' ;;
-    ha) echo '["ha:0"]' ;;
+    db) echo '["db:1"]' ;;
+    mon) echo '["mon:2"]' ;;
+    ha) echo '[]' ;;
     db0) echo '[]' ;;
-    db1) echo '["db1:1"]' ;;
-    db2) echo '["db2:1", "db2:2"]' ;;
+    db1) echo '["db1:4"]' ;;
+    db2) echo '["db2:5", "db2:6"]' ;;
     *) echo '[]' ;;
 esac

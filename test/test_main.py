@@ -109,9 +109,11 @@ class TestMain(unittest.TestCase):
             'CHARM_CONFIG': charm_config,
         }
         if 'relation' in event_name:
+            rel_name = event_name.split('_')[0]
+            rel_id = {'db': '1', 'mon': '2', 'ha': '3'}[rel_name]
             env.update({
-                'JUJU_RELATION': event_name.split('_')[0],
-                'JUJU_RELATION_ID': '0',
+                'JUJU_RELATION': rel_name,
+                'JUJU_RELATION_ID': rel_id,
             })
             if 'broken' not in event_name:
                 env.update({
@@ -153,9 +155,9 @@ class TestMain(unittest.TestCase):
         }
 
         expected_event_data = {
-            'db_relation_joined': {'relation_name': 'db', 'relation_id': 'db:0', 'unit_name': 'remote/0'},
-            'mon_relation_changed': {'relation_name': 'mon', 'relation_id': 'mon:0', 'unit_name': 'remote/0'},
-            'ha_relation_broken': {'relation_name': 'ha', 'relation_id': 'ha:0'},
+            'db_relation_joined': {'relation_name': 'db', 'relation_id': 1, 'unit_name': 'remote/0'},
+            'mon_relation_changed': {'relation_name': 'mon', 'relation_id': 2, 'unit_name': 'remote/0'},
+            'ha_relation_broken': {'relation_name': 'ha', 'relation_id': 3},
         }
 
         logger.debug(f'Expected events {events_under_test}')

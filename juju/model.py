@@ -32,13 +32,10 @@ class Model:
             raise TooManyRelatedApps(relation_name, num_related, 1)
 
     def get_relation_by_id(self, relation_name, relation_id):
-        def _norm(relation_id):
-            # Relation IDs can be in the form '{relation_name}:{id}', so we need to
-            # normalize them to just '{id}' for comparison.
-            return relation_id.split(':')[-1]
-
+        if isinstance(relation_id, str):
+            relation_id = int(relation_id.split(':')[-1])
         for relation in self.relations[relation_name]:
-            if _norm(relation.relation_id) == _norm(relation_id):
+            if relation.relation_id == relation_id:
                 return relation
         else:
             # The relation may be dead, but it is not forgotten.
@@ -131,14 +128,14 @@ class RelationMapping(Mapping):
 class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
         self.relation_name = relation_name
-        self.relation_id = relation_id
+        self.relation_id = int(relation_id.split(':')[-1])
         self.apps = set()
         self.units = set()
-        for unit_name in backend.relation_list(relation_id):
+        for unit_name in backend.relation_list(self.relation_id):
             unit = cache.get(Unit, unit_name)
             self.units.add(unit)
             self.apps.add(unit.app)
-        self.data = RelationData(relation_name, relation_id, local_unit, self.units, backend)
+        self.data = RelationData(self.relation_name, self.relation_id, local_unit, self.units, backend)
 
 
 class DeadRelation(Relation):
@@ -249,13 +246,13 @@ class ModelBackend:
         return self._run('relation-ids', relation_name)
 
     def relation_list(self, relation_id):
-        return self._run('relation-list', '-r', relation_id)
+        return self._run('relation-list', '-r', str(relation_id))
 
     def relation_get(self, relation_id, member_name):
-        return self._run('relation-get', '-r', relation_id, '-', member_name)
+        return self._run('relation-get', '-r', str(relation_id), '-', member_name)
 
     def relation_set(self, relation_id, key, value):
-        return self._run_no_output('relation-set', '-r', relation_id, f'{key}={value}')
+        return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
 
     def config_get(self):
         return self._run('config-get')

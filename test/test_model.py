@@ -16,35 +16,35 @@ class TestModelBackend:
     def relation_ids(self, relation_name):
         return {
             'db0': [],
-            'db1': ['db1:1'],
-            'db2': ['db2:1', 'db2:2'],
+            'db1': ['db1:4'],
+            'db2': ['db2:5', 'db2:6'],
         }[relation_name]
 
     def relation_list(self, relation_id):
         return {
-            'db1:1': ['remoteapp1/0'],
-            'db2:1': ['remoteapp1/0'],
-            'db2:2': ['remoteapp2/0'],
+            4: ['remoteapp1/0'],
+            5: ['remoteapp1/0'],
+            6: ['remoteapp2/0'],
         }[relation_id]
 
     def relation_get(self, relation_id, member_name):
         return {
-            'db1:1': {
+            4: {
                 'myapp/0': {'host': 'myapp-0'},
                 'remoteapp1/0': {'host': 'remoteapp1-0'},
             },
-            'db2:1': {
+            5: {
                 'myapp/0': {'host': 'myapp-0'},
                 'remoteapp1/0': {'host': 'remoteapp1-0'},
             },
-            'db2:2': {
+            6: {
                 'myapp/0': {'host': 'myapp-0'},
                 'remoteapp2/0': {'host': 'remoteapp2-0'},
             },
         }[relation_id][member_name]
 
     def relation_set(self, relation_id, key, value):
-        if relation_id == 'db2:1':
+        if relation_id == 5:
             raise ValueError()
         self.relation_set_calls.append((relation_id, key, value))
 
@@ -98,7 +98,7 @@ class TestModel(unittest.TestCase):
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         rel_db1.data[self.model.unit]['host'] = 'bar'
-        self.assertEqual(self.backend.relation_set_calls, [('db1:1', 'host', 'bar')])
+        self.assertEqual(self.backend.relation_set_calls, [(4, 'host', 'bar')])
         self.assertEqual(rel_db1.data[self.model.unit]['host'], 'bar')
 
     def test_relation_data_del_key(self):
@@ -106,7 +106,7 @@ class TestModel(unittest.TestCase):
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         del rel_db1.data[self.model.unit]['host']
-        self.assertEqual(self.backend.relation_set_calls, [('db1:1', 'host', '')])
+        self.assertEqual(self.backend.relation_set_calls, [(4, 'host', '')])
         self.assertNotIn('host', rel_db1.data[self.model.unit])
 
     def test_relation_set_fail(self):
