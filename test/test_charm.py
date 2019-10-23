@@ -10,7 +10,7 @@ from pathlib import Path
 from juju.charm import CharmBase, CharmMeta
 from juju.charm import CharmEvents
 from juju.framework import Framework, Event, EventBase
-from juju.model import DeadRelation, Model, ModelBackend
+from juju.model import Model, ModelBackend
 
 
 class TestCharm(unittest.TestCase):
@@ -99,7 +99,7 @@ class TestCharm(unittest.TestCase):
 
         charm = MyCharm(self.create_framework(), None)
 
-        rel = DeadRelation('req1', '0')
+        rel = charm.framework.model.get_relation('req1', 0)
         unit = charm.framework.model.get_unit('app/0')
         charm.on.req1_relation_joined.emit(rel, unit)
         charm.on.req1_relation_changed.emit(rel, unit)

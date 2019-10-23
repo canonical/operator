@@ -25,7 +25,7 @@ class Model:
         """
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError(f'relation id {relation_id} must be an integer')
+                raise ModelError(f'relation id {relation_id} must be an int not {type(relation_id).__name__}')
             for relation in self.relations[relation_name]:
                 if relation.id == relation_id:
                     return relation
@@ -146,7 +146,7 @@ class Relation:
 class DeadRelation(Relation):
     def __init__(self, relation_name, relation_id):
         self.name = relation_name
-        self.id = int(relation_id.split(':')[-1]) if isinstance(relation_id, str) else relation_id
+        self.id = relation_id
         self.apps = set()
         self.units = set()
         self.data = RelationData(self, None, None)
