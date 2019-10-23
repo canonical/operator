@@ -43,8 +43,8 @@ class RelationEvent(HookEvent):
 
     def snapshot(self):
         return {
-            'relation_name': self.relation.relation_name,
-            'relation_id': self.relation.relation_id,
+            'relation_name': self.relation.name,
+            'relation_id': self.relation.id,
         }
 
     def restore(self, snapshot):

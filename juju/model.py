@@ -1,8 +1,8 @@
 import json
+import weakref
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from subprocess import run, PIPE
-from weakref import WeakValueDictionary
 
 
 class Model:
@@ -35,7 +35,7 @@ class Model:
         if isinstance(relation_id, str):
             relation_id = int(relation_id.split(':')[-1])
         for relation in self.relations[relation_name]:
-            if relation.relation_id == relation_id:
+            if relation.id == relation_id:
                 return relation
         else:
             # The relation may be dead, but it is not forgotten.
@@ -45,7 +45,7 @@ class Model:
         return self._cache.get(Unit, unit_name)
 
 
-class ModelCache(WeakValueDictionary):
+class ModelCache(weakref.WeakValueDictionary):
     def get(self, entity_type, *args):
         key = (entity_type,) + args
         entity = super().get(key)
@@ -127,33 +127,35 @@ class RelationMapping(Mapping):
 
 class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
-        self.relation_name = relation_name
-        self.relation_id = int(relation_id.split(':')[-1])
+        self.name = relation_name
+        self.id = int(relation_id.split(':')[-1]) if isinstance(relation_id, str) else relation_id
         self.apps = set()
         self.units = set()
-        for unit_name in backend.relation_list(self.relation_id):
+        for unit_name in backend.relation_list(self.id):
             unit = cache.get(Unit, unit_name)
             self.units.add(unit)
             self.apps.add(unit.app)
-        self.data = RelationData(self.relation_name, self.relation_id, local_unit, self.units, backend)
+        self.data = RelationData(self, local_unit, backend)
+
+    def __repr__(self):
+        return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
 
 class DeadRelation(Relation):
     def __init__(self, relation_name, relation_id):
-        self.relation_name = relation_name
-        self.relation_id = relation_id
+        self.name = relation_name
+        self.id = int(relation_id.split(':')[-1]) if isinstance(relation_id, str) else relation_id
         self.apps = set()
         self.units = set()
-        self.data = RelationData(relation_name, relation_id, None, None, None)
+        self.data = RelationData(self, None, None)
 
 
 class RelationData(Mapping):
-    def __init__(self, relation_name, relation_id, local_unit, remote_units, backend):
-        self.relation_name = relation_name
-        self.relation_id = relation_id
+    def __init__(self, relation, local_unit, backend):
+        self.relation = weakref.proxy(relation)
         if local_unit:
-            self._data = {local_unit: RelationUnitData(relation_id, local_unit, True, backend)}
-            self._data.update({unit: RelationUnitData(relation_id, unit, False, backend) for unit in remote_units})
+            self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
+            self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
         else:
             # If we don't have even a local unit, then we're dealing with a dead relation;
             # and dead relations tell no tales.
@@ -175,24 +177,21 @@ class RelationData(Mapping):
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
 class RelationUnitData(LazyMapping, MutableMapping):
-    def __init__(self, relation_id, unit, is_mutable, backend):
-        self.relation_id = relation_id
+    def __init__(self, relation, unit, is_mutable, backend):
+        self.relation = relation
         self.unit = unit
         self._is_mutable = is_mutable
         self._backend = backend
 
     def _load(self):
-        # TODO: We will need to ensure we properly handle modifications when support for those are added.
-        # Specifically, if we're caching relation data in memory, modifications need to affect both the
-        # in-memory cache as well as calling out to relation-set.
-        return self._backend.relation_get(self.relation_id, self.unit.name)
+        return self._backend.relation_get(self.relation.id, self.unit.name)
 
     def __setitem__(self, key, value):
         if not self._is_mutable:
             raise RelationDataError(f'cannot set relation data for {self.unit.name}')
         if not isinstance(value, str):
             raise RelationDataError('relation data values must be strings')
-        self._backend.relation_set(self.relation_id, key, value)
+        self._backend.relation_set(self.relation.id, key, value)
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':

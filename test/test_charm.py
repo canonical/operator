@@ -78,7 +78,7 @@ class TestCharm(unittest.TestCase):
                         self.framework.observe(bound_event, self.on_any_relation)
 
             def on_any_relation(self, event):
-                assert event.relation.relation_name == 'req1'
+                assert event.relation.name == 'req1'
                 self.seen.append(f'{type(event).__name__}')
 
         self.meta = CharmMeta({
