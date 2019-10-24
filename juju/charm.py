@@ -37,16 +37,40 @@ class LeaderSettingsChangedEvent(HookEvent):
 
 
 class RelationEvent(HookEvent):
+    def __init__(self, handle, relation):
+        super().__init__(handle)
+        self.relation = relation
+
+    def snapshot(self):
+        return {
+            'relation_name': self.relation.name,
+            'relation_id': self.relation.id,
+        }
+
+    def restore(self, snapshot):
+        self.relation = self.framework.model.get_relation(snapshot['relation_name'], snapshot['relation_id'])
+
+class RelationUnitEvent(RelationEvent):
+    def __init__(self, handle, relation, unit):
+        super().__init__(handle, relation)
+        self.unit = unit
+
+    def snapshot(self):
+        snapshot = super().snapshot()
+        snapshot['unit_name'] = self.unit.name
+        return snapshot
+
+    def restore(self, snapshot):
+        super().restore(snapshot)
+        self.unit = self.framework.model.get_unit(snapshot['unit_name'])
+
+class RelationJoinedEvent(RelationUnitEvent):
     pass
 
-
-class RelationJoinedEvent(RelationEvent):
+class RelationChangedEvent(RelationUnitEvent):
     pass
 
-class RelationChangedEvent(RelationEvent):
-    pass
-
-class RelationDepartedEvent(RelationEvent):
+class RelationDepartedEvent(RelationUnitEvent):
     pass
 
 class RelationBrokenEvent(RelationEvent):
@@ -55,7 +79,6 @@ class RelationBrokenEvent(RelationEvent):
 
 class StorageEvent(HookEvent):
     pass
-
 
 class StorageAttachedEvent(StorageEvent):
     pass

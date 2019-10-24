@@ -80,14 +80,17 @@ class Charm(CharmBase):
     def on_db_relation_joined(self, event):
         self._state['on_db_relation_joined'].append(type(event))
         self._state['observed_event_types'].append(type(event))
+        self._state['db_relation_joined_data'] = event.snapshot()
         self._write_state()
 
     def on_mon_relation_changed(self, event):
         self._state['on_mon_relation_changed'].append(type(event))
         self._state['observed_event_types'].append(type(event))
+        self._state['mon_relation_changed_data'] = event.snapshot()
         self._write_state()
 
     def on_ha_relation_broken(self, event):
         self._state['on_ha_relation_broken'].append(type(event))
         self._state['observed_event_types'].append(type(event))
+        self._state['ha_relation_broken_data'] = event.snapshot()
         self._write_state()

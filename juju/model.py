@@ -1,38 +1,53 @@
 import json
+import weakref
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from subprocess import run, PIPE
-from weakref import WeakValueDictionary
 
 
 class Model:
     def __init__(self, local_unit_name, relation_names, backend):
         self._cache = ModelCache()
         self._backend = backend
-        self.unit = self._cache.get(Unit, local_unit_name)
+        self.unit = self.get_unit(local_unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
 
-    def relation(self, relation_name):
-        """Return the single Relation object for the named relation, or None.
+    def get_relation(self, relation_name, relation_id=None):
+        """Get a specific Relation instance.
 
-        This convenience method returns None if the relation is not established, or the
-        single Relation if the relation is established only once. If this same relation
-        is established multiple times the error TooManyRelatedApps is raised.
+        If relation_id is given, this will return that Relation instance.
+
+        If relation_id is not given, this will return the Relation instance if the
+        relation is established only once or None if it is not established. If this
+        same relation is established multiple times the error TooManyRelatedApps is raised.
         """
-        num_related = len(self.relations[relation_name])
-        if num_related == 0:
-            return None
-        elif num_related == 1:
-            return self.relations[relation_name][0]
+        if relation_id is not None:
+            if not isinstance(relation_id, int):
+                raise ModelError(f'relation id {relation_id} must be an int not {type(relation_id).__name__}')
+            for relation in self.relations[relation_name]:
+                if relation.id == relation_id:
+                    return relation
+            else:
+                # The relation may be dead, but it is not forgotten.
+                return DeadRelation(relation_name, relation_id)
         else:
-            # TODO: We need something in the framework to catch and gracefully handle errors,
-            # ideally integrating the error catching with Juju's mechanisms.
-            raise TooManyRelatedApps(relation_name, num_related, 1)
+            num_related = len(self.relations[relation_name])
+            if num_related == 0:
+                return None
+            elif num_related == 1:
+                return self.relations[relation_name][0]
+            else:
+                # TODO: We need something in the framework to catch and gracefully handle
+                # errors, ideally integrating the error catching with Juju's mechanisms.
+                raise TooManyRelatedApps(relation_name, num_related, 1)
+
+    def get_unit(self, unit_name):
+        return self._cache.get(Unit, unit_name)
 
 
-class ModelCache(WeakValueDictionary):
+class ModelCache(weakref.WeakValueDictionary):
     def get(self, entity_type, *args):
         key = (entity_type,) + args
         entity = super().get(key)
@@ -114,31 +129,39 @@ class RelationMapping(Mapping):
 
 class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
-        self.relation_name = relation_name
-        self.relation_id = relation_id
-        self._apps = set()
-        self._units = []
-        for unit_name in backend.relation_list(relation_id):
+        self.name = relation_name
+        self.id = relation_id
+        self.apps = set()
+        self.units = set()
+        for unit_name in backend.relation_list(self.id):
             unit = cache.get(Unit, unit_name)
-            self._units.append(unit)
-            self._apps.add(unit.app)
-        self.data = RelationData(relation_name, relation_id, local_unit, self.units, backend)
+            self.units.add(unit)
+            self.apps.add(unit.app)
+        self.data = RelationData(self, local_unit, backend)
 
-    @property
-    def apps(self):
-        return self._apps
+    def __repr__(self):
+        return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
-    @property
-    def units(self):
-        return self._units
+
+class DeadRelation(Relation):
+    def __init__(self, relation_name, relation_id):
+        self.name = relation_name
+        self.id = relation_id
+        self.apps = set()
+        self.units = set()
+        self.data = RelationData(self, None, None)
 
 
 class RelationData(Mapping):
-    def __init__(self, relation_name, relation_id, local_unit, remote_units, backend):
-        self.relation_name = relation_name
-        self.relation_id = relation_id
-        self._data = {local_unit: RelationUnitData(relation_id, local_unit, True, backend)}
-        self._data.update({unit: RelationUnitData(relation_id, unit, False, backend) for unit in remote_units})
+    def __init__(self, relation, local_unit, backend):
+        self.relation = weakref.proxy(relation)
+        if local_unit:
+            self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
+            self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
+        else:
+            # If we don't have even a local unit, then we're dealing with a dead relation;
+            # and dead relations tell no tales.
+            self._data = {}
 
     def __contains__(self, key):
         return key in self._data
@@ -156,24 +179,21 @@ class RelationData(Mapping):
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
 class RelationUnitData(LazyMapping, MutableMapping):
-    def __init__(self, relation_id, unit, is_mutable, backend):
-        self.relation_id = relation_id
+    def __init__(self, relation, unit, is_mutable, backend):
+        self.relation = relation
         self.unit = unit
         self._is_mutable = is_mutable
         self._backend = backend
 
     def _load(self):
-        # TODO: We will need to ensure we properly handle modifications when support for those are added.
-        # Specifically, if we're caching relation data in memory, modifications need to affect both the
-        # in-memory cache as well as calling out to relation-set.
-        return self._backend.relation_get(self.relation_id, self.unit.name)
+        return self._backend.relation_get(self.relation.id, self.unit.name)
 
     def __setitem__(self, key, value):
         if not self._is_mutable:
             raise RelationDataError(f'cannot set relation data for {self.unit.name}')
         if not isinstance(value, str):
             raise RelationDataError('relation data values must be strings')
-        self._backend.relation_set(self.relation_id, key, value)
+        self._backend.relation_set(self.relation.id, key, value)
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
@@ -224,16 +244,17 @@ class ModelBackend:
         run(args, check=True)
 
     def relation_ids(self, relation_name):
-        return self._run('relation-ids', relation_name)
+        relation_ids = self._run('relation-ids', relation_name)
+        return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id):
-        return self._run('relation-list', '-r', relation_id)
+        return self._run('relation-list', '-r', str(relation_id))
 
     def relation_get(self, relation_id, member_name):
-        return self._run('relation-get', '-r', relation_id, '-', member_name)
+        return self._run('relation-get', '-r', str(relation_id), '-', member_name)
 
     def relation_set(self, relation_id, key, value):
-        return self._run_no_output('relation-set', '-r', relation_id, f'{key}={value}')
+        return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
 
     def config_get(self):
         return self._run('config-get')

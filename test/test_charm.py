@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import os
 import unittest
 import tempfile
 import shutil
@@ -9,11 +10,14 @@ from pathlib import Path
 from juju.charm import CharmBase, CharmMeta
 from juju.charm import CharmEvents
 from juju.framework import Framework, Event, EventBase
+from juju.model import Model, ModelBackend
 
 
 class TestCharm(unittest.TestCase):
 
     def setUp(self):
+        self._path = os.environ['PATH']
+        os.environ['PATH'] = str(Path(__file__).parent / 'bin')
         self.tmpdir = Path(tempfile.mkdtemp())
         self.meta = CharmMeta()
 
@@ -29,11 +33,13 @@ class TestCharm(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
+        os.environ['PATH'] = self._path
 
         CharmBase.on = CharmEvents()
 
     def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.meta, None)
+        model = Model('local/0', list(self.meta.relations), ModelBackend())
+        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.meta, model)
         self.addCleanup(framework.close)
         return framework
 
@@ -72,6 +78,7 @@ class TestCharm(unittest.TestCase):
                         self.framework.observe(bound_event, self.on_any_relation)
 
             def on_any_relation(self, event):
+                assert event.relation.name == 'req1'
                 self.seen.append(f'{type(event).__name__}')
 
         self.meta = CharmMeta({
@@ -92,13 +99,15 @@ class TestCharm(unittest.TestCase):
 
         charm = MyCharm(self.create_framework(), None)
 
-        charm.on.req1_relation_joined.emit()
-        charm.on.req1_relation_changed.emit()
-        charm.on.req_2_relation_changed.emit()
-        charm.on.pro1_relation_departed.emit()
-        charm.on.pro_2_relation_departed.emit()
-        charm.on.peer1_relation_broken.emit()
-        charm.on.peer_2_relation_broken.emit()
+        rel = charm.framework.model.get_relation('req1', 0)
+        unit = charm.framework.model.get_unit('app/0')
+        charm.on.req1_relation_joined.emit(rel, unit)
+        charm.on.req1_relation_changed.emit(rel, unit)
+        charm.on.req_2_relation_changed.emit(rel, unit)
+        charm.on.pro1_relation_departed.emit(rel, unit)
+        charm.on.pro_2_relation_departed.emit(rel, unit)
+        charm.on.peer1_relation_broken.emit(rel)
+        charm.on.peer_2_relation_broken.emit(rel)
 
         self.assertEqual(charm.seen, [
             'RelationJoinedEvent',

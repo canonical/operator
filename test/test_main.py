@@ -102,15 +102,26 @@ class TestMain(unittest.TestCase):
 
     def _simulate_event(self, event_name, charm_config):
         event_hook = JUJU_CHARM_DIR / f"hooks/{event_name.replace('_', '-')}"
+        env = {
+            'PATH': str(Path(__file__).parent / 'bin'),
+            'JUJU_CHARM_DIR': JUJU_CHARM_DIR,
+            'JUJU_UNIT_NAME': 'test_main/0',
+            'CHARM_CONFIG': charm_config,
+        }
+        if 'relation' in event_name:
+            rel_name = event_name.split('_')[0]
+            rel_id = {'db': '1', 'mon': '2', 'ha': '3'}[rel_name]
+            env.update({
+                'JUJU_RELATION': rel_name,
+                'JUJU_RELATION_ID': rel_id,
+            })
+            if 'broken' not in event_name:
+                env.update({
+                    'JUJU_REMOTE_UNIT': 'remote/0',
+                })
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call(
-            [sys.executable, event_hook],
-            env={
-                'JUJU_CHARM_DIR': JUJU_CHARM_DIR,
-                'JUJU_UNIT_NAME': 'test_main/0',
-                'CHARM_CONFIG': charm_config,
-            })
+        subprocess.check_call([sys.executable, event_hook], env=env)
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -143,6 +154,12 @@ class TestMain(unittest.TestCase):
             'ha_relation_broken': RelationBrokenEvent,
         }
 
+        expected_event_data = {
+            'db_relation_joined': {'relation_name': 'db', 'relation_id': 1, 'unit_name': 'remote/0'},
+            'mon_relation_changed': {'relation_name': 'mon', 'relation_id': 2, 'unit_name': 'remote/0'},
+            'ha_relation_broken': {'relation_name': 'ha', 'relation_id': 3},
+        }
+
         logger.debug(f'Expected events {events_under_test}')
 
         charm_config = base64.b64encode(pickle.dumps({
@@ -164,6 +181,9 @@ class TestMain(unittest.TestCase):
             self.assertEqual(handled_event_type, event)
 
             self.assertEqual(state['observed_event_types'], [event])
+
+            if event_kind in expected_event_data:
+                self.assertEqual(state[f'{event_kind}_data'], expected_event_data[event_kind])
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit.
