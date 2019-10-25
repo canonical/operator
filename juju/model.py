@@ -249,6 +249,9 @@ class ModelBackend:
         try:
             return self._run('relation-list', '-r', str(relation_id))
         except CalledProcessError as e:
+            # TODO: This should use the return code if it is specific enough rather than the message.
+            # It seems to be 2 for this error, but I haven't been able to confirm yet if that might
+            # also apply to other error cases.
             if b'relation not found' in e.stderr:
                 raise RelationNotFound() from e
             else:
@@ -258,6 +261,9 @@ class ModelBackend:
         try:
             return self._run('relation-get', '-r', str(relation_id), '-', member_name)
         except CalledProcessError as e:
+            # TODO: This should use the return code if it is specific enough rather than the message.
+            # It seems to be 2 for this error, but I haven't been able to confirm yet if that might
+            # also apply to other error cases.
             if b'relation not found' in e.stderr:
                 raise RelationNotFound() from e
             else:
