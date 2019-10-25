@@ -21,27 +21,33 @@ class TestModelBackend:
         }[relation_name]
 
     def relation_list(self, relation_id):
-        return {
-            4: ['remoteapp1/0'],
-            5: ['remoteapp1/0'],
-            6: ['remoteapp2/0'],
-        }[relation_id]
+        try:
+            return {
+                4: ['remoteapp1/0'],
+                5: ['remoteapp1/0'],
+                6: ['remoteapp2/0'],
+            }[relation_id]
+        except KeyError:
+            raise juju.model.RelationNotFound()
 
     def relation_get(self, relation_id, member_name):
-        return {
-            4: {
-                'myapp/0': {'host': 'myapp-0'},
-                'remoteapp1/0': {'host': 'remoteapp1-0'},
-            },
-            5: {
-                'myapp/0': {'host': 'myapp-0'},
-                'remoteapp1/0': {'host': 'remoteapp1-0'},
-            },
-            6: {
-                'myapp/0': {'host': 'myapp-0'},
-                'remoteapp2/0': {'host': 'remoteapp2-0'},
-            },
-        }[relation_id][member_name]
+        try:
+            return {
+                4: {
+                    'myapp/0': {'host': 'myapp-0'},
+                    'remoteapp1/0': {'host': 'remoteapp1-0'},
+                },
+                5: {
+                    'myapp/0': {'host': 'myapp-0'},
+                    'remoteapp1/0': {'host': 'remoteapp1-0'},
+                },
+                6: {
+                    'myapp/0': {'host': 'myapp-0'},
+                    'remoteapp2/0': {'host': 'remoteapp2-0'},
+                },
+            }[relation_id][member_name]
+        except KeyError:
+            raise juju.model.RelationNotFound()
 
     def relation_set(self, relation_id, key, value):
         if relation_id == 5:
@@ -75,7 +81,10 @@ class TestModel(unittest.TestCase):
             self.model.get_relation('db1', 'db1:4')
         db1_4 = self.model.get_relation('db1', 4)
         self.assertIsInstance(db1_4, juju.model.Relation)
-        self.assertIsInstance(self.model.get_relation('db1', 7), juju.model.DeadRelation)
+        dead_rel = self.model.get_relation('db1', 7)
+        self.assertIsInstance(dead_rel, juju.model.Relation)
+        self.assertEqual(list(dead_rel.data.keys()), [self.model.unit])
+        self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertIsNone(self.model.get_relation('db0'))
         self.assertIs(self.model.get_relation('db1'), db1_4)
         with self.assertRaises(juju.model.TooManyRelatedApps):
