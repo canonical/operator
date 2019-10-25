@@ -139,7 +139,7 @@ class Relation:
                 self.units.add(unit)
                 self.apps.add(unit.app)
         except RelationNotFound:
-            # If the relation is dead, just treat it as if it has no units.
+            # If the relation is dead, just treat it as if it has no remote units.
             pass
         self.data = RelationData(self, local_unit, backend)
 
@@ -179,6 +179,7 @@ class RelationUnitData(LazyMapping, MutableMapping):
         try:
             return self._backend.relation_get(self.relation.id, self.unit.name)
         except RelationNotFound:
+            # Dead relations tell no tales (and have no data).
             return {}
 
     def __setitem__(self, key, value):
