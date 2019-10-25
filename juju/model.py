@@ -2,7 +2,7 @@ import json
 import weakref
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
-from subprocess import run, PIPE
+from subprocess import run, PIPE, CalledProcessError
 
 
 class Model:
@@ -31,7 +31,7 @@ class Model:
                     return relation
             else:
                 # The relation may be dead, but it is not forgotten.
-                return DeadRelation(relation_name, relation_id)
+                return Relation(relation_name, relation_id, self.unit, self._backend, self._cache)
         else:
             num_related = len(self.relations[relation_name])
             if num_related == 0:
@@ -133,35 +133,25 @@ class Relation:
         self.id = relation_id
         self.apps = set()
         self.units = set()
-        for unit_name in backend.relation_list(self.id):
-            unit = cache.get(Unit, unit_name)
-            self.units.add(unit)
-            self.apps.add(unit.app)
+        try:
+            for unit_name in backend.relation_list(self.id):
+                unit = cache.get(Unit, unit_name)
+                self.units.add(unit)
+                self.apps.add(unit.app)
+        except RelationNotFound:
+            # If the relation is dead, just treat it as if it has no units.
+            pass
         self.data = RelationData(self, local_unit, backend)
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
 
-class DeadRelation(Relation):
-    def __init__(self, relation_name, relation_id):
-        self.name = relation_name
-        self.id = relation_id
-        self.apps = set()
-        self.units = set()
-        self.data = RelationData(self, None, None)
-
-
 class RelationData(Mapping):
     def __init__(self, relation, local_unit, backend):
         self.relation = weakref.proxy(relation)
-        if local_unit:
-            self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
-            self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
-        else:
-            # If we don't have even a local unit, then we're dealing with a dead relation;
-            # and dead relations tell no tales.
-            self._data = {}
+        self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
+        self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
 
     def __contains__(self, key):
         return key in self._data
@@ -186,7 +176,10 @@ class RelationUnitData(LazyMapping, MutableMapping):
         self._backend = backend
 
     def _load(self):
-        return self._backend.relation_get(self.relation.id, self.unit.name)
+        try:
+            return self._backend.relation_get(self.relation.id, self.unit.name)
+        except RelationNotFound:
+            return {}
 
     def __setitem__(self, key, value):
         if not self._is_mutable:
@@ -233,9 +226,13 @@ class RelationDataError(ModelError):
     pass
 
 
+class RelationNotFound(ModelError):
+    pass
+
+
 class ModelBackend:
     def _run(self, *args):
-        result = run(args + ('--format=json',), stdout=PIPE, check=True)
+        result = run(args + ('--format=json',), stdout=PIPE, stderr=PIPE, check=True)
         text = result.stdout.decode('utf8')
         data = json.loads(text)
         return data
@@ -248,13 +245,31 @@ class ModelBackend:
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id):
-        return self._run('relation-list', '-r', str(relation_id))
+        try:
+            return self._run('relation-list', '-r', str(relation_id))
+        except CalledProcessError as e:
+            if b'relation not found' in e.stderr:
+                raise RelationNotFound() from e
+            else:
+                raise
 
     def relation_get(self, relation_id, member_name):
-        return self._run('relation-get', '-r', str(relation_id), '-', member_name)
+        try:
+            return self._run('relation-get', '-r', str(relation_id), '-', member_name)
+        except CalledProcessError as e:
+            if b'relation not found' in e.stderr:
+                raise RelationNotFound() from e
+            else:
+                raise
 
     def relation_set(self, relation_id, key, value):
-        return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
+        try:
+            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
+        except CalledProcessError as e:
+            if b'relation not found' in e.stderr:
+                raise RelationNotFound() from e
+            else:
+                raise
 
     def config_get(self):
         return self._run('config-get')
