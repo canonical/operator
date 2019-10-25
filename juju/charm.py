@@ -63,7 +63,6 @@ class RelationUnitEvent(RelationEvent):
     def restore(self, snapshot):
         super().restore(snapshot)
         self.unit = self.framework.model.get_unit(snapshot['unit_name'])
-        self.relation.data._data = {self.unit: {}, self.framework.model.unit: {}}
 
 class RelationJoinedEvent(RelationUnitEvent):
     pass
