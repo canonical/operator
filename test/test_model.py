@@ -8,6 +8,7 @@ import shutil
 import unittest
 
 import op.model
+import op.status
 
 
 # TODO: We need some manner of test to validate the actual ModelBackend implementation, round-tripped
@@ -212,6 +213,178 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
         ])
 
+    def test_base_status_instance_raises(self):
+        with self.assertRaises(TypeError):
+            op.status.Status('test')
+
+    def test_local_set_valid_unit_status(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        test_cases = (
+            (
+                op.status.Active('Green'),
+                lambda: fake_script(self, 'status-set', 'exit 0'),
+                lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
+            ),
+            (
+                op.status.Maintenance('Yellow'),
+                lambda: fake_script(self, 'status-set', 'exit 0'),
+                lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'maintenance', 'Yellow']]),
+            ),
+            (
+                op.status.Blocked('Red'),
+                lambda: fake_script(self, 'status-set', 'exit 0'),
+                lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'blocked', 'Red']]),
+            ),
+            (
+                op.status.Waiting('White'),
+                lambda: fake_script(self, 'status-set', 'exit 0'),
+                lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'waiting', 'White']]),
+            ),
+        )
+
+        for target_status, setup_tools, check_tool_calls in test_cases:
+            setup_tools()
+
+            self.model.unit.status = target_status
+
+            self.assertEqual(self.model.unit.status, target_status)
+
+            check_tool_calls()
+
+    def test_local_set_valid_app_status(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        fake_script(self, 'is-leader', 'echo true')
+
+        # TODO: update after is-leader caching optimization is merged
+        # this will break those test cases as is-leader hook tool invocation
+        # will depend on time.
+
+        test_cases = (
+            (
+                op.status.Active('Green'),
+                lambda: fake_script(self, 'status-set', 'exit 0'),
+                lambda: self.assertEqual(fake_script_calls(self, True), [
+                    ['is-leader', '--format=json'],
+                    ['status-set', '--application=True', 'active', 'Green'],
+                    ['is-leader', '--format=json'],
+                ]),
+            ),
+            (
+                op.status.Maintenance('Yellow'),
+                lambda: fake_script(self, 'status-set', 'exit 0'),
+                lambda: self.assertEqual(fake_script_calls(self, True), [
+                    ['is-leader', '--format=json'],
+                    ['status-set', '--application=True', 'maintenance', 'Yellow'],
+                    ['is-leader', '--format=json'],
+                ]),
+            ),
+            (
+                op.status.Blocked('Red'),
+                lambda: fake_script(self, 'status-set', 'exit 0'),
+                lambda: self.assertEqual(fake_script_calls(self, True), [
+                    ['is-leader', '--format=json'],
+                    ['status-set', '--application=True', 'blocked', 'Red'],
+                    ['is-leader', '--format=json'],
+                ]),
+            ),
+            (
+                op.status.Waiting('White'),
+                lambda: fake_script(self, 'status-set', 'exit 0'),
+                lambda: self.assertEqual(fake_script_calls(self, True), [
+                    ['is-leader', '--format=json'],
+                    ['status-set', '--application=True', 'waiting', 'White'],
+                    ['is-leader', '--format=json'],
+                ]),
+            ),
+        )
+
+        for target_status, setup_tools, check_tool_calls in test_cases:
+            setup_tools()
+
+            self.model.app.status = target_status
+
+            self.assertEqual(self.model.app.status, target_status)
+
+            check_tool_calls()
+
+    def test_set_app_status_non_leader_raises(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        fake_script(self, 'is-leader', 'echo false')
+
+        with self.assertRaises(RuntimeError):
+            self.model.app.status
+
+        with self.assertRaises(RuntimeError):
+            self.model.app.status = op.status.Active()
+
+    def test_local_set_invalid_status(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        fake_script(self, 'status-set', 'exit 1')
+        fake_script(self, 'is-leader', 'echo true')
+
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.model.unit.status = op.status.Unknown()
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['status-set', '--application=False', 'unknown', ''],
+        ])
+
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.model.app.status = op.status.Unknown()
+
+        # A leadership check is needed for application status.
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+            ['status-set', '--application=True', 'unknown', ''],
+        ])
+
+    def test_remote_unit_status(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+
+        remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
+
+        test_statuses = (
+            op.status.Unknown(),
+            op.status.Active('Green'),
+            op.status.Maintenance('Yellow'),
+            op.status.Blocked('Red'),
+            op.status.Waiting('White'),
+        )
+
+        for target_status in test_statuses:
+            with self.assertRaises(RuntimeError):
+                remote_unit.status = target_status
+
+    def test_remote_app_status(self):
+        remoteapp1 = self.model.get_relation('db1').app
+
+        # Remote application status is always unknown.
+        self.assertIsInstance(remoteapp1.status, op.status.Unknown)
+
+        test_statuses = (
+            op.status.Unknown(),
+            op.status.Active('Ready'),
+            op.status.Maintenance('Upgrading software'),
+            op.status.Blocked('Awaiting manual resolution'),
+            op.status.Waiting('Awaiting related app updates'),
+        )
+        for target_status in test_statuses:
+            with self.assertRaises(RuntimeError):
+                remoteapp1.status = target_status
+
+
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
@@ -229,9 +402,13 @@ def fake_script(test_case, name, content):
         f.write('#!/bin/bash\n{ echo -n $(basename $0); for s in "$@"; do echo -n \\;$s; done; echo; } >> $(dirname $0)/calls.txt\n' + content)
     os.chmod(test_case.fake_script_path / name, 0o755)
 
-def fake_script_calls(test_case):
-    with open(test_case.fake_script_path / 'calls.txt') as f:
-        return [line.split(';') for line in f.read().splitlines()]
+def fake_script_calls(test_case, clear=False):
+    with open(test_case.fake_script_path / 'calls.txt', 'r+') as f:
+        calls = [line.split(';') for line in f.read().splitlines()]
+        if clear:
+            f.truncate(0)
+
+        return calls
 
 
 class FakeScriptTest(unittest.TestCase):
@@ -245,3 +422,20 @@ class FakeScriptTest(unittest.TestCase):
             ['foo', 'a', 'b c'],
             ['bar', 'd e', 'f'],
         ])
+
+    def test_fake_script_clear(self):
+        fake_script(self, 'foo', 'echo foo runs')
+
+        output = subprocess.getoutput('foo a "b c"')
+        self.assertEqual(output, 'foo runs')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [['foo', 'a', 'b c']])
+
+        fake_script(self, 'bar', 'echo bar runs')
+
+        output = subprocess.getoutput('bar "d e" f')
+        self.assertEqual(output, 'bar runs')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [['bar', 'd e', 'f']])
+
+        self.assertEqual(fake_script_calls(self, clear=True), [])

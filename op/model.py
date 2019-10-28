@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from subprocess import run, PIPE, CalledProcessError
 
+import op.status
+from op.status import Status
 
 class Model:
     def __init__(self, unit_name, relation_names, backend):
@@ -62,7 +64,6 @@ class ModelCache:
             self._weakrefs[key] = entity
         return entity
 
-
 class Application:
     def __init__(self, name, backend, cache):
         self.name = name
@@ -71,6 +72,38 @@ class Application:
         self._cache = cache
 
         self._is_our_app = self.name == self._backend.app_name
+
+        self._status = None
+
+    @property
+    def status(self):
+        if not self._is_our_app:
+            return op.status.Unknown()
+
+        if not self._backend.is_leader():
+            raise RuntimeError('cannot get application status as a non-leader unit')
+
+        if self._status:
+            return self._status
+
+        s = self._backend.status_get(True)
+        self._status = Status.from_string(s['status'], s['message'])
+
+        return self._status
+
+    @status.setter
+    def status(self, value):
+        if not isinstance(value, Status):
+            raise InvalidStatusError(f'invalid value provided for application {self} status: {value}')
+
+        if not self._is_our_app:
+            raise RuntimeError(f'cannot to set status for a remote application {self}')
+
+        if not self._backend.is_leader():
+            raise RuntimeError('cannot set application status as a non-leader unit')
+
+        self._backend.status_set(True, value.name, value.message)
+        self._status = value
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -87,6 +120,32 @@ class Unit:
         self._cache = cache
 
         self._is_our_unit = self.name == self._backend.unit_name
+
+        self._status = None
+
+    @property
+    def status(self):
+        if not self._is_our_unit:
+            return op.status.Unknown()
+
+        if self._status:
+            return self._status
+
+        s = self._backend.status_get(False)
+        self._status = Status.from_string(s['status'], s['message'])
+
+        return self._status
+
+    @status.setter
+    def status(self, value):
+        if not isinstance(value, Status):
+            raise InvalidStatusError(f'invalid value provided for unit {self} status: {value}')
+
+        if not self._is_our_unit:
+            raise RuntimeError(f'cannot set status for a remote unit {self}')
+
+        self._backend.status_set(False, value.name, value.message)
+        self._status = value
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -258,6 +317,10 @@ class RelationNotFound(ModelError):
     pass
 
 
+class InvalidStatusError(ModelError):
+    pass
+
+
 class ModelBackend:
     def __init__(self):
         self.unit_name = os.environ['JUJU_UNIT_NAME']
@@ -314,3 +377,17 @@ class ModelBackend:
 
     def is_leader(self):
         return self._run('is-leader')
+
+    def status_get(self, app):
+        """Get a status of a unit or an application.
+
+        app -- A boolean indicating whether the status should be retrieved for a unit or an application.
+        """
+        return self._run('status-get', '--include-data', f'--application={app}')
+
+    def status_set(self, app, status, message=''):
+        """Set a status of a unit or an application.
+
+        app -- A boolean indicating whether the status should be set for a unit or an application.
+        """
+        return self._run_no_output('status-set', f'--application={app}', status, message)
