@@ -5,6 +5,23 @@ from juju.interface import InterfaceBase
 
 
 class HTTPInterfaceProvides(InterfaceBase):
+    """Provides side for the 'http' interface protocol.
+
+    Example usage:
+
+        class MyCharm(CharmBase):
+            website = Endpoint(HTTPInterfaceProvides)
+
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self.framework.observe(self.website.on.joined, self.on_website_joined)
+
+        def on_website_joined(self, event):
+            self.config = self.framework.model.config
+            for client in self.website.clients:
+                client.serve(hosts=[client.ingress_address],
+                             port=self.config['http_port'])
+    """
     @property
     def clients(self):
         return [HTTPInterfaceClient(self.framework, relation) for relation in self.relations]
