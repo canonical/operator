@@ -11,7 +11,9 @@ class HTTPInterfaceProvides(InterfaceBase):
 
 
 class HTTPInterfaceRequires(InterfaceBase):
-    pass
+    @property
+    def servers(self):
+        return [HTTPInterfaceServer(relation) for relation in self.relations]
 
 
 class HTTPInterfaceClient:
@@ -35,7 +37,7 @@ class HTTPInterfaceClient:
         self._relation.data[local_unit]['extended_data'] = json.dumps(extra_hosts)
 
 
-HTTPHost = namedtuple('HTTPHost', ['host', 'port'])
+HTTPInterfaceHost = namedtuple('HTTPInterfaceHost', ['host', 'port'])
 
 
 class HTTPInterfaceServer:
@@ -54,11 +56,11 @@ class HTTPInterfaceServer:
             host = data.get('hostname', data.get('private-address'))
             port = data.get('port')
             if host and port:
-                hosts_set.add(HTTPHost(host, port))
+                hosts_set.add(HTTPInterfaceHost(host, port))
             extended_data = data.get('extended_data')
             if extended_data:
                 for extra_host in json.loads(extended_data):
                     host = data.get('hostname', data.get('private-address'))
                     port = data.get('port')
-                    hosts_set.add(HTTPHost(host, port))
+                    hosts_set.add(HTTPInterfaceHost(host, port))
         return hosts_set
