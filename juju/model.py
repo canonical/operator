@@ -3,12 +3,14 @@ import weakref
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from subprocess import run, PIPE, CalledProcessError
+from enum import Enum, unique
 
 
 class Model:
     def __init__(self, local_unit_name, relation_names, backend):
         self._cache = ModelCache()
         self._backend = backend
+        self._local_unit_name = local_unit_name
         self.unit = self.get_unit(local_unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
@@ -43,8 +45,11 @@ class Model:
                 # errors, ideally integrating the error catching with Juju's mechanisms.
                 raise TooManyRelatedApps(relation_name, num_related, 1)
 
+    def _is_local_unit(self, unit_name):
+        return unit_name == self._local_unit_name
+
     def get_unit(self, unit_name):
-        return self._cache.get(Unit, unit_name)
+        return self._cache.get(Unit, unit_name, self._is_local_unit(unit_name), self._backend)
 
 
 class ModelCache(weakref.WeakValueDictionary):
@@ -56,19 +61,63 @@ class ModelCache(weakref.WeakValueDictionary):
             self[key] = entity
         return entity
 
+class EntityStatus:
+    """A helper class for getting and setting entity (application or unit) status."""
+
+    def __init__(self):
+        self._cached = None
+
+    def __get__(self, instance, owner):
+        is_app = isinstance(instance, Application)
+
+        if not is_app and not isinstance(instance, Unit):
+            raise RuntimeError(f'EntityStatus was used as an attribute on {type(instance)} which is not supported')
+
+        if not instance.is_local:
+            return Unknown()
+
+        if self._cached:
+            return self._cached
+
+        s = instance._backend.status_get(is_app)
+        self._cached = StatusTypes[s['status']].value(s['message'])
+
+        return self._cached
+
+    def __set__(self, instance, value):
+        is_app = isinstance(instance, Application)
+
+        if not is_app and not isinstance(instance, Unit):
+            raise RuntimeError(f'EntityStatus was used as an attribute on {type(instance)} which is not supported')
+        if not isinstance(value, Status):
+            raise InvalidStatusError(f'Invalid value provided for entity {instance} status: {value}')
+
+        if not instance.is_local:
+            raise RuntimeError(f'Unable to get status for a non-local entity {instance}')
+
+        self._cached = value
+        instance._backend.status_set(is_app, value.id, value.message)
 
 class Application:
-    def __init__(self, name, cache):
+    status = EntityStatus()
+
+    def __init__(self, name, is_local, backend, cache):
         self.name = name
+        self.is_local = is_local
+        self._backend = backend
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
 
 class Unit:
-    def __init__(self, name, cache):
+    status = EntityStatus()
+
+    def __init__(self, name, is_local, backend, cache):
         self.name = name
-        self.app = cache.get(Application, name.split('/')[0])
+        self.app = cache.get(Application, name.split('/')[0], is_local, backend)
+        self.is_local = is_local
+        self._backend = backend
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -135,7 +184,7 @@ class Relation:
         self.units = set()
         try:
             for unit_name in backend.relation_list(self.id):
-                unit = cache.get(Unit, unit_name)
+                unit = cache.get(Unit, unit_name, False, backend)
                 self.units.add(unit)
                 self.apps.add(unit.app)
         except RelationNotFound:
@@ -231,6 +280,54 @@ class RelationNotFound(ModelError):
     pass
 
 
+class Status:
+    """Status values specific to applications and units."""
+    def __init__(self, id, message):
+        self.id = id
+        self.message = message
+
+class Active(Status):
+    """The unit believes it is correctly offering all the services it has been asked to offer."""
+    def __init__(self, message):
+        super().__init__('active', message)
+
+class Blocked(Status):
+    """The unit needs manual intervention to get back to the Running state."""
+    def __init__(self, message):
+        super().__init__('blocked', message)
+
+class Maintenance(Status):
+    """
+    The unit is not yet providing services, but is actively doing work in preparation for providing those services.
+    This is a "spinning" state, not an error state. It reflects activity on the unit itself, not on peers or related units.
+    """
+    def __init__(self, message):
+        super().__init__('maintenance', message)
+
+class Unknown(Status):
+    """A unit-agent has finished calling install, config-changed and start, but the charm has not called status-set yet."""
+    def __init__(self, message=''):
+        # Unknown status cannot be set and does not have a message associated with it.
+        super().__init__('unknown', '')
+
+class Waiting(Status):
+    """The unit is unable to progress to an active state because an application to which it is related is not running."""
+    def __init__(self, message):
+        super().__init__('waiting', message)
+
+@unique
+class StatusTypes(Enum):
+    active = Active
+    blocked = Blocked
+    maintenance = Maintenance
+    unknown = Unknown
+    waiting = Waiting
+
+
+class InvalidStatusError(ModelError):
+    pass
+
+
 class ModelBackend:
     def _run(self, *args):
         result = run(args + ('--format=json',), stdout=PIPE, stderr=PIPE, check=True)
@@ -280,3 +377,17 @@ class ModelBackend:
 
     def config_get(self):
         return self._run('config-get')
+
+    def status_get(self, app):
+        """Get a status of a unit or an application.
+
+        app -- A boolean indicating whether the status should be retrieved for a unit or an application.
+        """
+        return self._run('status-get', '--include-data', f'--application={app}')
+
+    def status_set(self, app, status, message=''):
+        """Set a status of a unit or an application.
+
+        app -- A boolean indicating whether the status should be set for a unit or an application.
+        """
+        return self._run_no_output('status-set', f'--application={app}', status, message)

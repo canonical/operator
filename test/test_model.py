@@ -12,6 +12,7 @@ import juju.model
 class TestModelBackend:
     def __init__(self):
         self.relation_set_calls = []
+        self.status_set_calls = []
 
     def relation_ids(self, relation_name):
         return {
@@ -61,11 +62,24 @@ class TestModelBackend:
             'qux': True,
         }
 
+    def status_get(self, app):
+        return {
+            'message': '',
+            'status': 'unknown',
+            'status-data': '',
+        }
+
+    def status_set(self, app, status, message=''):
+        self.status_set_calls.append((app, status, message))
+
 
 class TestModel(unittest.TestCase):
     def setUp(self):
         self.backend = TestModelBackend()
         self.model = juju.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        juju.model.Unit.status = juju.model.EntityStatus()
+        juju.model.Application.status = juju.model.EntityStatus()
 
     def test_model(self):
         self.assertIs(self.model.app, self.model.unit.app)
@@ -91,7 +105,7 @@ class TestModel(unittest.TestCase):
             self.model.get_relation('db2')
 
     def test_relation_data(self):
-        random_unit = self.model._cache.get(juju.model.Unit, 'randomunit/0')
+        random_unit = self.model._cache.get(juju.model.Unit, 'randomunit/0', False, self.model._backend)
         with self.assertRaises(KeyError):
             self.model.get_relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
@@ -153,3 +167,56 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(TypeError):
             # Confirm that we cannot modify config values.
             self.model.config['foo'] = 'bar'
+
+    def test_local_unit_status(self):
+        self.assertIsInstance(self.model.unit.status, juju.model.Unknown)
+        self.assertIsInstance(self.model.app.status, juju.model.Unknown)
+
+        test_cases = (
+            (juju.model.Active('Ready'), (False, 'active', 'Ready')),
+            (juju.model.Maintenance('Upgrading software'), (False, 'maintenance', 'Upgrading software')),
+            (juju.model.Blocked('Awaiting manual resolution'), (False, 'blocked', 'Awaiting manual resolution')),
+            (juju.model.Waiting('Awaiting related app updates'), (False, 'waiting', 'Awaiting related app updates')),
+        )
+
+        expected_calls = []
+
+        for target_status, expected_call in test_cases:
+            self.model.unit.status = target_status
+            expected_calls.append(expected_call)
+
+            self.assertEqual(self.model.unit.status, target_status)
+            self.assertEqual(self.backend.status_set_calls, expected_calls)
+
+            # App status should not have changed.
+            self.assertIsInstance(self.model.app.status, juju.model.Unknown)
+
+    def test_local_app_status(self):
+        self.assertIsInstance(self.model.app.status, juju.model.Unknown)
+        self.assertIsInstance(self.model.unit.status, juju.model.Unknown)
+
+        test_cases = (
+            (juju.model.Active('Ready'), (True, 'active', 'Ready')),
+            (juju.model.Maintenance('Upgrading software'), (True, 'maintenance', 'Upgrading software')),
+            (juju.model.Blocked('Awaiting manual resolution'), (True, 'blocked', 'Awaiting manual resolution')),
+            (juju.model.Waiting('Awaiting related app updates'), (True, 'waiting', 'Awaiting related app updates')),
+        )
+
+        expected_calls = []
+
+        for target_status, expected_call in test_cases:
+            self.model.app.status = target_status
+            expected_calls.append(expected_call)
+
+            self.assertEqual(self.model.app.status, target_status)
+            self.assertEqual(self.backend.status_set_calls, expected_calls)
+            # Unit status should not have changed.
+            self.assertIsInstance(self.model.unit.status, juju.model.Unknown)
+
+    def test_remote_unit_status(self):
+        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
+        self.assertIsInstance(remoteapp1_0.status, juju.model.Unknown)
+
+    def test_remote_app_status(self):
+        remoteapp1 = next(filter(lambda u: u.name == 'remoteapp1', self.model.get_relation('db1').apps))
+        self.assertIsInstance(remoteapp1.status, juju.model.Unknown)
