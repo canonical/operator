@@ -1,0 +1,5 @@
+options:
+  http_port:
+    type: string
+    description: 'The HTTP port'
+    default: '80'
