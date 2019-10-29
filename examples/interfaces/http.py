@@ -16,11 +16,11 @@ class HTTPInterfaceProvides(InterfaceBase):
                 super().__init__(parent, key)
                 self.framework.observe(self.website.on.joined, self.on_website_joined)
 
-        def on_website_joined(self, event):
-            self.config = self.framework.model.config
-            for client in self.website.clients:
-                client.serve(hosts=[client.ingress_address],
-                             port=self.config['http_port'])
+            def on_website_joined(self, event):
+                self.config = self.framework.model.config
+                for client in self.website.clients:
+                    client.serve(hosts=[client.ingress_address],
+                                 port=self.config['http_port'])
     """
     @property
     def clients(self):
