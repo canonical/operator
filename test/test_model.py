@@ -217,6 +217,32 @@ class TestModel(unittest.TestCase):
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
         self.assertIsInstance(remoteapp1_0.status, juju.model.Unknown)
 
+        test_statuses = (
+            juju.model.Status('active', 'deadbeefcafe'),
+            juju.model.Unknown(),
+            juju.model.Active('Ready'),
+            juju.model.Maintenance('Upgrading software'),
+            juju.model.Blocked('Awaiting manual resolution'),
+            juju.model.Waiting('Awaiting related app updates'),
+        )
+
+        for target_status in test_statuses:
+            with self.assertRaises(RuntimeError):
+                remoteapp1_0.status = target_status
+
     def test_remote_app_status(self):
         remoteapp1 = next(filter(lambda u: u.name == 'remoteapp1', self.model.get_relation('db1').apps))
         self.assertIsInstance(remoteapp1.status, juju.model.Unknown)
+
+        test_statuses = (
+            juju.model.Status('active', 'deadbeefcafe'),
+            juju.model.Unknown(),
+            juju.model.Active('Ready'),
+            juju.model.Maintenance('Upgrading software'),
+            juju.model.Blocked('Awaiting manual resolution'),
+            juju.model.Waiting('Awaiting related app updates'),
+        )
+
+        for target_status in test_statuses:
+            with self.assertRaises(RuntimeError):
+                remoteapp1.status = target_status
