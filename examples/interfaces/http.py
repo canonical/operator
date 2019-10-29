@@ -19,8 +19,8 @@ class HTTPInterfaceProvides(InterfaceBase):
             def on_website_joined(self, event):
                 self.config = self.framework.model.config
                 for client in self.website.clients:
-                    client.serve(hosts=[client.ingress_address],
-                                 port=self.config['http_port'])
+                    client.configure(hosts=[client.address_for],
+                                     port=self.config['http_port'])
     """
     @property
     def clients(self):
@@ -39,12 +39,11 @@ class HTTPInterfaceClient:
         self._relation = relation
 
     @property
-    # TODO: Should this be binding_address?
-    def ingress_address(self):
+    def address_for(self):
         binding = self._framework.model.network_bindings[self._relation.name]
         return binding.ingress_address
 
-    def serve(self, hosts, port):
+    def configure(self, hosts, port):
         local_unit = self._framework.model.unit
         hosts = list(hosts)
         first_host = hosts.pop(0)
