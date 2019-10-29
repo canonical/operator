@@ -12,14 +12,20 @@ class Endpoint:
         self.interface_type = interface_type
         self.name = None
 
-    def __set_name__(self, charm, name):
+    def __set_name__(self, charm_type, name):
         self.name = name
 
-    def __get__(self, charm, _):
+    def __get__(self, charm, charm_type):
         if charm is None:
             return self
         else:
-            return self.interface_type(charm, self.name)
+            interface = self.interface_type(charm, self.name)
+            # Permanently bind the interface instance to the charm. Because Endpoint is a
+            # descriptor and not a data descriptor (i.e., it does not define either __set__
+            # or __delete__), the descriptor can be overridden on a per-instance basis,
+            # meaning this method will no longer be invoked for that instance.
+            charm.__setattr__(self.name, interface)
+            return interface
 
 
 class InterfaceEvents(EventsBase):
