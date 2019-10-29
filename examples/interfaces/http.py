@@ -70,14 +70,14 @@ class HTTPInterfaceServer:
         hosts_set = set()
         for unit in self._relation.units:
             data = self._relation.data[unit]
-            host = data.get('hostname', data.get('private-address'))
+            host = data.get('hostname', data.get('ingress-address'))
             port = data.get('port')
             if host and port:
                 hosts_set.add(HTTPInterfaceHost(host, port))
             extended_data = data.get('extended_data')
             if extended_data:
                 for extra_host in json.loads(extended_data):
-                    host = data.get('hostname', data.get('private-address'))
+                    host = data.get('hostname', data.get('ingress-address'))
                     port = data.get('port')
                     hosts_set.add(HTTPInterfaceHost(host, port))
         return hosts_set
