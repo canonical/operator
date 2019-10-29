@@ -49,15 +49,22 @@ class Model:
         return unit_name == self._local_unit_name
 
     def get_unit(self, unit_name):
-        return self._cache.get(Unit, unit_name, self._is_local_unit(unit_name), self._backend)
+        return self._cache.get(CacheKey(Unit, unit_name), unit_name, self._is_local_unit(unit_name), self._backend, self._cache)
 
+
+class CacheKey:
+    def __init__(self, entity_type, *key_parts):
+        self.entity_type = entity_type
+        self.key_parts = key_parts
+
+    def __hash__(self):
+        return hash((self.entity_type, *self.key_parts))
 
 class ModelCache(weakref.WeakValueDictionary):
-    def get(self, entity_type, *args):
-        key = (entity_type,) + args
+    def get(self, key, *init_args):
         entity = super().get(key)
         if entity is None:
-            entity = entity_type(*args, cache=self)
+            entity = key.entity_type(*init_args)
             self[key] = entity
         return entity
 
@@ -101,7 +108,7 @@ class EntityStatus:
 class Application:
     status = EntityStatus()
 
-    def __init__(self, name, is_local, backend, cache):
+    def __init__(self, name, is_local, backend):
         self.name = name
         self.is_local = is_local
         self._backend = backend
@@ -115,7 +122,9 @@ class Unit:
 
     def __init__(self, name, is_local, backend, cache):
         self.name = name
-        self.app = cache.get(Application, name.split('/')[0], is_local, backend)
+
+        app_name = name.split('/')[0]
+        self.app = cache.get(CacheKey(Application, app_name), app_name, is_local, backend)
         self.is_local = is_local
         self._backend = backend
 
@@ -184,7 +193,7 @@ class Relation:
         self.units = set()
         try:
             for unit_name in backend.relation_list(self.id):
-                unit = cache.get(Unit, unit_name, False, backend)
+                unit = cache.get(CacheKey(Unit, unit_name), unit_name, False, backend, cache)
                 self.units.add(unit)
                 self.apps.add(unit.app)
         except RelationNotFound:

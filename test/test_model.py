@@ -105,7 +105,7 @@ class TestModel(unittest.TestCase):
             self.model.get_relation('db2')
 
     def test_relation_data(self):
-        random_unit = self.model._cache.get(juju.model.Unit, 'randomunit/0', False, self.model._backend)
+        random_unit = self.model._cache.get(juju.model.CacheKey(juju.model.Unit, 'randomunit/0'), 'randomunit/0', False, self.model._backend, self.model._cache)
         with self.assertRaises(KeyError):
             self.model.get_relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
