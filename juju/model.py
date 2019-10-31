@@ -9,6 +9,7 @@ class Model:
     def __init__(self, local_unit_name, relation_names, backend):
         self._cache = ModelCache()
         self._backend = backend
+        self._local_unit_name = local_unit_name
         self.unit = self.get_unit(local_unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
@@ -43,32 +44,65 @@ class Model:
                 # errors, ideally integrating the error catching with Juju's mechanisms.
                 raise TooManyRelatedApps(relation_name, num_related, 1)
 
+    def _is_local_unit(self, unit_name):
+        return unit_name == self._local_unit_name
+
+    def _is_local_app(self, app_name):
+        return app_name == self.unit.app.name
+
     def get_unit(self, unit_name):
-        return self._cache.get(Unit, unit_name)
+        return self._cache.get(CacheKey(Unit, unit_name), unit_name, self._is_local_unit(unit_name), self._backend, self._cache)
+
+    def get_app(self, app_name):
+        return self._cache.get(CacheKey(Application, app_name), app_name, self._is_local_app(app_name), self._backend)
+
+
+class CacheKey:
+    def __init__(self, entity_type, *key_parts):
+        self.entity_type = entity_type
+        self.key_parts = key_parts
+
+    def __hash__(self):
+        return hash((self.entity_type, *self.key_parts))
 
 
 class ModelCache(weakref.WeakValueDictionary):
-    def get(self, entity_type, *args):
-        key = (entity_type,) + args
+    def get(self, key, *init_args):
         entity = super().get(key)
         if entity is None:
-            entity = entity_type(*args, cache=self)
+            entity = key.entity_type(*init_args)
             self[key] = entity
         return entity
 
 
 class Application:
-    def __init__(self, name, cache):
+    def __init__(self, name, is_local, backend):
         self.name = name
+        self.is_local = is_local
+        self._backend = backend
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
 
 class Unit:
-    def __init__(self, name, cache):
+    def __init__(self, name, is_local, backend, cache):
         self.name = name
-        self.app = cache.get(Application, name.split('/')[0])
+
+        app_name = name.split('/')[0]
+        self.app = cache.get(CacheKey(Application, app_name), app_name, is_local, backend)
+        self.is_local = is_local
+        self._backend = backend
+
+    @property
+    def is_leader(self):
+        if self.is_local:
+            # This value is not cached as it is not guaranteed to persist for the whole duration
+            # of a hook execution.
+            return self._backend.is_leader()
+        else:
+            # Unable to determine the leadership status for remote units.
+            return None
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -131,13 +165,15 @@ class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
         self.name = relation_name
         self.id = relation_id
-        self.apps = set()
         self.units = set()
+        self.app = None
         try:
             for unit_name in backend.relation_list(self.id):
-                unit = cache.get(Unit, unit_name)
+                unit = cache.get(CacheKey(Unit, unit_name), unit_name, False, backend, cache)
                 self.units.add(unit)
-                self.apps.add(unit.app)
+                if self.app is None:
+                    # Each relation is for a single remote app.
+                    self.app = unit.app
         except RelationNotFound:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
@@ -150,8 +186,17 @@ class Relation:
 class RelationData(Mapping):
     def __init__(self, relation, local_unit, backend):
         self.relation = weakref.proxy(relation)
-        self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
-        self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
+        self._data = {local_unit: RelationEntityData(self.relation, local_unit, (lambda _: True), backend)}
+
+        # Whether the application data bag is mutable or not depends on whether this unit is a leader or not,
+        # but this is not guaranteed to be always true during the same hook execution.
+        self._data.update({local_unit.app: RelationEntityData(self.relation, local_unit.app, (lambda backend: backend.is_leader), backend)})
+
+        self._data.update({unit: RelationEntityData(self.relation, unit, lambda _: False, backend) for unit in self.relation.units})
+
+        # The relation might be dead so avoid a None key here.
+        if self.relation.app:
+            self._data.update({self.relation.app: RelationEntityData(self.relation, self.relation.app, (lambda _: False), backend)})
 
     def __contains__(self, key):
         return key in self._data
@@ -168,26 +213,34 @@ class RelationData(Mapping):
 
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
-class RelationUnitData(LazyMapping, MutableMapping):
-    def __init__(self, relation, unit, is_mutable, backend):
+class RelationEntityData(LazyMapping, MutableMapping):
+    def __init__(self, relation, entity, is_mutable, backend):
         self.relation = relation
-        self.unit = unit
+        self.entity = entity
         self._is_mutable = is_mutable
         self._backend = backend
 
     def _load(self):
         try:
-            return self._backend.relation_get(self.relation.id, self.unit.name)
+            return self._backend.relation_get(self.relation.id, self.entity.name, app=False)
         except RelationNotFound:
             # Dead relations tell no tales (and have no data).
             return {}
 
     def __setitem__(self, key, value):
-        if not self._is_mutable:
-            raise RelationDataError(f'cannot set relation data for {self.unit.name}')
+        if not self._is_mutable(self._backend):
+            # This might happen due to a mid-hook leadership change besides trying to set data in remote data bags.
+            raise RelationDataError(f'cannot set relation data for {self.entity.name}')
         if not isinstance(value, str):
             raise RelationDataError('relation data values must be strings')
-        self._backend.relation_set(self.relation.id, key, value)
+
+        if isinstance(self.entity, Application):
+            app = True
+        else:
+            app = False
+
+        self._backend.relation_set(self.relation.id, key, value, app)
+
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
@@ -257,9 +310,9 @@ class ModelBackend:
             else:
                 raise
 
-    def relation_get(self, relation_id, member_name):
+    def relation_get(self, relation_id, member_name, app):
         try:
-            return self._run('relation-get', '-r', str(relation_id), '-', member_name)
+            return self._run('relation-get', f'--app={app}', '-r', str(relation_id), '-', member_name)
         except CalledProcessError as e:
             # TODO: This should use the return code if it is specific enough rather than the message.
             # It seems to be 2 for this error, but I haven't been able to confirm yet if that might
@@ -269,9 +322,9 @@ class ModelBackend:
             else:
                 raise
 
-    def relation_set(self, relation_id, key, value):
+    def relation_set(self, relation_id, key, value, app):
         try:
-            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
+            return self._run_no_output('relation-set', f'--app={app}', '-r', str(relation_id), f'{key}={value}')
         except CalledProcessError as e:
             if b'relation not found' in e.stderr:
                 raise RelationNotFound() from e
@@ -280,3 +333,6 @@ class ModelBackend:
 
     def config_get(self):
         return self._run('config-get')
+
+    def is_leader(self):
+        return self._run('is-leader')
