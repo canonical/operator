@@ -5,6 +5,7 @@ import types
 import sqlite3
 import collections
 import keyword
+import weakref
 
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
@@ -179,6 +180,7 @@ class Object:
     handle_kind = HandleKind()
 
     def __init__(self, parent, key):
+        self.parent = weakref.proxy(parent)
         kind = self.handle_kind
         if isinstance(parent, Framework):
             self.framework = parent

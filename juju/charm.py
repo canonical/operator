@@ -108,17 +108,13 @@ class CharmBase(Object):
     def __init__(self, framework, key):
         super().__init__(framework, key)
 
-        for relation_name in self.framework.meta.relations:
-            relation_name = relation_name.replace('-', '_')
-            self.on.define_event(f'{relation_name}_relation_joined', RelationJoinedEvent)
-            self.on.define_event(f'{relation_name}_relation_changed', RelationChangedEvent)
-            self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
-            self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
+        self.endpoints = {}
+        for endpoint_name in self.framework.meta.endpoints:
+            self.endpoints[endpoint_name] = CharmEndpoint(self, endpoint_name)
 
+        self.storage = {}
         for storage_name in self.framework.meta.storage:
-            storage_name = storage_name.replace('-', '_')
-            self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
-            self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
+            self.storage[storage_name] = CharmStorage(self, storage_name)
 
 
 class CharmMeta:
@@ -148,16 +144,16 @@ class CharmMeta:
         self.series = raw.get('series', [])
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
-        self.requires = {name: RelationMeta('requires', name, rel)
+        self.requires = {name: EndpointMeta('requires', name, rel)
                          for name, rel in raw.get('requires', {}).items()}
-        self.provides = {name: RelationMeta('provides', name, rel)
+        self.provides = {name: EndpointMeta('provides', name, rel)
                          for name, rel in raw.get('provides', {}).items()}
-        self.peers = {name: RelationMeta('peers', name, rel)
+        self.peers = {name: EndpointMeta('peers', name, rel)
                       for name, rel in raw.get('peers', {}).items()}
-        self.relations = {}
-        self.relations.update(self.requires)
-        self.relations.update(self.provides)
-        self.relations.update(self.peers)
+        self.endpoints = {}
+        self.endpoints.update(self.requires)
+        self.endpoints.update(self.provides)
+        self.endpoints.update(self.peers)
         self.storage = {name: StorageMeta(name, store)
                         for name, store in raw.get('storage', {}).items()}
         self.resources = {name: ResourceMeta(name, res)
@@ -167,8 +163,8 @@ class CharmMeta:
         self.extra_bindings = raw.get('extra-bindings', [])
 
 
-class RelationMeta:
-    """Object containing metadata about a relation definition."""
+class EndpointMeta:
+    """Object containing metadata about a relation endpoint definition."""
     def __init__(self, role, relation_name, raw):
         self.role = role
         self.relation_name = relation_name
@@ -210,3 +206,31 @@ class PayloadMeta:
     def __init__(self, name, raw):
         self.payload_name = name
         self.type = raw['type']
+
+
+class CharmRelationEvents(EventsBase):
+    joined = Event(RelationJoinedEvent)
+    changed = Event(RelationChangedEvent)
+    departed = Event(RelationDepartedEvent)
+    broken = Event(RelationBrokenEvent)
+
+
+class CharmEndpoint(Object):
+    on = CharmRelationEvents()
+
+    @property
+    def name(self):
+        return self.handle.key
+
+
+class CharmStorageEvents(EventsBase):
+    attached = Event(StorageAttachedEvent)
+    detaching = Event(StorageDetachingEvent)
+
+
+class CharmStorage(Object):
+    on = CharmStorageEvents()
+
+    @property
+    def name(self):
+        return self.handle.key

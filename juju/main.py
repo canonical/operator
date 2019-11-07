@@ -35,14 +35,20 @@ def _handle_event_link(charm_dir, bound_event):
     charm_dir -- A root directory of the charm
     bound_event -- An event for which to create a symlink.
     """
-    from juju.charm import InstallEvent
+    from juju.charm import InstallEvent, RelationEvent, StorageEvent
 
     if issubclass(bound_event.event_type, InstallEvent):
         # We don't set up the link for install events, since we assume it's already in place
         # (otherwise, we would never have been called).
         return
+    elif issubclass(bound_event.event_type, RelationEvent):
+        hook_name = f'{bound_event.emitter.parent.name}-relation-{bound_event.event_kind}'
+    elif issubclass(bound_event.event_type, StorageEvent):
+        hook_name = f'{bound_event.emitter.parent.name}-storage-{bound_event.event_kind}'
+    else:
+        hook_name = bound_event.event_kind.replace('_', '-')
 
-    event_hook_path = charm_dir / 'hooks' / bound_event.event_kind.replace('_', '-')
+    event_hook_path = charm_dir / 'hooks' / hook_name
     create_link = True
     # Remove incorrect symlinks or files.
     if event_hook_path.exists():
@@ -83,29 +89,41 @@ def _setup_hooks(charm_dir, charm):
     """
     from juju.charm import HookEvent
 
-    for bound_event in charm.on.events().values():
-        if issubclass(bound_event.event_type, HookEvent):
-            _handle_event_link(charm_dir, bound_event)
+    emitters = [charm.on]
+    for endpoint in charm.endpoints.values():
+        emitters.append(endpoint.on)
+    for storage in charm.storage.values():
+        emitters.append(storage.on)
+    for emitter in emitters:
+        for bound_event in emitter.events().values():
+            if issubclass(bound_event.event_type, HookEvent):
+                _handle_event_link(charm_dir, bound_event)
 
 
-def _emit_charm_event(charm, event_name):
+def _emit_charm_event(charm, hook_name):
     """Emits a charm event based on a Juju event name.
 
     charm -- A charm instance to emit an event from.
-    event_name -- A Juju event name to emit on a charm.
+    hook_name -- The name of a Juju hook to translate into a charm event.
     """
-    formatted_event_name = event_name.replace('-', '_')
-    event_to_emit = None
+    if '-relation-' in hook_name:
+        relation_name, _, event_name = hook_name.rsplit('-', 2)
+        emitter = charm.endpoints[relation_name].on
+    elif '-storage-' in hook_name:
+        storage_name, _, event_name = hook_name.rsplit('-', 2)
+        emitter = charm.storage[storage_name].on
+    else:
+        event_name = hook_name.replace('-', '_')
+        emitter = charm.on
     try:
-        event_to_emit = getattr(charm.on, formatted_event_name)
+        event_to_emit = getattr(emitter, event_name)
     except AttributeError:
-        debugf(f"event {formatted_event_name} not defined for {charm}")
-
-    # If the event is not supported by the charm implementation, do
-    # not error out or try to emit it. This is to support rollbacks.
-    if event_to_emit is not None:
+        # If the event is not supported by the charm implementation, do
+        # not error out or try to emit it. This is to support rollbacks.
+        debugf(f"event {event_name} not defined for {emitter}")
+    else:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        debugf(f'Emitting Juju event {event_name}')
+        debugf(f'Emitting Juju event {event_name} on {emitter}')
         event_to_emit.emit(*args, **kwargs)
 
 
@@ -145,7 +163,7 @@ def main():
 
     meta = juju.charm.CharmMeta(_load_metadata(charm_dir))
     unit_name = os.environ['JUJU_UNIT_NAME']
-    model = juju.model.Model(unit_name, list(meta.relations), juju.model.ModelBackend())
+    model = juju.model.Model(unit_name, list(meta.endpoints), juju.model.ModelBackend())
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its

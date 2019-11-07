@@ -43,9 +43,9 @@ class Charm(CharmBase):
         self.framework.observe(self.on.leader_settings_changed, self)
         # Test relation events with endpoints from different
         # sections (provides, requires, peers) as well.
-        self.framework.observe(self.on.db_relation_joined, self)
-        self.framework.observe(self.on.mon_relation_changed, self)
-        self.framework.observe(self.on.ha_relation_broken, self)
+        self.framework.observe(self.endpoints['db'].on.joined, self.on_db_relation_joined)
+        self.framework.observe(self.endpoints['mon'].on.changed, self.on_mon_relation_changed)
+        self.framework.observe(self.endpoints['ha'].on.broken, self.on_ha_relation_broken)
 
     def _write_state(self):
         """Write state variables so that the parent process can read them.
