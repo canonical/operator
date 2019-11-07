@@ -10,11 +10,10 @@ class HTTPInterfaceProvides(InterfaceBase):
     Example usage:
 
         class MyCharm(CharmBase):
-            website = Endpoint(HTTPInterfaceProvides)
-
             def __init__(self, parent, key):
                 super().__init__(parent, key)
-                self.framework.observe(self.website.on.joined, self.on_website_joined)
+                self.website = HTTPInterfaceProvides(self, 'website')
+                self.framework.observe(self.relations['website'].on.joined, self.on_website_joined)
 
             def on_website_joined(self, event):
                 self.config = self.framework.model.config

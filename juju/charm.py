@@ -108,17 +108,13 @@ class CharmBase(Object):
     def __init__(self, framework, key):
         super().__init__(framework, key)
 
+        self.relations = {}
         for relation_name in self.framework.meta.relations:
-            relation_name = relation_name.replace('-', '_')
-            self.on.define_event(f'{relation_name}_relation_joined', RelationJoinedEvent)
-            self.on.define_event(f'{relation_name}_relation_changed', RelationChangedEvent)
-            self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
-            self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
+            self.relations[relation_name] = CharmRelation(self, relation_name)
 
+        self.storage = {}
         for storage_name in self.framework.meta.storage:
-            storage_name = storage_name.replace('-', '_')
-            self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
-            self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
+            self.storage[storage_name] = CharmStorage(self, storage_name)
 
 
 class CharmMeta:
@@ -210,3 +206,31 @@ class PayloadMeta:
     def __init__(self, name, raw):
         self.payload_name = name
         self.type = raw['type']
+
+
+class CharmRelationEvents(EventsBase):
+    joined = Event(RelationJoinedEvent)
+    changed = Event(RelationChangedEvent)
+    departed = Event(RelationDepartedEvent)
+    broken = Event(RelationBrokenEvent)
+
+
+class CharmRelation(Object):
+    on = CharmRelationEvents()
+
+    @property
+    def name(self):
+        return self.handle.key
+
+
+class CharmStorageEvents(EventsBase):
+    attached = Event(StorageAttachedEvent)
+    detaching = Event(StorageDetachingEvent)
+
+
+class CharmStorage(Object):
+    on = CharmStorageEvents()
+
+    @property
+    def name(self):
+        return self.handle.key

@@ -5,6 +5,7 @@ import types
 import sqlite3
 import collections
 import keyword
+import weakref
 
 
 class Handle:
@@ -180,6 +181,7 @@ class Object:
     handle_kind = HandleKind()
 
     def __init__(self, parent, key):
+        self.parent = weakref.proxy(parent)
         kind = self.handle_kind
         if isinstance(parent, Framework):
             self.framework = parent
