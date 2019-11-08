@@ -72,10 +72,12 @@ class TestCharm(unittest.TestCase):
             def __init__(self, *args):
                 super().__init__(*args)
                 self.seen = []
-                for event_kind, bound_event in self.on.events().items():
-                    # hook up relation events to generic handler
-                    if 'relation' in event_kind:
-                        self.framework.observe(bound_event, self.on_any_relation)
+                for rel in ('req1', 'req-2', 'pro1', 'pro-2', 'peer1', 'peer-2'):
+                    # Hook up relation events to generic handler.
+                    self.framework.observe(self.on[rel].relation_joined, self.on_any_relation)
+                    self.framework.observe(self.on[rel].relation_changed, self.on_any_relation)
+                    self.framework.observe(self.on[rel].relation_departed, self.on_any_relation)
+                    self.framework.observe(self.on[rel].relation_broken, self.on_any_relation)
 
             def on_any_relation(self, event):
                 assert event.relation.name == 'req1'
@@ -101,13 +103,13 @@ class TestCharm(unittest.TestCase):
 
         rel = charm.framework.model.get_relation('req1', 0)
         unit = charm.framework.model.get_unit('app/0')
-        charm.on.req1_relation_joined.emit(rel, unit)
-        charm.on.req1_relation_changed.emit(rel, unit)
-        charm.on.req_2_relation_changed.emit(rel, unit)
-        charm.on.pro1_relation_departed.emit(rel, unit)
-        charm.on.pro_2_relation_departed.emit(rel, unit)
-        charm.on.peer1_relation_broken.emit(rel)
-        charm.on.peer_2_relation_broken.emit(rel)
+        charm.on['req1'].relation_joined.emit(rel, unit)
+        charm.on['req1'].relation_changed.emit(rel, unit)
+        charm.on['req-2'].relation_changed.emit(rel, unit)
+        charm.on['pro1'].relation_departed.emit(rel, unit)
+        charm.on['pro-2'].relation_departed.emit(rel, unit)
+        charm.on['peer1'].relation_broken.emit(rel)
+        charm.on['peer-2'].relation_broken.emit(rel)
 
         self.assertEqual(charm.seen, [
             'RelationJoinedEvent',
@@ -125,10 +127,10 @@ class TestCharm(unittest.TestCase):
             def __init__(self, *args):
                 super().__init__(*args)
                 self.seen = []
-                self.framework.observe(self.on.stor1_storage_attached, self)
-                self.framework.observe(self.on.stor2_storage_detaching, self)
-                self.framework.observe(self.on.stor3_storage_attached, self)
-                self.framework.observe(self.on.stor_4_storage_attached, self)
+                self.framework.observe(self.on['stor1'].storage_attached, self)
+                self.framework.observe(self.on['stor2'].storage_detaching, self)
+                self.framework.observe(self.on['stor3'].storage_attached, self)
+                self.framework.observe(self.on['stor-4'].storage_attached, self)
 
             def on_stor1_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
@@ -174,10 +176,10 @@ class TestCharm(unittest.TestCase):
 
         charm = MyCharm(self.create_framework(), None)
 
-        charm.on.stor1_storage_attached.emit()
-        charm.on.stor2_storage_detaching.emit()
-        charm.on.stor3_storage_attached.emit()
-        charm.on.stor_4_storage_attached.emit()
+        charm.on['stor1'].storage_attached.emit()
+        charm.on['stor2'].storage_detaching.emit()
+        charm.on['stor3'].storage_attached.emit()
+        charm.on['stor-4'].storage_attached.emit()
 
         self.assertEqual(charm.seen, [
             'StorageAttachedEvent',

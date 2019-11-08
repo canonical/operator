@@ -6,6 +6,7 @@ import sqlite3
 import collections
 import keyword
 
+
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
 
@@ -252,6 +253,18 @@ class EventsBase(Object):
                 bound_event = getattr(self, event_kind)
                 events_map[event_kind] = bound_event
         return events_map
+
+    def __getitem__(self, key):
+        return PrefixedEvents(self, key)
+
+
+class PrefixedEvents:
+    def __init__(self, emitter, key):
+        self._emitter = emitter
+        self._prefix = key.replace("-", "_") + '_'
+
+    def __getattr__(self, name):
+        return getattr(self._emitter, self._prefix + name)
 
 
 class PreCommitEvent(EventBase):
