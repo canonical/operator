@@ -6,6 +6,9 @@ import sqlite3
 import collections
 import keyword
 
+from collections import namedtuple
+
+
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
 
@@ -252,6 +255,16 @@ class EventsBase(Object):
                 bound_event = getattr(self, event_kind)
                 events_map[event_kind] = bound_event
         return events_map
+
+    def __getitem__(self, key):
+        prefix = f'{key.replace("-", "_")}_'
+        scoped_events = {}
+        for event_name, bound_event in self.events().items():
+            if event_name.startswith(prefix):
+                unprefixed_event_name = event_name[len(prefix):]
+                scoped_events[unprefixed_event_name] = bound_event
+        events_scope = namedtuple('EventsScope', scoped_events.keys())
+        return events_scope(**scoped_events)
 
 
 class PreCommitEvent(EventBase):
