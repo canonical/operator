@@ -1,7 +1,26 @@
+from juju.framework import EventsBase, Event, EventBase
 from juju.interface import InterfaceBase
 
 
+class ReadyEvent(EventBase):
+    pass
+
+
+class MySQLRequiresEvents(EventsBase):
+    ready = Event(ReadyEvent)
+
+
 class MySQLInterfaceRequires(InterfaceBase):
+    on = MySQLRequiresEvents()
+
+    def __init__(self, charm, name):
+        super().__init__(charm, name)
+        self.framework.observe(self.charm.on[self.name].relation_changed, self.on_change)
+
+    def on_change(self, event):
+        if self.is_ready:
+            self.on.ready.emit()
+
     @property
     def is_joined(self):
         return len(self.relations) > 0
