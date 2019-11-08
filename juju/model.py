@@ -131,13 +131,14 @@ class Relation:
     def __init__(self, relation_name, relation_id, local_unit, backend, cache):
         self.name = relation_name
         self.id = relation_id
-        self.apps = set()
+        self.app = None
         self.units = set()
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
-                self.apps.add(unit.app)
+                if self.app is None:
+                    self.app = unit.app
         except RelationNotFound:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
