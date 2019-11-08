@@ -13,7 +13,7 @@ class HTTPInterfaceProvides(InterfaceBase):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.website = HTTPInterfaceProvides(self, 'website')
-                self.framework.observe(self.relations['website'].on.joined, self.on_website_joined)
+                self.framework.observe(self.on.website_relation_joined, self)
 
             def on_website_joined(self, event):
                 self.config = self.framework.model.config

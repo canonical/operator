@@ -132,16 +132,16 @@ class TestCharm(unittest.TestCase):
                 self.framework.observe(self.on['stor3'].storage_attached, self)
                 self.framework.observe(self.on['stor-4'].storage_attached, self)
 
-            def on_stor1_attached(self, event):
+            def on_stor1_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-            def on_stor2_detaching(self, event):
+            def on_stor2_storage_detaching(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-            def on_stor3_attached(self, event):
+            def on_stor3_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-            def on_stor4_attached(self, event):
+            def on_stor_4_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
         self.meta = CharmMeta({
