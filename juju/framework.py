@@ -259,12 +259,12 @@ class EventsBase(Object):
 
 
 class PrefixedEvents:
-    def __init__(self, emitter, prefix):
+    def __init__(self, emitter, key):
         self._emitter = emitter
-        self._prefix = prefix
+        self._prefix = key.replace("-", "_") + '_'
 
     def __getattr__(self, name):
-        return getattr(self._emitter, self._prefix + '_' + name)
+        return getattr(self._emitter, self._prefix + name)
 
 
 class PreCommitEvent(EventBase):
