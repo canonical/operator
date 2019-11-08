@@ -132,7 +132,12 @@ class Event:
     def __get__(self, emitter, emitter_type=None):
         if emitter is None:
             return self
-        return BoundEvent(emitter, self.event_type, self.event_kind)
+        bound_event = BoundEvent(emitter, self.event_type, self.event_kind)
+        # Permanently bind the new instance to the emitter. This ensures that we don't create
+        # a new BoundEvent instance on every access. This means that this accessor will not
+        # be called for that parent instance on subsequent accesses.
+        setattr(emitter, self.event_kind, bound_event)
+        return bound_event
 
 
 class BoundEvent:
@@ -209,12 +214,18 @@ class EventsBase(Object):
         if parent is not None:
             super().__init__(parent, key)
 
-    def __get__(self, emitter, emitter_type):
-        # Same type, different instance, more data. Doing this unusual construct
-        # means people can subclass just this one class to have their own 'on'.
-        if emitter is None:
+    def __get__(self, parent, parent_type):
+        # Automatically bind to a parent instance on access. This allows the Charm class to define
+        # its .on attribute at the class level while still giving us access to the charm instance
+        # and via that the framework.
+        if parent is None:
             return self
-        return type(self)(emitter)
+        instance = type(self)(parent)
+        # Permanently bind the new instance to the parent. This ensures that we don't create
+        # a new EventsBase instance on every access. This means that this accessor will not
+        # be called for that parent instance on subsequent accesses.
+        setattr(parent, self.handle_kind, instance)
+        return instance
 
     @classmethod
     def define_event(cls, event_kind, event_type):

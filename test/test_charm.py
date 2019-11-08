@@ -99,6 +99,9 @@ class TestCharm(unittest.TestCase):
 
         charm = MyCharm(self.create_framework(), None)
 
+        # Confirm that we always get the same BoundEvent instance for a given event.
+        self.assertIs(charm.on.start, charm.on.start)
+
         rel = charm.framework.model.get_relation('req1', 0)
         unit = charm.framework.model.get_unit('app/0')
         charm.on.req1_relation_joined.emit(rel, unit)
