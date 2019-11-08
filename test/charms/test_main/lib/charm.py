@@ -5,6 +5,8 @@ import base64
 import pickle
 
 from juju.charm import CharmBase
+from juju.framework import Event, EventBase, EventsBase
+from juju.interface import InterfaceBase
 
 import logging
 
@@ -15,6 +17,8 @@ class Charm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        self.db = DBInterface(self, 'db')
 
         # This environment variable controls the test charm behavior.
         charm_config = os.environ.get('CHARM_CONFIG')
@@ -37,6 +41,8 @@ class Charm(CharmBase):
         # Observed event types per invocation. A list is used to preserve the order in which charm handlers have observed the events.
         self._state['observed_event_types'] = []
 
+        self._state['db_ready_seen'] = False
+
         self.framework.observe(self.on.install, self)
         self.framework.observe(self.on.config_changed, self)
         self.framework.observe(self.on.update_status, self)
@@ -46,6 +52,8 @@ class Charm(CharmBase):
         self.framework.observe(self.on.db_relation_joined, self)
         self.framework.observe(self.on.mon_relation_changed, self)
         self.framework.observe(self.on.ha_relation_broken, self)
+
+        self.framework.observe(self.db.on.ready, self.on_db_ready)
 
     def _write_state(self):
         """Write state variables so that the parent process can read them.
@@ -94,3 +102,27 @@ class Charm(CharmBase):
         self._state['observed_event_types'].append(type(event))
         self._state['ha_relation_broken_data'] = event.snapshot()
         self._write_state()
+
+    def on_db_ready(self, event):
+        self._state['db_ready_seen'] = True
+        self._write_state()
+
+
+class ReadyEvent(EventBase):
+    pass
+
+
+class DBEvents(EventsBase):
+    ready = Event(ReadyEvent)
+
+
+class DBInterface(InterfaceBase):
+    on = DBEvents()
+
+    def __init__(self, charm, name):
+        super().__init__(charm, name)
+        self.framework.observe(charm.on[self.name].relation_joined, self.on_joined)
+
+    def on_joined(self, event):
+        if len(self.relations) == 1:
+            self.on.ready.emit()

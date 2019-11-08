@@ -185,6 +185,9 @@ class TestMain(unittest.TestCase):
             if event_kind in expected_event_data:
                 self.assertEqual(state[f'{event_kind}_data'], expected_event_data[event_kind])
 
+            if event_kind == 'db_relation_joined':
+                self.assertTrue(state['db_ready_seen'])
+
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit.
         """
