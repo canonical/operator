@@ -101,10 +101,6 @@ class TestCharm(unittest.TestCase):
 
         charm = MyCharm(self.create_framework(), None)
 
-        actual_scoped_events = set(charm.on['req1']._fields)
-        expected_scoped_events = {'relation_joined', 'relation_changed', 'relation_departed', 'relation_broken'}
-        self.assertEqual(actual_scoped_events, expected_scoped_events)
-
         rel = charm.framework.model.get_relation('req1', 0)
         unit = charm.framework.model.get_unit('app/0')
         charm.on['req1'].relation_joined.emit(rel, unit)
