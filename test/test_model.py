@@ -2,7 +2,7 @@
 
 import unittest
 
-import juju.model
+import op.model
 
 
 # TODO: We need some manner of test to validate the actual ModelBackend implementation, round-tripped
@@ -28,7 +28,7 @@ class TestModelBackend:
                 6: ['remoteapp2/0'],
             }[relation_id]
         except KeyError:
-            raise juju.model.RelationNotFound()
+            raise op.model.RelationNotFound()
 
     def relation_get(self, relation_id, member_name):
         try:
@@ -47,7 +47,7 @@ class TestModelBackend:
                 },
             }[relation_id][member_name]
         except KeyError:
-            raise juju.model.RelationNotFound()
+            raise op.model.RelationNotFound()
 
     def relation_set(self, relation_id, key, value):
         if relation_id == 5:
@@ -65,7 +65,7 @@ class TestModelBackend:
 class TestModel(unittest.TestCase):
     def setUp(self):
         self.backend = TestModelBackend()
-        self.model = juju.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
 
     def test_model(self):
         self.assertIs(self.model.app, self.model.unit.app)
@@ -77,21 +77,21 @@ class TestModel(unittest.TestCase):
             self.assertIs(self.model.unit, unit_from_rel)
 
     def test_get_relation(self):
-        with self.assertRaises(juju.model.ModelError):
+        with self.assertRaises(op.model.ModelError):
             self.model.get_relation('db1', 'db1:4')
         db1_4 = self.model.get_relation('db1', 4)
-        self.assertIsInstance(db1_4, juju.model.Relation)
+        self.assertIsInstance(db1_4, op.model.Relation)
         dead_rel = self.model.get_relation('db1', 7)
-        self.assertIsInstance(dead_rel, juju.model.Relation)
+        self.assertIsInstance(dead_rel, op.model.Relation)
         self.assertEqual(list(dead_rel.data.keys()), [self.model.unit])
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertIsNone(self.model.get_relation('db0'))
         self.assertIs(self.model.get_relation('db1'), db1_4)
-        with self.assertRaises(juju.model.TooManyRelatedApps):
+        with self.assertRaises(op.model.TooManyRelatedApps):
             self.model.get_relation('db2')
 
     def test_relation_data(self):
-        random_unit = self.model._cache.get(juju.model.Unit, 'randomunit/0')
+        random_unit = self.model._cache.get(op.model.Unit, 'randomunit/0')
         with self.assertRaises(KeyError):
             self.model.get_relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
@@ -102,7 +102,7 @@ class TestModel(unittest.TestCase):
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[remoteapp1_0])
-        with self.assertRaises(juju.model.RelationDataError):
+        with self.assertRaises(op.model.RelationDataError):
             rel_db1.data[remoteapp1_0]['foo'] = 'bar'
         self.assertEqual(self.backend.relation_set_calls, [])
         self.assertNotIn('foo', rel_db1.data[remoteapp1_0])
@@ -136,11 +136,11 @@ class TestModel(unittest.TestCase):
 
     def test_relation_data_type_check(self):
         rel_db1 = self.model.get_relation('db1')
-        with self.assertRaises(juju.model.RelationDataError):
+        with self.assertRaises(op.model.RelationDataError):
             rel_db1.data[self.model.unit]['foo'] = 1
-        with self.assertRaises(juju.model.RelationDataError):
+        with self.assertRaises(op.model.RelationDataError):
             rel_db1.data[self.model.unit]['foo'] = {'foo': 'bar'}
-        with self.assertRaises(juju.model.RelationDataError):
+        with self.assertRaises(op.model.RelationDataError):
             rel_db1.data[self.model.unit]['foo'] = None
         self.assertEqual(self.backend.relation_set_calls, [])
 

@@ -7,10 +7,10 @@ import shutil
 
 from pathlib import Path
 
-from juju.charm import CharmBase, CharmMeta
-from juju.charm import CharmEvents
-from juju.framework import Framework, Event, EventBase
-from juju.model import Model, ModelBackend
+from op.charm import CharmBase, CharmMeta
+from op.charm import CharmEvents
+from op.framework import Framework, Event, EventBase
+from op.model import Model, ModelBackend
 
 
 class TestCharm(unittest.TestCase):

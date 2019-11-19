@@ -16,7 +16,7 @@ def debugf(format, *args, **kwargs):
 def _get_charm_dir():
     charm_dir = os.environ.get("JUJU_CHARM_DIR")
     if charm_dir is None:
-        # Assume $JUJU_CHARM_DIR/lib/juju/main.py structure.
+        # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
         charm_dir = Path(f'{__file__}/../../..').resolve()
     else:
         charm_dir = Path(charm_dir).resolve()
@@ -35,7 +35,7 @@ def _handle_event_link(charm_dir, bound_event):
     charm_dir -- A root directory of the charm
     bound_event -- An event for which to create a symlink.
     """
-    from juju.charm import InstallEvent
+    from op.charm import InstallEvent
 
     if issubclass(bound_event.event_type, InstallEvent):
         # We don't set up the link for install events, since we assume it's already in place
@@ -81,7 +81,7 @@ def _setup_hooks(charm_dir, charm):
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
     """
-    from juju.charm import HookEvent
+    from op.charm import HookEvent
 
     for bound_event in charm.on.events().values():
         if issubclass(bound_event.event_type, HookEvent):
@@ -110,14 +110,14 @@ def _emit_charm_event(charm, event_name):
 
 
 def _get_event_args(charm, bound_event):
-    import juju.charm
+    import op.charm
     event_type = bound_event.event_type
     model = charm.framework.model
-    if issubclass(event_type, juju.charm.RelationEvent):
+    if issubclass(event_type, op.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
         relation = model.get_relation(relation_name, relation_id)
-        if issubclass(event_type, juju.charm.RelationUnitEvent):
+        if issubclass(event_type, op.charm.RelationUnitEvent):
             remote_unit_name = os.environ['JUJU_REMOTE_UNIT']
             remote_unit = model.get_unit(remote_unit_name)
             return [relation, remote_unit], {}
@@ -132,9 +132,9 @@ def main():
     The event name is based on the way this executable was called (argv[0]).
     """
     import charm as charm_module
-    import juju.charm
-    import juju.framework
-    import juju.model
+    import op.charm
+    import op.framework
+    import op.model
 
     charm_dir = _get_charm_dir()
 
@@ -143,15 +143,15 @@ def main():
     # of events from debugging sessions.
     juju_event_name = Path(sys.argv[0]).name
 
-    meta = juju.charm.CharmMeta(_load_metadata(charm_dir))
+    meta = op.charm.CharmMeta(_load_metadata(charm_dir))
     unit_name = os.environ['JUJU_UNIT_NAME']
-    model = juju.model.Model(unit_name, list(meta.relations), juju.model.ModelBackend())
+    model = op.model.Model(unit_name, list(meta.relations), op.model.ModelBackend())
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
-    framework = juju.framework.Framework(charm_state_path, charm_dir, meta, model)
+    framework = op.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
         # TODO: The Charm itself sholud probably receive no other argument than the framework, because
         # this will be code that the user will need to implement on their end. In other words, their
