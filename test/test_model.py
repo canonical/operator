@@ -9,7 +9,7 @@ import op.model
 # through the actual subprocess calls. Either this class could implement these functions as executables
 # that were called via subprocess, or more simple tests that just test through ModelBackend while leaving
 # these tests alone, depending on what proves easier.
-class TestModelBackend:
+class FakeModelBackend:
     def __init__(self):
         self.relation_set_calls = []
 
@@ -64,7 +64,7 @@ class TestModelBackend:
 
 class TestModel(unittest.TestCase):
     def setUp(self):
-        self.backend = TestModelBackend()
+        self.backend = FakeModelBackend()
         self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
 
     def test_model(self):
