@@ -45,7 +45,7 @@ class SymlinkTargetError(Exception):
 
 class TestMain(unittest.TestCase):
 
-    MAIN_PY_RELPATH = '../lib/op/main.py'
+    CHARM_PY_RELPATH = '../lib/charm.py'
 
     @classmethod
     def _clear_unit_db(cls):
@@ -84,8 +84,8 @@ class TestMain(unittest.TestCase):
         for f in files:
             absolute_path = Path(r) / f
             if absolute_path.name == 'install' and absolute_path.is_symlink():
-                if os.readlink(absolute_path) != cls.MAIN_PY_RELPATH:
-                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {cls.MAIN_PY_RELPATH}')
+                if os.readlink(absolute_path) != cls.CHARM_PY_RELPATH:
+                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {cls.CHARM_PY_RELPATH}')
             elif absolute_path.name.endswith('-storage-attached') and absolute_path.is_symlink():
                 if os.readlink(absolute_path) != 'install':
                     raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to "install"')
@@ -216,7 +216,7 @@ class TestMain(unittest.TestCase):
         # The symlink is expected to be present in the source tree.
         self.assertTrue(install_link_path.exists())
         # It has to point to main.py in the lib directory of the charm.
-        self.assertEqual(os.readlink(install_link_path), self.MAIN_PY_RELPATH)
+        self.assertEqual(os.readlink(install_link_path), self.CHARM_PY_RELPATH)
 
         def _assess_setup_hooks(event_name):
             event_hook = JUJU_CHARM_DIR / f'hooks/{event_name}'
@@ -236,7 +236,7 @@ class TestMain(unittest.TestCase):
                 self.assertTrue(os.path.exists(event_hook))
                 self.assertEqual(os.readlink(event_hook), 'install')
                 self.assertEqual(os.readlink('hooks/install'),
-                                 self.MAIN_PY_RELPATH)
+                                 self.CHARM_PY_RELPATH)
 
         # Assess 'install' first because upgrade-charm or other
         # events cannot be handled before install creates symlinks for them.

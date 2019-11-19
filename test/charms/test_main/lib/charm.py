@@ -5,6 +5,7 @@ import base64
 import pickle
 
 from op.charm import CharmBase
+from op.main import main
 
 import logging
 
@@ -94,3 +95,7 @@ class Charm(CharmBase):
         self._state['observed_event_types'].append(type(event))
         self._state['ha_relation_broken_data'] = event.snapshot()
         self._write_state()
+
+
+if __name__ == '__main__':
+    main(Charm)

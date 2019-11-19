@@ -6,6 +6,10 @@ from pathlib import Path
 
 import yaml
 
+import op.charm
+import op.framework
+import op.model
+
 CHARM_STATE_FILE = '.unit-state.db'
 
 
@@ -35,9 +39,7 @@ def _handle_event_link(charm_dir, bound_event):
     charm_dir -- A root directory of the charm
     bound_event -- An event for which to create a symlink.
     """
-    from op.charm import InstallEvent
-
-    if issubclass(bound_event.event_type, InstallEvent):
+    if issubclass(bound_event.event_type, op.charm.InstallEvent):
         # We don't set up the link for install events, since we assume it's already in place
         # (otherwise, we would never have been called).
         return
@@ -81,10 +83,8 @@ def _setup_hooks(charm_dir, charm):
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
     """
-    from op.charm import HookEvent
-
     for bound_event in charm.on.events().values():
-        if issubclass(bound_event.event_type, HookEvent):
+        if issubclass(bound_event.event_type, op.charm.HookEvent):
             _handle_event_link(charm_dir, bound_event)
 
 
@@ -110,7 +110,6 @@ def _emit_charm_event(charm, event_name):
 
 
 def _get_event_args(charm, bound_event):
-    import op.charm
     event_type = bound_event.event_type
     model = charm.framework.model
     if issubclass(event_type, op.charm.RelationEvent):
@@ -126,15 +125,11 @@ def _get_event_args(charm, bound_event):
     return [], {}
 
 
-def main():
+def main(charm_class):
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
     """
-    import charm as charm_module
-    import op.charm
-    import op.framework
-    import op.model
 
     charm_dir = _get_charm_dir()
 
@@ -153,11 +148,7 @@ def main():
     charm_state_path = charm_dir / CHARM_STATE_FILE
     framework = op.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
-        # TODO: The Charm itself sholud probably receive no other argument than the framework, because
-        # this will be code that the user will need to implement on their end. In other words, their
-        # Charm subclass will have an __init__, which needs to take parameters, and this needs to be
-        # simple and elegant so it doesn't feel hackish.
-        charm = charm_module.Charm(framework, None)
+        charm = charm_class(framework, None)
 
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading
@@ -172,15 +163,3 @@ def main():
         framework.commit()
     finally:
         framework.close()
-
-
-def _setup_path():
-    # The first element is the directory containing this file. We don't want that in the path.
-    del sys.path[0]
-    # Add $JUJU_CHARM_DIR/lib to the path.
-    sys.path.insert(0, str(_get_charm_dir() / 'lib'))
-
-
-if __name__ == '__main__':
-    _setup_path()
-    main()
