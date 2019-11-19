@@ -81,7 +81,8 @@ class TestCharm(unittest.TestCase):
 
             def on_any_relation(self, event):
                 assert event.relation.name == 'req1'
-                self.seen.append(f'{type(event).__name__}')
+                assert event.relation.app.name == 'remote'
+                self.seen.append(type(event).__name__)
 
         self.meta = CharmMeta({
             'name': 'my-charm',
@@ -101,8 +102,8 @@ class TestCharm(unittest.TestCase):
 
         charm = MyCharm(self.create_framework(), None)
 
-        rel = charm.framework.model.get_relation('req1', 0)
-        unit = charm.framework.model.get_unit('app/0')
+        rel = charm.framework.model.get_relation('req1', 1)
+        unit = charm.framework.model.get_unit('remote/0')
         charm.on['req1'].relation_joined.emit(rel, unit)
         charm.on['req1'].relation_changed.emit(rel, unit)
         charm.on['req-2'].relation_changed.emit(rel, unit)
