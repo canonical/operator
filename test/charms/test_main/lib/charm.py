@@ -4,7 +4,7 @@ import os
 import base64
 import pickle
 
-from juju.charm import CharmBase
+from op.charm import CharmBase
 
 import logging
 

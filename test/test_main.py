@@ -11,11 +11,11 @@ import tempfile
 
 import importlib.util
 
-import juju.main
+import op.main
 
 from pathlib import Path
 
-from juju.charm import (
+from op.charm import (
     CharmBase,
     CharmEvents,
     InstallEvent,
@@ -45,11 +45,11 @@ class SymlinkTargetError(Exception):
 
 class TestMain(unittest.TestCase):
 
-    MAIN_PY_RELPATH = '../lib/juju/main.py'
+    MAIN_PY_RELPATH = '../lib/op/main.py'
 
     @classmethod
     def _clear_unit_db(cls):
-        charm_state_file = JUJU_CHARM_DIR / juju.main.CHARM_STATE_FILE
+        charm_state_file = JUJU_CHARM_DIR / op.main.CHARM_STATE_FILE
         if charm_state_file.exists():
             charm_state_file.unlink()
 

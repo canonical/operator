@@ -6,8 +6,8 @@ import shutil
 
 from pathlib import Path
 
-from juju.framework import Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent
-from juju.framework import NoSnapshotError, StoredState, StoredList
+from op.framework import Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent
+from op.framework import NoSnapshotError, StoredState, StoredList
 
 
 class TestFramework(unittest.TestCase):
