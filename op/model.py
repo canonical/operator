@@ -44,15 +44,23 @@ class Model:
                 raise TooManyRelatedApps(relation_name, num_related, 1)
 
     def get_unit(self, unit_name):
-        return self._cache.get(Unit, unit_name)
+        return self._cache.get(CacheKey(Unit, unit_name), unit_name, self._cache)
+
+
+class CacheKey:
+    def __init__(self, entity_type, *key_parts):
+        self.entity_type = entity_type
+        self.key_parts = key_parts
+
+    def __hash__(self):
+        return hash((self.entity_type, *self.key_parts))
 
 
 class ModelCache(weakref.WeakValueDictionary):
-    def get(self, entity_type, *args):
-        key = (entity_type,) + args
+    def get(self, key, *init_args):
         entity = super().get(key)
         if entity is None:
-            entity = entity_type(*args, cache=self)
+            entity = key.entity_type(*init_args)
             self[key] = entity
         return entity
 
@@ -68,7 +76,9 @@ class Application:
 class Unit:
     def __init__(self, name, cache):
         self.name = name
-        self.app = cache.get(Application, name.split('/')[0])
+
+        app_name = name.split('/')[0]
+        self.app = cache.get(CacheKey(Application, app_name), app_name, cache)
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -135,7 +145,7 @@ class Relation:
         self.units = set()
         try:
             for unit_name in backend.relation_list(self.id):
-                unit = cache.get(Unit, unit_name)
+                unit = cache.get(CacheKey(Unit, unit_name), unit_name, cache)
                 self.units.add(unit)
                 if self.app is None:
                     self.app = unit.app
