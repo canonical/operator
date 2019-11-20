@@ -10,8 +10,9 @@ import op.model
 # that were called via subprocess, or more simple tests that just test through ModelBackend while leaving
 # these tests alone, depending on what proves easier.
 class TestModelBackend:
-    def __init__(self):
+    def __init__(self, is_leader=False):
         self.relation_set_calls = []
+        self._is_leader = is_leader
 
         self.local_unit_name = 'myapp/0'
         self.local_app_name = 'myapp'
@@ -66,6 +67,9 @@ class TestModelBackend:
             'bar': 1,
             'qux': True,
         }
+
+    def is_leader(self):
+        return self._is_leader
 
 class TestModel(unittest.TestCase):
     def setUp(self):
@@ -167,3 +171,15 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(TypeError):
             # Confirm that we cannot modify config values.
             self.model.config['foo'] = 'bar'
+
+    def test_is_leader(self):
+        self.assertFalse(self.model.unit.is_leader)
+
+        self.backend = TestModelBackend(is_leader=True)
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        self.assertTrue(self.model.unit.is_leader)
+
+        # Cannot determine leadership for remote units.
+        for u in self.model.get_relation('db1').units:
+            self.assertIsNone(u.is_leader)

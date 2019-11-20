@@ -91,6 +91,16 @@ class Unit:
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
+    @property
+    def is_leader(self):
+        if self.is_local:
+            # This value is not cached as it is not guaranteed to persist for the whole duration
+            # of a hook execution.
+            return self._backend.is_leader()
+        else:
+            # Unable to determine the leadership status for remote units.
+            return None
+
 class LazyMapping(Mapping, ABC):
     _lazy_data = None
 
@@ -302,3 +312,6 @@ class ModelBackend:
 
     def config_get(self):
         return self._run('config-get')
+
+    def is_leader(self):
+        return self._run('is-leader')
