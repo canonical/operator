@@ -1,5 +1,6 @@
 import json
 import weakref
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from subprocess import run, PIPE, CalledProcessError
@@ -7,7 +8,7 @@ from subprocess import run, PIPE, CalledProcessError
 
 class Model:
     def __init__(self, local_unit_name, relation_names, backend):
-        self._cache = ModelCache()
+        self._cache = ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(local_unit_name)
         self.app = self.unit.app
@@ -47,32 +48,48 @@ class Model:
         return self._cache.get(Unit, unit_name)
 
 
-class ModelCache(weakref.WeakValueDictionary):
+class ModelCache:
+
+    def __init__(self, backend):
+        self._backend = backend
+        self._weakrefs = weakref.WeakValueDictionary()
+
     def get(self, entity_type, *args):
         key = (entity_type,) + args
-        entity = super().get(key)
+        entity = self._weakrefs.get(key)
         if entity is None:
-            entity = entity_type(*args, cache=self)
-            self[key] = entity
+            entity = entity_type(*args, backend=self._backend, cache=self)
+            self._weakrefs[key] = entity
         return entity
 
 
 class Application:
-    def __init__(self, name, cache):
+    def __init__(self, name, backend, cache):
         self.name = name
+
+        self._backend = backend
+        self._cache = cache
+
+        self.is_local = self.name == self._backend.local_app_name
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
 
 class Unit:
-    def __init__(self, name, cache):
+    def __init__(self, name, backend, cache):
         self.name = name
-        self.app = cache.get(Application, name.split('/')[0])
+
+        app_name = name.split('/')[0]
+        self.app = cache.get(Application, app_name)
+
+        self._backend = backend
+        self._cache = cache
+
+        self.is_local = self.name == self._backend.local_unit_name
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
-
 
 class LazyMapping(Mapping, ABC):
     _lazy_data = None
@@ -233,6 +250,10 @@ class RelationNotFound(ModelError):
 
 
 class ModelBackend:
+    def __init__(self):
+        self.local_unit_name = os.environ['JUJU_UNIT_NAME']
+        self.local_app_name = self.local_unit_name.split('/')[0]
+
     def _run(self, *args):
         result = run(args + ('--format=json',), stdout=PIPE, stderr=PIPE, check=True)
         text = result.stdout.decode('utf8')

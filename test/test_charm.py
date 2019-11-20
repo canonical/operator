@@ -18,6 +18,9 @@ class TestCharm(unittest.TestCase):
     def setUp(self):
         self._path = os.environ['PATH']
         os.environ['PATH'] = str(Path(__file__).parent / 'bin')
+
+        os.environ['JUJU_UNIT_NAME'] = 'local/0'
+
         self.tmpdir = Path(tempfile.mkdtemp())
         self.meta = CharmMeta()
 
@@ -34,6 +37,8 @@ class TestCharm(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
         os.environ['PATH'] = self._path
+
+        del os.environ['JUJU_UNIT_NAME']
 
         CharmBase.on = CharmEvents()
 
