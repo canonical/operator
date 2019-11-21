@@ -7,7 +7,6 @@ import sys
 import subprocess
 import pickle
 import base64
-import tempfile
 
 import importlib.util
 
