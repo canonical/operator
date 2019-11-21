@@ -63,6 +63,7 @@ class TestMain(unittest.TestCase):
         os.chdir(JUJU_CHARM_DIR)
         _, tmp_file = tempfile.mkstemp()
         self._state_file = Path(tmp_file)
+        self.addCleanup(self._state_file.unlink)
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
@@ -70,13 +71,11 @@ class TestMain(unittest.TestCase):
             pass
         CharmBase.on = TestCharmEvents()
 
-    def tearDown(self):
-        self._clear_unit_db()
-        self._clear_symlinks()
-
-        self._state_file.unlink()
-
-        CharmBase.on = CharmEvents()
+        def cleanup():
+            self._clear_unit_db()
+            self._clear_symlinks()
+            CharmBase.on = CharmEvents()
+        self.addCleanup(cleanup)
 
     @classmethod
     def _clear_symlinks(cls):
