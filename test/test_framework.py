@@ -6,12 +6,20 @@ import shutil
 
 from pathlib import Path
 
-from op.framework import Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent
+from op.framework import (
+    Framework,
+    Handle,
+    Event,
+    EventsBase,
+    EventBase,
+    Object,
+    PreCommitEvent,
+    CommitEvent,
+)
 from op.framework import NoSnapshotError, StoredState, StoredList
 
 
 class TestFramework(unittest.TestCase):
-
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
 
@@ -48,7 +56,9 @@ class TestFramework(unittest.TestCase):
             framework.load_snapshot(handle)
         except NoSnapshotError as e:
             self.assertEqual(e.handle_path, str(handle))
-            self.assertEqual(str(e), "no snapshot data found for a_foo[some_key] object")
+            self.assertEqual(
+                str(e), "no snapshot data found for a_foo[some_key] object"
+            )
         else:
             self.fail("exception NoSnapshotError not raised")
 
@@ -123,7 +133,10 @@ class TestFramework(unittest.TestCase):
         try:
             framework.observe(pub.baz, obs)
         except RuntimeError as e:
-            self.assertEqual(str(e), 'Observer method not provided explicitly and MyObserver type has no "on_baz" method')
+            self.assertEqual(
+                str(e),
+                'Observer method not provided explicitly and MyObserver type has no "on_baz" method',
+            )
         else:
             self.fail("RuntimeError not raised")
 
@@ -329,19 +342,25 @@ class TestFramework(unittest.TestCase):
             foo = event
 
         with self.assertRaises(RuntimeError) as cm:
+
             class OtherEvents(EventsBase):
                 foo = event
+
         self.assertEqual(
             str(cm.exception.__cause__),
-            "Event(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
+            "Event(MyEvent) reused as MyEvents.foo and OtherEvents.foo",
+        )
 
         with self.assertRaises(RuntimeError) as cm:
+
             class MyNotifier(Object):
                 on = MyEvents()
                 bar = event
+
         self.assertEqual(
             str(cm.exception.__cause__),
-            "Event(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
+            "Event(MyEvent) reused as MyEvents.foo and MyNotifier.bar",
+        )
 
     def test_reemit_ignores_unknown_event_type(self):
         # The event type may have been gone for good, and nobody cares,
@@ -498,7 +517,6 @@ class TestFramework(unittest.TestCase):
 
 
 class TestStoredState(unittest.TestCase):
-
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
 
@@ -557,131 +575,155 @@ class TestStoredState(unittest.TestCase):
         class SomeObject(Object):
             state = StoredState()
 
-        obj = SomeObject(framework, '1')
+        obj = SomeObject(framework, "1")
         try:
+
             class CustomObject:
                 pass
+
             obj.state.foo = CustomObject()
         except AttributeError as e:
-            self.assertEqual(str(e), 'attribute \'foo\' cannot be set to CustomObject: must be int/dict/list/etc')
+            self.assertEqual(
+                str(e),
+                "attribute 'foo' cannot be set to CustomObject: must be int/dict/list/etc",
+            )
         else:
-            self.fail('AttributeError not raised')
+            self.fail("AttributeError not raised")
 
         framework.commit()
 
         # Test and validation functions in a list of 2-tuples.
         # Assignment and keywords like del are not supported in lambdas so functions are used instead.
-        test_operations = [(
-            {},                                                            # Operand A.
-            None,                                                          # Operand B.
-            {},                                                            # Expected result.
-            lambda a, b: None,                                             # Operation to perform.
-            lambda res, expected_res: self.assertEqual(res, expected_res)  # Validation to perform.
-        ), (
-            {},
-            {'a': {}},
-            {'a': {}},
-            lambda a, b: a.update(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            {'a': {}},
-            {'b': 'c'},
-            {'a': {'b': 'c'}},
-            lambda a, b: a['a'].update(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            {'a': {'b': 'c'}},
-            {'d': 'e'},
-            {'a': {'b': 'c', 'd': 'e'}},
-            lambda a, b: a['a'].update(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            {'a': {'b': 'c', 'd': 'e'}},
-            'd',
-            {'a': {'b': 'c'}},
-            lambda a, b: a['a'].pop(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            [],
-            None,
-            [],
-            lambda a, b: None,
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            [],
-            'a',
-            ['a'],
-            lambda a, b: a.append(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            ['a'],
-            ['c'],
-            ['a', ['c']],
-            lambda a, b: a.append(b),
-            lambda res, expected_res: (
-                self.assertEqual(res, expected_res),
-                self.assertIsInstance(res[1], StoredList),
-            )
-        ), (
-            ['a', ['c']],
-            'b',
-            ['b', 'a', ['c']],
-            lambda a, b: a.insert(0, b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            ['b', 'a', ['c']],
-            ['d'],
-            ['b', ['d'], 'a', ['c']],
-            lambda a, b: a.insert(1, b),
-            lambda res, expected_res: (
-                self.assertEqual(res, expected_res),
-                self.assertIsInstance(res[1], StoredList)
+        test_operations = [
+            (
+                {},  # Operand A.
+                None,  # Operand B.
+                {},  # Expected result.
+                lambda a, b: None,  # Operation to perform.
+                lambda res, expected_res: self.assertEqual(
+                    res, expected_res
+                ),  # Validation to perform.
             ),
-        ), (
-            ['b', ['d'], 'a', ['c']],
-            0,
-            [['d'], 'a', ['c']],
-            lambda a, b: a.pop(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            [['d'], 'a', ['c']],
-            ['d'],
-            ['a', ['c']],
-            lambda a, b: a.remove(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            set(),
-            None,
-            set(),
-            lambda a, b: None,
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            set(),
-            'a',
-            set(['a']),
-            lambda a, b: a.add(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            set(['a']),
-            'a',
-            set(),
-            lambda a, b: a.discard(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        ), (
-            set(),
-            {'a'},
-            set(),
-            # Nested sets are not allowed as sets themselves are not hashable.
-            lambda a, b: self.assertRaises(TypeError, a.add, b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
-        )]
+            (
+                {},
+                {"a": {}},
+                {"a": {}},
+                lambda a, b: a.update(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                {"a": {}},
+                {"b": "c"},
+                {"a": {"b": "c"}},
+                lambda a, b: a["a"].update(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                {"a": {"b": "c"}},
+                {"d": "e"},
+                {"a": {"b": "c", "d": "e"}},
+                lambda a, b: a["a"].update(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                {"a": {"b": "c", "d": "e"}},
+                "d",
+                {"a": {"b": "c"}},
+                lambda a, b: a["a"].pop(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                [],
+                None,
+                [],
+                lambda a, b: None,
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                [],
+                "a",
+                ["a"],
+                lambda a, b: a.append(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                ["a"],
+                ["c"],
+                ["a", ["c"]],
+                lambda a, b: a.append(b),
+                lambda res, expected_res: (
+                    self.assertEqual(res, expected_res),
+                    self.assertIsInstance(res[1], StoredList),
+                ),
+            ),
+            (
+                ["a", ["c"]],
+                "b",
+                ["b", "a", ["c"]],
+                lambda a, b: a.insert(0, b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                ["b", "a", ["c"]],
+                ["d"],
+                ["b", ["d"], "a", ["c"]],
+                lambda a, b: a.insert(1, b),
+                lambda res, expected_res: (
+                    self.assertEqual(res, expected_res),
+                    self.assertIsInstance(res[1], StoredList),
+                ),
+            ),
+            (
+                ["b", ["d"], "a", ["c"]],
+                0,
+                [["d"], "a", ["c"]],
+                lambda a, b: a.pop(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                [["d"], "a", ["c"]],
+                ["d"],
+                ["a", ["c"]],
+                lambda a, b: a.remove(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                set(),
+                None,
+                set(),
+                lambda a, b: None,
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                set(),
+                "a",
+                set(["a"]),
+                lambda a, b: a.add(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                set(["a"]),
+                "a",
+                set(),
+                lambda a, b: a.discard(b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+            (
+                set(),
+                {"a"},
+                set(),
+                # Nested sets are not allowed as sets themselves are not hashable.
+                lambda a, b: self.assertRaises(TypeError, a.add, b),
+                lambda res, expected_res: self.assertEqual(res, expected_res),
+            ),
+        ]
 
         class SomeObject(Object):
             state = StoredState()
 
         for a, b, expected_res, op, validate_op in test_operations:
             framework = self.create_framework()
-            obj = SomeObject(framework, '1')
+            obj = SomeObject(framework, "1")
             obj.state.a = a
 
             op(obj.state.a, b)
@@ -691,93 +733,41 @@ class TestStoredState(unittest.TestCase):
 
             framework_copy = self.create_framework()
 
-            obj = SomeObject(framework_copy, '1')
+            obj = SomeObject(framework_copy, "1")
 
             validate_op(obj.state.a, expected_res)
 
             framework_copy.commit()
 
     def test_comparison_operations(self):
-        test_operations = [(
-            {"1"},               # Operand A.
-            {"1", "2"},          # Operand B.
-            lambda a, b: a < b,  # Operation to test.
-            True,                # Result of op(A, B).
-            False,               # Result of op(B, A).
-        ), (
-            {"1"},
-            {"1", "2"},
-            lambda a, b: a > b,
-            False,
-            True
-        ), (
-            # Empty set comparison.
-            set(),
-            set(),
-            lambda a, b: a == b,
-            True,
-            True
-        ), (
-            {"a", "c"},
-            {"c", "a"},
-            lambda a, b: a == b,
-            True,
-            True
-        ), (
-            dict(),
-            dict(),
-            lambda a, b: a == b,
-            True,
-            True
-        ), (
-            {"1": "2"},
-            {"1": "2"},
-            lambda a, b: a == b,
-            True,
-            True
-        ), (
-            {"1": "2"},
-            {"1": "3"},
-            lambda a, b: a == b,
-            False,
-            False
-        ), (
-            [],
-            [],
-            lambda a, b: a == b,
-            True,
-            True
-        ), (
-            [1, 2],
-            [1, 2],
-            lambda a, b: a == b,
-            True,
-            True
-        ), (
-            [1, 2, 5, 6],
-            [1, 2, 5, 8, 10],
-            lambda a, b: a <= b,
-            True,
-            False
-        ), (
-            [1, 2, 5, 6],
-            [1, 2, 5, 8, 10],
-            lambda a, b: a < b,
-            True,
-            False
-        ), (
-            [1, 2, 5, 8],
-            [1, 2, 5, 6, 10],
-            lambda a, b: a > b,
-            True,
-            False
-        ), (
-            [1, 2, 5, 8],
-            [1, 2, 5, 6, 10],
-            lambda a, b: a >= b,
-            True,
-            False
-        )]
+        test_operations = [
+            (
+                {"1"},  # Operand A.
+                {"1", "2"},  # Operand B.
+                lambda a, b: a < b,  # Operation to test.
+                True,  # Result of op(A, B).
+                False,  # Result of op(B, A).
+            ),
+            ({"1"}, {"1", "2"}, lambda a, b: a > b, False, True),
+            (
+                # Empty set comparison.
+                set(),
+                set(),
+                lambda a, b: a == b,
+                True,
+                True,
+            ),
+            ({"a", "c"}, {"c", "a"}, lambda a, b: a == b, True, True),
+            (dict(), dict(), lambda a, b: a == b, True, True),
+            ({"1": "2"}, {"1": "2"}, lambda a, b: a == b, True, True),
+            ({"1": "2"}, {"1": "3"}, lambda a, b: a == b, False, False),
+            ([], [], lambda a, b: a == b, True, True),
+            ([1, 2], [1, 2], lambda a, b: a == b, True, True),
+            ([1, 2, 5, 6], [1, 2, 5, 8, 10], lambda a, b: a <= b, True, False),
+            ([1, 2, 5, 6], [1, 2, 5, 8, 10], lambda a, b: a < b, True, False),
+            ([1, 2, 5, 8], [1, 2, 5, 6, 10], lambda a, b: a > b, True, False),
+            ([1, 2, 5, 8], [1, 2, 5, 6, 10], lambda a, b: a >= b, True, False),
+        ]
 
         class SomeObject(Object):
             state = StoredState()
@@ -791,32 +781,26 @@ class TestStoredState(unittest.TestCase):
             self.assertEqual(op(b, obj.state.a), op_ba)
 
     def test_set_operations(self):
-        test_operations = [(
-            {"1"},  # A set to test an operation against (other_set).
-            lambda a, b: a | b,  # An operation to test.
-            {"1", "a", "b"},  # The expected result of operation(obj.state.set, other_set).
-            {"1", "a", "b"}  # The expected result of operation(other_set, obj.state.set).
-        ), (
-            {"a", "c"},
-            lambda a, b: a - b,
-            {"b"},
-            {"c"}
-        ), (
-            {"a", "c"},
-            lambda a, b: a & b,
-            {"a"},
-            {"a"}
-        ), (
-            {"a", "c", "d"},
-            lambda a, b: a ^ b,
-            {"b", "c", "d"},
-            {"b", "c", "d"}
-        ), (
-            set(),
-            lambda a, b: set(a),
-            {"a", "b"},
-            set()
-        )]
+        test_operations = [
+            (
+                {"1"},  # A set to test an operation against (other_set).
+                lambda a, b: a | b,  # An operation to test.
+                {
+                    "1",
+                    "a",
+                    "b",
+                },  # The expected result of operation(obj.state.set, other_set).
+                {
+                    "1",
+                    "a",
+                    "b",
+                },  # The expected result of operation(other_set, obj.state.set).
+            ),
+            ({"a", "c"}, lambda a, b: a - b, {"b"}, {"c"}),
+            ({"a", "c"}, lambda a, b: a & b, {"a"}, {"a"}),
+            ({"a", "c", "d"}, lambda a, b: a ^ b, {"b", "c", "d"}, {"b", "c", "d"}),
+            (set(), lambda a, b: set(a), {"a", "b"}, set()),
+        ]
 
         class SomeObject(Object):
             state = StoredState()
@@ -829,7 +813,10 @@ class TestStoredState(unittest.TestCase):
             obj = SomeObject(framework, "2")
             obj.state.set = {"a", "b"}
 
-            for a, b, expected in [(obj.state.set, variable_operand, ab_res), (variable_operand, obj.state.set, ba_res)]:
+            for a, b, expected in [
+                (obj.state.set, variable_operand, ab_res),
+                (variable_operand, obj.state.set, ba_res),
+            ]:
                 old_a = set(a)
                 old_b = set(b)
 

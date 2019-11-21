@@ -12,7 +12,9 @@ class Model:
         self._backend = backend
         self.unit = self.get_unit(local_unit_name)
         self.app = self.unit.app
-        self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
+        self.relations = RelationMapping(
+            relation_names, self.unit, self._backend, self._cache
+        )
         self.config = ConfigData(self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
@@ -26,13 +28,17 @@ class Model:
         """
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError(f'relation id {relation_id} must be an int not {type(relation_id).__name__}')
+                raise ModelError(
+                    f"relation id {relation_id} must be an int not {type(relation_id).__name__}"
+                )
             for relation in self.relations[relation_name]:
                 if relation.id == relation_id:
                     return relation
             else:
                 # The relation may be dead, but it is not forgotten.
-                return Relation(relation_name, relation_id, self.unit, self._backend, self._cache)
+                return Relation(
+                    relation_name, relation_id, self.unit, self._backend, self._cache
+                )
         else:
             num_related = len(self.relations[relation_name])
             if num_related == 0:
@@ -49,7 +55,6 @@ class Model:
 
 
 class ModelCache:
-
     def __init__(self, backend):
         self._backend = backend
         self._weakrefs = weakref.WeakValueDictionary()
@@ -73,14 +78,14 @@ class Application:
         self.is_local = self.name == self._backend.local_app_name
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
+        return f"<{type(self).__module__}.{type(self).__name__} {self.name}>"
 
 
 class Unit:
     def __init__(self, name, backend, cache):
         self.name = name
 
-        app_name = name.split('/')[0]
+        app_name = name.split("/")[0]
         self.app = cache.get(Application, app_name)
 
         self._backend = backend
@@ -89,7 +94,8 @@ class Unit:
         self.is_local = self.name == self._backend.local_unit_name
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
+        return f"<{type(self).__module__}.{type(self).__name__} {self.name}>"
+
 
 class LazyMapping(Mapping, ABC):
     _lazy_data = None
@@ -120,6 +126,7 @@ class LazyMapping(Mapping, ABC):
 
 class RelationMapping(Mapping):
     """Map of relation names to lists of Relation instances."""
+
     def __init__(self, relation_names, local_unit, backend, cache):
         self._local_unit = local_unit
         self._backend = backend
@@ -140,7 +147,15 @@ class RelationMapping(Mapping):
         if relation_list is None:
             relation_list = self._data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
-                relation_list.append(Relation(relation_name, relation_id, self._local_unit, self._backend, self._cache))
+                relation_list.append(
+                    Relation(
+                        relation_name,
+                        relation_id,
+                        self._local_unit,
+                        self._backend,
+                        self._cache,
+                    )
+                )
         return relation_list
 
 
@@ -162,14 +177,21 @@ class Relation:
         self.data = RelationData(self, local_unit, backend)
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
+        return f"<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>"
 
 
 class RelationData(Mapping):
     def __init__(self, relation, local_unit, backend):
         self.relation = weakref.proxy(relation)
-        self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
-        self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
+        self._data = {
+            local_unit: RelationUnitData(self.relation, local_unit, True, backend)
+        }
+        self._data.update(
+            {
+                unit: RelationUnitData(self.relation, unit, False, backend)
+                for unit in self.relation.units
+            }
+        )
 
     def __contains__(self, key):
         return key in self._data
@@ -202,13 +224,13 @@ class RelationUnitData(LazyMapping, MutableMapping):
 
     def __setitem__(self, key, value):
         if not self._is_mutable:
-            raise RelationDataError(f'cannot set relation data for {self.unit.name}')
+            raise RelationDataError(f"cannot set relation data for {self.unit.name}")
         if not isinstance(value, str):
-            raise RelationDataError('relation data values must be strings')
+            raise RelationDataError("relation data values must be strings")
         self._backend.relation_set(self.relation.id, key, value)
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
-            if value == '':
+            if value == "":
                 # Match the behavior of Juju, which is that setting the value to an empty string will
                 # remove the key entirely from the relation data.
                 del self._data[key]
@@ -218,7 +240,7 @@ class RelationUnitData(LazyMapping, MutableMapping):
     def __delitem__(self, key):
         # Match the behavior of Juju, which is that setting the value to an empty string will
         # remove the key entirely from the relation data.
-        self.__setitem__(key, '')
+        self.__setitem__(key, "")
 
 
 class ConfigData(LazyMapping):
@@ -235,7 +257,9 @@ class ModelError(Exception):
 
 class TooManyRelatedApps(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
-        super().__init__(f'Too many remote applications on {relation_name} ({num_related} > {max_supported})')
+        super().__init__(
+            f"Too many remote applications on {relation_name} ({num_related} > {max_supported})"
+        )
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
@@ -251,12 +275,12 @@ class RelationNotFound(ModelError):
 
 class ModelBackend:
     def __init__(self):
-        self.local_unit_name = os.environ['JUJU_UNIT_NAME']
-        self.local_app_name = self.local_unit_name.split('/')[0]
+        self.local_unit_name = os.environ["JUJU_UNIT_NAME"]
+        self.local_app_name = self.local_unit_name.split("/")[0]
 
     def _run(self, *args):
-        result = run(args + ('--format=json',), stdout=PIPE, stderr=PIPE, check=True)
-        text = result.stdout.decode('utf8')
+        result = run(args + ("--format=json",), stdout=PIPE, stderr=PIPE, check=True)
+        text = result.stdout.decode("utf8")
         data = json.loads(text)
         return data
 
@@ -264,41 +288,43 @@ class ModelBackend:
         run(args, check=True)
 
     def relation_ids(self, relation_name):
-        relation_ids = self._run('relation-ids', relation_name)
-        return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
+        relation_ids = self._run("relation-ids", relation_name)
+        return [int(relation_id.split(":")[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id):
         try:
-            return self._run('relation-list', '-r', str(relation_id))
+            return self._run("relation-list", "-r", str(relation_id))
         except CalledProcessError as e:
             # TODO: This should use the return code if it is specific enough rather than the message.
             # It seems to be 2 for this error, but I haven't been able to confirm yet if that might
             # also apply to other error cases.
-            if b'relation not found' in e.stderr:
+            if b"relation not found" in e.stderr:
                 raise RelationNotFound() from e
             else:
                 raise
 
     def relation_get(self, relation_id, member_name):
         try:
-            return self._run('relation-get', '-r', str(relation_id), '-', member_name)
+            return self._run("relation-get", "-r", str(relation_id), "-", member_name)
         except CalledProcessError as e:
             # TODO: This should use the return code if it is specific enough rather than the message.
             # It seems to be 2 for this error, but I haven't been able to confirm yet if that might
             # also apply to other error cases.
-            if b'relation not found' in e.stderr:
+            if b"relation not found" in e.stderr:
                 raise RelationNotFound() from e
             else:
                 raise
 
     def relation_set(self, relation_id, key, value):
         try:
-            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
+            return self._run_no_output(
+                "relation-set", "-r", str(relation_id), f"{key}={value}"
+            )
         except CalledProcessError as e:
-            if b'relation not found' in e.stderr:
+            if b"relation not found" in e.stderr:
                 raise RelationNotFound() from e
             else:
                 raise
 
     def config_get(self):
-        return self._run('config-get')
+        return self._run("config-get")

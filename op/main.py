@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-CHARM_STATE_FILE = '.unit-state.db'
+CHARM_STATE_FILE = ".unit-state.db"
 
 
 def debugf(format, *args, **kwargs):
@@ -17,14 +17,14 @@ def _get_charm_dir():
     charm_dir = os.environ.get("JUJU_CHARM_DIR")
     if charm_dir is None:
         # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = Path(f'{__file__}/../../..').resolve()
+        charm_dir = Path(f"{__file__}/../../..").resolve()
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
 
 
 def _load_metadata(charm_dir):
-    with open(charm_dir / 'metadata.yaml') as f:
+    with open(charm_dir / "metadata.yaml") as f:
         metadata = yaml.load(f, Loader=yaml.SafeLoader)
     return metadata
 
@@ -42,29 +42,34 @@ def _handle_event_link(charm_dir, bound_event):
         # (otherwise, we would never have been called).
         return
 
-    event_hook_path = charm_dir / 'hooks' / bound_event.event_kind.replace('_', '-')
+    event_hook_path = charm_dir / "hooks" / bound_event.event_kind.replace("_", "-")
     create_link = True
     # Remove incorrect symlinks or files.
     if event_hook_path.exists():
         # Non-symlink entries and the ones not pointing to "install"
         # need to be removed.
         if not event_hook_path.is_symlink():
-            debugf(f'Hook entry at {event_hook_path} is not a symlink:'
-                   ' attempting to remove it.')
+            debugf(
+                f"Hook entry at {event_hook_path} is not a symlink:"
+                " attempting to remove it."
+            )
             # May raise IsADirectoryError, e.g. in case it is a directory which
             # is unexpected and left to the developer or operator to handle.
             event_hook_path.unlink()
-        elif os.readlink(event_hook_path) != 'install':
-            debugf(f'Removing entry {event_hook_path} as it does not point'
-                   ' to "install"')
+        elif os.readlink(event_hook_path) != "install":
+            debugf(
+                f"Removing entry {event_hook_path} as it does not point" ' to "install"'
+            )
             event_hook_path.unlink()
         else:
             create_link = False
 
     if create_link:
-        debugf(f'Creating a new relative symlink at {event_hook_path}'
-               f' to pointing to "install" located in {charm_dir}/hooks')
-        event_hook_path.symlink_to('install')
+        debugf(
+            f"Creating a new relative symlink at {event_hook_path}"
+            f' to pointing to "install" located in {charm_dir}/hooks'
+        )
+        event_hook_path.symlink_to("install")
 
 
 def _setup_hooks(charm_dir, charm):
@@ -94,7 +99,7 @@ def _emit_charm_event(charm, event_name):
     charm -- A charm instance to emit an event from.
     event_name -- A Juju event name to emit on a charm.
     """
-    formatted_event_name = event_name.replace('-', '_')
+    formatted_event_name = event_name.replace("-", "_")
     event_to_emit = None
     try:
         event_to_emit = getattr(charm.on, formatted_event_name)
@@ -105,20 +110,21 @@ def _emit_charm_event(charm, event_name):
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        debugf(f'Emitting Juju event {event_name}')
+        debugf(f"Emitting Juju event {event_name}")
         event_to_emit.emit(*args, **kwargs)
 
 
 def _get_event_args(charm, bound_event):
     import op.charm
+
     event_type = bound_event.event_type
     model = charm.framework.model
     if issubclass(event_type, op.charm.RelationEvent):
-        relation_name = os.environ['JUJU_RELATION']
-        relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+        relation_name = os.environ["JUJU_RELATION"]
+        relation_id = int(os.environ["JUJU_RELATION_ID"].split(":")[-1])
         relation = model.get_relation(relation_name, relation_id)
         if issubclass(event_type, op.charm.RelationUnitEvent):
-            remote_unit_name = os.environ['JUJU_REMOTE_UNIT']
+            remote_unit_name = os.environ["JUJU_REMOTE_UNIT"]
             remote_unit = model.get_unit(remote_unit_name)
             return [relation, remote_unit], {}
         else:
@@ -144,7 +150,7 @@ def main():
     juju_event_name = Path(sys.argv[0]).name
 
     meta = op.charm.CharmMeta(_load_metadata(charm_dir))
-    unit_name = os.environ['JUJU_UNIT_NAME']
+    unit_name = os.environ["JUJU_UNIT_NAME"]
     model = op.model.Model(unit_name, list(meta.relations), op.model.ModelBackend())
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
@@ -162,7 +168,9 @@ def main():
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading
         # the hook setup code is not triggered on config-changed.
-        if (juju_event_name in ('install', 'upgrade-charm') or juju_event_name.endswith('-storage-attached')):
+        if juju_event_name in ("install", "upgrade-charm") or juju_event_name.endswith(
+            "-storage-attached"
+        ):
             _setup_hooks(charm_dir, charm)
 
         framework.reemit()
@@ -178,9 +186,9 @@ def _setup_path():
     # The first element is the directory containing this file. We don't want that in the path.
     del sys.path[0]
     # Add $JUJU_CHARM_DIR/lib to the path.
-    sys.path.insert(0, str(_get_charm_dir() / 'lib'))
+    sys.path.insert(0, str(_get_charm_dir() / "lib"))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     _setup_path()
     main()

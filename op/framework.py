@@ -35,7 +35,11 @@ class Handle:
         return hash((self.parent, self.kind, self.key))
 
     def __eq__(self, other):
-        return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
+        return (self.parent, self.kind, self.key) == (
+            other.parent,
+            other.kind,
+            other.key,
+        )
 
     def __str__(self):
         return self.path
@@ -65,7 +69,7 @@ class Handle:
                 good = True
             elif len(pair) == 2:
                 kind, key = pair
-                if key and key[-1] == ']':
+                if key and key[-1] == "]":
                     key = key[:-1]
                     good = True
             if not good:
@@ -75,7 +79,6 @@ class Handle:
 
 
 class EventBase:
-
     def __init__(self, handle):
         self.handle = handle
         self.deferred = False
@@ -116,7 +119,9 @@ class Event:
 
     def __init__(self, event_type):
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
-            raise RuntimeError(f"Event requires a subclass of EventBase as an argument, got {event_type}")
+            raise RuntimeError(
+                f"Event requires a subclass of EventBase as an argument, got {event_type}"
+            )
         self.event_type = event_type
         self.event_kind = None
         self.emitter_type = None
@@ -124,9 +129,10 @@ class Event:
     def __set_name__(self, emitter_type, event_kind):
         if self.event_kind is not None:
             raise RuntimeError(
-                f'Event({self.event_type.__name__}) reused as '
-                f'{self.emitter_type.__name__}.{self.event_kind} and '
-                f'{emitter_type.__name__}.{event_kind}')
+                f"Event({self.event_type.__name__}) reused as "
+                f"{self.emitter_type.__name__}.{self.event_kind} and "
+                f"{emitter_type.__name__}.{event_kind}"
+            )
         self.event_kind = event_kind
         self.emitter_type = emitter_type
 
@@ -137,11 +143,12 @@ class Event:
 
 
 class BoundEvent:
-
     def __repr__(self):
-        return (f'<BoundEvent {self.event_type.__name__} bound to '
-                f'{type(self.emitter).__name__}.{self.event_kind} '
-                f'at {hex(id(self))}>')
+        return (
+            f"<BoundEvent {self.event_type.__name__} bound to "
+            f"{type(self.emitter).__name__}.{self.event_kind} "
+            f"at {hex(id(self))}>"
+        )
 
     def __init__(self, emitter, event_type, event_kind):
         self.emitter = emitter
@@ -157,7 +164,9 @@ class BoundEvent:
         # TODO This needs to be persisted.
         framework._event_count += 1
         key = str(framework._event_count)
-        event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
+        event = self.event_type(
+            Handle(self.emitter, self.event_kind, key), *args, **kwargs
+        )
         framework._emit(event)
 
 
@@ -226,12 +235,18 @@ class EventsBase(Object):
         event_type -- a type of the event to define.
         """
         if not event_kind.isidentifier():
-            raise RuntimeError(f'unable to define an event with event_kind that is not a valid python identifier: {event_kind}')
+            raise RuntimeError(
+                f"unable to define an event with event_kind that is not a valid python identifier: {event_kind}"
+            )
         elif keyword.iskeyword(event_kind):
-            raise RuntimeError(f'unable to define an event with event_kind that is a python keyword: {event_kind}')
+            raise RuntimeError(
+                f"unable to define an event with event_kind that is a python keyword: {event_kind}"
+            )
         try:
             getattr(cls, event_kind)
-            raise RuntimeError(f'unable to define an event with event_kind that overlaps with an existing type {cls} attribute: {event_kind}')
+            raise RuntimeError(
+                f"unable to define an event with event_kind that overlaps with an existing type {cls} attribute: {event_kind}"
+            )
         except AttributeError:
             pass
 
@@ -261,7 +276,7 @@ class EventsBase(Object):
 class PrefixedEvents:
     def __init__(self, emitter, key):
         self._emitter = emitter
-        self._prefix = key.replace("-", "_") + '_'
+        self._prefix = key.replace("-", "_") + "_"
 
     def __getattr__(self, name):
         return getattr(self._emitter, self._prefix + name)
@@ -270,8 +285,10 @@ class PrefixedEvents:
 class PreCommitEvent(EventBase):
     pass
 
+
 class CommitEvent(EventBase):
     pass
+
 
 class FrameworkEvents(EventsBase):
     pre_commit = Event(PreCommitEvent)
@@ -279,16 +296,14 @@ class FrameworkEvents(EventsBase):
 
 
 class NoSnapshotError(Exception):
-
     def __init__(self, handle_path):
         self.handle_path = handle_path
 
     def __str__(self):
-        return f'no snapshot data found for {self.handle_path} object'
+        return f"no snapshot data found for {self.handle_path} object"
 
 
 class NoTypeError(Exception):
-
     def __init__(self, handle_path):
         self.handle_path = handle_path
 
@@ -297,19 +312,24 @@ class NoTypeError(Exception):
 
 
 class SQLiteStorage:
-
     def __init__(self, filename):
         self._db = sqlite3.connect(str(filename), isolation_level="EXCLUSIVE")
         self._setup()
 
     def _setup(self):
         c = self._db.execute("BEGIN")
-        c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
+        c.execute(
+            "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'"
+        )
         if c.fetchone()[0] == 0:
             # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
-            self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)")
-            self._db.execute("CREATE TABLE notice (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_path TEXT, observer_path TEXT, method_name TEXT)")
+            self._db.execute(
+                "CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)"
+            )
+            self._db.execute(
+                "CREATE TABLE notice (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_path TEXT, observer_path TEXT, method_name TEXT)"
+            )
             self._db.commit()
 
     def close(self):
@@ -325,7 +345,9 @@ class SQLiteStorage:
     # This is doable but will increase significantly the chances for mistakes.
 
     def save_snapshot(self, handle_path, snapshot_data):
-        self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, snapshot_data))
+        self._db.execute(
+            "REPLACE INTO snapshot VALUES (?, ?)", (handle_path, snapshot_data)
+        )
 
     def load_snapshot(self, handle_path):
         c = self._db.cursor()
@@ -339,16 +361,27 @@ class SQLiteStorage:
         self._db.execute("DELETE FROM snapshot WHERE handle=?", (handle_path,))
 
     def save_notice(self, event_path, observer_path, method_name):
-        self._db.execute("INSERT INTO notice VALUES (NULL, ?, ?, ?)", (event_path, observer_path, method_name))
+        self._db.execute(
+            "INSERT INTO notice VALUES (NULL, ?, ?, ?)",
+            (event_path, observer_path, method_name),
+        )
 
     def drop_notice(self, event_path, observer_path, method_name):
-        self._db.execute("DELETE FROM notice WHERE event_path=? AND observer_path=? AND method_name=?", (event_path, observer_path, method_name))
+        self._db.execute(
+            "DELETE FROM notice WHERE event_path=? AND observer_path=? AND method_name=?",
+            (event_path, observer_path, method_name),
+        )
 
     def notices(self, event_path):
         if event_path:
-            c = self._db.execute("SELECT event_path, observer_path, method_name FROM notice WHERE event_path=? ORDER BY sequence", (event_path,))
+            c = self._db.execute(
+                "SELECT event_path, observer_path, method_name FROM notice WHERE event_path=? ORDER BY sequence",
+                (event_path,),
+            )
         else:
-            c = self._db.execute("SELECT event_path, observer_path, method_name FROM notice ORDER BY sequence")
+            c = self._db.execute(
+                "SELECT event_path, observer_path, method_name FROM notice ORDER BY sequence"
+            )
         while True:
             rows = c.fetchmany()
             if not rows:
@@ -370,8 +403,8 @@ class Framework(Object):
         self.meta = meta
         self.model = model
         self._event_count = 0
-        self._observers = []      # [(observer, method_name, parent_path, event_key)]
-        self._observer = {}       # {observer_path: observer}
+        self._observers = []  # [(observer, method_name, parent_path, event_key)]
+        self._observer = {}  # {observer_path: observer}
         self._type_registry = {}  # {(parent_path, kind): cls}
         self._type_known = set()  # {cls}
 
@@ -410,7 +443,9 @@ class Framework(Object):
         value.restore(snapshot)    # Restore custom state from prior snapshot.
         """
         if type(value) not in self._type_known:
-            raise RuntimeError(f"cannot save {type(value).__name__} values before registering that type")
+            raise RuntimeError(
+                f"cannot save {type(value).__name__} values before registering that type"
+            )
         data = value.snapshot()
         # Use marshal as a validator, enforcing the use of simple types.
         marshal.dumps(data)
@@ -458,7 +493,9 @@ class Framework(Object):
 
         """
         if not isinstance(bound_event, BoundEvent):
-            raise RuntimeError(f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}')
+            raise RuntimeError(
+                f"Framework.observe requires a BoundEvent as second parameter, got {bound_event}"
+            )
 
         event_type = bound_event.event_type
         event_kind = bound_event.event_kind
@@ -469,7 +506,9 @@ class Framework(Object):
         if hasattr(emitter, "handle"):
             emitter_path = emitter.handle.path
         else:
-            raise RuntimeError(f'event emitter {type(emitter).__name__} must have a "handle" attribute')
+            raise RuntimeError(
+                f'event emitter {type(emitter).__name__} must have a "handle" attribute'
+            )
 
         method_name = None
         if isinstance(observer, types.MethodType):
@@ -478,14 +517,18 @@ class Framework(Object):
         else:
             method_name = "on_" + event_kind
             if not hasattr(observer, method_name):
-                raise RuntimeError(f'Observer method not provided explicitly and {type(observer).__name__} type has no "{method_name}" method')
+                raise RuntimeError(
+                    f'Observer method not provided explicitly and {type(observer).__name__} type has no "{method_name}" method'
+                )
 
         # TODO Validate that the method has the right signature here.
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
         self._observer[observer.handle.path] = observer
-        self._observers.append((observer.handle.path, method_name, emitter_path, event_kind))
+        self._observers.append(
+            (observer.handle.path, method_name, emitter_path, event_kind)
+        )
 
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""
@@ -518,7 +561,9 @@ class Framework(Object):
     def _reemit(self, single_event_path=None):
         last_event_path = None
         deferred = True
-        for event_path, observer_path, method_name in self._storage.notices(single_event_path):
+        for event_path, observer_path, method_name in self._storage.notices(
+            single_event_path
+        ):
             event_handle = Handle.from_path(event_path)
 
             if last_event_path != event_path:
@@ -552,8 +597,10 @@ class Framework(Object):
 class StoredStateChanged(EventBase):
     pass
 
+
 class StoredStateEvents(EventsBase):
     changed = Event(StoredStateChanged)
+
 
 class StoredStateData(Object):
 
@@ -581,8 +628,8 @@ class StoredStateData(Object):
     def on_commit(self, event):
         self.framework.save_snapshot(self)
 
-class BoundStoredState:
 
+class BoundStoredState:
     def __init__(self, parent, attr_name):
         parent.framework.register_type(StoredStateData, parent)
 
@@ -616,14 +663,15 @@ class BoundStoredState:
         value = _unwrap_stored(self._data, value)
 
         if not isinstance(value, (type(None), int, str, bytes, list, dict, set)):
-            raise AttributeError(f"attribute '{key}' cannot be set to {type(value).__name__}: must be int/dict/list/etc")
+            raise AttributeError(
+                f"attribute '{key}' cannot be set to {type(value).__name__}: must be int/dict/list/etc"
+            )
 
         self._data[key] = _unwrap_stored(self._data, value)
         self.on.changed.emit()
 
 
 class StoredState:
-
     def __init__(self):
         self.parent_type = None
         self.attr_name = None
@@ -632,7 +680,11 @@ class StoredState:
         if self.parent_type is None:
             self.parent_type = parent_type
         elif self.parent_type is not parent_type:
-            raise RuntimeError("StoredState shared by {} and {}".format(self.parent_type.__name__, parent_type.__name__))
+            raise RuntimeError(
+                "StoredState shared by {} and {}".format(
+                    self.parent_type.__name__, parent_type.__name__
+                )
+            )
 
         if parent is None:
             return self
@@ -643,13 +695,19 @@ class StoredState:
                 if attr_value is self:
                     if self.attr_name and attr_name != self.attr_name:
                         parent_tname = parent_type.__name__
-                        raise RuntimeError(f"StoredState shared by {parent_tname}.{self.attr_name} and {parent_tname}.{attr_name}")
+                        raise RuntimeError(
+                            f"StoredState shared by {parent_tname}.{self.attr_name} and {parent_tname}.{attr_name}"
+                        )
                     self.attr_name = attr_name
                     bound = BoundStoredState(parent, attr_name)
                     parent.__dict__[attr_name] = bound
                     break
             else:
-                raise RuntimeError("Cannot find StoredVariable attribute in type {}".format(parent_type.__name__))
+                raise RuntimeError(
+                    "Cannot find StoredVariable attribute in type {}".format(
+                        parent_type.__name__
+                    )
+                )
 
         return bound
 
@@ -664,6 +722,7 @@ def _wrap_stored(parent_data, value):
         return StoredSet(parent_data, value)
     return value
 
+
 def _unwrap_stored(parent_data, value):
     t = type(value)
     if t is StoredDict or t is StoredList or t is StoredSet:
@@ -672,7 +731,6 @@ def _unwrap_stored(parent_data, value):
 
 
 class StoredDict(collections.MutableMapping):
-
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
         self._under = under
@@ -702,7 +760,6 @@ class StoredDict(collections.MutableMapping):
 
 
 class StoredList(collections.MutableSequence):
-
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
         self._under = under
@@ -767,7 +824,6 @@ class StoredList(collections.MutableSequence):
 
 
 class StoredSet(collections.MutableSet):
-
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
         self._under = under
