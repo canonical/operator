@@ -33,6 +33,7 @@ class Charm(CharmBase):
         self._state['on_leader_settings_changed'] = []
         self._state['on_db_relation_joined'] = []
         self._state['on_mon_relation_changed'] = []
+        self._state['on_mon_relation_departed'] = []
         self._state['on_ha_relation_broken'] = []
 
         # Observed event types per invocation. A list is used to preserve the order in which charm handlers have observed the events.
@@ -46,6 +47,7 @@ class Charm(CharmBase):
         # sections (provides, requires, peers) as well.
         self.framework.observe(self.on.db_relation_joined, self)
         self.framework.observe(self.on.mon_relation_changed, self)
+        self.framework.observe(self.on.mon_relation_departed, self)
         self.framework.observe(self.on.ha_relation_broken, self)
 
     def _write_state(self):
@@ -88,6 +90,12 @@ class Charm(CharmBase):
         self._state['on_mon_relation_changed'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['mon_relation_changed_data'] = event.snapshot()
+        self._write_state()
+
+    def on_mon_relation_departed(self, event):
+        self._state['on_mon_relation_departed'].append(type(event))
+        self._state['observed_event_types'].append(type(event))
+        self._state['mon_relation_departed_data'] = event.snapshot()
         self._write_state()
 
     def on_ha_relation_broken(self, event):

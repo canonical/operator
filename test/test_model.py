@@ -38,29 +38,35 @@ class FakeModelBackend:
         except KeyError:
             raise op.model.RelationNotFound()
 
-    def relation_get(self, relation_id, member_name):
+    def relation_get(self, relation_id, member_name, app):
         try:
             return {
                 4: {
                     'myapp/0': {'host': 'myapp-0'},
                     'remoteapp1/0': {'host': 'remoteapp1-0'},
+                    'myapp': {'password': 'deadbeefcafe'},
+                    'remoteapp1': {'secret': 'cafedeadbeef'}
                 },
                 5: {
                     'myapp/0': {'host': 'myapp-0'},
                     'remoteapp1/0': {'host': 'remoteapp1-0'},
+                    'myapp': {'password': 'deadbeefcafe'},
+                    'remoteapp1': {'secret': 'cafedeadbeef'}
                 },
                 6: {
                     'myapp/0': {'host': 'myapp-0'},
                     'remoteapp2/0': {'host': 'remoteapp2-0'},
+                    'myapp': {'password': 'deadbeefcafe'},
+                    'remoteapp1': {'secret': 'cafedeadbeef'}
                 },
             }[relation_id][member_name]
         except KeyError:
             raise op.model.RelationNotFound()
 
-    def relation_set(self, relation_id, key, value):
+    def relation_set(self, relation_id, key, value, app):
         if relation_id == 5:
             raise ValueError()
-        self.relation_set_calls.append((relation_id, key, value))
+        self.relation_set_calls.append((relation_id, key, value, app))
 
     def config_get(self):
         return {
@@ -94,7 +100,7 @@ class TestModel(unittest.TestCase):
         self.assertIsInstance(db1_4, op.model.Relation)
         dead_rel = self.model.get_relation('db1', 7)
         self.assertIsInstance(dead_rel, op.model.Relation)
-        self.assertEqual(list(dead_rel.data.keys()), [self.model.unit])
+        self.assertEqual(list(dead_rel.data.keys()), [self.model.unit, self.model.unit.app])
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertIsNone(self.model.get_relation('db0'))
         self.assertIs(self.model.get_relation('db1'), db1_4)
@@ -110,12 +116,34 @@ class TestModel(unittest.TestCase):
         self.assertTrue(self.model.unit._is_our_unit)
         self.assertTrue(self.model.unit.app._is_our_app)
 
-    def test_relation_data(self):
+    def test_unit_relation_data(self):
         random_unit = self.model._cache.get(op.model.Unit, 'randomunit/0')
         with self.assertRaises(KeyError):
             self.model.get_relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
         self.assertEqual(self.model.get_relation('db1').data[remoteapp1_0], {'host': 'remoteapp1-0'})
+
+    def test_remote_app_relation_data(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = remoteapp1 ] && echo '{"secret": "cafedeadbeef"}' || exit 2""")
+
+        # Try to get relation data for an invalid remote application.
+        random_app = self.model._cache.get(op.model.Application, 'randomapp')
+        with self.assertRaises(KeyError):
+            self.model.get_relation('db1').data[random_app]
+
+        remoteapp1 = self.model.get_relation('db1').app
+        self.assertEqual(self.model.get_relation('db1').data[remoteapp1], {'secret': 'cafedeadbeef'})
+
+        self.assertEqual(fake_script_calls(self), [
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+            ['relation-get', '-r', '4', '-', 'remoteapp1', '--app=True', '--format=json'],
+        ])
 
     def test_relation_data_modify_remote(self):
         rel_db1 = self.model.get_relation('db1')
@@ -132,15 +160,66 @@ class TestModel(unittest.TestCase):
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         rel_db1.data[self.model.unit]['host'] = 'bar'
-        self.assertEqual(self.backend.relation_set_calls, [(4, 'host', 'bar')])
+        self.assertEqual(self.backend.relation_set_calls, [(4, 'host', 'bar', False)])
         self.assertEqual(rel_db1.data[self.model.unit]['host'], 'bar')
+
+    def test_app_relation_data_modify_local_as_leader(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
+        fake_script(self, 'relation-set', """[ "$2" = 4 ] && exit 0 || exit 2""")
+        fake_script(self, 'is-leader', 'echo true')
+
+        local_app = self.model.unit.app
+
+        rel_db1 = self.model.get_relation('db1')
+        self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
+
+        rel_db1.data[local_app]['password'] = 'foo'
+
+        self.assertEqual(rel_db1.data[local_app]['password'], 'foo')
+
+        self.assertEqual(fake_script_calls(self), [
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+            ['relation-get', '-r', '4', '-', 'myapp', '--app=True', '--format=json'],
+            ['is-leader', '--format=json'],
+            ['relation-set', '-r', '4', 'password=foo', '--app=True'],
+        ])
+
+    def test_app_relation_data_modify_local_as_minion(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
+        fake_script(self, 'is-leader', 'echo false')
+
+        local_app = self.model.unit.app
+
+        rel_db1 = self.model.get_relation('db1')
+        self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
+
+        with self.assertRaises(op.model.RelationDataError):
+            rel_db1.data[local_app]['password'] = 'foobar'
+
+        self.assertEqual(fake_script_calls(self), [
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+            ['relation-get', '-r', '4', '-', 'myapp', '--app=True', '--format=json'],
+            ['is-leader', '--format=json'],
+        ])
 
     def test_relation_data_del_key(self):
         rel_db1 = self.model.get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         del rel_db1.data[self.model.unit]['host']
-        self.assertEqual(self.backend.relation_set_calls, [(4, 'host', '')])
+        self.assertEqual(self.backend.relation_set_calls, [(4, 'host', '', False)])
         self.assertNotIn('host', rel_db1.data[self.model.unit])
 
     def test_relation_set_fail(self):
