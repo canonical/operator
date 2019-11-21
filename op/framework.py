@@ -4,6 +4,7 @@ import marshal
 import types
 import sqlite3
 import collections
+import collections.abc
 import keyword
 
 
@@ -671,7 +672,7 @@ def _unwrap_stored(parent_data, value):
     return value
 
 
-class StoredDict(collections.MutableMapping):
+class StoredDict(collections.abc.MutableMapping):
 
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
@@ -701,7 +702,7 @@ class StoredDict(collections.MutableMapping):
             return NotImplemented
 
 
-class StoredList(collections.MutableSequence):
+class StoredList(collections.abc.MutableSequence):
 
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
@@ -766,7 +767,7 @@ class StoredList(collections.MutableSequence):
             return NotImplemented
 
 
-class StoredSet(collections.MutableSet):
+class StoredSet(collections.abc.MutableSet):
 
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
