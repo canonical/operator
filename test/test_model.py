@@ -24,27 +24,16 @@ class TestModelBackend:
 
     def relation_list(self, relation_id):
         try:
-            return {4: ["remoteapp1/0"], 5: ["remoteapp1/0"], 6: ["remoteapp2/0"],}[
-                relation_id
-            ]
+            return {4: ["remoteapp1/0"], 5: ["remoteapp1/0"], 6: ["remoteapp2/0"],}[relation_id]
         except KeyError:
             raise op.model.RelationNotFound()
 
     def relation_get(self, relation_id, member_name):
         try:
             return {
-                4: {
-                    "myapp/0": {"host": "myapp-0"},
-                    "remoteapp1/0": {"host": "remoteapp1-0"},
-                },
-                5: {
-                    "myapp/0": {"host": "myapp-0"},
-                    "remoteapp1/0": {"host": "remoteapp1-0"},
-                },
-                6: {
-                    "myapp/0": {"host": "myapp-0"},
-                    "remoteapp2/0": {"host": "remoteapp2-0"},
-                },
+                4: {"myapp/0": {"host": "myapp-0"}, "remoteapp1/0": {"host": "remoteapp1-0"},},
+                5: {"myapp/0": {"host": "myapp-0"}, "remoteapp1/0": {"host": "remoteapp1-0"},},
+                6: {"myapp/0": {"host": "myapp-0"}, "remoteapp2/0": {"host": "remoteapp2-0"},},
             }[relation_id][member_name]
         except KeyError:
             raise op.model.RelationNotFound()
@@ -73,9 +62,7 @@ class TestModel(unittest.TestCase):
     def test_relations_keys(self):
         for relation in self.model.relations["db2"]:
             self.assertIn(self.model.unit, relation.data)
-            unit_from_rel = next(
-                filter(lambda u: u.name == "myapp/0", relation.data.keys())
-            )
+            unit_from_rel = next(filter(lambda u: u.name == "myapp/0", relation.data.keys()))
             self.assertIs(self.model.unit, unit_from_rel)
 
     def test_get_relation(self):
@@ -105,22 +92,12 @@ class TestModel(unittest.TestCase):
         random_unit = self.model._cache.get(op.model.Unit, "randomunit/0")
         with self.assertRaises(KeyError):
             self.model.get_relation("db1").data[random_unit]
-        remoteapp1_0 = next(
-            filter(
-                lambda u: u.name == "remoteapp1/0", self.model.get_relation("db1").units
-            )
-        )
-        self.assertEqual(
-            self.model.get_relation("db1").data[remoteapp1_0], {"host": "remoteapp1-0"}
-        )
+        remoteapp1_0 = next(filter(lambda u: u.name == "remoteapp1/0", self.model.get_relation("db1").units))
+        self.assertEqual(self.model.get_relation("db1").data[remoteapp1_0], {"host": "remoteapp1-0"})
 
     def test_relation_data_modify_remote(self):
         rel_db1 = self.model.get_relation("db1")
-        remoteapp1_0 = next(
-            filter(
-                lambda u: u.name == "remoteapp1/0", self.model.get_relation("db1").units
-            )
-        )
+        remoteapp1_0 = next(filter(lambda u: u.name == "remoteapp1/0", self.model.get_relation("db1").units))
         # Force memory cache to be loaded.
         self.assertIn("host", rel_db1.data[remoteapp1_0])
         with self.assertRaises(op.model.RelationDataError):

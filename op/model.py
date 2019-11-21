@@ -12,9 +12,7 @@ class Model:
         self._backend = backend
         self.unit = self.get_unit(local_unit_name)
         self.app = self.unit.app
-        self.relations = RelationMapping(
-            relation_names, self.unit, self._backend, self._cache
-        )
+        self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
@@ -28,17 +26,13 @@ class Model:
         """
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError(
-                    f"relation id {relation_id} must be an int not {type(relation_id).__name__}"
-                )
+                raise ModelError(f"relation id {relation_id} must be an int not {type(relation_id).__name__}")
             for relation in self.relations[relation_name]:
                 if relation.id == relation_id:
                     return relation
             else:
                 # The relation may be dead, but it is not forgotten.
-                return Relation(
-                    relation_name, relation_id, self.unit, self._backend, self._cache
-                )
+                return Relation(relation_name, relation_id, self.unit, self._backend, self._cache)
         else:
             num_related = len(self.relations[relation_name])
             if num_related == 0:
@@ -147,15 +141,7 @@ class RelationMapping(Mapping):
         if relation_list is None:
             relation_list = self._data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
-                relation_list.append(
-                    Relation(
-                        relation_name,
-                        relation_id,
-                        self._local_unit,
-                        self._backend,
-                        self._cache,
-                    )
-                )
+                relation_list.append(Relation(relation_name, relation_id, self._local_unit, self._backend, self._cache,))
         return relation_list
 
 
@@ -183,15 +169,8 @@ class Relation:
 class RelationData(Mapping):
     def __init__(self, relation, local_unit, backend):
         self.relation = weakref.proxy(relation)
-        self._data = {
-            local_unit: RelationUnitData(self.relation, local_unit, True, backend)
-        }
-        self._data.update(
-            {
-                unit: RelationUnitData(self.relation, unit, False, backend)
-                for unit in self.relation.units
-            }
-        )
+        self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
+        self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
 
     def __contains__(self, key):
         return key in self._data
@@ -257,9 +236,7 @@ class ModelError(Exception):
 
 class TooManyRelatedApps(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
-        super().__init__(
-            f"Too many remote applications on {relation_name} ({num_related} > {max_supported})"
-        )
+        super().__init__(f"Too many remote applications on {relation_name} ({num_related} > {max_supported})")
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
@@ -317,9 +294,7 @@ class ModelBackend:
 
     def relation_set(self, relation_id, key, value):
         try:
-            return self._run_no_output(
-                "relation-set", "-r", str(relation_id), f"{key}={value}"
-            )
+            return self._run_no_output("relation-set", "-r", str(relation_id), f"{key}={value}")
         except CalledProcessError as e:
             if b"relation not found" in e.stderr:
                 raise RelationNotFound() from e

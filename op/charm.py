@@ -57,9 +57,7 @@ class RelationEvent(HookEvent):
         }
 
     def restore(self, snapshot):
-        self.relation = self.framework.model.get_relation(
-            snapshot["relation_name"], snapshot["relation_id"]
-        )
+        self.relation = self.framework.model.get_relation(snapshot["relation_name"], snapshot["relation_id"])
 
 
 class RelationUnitEvent(RelationEvent):
@@ -128,27 +126,15 @@ class CharmBase(Object):
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace("-", "_")
-            self.on.define_event(
-                f"{relation_name}_relation_joined", RelationJoinedEvent
-            )
-            self.on.define_event(
-                f"{relation_name}_relation_changed", RelationChangedEvent
-            )
-            self.on.define_event(
-                f"{relation_name}_relation_departed", RelationDepartedEvent
-            )
-            self.on.define_event(
-                f"{relation_name}_relation_broken", RelationBrokenEvent
-            )
+            self.on.define_event(f"{relation_name}_relation_joined", RelationJoinedEvent)
+            self.on.define_event(f"{relation_name}_relation_changed", RelationChangedEvent)
+            self.on.define_event(f"{relation_name}_relation_departed", RelationDepartedEvent)
+            self.on.define_event(f"{relation_name}_relation_broken", RelationBrokenEvent)
 
         for storage_name in self.framework.meta.storage:
             storage_name = storage_name.replace("-", "_")
-            self.on.define_event(
-                f"{storage_name}_storage_attached", StorageAttachedEvent
-            )
-            self.on.define_event(
-                f"{storage_name}_storage_detaching", StorageDetachingEvent
-            )
+            self.on.define_event(f"{storage_name}_storage_attached", StorageAttachedEvent)
+            self.on.define_event(f"{storage_name}_storage_detaching", StorageDetachingEvent)
 
 
 class CharmMeta:
@@ -179,34 +165,16 @@ class CharmMeta:
         self.series = raw.get("series", [])
         self.subordinate = raw.get("subordinate", False)
         self.min_juju_version = raw.get("min-juju-version")
-        self.requires = {
-            name: RelationMeta("requires", name, rel)
-            for name, rel in raw.get("requires", {}).items()
-        }
-        self.provides = {
-            name: RelationMeta("provides", name, rel)
-            for name, rel in raw.get("provides", {}).items()
-        }
-        self.peers = {
-            name: RelationMeta("peers", name, rel)
-            for name, rel in raw.get("peers", {}).items()
-        }
+        self.requires = {name: RelationMeta("requires", name, rel) for name, rel in raw.get("requires", {}).items()}
+        self.provides = {name: RelationMeta("provides", name, rel) for name, rel in raw.get("provides", {}).items()}
+        self.peers = {name: RelationMeta("peers", name, rel) for name, rel in raw.get("peers", {}).items()}
         self.relations = {}
         self.relations.update(self.requires)
         self.relations.update(self.provides)
         self.relations.update(self.peers)
-        self.storage = {
-            name: StorageMeta(name, store)
-            for name, store in raw.get("storage", {}).items()
-        }
-        self.resources = {
-            name: ResourceMeta(name, res)
-            for name, res in raw.get("resources", {}).items()
-        }
-        self.payloads = {
-            name: PayloadMeta(name, payload)
-            for name, payload in raw.get("payloads", {}).items()
-        }
+        self.storage = {name: StorageMeta(name, store) for name, store in raw.get("storage", {}).items()}
+        self.resources = {name: ResourceMeta(name, res) for name, res in raw.get("resources", {}).items()}
+        self.payloads = {name: PayloadMeta(name, payload) for name, payload in raw.get("payloads", {}).items()}
         self.extra_bindings = raw.get("extra-bindings", [])
 
 

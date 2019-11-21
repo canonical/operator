@@ -49,26 +49,18 @@ def _handle_event_link(charm_dir, bound_event):
         # Non-symlink entries and the ones not pointing to "install"
         # need to be removed.
         if not event_hook_path.is_symlink():
-            debugf(
-                f"Hook entry at {event_hook_path} is not a symlink:"
-                " attempting to remove it."
-            )
+            debugf(f"Hook entry at {event_hook_path} is not a symlink:" " attempting to remove it.")
             # May raise IsADirectoryError, e.g. in case it is a directory which
             # is unexpected and left to the developer or operator to handle.
             event_hook_path.unlink()
         elif os.readlink(event_hook_path) != "install":
-            debugf(
-                f"Removing entry {event_hook_path} as it does not point" ' to "install"'
-            )
+            debugf(f"Removing entry {event_hook_path} as it does not point" ' to "install"')
             event_hook_path.unlink()
         else:
             create_link = False
 
     if create_link:
-        debugf(
-            f"Creating a new relative symlink at {event_hook_path}"
-            f' to pointing to "install" located in {charm_dir}/hooks'
-        )
+        debugf(f"Creating a new relative symlink at {event_hook_path}" f' to pointing to "install" located in {charm_dir}/hooks')
         event_hook_path.symlink_to("install")
 
 
@@ -168,9 +160,7 @@ def main():
         # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading
         # the hook setup code is not triggered on config-changed.
-        if juju_event_name in ("install", "upgrade-charm") or juju_event_name.endswith(
-            "-storage-attached"
-        ):
+        if juju_event_name in ("install", "upgrade-charm") or juju_event_name.endswith("-storage-attached"):
             _setup_hooks(charm_dir, charm)
 
         framework.reemit()

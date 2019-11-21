@@ -43,9 +43,7 @@ class TestCharm(unittest.TestCase):
 
     def create_framework(self):
         model = Model("local/0", list(self.meta.relations), ModelBackend())
-        framework = Framework(
-            self.tmpdir / "framework.data", self.tmpdir, self.meta, model
-        )
+        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.meta, model)
         self.addCleanup(framework.close)
         return framework
 
@@ -77,18 +75,10 @@ class TestCharm(unittest.TestCase):
                 self.seen = []
                 for rel in ("req1", "req-2", "pro1", "pro-2", "peer1", "peer-2"):
                     # Hook up relation events to generic handler.
-                    self.framework.observe(
-                        self.on[rel].relation_joined, self.on_any_relation
-                    )
-                    self.framework.observe(
-                        self.on[rel].relation_changed, self.on_any_relation
-                    )
-                    self.framework.observe(
-                        self.on[rel].relation_departed, self.on_any_relation
-                    )
-                    self.framework.observe(
-                        self.on[rel].relation_broken, self.on_any_relation
-                    )
+                    self.framework.observe(self.on[rel].relation_joined, self.on_any_relation)
+                    self.framework.observe(self.on[rel].relation_changed, self.on_any_relation)
+                    self.framework.observe(self.on[rel].relation_departed, self.on_any_relation)
+                    self.framework.observe(self.on[rel].relation_broken, self.on_any_relation)
 
             def on_any_relation(self, event):
                 assert event.relation.name == "req1"
@@ -98,18 +88,9 @@ class TestCharm(unittest.TestCase):
         self.meta = CharmMeta(
             {
                 "name": "my-charm",
-                "requires": {
-                    "req1": {"interface": "req1"},
-                    "req-2": {"interface": "req2"},
-                },
-                "provides": {
-                    "pro1": {"interface": "pro1"},
-                    "pro-2": {"interface": "pro2"},
-                },
-                "peers": {
-                    "peer1": {"interface": "peer1"},
-                    "peer-2": {"interface": "peer2"},
-                },
+                "requires": {"req1": {"interface": "req1"}, "req-2": {"interface": "req2"},},
+                "provides": {"pro1": {"interface": "pro1"}, "pro-2": {"interface": "pro2"},},
+                "peers": {"peer1": {"interface": "peer1"}, "peer-2": {"interface": "peer2"},},
             }
         )
 
@@ -185,13 +166,7 @@ class TestCharm(unittest.TestCase):
         charm.on["stor-4"].storage_attached.emit()
 
         self.assertEqual(
-            charm.seen,
-            [
-                "StorageAttachedEvent",
-                "StorageDetachingEvent",
-                "StorageAttachedEvent",
-                "StorageAttachedEvent",
-            ],
+            charm.seen, ["StorageAttachedEvent", "StorageDetachingEvent", "StorageAttachedEvent", "StorageAttachedEvent",],
         )
 
 

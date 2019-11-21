@@ -1,0 +1,9 @@
+
+[tool.black]
+target-version = ['py36', 'py37']
+line-length = 160
+exclude = '''
+(
+  sandbox
+)
+'''

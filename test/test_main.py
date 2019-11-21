@@ -31,9 +31,7 @@ from op.charm import (
 # a path to the charm under test.
 JUJU_CHARM_DIR = Path(f"{__file__}/../charms/test_main").resolve()
 
-charm_spec = importlib.util.spec_from_file_location(
-    "charm", str(JUJU_CHARM_DIR / "lib/charm.py")
-)
+charm_spec = importlib.util.spec_from_file_location("charm", str(JUJU_CHARM_DIR / "lib/charm.py"))
 charm = importlib.util.module_from_spec(charm_spec)
 charm_spec.loader.exec_module(charm)
 
@@ -88,17 +86,10 @@ class TestMain(unittest.TestCase):
             absolute_path = Path(r) / f
             if absolute_path.name == "install" and absolute_path.is_symlink():
                 if os.readlink(absolute_path) != cls.MAIN_PY_RELPATH:
-                    raise SymlinkTargetError(
-                        f'"{absolute_path.name}" link does not point to {cls.MAIN_PY_RELPATH}'
-                    )
-            elif (
-                absolute_path.name.endswith("-storage-attached")
-                and absolute_path.is_symlink()
-            ):
+                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {cls.MAIN_PY_RELPATH}')
+            elif absolute_path.name.endswith("-storage-attached") and absolute_path.is_symlink():
                 if os.readlink(absolute_path) != "install":
-                    raise SymlinkTargetError(
-                        f'"{absolute_path.name}" link does not point to "install"'
-                    )
+                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to "install"')
             else:
                 absolute_path.unlink()
 
@@ -146,9 +137,7 @@ class TestMain(unittest.TestCase):
 
         # Re-emit should pick the deferred config-changed.
         state = self._simulate_event("update-status", charm_config)
-        self.assertEqual(
-            state["observed_event_types"], [ConfigChangedEvent, UpdateStatusEvent]
-        )
+        self.assertEqual(state["observed_event_types"], [ConfigChangedEvent, UpdateStatusEvent])
 
     def test_multiple_events_handled(self):
 
@@ -164,16 +153,8 @@ class TestMain(unittest.TestCase):
         }
 
         expected_event_data = {
-            "db_relation_joined": {
-                "relation_name": "db",
-                "relation_id": 1,
-                "unit_name": "remote/0",
-            },
-            "mon_relation_changed": {
-                "relation_name": "mon",
-                "relation_id": 2,
-                "unit_name": "remote/0",
-            },
+            "db_relation_joined": {"relation_name": "db", "relation_id": 1, "unit_name": "remote/0",},
+            "mon_relation_changed": {"relation_name": "mon", "relation_id": 2, "unit_name": "remote/0",},
             "ha_relation_broken": {"relation_name": "ha", "relation_id": 3},
         }
 
@@ -198,9 +179,7 @@ class TestMain(unittest.TestCase):
             self.assertEqual(state["observed_event_types"], [event])
 
             if event_kind in expected_event_data:
-                self.assertEqual(
-                    state[f"{event_kind}_data"], expected_event_data[event_kind]
-                )
+                self.assertEqual(state[f"{event_kind}_data"], expected_event_data[event_kind])
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit.
@@ -216,19 +195,12 @@ class TestMain(unittest.TestCase):
         try:
             self._simulate_event("not-implemented-event", charm_config)
         except subprocess.CalledProcessError:
-            self.fail(
-                "Event simulation for an unsupported event"
-                " results in a non-zero exit code returned"
-            )
+            self.fail("Event simulation for an unsupported event" " results in a non-zero exit code returned")
 
     def test_setup_hooks(self):
         """Test auto-creation of symlinks for supported events.
         """
-        event_hooks = [
-            f'hooks/{e.replace("_", "-")}'
-            for e in charm.Charm.on.events().keys()
-            if e != "install"
-        ]
+        event_hooks = [f'hooks/{e.replace("_", "-")}' for e in charm.Charm.on.events().keys() if e != "install"]
 
         install_link_path = JUJU_CHARM_DIR / "hooks/install"
 
@@ -240,9 +212,7 @@ class TestMain(unittest.TestCase):
         def _assess_setup_hooks(event_name):
             event_hook = JUJU_CHARM_DIR / f"hooks/{event_name}"
 
-            charm_config = base64.b64encode(
-                pickle.dumps({"STATE_FILE": self._state_file,})
-            )
+            charm_config = base64.b64encode(pickle.dumps({"STATE_FILE": self._state_file,}))
 
             # Simulate a fork + exec of a hook from a unit agent.
             self._simulate_event(event_name, charm_config)

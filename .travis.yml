@@ -8,9 +8,9 @@ python:
 
 install:
     - sudo apt update
-    - sudo apt install flake8
+    - pip3 install black
     - pip3 install pyyaml
 
 script:
     - python3 -m unittest
-    - flake8
+    - black --diff --check .
