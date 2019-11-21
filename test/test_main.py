@@ -27,6 +27,8 @@ from op.charm import (
     RelationBrokenEvent,
 )
 
+from .base import BaseTestCase
+
 # This relies on the expected repository structure to find
 # a path to the charm under test.
 JUJU_CHARM_DIR = Path(f'{__file__}/../charms/test_main').resolve()
@@ -43,7 +45,7 @@ class SymlinkTargetError(Exception):
     pass
 
 
-class TestMain(unittest.TestCase):
+class TestMain(BaseTestCase):
 
     CHARM_PY_RELPATH = '../lib/charm.py'
 
@@ -57,13 +59,7 @@ class TestMain(unittest.TestCase):
         self._clear_unit_db()
         self._clear_symlinks()
 
-        # Change cwd for the current process to the test charm directory
-        # as it is preserved across fork + exec.
-        self.addCleanup(os.chdir, os.curdir)
-        os.chdir(JUJU_CHARM_DIR)
-        _, tmp_file = tempfile.mkstemp()
-        self._state_file = Path(tmp_file)
-        self.addCleanup(self._state_file.unlink)
+        self._state_file = Path(self.tmpdir) / 'test-state.db'
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
@@ -93,7 +89,7 @@ class TestMain(unittest.TestCase):
 
     def _read_and_clear_state(self):
         state = None
-        if self._state_file.stat().st_size:
+        if self._state_file.exists() and self._state_file.stat().st_size:
             with open(self._state_file, 'r+b') as state_file:
                 state = pickle.load(state_file)
                 state_file.truncate()
@@ -101,12 +97,12 @@ class TestMain(unittest.TestCase):
 
     def _simulate_event(self, event_name, charm_config):
         event_hook = JUJU_CHARM_DIR / f"hooks/{event_name.replace('_', '-')}"
-        env = {
-            'PATH': str(Path(__file__).parent / 'bin'),
+        env = dict(os.environ)
+        env.update({
             'JUJU_CHARM_DIR': JUJU_CHARM_DIR,
             'JUJU_UNIT_NAME': 'test_main/0',
             'CHARM_CONFIG': charm_config,
-        }
+        })
         if 'relation' in event_name:
             rel_name = event_name.split('_')[0]
             rel_id = {'db': '1', 'mon': '2', 'ha': '3'}[rel_name]
@@ -120,7 +116,7 @@ class TestMain(unittest.TestCase):
                 })
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call([sys.executable, event_hook], env=env)
+        subprocess.check_call([sys.executable, event_hook], env=env, cwd=JUJU_CHARM_DIR)
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -152,6 +148,9 @@ class TestMain(unittest.TestCase):
             'mon_relation_changed': RelationChangedEvent,
             'ha_relation_broken': RelationBrokenEvent,
         }
+
+        self.create_hook_tool('relation-ids', '[]')
+        self.create_hook_tool('relation-list', '[]')
 
         expected_event_data = {
             'db_relation_joined': {'relation_name': 'db', 'relation_id': 1, 'unit_name': 'remote/0'},
@@ -218,8 +217,6 @@ class TestMain(unittest.TestCase):
         self.assertEqual(os.readlink(install_link_path), self.CHARM_PY_RELPATH)
 
         def _assess_setup_hooks(event_name):
-            event_hook = JUJU_CHARM_DIR / f'hooks/{event_name}'
-
             charm_config = base64.b64encode(pickle.dumps({
                 'STATE_FILE': self._state_file,
             }))
@@ -231,11 +228,11 @@ class TestMain(unittest.TestCase):
 
             self.assertTrue(event_name in files)
 
-            for event_hook in event_hooks:
-                self.assertTrue(os.path.exists(event_hook))
+            for event_hook_rel in event_hooks:
+                event_hook = JUJU_CHARM_DIR / event_hook_rel
+                self.assertTrue(event_hook.exists(), f'Missing hook: {event_hook}')
                 self.assertEqual(os.readlink(event_hook), 'install')
-                self.assertEqual(os.readlink('hooks/install'),
-                                 self.CHARM_PY_RELPATH)
+                self.assertEqual(os.readlink(JUJU_CHARM_DIR / 'hooks/install'), self.CHARM_PY_RELPATH)
 
         # Assess 'install' first because upgrade-charm or other
         # events cannot be handled before install creates symlinks for them.

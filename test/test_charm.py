@@ -1,28 +1,19 @@
 #!/usr/bin/python3
 
-import os
 import unittest
-import tempfile
-import shutil
-
-from pathlib import Path
 
 from op.charm import CharmBase, CharmMeta
 from op.charm import CharmEvents
 from op.framework import Framework, Event, EventBase
 from op.model import Model, ModelBackend
 
+from .base import BaseTestCase
 
-class TestCharm(unittest.TestCase):
+
+class TestCharm(BaseTestCase):
 
     def setUp(self):
-        self._path = os.environ['PATH']
-        os.environ['PATH'] = str(Path(__file__).parent / 'bin')
-
-        os.environ['JUJU_UNIT_NAME'] = 'local/0'
-
-        self.tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmpdir)
+        self.patch_env(JUJU_UNIT_NAME='local/0')
         self.meta = CharmMeta()
 
         class CustomEvent(EventBase):
@@ -36,8 +27,6 @@ class TestCharm(unittest.TestCase):
         CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            os.environ['PATH'] = self._path
-            del os.environ['JUJU_UNIT_NAME']
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
@@ -103,6 +92,9 @@ class TestCharm(unittest.TestCase):
                 'peer-2': {'interface': 'peer2'},
             },
         })
+
+        self.create_hook_tool('relation-ids', '[]')
+        self.create_hook_tool('relation-list', '["remote/0"]')
 
         charm = MyCharm(self.create_framework(), None)
 
