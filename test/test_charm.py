@@ -22,6 +22,7 @@ class TestCharm(unittest.TestCase):
         os.environ['JUJU_UNIT_NAME'] = 'local/0'
 
         self.tmpdir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmpdir)
         self.meta = CharmMeta()
 
         class CustomEvent(EventBase):
@@ -34,13 +35,11 @@ class TestCharm(unittest.TestCase):
         # We use a subclass temporarily to prevent these side effects from leaking.
         CharmBase.on = TestCharmEvents()
 
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir)
-        os.environ['PATH'] = self._path
-
-        del os.environ['JUJU_UNIT_NAME']
-
-        CharmBase.on = CharmEvents()
+        def cleanup():
+            os.environ['PATH'] = self._path
+            del os.environ['JUJU_UNIT_NAME']
+            CharmBase.on = CharmEvents()
+        self.addCleanup(cleanup)
 
     def create_framework(self):
         model = Model('local/0', list(self.meta.relations), ModelBackend())

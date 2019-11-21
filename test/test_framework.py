@@ -14,9 +14,7 @@ class TestFramework(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir)
+        self.addCleanup(shutil.rmtree, self.tmpdir)
 
     def create_framework(self):
         framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)
@@ -501,9 +499,7 @@ class TestStoredState(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir)
+        self.addCleanup(shutil.rmtree, self.tmpdir)
 
     def create_framework(self):
         framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)

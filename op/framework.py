@@ -166,7 +166,7 @@ class HandleKind:
     """Helper descriptor to define the Object.handle_kind field.
 
     The handle_kind for an object defaults to its type name, but it may
-    be explicitly overriden if desired.
+    be explicitly overridden if desired.
     """
 
     def __get__(self, obj, obj_type):
