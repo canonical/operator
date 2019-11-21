@@ -13,6 +13,12 @@ class TestModelBackend:
     def __init__(self):
         self.relation_set_calls = []
 
+        self.local_unit_name = 'myapp/0'
+        self.local_app_name = 'myapp'
+
+    def local_app_name(self):
+        return 'myapp'
+
     def relation_ids(self, relation_name):
         return {
             'db0': [],
@@ -61,7 +67,6 @@ class TestModelBackend:
             'qux': True,
         }
 
-
 class TestModel(unittest.TestCase):
     def setUp(self):
         self.backend = TestModelBackend()
@@ -89,6 +94,15 @@ class TestModel(unittest.TestCase):
         self.assertIs(self.model.get_relation('db1'), db1_4)
         with self.assertRaises(op.model.TooManyRelatedApps):
             self.model.get_relation('db2')
+
+    def test_remote_units_is_local(self):
+        for u in self.model.get_relation('db1').units:
+            self.assertFalse(u.is_local)
+            self.assertFalse(u.app.is_local)
+
+    def test_local_unit_is_local(self):
+        self.assertTrue(self.model.unit.is_local)
+        self.assertTrue(self.model.unit.app.is_local)
 
     def test_relation_data(self):
         random_unit = self.model._cache.get(op.model.Unit, 'randomunit/0')
