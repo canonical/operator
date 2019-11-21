@@ -47,6 +47,8 @@ class Model:
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
 
+    def get_app(self, app_name):
+        return self._cache.get(Application, app_name)
 
 class ModelCache:
 
@@ -178,8 +180,17 @@ class Relation:
 class RelationData(Mapping):
     def __init__(self, relation, local_unit, backend):
         self.relation = weakref.proxy(relation)
-        self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
-        self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
+        self._data = {local_unit: RelationEntityData(self.relation, local_unit, (lambda _: True), backend)}
+
+        # Whether the application data bag is mutable or not depends on whether this unit is a leader or not,
+        # but this is not guaranteed to be always true during the same hook execution.
+        self._data.update({local_unit.app: RelationEntityData(self.relation, local_unit.app, (lambda backend: backend.is_leader()), backend)})
+
+        self._data.update({unit: RelationEntityData(self.relation, unit, lambda _: False, backend) for unit in self.relation.units})
+
+        # The relation might be dead so avoid a None key here.
+        if self.relation.app:
+            self._data.update({self.relation.app: RelationEntityData(self.relation, self.relation.app, (lambda _: False), backend)})
 
     def __contains__(self, key):
         return key in self._data
@@ -196,26 +207,34 @@ class RelationData(Mapping):
 
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
-class RelationUnitData(LazyMapping, MutableMapping):
-    def __init__(self, relation, unit, is_mutable, backend):
+class RelationEntityData(LazyMapping, MutableMapping):
+    def __init__(self, relation, entity, is_mutable, backend):
         self.relation = relation
-        self.unit = unit
+        self.entity = entity
         self._is_mutable = is_mutable
         self._backend = backend
 
+        if isinstance(self.entity, Application):
+            self._is_app = True
+        else:
+            self._is_app = False
+
     def _load(self):
         try:
-            return self._backend.relation_get(self.relation.id, self.unit.name)
+            return self._backend.relation_get(self.relation.id, self.entity.name, self._is_app)
         except RelationNotFound:
             # Dead relations tell no tales (and have no data).
             return {}
 
     def __setitem__(self, key, value):
-        if not self._is_mutable:
-            raise RelationDataError(f'cannot set relation data for {self.unit.name}')
+        if not self._is_mutable(self._backend):
+            # This might happen due to a mid-hook leadership change besides trying to set data in remote data bags.
+            raise RelationDataError(f'cannot set relation data for {self.entity.name}')
         if not isinstance(value, str):
             raise RelationDataError('relation data values must be strings')
-        self._backend.relation_set(self.relation.id, key, value)
+
+        self._backend.relation_set(self.relation.id, key, value, self._is_app)
+
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
@@ -289,9 +308,9 @@ class ModelBackend:
             else:
                 raise
 
-    def relation_get(self, relation_id, member_name):
+    def relation_get(self, relation_id, member_name, app):
         try:
-            return self._run('relation-get', '-r', str(relation_id), '-', member_name)
+            return self._run('relation-get', f'--app={app}', '-r', str(relation_id), '-', member_name)
         except CalledProcessError as e:
             # TODO: This should use the return code if it is specific enough rather than the message.
             # It seems to be 2 for this error, but I haven't been able to confirm yet if that might
@@ -301,9 +320,9 @@ class ModelBackend:
             else:
                 raise
 
-    def relation_set(self, relation_id, key, value):
+    def relation_set(self, relation_id, key, value, app):
         try:
-            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
+            return self._run_no_output('relation-set', f'--app={app}', '-r', str(relation_id), f'{key}={value}')
         except CalledProcessError as e:
             if b'relation not found' in e.stderr:
                 raise RelationNotFound() from e
