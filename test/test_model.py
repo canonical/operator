@@ -190,7 +190,7 @@ def fake_script(test_case, name, content):
 
     with open(test_case.fake_script_path / name, "w") as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
-        f.write('#!/bin/bash\n{ echo -n $(basename $0); for s in "$@"; do echo -n \;$s; done; echo; } >> $(dirname $0)/calls.txt\n' + content)
+        f.write('#!/bin/bash\n{ echo -n $(basename $0); for s in "$@"; do echo -n \\;$s; done; echo; } >> $(dirname $0)/calls.txt\n' + content)
     os.chmod(test_case.fake_script_path / name, 0o755)
 
 def fake_script_calls(test_case):
