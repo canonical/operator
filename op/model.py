@@ -3,17 +3,19 @@ import weakref
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
+from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
 
 class Model:
-    def __init__(self, unit_name, relation_names, backend):
+    def __init__(self, unit_name, meta, backend):
         self._cache = ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
-        self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
+        self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
+        self.resources = ResourceMapping(list(meta.resources), self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -238,6 +240,28 @@ class ConfigData(LazyMapping):
         return self._backend.config_get()
 
 
+class ResourceMapping(Mapping):
+    """Map of resource names to the local path for the resource."""
+    def __init__(self, resource_names, backend):
+        self._backend = backend
+        self._data = {resource_name: None for resource_name in resource_names}
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __len__(self):
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __getitem__(self, resource_name):
+        resource_path = self._data[resource_name]
+        if resource_path is None:
+            resource_path = self._data[resource_name] = Path(self._backend.resource_get(resource_name))
+        return resource_path
+
+
 class ModelError(Exception):
     pass
 
@@ -258,6 +282,10 @@ class RelationNotFound(ModelError):
     pass
 
 
+class ResourceError(ModelError):
+    pass
+
+
 class ModelBackend:
     def __init__(self):
         self.unit_name = os.environ['JUJU_UNIT_NAME']
@@ -268,6 +296,11 @@ class ModelBackend:
         text = result.stdout.decode('utf8')
         data = json.loads(text)
         return data
+
+    def _run_text(self, *args):
+        result = run(args, stdout=PIPE, stderr=PIPE, check=True)
+        text = result.stdout.decode('utf8')
+        return text
 
     def _run_no_output(self, *args):
         run(args, check=True)
@@ -314,3 +347,10 @@ class ModelBackend:
 
     def is_leader(self):
         return self._run('is-leader')
+
+    def resource_get(self, resource_name):
+        try:
+            return self._run_text('resource-get', resource_name).strip()
+        except CalledProcessError as e:
+            # The resource was not attached (local charm) or could not be fetched from the controller.
+            raise ResourceError(e.stderr.decode('utf8'))
