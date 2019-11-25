@@ -212,6 +212,17 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
         ])
 
+    def test_pod_spec(self):
+        model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], op.model.ModelBackend())
+
+        fake_script(self, 'pod-spec-set', """cat - > $(dirname $0)/pod_spec.json""")
+        fake_script(self, 'pod-spec-get', """cat $(dirname $0)/pod_spec.json || echo {}""")
+
+        self.assertEqual(model.pod_spec, {})
+        model.pod_spec = {'foo': 'bar'}
+        self.assertEqual(model.pod_spec, {'foo': 'bar'})
+
+
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')

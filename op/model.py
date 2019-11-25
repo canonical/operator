@@ -14,6 +14,7 @@ class Model:
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
+        self._pod_spec = None
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -46,6 +47,17 @@ class Model:
 
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
+
+    @property
+    def pod_spec(self):
+        if self._pod_spec is None:
+            self._pod_spec = self._backend.pod_spec_get()
+        return self._pod_spec
+
+    @pod_spec.setter
+    def pod_spec(self, pod_spec):
+        self._backend.pod_spec_set(pod_spec)
+        self._pod_spec = pod_spec
 
 
 class ModelCache:
@@ -314,3 +326,9 @@ class ModelBackend:
 
     def is_leader(self):
         return self._run('is-leader')
+
+    def pod_spec_get(self):
+        return self._run('pod-spec-get')
+
+    def pod_spec_set(self, pod_spec_data):
+        run(['pod-spec-set'], check=True, input=json.dumps(pod_spec_data).encode('utf8'))
