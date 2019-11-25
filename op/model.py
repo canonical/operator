@@ -15,7 +15,7 @@ class Model:
         self.app = self.unit.app
         self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
-        self.resources = ResourceMapping(list(meta.resources), self._backend)
+        self.resources = {name: Resource(name, backend) for name in meta.resources}
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -240,26 +240,28 @@ class ConfigData(LazyMapping):
         return self._backend.config_get()
 
 
-class ResourceMapping(Mapping):
-    """Map of resource names to the local path for the resource."""
-    def __init__(self, resource_names, backend):
+class Resource:
+    """Object representing a resource for the charm.
+    """
+    def __init__(self, name, backend):
+        self.name = name
         self._backend = backend
-        self._data = {resource_name: None for resource_name in resource_names}
+        self.path = None
 
-    def __contains__(self, key):
-        return key in self._data
+    def fetch(self):
+        """Fetch the resource from the controller or store.
 
-    def __len__(self):
-        return len(self._data)
-
-    def __iter__(self):
-        return iter(self._data)
-
-    def __getitem__(self, resource_name):
-        resource_path = self._data[resource_name]
-        if resource_path is None:
-            resource_path = self._data[resource_name] = Path(self._backend.resource_get(resource_name))
-        return resource_path
+        If successfully fetched, this returns True and the resource file can be
+        accessed via the path attribute.
+        """
+        try:
+            filename = self._backend.resource_get(self.name)
+            if filename:
+                self.path = Path(filename)
+                return True
+        except CalledProcessError:
+            # The resource was not attached (local charm) or could not be fetched from the controller.
+            return False
 
 
 class ModelError(Exception):
@@ -279,10 +281,6 @@ class RelationDataError(ModelError):
 
 
 class RelationNotFound(ModelError):
-    pass
-
-
-class ResourceError(ModelError):
     pass
 
 
@@ -349,8 +347,4 @@ class ModelBackend:
         return self._run('is-leader')
 
     def resource_get(self, resource_name):
-        try:
-            return self._run_text('resource-get', resource_name).strip()
-        except CalledProcessError as e:
-            # The resource was not attached (local charm) or could not be fetched from the controller.
-            raise ResourceError(e.stderr.decode('utf8'))
+        return self._run_text('resource-get', resource_name).strip()
