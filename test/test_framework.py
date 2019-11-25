@@ -6,8 +6,10 @@ import shutil
 
 from pathlib import Path
 
-from op.framework import Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent
-from op.framework import NoSnapshotError, StoredState, StoredList
+from op.framework import (
+    Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
+    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData
+)
 
 
 class TestFramework(unittest.TestCase):
@@ -547,7 +549,7 @@ class TestStoredState(unittest.TestCase):
         self.assertEqual(obj_copy.state.foo, 42)
         self.assertEqual(obj_copy.state.bar, "s")
 
-    def test_mutable_types(self):
+    def test_mutable_types_invalid(self):
         framework = self.create_framework()
 
         class SomeObject(Object):
@@ -565,52 +567,65 @@ class TestStoredState(unittest.TestCase):
 
         framework.commit()
 
+    def test_mutable_types(self):
         # Test and validation functions in a list of 2-tuples.
         # Assignment and keywords like del are not supported in lambdas so functions are used instead.
         test_operations = [(
-            {},                                                            # Operand A.
-            None,                                                          # Operand B.
-            {},                                                            # Expected result.
-            lambda a, b: None,                                             # Operation to perform.
+            lambda: {},         # Operand A.
+            None,               # Operand B.
+            {},                 # Expected result.
+            lambda a, b: None,  # Operation to perform.
             lambda res, expected_res: self.assertEqual(res, expected_res)  # Validation to perform.
         ), (
-            {},
+            lambda: {},
             {'a': {}},
             {'a': {}},
             lambda a, b: a.update(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            {'a': {}},
+            lambda: {'a': {}},
             {'b': 'c'},
             {'a': {'b': 'c'}},
             lambda a, b: a['a'].update(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            {'a': {'b': 'c'}},
+            lambda: {'a': {'b': 'c'}},
             {'d': 'e'},
             {'a': {'b': 'c', 'd': 'e'}},
             lambda a, b: a['a'].update(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            {'a': {'b': 'c', 'd': 'e'}},
+            lambda: {'a': {'b': 'c', 'd': 'e'}},
             'd',
             {'a': {'b': 'c'}},
             lambda a, b: a['a'].pop(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            [],
+            lambda: {'s': set()},
+            'a',
+            {'s': {'a'}},
+            lambda a, b: a['s'].add(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            lambda: {'s': {'a'}},
+            'a',
+            {'s': set()},
+            lambda a, b: a['s'].discard(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            lambda: [],
             None,
             [],
             lambda a, b: None,
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            [],
+            lambda: [],
             'a',
             ['a'],
             lambda a, b: a.append(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            ['a'],
+            lambda: ['a'],
             ['c'],
             ['a', ['c']],
             lambda a, b: a.append(b),
@@ -619,13 +634,13 @@ class TestStoredState(unittest.TestCase):
                 self.assertIsInstance(res[1], StoredList),
             )
         ), (
-            ['a', ['c']],
+            lambda: ['a', ['c']],
             'b',
             ['b', 'a', ['c']],
             lambda a, b: a.insert(0, b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            ['b', 'a', ['c']],
+            lambda: ['b', 'a', ['c']],
             ['d'],
             ['b', ['d'], 'a', ['c']],
             lambda a, b: a.insert(1, b),
@@ -634,37 +649,71 @@ class TestStoredState(unittest.TestCase):
                 self.assertIsInstance(res[1], StoredList)
             ),
         ), (
-            ['b', ['d'], 'a', ['c']],
+            lambda: ['b', 'a', ['c']],
+            ['d'],
+            ['b', ['d'], ['c']],
+            # a[1] = b
+            lambda a, b: a.__setitem__(1, b),
+            lambda res, expected_res: (
+                self.assertEqual(res, expected_res),
+                self.assertIsInstance(res[1], StoredList)
+            ),
+        ), (
+            lambda: ['b', ['d'], 'a', ['c']],
             0,
             [['d'], 'a', ['c']],
             lambda a, b: a.pop(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            [['d'], 'a', ['c']],
+            lambda: [['d'], 'a', ['c']],
             ['d'],
             ['a', ['c']],
             lambda a, b: a.remove(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            set(),
+            lambda: ['a', ['c']],
+            'd',
+            ['a', ['c', 'd']],
+            lambda a, b: a[1].append(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            lambda: ['a', ['c', 'd']],
+            1,
+            ['a', ['c']],
+            lambda a, b: a[1].pop(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            lambda: ['a', ['c']],
+            'd',
+            ['a', ['c', 'd']],
+            lambda a, b: a[1].insert(1, b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            lambda: ['a', ['c', 'd']],
+            'd',
+            ['a', ['c']],
+            lambda a, b: a[1].remove(b),
+            lambda res, expected_res: self.assertEqual(res, expected_res)
+        ), (
+            lambda: set(),
             None,
             set(),
             lambda a, b: None,
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            set(),
+            lambda: set(),
             'a',
             set(['a']),
             lambda a, b: a.add(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            set(['a']),
+            lambda: set(['a']),
             'a',
             set(),
             lambda a, b: a.discard(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            set(),
+            lambda: set(),
             {'a'},
             set(),
             # Nested sets are not allowed as sets themselves are not hashable.
@@ -675,23 +724,47 @@ class TestStoredState(unittest.TestCase):
         class SomeObject(Object):
             state = StoredState()
 
-        for a, b, expected_res, op, validate_op in test_operations:
+        # Validate correctness of modification operations.
+        for get_a, b, expected_res, op, validate_op in test_operations:
             framework = self.create_framework()
             obj = SomeObject(framework, '1')
-            obj.state.a = a
+
+            obj.state.a = get_a()
+            self.assertTrue(isinstance(obj.state, BoundStoredState))
 
             op(obj.state.a, b)
             validate_op(obj.state.a, expected_res)
+
+            obj.state.a = get_a()
+            framework.commit()
+
+            obj_copy1 = SomeObject(framework, '1')
+            self.assertEqual(obj_copy1.state.a, get_a())
+
+            op(obj_copy1.state.a, b)
+            validate_op(obj_copy1.state.a, expected_res)
 
             framework.commit()
 
             framework_copy = self.create_framework()
 
-            obj = SomeObject(framework_copy, '1')
+            obj_copy2 = SomeObject(framework_copy, '1')
 
-            validate_op(obj.state.a, expected_res)
+            validate_op(obj_copy2.state.a, expected_res)
 
+            # Validate the dirty state functionality.
+            # obj_copy2 state is not dirty because it was not modified in any supported way since the last commit so
+            # it still contains the old value at this point. State is overridden here via save_snapshot to validate that
+            # the modification will not be saved when StoredStateData is not dirty. This check assumes that the artificially
+            # created StoredStateData does not observe the on_commit event.
+            framework_copy.save_snapshot(StoredStateData(obj_copy2, 'state'))
             framework_copy.commit()
+
+            obj_copy3 = SomeObject(framework_copy, '1')
+
+            # Now make sure that the modification was not saved as the state holding it was not dirty.
+            with self.assertRaises(AttributeError):
+                obj_copy3.state.a
 
     def test_comparison_operations(self):
         test_operations = [(
