@@ -215,11 +215,16 @@ class TestModel(unittest.TestCase):
     def test_pod_spec(self):
         model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], op.model.ModelBackend())
 
-        fake_script(self, 'pod-spec-set', """cat - > $(dirname $0)/pod_spec.json""")
+        fake_script(self, 'pod-spec-set', """
+                    cat $2 > $(dirname $0)/spec.json
+                    cat $4 > $(dirname $0)/k8s_res.json
+                    """)
 
-        model.pod.set_spec({'foo': 'bar'})
-        spec_file = self.fake_script_path / 'pod_spec.json'
+        model.pod.set_spec({'foo': 'bar'}, {'qux': 'baz'})
+        spec_file = self.fake_script_path / 'spec.json'
         self.assertEqual(spec_file.read_text(), '{"foo": "bar"}')
+        k8s_res_file = self.fake_script_path / 'k8s_res.json'
+        self.assertEqual(k8s_res_file.read_text(), '{"qux": "baz"}')
 
 
 def fake_script(test_case, name, content):

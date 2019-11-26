@@ -1,8 +1,11 @@
 import json
 import weakref
 import os
+import shutil
+import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
+from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
 
@@ -243,8 +246,8 @@ class Pod:
     def __init__(self, backend):
         self._backend = backend
 
-    def set_spec(self, spec_data):
-        self._backend.pod_spec_set(spec_data)
+    def set_spec(self, spec, k8s_resources=None):
+        self._backend.pod_spec_set(spec, k8s_resources)
 
 
 class ModelError(Exception):
@@ -324,5 +327,14 @@ class ModelBackend:
     def is_leader(self):
         return self._run('is-leader')
 
-    def pod_spec_set(self, pod_spec_data):
-        run(['pod-spec-set'], check=True, input=json.dumps(pod_spec_data).encode('utf8'))
+    def pod_spec_set(self, spec, k8s_resources):
+        tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
+        spec_file = tmpdir / 'spec.json'
+        k8s_res_file = tmpdir / 'k8s-resources.json'
+        try:
+            spec_file.write_text(json.dumps(spec))
+            if k8s_resources:
+                k8s_res_file.write_text(json.dumps(k8s_resources))
+            self._run_no_output('pod-spec-set', '--spec', str(spec_file), '--k8s-resources', str(k8s_res_file))
+        finally:
+            shutil.rmtree(tmpdir)
