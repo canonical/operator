@@ -223,17 +223,14 @@ class TestModel(unittest.TestCase):
         meta.resources = {'foo': None}
         model = op.model.Model('myapp/0', meta, backend)
 
+        with self.assertRaises(RuntimeError):
+            model.resources.fetch('bar')
+
         fake_script(self, 'resource-get', 'exit 1')
-
-        with self.assertRaises(KeyError):
-            model.resources['bar']
-
-        self.assertFalse(model.resources['foo'].fetch())
-        self.assertIsNone(model.resources['foo'].path)
+        self.assertIsNone(model.resources.fetch('foo'))
 
         fake_script(self, 'resource-get', 'echo /var/lib/juju/agents/unit-test-0/resources/foo/foo.tgz')
-        self.assertTrue(model.resources['foo'].fetch())
-        self.assertEqual(model.resources['foo'].path.name, 'foo.tgz')
+        self.assertEqual(model.resources.fetch('foo').name, 'foo.tgz')
 
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):

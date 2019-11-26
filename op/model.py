@@ -15,7 +15,7 @@ class Model:
         self.app = self.unit.app
         self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
-        self.resources = {name: Resource(name, backend) for name in meta.resources}
+        self.resources = Resources(list(meta.resources), self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -240,28 +240,30 @@ class ConfigData(LazyMapping):
         return self._backend.config_get()
 
 
-class Resource:
-    """Object representing a resource for the charm.
+class Resources:
+    """Object representing resources for the charm.
     """
-    def __init__(self, name, backend):
-        self.name = name
+    def __init__(self, names, backend):
+        self._names = names
         self._backend = backend
-        self.path = None
 
-    def fetch(self):
+    def fetch(self, name):
         """Fetch the resource from the controller or store.
 
-        If successfully fetched, this returns True and the resource file can be
-        accessed via the path attribute.
+        If successfully fetched, this returns a Path object to where the resource is stored
+        on disk, otherwise it returns None.
         """
+        if name not in self._names:
+            raise RuntimeError(f'invalid resource name: {name}')
         try:
-            filename = self._backend.resource_get(self.name)
+            filename = self._backend.resource_get(name)
             if filename:
-                self.path = Path(filename)
-                return True
+                return Path(filename)
+            else:
+                return None
         except CalledProcessError:
             # The resource was not attached (local charm) or could not be fetched from the controller.
-            return False
+            return None
 
 
 class ModelError(Exception):
