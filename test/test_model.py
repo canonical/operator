@@ -72,12 +72,14 @@ class FakeModelBackend:
             'qux': True,
         }
 
-
 class TestModel(unittest.TestCase):
 
     def setUp(self):
         self.backend = FakeModelBackend()
         self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
+        self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
 
     def test_model(self):
         self.assertIs(self.model.app, self.model.unit.app)
@@ -175,6 +177,43 @@ class TestModel(unittest.TestCase):
             # Confirm that we cannot modify config values.
             self.model.config['foo'] = 'bar'
 
+    def test_is_leader(self):
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        def check_remote_units():
+            fake_script(self, 'relation-ids',
+                        """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+
+            fake_script(self, 'relation-list',
+                        """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+
+            # Cannot determine leadership for remote units.
+            for u in self.model.get_relation('db1').units:
+                with self.assertRaises(RuntimeError):
+                    u.is_leader()
+
+        fake_script(self, 'is-leader', 'echo true')
+        self.assertTrue(self.model.unit.is_leader())
+
+        check_remote_units()
+
+        self.backend = op.model.ModelBackend()
+        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+
+        fake_script(self, 'is-leader', 'echo false')
+        self.assertFalse(self.model.unit.is_leader())
+
+        check_remote_units()
+
+        self.assertEqual(fake_script_calls(self), [
+            ['is-leader', '--format=json'],
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+            ['is-leader', '--format=json'],
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+        ])
 
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):
