@@ -18,11 +18,8 @@ class FakeModelBackend:
     def __init__(self):
         self.relation_set_calls = []
 
-        self.local_unit_name = 'myapp/0'
-        self.local_app_name = 'myapp'
-
-    def local_app_name(self):
-        return 'myapp'
+        self.unit_name = 'myapp/0'
+        self.app_name = 'myapp'
 
     def relation_ids(self, relation_name):
         return {
@@ -104,14 +101,14 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(op.model.TooManyRelatedApps):
             self.model.get_relation('db2')
 
-    def test_remote_units_is_local(self):
+    def test_remote_units_is_our(self):
         for u in self.model.get_relation('db1').units:
-            self.assertFalse(u.is_local)
-            self.assertFalse(u.app.is_local)
+            self.assertFalse(u._is_our_unit)
+            self.assertFalse(u.app._is_our_app)
 
-    def test_local_unit_is_local(self):
-        self.assertTrue(self.model.unit.is_local)
-        self.assertTrue(self.model.unit.app.is_local)
+    def test_our_unit_is_our(self):
+        self.assertTrue(self.model.unit._is_our_unit)
+        self.assertTrue(self.model.unit.app._is_our_app)
 
     def test_relation_data(self):
         random_unit = self.model._cache.get(op.model.Unit, 'randomunit/0')
@@ -130,7 +127,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(self.backend.relation_set_calls, [])
         self.assertNotIn('foo', rel_db1.data[remoteapp1_0])
 
-    def test_relation_data_modify_local(self):
+    def test_relation_data_modify_our(self):
         rel_db1 = self.model.get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
