@@ -246,6 +246,7 @@ class Resources:
     def __init__(self, names, backend):
         self._names = names
         self._backend = backend
+        self._path = None
 
     def fetch(self, name):
         """Fetch the resource from the controller or store.
@@ -255,15 +256,15 @@ class Resources:
         """
         if name not in self._names:
             raise RuntimeError(f'invalid resource name: {name}')
-        try:
-            filename = self._backend.resource_get(name)
-            if filename:
-                return Path(filename)
-            else:
-                return None
-        except CalledProcessError:
-            # The resource was not attached (local charm) or could not be fetched from the controller.
-            return None
+        if self._path is None:
+            try:
+                filename = self._backend.resource_get(name)
+                if filename:
+                    self._path = Path(filename)
+            except CalledProcessError:
+                # The resource was not attached (local charm) or could not be fetched from the controller.
+                pass
+        return self._path
 
 
 class ModelError(Exception):
