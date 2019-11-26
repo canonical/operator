@@ -3,6 +3,7 @@
 import unittest
 import tempfile
 import shutil
+import gc
 
 from pathlib import Path
 
@@ -311,10 +312,10 @@ class TestFramework(unittest.TestCase):
         framework.observe(pub.on.foo, obs)
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo"])
-        # Now delete the observer, and note that
-        # when we emit the event, it doesn't update
-        # the local slice again
+        # Now delete the observer, and note that when we emit the event, it
+        # doesn't update the local slice again
         del obs
+        gc.collect()
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo"])
 
