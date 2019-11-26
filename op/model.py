@@ -7,10 +7,10 @@ from subprocess import run, PIPE, CalledProcessError
 
 
 class Model:
-    def __init__(self, local_unit_name, relation_names, backend):
+    def __init__(self, unit_name, relation_names, backend):
         self._cache = ModelCache(backend)
         self._backend = backend
-        self.unit = self.get_unit(local_unit_name)
+        self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
@@ -70,7 +70,7 @@ class Application:
         self._backend = backend
         self._cache = cache
 
-        self.is_local = self.name == self._backend.local_app_name
+        self._is_our_app = self.name == self._backend.app_name
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -86,13 +86,13 @@ class Unit:
         self._backend = backend
         self._cache = cache
 
-        self.is_local = self.name == self._backend.local_unit_name
+        self._is_our_unit = self.name == self._backend.unit_name
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
     def is_leader(self):
-        if self.is_local:
+        if self._is_our_unit:
             # This value is not cached as it is not guaranteed to persist for the whole duration
             # of a hook execution.
             return self._backend.is_leader()
@@ -128,8 +128,8 @@ class LazyMapping(Mapping, ABC):
 
 class RelationMapping(Mapping):
     """Map of relation names to lists of Relation instances."""
-    def __init__(self, relation_names, local_unit, backend, cache):
-        self._local_unit = local_unit
+    def __init__(self, relation_names, our_unit, backend, cache):
+        self._our_unit = our_unit
         self._backend = backend
         self._cache = cache
         self._data = {relation_name: None for relation_name in relation_names}
@@ -148,12 +148,12 @@ class RelationMapping(Mapping):
         if relation_list is None:
             relation_list = self._data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
-                relation_list.append(Relation(relation_name, relation_id, self._local_unit, self._backend, self._cache))
+                relation_list.append(Relation(relation_name, relation_id, self._our_unit, self._backend, self._cache))
         return relation_list
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, local_unit, backend, cache):
+    def __init__(self, relation_name, relation_id, our_unit, backend, cache):
         self.name = relation_name
         self.id = relation_id
         self.app = None
@@ -167,16 +167,16 @@ class Relation:
         except RelationNotFound:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
-        self.data = RelationData(self, local_unit, backend)
+        self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
 
 class RelationData(Mapping):
-    def __init__(self, relation, local_unit, backend):
+    def __init__(self, relation, our_unit, backend):
         self.relation = weakref.proxy(relation)
-        self._data = {local_unit: RelationUnitData(self.relation, local_unit, True, backend)}
+        self._data = {our_unit: RelationUnitData(self.relation, our_unit, True, backend)}
         self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
 
     def __contains__(self, key):
@@ -259,8 +259,8 @@ class RelationNotFound(ModelError):
 
 class ModelBackend:
     def __init__(self):
-        self.local_unit_name = os.environ['JUJU_UNIT_NAME']
-        self.local_app_name = self.local_unit_name.split('/')[0]
+        self.unit_name = os.environ['JUJU_UNIT_NAME']
+        self.app_name = self.unit_name.split('/')[0]
 
     def _run(self, *args):
         result = run(args + ('--format=json',), stdout=PIPE, stderr=PIPE, check=True)
