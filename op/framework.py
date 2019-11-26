@@ -599,9 +599,6 @@ class BoundStoredState:
         self.__dict__["_data"] = data
         self.__dict__["_attr_name"] = attr_name
 
-        # TODO: Use weak references to make sure observers are garbage collected as a new observer will
-        # be created every time an instance of BoundStoredState is created.
-
         parent.framework.observe(parent.framework.on.commit, self._data)
 
     def __getattr__(self, key):
