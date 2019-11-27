@@ -299,7 +299,7 @@ class Status(ABC):
 
     _statuses = {}
 
-    def __init__(self, message=''):
+    def __init__(self, message):
         self.message = message
 
     def __new__(cls, *args, **kwargs):
@@ -324,6 +324,9 @@ class Status(ABC):
 class ActiveStatus(Status):
     """The unit believes it is correctly offering all the services it has been asked to offer."""
     name = 'active'
+
+    def __init__(self, message=''):
+        super().__init__(message)
 
 class BlockedStatus(Status):
     """The unit needs manual intervention to get back to the Running state."""
