@@ -220,28 +220,23 @@ class TestModel(unittest.TestCase):
         self.backend = op.model.ModelBackend()
         self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
 
-        test_cases = (
-            (
-                op.model.ActiveStatus('Green'),
-                lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
-            ),
-            (
-                op.model.MaintenanceStatus('Yellow'),
-                lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'maintenance', 'Yellow']]),
-            ),
-            (
-                op.model.BlockedStatus('Red'),
-                lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'blocked', 'Red']]),
-            ),
-            (
-                op.model.WaitingStatus('White'),
-                lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'waiting', 'White']]),
-            ),
-        )
+        test_cases = [(
+            op.model.ActiveStatus('Green'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
+        ), (
+            op.model.MaintenanceStatus('Yellow'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'maintenance', 'Yellow']]),
+        ), (
+            op.model.BlockedStatus('Red'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'blocked', 'Red']]),
+        ), (
+            op.model.WaitingStatus('White'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'waiting', 'White']]),
+        )]
 
         for target_status, setup_tools, check_tool_calls in test_cases:
             setup_tools()
@@ -258,28 +253,23 @@ class TestModel(unittest.TestCase):
 
         fake_script(self, 'is-leader', 'echo true')
 
-        test_cases = (
-            (
-                op.model.ActiveStatus('Green'),
-                lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertIn(['status-set', '--application=True', 'active', 'Green'], fake_script_calls(self, True)),
-            ),
-            (
-                op.model.MaintenanceStatus('Yellow'),
-                lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'], fake_script_calls(self, True)),
-            ),
-            (
-                op.model.BlockedStatus('Red'),
-                lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertIn(['status-set', '--application=True', 'blocked', 'Red'], fake_script_calls(self, True)),
-            ),
-            (
-                op.model.WaitingStatus('White'),
-                lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertIn(['status-set', '--application=True', 'waiting', 'White'], fake_script_calls(self, True)),
-            ),
-        )
+        test_cases = [(
+            op.model.ActiveStatus('Green'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'active', 'Green'], fake_script_calls(self, True)),
+        ), (
+            op.model.MaintenanceStatus('Yellow'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'], fake_script_calls(self, True)),
+        ), (
+            op.model.BlockedStatus('Red'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'blocked', 'Red'], fake_script_calls(self, True)),
+        ), (
+            op.model.WaitingStatus('White'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'waiting', 'White'], fake_script_calls(self, True)),
+        )]
 
         for target_status, setup_tools, check_tool_calls in test_cases:
             setup_tools()
@@ -324,6 +314,16 @@ class TestModel(unittest.TestCase):
             ['is-leader', '--format=json'],
             ['status-set', '--application=True', 'unknown', ''],
         ])
+
+    def test_status_set_is_app_not_bool_raises(self):
+        self.backend = op.model.ModelBackend()
+
+        with self.assertRaises(RuntimeError):
+            self.backend.status_set(op.model.ActiveStatus)
+
+        for is_app_v in [None, 1, 2.0, 'a', b'beef']:
+            with self.assertRaises(RuntimeError):
+                self.backend.status_set(op.model.ActiveStatus, is_app=is_app_v)
 
     def test_remote_unit_status(self):
         self.backend = op.model.ModelBackend()
