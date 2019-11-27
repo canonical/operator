@@ -6,6 +6,7 @@ import sqlite3
 import collections
 import collections.abc
 import keyword
+import weakref
 
 
 class Handle:
@@ -371,8 +372,8 @@ class Framework(Object):
         self.meta = meta
         self.model = model
         self._event_count = 0
-        self._observers = []      # [(observer, method_name, parent_path, event_key)]
-        self._observer = {}       # {observer_path: observer}
+        self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
+        self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}
         self._type_registry = {}  # {(parent_path, kind): cls}
         self._type_known = set()  # {cls}
 
@@ -497,6 +498,7 @@ class Framework(Object):
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent_path = event.handle.parent.path
+        # TODO Track observers by (parent_path, event_kind) rather than as a list of all observers. Avoiding linear search through all observers for every event
         for observer_path, method_name, _parent_path, _event_kind in self._observers:
             if _parent_path != parent_path:
                 continue
@@ -601,9 +603,6 @@ class BoundStoredState:
         # __dict__ is used to avoid infinite recursion.
         self.__dict__["_data"] = data
         self.__dict__["_attr_name"] = attr_name
-
-        # TODO: Use weak references to make sure observers are garbage collected as a new observer will
-        # be created every time an instance of BoundStoredState is created.
 
         parent.framework.observe(parent.framework.on.commit, self._data)
 

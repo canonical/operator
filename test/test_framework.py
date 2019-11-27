@@ -3,6 +3,7 @@
 import unittest
 import tempfile
 import shutil
+import gc
 
 from pathlib import Path
 
@@ -288,6 +289,37 @@ class TestFramework(unittest.TestCase):
         #    we'd get a foo=3).
         #
         self.assertEqual(obs.seen, ["on_foo:foo=2", "on_foo:foo=2"])
+
+    def test_weak_observer(self):
+        framework = self.create_framework()
+
+        observed_events = []
+
+        class MyEvent(EventBase):
+            pass
+
+        class MyEvents(EventsBase):
+            foo = Event(MyEvent)
+
+        class MyNotifier(Object):
+            on = MyEvents()
+
+        class MyObserver(Object):
+            def on_foo(self, event):
+                observed_events.append("foo")
+
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "2")
+
+        framework.observe(pub.on.foo, obs)
+        pub.on.foo.emit()
+        self.assertEqual(observed_events, ["foo"])
+        # Now delete the observer, and note that when we emit the event, it
+        # doesn't update the local slice again
+        del obs
+        gc.collect()
+        pub.on.foo.emit()
+        self.assertEqual(observed_events, ["foo"])
 
     def test_events_base(self):
         framework = self.create_framework()
