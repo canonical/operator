@@ -243,6 +243,7 @@ class ConfigData(LazyMapping):
 class Resources:
     """Object representing resources for the charm.
     """
+
     def __init__(self, names, backend):
         self._backend = backend
         self._paths = {name: None for name in names}
