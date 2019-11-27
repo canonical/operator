@@ -372,7 +372,7 @@ class Framework(Object):
         self.meta = meta
         self.model = model
         self._event_count = 0
-        self._observers = []      # [(observer, method_name, parent_path, event_key)]
+        self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
         self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}
         self._type_registry = {}  # {(parent_path, kind): cls}
         self._type_known = set()  # {cls}
