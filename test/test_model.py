@@ -258,46 +258,26 @@ class TestModel(unittest.TestCase):
 
         fake_script(self, 'is-leader', 'echo true')
 
-        # TODO: update after is-leader caching optimization is merged
-        # this will break those test cases as is-leader hook tool invocation
-        # will depend on time.
-
         test_cases = (
             (
                 op.model.ActiveStatus('Green'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertEqual(fake_script_calls(self, True), [
-                    ['is-leader', '--format=json'],
-                    ['status-set', '--application=True', 'active', 'Green'],
-                    ['is-leader', '--format=json'],
-                ]),
+                lambda: self.assertIn(['status-set', '--application=True', 'active', 'Green'], fake_script_calls(self, True)),
             ),
             (
                 op.model.MaintenanceStatus('Yellow'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertEqual(fake_script_calls(self, True), [
-                    ['is-leader', '--format=json'],
-                    ['status-set', '--application=True', 'maintenance', 'Yellow'],
-                    ['is-leader', '--format=json'],
-                ]),
+                lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'], fake_script_calls(self, True)),
             ),
             (
                 op.model.BlockedStatus('Red'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertEqual(fake_script_calls(self, True), [
-                    ['is-leader', '--format=json'],
-                    ['status-set', '--application=True', 'blocked', 'Red'],
-                    ['is-leader', '--format=json'],
-                ]),
+                lambda: self.assertIn(['status-set', '--application=True', 'blocked', 'Red'], fake_script_calls(self, True)),
             ),
             (
                 op.model.WaitingStatus('White'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
-                lambda: self.assertEqual(fake_script_calls(self, True), [
-                    ['is-leader', '--format=json'],
-                    ['status-set', '--application=True', 'waiting', 'White'],
-                    ['is-leader', '--format=json'],
-                ]),
+                lambda: self.assertIn(['status-set', '--application=True', 'waiting', 'White'], fake_script_calls(self, True)),
             ),
         )
 
