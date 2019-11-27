@@ -128,6 +128,7 @@ class LazyMapping(Mapping, ABC):
 
 class RelationMapping(Mapping):
     """Map of relation names to lists of Relation instances."""
+
     def __init__(self, relation_names, our_unit, backend, cache):
         self._our_unit = our_unit
         self._backend = backend
