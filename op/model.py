@@ -292,19 +292,20 @@ class ModelBackend:
         self.unit_name = os.environ['JUJU_UNIT_NAME']
         self.app_name = self.unit_name.split('/')[0]
 
-    def _run(self, *args):
-        result = run(args + ('--format=json',), stdout=PIPE, stderr=PIPE, check=True)
-        text = result.stdout.decode('utf8')
-        data = json.loads(text)
-        return data
-
-    def _run_text(self, *args):
-        result = run(args, stdout=PIPE, stderr=PIPE, check=True)
-        text = result.stdout.decode('utf8')
-        return text
-
-    def _run_no_output(self, *args):
-        run(args, check=True)
+    def _run(self, *args, capture_output=True, use_json=True):
+        if capture_output:
+            kwargs = dict(stdout=PIPE, stderr=PIPE)
+            if use_json:
+                args += ('--format=json',)
+        else:
+            kwargs = dict()
+        result = run(args, check=True, **kwargs)
+        if capture_output:
+            text = result.stdout.decode('utf8')
+            if use_json:
+                return json.loads(text)
+            else:
+                return text
 
     def relation_ids(self, relation_name):
         relation_ids = self._run('relation-ids', relation_name)
@@ -336,7 +337,7 @@ class ModelBackend:
 
     def relation_set(self, relation_id, key, value):
         try:
-            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
+            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', capture_output=False)
         except CalledProcessError as e:
             if b'relation not found' in e.stderr:
                 raise RelationNotFound() from e
@@ -350,4 +351,4 @@ class ModelBackend:
         return self._run('is-leader')
 
     def resource_get(self, resource_name):
-        return self._run_text('resource-get', resource_name).strip()
+        return self._run('resource-get', resource_name, use_json=False).strip()
