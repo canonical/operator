@@ -8,7 +8,7 @@ python:
 
 install:
     - sudo apt update
-    - sudo apt install flake8 autopep8
+    - sudo apt install flake8 python-autopep8
     - pip3 install pyyaml
 
 script:
