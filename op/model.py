@@ -329,12 +329,14 @@ class ModelBackend:
 
     def pod_spec_set(self, spec, k8s_resources):
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
-        spec_file = tmpdir / 'spec.json'
-        k8s_res_file = tmpdir / 'k8s-resources.json'
         try:
-            spec_file.write_text(json.dumps(spec))
+            spec_path = tmpdir / 'spec.json'
+            spec_path.write_text(json.dumps(spec))
+            args = ['--spec', str(spec_path)]
             if k8s_resources:
-                k8s_res_file.write_text(json.dumps(k8s_resources))
-            self._run_no_output('pod-spec-set', '--spec', str(spec_file), '--k8s-resources', str(k8s_res_file))
+                k8s_res_path = tmpdir / 'k8s-resources.json'
+                k8s_res_path.write_text(json.dumps(k8s_resources))
+                args.extend(['--k8s-resources', str(k8s_res_path)])
+            self._run_no_output('pod-spec-set', *args)
         finally:
             shutil.rmtree(tmpdir)
