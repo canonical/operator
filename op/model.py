@@ -252,18 +252,12 @@ class Resources:
         """Fetch the resource from the controller or store.
 
         If successfully fetched, this returns a Path object to where the resource is stored
-        on disk, otherwise it returns None.
+        on disk, otherwise it raises a CalledProcessError.
         """
         if name not in self._paths:
             raise RuntimeError(f'invalid resource name: {name}')
         if self._paths[name] is None:
-            try:
-                filename = self._backend.resource_get(name)
-                if filename:
-                    self._paths[name] = Path(filename)
-            except CalledProcessError:
-                # The resource was not attached (local charm) or could not be fetched from the controller.
-                pass
+            self._paths[name] = Path(self._backend.resource_get(name))
         return self._paths[name]
 
 
