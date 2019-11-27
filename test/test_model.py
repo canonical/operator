@@ -8,7 +8,6 @@ import shutil
 import unittest
 
 import op.model
-import op.status
 
 
 # TODO: We need some manner of test to validate the actual ModelBackend implementation, round-tripped
@@ -215,7 +214,7 @@ class TestModel(unittest.TestCase):
 
     def test_base_status_instance_raises(self):
         with self.assertRaises(TypeError):
-            op.status.Status('test')
+            op.model.Status('test')
 
     def test_local_set_valid_unit_status(self):
         self.backend = op.model.ModelBackend()
@@ -223,22 +222,22 @@ class TestModel(unittest.TestCase):
 
         test_cases = (
             (
-                op.status.Active('Green'),
+                op.model.ActiveStatus('Green'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
                 lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
             ),
             (
-                op.status.Maintenance('Yellow'),
+                op.model.MaintenanceStatus('Yellow'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
                 lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'maintenance', 'Yellow']]),
             ),
             (
-                op.status.Blocked('Red'),
+                op.model.BlockedStatus('Red'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
                 lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'blocked', 'Red']]),
             ),
             (
-                op.status.Waiting('White'),
+                op.model.WaitingStatus('White'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
                 lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'waiting', 'White']]),
             ),
@@ -265,7 +264,7 @@ class TestModel(unittest.TestCase):
 
         test_cases = (
             (
-                op.status.Active('Green'),
+                op.model.ActiveStatus('Green'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
                 lambda: self.assertEqual(fake_script_calls(self, True), [
                     ['is-leader', '--format=json'],
@@ -274,7 +273,7 @@ class TestModel(unittest.TestCase):
                 ]),
             ),
             (
-                op.status.Maintenance('Yellow'),
+                op.model.MaintenanceStatus('Yellow'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
                 lambda: self.assertEqual(fake_script_calls(self, True), [
                     ['is-leader', '--format=json'],
@@ -283,7 +282,7 @@ class TestModel(unittest.TestCase):
                 ]),
             ),
             (
-                op.status.Blocked('Red'),
+                op.model.BlockedStatus('Red'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
                 lambda: self.assertEqual(fake_script_calls(self, True), [
                     ['is-leader', '--format=json'],
@@ -292,7 +291,7 @@ class TestModel(unittest.TestCase):
                 ]),
             ),
             (
-                op.status.Waiting('White'),
+                op.model.WaitingStatus('White'),
                 lambda: fake_script(self, 'status-set', 'exit 0'),
                 lambda: self.assertEqual(fake_script_calls(self, True), [
                     ['is-leader', '--format=json'],
@@ -321,7 +320,7 @@ class TestModel(unittest.TestCase):
             self.model.app.status
 
         with self.assertRaises(RuntimeError):
-            self.model.app.status = op.status.Active()
+            self.model.app.status = op.model.ActiveStatus()
 
     def test_local_set_invalid_status(self):
         self.backend = op.model.ModelBackend()
@@ -331,14 +330,14 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'is-leader', 'echo true')
 
         with self.assertRaises(subprocess.CalledProcessError):
-            self.model.unit.status = op.status.Unknown()
+            self.model.unit.status = op.model.UnknownStatus()
 
         self.assertEqual(fake_script_calls(self, True), [
             ['status-set', '--application=False', 'unknown', ''],
         ])
 
         with self.assertRaises(subprocess.CalledProcessError):
-            self.model.app.status = op.status.Unknown()
+            self.model.app.status = op.model.UnknownStatus()
 
         # A leadership check is needed for application status.
         self.assertEqual(fake_script_calls(self, True), [
@@ -356,11 +355,11 @@ class TestModel(unittest.TestCase):
         remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
 
         test_statuses = (
-            op.status.Unknown(),
-            op.status.Active('Green'),
-            op.status.Maintenance('Yellow'),
-            op.status.Blocked('Red'),
-            op.status.Waiting('White'),
+            op.model.UnknownStatus(),
+            op.model.ActiveStatus('Green'),
+            op.model.MaintenanceStatus('Yellow'),
+            op.model.BlockedStatus('Red'),
+            op.model.WaitingStatus('White'),
         )
 
         for target_status in test_statuses:
@@ -371,14 +370,14 @@ class TestModel(unittest.TestCase):
         remoteapp1 = self.model.get_relation('db1').app
 
         # Remote application status is always unknown.
-        self.assertIsInstance(remoteapp1.status, op.status.Unknown)
+        self.assertIsInstance(remoteapp1.status, op.model.UnknownStatus)
 
         test_statuses = (
-            op.status.Unknown(),
-            op.status.Active('Ready'),
-            op.status.Maintenance('Upgrading software'),
-            op.status.Blocked('Awaiting manual resolution'),
-            op.status.Waiting('Awaiting related app updates'),
+            op.model.UnknownStatus(),
+            op.model.ActiveStatus('Ready'),
+            op.model.MaintenanceStatus('Upgrading software'),
+            op.model.BlockedStatus('Awaiting manual resolution'),
+            op.model.WaitingStatus('Awaiting related app updates'),
         )
         for target_status in test_statuses:
             with self.assertRaises(RuntimeError):

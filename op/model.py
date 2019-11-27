@@ -5,8 +5,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from subprocess import run, PIPE, CalledProcessError
 
-import op.status
-from op.status import Status
 
 class Model:
     def __init__(self, unit_name, relation_names, backend):
@@ -78,7 +76,7 @@ class Application:
     @property
     def status(self):
         if not self._is_our_app:
-            return op.status.Unknown()
+            return UnknownStatus()
 
         if not self._backend.is_leader():
             raise RuntimeError('cannot get application status as a non-leader unit')
@@ -126,7 +124,7 @@ class Unit:
     @property
     def status(self):
         if not self._is_our_unit:
-            return op.status.Unknown()
+            return UnknownStatus()
 
         if self._status:
             return self._status
@@ -295,6 +293,60 @@ class ConfigData(LazyMapping):
 
     def _load(self):
         return self._backend.config_get()
+
+class Status(ABC):
+    """Status values specific to applications and units."""
+
+    _statuses = {}
+
+    def __init__(self, message=''):
+        self.message = message
+
+    def __new__(cls, *args, **kwargs):
+        if cls is Status:
+            raise TypeError("cannot instantiate a base class")
+
+        return super().__new__(cls)
+
+    @classmethod
+    def _register_status(cls, name, type_):
+        """For use by subclasses only."""
+        cls._statuses[name] = type_
+
+    @classmethod
+    def from_string(cls, name, message):
+        return cls._statuses[name](message)
+
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+        Status._register_status(cls.name, cls)
+
+class ActiveStatus(Status):
+    """The unit believes it is correctly offering all the services it has been asked to offer."""
+    name = 'active'
+
+class BlockedStatus(Status):
+    """The unit needs manual intervention to get back to the Running state."""
+    name = 'blocked'
+
+class MaintenanceStatus(Status):
+    """
+    The unit is not yet providing services, but is actively doing work in preparation for providing those services.
+    This is a "spinning" state, not an error state. It reflects activity on the unit itself, not on peers or related units.
+    """
+    name = 'maintenance'
+
+class UnknownStatus(Status):
+    """A unit-agent has finished calling install, config-changed and start, but the charm has not called status-set yet."""
+    name = 'unknown'
+
+    def __init__(self, message=''):
+        # Unknown status cannot be set and does not have a message associated with it.
+        super().__init__('')
+
+class WaitingStatus(Status):
+    """The unit is unable to progress to an active state because an application to which it is related is not running."""
+    name = 'waiting'
 
 
 class ModelError(Exception):
