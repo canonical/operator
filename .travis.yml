@@ -8,9 +8,10 @@ python:
 
 install:
     - sudo apt update
-    - sudo apt install flake8
+    - sudo apt install flake8 autopep8
     - pip3 install pyyaml
 
 script:
     - python3 -m unittest
     - flake8
+    - autopep8 -r --aggressive --diff --exit-code .
