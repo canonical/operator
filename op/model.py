@@ -368,7 +368,8 @@ class ModelBackend:
         The value is cached for the duration of a lease which is 30s in Juju.
         """
         if datetime.timedelta(seconds=time.monotonic() - self._leader_check_time) > self.LEASE_REFRESH_PERIOD or self._is_leader is None:
-            # Record the time before executing is-leader to account for the execution delay and so make the next check to happen earlier.
+            # Current time MUST be saved before running is-leader to ensure the cache
+            # is only used inside the window that is-leader itself asserts.
             self._leader_check_time = time.monotonic()
             self._is_leader = self._run('is-leader')
 
