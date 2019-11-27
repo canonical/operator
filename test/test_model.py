@@ -220,17 +220,18 @@ class TestModel(unittest.TestCase):
     def test_resources(self):
         backend = op.model.ModelBackend()
         meta = op.charm.CharmMeta()
-        meta.resources = {'foo': None}
+        meta.resources = {'foo': None, 'bar': None}
         model = op.model.Model('myapp/0', meta, backend)
 
         with self.assertRaises(RuntimeError):
-            model.resources.fetch('bar')
+            model.resources.fetch('qux')
 
         fake_script(self, 'resource-get', 'exit 1')
         self.assertIsNone(model.resources.fetch('foo'))
 
-        fake_script(self, 'resource-get', 'echo /var/lib/juju/agents/unit-test-0/resources/foo/foo.tgz')
+        fake_script(self, 'resource-get', 'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
         self.assertEqual(model.resources.fetch('foo').name, 'foo.tgz')
+        self.assertEqual(model.resources.fetch('bar').name, 'bar.tgz')
 
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):

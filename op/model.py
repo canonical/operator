@@ -244,9 +244,8 @@ class Resources:
     """Object representing resources for the charm.
     """
     def __init__(self, names, backend):
-        self._names = names
         self._backend = backend
-        self._path = None
+        self._paths = {name: None for name in names}
 
     def fetch(self, name):
         """Fetch the resource from the controller or store.
@@ -254,17 +253,17 @@ class Resources:
         If successfully fetched, this returns a Path object to where the resource is stored
         on disk, otherwise it returns None.
         """
-        if name not in self._names:
+        if name not in self._paths:
             raise RuntimeError(f'invalid resource name: {name}')
-        if self._path is None:
+        if self._paths[name] is None:
             try:
                 filename = self._backend.resource_get(name)
                 if filename:
-                    self._path = Path(filename)
+                    self._paths[name] = Path(filename)
             except CalledProcessError:
                 # The resource was not attached (local charm) or could not be fetched from the controller.
                 pass
-        return self._path
+        return self._paths[name]
 
 
 class ModelError(Exception):
