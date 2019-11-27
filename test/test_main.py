@@ -50,13 +50,15 @@ class SymlinkTargetError(Exception):
     pass
 
 
-class SimulatedEventSpec:
-    def __init__(self, event_type, event_name, relation_id=None, remote_app=None, remote_unit=None):
+class EventSpec:
+    def __init__(self, event_type, event_name, relation_id=None, remote_app=None, remote_unit=None,
+                 charm_config=None):
         self.event_type = event_type
         self.event_name = event_name
-        self.relation_id = str(relation_id)
+        self.relation_id = relation_id
         self.remote_app = remote_app
         self.remote_unit = remote_unit
+        self.charm_config = charm_config
 
 
 class TestMain(unittest.TestCase):
@@ -115,25 +117,25 @@ class TestMain(unittest.TestCase):
                 state_file.truncate()
         return state
 
-    def _simulate_event(self, event_spec, charm_config):
+    def _simulate_event(self, event_spec):
         event_hook = JUJU_CHARM_DIR / f"hooks/{event_spec.event_name.replace('_', '-')}"
         env = {
             'PATH': str(Path(__file__).parent / 'bin'),
             'JUJU_CHARM_DIR': JUJU_CHARM_DIR,
             'JUJU_UNIT_NAME': 'test_main/0',
-            'CHARM_CONFIG': charm_config,
+            'CHARM_CONFIG': event_spec.charm_config,
         }
         if issubclass(event_spec.event_type, RelationEvent):
             rel_name = event_spec.event_name.split('_')[0]
             env.update({
                 'JUJU_RELATION': rel_name,
-                'JUJU_RELATION_ID': event_spec.relation_id,
+                'JUJU_RELATION_ID': str(event_spec.relation_id),
             })
             remote_app = event_spec.remote_app
             if remote_app is None:
                 remote_app = ''
 
-            env['JUJU_REMOTE_UNIT'] = remote_app
+            env['JUJU_REMOTE_APP'] = remote_app
 
             remote_unit = event_spec.remote_unit
             if remote_unit is None:
@@ -158,66 +160,62 @@ class TestMain(unittest.TestCase):
         }))
 
         # First run "install" to make sure all hooks are set up.
-        state = self._simulate_event(SimulatedEventSpec(InstallEvent, 'install'), charm_config)
+        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
         self.assertEqual(state['observed_event_types'], [InstallEvent])
 
-        state = self._simulate_event(SimulatedEventSpec(ConfigChangedEvent, 'config-changed'), charm_config)
+        state = self._simulate_event(EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config))
         self.assertEqual(state['observed_event_types'], [ConfigChangedEvent])
 
         # Re-emit should pick the deferred config-changed.
-        state = self._simulate_event(SimulatedEventSpec(UpdateStatusEvent, 'update-status'), charm_config)
+        state = self._simulate_event(EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config))
         self.assertEqual(state['observed_event_types'], [ConfigChangedEvent, UpdateStatusEvent])
 
     def test_multiple_events_handled(self):
-        # Sample events with a different amount of dashes used
-        # and with endpoints from different sections of metadata.yaml
-        events_under_test = (
-            (
-                SimulatedEventSpec(InstallEvent, 'install'),
-                {},
-            ),
-            (
-                SimulatedEventSpec(UpdateStatusEvent, 'update_status'),
-                {},
-            ),
-            (
-                SimulatedEventSpec(LeaderSettingsChangedEvent, 'leader_settings_changed'),
-                {},
-            ),
-            (
-                SimulatedEventSpec(RelationJoinedEvent, 'db_relation_joined', relation_id=1, remote_app='remote', remote_unit='remote/0'),
-                {'relation_name': 'db', 'relation_id': 1, 'app_name': 'remote', 'unit_name': 'remote/0'},
-            ),
-            (
-                SimulatedEventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2, remote_app='remote', remote_unit='remote/0'),
-                {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
-            ),
-            (
-                SimulatedEventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2, remote_app='remote', remote_unit=None),
-                {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': None},
-            ),
-            (
-                SimulatedEventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2, remote_app='remote', remote_unit='remote/0'),
-                {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
-            ),
-            (
-                SimulatedEventSpec(RelationBrokenEvent, 'ha_relation_broken', relation_id=3),
-                {'relation_name': 'ha', 'relation_id': 3},
-            )
-        )
-
-        logger.debug(f'Expected events {events_under_test}')
-
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
 
+        # Sample events with a different amount of dashes used
+        # and with endpoints from different sections of metadata.yaml
+        events_under_test = [(
+            EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            {},
+        ), (
+            EventSpec(UpdateStatusEvent, 'update_status', charm_config=charm_config),
+            {},
+        ), (
+            EventSpec(LeaderSettingsChangedEvent, 'leader_settings_changed', charm_config=charm_config),
+            {},
+        ), (
+            EventSpec(RelationJoinedEvent, 'db_relation_joined', relation_id=1,
+                      remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
+            {'relation_name': 'db', 'relation_id': 1, 'app_name': 'remote', 'unit_name': 'remote/0'},
+        ), (
+            EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
+                      remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
+            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
+        ), (
+            EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
+                      remote_app='remote', remote_unit=None, charm_config=charm_config),
+            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': None},
+        ), (
+            EventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2,
+                      remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
+            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
+        ), (
+            EventSpec(RelationBrokenEvent, 'ha_relation_broken', relation_id=3,
+                      charm_config=charm_config),
+            {'relation_name': 'ha', 'relation_id': 3},
+        )]
+
+        logger.debug(f'Expected events {events_under_test}')
+
         # First run "install" to make sure all hooks are set up.
-        self._simulate_event(SimulatedEventSpec(InstallEvent, 'install'), charm_config)
+        self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
 
         # Simulate hook executions for every event.
         for event_spec, expected_event_data in events_under_test:
-            state = self._simulate_event(event_spec, charm_config)
+            state = self._simulate_event(event_spec)
 
             handled_events = state.get(f'on_{event_spec.event_name}', [])
 
@@ -246,7 +244,7 @@ class TestMain(unittest.TestCase):
         hook_path.symlink_to('install')
 
         try:
-            self._simulate_event(SimulatedEventSpec(HookEvent, 'not-implemented-event'), charm_config)
+            self._simulate_event(EventSpec(HookEvent, 'not-implemented-event', charm_config=charm_config))
         except subprocess.CalledProcessError:
             self.fail('Event simulation for an unsupported event'
                       ' results in a non-zero exit code returned')
@@ -268,12 +266,8 @@ class TestMain(unittest.TestCase):
         def _assess_setup_hooks(event_spec):
             event_hook = JUJU_CHARM_DIR / f'hooks/{event_spec.event_name}'
 
-            charm_config = base64.b64encode(pickle.dumps({
-                'STATE_FILE': self._state_file,
-            }))
-
             # Simulate a fork + exec of a hook from a unit agent.
-            self._simulate_event(event_spec, charm_config)
+            self._simulate_event(event_spec)
 
             r, _, files = next(os.walk(JUJU_CHARM_DIR / 'hooks'))
 
@@ -285,15 +279,19 @@ class TestMain(unittest.TestCase):
                 self.assertEqual(os.readlink('hooks/install'),
                                  self.CHARM_PY_RELPATH)
 
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+
         # Assess 'install' first because upgrade-charm or other
         # events cannot be handled before install creates symlinks for them.
         events_to_assess = (
-            SimulatedEventSpec(InstallEvent, 'install'),
-            SimulatedEventSpec(StartEvent, 'start'),
-            SimulatedEventSpec(ConfigChangedEvent, 'config-changed'),
-            SimulatedEventSpec(LeaderElectedEvent, 'leader-elected'),
-            SimulatedEventSpec(UpgradeCharmEvent, 'upgrade-charm'),
-            SimulatedEventSpec(UpdateStatusEvent, 'update-status'),
+            EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            EventSpec(StartEvent, 'start', charm_config=charm_config),
+            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
+            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
+            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
         )
 
         for event_spec in events_to_assess:
@@ -303,13 +301,13 @@ class TestMain(unittest.TestCase):
 
         # Storage hooks run before "install" so this case needs to be checked as well.
         events_to_assess = (
-            SimulatedEventSpec(StorageAttachedEvent, 'disks-storage-attached'),
-            SimulatedEventSpec(InstallEvent, 'install'),
-            SimulatedEventSpec(StartEvent, 'start'),
-            SimulatedEventSpec(ConfigChangedEvent, 'config-changed'),
-            SimulatedEventSpec(LeaderElectedEvent, 'leader-elected'),
-            SimulatedEventSpec(UpgradeCharmEvent, 'upgrade-charm'),
-            SimulatedEventSpec(UpdateStatusEvent, 'update-status'),
+            EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+            EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            EventSpec(StartEvent, 'start', charm_config=charm_config),
+            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
+            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
+            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
         )
 
         for event_spec in events_to_assess:

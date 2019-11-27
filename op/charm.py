@@ -52,13 +52,10 @@ class RelationEvent(HookEvent):
             'relation_name': self.relation.name,
             'relation_id': self.relation.id,
         }
-
         if self.app:
             snapshot['app_name'] = self.app.name
-
         if self.unit:
             snapshot['unit_name'] = self.unit.name
-
         return snapshot
 
     def restore(self, snapshot):

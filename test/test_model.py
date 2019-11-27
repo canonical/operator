@@ -63,10 +63,10 @@ class FakeModelBackend:
         except KeyError:
             raise op.model.RelationNotFound()
 
-    def relation_set(self, relation_id, key, value, app):
+    def relation_set(self, relation_id, key, value, is_app):
         if relation_id == 5:
             raise ValueError()
-        self.relation_set_calls.append((relation_id, key, value, app))
+        self.relation_set_calls.append((relation_id, key, value, is_app))
 
     def config_get(self):
         return {
@@ -232,6 +232,24 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(ValueError):
             del rel_db2.data[self.model.unit]['host']
         self.assertIn('host', rel_db2.data[self.model.unit])
+
+    def test_relation_get_set_is_app_arg(self):
+        self.backend = op.model.ModelBackend()
+
+        # No is_app provided.
+        with self.assertRaises(TypeError):
+            self.backend.relation_set(1, 'fookey', 'barval')
+
+        with self.assertRaises(TypeError):
+            self.backend.relation_get(1, 'fooentity')
+
+        # Invalid types for is_app.
+        for is_app_v in [None, 1, 2.0, 'a', b'beef']:
+            with self.assertRaises(RuntimeError):
+                self.backend.relation_set(1, 'fookey', 'barval', is_app=is_app_v)
+
+            with self.assertRaises(RuntimeError):
+                self.backend.relation_get(1, 'fooentity', is_app=is_app_v)
 
     def test_relation_data_type_check(self):
         rel_db1 = self.model.get_relation('db1')

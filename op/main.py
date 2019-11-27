@@ -116,14 +116,20 @@ def _get_event_args(charm, bound_event):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
         relation = model.get_relation(relation_name, relation_id)
+
         remote_app_name = os.environ.get('JUJU_REMOTE_APP')
+        remote_unit_name = os.environ['JUJU_REMOTE_UNIT']
+
+        if remote_app_name is None:
+            if remote_unit_name:
+                remote_app_name = remote_unit_name.split('/')[0]
+
         if remote_app_name:
             remote_app = model.get_app(remote_app_name)
         else:
             remote_app = None
 
         if remote_app:
-            remote_unit_name = os.environ['JUJU_REMOTE_UNIT']
             if remote_unit_name:
                 remote_unit = model.get_unit(remote_unit_name)
                 return [relation, remote_app, remote_unit], {}
