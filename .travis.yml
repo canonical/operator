@@ -13,5 +13,5 @@ install:
 
 script:
     - python3 -m unittest
-    - flake8
     - autopep8 -r --aggressive --diff --exit-code .
+    - flake8
