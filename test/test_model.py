@@ -227,7 +227,8 @@ class TestModel(unittest.TestCase):
             model.resources.fetch('qux')
 
         fake_script(self, 'resource-get', 'exit 1')
-        self.assertIsNone(model.resources.fetch('foo'))
+        with self.assertRaises(subprocess.CalledProcessError):
+            model.resources.fetch('foo')
 
         fake_script(self, 'resource-get', 'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
         self.assertEqual(model.resources.fetch('foo').name, 'foo.tgz')
