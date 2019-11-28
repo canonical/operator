@@ -234,6 +234,25 @@ class TestModel(unittest.TestCase):
         self.assertEqual(model.resources.fetch('foo').name, 'foo.tgz')
         self.assertEqual(model.resources.fetch('bar').name, 'bar.tgz')
 
+    def test_pod_spec(self):
+        model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], op.model.ModelBackend())
+
+        fake_script(self, 'pod-spec-set', """
+                    cat $2 > $(dirname $0)/spec.json
+                    [[ -n $4 ]] && cat $4 > $(dirname $0)/k8s_res.json || true
+                    """)
+        spec_path = self.fake_script_path / 'spec.json'
+        k8s_res_path = self.fake_script_path / 'k8s_res.json'
+
+        model.pod.set_spec({'foo': 'bar'})
+        self.assertEqual(spec_path.read_text(), '{"foo": "bar"}')
+        self.assertFalse(k8s_res_path.exists())
+
+        model.pod.set_spec({'bar': 'foo'}, {'qux': 'baz'})
+        self.assertEqual(spec_path.read_text(), '{"bar": "foo"}')
+        self.assertEqual(k8s_res_path.read_text(), '{"qux": "baz"}')
+
+
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
