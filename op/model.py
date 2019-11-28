@@ -451,7 +451,7 @@ class ModelBackend:
 
         app -- A boolean indicating whether the status should be set for a unit or an application.
         """
-        if not type(is_app) == bool:
+        if not isinstance(is_app, bool):
             raise RuntimeError('is_app parameter must be boolean')
 
         return self._run_no_output('status-set', f'--application={is_app}', status, message)
