@@ -38,7 +38,7 @@ class FakeModelBackend:
                 6: ['remoteapp2/0'],
             }[relation_id]
         except KeyError:
-            raise op.model.RelationNotFound()
+            raise op.model.RelationNotFoundError()
 
     def relation_get(self, relation_id, member_name, app):
         try:
@@ -63,7 +63,7 @@ class FakeModelBackend:
                 },
             }[relation_id][member_name]
         except KeyError:
-            raise op.model.RelationNotFound()
+            raise op.model.RelationNotFoundError()
 
     def relation_set(self, relation_id, key, value, is_app):
         if relation_id == 5:
@@ -353,7 +353,7 @@ class TestModel(unittest.TestCase):
             model.resources.fetch('qux')
 
         fake_script(self, 'resource-get', 'exit 1')
-        with self.assertRaises(subprocess.CalledProcessError):
+        with self.assertRaises(op.model.ModelError):
             model.resources.fetch('foo')
 
         fake_script(self, 'resource-get', 'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
@@ -381,6 +381,56 @@ class TestModel(unittest.TestCase):
         self.assertEqual(k8s_res_path.read_text(), '{"qux": "baz"}')
 
 
+class TestModelBackend(unittest.TestCase):
+
+    def setUp(self):
+        os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
+        self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
+
+        self.backend = op.model.ModelBackend()
+
+    def test_relation_tool_errors(self):
+        RELATION_ERROR_MESSAGE = "ERROR invalid value \"$1\" for option -r: relation not found"
+
+        test_cases = [(
+            lambda: fake_script(self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_list(3),
+            op.model.ModelError,
+            [['relation-list', '-r', '3', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'relation-list', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_list(3),
+            op.model.RelationNotFoundError,
+            [['relation-list', '-r', '3', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'relation-set', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar'),
+            op.model.ModelError,
+            [['relation-set', '-r', '3', 'foo=bar']],
+        ), (
+            lambda: fake_script(self, 'relation-set', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar'),
+            op.model.RelationNotFoundError,
+            [['relation-set', '-r', '3', 'foo=bar']],
+        ), (
+            lambda: fake_script(self, 'relation-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_get(3, 'remote/0'),
+            op.model.ModelError,
+            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'relation-get', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_get(3, 'remote/0'),
+            op.model.RelationNotFoundError,
+            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+        )]
+
+        for do_fake, run, exception, calls in test_cases:
+            do_fake()
+            with self.assertRaises(exception):
+                run()
+            self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
@@ -398,9 +448,12 @@ def fake_script(test_case, name, content):
         f.write('#!/bin/bash\n{ echo -n $(basename $0); for s in "$@"; do echo -n \\;$s; done; echo; } >> $(dirname $0)/calls.txt\n' + content)
     os.chmod(test_case.fake_script_path / name, 0o755)
 
-def fake_script_calls(test_case):
-    with open(test_case.fake_script_path / 'calls.txt') as f:
-        return [line.split(';') for line in f.read().splitlines()]
+def fake_script_calls(test_case, clear=False):
+    with open(test_case.fake_script_path / 'calls.txt', 'r+') as f:
+        calls = [line.split(';') for line in f.read().splitlines()]
+        if clear:
+            f.truncate(0)
+        return calls
 
 
 class FakeScriptTest(unittest.TestCase):
@@ -414,3 +467,20 @@ class FakeScriptTest(unittest.TestCase):
             ['foo', 'a', 'b c'],
             ['bar', 'd e', 'f'],
         ])
+
+    def test_fake_script_clear(self):
+        fake_script(self, 'foo', 'echo foo runs')
+
+        output = subprocess.getoutput('foo a "b c"')
+        self.assertEqual(output, 'foo runs')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [['foo', 'a', 'b c']])
+
+        fake_script(self, 'bar', 'echo bar runs')
+
+        output = subprocess.getoutput('bar "d e" f')
+        self.assertEqual(output, 'bar runs')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [['bar', 'd e', 'f']])
+
+        self.assertEqual(fake_script_calls(self, clear=True), [])
