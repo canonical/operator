@@ -277,15 +277,7 @@ class Pod:
 
 
 class ModelError(Exception):
-
-    @classmethod
-    def from_exception(cls, exception):
-        if isinstance(exception, CalledProcessError):
-            if exception.cmd[0] in ('relation-list', 'relation-get', 'relation-set') and exception.returncode == 2\
-                    and b'relation not found' in exception.stderr:
-                return RelationNotFoundError
-        return ModelError
-
+    pass
 
 class TooManyRelatedApps(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
@@ -314,7 +306,7 @@ class ModelBackend:
         self._is_leader = None
         self._leader_check_time = 0
 
-    def _run(self, *args, return_output=True, use_json=True):
+    def _run(self, *args, return_output=False, use_json=False):
         kwargs = dict(stdout=PIPE, stderr=PIPE)
 
         if use_json:
@@ -323,8 +315,7 @@ class ModelBackend:
         try:
             result = run(args, check=True, **kwargs)
         except CalledProcessError as e:
-            raise ModelError.from_exception(e) from e
-
+            raise ModelError from e
         if return_output:
             if result.stdout is None:
                 return ''
@@ -336,20 +327,41 @@ class ModelBackend:
                     return text
 
     def relation_ids(self, relation_name):
-        relation_ids = self._run('relation-ids', relation_name)
+        relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id):
-        return self._run('relation-list', '-r', str(relation_id))
+        try:
+            return self._run('relation-list', '-r', str(relation_id), return_output=True, use_json=True)
+        except ModelError as exception:
+            e = exception.__cause__
+            if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-list' and\
+                    e.returncode == 2 and b'relation not found' in e.stderr:
+                raise RelationNotFoundError()
+            raise
 
     def relation_get(self, relation_id, member_name):
-        return self._run('relation-get', '-r', str(relation_id), '-', member_name)
+        try:
+            return self._run('relation-get', '-r', str(relation_id), '-', member_name, return_output=True, use_json=True)
+        except ModelError as exception:
+            e = exception.__cause__
+            if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-get' and\
+                    e.returncode == 2 and b'relation not found' in e.stderr:
+                raise RelationNotFoundError()
+            raise
 
     def relation_set(self, relation_id, key, value):
-        return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', return_output=False, use_json=False)
+        try:
+            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', return_output=False)
+        except ModelError as exception:
+            e = exception.__cause__
+            if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-set' and\
+                    e.returncode == 2 and b'relation not found' in e.stderr:
+                raise RelationNotFoundError()
+            raise
 
     def config_get(self):
-        return self._run('config-get')
+        return self._run('config-get', return_output=True, use_json=True)
 
     def is_leader(self):
         """Obtain the current leadership status for the unit the charm code is executing on.
@@ -362,12 +374,12 @@ class ModelBackend:
             # Current time MUST be saved before running is-leader to ensure the cache
             # is only used inside the window that is-leader itself asserts.
             self._leader_check_time = now
-            self._is_leader = self._run('is-leader')
+            self._is_leader = self._run('is-leader', return_output=True, use_json=True)
 
         return self._is_leader
 
     def resource_get(self, resource_name):
-        return self._run('resource-get', resource_name, use_json=False).strip()
+        return self._run('resource-get', resource_name, return_output=True, use_json=False).strip()
 
     def pod_spec_set(self, spec, k8s_resources):
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
