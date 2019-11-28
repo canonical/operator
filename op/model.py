@@ -1,8 +1,11 @@
 import json
 import weakref
 import os
+import shutil
+import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
+from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
 
@@ -14,6 +17,7 @@ class Model:
         self.app = self.unit.app
         self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
+        self.pod = Pod(self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -238,6 +242,14 @@ class ConfigData(LazyMapping):
         return self._backend.config_get()
 
 
+class Pod:
+    def __init__(self, backend):
+        self._backend = backend
+
+    def set_spec(self, spec, k8s_resources=None):
+        self._backend.pod_spec_set(spec, k8s_resources)
+
+
 class ModelError(Exception):
     pass
 
@@ -314,3 +326,17 @@ class ModelBackend:
 
     def is_leader(self):
         return self._run('is-leader')
+
+    def pod_spec_set(self, spec, k8s_resources):
+        tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
+        try:
+            spec_path = tmpdir / 'spec.json'
+            spec_path.write_text(json.dumps(spec))
+            args = ['--spec', str(spec_path)]
+            if k8s_resources:
+                k8s_res_path = tmpdir / 'k8s-resources.json'
+                k8s_res_path.write_text(json.dumps(k8s_resources))
+                args.extend(['--k8s-resources', str(k8s_res_path)])
+            self._run_no_output('pod-spec-set', *args)
+        finally:
+            shutil.rmtree(tmpdir)
