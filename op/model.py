@@ -368,6 +368,6 @@ class ModelBackend:
                 k8s_res_path = tmpdir / 'k8s-resources.json'
                 k8s_res_path.write_text(json.dumps(k8s_resources))
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            self._run_no_output('pod-spec-set', *args)
+            self._run('pod-spec-set', *args, capture_output=False)
         finally:
             shutil.rmtree(tmpdir)
