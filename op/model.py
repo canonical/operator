@@ -1,19 +1,28 @@
 import json
 import weakref
 import os
+import shutil
+import tempfile
+import time
+import datetime
+
+
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
+from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
 
 class Model:
-    def __init__(self, unit_name, relation_names, backend):
+    def __init__(self, unit_name, meta, backend):
         self._cache = ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
-        self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
+        self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
+        self.resources = Resources(list(meta.resources), self._backend)
+        self.pod = Pod(self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -252,6 +261,35 @@ class ConfigData(LazyMapping):
         return self._backend.config_get()
 
 
+class Resources:
+    """Object representing resources for the charm.
+    """
+
+    def __init__(self, names, backend):
+        self._backend = backend
+        self._paths = {name: None for name in names}
+
+    def fetch(self, name):
+        """Fetch the resource from the controller or store.
+
+        If successfully fetched, this returns a Path object to where the resource is stored
+        on disk, otherwise it raises a CalledProcessError.
+        """
+        if name not in self._paths:
+            raise RuntimeError(f'invalid resource name: {name}')
+        if self._paths[name] is None:
+            self._paths[name] = Path(self._backend.resource_get(name))
+        return self._paths[name]
+
+
+class Pod:
+    def __init__(self, backend):
+        self._backend = backend
+
+    def set_spec(self, spec, k8s_resources=None):
+        self._backend.pod_spec_set(spec, k8s_resources)
+
+
 class ModelError(Exception):
     pass
 
@@ -273,18 +311,30 @@ class RelationNotFound(ModelError):
 
 
 class ModelBackend:
+
+    LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
+
     def __init__(self):
         self.unit_name = os.environ['JUJU_UNIT_NAME']
         self.app_name = self.unit_name.split('/')[0]
 
-    def _run(self, *args):
-        result = run(args + ('--format=json',), stdout=PIPE, stderr=PIPE, check=True)
-        text = result.stdout.decode('utf8')
-        data = json.loads(text)
-        return data
+        self._is_leader = None
+        self._leader_check_time = 0
 
-    def _run_no_output(self, *args):
-        run(args, check=True)
+    def _run(self, *args, capture_output=True, use_json=True):
+        if capture_output:
+            kwargs = dict(stdout=PIPE, stderr=PIPE)
+            if use_json:
+                args += ('--format=json',)
+        else:
+            kwargs = dict()
+        result = run(args, check=True, **kwargs)
+        if capture_output:
+            text = result.stdout.decode('utf8')
+            if use_json:
+                return json.loads(text)
+            else:
+                return text
 
     def relation_ids(self, relation_name):
         relation_ids = self._run('relation-ids', relation_name)
@@ -322,7 +372,7 @@ class ModelBackend:
             raise RuntimeError('is_app parameter to relation_set must be a boolean')
 
         try:
-            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}')
+            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}', capture_output=False)
         except CalledProcessError as e:
             if b'relation not found' in e.stderr:
                 raise RelationNotFound() from e
@@ -333,4 +383,33 @@ class ModelBackend:
         return self._run('config-get')
 
     def is_leader(self):
-        return self._run('is-leader')
+        """Obtain the current leadership status for the unit the charm code is executing on.
+
+        The value is cached for the duration of a lease which is 30s in Juju.
+        """
+        now = time.monotonic()
+        time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
+        if time_since_check > self.LEASE_RENEWAL_PERIOD or self._is_leader is None:
+            # Current time MUST be saved before running is-leader to ensure the cache
+            # is only used inside the window that is-leader itself asserts.
+            self._leader_check_time = now
+            self._is_leader = self._run('is-leader')
+
+        return self._is_leader
+
+    def resource_get(self, resource_name):
+        return self._run('resource-get', resource_name, use_json=False).strip()
+
+    def pod_spec_set(self, spec, k8s_resources):
+        tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
+        try:
+            spec_path = tmpdir / 'spec.json'
+            spec_path.write_text(json.dumps(spec))
+            args = ['--spec', str(spec_path)]
+            if k8s_resources:
+                k8s_res_path = tmpdir / 'k8s-resources.json'
+                k8s_res_path.write_text(json.dumps(k8s_resources))
+                args.extend(['--k8s-resources', str(k8s_res_path)])
+            self._run('pod-spec-set', *args, capture_output=False)
+        finally:
+            shutil.rmtree(tmpdir)
