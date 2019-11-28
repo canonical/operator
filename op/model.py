@@ -224,7 +224,7 @@ class Relation:
                 self.units.add(unit)
                 if self.app is None:
                     self.app = unit.app
-        except RelationNotFound:
+        except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
         self.data = RelationData(self, our_unit, backend)
@@ -264,7 +264,7 @@ class RelationUnitData(LazyMapping, MutableMapping):
     def _load(self):
         try:
             return self._backend.relation_get(self.relation.id, self.unit.name)
-        except RelationNotFound:
+        except RelationNotFoundError:
             # Dead relations tell no tales (and have no data).
             return {}
 
@@ -379,7 +379,7 @@ class Resources:
         """Fetch the resource from the controller or store.
 
         If successfully fetched, this returns a Path object to where the resource is stored
-        on disk, otherwise it raises a CalledProcessError.
+        on disk, otherwise it raises a ModelError.
         """
         if name not in self._paths:
             raise RuntimeError(f'invalid resource name: {name}')
@@ -399,7 +399,6 @@ class Pod:
 class ModelError(Exception):
     pass
 
-
 class TooManyRelatedApps(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
         super().__init__(f'Too many remote applications on {relation_name} ({num_related} > {max_supported})')
@@ -412,7 +411,7 @@ class RelationDataError(ModelError):
     pass
 
 
-class RelationNotFound(ModelError):
+class RelationNotFoundError(ModelError):
     pass
 
 
@@ -431,60 +430,54 @@ class ModelBackend:
         self._is_leader = None
         self._leader_check_time = 0
 
-    def _run(self, *args, capture_output=True, use_json=True):
-        if capture_output:
-            kwargs = dict(stdout=PIPE, stderr=PIPE)
-            if use_json:
-                args += ('--format=json',)
-        else:
-            kwargs = dict()
-        result = run(args, check=True, **kwargs)
-        if capture_output:
-            text = result.stdout.decode('utf8')
-            if use_json:
-                return json.loads(text)
+    def _run(self, *args, return_output=False, use_json=False):
+        kwargs = dict(stdout=PIPE, stderr=PIPE)
+        if use_json:
+            args += ('--format=json',)
+        try:
+            result = run(args, check=True, **kwargs)
+        except CalledProcessError as e:
+            raise ModelError(e.stderr)
+        if return_output:
+            if result.stdout is None:
+                return ''
             else:
-                return text
+                text = result.stdout.decode('utf8')
+                if use_json:
+                    return json.loads(text)
+                else:
+                    return text
 
     def relation_ids(self, relation_name):
-        relation_ids = self._run('relation-ids', relation_name)
+        relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id):
         try:
-            return self._run('relation-list', '-r', str(relation_id))
-        except CalledProcessError as e:
-            # TODO: This should use the return code if it is specific enough rather than the message.
-            # It seems to be 2 for this error, but I haven't been able to confirm yet if that might
-            # also apply to other error cases.
-            if b'relation not found' in e.stderr:
-                raise RelationNotFound() from e
-            else:
-                raise
+            return self._run('relation-list', '-r', str(relation_id), return_output=True, use_json=True)
+        except ModelError as e:
+            if 'relation not found' in str(e):
+                raise RelationNotFoundError() from e
+            raise
 
     def relation_get(self, relation_id, member_name):
         try:
-            return self._run('relation-get', '-r', str(relation_id), '-', member_name)
-        except CalledProcessError as e:
-            # TODO: This should use the return code if it is specific enough rather than the message.
-            # It seems to be 2 for this error, but I haven't been able to confirm yet if that might
-            # also apply to other error cases.
-            if b'relation not found' in e.stderr:
-                raise RelationNotFound() from e
-            else:
-                raise
+            return self._run('relation-get', '-r', str(relation_id), '-', member_name, return_output=True, use_json=True)
+        except ModelError as e:
+            if 'relation not found' in str(e):
+                raise RelationNotFoundError() from e
+            raise
 
     def relation_set(self, relation_id, key, value):
         try:
-            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', capture_output=False)
-        except CalledProcessError as e:
-            if b'relation not found' in e.stderr:
-                raise RelationNotFound() from e
-            else:
-                raise
+            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}')
+        except ModelError as e:
+            if 'relation not found' in str(e):
+                raise RelationNotFoundError() from e
+            raise
 
     def config_get(self):
-        return self._run('config-get')
+        return self._run('config-get', return_output=True, use_json=True)
 
     def is_leader(self):
         """Obtain the current leadership status for the unit the charm code is executing on.
@@ -497,12 +490,12 @@ class ModelBackend:
             # Current time MUST be saved before running is-leader to ensure the cache
             # is only used inside the window that is-leader itself asserts.
             self._leader_check_time = now
-            self._is_leader = self._run('is-leader')
+            self._is_leader = self._run('is-leader', return_output=True, use_json=True)
 
         return self._is_leader
 
     def resource_get(self, resource_name):
-        return self._run('resource-get', resource_name, use_json=False).strip()
+        return self._run('resource-get', resource_name, return_output=True).strip()
 
     def pod_spec_set(self, spec, k8s_resources):
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
@@ -514,7 +507,7 @@ class ModelBackend:
                 k8s_res_path = tmpdir / 'k8s-resources.json'
                 k8s_res_path.write_text(json.dumps(k8s_resources))
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            self._run('pod-spec-set', *args, capture_output=False)
+            self._run('pod-spec-set', *args)
         finally:
             shutil.rmtree(tmpdir)
 

@@ -38,7 +38,7 @@ class FakeModelBackend:
                 6: ['remoteapp2/0'],
             }[relation_id]
         except KeyError:
-            raise op.model.RelationNotFound()
+            raise op.model.RelationNotFoundError()
 
     def relation_get(self, relation_id, member_name):
         try:
@@ -57,7 +57,7 @@ class FakeModelBackend:
                 },
             }[relation_id][member_name]
         except KeyError:
-            raise op.model.RelationNotFound()
+            raise op.model.RelationNotFoundError()
 
     def relation_set(self, relation_id, key, value):
         if relation_id == 5:
@@ -250,7 +250,7 @@ class TestModel(unittest.TestCase):
             model.resources.fetch('qux')
 
         fake_script(self, 'resource-get', 'exit 1')
-        with self.assertRaises(subprocess.CalledProcessError):
+        with self.assertRaises(op.model.ModelError):
             model.resources.fetch('foo')
 
         fake_script(self, 'resource-get', 'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
@@ -439,6 +439,56 @@ class TestModel(unittest.TestCase):
                 remoteapp1.status = target_status
 
 
+class TestModelBackend(unittest.TestCase):
+
+    def setUp(self):
+        os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
+        self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
+
+        self.backend = op.model.ModelBackend()
+
+    def test_relation_tool_errors(self):
+        RELATION_ERROR_MESSAGE = "ERROR invalid value \"$1\" for option -r: relation not found"
+
+        test_cases = [(
+            lambda: fake_script(self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_list(3),
+            op.model.ModelError,
+            [['relation-list', '-r', '3', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'relation-list', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_list(3),
+            op.model.RelationNotFoundError,
+            [['relation-list', '-r', '3', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'relation-set', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar'),
+            op.model.ModelError,
+            [['relation-set', '-r', '3', 'foo=bar']],
+        ), (
+            lambda: fake_script(self, 'relation-set', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar'),
+            op.model.RelationNotFoundError,
+            [['relation-set', '-r', '3', 'foo=bar']],
+        ), (
+            lambda: fake_script(self, 'relation-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_get(3, 'remote/0'),
+            op.model.ModelError,
+            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'relation-get', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_get(3, 'remote/0'),
+            op.model.RelationNotFoundError,
+            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+        )]
+
+        for do_fake, run, exception, calls in test_cases:
+            do_fake()
+            with self.assertRaises(exception):
+                run()
+            self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
@@ -461,7 +511,6 @@ def fake_script_calls(test_case, clear=False):
         calls = [line.split(';') for line in f.read().splitlines()]
         if clear:
             f.truncate(0)
-
         return calls
 
 
