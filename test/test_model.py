@@ -372,14 +372,14 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'status-set', 'exit 1')
         fake_script(self, 'is-leader', 'echo true')
 
-        with self.assertRaises(subprocess.CalledProcessError):
+        with self.assertRaises(op.model.ModelError):
             self.model.unit.status = op.model.UnknownStatus()
 
         self.assertEqual(fake_script_calls(self, True), [
             ['status-set', '--application=False', 'unknown', ''],
         ])
 
-        with self.assertRaises(subprocess.CalledProcessError):
+        with self.assertRaises(op.model.ModelError):
             self.model.app.status = op.model.UnknownStatus()
 
         # A leadership check is needed for application status.

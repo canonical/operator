@@ -523,4 +523,4 @@ class ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise RuntimeError('is_app parameter must be boolean')
-        return self._run('status-set', f'--application={is_app}', status, message, capture_output=False)
+        return self._run('status-set', f'--application={is_app}', status, message)
