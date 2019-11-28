@@ -346,7 +346,7 @@ class ModelBackend:
 
     def relation_set(self, relation_id, key, value):
         try:
-            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', return_output=False)
+            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}')
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
@@ -371,7 +371,7 @@ class ModelBackend:
         return self._is_leader
 
     def resource_get(self, resource_name):
-        return self._run('resource-get', resource_name, return_output=True, use_json=False).strip()
+        return self._run('resource-get', resource_name, return_output=True).strip()
 
     def pod_spec_set(self, spec, k8s_resources):
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
@@ -383,6 +383,6 @@ class ModelBackend:
                 k8s_res_path = tmpdir / 'k8s-resources.json'
                 k8s_res_path.write_text(json.dumps(k8s_resources))
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            self._run('pod-spec-set', *args, return_output=False)
+            self._run('pod-spec-set', *args)
         finally:
             shutil.rmtree(tmpdir)
