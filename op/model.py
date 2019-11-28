@@ -337,7 +337,7 @@ class ModelBackend:
             e = exception.__cause__
             if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-list' and\
                     e.returncode == 2 and b'relation not found' in e.stderr:
-                raise RelationNotFoundError()
+                raise RelationNotFoundError() from e
             raise
 
     def relation_get(self, relation_id, member_name):
@@ -347,7 +347,7 @@ class ModelBackend:
             e = exception.__cause__
             if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-get' and\
                     e.returncode == 2 and b'relation not found' in e.stderr:
-                raise RelationNotFoundError()
+                raise RelationNotFoundError() from e
             raise
 
     def relation_set(self, relation_id, key, value):
@@ -357,7 +357,7 @@ class ModelBackend:
             e = exception.__cause__
             if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-set' and\
                     e.returncode == 2 and b'relation not found' in e.stderr:
-                raise RelationNotFoundError()
+                raise RelationNotFoundError() from e
             raise
 
     def config_get(self):
