@@ -3,6 +3,10 @@ import weakref
 import os
 import shutil
 import tempfile
+import time
+import datetime
+
+
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
@@ -293,9 +297,15 @@ class RelationNotFound(ModelError):
 
 
 class ModelBackend:
+
+    LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
+
     def __init__(self):
         self.unit_name = os.environ['JUJU_UNIT_NAME']
         self.app_name = self.unit_name.split('/')[0]
+
+        self._is_leader = None
+        self._leader_check_time = 0
 
     def _run(self, *args, capture_output=True, use_json=True):
         if capture_output:
@@ -353,7 +363,19 @@ class ModelBackend:
         return self._run('config-get')
 
     def is_leader(self):
-        return self._run('is-leader')
+        """Obtain the current leadership status for the unit the charm code is executing on.
+
+        The value is cached for the duration of a lease which is 30s in Juju.
+        """
+        now = time.monotonic()
+        time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
+        if time_since_check > self.LEASE_RENEWAL_PERIOD or self._is_leader is None:
+            # Current time MUST be saved before running is-leader to ensure the cache
+            # is only used inside the window that is-leader itself asserts.
+            self._leader_check_time = now
+            self._is_leader = self._run('is-leader')
+
+        return self._is_leader
 
     def resource_get(self, resource_name):
         return self._run('resource-get', resource_name, use_json=False).strip()
