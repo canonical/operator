@@ -298,7 +298,7 @@ class RelationNotFound(ModelError):
 
 class ModelBackend:
 
-    LEASE_REFRESH_PERIOD = datetime.timedelta(seconds=30)
+    LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
 
     def __init__(self):
         self.unit_name = os.environ['JUJU_UNIT_NAME']
@@ -367,10 +367,12 @@ class ModelBackend:
 
         The value is cached for the duration of a lease which is 30s in Juju.
         """
-        if datetime.timedelta(seconds=time.monotonic() - self._leader_check_time) > self.LEASE_REFRESH_PERIOD or self._is_leader is None:
+        now = time.monotonic()
+        time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
+        if time_since_check > self.LEASE_RENEWAL_PERIOD or self._is_leader is None:
             # Current time MUST be saved before running is-leader to ensure the cache
             # is only used inside the window that is-leader itself asserts.
-            self._leader_check_time = time.monotonic()
+            self._leader_check_time = now
             self._is_leader = self._run('is-leader')
 
         return self._is_leader

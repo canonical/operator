@@ -225,20 +225,20 @@ class TestModel(unittest.TestCase):
         self.model = op.model.Model('myapp/0', meta, self.backend)
 
         # A sanity check.
-        self.assertGreater(time.monotonic(), op.model.ModelBackend.LEASE_REFRESH_PERIOD.total_seconds())
+        self.assertGreater(time.monotonic(), op.model.ModelBackend.LEASE_RENEWAL_PERIOD.total_seconds())
 
+        fake_script(self, 'is-leader', 'echo false')
+        self.assertFalse(self.model.unit.is_leader())
+
+        # Change the leadership status and force a recheck.
         fake_script(self, 'is-leader', 'echo true')
+        self.backend._leader_check_time = 0
         self.assertTrue(self.model.unit.is_leader())
 
         # Force a recheck without changing the leadership status.
         fake_script(self, 'is-leader', 'echo true')
         self.backend._leader_check_time = 0
         self.assertTrue(self.model.unit.is_leader())
-
-        # Change the leadership status and force a recheck.
-        fake_script(self, 'is-leader', 'echo false')
-        self.backend._leader_check_time = 0
-        self.assertFalse(self.model.unit.is_leader())
 
     def test_resources(self):
         backend = op.model.ModelBackend()
