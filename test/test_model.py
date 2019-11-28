@@ -6,8 +6,10 @@ import subprocess
 import pathlib
 import shutil
 import unittest
+import time
 
 import op.model
+import op.charm
 
 
 # TODO: We need some manner of test to validate the actual ModelBackend implementation, round-tripped
@@ -73,7 +75,9 @@ class TestModel(unittest.TestCase):
 
     def setUp(self):
         self.backend = FakeModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
         self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
@@ -176,7 +180,9 @@ class TestModel(unittest.TestCase):
 
     def test_is_leader(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         def check_remote_units():
             fake_script(self, 'relation-ids',
@@ -196,7 +202,7 @@ class TestModel(unittest.TestCase):
         check_remote_units()
 
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'is-leader', 'echo false')
         self.assertFalse(self.model.unit.is_leader())
@@ -212,13 +218,74 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
         ])
 
+    def test_is_leader_refresh(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        # A sanity check.
+        self.assertGreater(time.monotonic(), op.model.ModelBackend.LEASE_RENEWAL_PERIOD.total_seconds())
+
+        fake_script(self, 'is-leader', 'echo false')
+        self.assertFalse(self.model.unit.is_leader())
+
+        # Change the leadership status and force a recheck.
+        fake_script(self, 'is-leader', 'echo true')
+        self.backend._leader_check_time = 0
+        self.assertTrue(self.model.unit.is_leader())
+
+        # Force a recheck without changing the leadership status.
+        fake_script(self, 'is-leader', 'echo true')
+        self.backend._leader_check_time = 0
+        self.assertTrue(self.model.unit.is_leader())
+
+    def test_resources(self):
+        backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.resources = {'foo': None, 'bar': None}
+        model = op.model.Model('myapp/0', meta, backend)
+
+        with self.assertRaises(RuntimeError):
+            model.resources.fetch('qux')
+
+        fake_script(self, 'resource-get', 'exit 1')
+        with self.assertRaises(subprocess.CalledProcessError):
+            model.resources.fetch('foo')
+
+        fake_script(self, 'resource-get', 'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
+        self.assertEqual(model.resources.fetch('foo').name, 'foo.tgz')
+        self.assertEqual(model.resources.fetch('bar').name, 'bar.tgz')
+
+    def test_pod_spec(self):
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        model = op.model.Model('myapp/0', meta, op.model.ModelBackend())
+
+        fake_script(self, 'pod-spec-set', """
+                    cat $2 > $(dirname $0)/spec.json
+                    [[ -n $4 ]] && cat $4 > $(dirname $0)/k8s_res.json || true
+                    """)
+        spec_path = self.fake_script_path / 'spec.json'
+        k8s_res_path = self.fake_script_path / 'k8s_res.json'
+
+        model.pod.set_spec({'foo': 'bar'})
+        self.assertEqual(spec_path.read_text(), '{"foo": "bar"}')
+        self.assertFalse(k8s_res_path.exists())
+
+        model.pod.set_spec({'bar': 'foo'}, {'qux': 'baz'})
+        self.assertEqual(spec_path.read_text(), '{"bar": "foo"}')
+        self.assertEqual(k8s_res_path.read_text(), '{"qux": "baz"}')
+
     def test_base_status_instance_raises(self):
         with self.assertRaises(TypeError):
             op.model.Status('test')
 
     def test_local_set_valid_unit_status(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         test_cases = [(
             op.model.ActiveStatus('Green'),
@@ -249,7 +316,9 @@ class TestModel(unittest.TestCase):
 
     def test_local_set_valid_app_status(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'is-leader', 'echo true')
 
@@ -282,7 +351,9 @@ class TestModel(unittest.TestCase):
 
     def test_set_app_status_non_leader_raises(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'is-leader', 'echo false')
 
@@ -294,7 +365,9 @@ class TestModel(unittest.TestCase):
 
     def test_local_set_invalid_status(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'status-set', 'exit 1')
         fake_script(self, 'is-leader', 'echo true')
@@ -327,7 +400,9 @@ class TestModel(unittest.TestCase):
 
     def test_remote_unit_status(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
