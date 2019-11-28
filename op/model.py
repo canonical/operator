@@ -315,7 +315,7 @@ class ModelBackend:
         try:
             result = run(args, check=True, **kwargs)
         except CalledProcessError as e:
-            raise ModelError from e
+            raise ModelError(e.stderr) from e
         if return_output:
             if result.stdout is None:
                 return ''
@@ -333,30 +333,24 @@ class ModelBackend:
     def relation_list(self, relation_id):
         try:
             return self._run('relation-list', '-r', str(relation_id), return_output=True, use_json=True)
-        except ModelError as exception:
-            e = exception.__cause__
-            if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-list' and\
-                    e.returncode == 2 and b'relation not found' in e.stderr:
+        except ModelError as e:
+            if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
             raise
 
     def relation_get(self, relation_id, member_name):
         try:
             return self._run('relation-get', '-r', str(relation_id), '-', member_name, return_output=True, use_json=True)
-        except ModelError as exception:
-            e = exception.__cause__
-            if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-get' and\
-                    e.returncode == 2 and b'relation not found' in e.stderr:
+        except ModelError as e:
+            if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
             raise
 
     def relation_set(self, relation_id, key, value):
         try:
             return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', return_output=False)
-        except ModelError as exception:
-            e = exception.__cause__
-            if isinstance(e, CalledProcessError) and e.cmd[0] == 'relation-set' and\
-                    e.returncode == 2 and b'relation not found' in e.stderr:
+        except ModelError as e:
+            if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
             raise
 
