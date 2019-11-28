@@ -129,7 +129,9 @@ class TestModel(unittest.TestCase):
 
     def test_remote_app_relation_data(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
@@ -169,7 +171,9 @@ class TestModel(unittest.TestCase):
 
     def test_app_relation_data_modify_local_as_leader(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
@@ -196,7 +200,9 @@ class TestModel(unittest.TestCase):
 
     def test_app_relation_data_modify_local_as_minion(self):
         self.backend = op.model.ModelBackend()
-        self.model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], self.backend)
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")

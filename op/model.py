@@ -372,7 +372,7 @@ class ModelBackend:
             raise RuntimeError('is_app parameter to relation_set must be a boolean')
 
         try:
-            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}', capture_output=False)
+            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}', capture_output=False)
         except CalledProcessError as e:
             if b'relation not found' in e.stderr:
                 raise RelationNotFound() from e
