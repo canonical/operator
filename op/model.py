@@ -308,10 +308,8 @@ class ModelBackend:
 
     def _run(self, *args, return_output=False, use_json=False):
         kwargs = dict(stdout=PIPE, stderr=PIPE)
-
         if use_json:
             args += ('--format=json',)
-
         try:
             result = run(args, check=True, **kwargs)
         except CalledProcessError as e:
