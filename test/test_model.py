@@ -7,7 +7,6 @@ import pathlib
 import shutil
 import unittest
 import time
-import functools
 
 import op.model
 import op.charm
@@ -291,33 +290,33 @@ class TestModelBackend(unittest.TestCase):
         RELATION_ERROR_MESSAGE = "ERROR invalid value \"$1\" for option -r: relation not found"
 
         test_cases = [(
-            functools.partial(fake_script, self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
-            functools.partial(self.backend.relation_list, 3),
+            lambda: fake_script(self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_list(3),
             op.model.ModelError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            functools.partial(fake_script, self, 'relation-list', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
-            functools.partial(self.backend.relation_list, 3),
+            lambda: fake_script(self, 'relation-list', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_list(3),
             op.model.RelationNotFoundError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            functools.partial(fake_script, self, 'relation-set', f'echo fooerror >&2 ; exit 1'),
-            functools.partial(self.backend.relation_set, 3, 'foo', 'bar'),
+            lambda: fake_script(self, 'relation-set', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar'),
             op.model.ModelError,
             [['relation-set', '-r', '3', 'foo=bar']],
         ), (
-            functools.partial(fake_script, self, 'relation-set', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
-            functools.partial(self.backend.relation_set, 3, 'foo', 'bar'),
+            lambda: fake_script(self, 'relation-set', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar'),
             op.model.RelationNotFoundError,
             [['relation-set', '-r', '3', 'foo=bar']],
         ), (
-            functools.partial(fake_script, self, 'relation-get', f'echo fooerror >&2 ; exit 1'),
-            functools.partial(self.backend.relation_get, 3, 'remote/0'),
+            lambda: fake_script(self, 'relation-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.relation_get(3, 'remote/0'),
             op.model.ModelError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
         ), (
-            functools.partial(fake_script, self, 'relation-get', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
-            functools.partial(self.backend.relation_get, 3, 'remote/0'),
+            lambda: fake_script(self, 'relation-get', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: self.backend.relation_get(3, 'remote/0'),
             op.model.RelationNotFoundError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
         )]
