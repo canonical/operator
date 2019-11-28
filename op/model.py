@@ -10,13 +10,14 @@ from subprocess import run, PIPE, CalledProcessError
 
 
 class Model:
-    def __init__(self, unit_name, relation_names, backend):
+    def __init__(self, unit_name, meta, backend):
         self._cache = ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
-        self.relations = RelationMapping(relation_names, self.unit, self._backend, self._cache)
+        self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
+        self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
@@ -242,6 +243,27 @@ class ConfigData(LazyMapping):
         return self._backend.config_get()
 
 
+class Resources:
+    """Object representing resources for the charm.
+    """
+
+    def __init__(self, names, backend):
+        self._backend = backend
+        self._paths = {name: None for name in names}
+
+    def fetch(self, name):
+        """Fetch the resource from the controller or store.
+
+        If successfully fetched, this returns a Path object to where the resource is stored
+        on disk, otherwise it raises a CalledProcessError.
+        """
+        if name not in self._paths:
+            raise RuntimeError(f'invalid resource name: {name}')
+        if self._paths[name] is None:
+            self._paths[name] = Path(self._backend.resource_get(name))
+        return self._paths[name]
+
+
 class Pod:
     def __init__(self, backend):
         self._backend = backend
@@ -275,14 +297,20 @@ class ModelBackend:
         self.unit_name = os.environ['JUJU_UNIT_NAME']
         self.app_name = self.unit_name.split('/')[0]
 
-    def _run(self, *args):
-        result = run(args + ('--format=json',), stdout=PIPE, stderr=PIPE, check=True)
-        text = result.stdout.decode('utf8')
-        data = json.loads(text)
-        return data
-
-    def _run_no_output(self, *args):
-        run(args, check=True)
+    def _run(self, *args, capture_output=True, use_json=True):
+        if capture_output:
+            kwargs = dict(stdout=PIPE, stderr=PIPE)
+            if use_json:
+                args += ('--format=json',)
+        else:
+            kwargs = dict()
+        result = run(args, check=True, **kwargs)
+        if capture_output:
+            text = result.stdout.decode('utf8')
+            if use_json:
+                return json.loads(text)
+            else:
+                return text
 
     def relation_ids(self, relation_name):
         relation_ids = self._run('relation-ids', relation_name)
@@ -314,7 +342,7 @@ class ModelBackend:
 
     def relation_set(self, relation_id, key, value):
         try:
-            return self._run_no_output('relation-set', '-r', str(relation_id), f'{key}={value}')
+            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', capture_output=False)
         except CalledProcessError as e:
             if b'relation not found' in e.stderr:
                 raise RelationNotFound() from e
@@ -327,6 +355,9 @@ class ModelBackend:
     def is_leader(self):
         return self._run('is-leader')
 
+    def resource_get(self, resource_name):
+        return self._run('resource-get', resource_name, use_json=False).strip()
+
     def pod_spec_set(self, spec, k8s_resources):
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
         try:
@@ -337,6 +368,6 @@ class ModelBackend:
                 k8s_res_path = tmpdir / 'k8s-resources.json'
                 k8s_res_path.write_text(json.dumps(k8s_resources))
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            self._run_no_output('pod-spec-set', *args)
+            self._run('pod-spec-set', *args, capture_output=False)
         finally:
             shutil.rmtree(tmpdir)
