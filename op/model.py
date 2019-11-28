@@ -315,7 +315,7 @@ class ModelBackend:
         try:
             result = run(args, check=True, **kwargs)
         except CalledProcessError as e:
-            raise ModelError(e.stderr) from e
+            raise ModelError(e.stderr)
         if return_output:
             if result.stdout is None:
                 return ''
