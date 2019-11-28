@@ -404,24 +404,24 @@ class TestModelBackend(unittest.TestCase):
             [['relation-list', '-r', '3', '--format=json']],
         ), (
             lambda: fake_script(self, 'relation-set', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.relation_set(3, 'foo', 'bar'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             op.model.ModelError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
         ), (
             lambda: fake_script(self, 'relation-set', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
-            lambda: self.backend.relation_set(3, 'foo', 'bar'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             op.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
         ), (
             lambda: fake_script(self, 'relation-get', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.relation_get(3, 'remote/0'),
+            lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             op.model.ModelError,
-            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+            [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
         ), (
             lambda: fake_script(self, 'relation-get', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
-            lambda: self.backend.relation_get(3, 'remote/0'),
+            lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             op.model.RelationNotFoundError,
-            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+            [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
         )]
 
         for do_fake, run, exception, calls in test_cases:
