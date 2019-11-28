@@ -235,7 +235,9 @@ class TestModel(unittest.TestCase):
         self.assertEqual(model.resources.fetch('bar').name, 'bar.tgz')
 
     def test_pod_spec(self):
-        model = op.model.Model('myapp/0', ['db0', 'db1', 'db2'], op.model.ModelBackend())
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        model = op.model.Model('myapp/0', meta, op.model.ModelBackend())
 
         fake_script(self, 'pod-spec-set', """
                     cat $2 > $(dirname $0)/spec.json
