@@ -353,7 +353,7 @@ class ModelBackend:
                 raise
 
     def relation_get(self, relation_id, member_name, is_app):
-        if type(is_app) != bool:
+        if not isinstance(is_app, bool):
             raise RuntimeError('is_app parameter to relation_get must be a boolean')
 
         try:
@@ -368,7 +368,7 @@ class ModelBackend:
                 raise
 
     def relation_set(self, relation_id, key, value, is_app):
-        if type(is_app) != bool:
+        if not isinstance(is_app, bool):
             raise RuntimeError('is_app parameter to relation_set must be a boolean')
 
         try:
