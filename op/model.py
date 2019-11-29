@@ -71,6 +71,7 @@ class ModelCache:
             self._weakrefs[key] = entity
         return entity
 
+
 class Application:
     def __init__(self, name, backend, cache):
         self.name = name
@@ -91,12 +92,12 @@ class Application:
             return self._status
 
         s = self._backend.status_get(is_app=True)
-        self._status = Status.from_string(s['status'], s['message'])
+        self._status = StatusBase.from_name(s['status'], s['message'])
         return self._status
 
     @status.setter
     def status(self, value):
-        if not isinstance(value, Status):
+        if not isinstance(value, StatusBase):
             raise InvalidStatusError(f'invalid value provided for application {self} status: {value}')
 
         if not self._is_our_app:
@@ -133,12 +134,12 @@ class Unit:
             return self._status
 
         s = self._backend.status_get(is_app=False)
-        self._status = Status.from_string(s['status'], s['message'])
+        self._status = StatusBase.from_name(s['status'], s['message'])
         return self._status
 
     @status.setter
     def status(self, value):
-        if not isinstance(value, Status):
+        if not isinstance(value, StatusBase):
             raise InvalidStatusError(f'invalid value provided for unit {self} status: {value}')
 
         if not self._is_our_unit:
@@ -296,7 +297,7 @@ class ConfigData(LazyMapping):
     def _load(self):
         return self._backend.config_get()
 
-class Status(ABC):
+class StatusBase:
     """Status values specific to applications and units."""
 
     _statuses = {}
@@ -305,42 +306,33 @@ class Status(ABC):
         self.message = message
 
     def __new__(cls, *args, **kwargs):
-        if cls is Status:
+        if cls is StatusBase:
             raise TypeError("cannot instantiate a base class")
-
+        cls._statuses[cls.name] = cls
         return super().__new__(cls)
 
     @classmethod
-    def _register_status(cls, name, type_):
-        """For use by subclasses only."""
-        cls._statuses[name] = type_
-
-    @classmethod
-    def from_string(cls, name, message):
+    def from_name(cls, name, message):
         return cls._statuses[name](message)
 
-    def __init_subclass__(cls):
-        super().__init_subclass__()
-        Status._register_status(cls.name, cls)
-
-class ActiveStatus(Status):
+class ActiveStatus(StatusBase):
     """The unit is ready.
 
     The unit believes it is correctly offering all the services it has been asked to offer.
     """
     name = 'active'
 
-    def __init__(self, message=''):
-        super().__init__(message)
+    def __init__(self):
+        super().__init__('')
 
-class BlockedStatus(Status):
+class BlockedStatus(StatusBase):
     """The unit requires manual intervention.
 
     An operator has to manually intervene to unblock the unit and let it proceed.
     """
     name = 'blocked'
 
-class MaintenanceStatus(Status):
+class MaintenanceStatus(StatusBase):
     """The unit is performing maintenance tasks.
 
     The unit is not yet providing services, but is actively doing work in preparation for providing those services.
@@ -348,18 +340,18 @@ class MaintenanceStatus(Status):
     """
     name = 'maintenance'
 
-class UnknownStatus(Status):
+class UnknownStatus(StatusBase):
     """The unit status is unknown.
 
     A unit-agent has finished calling install, config-changed and start, but the charm has not called status-set yet.
     """
     name = 'unknown'
 
-    def __init__(self, message=''):
+    def __init__(self):
         # Unknown status cannot be set and does not have a message associated with it.
         super().__init__('')
 
-class WaitingStatus(Status):
+class WaitingStatus(StatusBase):
     """A unit is unable to progress.
 
     The unit is unable to progress to an active state because an application to which it is related is not running.
