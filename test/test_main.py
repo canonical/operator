@@ -132,8 +132,7 @@ class TestMain(unittest.TestCase):
                 'JUJU_RELATION_ID': str(event_spec.relation_id),
             })
             remote_app = event_spec.remote_app
-            # A remote app may not be in an event spec and so JUJU_REMOTE_APP will not be populated
-            # but it may still be a relation event with JUJU_REMOTE_UNIT for Juju < 2.7.
+            # For juju < 2.7 app name is extracted from JUJU_REMOTE_UNIT.
             if remote_app is not None:
                 env['JUJU_REMOTE_APP'] = remote_app
 
@@ -209,15 +208,15 @@ class TestMain(unittest.TestCase):
         ), (
             # Events without a remote app specified (for Juju < 2.7).
             EventSpec(RelationJoinedEvent, 'db_relation_joined', relation_id=1,
-                      remote_app=None, remote_unit='remote/0', charm_config=charm_config),
+                      remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'db', 'relation_id': 1, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
             EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
-                      remote_app=None, remote_unit='remote/0', charm_config=charm_config),
+                      remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
             EventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2,
-                      remote_app=None, remote_unit='remote/0', charm_config=charm_config),
+                      remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         )]
 
