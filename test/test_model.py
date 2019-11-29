@@ -395,10 +395,7 @@ class TestModel(unittest.TestCase):
     def test_status_set_is_app_not_bool_raises(self):
         self.backend = op.model.ModelBackend()
 
-        with self.assertRaises(RuntimeError):
-            self.backend.status_set(op.model.ActiveStatus)
-
-        for is_app_v in [None, 1, 2.0, 'a', b'beef']:
+        for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
             with self.assertRaises(RuntimeError):
                 self.backend.status_set(op.model.ActiveStatus, is_app=is_app_v)
 
