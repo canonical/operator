@@ -40,17 +40,18 @@ class TestModel(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db2', '--format=json'],
             ['relation-list', '-r', '5', '--format=json'],
-            ['relation-list', '-r', '6', '--format=json']])
+            ['relation-list', '-r', '6', '--format=json']
+        ])
 
     def test_get_relation(self):
-        RELATION_ERROR_MESSAGE = "ERROR invalid value \"$2\" for option -r: relation not found"
+        err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
 
         fake_script(self, 'relation-ids',
                     """([ "$1" = db1 ] && echo '["db1:4"]') || ([ "$1" = db2 ] && echo '["db2:5", "db2:6"]') || echo '[]'""")
         fake_script(self, 'relation-list',
-                    f"""([ "$2" = 4 ] && echo '["remoteapp1/0"]') || (echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2)""")
+                    f"""([ "$2" = 4 ] && echo '["remoteapp1/0"]') || (echo {err_msg} >&2 ; exit 2)""")
         fake_script(self, 'relation-get',
-                    f"""echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2""")
+                    f"""echo {err_msg} >&2 ; exit 2""")
 
         with self.assertRaises(op.model.ModelError):
             self.model.get_relation('db1', 'db1:4')
@@ -73,7 +74,8 @@ class TestModel(unittest.TestCase):
             ['relation-ids', 'db0', '--format=json'],
             ['relation-ids', 'db2', '--format=json'],
             ['relation-list', '-r', '5', '--format=json'],
-            ['relation-list', '-r', '6', '--format=json']])
+            ['relation-list', '-r', '6', '--format=json']
+        ])
 
     def test_remote_units_is_our(self):
         fake_script(self, 'relation-ids',
@@ -87,7 +89,8 @@ class TestModel(unittest.TestCase):
 
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
-            ['relation-list', '-r', '4', '--format=json']])
+            ['relation-list', '-r', '4', '--format=json']
+        ])
 
     def test_our_unit_is_our(self):
         self.assertTrue(self.model.unit._is_our_unit)
@@ -107,7 +110,8 @@ class TestModel(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
-            ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--format=json']])
+            ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--format=json']
+        ])
 
     def test_relation_data_modify_remote(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
@@ -125,7 +129,8 @@ class TestModel(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
-            ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--format=json']])
+            ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--format=json']
+        ])
 
     def test_relation_data_modify_our(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
@@ -143,7 +148,8 @@ class TestModel(unittest.TestCase):
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
             ['relation-get', '-r', '4', '-', 'myapp/0', '--format=json'],
-            ['relation-set', '-r', '4', 'host=bar']])
+            ['relation-set', '-r', '4', 'host=bar']
+        ])
 
     def test_relation_data_del_key(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
@@ -162,14 +168,15 @@ class TestModel(unittest.TestCase):
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
             ['relation-get', '-r', '4', '-', 'myapp/0', '--format=json'],
-            ['relation-set', '-r', '4', 'host=']])
+            ['relation-set', '-r', '4', 'host=']
+        ])
 
     def test_relation_set_fail(self):
         fake_script(self, 'relation-ids', """[ "$1" = db2 ] && echo '["db2:5"]' || echo '[]'""")
         fake_script(self, 'relation-list',
                     """[ "$2" = 5 ] && echo '["remoteapp1/0"]' || exit 2""")
         fake_script(self, 'relation-get', """([ "$2" = 5 ] && [ "$4" = "myapp/0" ]) && echo '{"host": "myapp-0"}' || exit 2""")
-        fake_script(self, 'relation-set', '''exit 2''')
+        fake_script(self, 'relation-set', 'exit 2')
 
         rel_db2 = self.model.relations['db2'][0]
         # Force memory cache to be loaded.
@@ -186,7 +193,8 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '5', '--format=json'],
             ['relation-get', '-r', '5', '-', 'myapp/0', '--format=json'],
             ['relation-set', '-r', '5', 'host=bar'],
-            ['relation-set', '-r', '5', 'host=']])
+            ['relation-set', '-r', '5', 'host=']
+        ])
 
     def test_relation_data_type_check(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
@@ -204,7 +212,8 @@ class TestModel(unittest.TestCase):
 
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
-            ['relation-list', '-r', '4', '--format=json']])
+            ['relation-list', '-r', '4', '--format=json']
+        ])
 
     def test_config(self):
         fake_script(self, 'config-get', """echo '{"foo":"foo","bar":1,"qux":true}'""")
@@ -316,7 +325,7 @@ class TestModelBackend(unittest.TestCase):
         self.backend = op.model.ModelBackend()
 
     def test_relation_tool_errors(self):
-        RELATION_ERROR_MESSAGE = "ERROR invalid value \"$2\" for option -r: relation not found"
+        err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
 
         test_cases = [(
             lambda: fake_script(self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
@@ -324,7 +333,7 @@ class TestModelBackend(unittest.TestCase):
             op.model.ModelError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-list', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-list', f'echo {err_msg} >&2 ; exit 2'),
             lambda: self.backend.relation_list(3),
             op.model.RelationNotFoundError,
             [['relation-list', '-r', '3', '--format=json']],
@@ -334,7 +343,7 @@ class TestModelBackend(unittest.TestCase):
             op.model.ModelError,
             [['relation-set', '-r', '3', 'foo=bar']],
         ), (
-            lambda: fake_script(self, 'relation-set', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-set', f'echo {err_msg} >&2 ; exit 2'),
             lambda: self.backend.relation_set(3, 'foo', 'bar'),
             op.model.RelationNotFoundError,
             [['relation-set', '-r', '3', 'foo=bar']],
@@ -344,7 +353,7 @@ class TestModelBackend(unittest.TestCase):
             op.model.ModelError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-get', f'echo {RELATION_ERROR_MESSAGE} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-get', f'echo {err_msg} >&2 ; exit 2'),
             lambda: self.backend.relation_get(3, 'remote/0'),
             op.model.RelationNotFoundError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
