@@ -132,10 +132,10 @@ class TestMain(unittest.TestCase):
                 'JUJU_RELATION_ID': str(event_spec.relation_id),
             })
             remote_app = event_spec.remote_app
-            if remote_app is None:
-                remote_app = ''
-
-            env['JUJU_REMOTE_APP'] = remote_app
+            # A remote app may not be in an event spec and so JUJU_REMOTE_APP will not be populated
+            # but it may still be a relation event with JUJU_REMOTE_UNIT for Juju < 2.7.
+            if remote_app is not None:
+                env['JUJU_REMOTE_APP'] = remote_app
 
             remote_unit = event_spec.remote_unit
             if remote_unit is None:
@@ -206,6 +206,19 @@ class TestMain(unittest.TestCase):
             EventSpec(RelationBrokenEvent, 'ha_relation_broken', relation_id=3,
                       charm_config=charm_config),
             {'relation_name': 'ha', 'relation_id': 3},
+        ), (
+            # Events without a remote app specified (for Juju < 2.7).
+            EventSpec(RelationJoinedEvent, 'db_relation_joined', relation_id=1,
+                      remote_app=None, remote_unit='remote/0', charm_config=charm_config),
+            {'relation_name': 'db', 'relation_id': 1, 'app_name': 'remote', 'unit_name': 'remote/0'},
+        ), (
+            EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
+                      remote_app=None, remote_unit='remote/0', charm_config=charm_config),
+            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
+        ), (
+            EventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2,
+                      remote_app=None, remote_unit='remote/0', charm_config=charm_config),
+            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         )]
 
         logger.debug(f'Expected events {events_under_test}')
