@@ -81,27 +81,31 @@ class Charm(CharmBase):
         self._write_state()
 
     def on_db_relation_joined(self, event):
-        assert event.app is not None, 'application name cannot be None for a relation joined event'
+        assert event.app is not None, 'an application name must not be None for a relation-joined event'
         self._state['on_db_relation_joined'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['db_relation_joined_data'] = event.snapshot()
         self._write_state()
 
     def on_mon_relation_changed(self, event):
-        assert event.app is not None, 'application name cannot be None for a relation changed event'
+        assert event.app is not None, 'an application name must not be None for a relation-changed event'
+        if os.environ.get('JUJU_REMOTE_UNIT'):
+            assert event.unit is not None, 'a unit name must not be None for a relation-changed event associated with a remote unit'
         self._state['on_mon_relation_changed'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['mon_relation_changed_data'] = event.snapshot()
         self._write_state()
 
     def on_mon_relation_departed(self, event):
-        assert event.app is not None, 'application name cannot be None for a relation departed event'
+        assert event.app is not None, 'an application name must not be None for a relation-departed event'
         self._state['on_mon_relation_departed'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['mon_relation_departed_data'] = event.snapshot()
         self._write_state()
 
     def on_ha_relation_broken(self, event):
+        assert event.app is None, 'relation-broken events must not have a reference to a remote application'
+        assert event.unit is None, 'relation broken events must not have a reference to a remote unit'
         self._state['on_ha_relation_broken'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['ha_relation_broken_data'] = event.snapshot()
