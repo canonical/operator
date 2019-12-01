@@ -7,6 +7,7 @@ import pathlib
 import shutil
 import unittest
 import time
+import re
 
 import op.model
 import op.charm
@@ -269,13 +270,26 @@ class TestModel(unittest.TestCase):
         spec_path = self.fake_script_path / 'spec.json'
         k8s_res_path = self.fake_script_path / 'k8s_res.json'
 
+        def check_calls(calls):
+            self.assertEqual(len(fake_calls), 1)
+            self.assertEqual(fake_calls[0][:2], ['pod-spec-set', '--file'])
+            # 8 bytes are used as of python 3.4.0, see Python bug #12015.
+            # Other characters are from POSIX 3.282 (Portable Filename Character Set) a subset of which Python's mkdtemp uses.
+            self.assertTrue(re.match('/tmp/tmp[A-Za-z0-9._-]{8}-pod-spec-set', fake_calls[0][2]))
+
         model.pod.set_spec({'foo': 'bar'})
         self.assertEqual(spec_path.read_text(), '{"foo": "bar"}')
         self.assertFalse(k8s_res_path.exists())
 
+        fake_calls = fake_script_calls(self, clear=True)
+        check_calls(fake_calls)
+
         model.pod.set_spec({'bar': 'foo'}, {'qux': 'baz'})
         self.assertEqual(spec_path.read_text(), '{"bar": "foo"}')
         self.assertEqual(k8s_res_path.read_text(), '{"qux": "baz"}')
+
+        fake_calls = fake_script_calls(self, clear=True)
+        check_calls(fake_calls)
 
 
 class TestModelBackend(unittest.TestCase):
