@@ -522,7 +522,7 @@ class ModelBackend:
         try:
             spec_path = tmpdir / 'spec.json'
             spec_path.write_text(json.dumps(spec))
-            args = ['--spec', str(spec_path)]
+            args = ['--file', str(spec_path)]
             if k8s_resources:
                 k8s_res_path = tmpdir / 'k8s-resources.json'
                 k8s_res_path.write_text(json.dumps(k8s_resources))
