@@ -112,18 +112,28 @@ def _emit_charm_event(charm, event_name):
 def _get_event_args(charm, bound_event):
     event_type = bound_event.event_type
     model = charm.framework.model
+
     if issubclass(event_type, op.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
         relation = model.get_relation(relation_name, relation_id)
-        if issubclass(event_type, op.charm.RelationUnitEvent):
-            remote_unit_name = os.environ['JUJU_REMOTE_UNIT']
-            remote_unit = model.get_unit(remote_unit_name)
-            return [relation, remote_unit], {}
-        else:
-            return [relation], {}
-    return [], {}
+    else:
+        relation = None
 
+    remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
+    remote_unit_name = os.environ.get('JUJU_REMOTE_UNIT', '')
+    if remote_app_name or remote_unit_name:
+        if not remote_app_name:
+            if '/' not in remote_unit_name:
+                raise RuntimeError(f'invalid remote unit name: {remote_unit_name}')
+            remote_app_name = remote_unit_name.split('/')[0]
+        args = [relation, model.get_app(remote_app_name)]
+        if remote_unit_name:
+            args.append(model.get_unit(remote_unit_name))
+        return args, {}
+    elif relation:
+        return [relation], {}
+    return [], {}
 
 def main(charm_class):
     """Setup the charm and dispatch the observed event.
