@@ -63,6 +63,8 @@ class EventSpec:
 
 class TestMain(unittest.TestCase):
 
+    CHARM_PY_RELPATH = '../lib/charm.py'
+
     @classmethod
     def _clear_unit_db(cls):
         charm_state_file = JUJU_CHARM_DIR / op.main.CHARM_STATE_FILE
@@ -99,8 +101,8 @@ class TestMain(unittest.TestCase):
         for f in files:
             absolute_path = Path(r) / f
             if absolute_path.name in ('install', 'start') or absolute_path.name.endswith('-storage-attached') and absolute_path.is_symlink():
-                if os.readlink(absolute_path) != op.main.CHARM_CODE_FILE:
-                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {op.main.CHARM_CODE_FILE}')
+                if os.readlink(absolute_path) != cls.CHARM_PY_RELPATH:
+                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {cls.CHARM_PY_RELPATH}')
             else:
                 absolute_path.unlink()
 
@@ -265,7 +267,7 @@ class TestMain(unittest.TestCase):
         # The symlink is expected to be present in the source tree.
         self.assertTrue(install_link_path.exists())
         # It has to point to main.py in the lib directory of the charm.
-        self.assertEqual(os.readlink(install_link_path), op.main.CHARM_CODE_FILE)
+        self.assertEqual(os.readlink(install_link_path), self.CHARM_PY_RELPATH)
 
         def _assess_event_links(event_spec):
             event_hook = JUJU_CHARM_DIR / f'hooks/{event_spec.event_name}'
@@ -279,7 +281,7 @@ class TestMain(unittest.TestCase):
 
             for event_hook in event_hooks:
                 self.assertTrue(os.path.exists(event_hook))
-                self.assertEqual(os.readlink(event_hook), op.main.CHARM_CODE_FILE)
+                self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))

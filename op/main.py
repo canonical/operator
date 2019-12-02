@@ -11,7 +11,6 @@ import op.framework
 import op.model
 
 CHARM_STATE_FILE = '.unit-state.db'
-CHARM_CODE_FILE = '../lib/charm.py'
 
 
 def debugf(format, *args, **kwargs):
@@ -34,25 +33,23 @@ def _load_metadata(charm_dir):
     return metadata
 
 
-def _handle_event_link(charm_dir, bound_event):
+def _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event):
     """Create a symlink for a particular event.
 
     charm_dir -- A root directory of the charm
     bound_event -- An event for which to create a symlink.
     """
+    # TODO: Handle function/action events here.
+    if not issubclass(bound_event.event_type, op.charm.HookEvent):
+        raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
+
     if issubclass(bound_event.event_type, op.charm.InstallEvent):
         # We don't set up the link for install events, since we assume it's already in place
         # (otherwise, we would never have been called).
         return
 
-    if issubclass(bound_event.event_type, op.charm.HookEvent):
-        event_dir = charm_dir / 'hooks'
-    else:
-        raise RuntimeError(f'unable to create a symlink: unsupported event type {bound_event.event_type}')
-    # TODO: Handle function/action events here.
-
     if not event_dir.exists():
-        raise RuntimeError(f'unable to create event symlink: {event_dir} directory does not exist')
+        raise RuntimeError(f'cannot create event symlink: {event_dir} directory does not exist')
 
     event_path = event_dir / bound_event.event_kind.replace('_', '-')
     create_link = True
@@ -60,20 +57,48 @@ def _handle_event_link(charm_dir, bound_event):
     if event_path.exists():
         # Non-symlink entries and the ones not pointing to the charm code file need to be removed.
         if not event_path.is_symlink():
-            debugf(f'Event entry at {event_path} is not a symlink: attempting to remove it.')
+            debugf(f'Path at {event_path} is not a symlink: attempting to remove it.')
             # May raise IsADirectoryError, e.g. in case it is a directory which
             # is unexpected and left to the developer or operator to handle.
             event_path.unlink()
-        elif os.readlink(event_path) != CHARM_CODE_FILE:
-            debugf(f'Removing entry {event_path} as it does not point to {CHARM_CODE_FILE}')
+        elif os.readlink(event_path) != charm_code_link:
+            debugf(f'Removing path {event_path} as it does not point to {charm_code_link}')
             event_path.unlink()
         else:
             create_link = False
 
     if create_link:
-        debugf(f'Creating a new relative symlink at {event_path} to pointing to {CHARM_CODE_FILE}')
-        event_path.symlink_to(CHARM_CODE_FILE)
+        debugf(f'Creating a new relative symlink at {event_path} pointing to {charm_code_link}')
+        event_path.symlink_to(charm_code_link)
 
+
+def _get_charm_code_link(charm_dir):
+    def _try_link(entry):
+        if entry.is_symlink():
+            link_path = Path(os.readlink(install_entry))
+            if link_path.is_absolute():
+                raise RuntimeError(f'{charm_dir / entry} points to an absolute path, not relative: {link_path}')
+            return link_path
+        elif entry.exists():
+            raise RuntimeError(f'{charm_dir / entry} exists but is not a symlink to the charm code file')
+        else:
+            return None
+
+    install_entry = charm_dir / 'hooks' / 'install'
+    charm_code_link = _try_link(install_entry)
+    if charm_code_link is None:
+        # Kubernetes charms may not have an install entry (see: LP: #1854635) and have only a 'start' entry.
+        start_entry = charm_dir / 'hooks' / 'start'
+        charm_code_link = _try_link(start_entry)
+
+    if charm_code_link is not None:
+        charm_code_file = charm_dir / 'hooks' / charm_code_link
+        if not charm_code_file.exists():
+            raise RuntimeError(f'{charm_code_file} does not exist')
+        if not charm_code_file.is_file():
+            raise RuntimeError(f'{charm_code_file} is not a regular file')
+        return charm_code_link
+    raise RuntimeError(f'cannot determine a link to the charm code based on {charm_dir}/hooks/install and {charm_dir}/hooks/start entries')
 
 def _setup_event_links(charm_dir, charm):
     """Set up links for supported events that originate from Juju.
@@ -81,16 +106,19 @@ def _setup_event_links(charm_dir, charm):
     Whether a charm can handle an event or not can be determined by
     introspecting which events are defined on it.
 
-    Hooks or functions are created as symlinks to ../lib/charm.py.
+    Hooks or functions are created as symlinks to the charm code file which is determined by inspecting
+    symlinks provided by the charm author at hooks/install or hooks/start.
 
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
     """
+    charm_code_link = _get_charm_code_link(charm_dir)
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         # TODO: handle function/action events here.
         if issubclass(bound_event.event_type, op.charm.HookEvent):
-            _handle_event_link(charm_dir, bound_event)
+            event_dir = charm_dir / 'hooks'
+            _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event)
 
 
 def _emit_charm_event(charm, event_name):
@@ -152,9 +180,8 @@ def main(charm_class):
     # JUJU_HOOK_NAME or JUJU_ACTION_NAME are not used to support simulation
     # of events from debugging sessions.
     juju_event_name = Path(sys.argv[0]).name
-
     if not juju_event_name:
-        raise RuntimeError('unable to determine an event name based on environment variables')
+        raise RuntimeError('cannot to determine an event name based on environment variables')
 
     meta = op.charm.CharmMeta(_load_metadata(charm_dir))
     unit_name = os.environ['JUJU_UNIT_NAME']
@@ -172,7 +199,7 @@ def main(charm_class):
         # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading
         # the hook setup code is not triggered on config-changed.
         # 'start' event is included as Juju does not fire the install event for K8s charms (see LP: #1854635).
-        if (juju_event_name in ('install', 'start', 'upgrade-charm') or juju_event_name.endswith('-storage-attached')):
+        if juju_event_name in ('install', 'start', 'upgrade-charm') or juju_event_name.endswith('-storage-attached'):
             _setup_event_links(charm_dir, charm)
 
         framework.reemit()
