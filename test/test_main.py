@@ -209,7 +209,7 @@ class TestMain(unittest.TestCase):
         # It has to point to main.py in the lib directory of the charm.
         self.assertEqual(os.readlink(install_link_path), op.main.CHARM_CODE_FILE)
 
-        def _assess_setup_hooks(event_name):
+        def _assess_event_links(event_name):
             event_hook = JUJU_CHARM_DIR / f'hooks/{event_name}'
 
             charm_config = base64.b64encode(pickle.dumps({
@@ -239,7 +239,7 @@ class TestMain(unittest.TestCase):
 
         for events_to_assess in test_cases:
             for event_name in events_to_assess:
-                _assess_setup_hooks(event_name)
+                _assess_event_links(event_name)
             self._clear_symlinks()
 
 
