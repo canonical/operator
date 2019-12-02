@@ -56,6 +56,8 @@ class Model:
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
 
+    def get_app(self, app_name):
+        return self._cache.get(Application, app_name)
 
 class ModelCache:
 
@@ -186,8 +188,12 @@ class Relation:
 class RelationData(Mapping):
     def __init__(self, relation, our_unit, backend):
         self.relation = weakref.proxy(relation)
-        self._data = {our_unit: RelationUnitData(self.relation, our_unit, True, backend)}
-        self._data.update({unit: RelationUnitData(self.relation, unit, False, backend) for unit in self.relation.units})
+        self._data = {our_unit: RelationDataContent(self.relation, our_unit, backend)}
+        self._data.update({our_unit.app: RelationDataContent(self.relation, our_unit.app, backend)})
+        self._data.update({unit: RelationDataContent(self.relation, unit, backend) for unit in self.relation.units})
+        # The relation might be dead so avoid a None key here.
+        if self.relation.app:
+            self._data.update({self.relation.app: RelationDataContent(self.relation, self.relation.app, backend)})
 
     def __contains__(self, key):
         return key in self._data
@@ -204,26 +210,42 @@ class RelationData(Mapping):
 
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
-class RelationUnitData(LazyMapping, MutableMapping):
-    def __init__(self, relation, unit, is_mutable, backend):
+class RelationDataContent(LazyMapping, MutableMapping):
+    def __init__(self, relation, entity, backend):
         self.relation = relation
-        self.unit = unit
-        self._is_mutable = is_mutable
+        self._entity = entity
         self._backend = backend
+        self._is_app = isinstance(entity, Application)
 
     def _load(self):
         try:
-            return self._backend.relation_get(self.relation.id, self.unit.name)
+            return self._backend.relation_get(self.relation.id, self._entity.name, self._is_app)
         except RelationNotFoundError:
             # Dead relations tell no tales (and have no data).
             return {}
 
+    def _is_mutable(self):
+        if self._is_app:
+            is_our_app = self._backend.app_name == self._entity.name
+            if not is_our_app:
+                return False
+            # Whether the application data bag is mutable or not depends on whether this unit is a leader or not,
+            # but this is not guaranteed to be always true during the same hook execution.
+            return self._backend.is_leader()
+        else:
+            is_our_unit = self._backend.unit_name == self._entity.name
+            if is_our_unit:
+                return True
+        return False
+
     def __setitem__(self, key, value):
-        if not self._is_mutable:
-            raise RelationDataError(f'cannot set relation data for {self.unit.name}')
+        if not self._is_mutable():
+            raise RelationDataError(f'cannot set relation data for {self._entity.name}')
         if not isinstance(value, str):
             raise RelationDataError('relation data values must be strings')
-        self._backend.relation_set(self.relation.id, key, value)
+
+        self._backend.relation_set(self.relation.id, key, value, self._is_app)
+
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
@@ -336,17 +358,23 @@ class ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_get(self, relation_id, member_name):
+    def relation_get(self, relation_id, member_name, is_app):
+        if not isinstance(is_app, bool):
+            raise RuntimeError('is_app parameter to relation_get must be a boolean')
+
         try:
-            return self._run('relation-get', '-r', str(relation_id), '-', member_name, return_output=True, use_json=True)
+            return self._run('relation-get', '-r', str(relation_id), '-', member_name, f'--app={is_app}', return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id, key, value):
+    def relation_set(self, relation_id, key, value, is_app):
+        if not isinstance(is_app, bool):
+            raise RuntimeError('is_app parameter to relation_set must be a boolean')
+
         try:
-            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}')
+            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}')
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
