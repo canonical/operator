@@ -414,6 +414,7 @@ class Pod:
 class Storage(Sequence):
     """Sequence of paths where each instance of a given storage name can be found.
     """
+
     def __init__(self, name, backend):
         self._name = name
         self._backend = backend
