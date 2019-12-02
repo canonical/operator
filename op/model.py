@@ -77,11 +77,39 @@ class ModelCache:
 class Application:
     def __init__(self, name, backend, cache):
         self.name = name
-
         self._backend = backend
         self._cache = cache
-
         self._is_our_app = self.name == self._backend.app_name
+        self._status = None
+
+    @property
+    def status(self):
+        if not self._is_our_app:
+            return UnknownStatus()
+
+        if not self._backend.is_leader():
+            raise RuntimeError('cannot get application status as a non-leader unit')
+
+        if self._status:
+            return self._status
+
+        s = self._backend.status_get(is_app=True)
+        self._status = StatusBase.from_name(s['status'], s['message'])
+        return self._status
+
+    @status.setter
+    def status(self, value):
+        if not isinstance(value, StatusBase):
+            raise InvalidStatusError(f'invalid value provided for application {self} status: {value}')
+
+        if not self._is_our_app:
+            raise RuntimeError(f'cannot to set status for a remote application {self}')
+
+        if not self._backend.is_leader():
+            raise RuntimeError('cannot set application status as a non-leader unit')
+
+        self._backend.status_set(value.name, value.message, is_app=True)
+        self._status = value
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -96,8 +124,31 @@ class Unit:
 
         self._backend = backend
         self._cache = cache
-
         self._is_our_unit = self.name == self._backend.unit_name
+        self._status = None
+
+    @property
+    def status(self):
+        if not self._is_our_unit:
+            return UnknownStatus()
+
+        if self._status:
+            return self._status
+
+        s = self._backend.status_get(is_app=False)
+        self._status = StatusBase.from_name(s['status'], s['message'])
+        return self._status
+
+    @status.setter
+    def status(self, value):
+        if not isinstance(value, StatusBase):
+            raise InvalidStatusError(f'invalid value provided for unit {self} status: {value}')
+
+        if not self._is_our_unit:
+            raise RuntimeError(f'cannot set status for a remote unit {self}')
+
+        self._backend.status_set(value.name, value.message, is_app=False)
+        self._status = value
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
@@ -268,6 +319,67 @@ class ConfigData(LazyMapping):
     def _load(self):
         return self._backend.config_get()
 
+class StatusBase:
+    """Status values specific to applications and units."""
+
+    _statuses = {}
+
+    def __init__(self, message):
+        self.message = message
+
+    def __new__(cls, *args, **kwargs):
+        if cls is StatusBase:
+            raise TypeError("cannot instantiate a base class")
+        cls._statuses[cls.name] = cls
+        return super().__new__(cls)
+
+    @classmethod
+    def from_name(cls, name, message):
+        return cls._statuses[name](message)
+
+class ActiveStatus(StatusBase):
+    """The unit is ready.
+
+    The unit believes it is correctly offering all the services it has been asked to offer.
+    """
+    name = 'active'
+
+    def __init__(self):
+        super().__init__('')
+
+class BlockedStatus(StatusBase):
+    """The unit requires manual intervention.
+
+    An operator has to manually intervene to unblock the unit and let it proceed.
+    """
+    name = 'blocked'
+
+class MaintenanceStatus(StatusBase):
+    """The unit is performing maintenance tasks.
+
+    The unit is not yet providing services, but is actively doing work in preparation for providing those services.
+    This is a "spinning" state, not an error state. It reflects activity on the unit itself, not on peers or related units.
+    """
+    name = 'maintenance'
+
+class UnknownStatus(StatusBase):
+    """The unit status is unknown.
+
+    A unit-agent has finished calling install, config-changed and start, but the charm has not called status-set yet.
+    """
+    name = 'unknown'
+
+    def __init__(self):
+        # Unknown status cannot be set and does not have a message associated with it.
+        super().__init__('')
+
+class WaitingStatus(StatusBase):
+    """A unit is unable to progress.
+
+    The unit is unable to progress to an active state because an application to which it is related is not running.
+    """
+    name = 'waiting'
+
 
 class Resources:
     """Object representing resources for the charm.
@@ -314,6 +426,10 @@ class RelationDataError(ModelError):
 
 
 class RelationNotFoundError(ModelError):
+    pass
+
+
+class InvalidStatusError(ModelError):
     pass
 
 
@@ -414,3 +530,17 @@ class ModelBackend:
             self._run('pod-spec-set', *args)
         finally:
             shutil.rmtree(tmpdir)
+
+    def status_get(self, *, is_app=False):
+        """Get a status of a unit or an application.
+        app -- A boolean indicating whether the status should be retrieved for a unit or an application.
+        """
+        return self._run('status-get', '--include-data', f'--application={is_app}')
+
+    def status_set(self, status, message='', *, is_app=False):
+        """Set a status of a unit or an application.
+        app -- A boolean indicating whether the status should be set for a unit or an application.
+        """
+        if not isinstance(is_app, bool):
+            raise RuntimeError('is_app parameter must be boolean')
+        return self._run('status-set', f'--application={is_app}', status, message)

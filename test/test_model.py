@@ -380,6 +380,168 @@ class TestModel(unittest.TestCase):
         self.assertEqual(spec_path.read_text(), '{"bar": "foo"}')
         self.assertEqual(k8s_res_path.read_text(), '{"qux": "baz"}')
 
+    def test_base_status_instance_raises(self):
+        with self.assertRaises(TypeError):
+            op.model.StatusBase('test')
+
+    def test_active_message_raises(self):
+        with self.assertRaises(TypeError):
+            op.model.ActiveStatus('test')
+
+    def test_local_set_valid_unit_status(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        test_cases = [(
+            op.model.ActiveStatus(),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', '']]),
+        ), (
+            op.model.MaintenanceStatus('Yellow'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'maintenance', 'Yellow']]),
+        ), (
+            op.model.BlockedStatus('Red'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'blocked', 'Red']]),
+        ), (
+            op.model.WaitingStatus('White'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'waiting', 'White']]),
+        )]
+
+        for target_status, setup_tools, check_tool_calls in test_cases:
+            setup_tools()
+
+            self.model.unit.status = target_status
+
+            self.assertEqual(self.model.unit.status, target_status)
+
+            check_tool_calls()
+
+    def test_local_set_valid_app_status(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'is-leader', 'echo true')
+
+        test_cases = [(
+            op.model.ActiveStatus(),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'active', ''], fake_script_calls(self, True)),
+        ), (
+            op.model.MaintenanceStatus('Yellow'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'], fake_script_calls(self, True)),
+        ), (
+            op.model.BlockedStatus('Red'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'blocked', 'Red'], fake_script_calls(self, True)),
+        ), (
+            op.model.WaitingStatus('White'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'waiting', 'White'], fake_script_calls(self, True)),
+        )]
+
+        for target_status, setup_tools, check_tool_calls in test_cases:
+            setup_tools()
+
+            self.model.app.status = target_status
+
+            self.assertEqual(self.model.app.status, target_status)
+
+            check_tool_calls()
+
+    def test_set_app_status_non_leader_raises(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'is-leader', 'echo false')
+
+        with self.assertRaises(RuntimeError):
+            self.model.app.status
+
+        with self.assertRaises(RuntimeError):
+            self.model.app.status = op.model.ActiveStatus()
+
+    def test_local_set_invalid_status(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'status-set', 'exit 1')
+        fake_script(self, 'is-leader', 'echo true')
+
+        with self.assertRaises(op.model.ModelError):
+            self.model.unit.status = op.model.UnknownStatus()
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['status-set', '--application=False', 'unknown', ''],
+        ])
+
+        with self.assertRaises(op.model.ModelError):
+            self.model.app.status = op.model.UnknownStatus()
+
+        # A leadership check is needed for application status.
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+            ['status-set', '--application=True', 'unknown', ''],
+        ])
+
+    def test_status_set_is_app_not_bool_raises(self):
+        self.backend = op.model.ModelBackend()
+
+        for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
+            with self.assertRaises(RuntimeError):
+                self.backend.status_set(op.model.ActiveStatus, is_app=is_app_v)
+
+    def test_remote_unit_status(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+
+        remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
+
+        test_statuses = (
+            op.model.UnknownStatus(),
+            op.model.ActiveStatus(),
+            op.model.MaintenanceStatus('Yellow'),
+            op.model.BlockedStatus('Red'),
+            op.model.WaitingStatus('White'),
+        )
+
+        for target_status in test_statuses:
+            with self.assertRaises(RuntimeError):
+                remote_unit.status = target_status
+
+    def test_remote_app_status(self):
+        remoteapp1 = self.model.get_relation('db1').app
+
+        # Remote application status is always unknown.
+        self.assertIsInstance(remoteapp1.status, op.model.UnknownStatus)
+
+        test_statuses = (
+            op.model.UnknownStatus(),
+            op.model.ActiveStatus(),
+            op.model.MaintenanceStatus('Upgrading software'),
+            op.model.BlockedStatus('Awaiting manual resolution'),
+            op.model.WaitingStatus('Awaiting related app updates'),
+        )
+        for target_status in test_statuses:
+            with self.assertRaises(RuntimeError):
+                remoteapp1.status = target_status
+
 
 class TestModelBackend(unittest.TestCase):
 
@@ -429,6 +591,21 @@ class TestModelBackend(unittest.TestCase):
             with self.assertRaises(exception):
                 run()
             self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_status_is_app_forced_kwargs(self):
+        fake_script(self, 'status-get', 'exit 1')
+        fake_script(self, 'status-set', 'exit 1')
+
+        test_cases = (
+            lambda: self.backend.status_get(False),
+            lambda: self.backend.status_get(True),
+            lambda: self.backend.status_set('active', '', False),
+            lambda: self.backend.status_set('active', '', True),
+        )
+
+        for case in test_cases:
+            with self.assertRaises(TypeError):
+                case()
 
 
 def fake_script(test_case, name, content):
