@@ -45,8 +45,6 @@ class SymlinkTargetError(Exception):
 
 class TestMain(unittest.TestCase):
 
-    CHARM_PY_RELPATH = '../lib/charm.py'
-
     @classmethod
     def _clear_unit_db(cls):
         charm_state_file = JUJU_CHARM_DIR / op.main.CHARM_STATE_FILE
@@ -82,12 +80,9 @@ class TestMain(unittest.TestCase):
         r, _, files = next(os.walk(JUJU_CHARM_DIR / 'hooks'))
         for f in files:
             absolute_path = Path(r) / f
-            if absolute_path.name == 'install' and absolute_path.is_symlink():
-                if os.readlink(absolute_path) != cls.CHARM_PY_RELPATH:
-                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {cls.CHARM_PY_RELPATH}')
-            elif absolute_path.name.endswith('-storage-attached') and absolute_path.is_symlink():
-                if os.readlink(absolute_path) != 'install':
-                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to "install"')
+            if absolute_path.name in ('install', 'start') or absolute_path.name.endswith('-storage-attached') and absolute_path.is_symlink():
+                if os.readlink(absolute_path) != op.main.CHARM_CODE_FILE:
+                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {op.main.CHARM_CODE_FILE}')
             else:
                 absolute_path.unlink()
 
@@ -203,19 +198,16 @@ class TestMain(unittest.TestCase):
             self.fail('Event simulation for an unsupported event'
                       ' results in a non-zero exit code returned')
 
-    def test_setup_hooks(self):
+    def test_setup_event_links(self):
         """Test auto-creation of symlinks for supported events.
         """
-        event_hooks = [f'hooks/{e.replace("_", "-")}'
-                       for e in charm.Charm.on.events().keys()
-                       if e != 'install']
-
+        event_hooks = [f'hooks/{e.replace("_", "-")}' for e in charm.Charm.on.events().keys()]
         install_link_path = JUJU_CHARM_DIR / 'hooks/install'
 
         # The symlink is expected to be present in the source tree.
         self.assertTrue(install_link_path.exists())
         # It has to point to main.py in the lib directory of the charm.
-        self.assertEqual(os.readlink(install_link_path), self.CHARM_PY_RELPATH)
+        self.assertEqual(os.readlink(install_link_path), op.main.CHARM_CODE_FILE)
 
         def _assess_setup_hooks(event_name):
             event_hook = JUJU_CHARM_DIR / f'hooks/{event_name}'
@@ -233,26 +225,22 @@ class TestMain(unittest.TestCase):
 
             for event_hook in event_hooks:
                 self.assertTrue(os.path.exists(event_hook))
-                self.assertEqual(os.readlink(event_hook), 'install')
-                self.assertEqual(os.readlink('hooks/install'),
-                                 self.CHARM_PY_RELPATH)
+                self.assertEqual(os.readlink(event_hook), op.main.CHARM_CODE_FILE)
 
-        # Assess 'install' first because upgrade-charm or other
-        # events cannot be handled before install creates symlinks for them.
-        events_to_assess = ['install', 'start', 'config-changed',
-                            'leader-elected', 'upgrade-charm', 'update-status']
+        test_cases = [
+            # Assess 'install' first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
+            ('install', 'start', 'config-changed', 'leader-elected', 'upgrade-charm', 'update-status'),
+            # Storage hooks run before "install" so this case needs to be checked as well.
+            ('disks-storage-attached', 'install', 'start', 'config-changed', 'leader-elected', 'upgrade-charm', 'update-status'),
+            # Do the above two test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
+            ('start', 'config-changed', 'leader-elected', 'upgrade-charm', 'update-status'),
+            ('disks-storage-attached', 'start', 'config-changed', 'leader-elected', 'upgrade-charm', 'update-status'),
+        ]
 
-        for event_name in events_to_assess:
-            _assess_setup_hooks(event_name)
-
-        self._clear_symlinks()
-
-        # Storage hooks run before "install" so this case needs to be checked as well.
-        events_to_assess = ['disks-storage-attached', 'install', 'start', 'config-changed',
-                            'leader-elected', 'upgrade-charm', 'update-status']
-
-        for event_name in events_to_assess:
-            _assess_setup_hooks(event_name)
+        for events_to_assess in test_cases:
+            for event_name in events_to_assess:
+                _assess_setup_hooks(event_name)
+            self._clear_symlinks()
 
 
 if __name__ == "__main__":
