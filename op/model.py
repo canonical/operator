@@ -8,7 +8,7 @@ import datetime
 
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
@@ -23,6 +23,7 @@ class Model:
         self.config = ConfigData(self._backend)
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
+        self.storage = {name: Storage(name, self._backend) for name in meta.storage}
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -410,6 +411,35 @@ class Pod:
         self._backend.pod_spec_set(spec, k8s_resources)
 
 
+class Storage(Sequence):
+    """Sequence of paths where each instance of a given storage name can be found.
+    """
+    def __init__(self, name, backend):
+        self._name = name
+        self._backend = backend
+        self._lazy_items = None
+
+    @property
+    def _items(self):
+        items = self._lazy_items
+        if items is None:
+            items = self._lazy_items = []
+            for storage_id in self._backend.storage_list(self._name):
+                items.append(Path(self._backend.storage_get(storage_id)))
+        return items
+
+    def __len__(self):
+        return len(self._items)
+
+    def __getitem__(self, index):
+        return self._items[index]
+
+    def request(self, count=1):
+        """Request new instance(s) be added to this storage.
+        """
+        self._backend.storage_add(self._name, count)
+
+
 class ModelError(Exception):
     pass
 
@@ -544,3 +574,12 @@ class ModelBackend:
         if not isinstance(is_app, bool):
             raise RuntimeError('is_app parameter must be boolean')
         return self._run('status-set', f'--application={is_app}', status, message)
+
+    def storage_list(self, name):
+        return self._run('storage-list', name, return_output=True, use_json=True)
+
+    def storage_get(self, storage_id):
+        return self._run('storage-get', '-s', storage_id, 'location', return_output=True, use_json=True)
+
+    def storage_add(self, name, count):
+        self._run('storage-add', f'{name}={count}')

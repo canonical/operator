@@ -22,6 +22,7 @@ class TestModel(unittest.TestCase):
         self.backend = op.model.ModelBackend()
         meta = op.charm.CharmMeta()
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        meta.storage = {'disks': None, 'data': None}
         self.model = op.model.Model('myapp/0', meta, self.backend)
 
     def test_model(self):
@@ -595,6 +596,25 @@ class TestModel(unittest.TestCase):
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
         ])
+
+    def test_storage(self):
+        fake_script(self, 'storage-list', """[ "$1" = disks ] && echo '["disks/0", "disks/1"]' || echo '[]'""")
+        fake_script(self, 'storage-get',
+                    """
+                    if [ "$2" = disks/0 ]; then
+                      echo '"/var/srv/disks/0"'
+                    elif [ "$2" == disks/1 ]; then
+                      echo '"/var/srv/disks/1"'
+                    else
+                      exit 2
+                    fi
+                    """)
+        fake_script(self, 'storage-add', '')
+
+        self.assertSequenceEqual(self.model.storage['disks'], [pathlib.Path('/var/srv/disks/0'), pathlib.Path('/var/srv/disks/1')])
+        self.assertSequenceEqual(self.model.storage['data'], [])
+        self.model.storage['data'].request(count=3)
+        self.assertIn(['storage-add', 'data=3'], fake_script_calls(self))
 
 
 class TestModelBackend(unittest.TestCase):
