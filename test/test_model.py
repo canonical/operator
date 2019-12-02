@@ -489,6 +489,21 @@ class TestModelBackend(unittest.TestCase):
                 run()
             self.assertEqual(fake_script_calls(self, clear=True), calls)
 
+    def test_status_is_app_forced_kwargs(self):
+        fake_script(self, 'status-get', 'exit 1')
+        fake_script(self, 'status-set', 'exit 1')
+
+        test_cases = (
+            lambda: self.backend.status_get(False),
+            lambda: self.backend.status_get(True),
+            lambda: self.backend.status_set('active', '', False),
+            lambda: self.backend.status_set('active', '', True),
+        )
+
+        for case in test_cases:
+            with self.assertRaises(TypeError):
+                case()
+
 
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):

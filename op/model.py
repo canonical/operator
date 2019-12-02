@@ -503,13 +503,13 @@ class ModelBackend:
         finally:
             shutil.rmtree(tmpdir)
 
-    def status_get(self, is_app=False):
+    def status_get(self, *, is_app=False):
         """Get a status of a unit or an application.
         app -- A boolean indicating whether the status should be retrieved for a unit or an application.
         """
         return self._run('status-get', '--include-data', f'--application={is_app}')
 
-    def status_set(self, status, message='', is_app=False):
+    def status_set(self, status, message='', *, is_app=False):
         """Set a status of a unit or an application.
         app -- A boolean indicating whether the status should be set for a unit or an application.
         """
