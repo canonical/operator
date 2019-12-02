@@ -70,7 +70,7 @@ class TestModel(unittest.TestCase):
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
             ['relation-list', '-r', '7', '--format=json'],
-            ['relation-get', '-r', '7', '-', 'myapp/0', '--format=json'],
+            ['relation-get', '-r', '7', '-', 'myapp/0', '--app=False', '--format=json'],
             ['relation-ids', 'db0', '--format=json'],
             ['relation-ids', 'db2', '--format=json'],
             ['relation-list', '-r', '5', '--format=json'],
@@ -110,8 +110,9 @@ class TestModel(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
-            ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--format=json']
+            ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--app=False', '--format=json']
         ])
+
     def test_remote_app_relation_data(self):
         self.backend = op.model.ModelBackend()
         meta = op.charm.CharmMeta()
@@ -152,7 +153,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
-            ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--format=json']
+            ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--app=False', '--format=json']
         ])
 
     def test_relation_data_modify_our(self):
@@ -170,8 +171,8 @@ class TestModel(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
-            ['relation-get', '-r', '4', '-', 'myapp/0', '--format=json'],
-            ['relation-set', '-r', '4', 'host=bar']
+            ['relation-get', '-r', '4', '-', 'myapp/0', '--app=False', '--format=json'],
+            ['relation-set', '-r', '4', 'host=bar', '--app=False']
         ])
 
     def test_app_relation_data_modify_local_as_leader(self):
@@ -245,8 +246,8 @@ class TestModel(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
-            ['relation-get', '-r', '4', '-', 'myapp/0', '--format=json'],
-            ['relation-set', '-r', '4', 'host=']
+            ['relation-get', '-r', '4', '-', 'myapp/0', '--app=False', '--format=json'],
+            ['relation-set', '-r', '4', 'host=', '--app=False']
         ])
 
     def test_relation_set_fail(self):
@@ -269,9 +270,9 @@ class TestModel(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db2', '--format=json'],
             ['relation-list', '-r', '5', '--format=json'],
-            ['relation-get', '-r', '5', '-', 'myapp/0', '--format=json'],
-            ['relation-set', '-r', '5', 'host=bar'],
-            ['relation-set', '-r', '5', 'host=']
+            ['relation-get', '-r', '5', '-', 'myapp/0', '--app=False', '--format=json'],
+            ['relation-set', '-r', '5', 'host=bar', '--app=False'],
+            ['relation-set', '-r', '5', 'host=', '--app=False']
         ])
 
     def test_relation_get_set_is_app_arg(self):
@@ -557,6 +558,9 @@ class TestModel(unittest.TestCase):
                 remote_unit.status = target_status
 
     def test_remote_app_status(self):
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+
         remoteapp1 = self.model.get_relation('db1').app
 
         # Remote application status is always unknown.
@@ -572,6 +576,11 @@ class TestModel(unittest.TestCase):
         for target_status in test_statuses:
             with self.assertRaises(RuntimeError):
                 remoteapp1.status = target_status
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+        ])
 
 
 class TestModelBackend(unittest.TestCase):
