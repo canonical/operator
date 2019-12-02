@@ -31,7 +31,7 @@ class Model:
 
         If relation_id is not given, this will return the Relation instance if the
         relation is established only once or None if it is not established. If this
-        same relation is established multiple times the error TooManyRelatedApps is raised.
+        same relation is established multiple times the error TooManyRelatedAppsError is raised.
         """
         if relation_id is not None:
             if not isinstance(relation_id, int):
@@ -51,7 +51,7 @@ class Model:
             else:
                 # TODO: We need something in the framework to catch and gracefully handle
                 # errors, ideally integrating the error catching with Juju's mechanisms.
-                raise TooManyRelatedApps(relation_name, num_related, 1)
+                raise TooManyRelatedAppsError(relation_name, num_related, 1)
 
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
@@ -413,7 +413,7 @@ class Pod:
 class ModelError(Exception):
     pass
 
-class TooManyRelatedApps(ModelError):
+class TooManyRelatedAppsError(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
         super().__init__(f'Too many remote applications on {relation_name} ({num_related} > {max_supported})')
         self.relation_name = relation_name
