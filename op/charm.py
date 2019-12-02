@@ -37,40 +37,49 @@ class LeaderSettingsChangedEvent(HookEvent):
 
 
 class RelationEvent(HookEvent):
-    def __init__(self, handle, relation):
+    def __init__(self, handle, relation, app=None, unit=None):
         super().__init__(handle)
+
+        if unit and unit.app != app:
+            raise RuntimeError(f'cannot create RelationEvent with application {app} and unit {unit}')
+
         self.relation = relation
+        self.app = app
+        self.unit = unit
 
     def snapshot(self):
-        return {
+        snapshot = {
             'relation_name': self.relation.name,
             'relation_id': self.relation.id,
         }
+        if self.app:
+            snapshot['app_name'] = self.app.name
+        if self.unit:
+            snapshot['unit_name'] = self.unit.name
+        return snapshot
 
     def restore(self, snapshot):
         self.relation = self.framework.model.get_relation(snapshot['relation_name'], snapshot['relation_id'])
 
-class RelationUnitEvent(RelationEvent):
-    def __init__(self, handle, relation, unit):
-        super().__init__(handle, relation)
-        self.unit = unit
+        app_name = snapshot.get('app_name')
+        if app_name:
+            self.app = self.framework.model.get_app(app_name)
+        else:
+            self.app = None
 
-    def snapshot(self):
-        snapshot = super().snapshot()
-        snapshot['unit_name'] = self.unit.name
-        return snapshot
+        unit_name = snapshot.get('unit_name')
+        if unit_name:
+            self.unit = self.framework.model.get_unit(unit_name)
+        else:
+            self.unit = None
 
-    def restore(self, snapshot):
-        super().restore(snapshot)
-        self.unit = self.framework.model.get_unit(snapshot['unit_name'])
-
-class RelationJoinedEvent(RelationUnitEvent):
+class RelationJoinedEvent(RelationEvent):
     pass
 
-class RelationChangedEvent(RelationUnitEvent):
+class RelationChangedEvent(RelationEvent):
     pass
 
-class RelationDepartedEvent(RelationUnitEvent):
+class RelationDepartedEvent(RelationEvent):
     pass
 
 class RelationBrokenEvent(RelationEvent):

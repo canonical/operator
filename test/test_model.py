@@ -59,7 +59,7 @@ class TestModel(unittest.TestCase):
         self.assertIsInstance(db1_4, op.model.Relation)
         dead_rel = self.model.get_relation('db1', 7)
         self.assertIsInstance(dead_rel, op.model.Relation)
-        self.assertEqual(list(dead_rel.data.keys()), [self.model.unit])
+        self.assertEqual(list(dead_rel.data.keys()), [self.model.unit, self.model.unit.app])
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertIsNone(self.model.get_relation('db0'))
         self.assertIs(self.model.get_relation('db1'), db1_4)
@@ -96,7 +96,7 @@ class TestModel(unittest.TestCase):
         self.assertTrue(self.model.unit._is_our_unit)
         self.assertTrue(self.model.unit.app._is_our_app)
 
-    def test_relation_data(self):
+    def test_unit_relation_data(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
         fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]) && echo '{"host": "remoteapp1-0"}' || exit 2""")
@@ -111,6 +111,29 @@ class TestModel(unittest.TestCase):
             ['relation-ids', 'db1', '--format=json'],
             ['relation-list', '-r', '4', '--format=json'],
             ['relation-get', '-r', '4', '-', 'remoteapp1/0', '--format=json']
+        ])
+    def test_remote_app_relation_data(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = remoteapp1 ] && echo '{"secret": "cafedeadbeef"}' || exit 2""")
+
+        # Try to get relation data for an invalid remote application.
+        random_app = self.model._cache.get(op.model.Application, 'randomapp')
+        with self.assertRaises(KeyError):
+            self.model.get_relation('db1').data[random_app]
+
+        remoteapp1 = self.model.get_relation('db1').app
+        self.assertEqual(self.model.get_relation('db1').data[remoteapp1], {'secret': 'cafedeadbeef'})
+
+        self.assertEqual(fake_script_calls(self), [
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+            ['relation-get', '-r', '4', '-', 'remoteapp1', '--app=True', '--format=json'],
         ])
 
     def test_relation_data_modify_remote(self):
@@ -149,6 +172,61 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
             ['relation-get', '-r', '4', '-', 'myapp/0', '--format=json'],
             ['relation-set', '-r', '4', 'host=bar']
+        ])
+
+    def test_app_relation_data_modify_local_as_leader(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
+        fake_script(self, 'relation-set', """[ "$2" = 4 ] && exit 0 || exit 2""")
+        fake_script(self, 'is-leader', 'echo true')
+
+        local_app = self.model.unit.app
+
+        rel_db1 = self.model.get_relation('db1')
+        self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
+
+        rel_db1.data[local_app]['password'] = 'foo'
+
+        self.assertEqual(rel_db1.data[local_app]['password'], 'foo')
+
+        self.assertEqual(fake_script_calls(self), [
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+            ['relation-get', '-r', '4', '-', 'myapp', '--app=True', '--format=json'],
+            ['is-leader', '--format=json'],
+            ['relation-set', '-r', '4', 'password=foo', '--app=True'],
+        ])
+
+    def test_app_relation_data_modify_local_as_minion(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
+        fake_script(self, 'is-leader', 'echo false')
+
+        local_app = self.model.unit.app
+
+        rel_db1 = self.model.get_relation('db1')
+        self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
+
+        with self.assertRaises(op.model.RelationDataError):
+            rel_db1.data[local_app]['password'] = 'foobar'
+
+        self.assertEqual(fake_script_calls(self), [
+            ['relation-ids', 'db1', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+            ['relation-get', '-r', '4', '-', 'myapp', '--app=True', '--format=json'],
+            ['is-leader', '--format=json'],
         ])
 
     def test_relation_data_del_key(self):
@@ -195,6 +273,24 @@ class TestModel(unittest.TestCase):
             ['relation-set', '-r', '5', 'host=bar'],
             ['relation-set', '-r', '5', 'host=']
         ])
+
+    def test_relation_get_set_is_app_arg(self):
+        self.backend = op.model.ModelBackend()
+
+        # No is_app provided.
+        with self.assertRaises(TypeError):
+            self.backend.relation_set(1, 'fookey', 'barval')
+
+        with self.assertRaises(TypeError):
+            self.backend.relation_get(1, 'fooentity')
+
+        # Invalid types for is_app.
+        for is_app_v in [None, 1, 2.0, 'a', b'beef']:
+            with self.assertRaises(RuntimeError):
+                self.backend.relation_set(1, 'fookey', 'barval', is_app=is_app_v)
+
+            with self.assertRaises(RuntimeError):
+                self.backend.relation_get(1, 'fooentity', is_app=is_app_v)
 
     def test_relation_data_type_check(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
@@ -315,6 +411,168 @@ class TestModel(unittest.TestCase):
         self.assertEqual(spec_path.read_text(), '{"bar": "foo"}')
         self.assertEqual(k8s_res_path.read_text(), '{"qux": "baz"}')
 
+    def test_base_status_instance_raises(self):
+        with self.assertRaises(TypeError):
+            op.model.StatusBase('test')
+
+    def test_active_message_raises(self):
+        with self.assertRaises(TypeError):
+            op.model.ActiveStatus('test')
+
+    def test_local_set_valid_unit_status(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        test_cases = [(
+            op.model.ActiveStatus(),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', '']]),
+        ), (
+            op.model.MaintenanceStatus('Yellow'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'maintenance', 'Yellow']]),
+        ), (
+            op.model.BlockedStatus('Red'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'blocked', 'Red']]),
+        ), (
+            op.model.WaitingStatus('White'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'waiting', 'White']]),
+        )]
+
+        for target_status, setup_tools, check_tool_calls in test_cases:
+            setup_tools()
+
+            self.model.unit.status = target_status
+
+            self.assertEqual(self.model.unit.status, target_status)
+
+            check_tool_calls()
+
+    def test_local_set_valid_app_status(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'is-leader', 'echo true')
+
+        test_cases = [(
+            op.model.ActiveStatus(),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'active', ''], fake_script_calls(self, True)),
+        ), (
+            op.model.MaintenanceStatus('Yellow'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'], fake_script_calls(self, True)),
+        ), (
+            op.model.BlockedStatus('Red'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'blocked', 'Red'], fake_script_calls(self, True)),
+        ), (
+            op.model.WaitingStatus('White'),
+            lambda: fake_script(self, 'status-set', 'exit 0'),
+            lambda: self.assertIn(['status-set', '--application=True', 'waiting', 'White'], fake_script_calls(self, True)),
+        )]
+
+        for target_status, setup_tools, check_tool_calls in test_cases:
+            setup_tools()
+
+            self.model.app.status = target_status
+
+            self.assertEqual(self.model.app.status, target_status)
+
+            check_tool_calls()
+
+    def test_set_app_status_non_leader_raises(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'is-leader', 'echo false')
+
+        with self.assertRaises(RuntimeError):
+            self.model.app.status
+
+        with self.assertRaises(RuntimeError):
+            self.model.app.status = op.model.ActiveStatus()
+
+    def test_local_set_invalid_status(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'status-set', 'exit 1')
+        fake_script(self, 'is-leader', 'echo true')
+
+        with self.assertRaises(op.model.ModelError):
+            self.model.unit.status = op.model.UnknownStatus()
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['status-set', '--application=False', 'unknown', ''],
+        ])
+
+        with self.assertRaises(op.model.ModelError):
+            self.model.app.status = op.model.UnknownStatus()
+
+        # A leadership check is needed for application status.
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+            ['status-set', '--application=True', 'unknown', ''],
+        ])
+
+    def test_status_set_is_app_not_bool_raises(self):
+        self.backend = op.model.ModelBackend()
+
+        for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
+            with self.assertRaises(RuntimeError):
+                self.backend.status_set(op.model.ActiveStatus, is_app=is_app_v)
+
+    def test_remote_unit_status(self):
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+
+        remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
+
+        test_statuses = (
+            op.model.UnknownStatus(),
+            op.model.ActiveStatus(),
+            op.model.MaintenanceStatus('Yellow'),
+            op.model.BlockedStatus('Red'),
+            op.model.WaitingStatus('White'),
+        )
+
+        for target_status in test_statuses:
+            with self.assertRaises(RuntimeError):
+                remote_unit.status = target_status
+
+    def test_remote_app_status(self):
+        remoteapp1 = self.model.get_relation('db1').app
+
+        # Remote application status is always unknown.
+        self.assertIsInstance(remoteapp1.status, op.model.UnknownStatus)
+
+        test_statuses = (
+            op.model.UnknownStatus(),
+            op.model.ActiveStatus(),
+            op.model.MaintenanceStatus('Upgrading software'),
+            op.model.BlockedStatus('Awaiting manual resolution'),
+            op.model.WaitingStatus('Awaiting related app updates'),
+        )
+        for target_status in test_statuses:
+            with self.assertRaises(RuntimeError):
+                remoteapp1.status = target_status
+
 
 class TestModelBackend(unittest.TestCase):
 
@@ -339,24 +597,24 @@ class TestModelBackend(unittest.TestCase):
             [['relation-list', '-r', '3', '--format=json']],
         ), (
             lambda: fake_script(self, 'relation-set', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.relation_set(3, 'foo', 'bar'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             op.model.ModelError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
         ), (
             lambda: fake_script(self, 'relation-set', f'echo {err_msg} >&2 ; exit 2'),
-            lambda: self.backend.relation_set(3, 'foo', 'bar'),
+            lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             op.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
         ), (
             lambda: fake_script(self, 'relation-get', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.relation_get(3, 'remote/0'),
+            lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             op.model.ModelError,
-            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+            [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
         ), (
             lambda: fake_script(self, 'relation-get', f'echo {err_msg} >&2 ; exit 2'),
-            lambda: self.backend.relation_get(3, 'remote/0'),
+            lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             op.model.RelationNotFoundError,
-            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+            [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
         )]
 
         for do_fake, run, exception, calls in test_cases:
@@ -364,6 +622,21 @@ class TestModelBackend(unittest.TestCase):
             with self.assertRaises(exception):
                 run()
             self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_status_is_app_forced_kwargs(self):
+        fake_script(self, 'status-get', 'exit 1')
+        fake_script(self, 'status-set', 'exit 1')
+
+        test_cases = (
+            lambda: self.backend.status_get(False),
+            lambda: self.backend.status_get(True),
+            lambda: self.backend.status_set('active', '', False),
+            lambda: self.backend.status_set('active', '', True),
+        )
+
+        for case in test_cases:
+            with self.assertRaises(TypeError):
+                case()
 
 
 def fake_script(test_case, name, content):
