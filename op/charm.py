@@ -8,29 +8,38 @@ class HookEvent(EventBase):
 class InstallEvent(HookEvent):
     pass
 
+
 class StartEvent(HookEvent):
     pass
+
 
 class StopEvent(HookEvent):
     pass
 
+
 class ConfigChangedEvent(HookEvent):
     pass
+
 
 class UpdateStatusEvent(HookEvent):
     pass
 
+
 class UpgradeCharmEvent(HookEvent):
     pass
+
 
 class PreSeriesUpgradeEvent(HookEvent):
     pass
 
+
 class PostSeriesUpgradeEvent(HookEvent):
     pass
 
+
 class LeaderElectedEvent(HookEvent):
     pass
+
 
 class LeaderSettingsChangedEvent(HookEvent):
     pass
@@ -73,14 +82,18 @@ class RelationEvent(HookEvent):
         else:
             self.unit = None
 
+
 class RelationJoinedEvent(RelationEvent):
     pass
+
 
 class RelationChangedEvent(RelationEvent):
     pass
 
+
 class RelationDepartedEvent(RelationEvent):
     pass
+
 
 class RelationBrokenEvent(RelationEvent):
     pass
@@ -89,8 +102,10 @@ class RelationBrokenEvent(RelationEvent):
 class StorageEvent(HookEvent):
     pass
 
+
 class StorageAttachedEvent(StorageEvent):
     pass
+
 
 class StorageDetachingEvent(StorageEvent):
     pass

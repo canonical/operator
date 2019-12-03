@@ -6,7 +6,6 @@ import tempfile
 import time
 import datetime
 
-
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
@@ -14,6 +13,7 @@ from subprocess import run, PIPE, CalledProcessError
 
 
 class Model:
+
     def __init__(self, unit_name, meta, backend):
         self._cache = ModelCache(backend)
         self._backend = backend
@@ -59,6 +59,7 @@ class Model:
     def get_app(self, app_name):
         return self._cache.get(Application, app_name)
 
+
 class ModelCache:
 
     def __init__(self, backend):
@@ -75,6 +76,7 @@ class ModelCache:
 
 
 class Application:
+
     def __init__(self, name, backend, cache):
         self.name = name
         self._backend = backend
@@ -116,6 +118,7 @@ class Application:
 
 
 class Unit:
+
     def __init__(self, name, backend, cache):
         self.name = name
 
@@ -161,7 +164,9 @@ class Unit:
         else:
             raise RuntimeError(f"cannot determine leadership status for remote applications: {self}")
 
+
 class LazyMapping(Mapping, ABC):
+
     _lazy_data = None
 
     @abstractmethod
@@ -262,6 +267,7 @@ class RelationData(Mapping):
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
 class RelationDataContent(LazyMapping, MutableMapping):
+
     def __init__(self, relation, entity, backend):
         self.relation = relation
         self._entity = entity
@@ -313,11 +319,13 @@ class RelationDataContent(LazyMapping, MutableMapping):
 
 
 class ConfigData(LazyMapping):
+
     def __init__(self, backend):
         self._backend = backend
 
     def _load(self):
         return self._backend.config_get()
+
 
 class StatusBase:
     """Status values specific to applications and units."""
@@ -337,6 +345,7 @@ class StatusBase:
     def from_name(cls, name, message):
         return cls._statuses[name](message)
 
+
 class ActiveStatus(StatusBase):
     """The unit is ready.
 
@@ -347,12 +356,14 @@ class ActiveStatus(StatusBase):
     def __init__(self):
         super().__init__('')
 
+
 class BlockedStatus(StatusBase):
     """The unit requires manual intervention.
 
     An operator has to manually intervene to unblock the unit and let it proceed.
     """
     name = 'blocked'
+
 
 class MaintenanceStatus(StatusBase):
     """The unit is performing maintenance tasks.
@@ -361,6 +372,7 @@ class MaintenanceStatus(StatusBase):
     This is a "spinning" state, not an error state. It reflects activity on the unit itself, not on peers or related units.
     """
     name = 'maintenance'
+
 
 class UnknownStatus(StatusBase):
     """The unit status is unknown.
@@ -372,6 +384,7 @@ class UnknownStatus(StatusBase):
     def __init__(self):
         # Unknown status cannot be set and does not have a message associated with it.
         super().__init__('')
+
 
 class WaitingStatus(StatusBase):
     """A unit is unable to progress.
@@ -412,6 +425,7 @@ class Pod:
 
 class ModelError(Exception):
     pass
+
 
 class TooManyRelatedAppsError(ModelError):
     def __init__(self, relation_name, num_related, max_supported):

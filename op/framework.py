@@ -261,6 +261,7 @@ class EventsBase(Object):
 
 
 class PrefixedEvents:
+
     def __init__(self, emitter, key):
         self._emitter = emitter
         self._prefix = key.replace("-", "_") + '_'
@@ -272,8 +273,10 @@ class PrefixedEvents:
 class PreCommitEvent(EventBase):
     pass
 
+
 class CommitEvent(EventBase):
     pass
+
 
 class FrameworkEvents(EventsBase):
     pre_commit = Event(PreCommitEvent)
@@ -555,8 +558,10 @@ class Framework(Object):
 class StoredStateChanged(EventBase):
     pass
 
+
 class StoredStateEvents(EventsBase):
     changed = Event(StoredStateChanged)
+
 
 class StoredStateData(Object):
 
@@ -588,6 +593,7 @@ class StoredStateData(Object):
         if self.dirty:
             self.framework.save_snapshot(self)
             self.dirty = False
+
 
 class BoundStoredState:
 
@@ -668,6 +674,7 @@ def _wrap_stored(parent_data, value):
     if t is set:
         return StoredSet(parent_data, value)
     return value
+
 
 def _unwrap_stored(parent_data, value):
     t = type(value)
