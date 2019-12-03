@@ -72,34 +72,6 @@ def _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event):
         event_path.symlink_to(charm_code_link)
 
 
-def _get_charm_code_link(charm_dir):
-    def _try_link(entry):
-        if entry.is_symlink():
-            link_path = Path(os.readlink(install_entry))
-            if link_path.is_absolute():
-                raise RuntimeError(f'{charm_dir / entry} points to an absolute path, not relative: {link_path}')
-            return link_path
-        elif entry.exists():
-            raise RuntimeError(f'{charm_dir / entry} exists but is not a symlink to the charm code file')
-        else:
-            return None
-
-    install_entry = charm_dir / 'hooks' / 'install'
-    charm_code_link = _try_link(install_entry)
-    if charm_code_link is None:
-        # Kubernetes charms may not have an install entry (see: LP: #1854635) and have only a 'start' entry.
-        start_entry = charm_dir / 'hooks' / 'start'
-        charm_code_link = _try_link(start_entry)
-
-    if charm_code_link is not None:
-        charm_code_file = charm_dir / 'hooks' / charm_code_link
-        if not charm_code_file.exists():
-            raise RuntimeError(f'{charm_code_file} does not exist')
-        if not charm_code_file.is_file():
-            raise RuntimeError(f'{charm_code_file} is not a regular file')
-        return charm_code_link
-    raise RuntimeError(f'cannot determine a link to the charm code based on {charm_dir}/hooks/install and {charm_dir}/hooks/start entries')
-
 def _setup_event_links(charm_dir, charm):
     """Set up links for supported events that originate from Juju.
 
@@ -112,7 +84,9 @@ def _setup_event_links(charm_dir, charm):
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
     """
-    charm_code_link = _get_charm_code_link(charm_dir)
+    # CPython has different implementations for populating sys.argv[0] for Linux and Windows. For Windows
+    # it is always an absolute path (any symlinks are resolved) while for Linux it can be a relative path.
+    charm_code_link = os.path.relpath(os.path.realpath(sys.argv[0]), charm_dir / 'hooks')
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         # TODO: handle function/action events here.
@@ -179,6 +153,7 @@ def main(charm_class):
     # Process the Juju event relevant to the current hook execution
     # JUJU_HOOK_NAME or JUJU_ACTION_NAME are not used to support simulation
     # of events from debugging sessions.
+    # TODO: For Windows, when symlinks are used, this is not a valid method of getting an event name (see LP: #1854505).
     juju_event_name = Path(sys.argv[0]).name
     if not juju_event_name:
         raise RuntimeError('cannot to determine an event name based on environment variables')

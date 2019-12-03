@@ -282,6 +282,7 @@ class TestMain(unittest.TestCase):
             for event_hook in event_hooks:
                 self.assertTrue(os.path.exists(event_hook))
                 self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
+
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
