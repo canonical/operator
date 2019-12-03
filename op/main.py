@@ -53,14 +53,10 @@ def _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event):
 
     event_path = event_dir / bound_event.event_kind.replace('_', '-')
     create_link = True
-    # Remove incorrect symlinks or files.
     if event_path.exists():
-        # Non-symlink entries and the ones not pointing to the charm code file need to be removed.
         if not event_path.is_symlink():
-            debugf(f'Path at {event_path} is not a symlink: attempting to remove it.')
-            # May raise IsADirectoryError, e.g. in case it is a directory which
-            # is unexpected and left to the developer or operator to handle.
-            event_path.unlink()
+            # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
+            create_link = False
         elif os.readlink(event_path) != charm_code_link:
             debugf(f'Removing path {event_path} as it does not point to {charm_code_link}')
             event_path.unlink()
