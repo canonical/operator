@@ -679,6 +679,7 @@ def fake_script(test_case, name, content):
         f.write('#!/bin/bash\n{ echo -n $(basename $0); for s in "$@"; do echo -n \\;$s; done; echo; } >> $(dirname $0)/calls.txt\n' + content)
     os.chmod(test_case.fake_script_path / name, 0o755)
 
+
 def fake_script_calls(test_case, clear=False):
     with open(test_case.fake_script_path / 'calls.txt', 'r+') as f:
         calls = [line.split(';') for line in f.read().splitlines()]

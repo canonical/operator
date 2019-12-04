@@ -135,6 +135,7 @@ def _get_event_args(charm, bound_event):
         return [relation], {}
     return [], {}
 
+
 def main(charm_class):
     """Setup the charm and dispatch the observed event.
 
