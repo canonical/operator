@@ -26,9 +26,19 @@ class Handle:
     def __init__(self, parent, kind, key):
         if parent and not isinstance(parent, Handle):
             parent = parent.handle
-        self.parent = parent
-        self.kind = kind
-        self.key = key
+        self._parent = parent
+        self._kind = kind
+        self._key = key
+        if parent:
+            if key:
+                self._path = f"{parent}/{kind}[{key}]"
+            else:
+                self._path = f"{parent}/{kind}"
+        else:
+            if key:
+                self._path = f"{kind}[{key}]"
+            else:
+                self._path = f"{kind}"
 
     def nest(self, kind, key):
         return Handle(self, kind, key)
@@ -43,18 +53,20 @@ class Handle:
         return self.path
 
     @property
+    def parent(self):
+        return self._parent
+
+    @property
+    def kind(self):
+        return self._kind
+
+    @property
+    def key(self):
+        return self._key
+
+    @property
     def path(self):
-        # TODO Cache result and either clear cache when attributes change, or make it read-only.
-        if self.parent:
-            if self.key:
-                return f"{self.parent}/{self.kind}[{self.key}]"
-            else:
-                return f"{self.parent}/{self.kind}"
-        else:
-            if self.key:
-                return f"{self.kind}[{self.key}]"
-            else:
-                return f"{self.kind}"
+        return self._path
 
     @classmethod
     def from_path(cls, path):
