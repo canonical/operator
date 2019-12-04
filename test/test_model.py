@@ -648,6 +648,7 @@ class TestModel(unittest.TestCase):
             with self.assertRaises(op.model.ModelError):
                 self.model.storages.add('data', count_v)
 
+
 class TestModelBackend(unittest.TestCase):
 
     def setUp(self):
