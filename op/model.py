@@ -490,7 +490,7 @@ class ModelBackend:
 
     def relation_get(self, relation_id, member_name, is_app):
         if not isinstance(is_app, bool):
-            raise RuntimeError('is_app parameter to relation_get must be a boolean')
+            raise TypeError('is_app parameter to relation_get must be a boolean')
 
         try:
             return self._run('relation-get', '-r', str(relation_id), '-', member_name, f'--app={is_app}', return_output=True, use_json=True)
@@ -501,7 +501,7 @@ class ModelBackend:
 
     def relation_set(self, relation_id, key, value, is_app):
         if not isinstance(is_app, bool):
-            raise RuntimeError('is_app parameter to relation_set must be a boolean')
+            raise TypeError('is_app parameter to relation_set must be a boolean')
 
         try:
             return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}')
@@ -556,5 +556,5 @@ class ModelBackend:
         app -- A boolean indicating whether the status should be set for a unit or an application.
         """
         if not isinstance(is_app, bool):
-            raise RuntimeError('is_app parameter must be boolean')
+            raise TypeError('is_app parameter must be boolean')
         return self._run('status-set', f'--application={is_app}', status, message)

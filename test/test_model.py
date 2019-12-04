@@ -288,10 +288,10 @@ class TestModel(unittest.TestCase):
 
         # Invalid types for is_app.
         for is_app_v in [None, 1, 2.0, 'a', b'beef']:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(TypeError):
                 self.backend.relation_set(1, 'fookey', 'barval', is_app=is_app_v)
 
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(TypeError):
                 self.backend.relation_get(1, 'fooentity', is_app=is_app_v)
 
     def test_relation_data_type_check(self):
@@ -545,7 +545,7 @@ class TestModel(unittest.TestCase):
         self.backend = op.model.ModelBackend()
 
         for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(TypeError):
                 self.backend.status_set(op.model.ActiveStatus, is_app=is_app_v)
 
     def test_remote_unit_status(self):
