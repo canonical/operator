@@ -596,6 +596,57 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
         ])
 
+    def test_storage(self):
+        meta = op.charm.CharmMeta()
+        meta.storages = {'disks': None, 'data': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        self.assertEqual(len(self.model.storages), 2)
+        self.assertEqual(self.model.storages.keys(), meta.storages.keys())
+        self.assertTrue('disks' in self.model.storages)
+
+        fake_script(self, 'storage-list', """[ "$1" = disks ] && echo '["disks/0", "disks/1"]' || echo '[]'""")
+        fake_script(self, 'storage-get',
+                    """
+                    if [ "$2" = disks/0 ]; then
+                      echo '"/var/srv/disks/0"'
+                    elif [ "$2" == disks/1 ]; then
+                      echo '"/var/srv/disks/1"'
+                    else
+                      exit 2
+                    fi
+                    """)
+        fake_script(self, 'storage-add', '')
+
+        test_cases = {
+            'disks/0': pathlib.Path('/var/srv/disks/0'),
+            'disks/1': pathlib.Path('/var/srv/disks/1'),
+        }
+        for storage in self.model.storages['disks']:
+            self.assertEqual(storage.name, 'disks')
+            self.assertEqual(storage.location, test_cases[storage.id])
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['storage-list', 'disks', '--format=json'],
+            ['storage-get', '-s', 'disks/0', 'location', '--format=json'],
+            ['storage-get', '-s', 'disks/1', 'location', '--format=json'],
+        ])
+
+        self.assertSequenceEqual(self.model.storages['data'], [])
+        self.model.storages.add('data', count=3)
+        self.assertEqual(fake_script_calls(self), [
+            ['storage-list', 'data', '--format=json'],
+            ['storage-add', 'data=3'],
+        ])
+
+        # Try to add storage not present in charm metadata.
+        with self.assertRaises(op.model.ModelError):
+            self.model.storages.add('deadbeef')
+
+        # Invalid count parameter types.
+        for count_v in [None, False, 2.0, 'a', b'beef', object]:
+            with self.assertRaises(op.model.ModelError):
+                self.model.storages.add('data', count_v)
 
 class TestModelBackend(unittest.TestCase):
 

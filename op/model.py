@@ -23,6 +23,7 @@ class Model:
         self.config = ConfigData(self._backend)
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
+        self.storages = StorageMapping(list(meta.storages), self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -423,6 +424,58 @@ class Pod:
         self._backend.pod_spec_set(spec, k8s_resources)
 
 
+class StorageMapping(Mapping):
+    """Map of storage names to lists of Storage instances."""
+
+    def __init__(self, storage_names, backend):
+        self._backend = backend
+        self._storage_map = {storage_name: None for storage_name in storage_names}
+
+    def __contains__(self, key):
+        return key in self._storage_map
+
+    def __len__(self):
+        return len(self._storage_map)
+
+    def __iter__(self):
+        return iter(self._storage_map)
+
+    def __getitem__(self, storage_name):
+        storage_list = self._storage_map[storage_name]
+        if storage_list is None:
+            storage_list = self._storage_map[storage_name] = []
+            for storage_id in self._backend.storage_list(storage_name):
+                storage_list.append(Storage(storage_name, storage_id, self._backend))
+        return storage_list
+
+    def add(self, storage_name, count=1):
+        """Adds new storage instances of a given name.
+
+        Juju will notify the unit via <storage-name>-storage-attached events when it becomes available.
+        """
+        if storage_name not in self._storage_map:
+            raise ModelError(f'cannot add storage with {storage_name} as it is not present in the charm metadata')
+        elif not isinstance(count, int) or isinstance(count, bool):
+            raise ModelError(f'storage count must be integer, got: {count} ({type(count)})')
+        self._backend.storage_add(storage_name, count)
+
+
+class Storage:
+    """A storage unit."""
+
+    def __init__(self, storage_name, storage_id, backend):
+        self.name = storage_name
+        self.id = storage_id
+        self._backend = backend
+        self._location = None
+
+    @property
+    def location(self):
+        if self._location is None:
+            self._location = Path(self._backend.storage_get(self.id, "location"))
+        return self._location
+
+
 class ModelError(Exception):
     pass
 
@@ -558,3 +611,12 @@ class ModelBackend:
         if not isinstance(is_app, bool):
             raise RuntimeError('is_app parameter must be boolean')
         return self._run('status-set', f'--application={is_app}', status, message)
+
+    def storage_list(self, name):
+        return self._run('storage-list', name, return_output=True, use_json=True)
+
+    def storage_get(self, storage_id, attribute):
+        return self._run('storage-get', '-s', storage_id, attribute, return_output=True, use_json=True)
+
+    def storage_add(self, name, count):
+        self._run('storage-add', f'{name}={count}')

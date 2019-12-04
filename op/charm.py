@@ -139,7 +139,7 @@ class CharmBase(Object):
             self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
             self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
 
-        for storage_name in self.framework.meta.storage:
+        for storage_name in self.framework.meta.storages:
             storage_name = storage_name.replace('-', '_')
             self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
@@ -183,8 +183,8 @@ class CharmMeta:
         self.relations.update(self.requires)
         self.relations.update(self.provides)
         self.relations.update(self.peers)
-        self.storage = {name: StorageMeta(name, store)
-                        for name, store in raw.get('storage', {}).items()}
+        self.storages = {name: StorageMeta(name, storage)
+                         for name, storage in raw.get('storage', {}).items()}
         self.resources = {name: ResourceMeta(name, res)
                           for name, res in raw.get('resources', {}).items()}
         self.payloads = {name: PayloadMeta(name, payload)
