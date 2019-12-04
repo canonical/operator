@@ -374,13 +374,16 @@ class Framework(Object):
         self.charm_dir = charm_dir
         self.meta = meta
         self.model = model
-        self._event_count = 0
         self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
         self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}
         self._type_registry = {}  # {(parent_path, kind): cls}
         self._type_known = set()  # {cls}
 
         self._storage = SQLiteStorage(data_path)
+
+        # Note: we can't persist the event count using StoredData because it relies on events.
+        self._event_count_handle = self.handle.nest('_event_count', None)
+        self._event_count = self._storage.load_snapshot(self._event_count_handle.path) or 0
 
     def close(self):
         self._storage.close()
@@ -391,6 +394,9 @@ class Framework(Object):
         # Make sure snapshots are saved by instances of StoredStateData. Any possible state
         # modifications in on_commit handlers of instances of other classes will not be persisted.
         self.on.commit.emit()
+        # Save our event count after all events have been emitted.
+        # Note: we can't persist the event count using StoredData because it relies on events.
+        self._storage.save_snapshot(self._event_count_handle.path, self._event_count)
         self._storage.commit()
 
     def register_type(self, cls, parent, kind=None):

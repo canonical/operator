@@ -528,6 +528,40 @@ class TestFramework(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             pub.on_a.define_event("foo", MyFoo)
 
+    def test_event_key_roundtrip(self):
+        class MyEvent(EventBase):
+            pass
+
+        class MyNotifier(Object):
+            foo = Event(MyEvent)
+
+        class MyObserver(Object):
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self.seen = []
+
+            def on_foo(self, event):
+                self.seen.append(event.handle)
+
+        framework1 = self.create_framework()
+        pub1 = MyNotifier(framework1, "1")
+        obs1 = MyObserver(framework1, "1")
+        framework1.observe(pub1.foo, obs1)
+        pub1.foo.emit()
+
+        framework1.commit()
+        framework1.close()
+
+        framework2 = self.create_framework()
+        pub2 = MyNotifier(framework2, "2")
+        obs2 = MyObserver(framework2, "2")
+        framework2.observe(pub2.foo, obs2)
+        pub2.foo.emit()
+
+        handle1 = obs1.seen[0]
+        handle2 = obs2.seen[0]
+        self.assertNotEqual(handle1.key, handle2.key)
+
 
 class TestStoredState(unittest.TestCase):
 
