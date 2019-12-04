@@ -455,8 +455,6 @@ class StorageMapping(Mapping):
         """
         if storage_name not in self._storage_map:
             raise ModelError(f'cannot add storage with {storage_name} as it is not present in the charm metadata')
-        elif not isinstance(count, int) or isinstance(count, bool):
-            raise ModelError(f'storage count must be integer, got: {count} ({type(count)})')
         self._backend.storage_add(storage_name, count)
 
 
@@ -618,5 +616,7 @@ class ModelBackend:
     def storage_get(self, storage_id, attribute):
         return self._run('storage-get', '-s', storage_id, attribute, return_output=True, use_json=True)
 
-    def storage_add(self, name, count):
+    def storage_add(self, name, count=1):
+        if not isinstance(count, int) or isinstance(count, bool):
+            raise RuntimeError(f'storage count must be integer, got: {count} ({type(count)})')
         self._run('storage-add', f'{name}={count}')

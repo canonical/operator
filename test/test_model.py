@@ -645,7 +645,7 @@ class TestModel(unittest.TestCase):
 
         # Invalid count parameter types.
         for count_v in [None, False, 2.0, 'a', b'beef', object]:
-            with self.assertRaises(op.model.ModelError):
+            with self.assertRaises(RuntimeError):
                 self.model.storages.add('data', count_v)
 
 
@@ -712,6 +712,39 @@ class TestModelBackend(unittest.TestCase):
         for case in test_cases:
             with self.assertRaises(TypeError):
                 case()
+
+    def storage_tool_errors(self):
+        test_cases = [(
+            lambda: fake_script(self, 'storage-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_list('foobar'),
+            op.model.ModelError,
+            [['storage-list', 'foobar', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'storage-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_get('foobar', 'someattr'),
+            op.model.ModelError,
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_add('foobar', count=2),
+            op.model.ModelError,
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_add('foobar', count=object),
+            RuntimeError,
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_add('foobar', count=True),
+            RuntimeError,
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        )]
+        for do_fake, run, exception, calls in test_cases:
+            do_fake()
+            with self.assertRaises(exception):
+                run()
+            self.assertEqual(fake_script_calls(self, clear=True), calls)
 
 
 def fake_script(test_case, name, content):
