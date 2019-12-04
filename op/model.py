@@ -470,7 +470,7 @@ class Storage:
     @property
     def location(self):
         if self._location is None:
-            self._location = Path(self._backend.storage_get(self.id, "location"))
+            self._location = Path(self._backend.storage_get(f'{self.name}/{self.id}', "location"))
         return self._location
 
 
@@ -611,10 +611,10 @@ class ModelBackend:
         return self._run('status-set', f'--application={is_app}', status, message)
 
     def storage_list(self, name):
-        return self._run('storage-list', name, return_output=True, use_json=True)
+        return [int(s.split('/')[1]) for s in self._run('storage-list', name, return_output=True, use_json=True)]
 
-    def storage_get(self, storage_id, attribute):
-        return self._run('storage-get', '-s', storage_id, attribute, return_output=True, use_json=True)
+    def storage_get(self, storage_name_id, attribute):
+        return self._run('storage-get', '-s', storage_name_id, attribute, return_output=True, use_json=True)
 
     def storage_add(self, name, count=1):
         if not isinstance(count, int) or isinstance(count, bool):

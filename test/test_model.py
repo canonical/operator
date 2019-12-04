@@ -619,12 +619,14 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'storage-add', '')
 
         test_cases = {
-            'disks/0': pathlib.Path('/var/srv/disks/0'),
-            'disks/1': pathlib.Path('/var/srv/disks/1'),
+            0: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/0')},
+            1: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/1')},
         }
         for storage in self.model.storages['disks']:
             self.assertEqual(storage.name, 'disks')
-            self.assertEqual(storage.location, test_cases[storage.id])
+            self.assertIn(storage.id, test_cases)
+            self.assertEqual(storage.name, test_cases[storage.id]['name'])
+            self.assertEqual(storage.location, test_cases[storage.id]['location'])
 
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['storage-list', 'disks', '--format=json'],
