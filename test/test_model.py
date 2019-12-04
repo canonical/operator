@@ -645,7 +645,7 @@ class TestModel(unittest.TestCase):
 
         # Invalid count parameter types.
         for count_v in [None, False, 2.0, 'a', b'beef', object]:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(TypeError):
                 self.model.storages.add('data', count_v)
 
 
@@ -732,12 +732,12 @@ class TestModelBackend(unittest.TestCase):
         ), (
             lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=object),
-            RuntimeError,
+            TypeError,
             [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
         ), (
             lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=True),
-            RuntimeError,
+            TypeError,
             [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
         )]
         for do_fake, run, exception, calls in test_cases:

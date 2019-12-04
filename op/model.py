@@ -618,5 +618,5 @@ class ModelBackend:
 
     def storage_add(self, name, count=1):
         if not isinstance(count, int) or isinstance(count, bool):
-            raise RuntimeError(f'storage count must be integer, got: {count} ({type(count)})')
+            raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
         self._run('storage-add', f'{name}={count}')
