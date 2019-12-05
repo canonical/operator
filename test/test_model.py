@@ -596,6 +596,59 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
         ])
 
+    def test_storage(self):
+        meta = op.charm.CharmMeta()
+        meta.storages = {'disks': None, 'data': None}
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'storage-list', """[ "$1" = disks ] && echo '["disks/0", "disks/1"]' || echo '[]'""")
+        fake_script(self, 'storage-get',
+                    """
+                    if [ "$2" = disks/0 ]; then
+                      echo '"/var/srv/disks/0"'
+                    elif [ "$2" = disks/1 ]; then
+                      echo '"/var/srv/disks/1"'
+                    else
+                      exit 2
+                    fi
+                    """)
+        fake_script(self, 'storage-add', '')
+
+        self.assertEqual(len(self.model.storages), 2)
+        self.assertEqual(self.model.storages.keys(), meta.storages.keys())
+        self.assertIn('disks', self.model.storages)
+        test_cases = {
+            0: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/0')},
+            1: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/1')},
+        }
+        for storage in self.model.storages['disks']:
+            self.assertEqual(storage.name, 'disks')
+            self.assertIn(storage.id, test_cases)
+            self.assertEqual(storage.name, test_cases[storage.id]['name'])
+            self.assertEqual(storage.location, test_cases[storage.id]['location'])
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['storage-list', 'disks', '--format=json'],
+            ['storage-get', '-s', 'disks/0', 'location', '--format=json'],
+            ['storage-get', '-s', 'disks/1', 'location', '--format=json'],
+        ])
+
+        self.assertSequenceEqual(self.model.storages['data'], [])
+        self.model.storages.request('data', count=3)
+        self.assertEqual(fake_script_calls(self), [
+            ['storage-list', 'data', '--format=json'],
+            ['storage-add', 'data=3'],
+        ])
+
+        # Try to add storage not present in charm metadata.
+        with self.assertRaises(op.model.ModelError):
+            self.model.storages.request('deadbeef')
+
+        # Invalid count parameter types.
+        for count_v in [None, False, 2.0, 'a', b'beef', object]:
+            with self.assertRaises(TypeError):
+                self.model.storages.request('data', count_v)
+
 
 class TestModelBackend(unittest.TestCase):
 
@@ -660,6 +713,39 @@ class TestModelBackend(unittest.TestCase):
         for case in test_cases:
             with self.assertRaises(TypeError):
                 case()
+
+    def storage_tool_errors(self):
+        test_cases = [(
+            lambda: fake_script(self, 'storage-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_list('foobar'),
+            op.model.ModelError,
+            [['storage-list', 'foobar', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'storage-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_get('foobar', 'someattr'),
+            op.model.ModelError,
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_add('foobar', count=2),
+            op.model.ModelError,
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_add('foobar', count=object),
+            TypeError,
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.storage_add('foobar', count=True),
+            TypeError,
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        )]
+        for do_fake, run, exception, calls in test_cases:
+            do_fake()
+            with self.assertRaises(exception):
+                run()
+            self.assertEqual(fake_script_calls(self, clear=True), calls)
 
 
 def fake_script(test_case, name, content):
