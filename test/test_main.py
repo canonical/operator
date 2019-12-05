@@ -177,6 +177,9 @@ class TestMain(unittest.TestCase):
             EventSpec(InstallEvent, 'install', charm_config=charm_config),
             {},
         ), (
+            EventSpec(StartEvent, 'start', charm_config=charm_config),
+            {},
+        ), (
             EventSpec(UpdateStatusEvent, 'update_status', charm_config=charm_config),
             {},
         ), (

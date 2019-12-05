@@ -28,6 +28,7 @@ class Charm(CharmBase):
         self._state = {}
 
         self._state['on_install'] = []
+        self._state['on_start'] = []
         self._state['on_config_changed'] = []
         self._state['on_update_status'] = []
         self._state['on_leader_settings_changed'] = []
@@ -40,6 +41,7 @@ class Charm(CharmBase):
         self._state['observed_event_types'] = []
 
         self.framework.observe(self.on.install, self)
+        self.framework.observe(self.on.start, self)
         self.framework.observe(self.on.config_changed, self)
         self.framework.observe(self.on.update_status, self)
         self.framework.observe(self.on.leader_settings_changed, self)
@@ -61,6 +63,11 @@ class Charm(CharmBase):
 
     def on_install(self, event):
         self._state['on_install'].append(type(event))
+        self._state['observed_event_types'].append(type(event))
+        self._write_state()
+
+    def on_start(self, event):
+        self._state['on_start'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
 
