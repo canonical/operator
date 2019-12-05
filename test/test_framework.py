@@ -35,6 +35,17 @@ class TestFramework(unittest.TestCase):
             self.assertEqual(str(handle), path)
             self.assertEqual(Handle.from_path(path), handle)
 
+    def test_handle_attrs_readonly(self):
+        handle = Handle(None, 'kind', 'key')
+        with self.assertRaises(AttributeError):
+            handle.parent = 'foo'
+        with self.assertRaises(AttributeError):
+            handle.kind = 'foo'
+        with self.assertRaises(AttributeError):
+            handle.key = 'foo'
+        with self.assertRaises(AttributeError):
+            handle.path = 'foo'
+
     def test_restore_unknown(self):
         framework = self.create_framework()
 
