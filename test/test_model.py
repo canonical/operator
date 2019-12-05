@@ -601,16 +601,12 @@ class TestModel(unittest.TestCase):
         meta.storages = {'disks': None, 'data': None}
         self.model = op.model.Model('myapp/0', meta, self.backend)
 
-        self.assertEqual(len(self.model.storages), 2)
-        self.assertEqual(self.model.storages.keys(), meta.storages.keys())
-        self.assertTrue('disks' in self.model.storages)
-
         fake_script(self, 'storage-list', """[ "$1" = disks ] && echo '["disks/0", "disks/1"]' || echo '[]'""")
         fake_script(self, 'storage-get',
                     """
                     if [ "$2" = disks/0 ]; then
                       echo '"/var/srv/disks/0"'
-                    elif [ "$2" == disks/1 ]; then
+                    elif [ "$2" = disks/1 ]; then
                       echo '"/var/srv/disks/1"'
                     else
                       exit 2
@@ -618,6 +614,9 @@ class TestModel(unittest.TestCase):
                     """)
         fake_script(self, 'storage-add', '')
 
+        self.assertEqual(len(self.model.storages), 2)
+        self.assertEqual(self.model.storages.keys(), meta.storages.keys())
+        self.assertIn('disks', self.model.storages)
         test_cases = {
             0: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/0')},
             1: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/1')},
