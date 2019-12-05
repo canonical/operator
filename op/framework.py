@@ -12,6 +12,10 @@ import weakref
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
 
+    Two instances of an object in memory with the same handle path represent the
+    same object in the system. An example of this would be two copies of the same
+    event being delivered to two different observers.
+
     The provided parent is the object (or that object's handle) that this handle
     sits under, or None if the object identified by this handle stands by itself
     as the root of its own hierarchy.
@@ -199,8 +203,6 @@ class Object:
                 event_kind = attr_name
                 emitter = self
                 self.framework.register_type(event_type, emitter, event_kind)
-
-        # TODO Detect conflicting handles here.
 
 
 class EventsBase(Object):
