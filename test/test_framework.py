@@ -217,9 +217,9 @@ class TestFramework(unittest.TestCase):
         pub2.c.emit()
 
         # Events remain stored because they were deferred.
-        ev_a = framework.load_snapshot(Handle(pub1, "a", "1"))
-        ev_b = framework.load_snapshot(Handle(pub1, "b", "2"))
-        ev_c = framework.load_snapshot(Handle(pub2, "c", "3"))
+        ev_a = framework.load_snapshot(Handle(pub1, "a", "0"))
+        ev_b = framework.load_snapshot(Handle(pub1, "b", "1"))
+        ev_c = framework.load_snapshot(Handle(pub2, "c", "2"))
 
         framework.reemit()
         obs1.done["a"] = True

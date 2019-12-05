@@ -156,8 +156,7 @@ class BoundEvent:
         The current storage state is committed before and after each observer is notified.
         """
         framework = self.emitter.framework
-        framework._stored['event_count'] += 1
-        key = str(framework._stored['event_count'])
+        key = str(framework.event_count)
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         framework._emit(event)
 
@@ -388,6 +387,10 @@ class Framework(Object):
         except NoSnapshotError:
             self._stored['event_count'] = 0
 
+    @property
+    def event_count(self):
+        return self._stored['event_count']
+
     def close(self):
         self._storage.close()
 
@@ -502,6 +505,9 @@ class Framework(Object):
 
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""
+
+        # Count another event having been emitted.
+        self._stored['event_count'] += 1
 
         # Save the event for all known observers before the first notification
         # takes place, so that either everyone interested sees it, or nobody does.
