@@ -530,37 +530,62 @@ class TestFramework(unittest.TestCase):
 
     def test_event_key_roundtrip(self):
         class MyEvent(EventBase):
-            pass
+            def __init__(self, handle, value):
+                super().__init__(handle)
+                self.value = value
+
+            def snapshot(self):
+                return self.value
+
+            def restore(self, value):
+                self.value = value
 
         class MyNotifier(Object):
             foo = Event(MyEvent)
 
         class MyObserver(Object):
+            has_deferred = False
+
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(event.handle)
+                self.seen.append(event.value)
+                # Only defer the first event and once.
+                if not MyObserver.has_deferred:
+                    event.defer()
+                    MyObserver.has_deferred = True
 
         framework1 = self.create_framework()
-        pub1 = MyNotifier(framework1, "1")
-        obs1 = MyObserver(framework1, "1")
+        self.assertEqual(framework1.event_count, 0)
+        pub1 = MyNotifier(framework1, "pub")
+        obs1 = MyObserver(framework1, "obs")
         framework1.observe(pub1.foo, obs1)
-        pub1.foo.emit()
+        pub1.foo.emit('first')
+        self.assertEqual(framework1.event_count, 1)
+        self.assertEqual(obs1.seen, ['first'])
 
         framework1.commit()
         framework1.close()
+        del framework1
 
         framework2 = self.create_framework()
-        pub2 = MyNotifier(framework2, "2")
-        obs2 = MyObserver(framework2, "2")
+        # It's 3 rather than 1 to account for the pre-commit and commit events.
+        self.assertEqual(framework2.event_count, 3)
+        pub2 = MyNotifier(framework2, "pub")
+        obs2 = MyObserver(framework2, "obs")
         framework2.observe(pub2.foo, obs2)
-        pub2.foo.emit()
+        pub2.foo.emit('second')
+        self.assertEqual(framework2.event_count, 4)
+        framework2.reemit()
+        # Reemits don't count as new events.
+        self.assertEqual(framework2.event_count, 4)
 
-        handle1 = obs1.seen[0]
-        handle2 = obs2.seen[0]
-        self.assertNotEqual(handle1.key, handle2.key)
+        # First observer didn't get updated, since framework it was bound to is gone.
+        self.assertEqual(obs1.seen, ['first'])
+        # Second observer saw the new event plus the reemit of the first event.
+        self.assertEqual(obs2.seen, ['second', 'first'])
 
 
 class TestStoredState(unittest.TestCase):
