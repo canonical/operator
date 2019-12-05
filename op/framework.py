@@ -156,9 +156,8 @@ class BoundEvent:
         The current storage state is committed before and after each observer is notified.
         """
         framework = self.emitter.framework
-        # TODO This needs to be persisted.
-        framework._event_count += 1
-        key = str(framework._event_count)
+        framework._stored['event_count'] += 1
+        key = str(framework._stored['event_count'])
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         framework._emit(event)
 
@@ -381,9 +380,13 @@ class Framework(Object):
 
         self._storage = SQLiteStorage(data_path)
 
-        # Note: we can't persist the event count using StoredData because it relies on events.
-        self._event_count_handle = self.handle.nest('_event_count', None)
-        self._event_count = self._storage.load_snapshot(self._event_count_handle.path) or 0
+        # Note: we can't use the higher-level StoredData because it relies on events.
+        self.register_type(StoredStateData, None, StoredStateData.handle_kind)
+        self._stored = StoredStateData(self, '_stored')
+        try:
+            self._stored = self.load_snapshot(self._stored.handle)
+        except NoSnapshotError:
+            self._stored['event_count'] = 0
 
     def close(self):
         self._storage.close()
@@ -395,8 +398,7 @@ class Framework(Object):
         # modifications in on_commit handlers of instances of other classes will not be persisted.
         self.on.commit.emit()
         # Save our event count after all events have been emitted.
-        # Note: we can't persist the event count using StoredData because it relies on events.
-        self._storage.save_snapshot(self._event_count_handle.path, self._event_count)
+        self.save_snapshot(self._stored)
         self._storage.commit()
 
     def register_type(self, cls, parent, kind=None):
