@@ -174,10 +174,10 @@ class TestCharm(unittest.TestCase):
             },
         })
 
-        self.assertIsNone(self.meta.storage['stor1'].multiple_range)
-        self.assertEqual(self.meta.storage['stor2'].multiple_range, (2, 2))
-        self.assertEqual(self.meta.storage['stor3'].multiple_range, (2, None))
-        self.assertEqual(self.meta.storage['stor-4'].multiple_range, (2, 4))
+        self.assertIsNone(self.meta.storages['stor1'].multiple_range)
+        self.assertEqual(self.meta.storages['stor2'].multiple_range, (2, 2))
+        self.assertEqual(self.meta.storages['stor3'].multiple_range, (2, None))
+        self.assertEqual(self.meta.storages['stor-4'].multiple_range, (2, 4))
 
         charm = MyCharm(self.create_framework(), None)
 

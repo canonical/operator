@@ -6,7 +6,6 @@ import tempfile
 import time
 import datetime
 
-
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
@@ -14,6 +13,7 @@ from subprocess import run, PIPE, CalledProcessError
 
 
 class Model:
+
     def __init__(self, unit_name, meta, backend):
         self._cache = ModelCache(backend)
         self._backend = backend
@@ -23,6 +23,7 @@ class Model:
         self.config = ConfigData(self._backend)
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
+        self.storages = StorageMapping(list(meta.storages), self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -31,7 +32,7 @@ class Model:
 
         If relation_id is not given, this will return the Relation instance if the
         relation is established only once or None if it is not established. If this
-        same relation is established multiple times the error TooManyRelatedApps is raised.
+        same relation is established multiple times the error TooManyRelatedAppsError is raised.
         """
         if relation_id is not None:
             if not isinstance(relation_id, int):
@@ -51,13 +52,14 @@ class Model:
             else:
                 # TODO: We need something in the framework to catch and gracefully handle
                 # errors, ideally integrating the error catching with Juju's mechanisms.
-                raise TooManyRelatedApps(relation_name, num_related, 1)
+                raise TooManyRelatedAppsError(relation_name, num_related, 1)
 
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
 
     def get_app(self, app_name):
         return self._cache.get(Application, app_name)
+
 
 class ModelCache:
 
@@ -75,6 +77,7 @@ class ModelCache:
 
 
 class Application:
+
     def __init__(self, name, backend, cache):
         self.name = name
         self._backend = backend
@@ -116,6 +119,7 @@ class Application:
 
 
 class Unit:
+
     def __init__(self, name, backend, cache):
         self.name = name
 
@@ -161,7 +165,9 @@ class Unit:
         else:
             raise RuntimeError(f"cannot determine leadership status for remote applications: {self}")
 
+
 class LazyMapping(Mapping, ABC):
+
     _lazy_data = None
 
     @abstractmethod
@@ -262,6 +268,7 @@ class RelationData(Mapping):
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
 class RelationDataContent(LazyMapping, MutableMapping):
+
     def __init__(self, relation, entity, backend):
         self.relation = relation
         self._entity = entity
@@ -313,11 +320,13 @@ class RelationDataContent(LazyMapping, MutableMapping):
 
 
 class ConfigData(LazyMapping):
+
     def __init__(self, backend):
         self._backend = backend
 
     def _load(self):
         return self._backend.config_get()
+
 
 class StatusBase:
     """Status values specific to applications and units."""
@@ -337,6 +346,7 @@ class StatusBase:
     def from_name(cls, name, message):
         return cls._statuses[name](message)
 
+
 class ActiveStatus(StatusBase):
     """The unit is ready.
 
@@ -347,12 +357,14 @@ class ActiveStatus(StatusBase):
     def __init__(self):
         super().__init__('')
 
+
 class BlockedStatus(StatusBase):
     """The unit requires manual intervention.
 
     An operator has to manually intervene to unblock the unit and let it proceed.
     """
     name = 'blocked'
+
 
 class MaintenanceStatus(StatusBase):
     """The unit is performing maintenance tasks.
@@ -361,6 +373,7 @@ class MaintenanceStatus(StatusBase):
     This is a "spinning" state, not an error state. It reflects activity on the unit itself, not on peers or related units.
     """
     name = 'maintenance'
+
 
 class UnknownStatus(StatusBase):
     """The unit status is unknown.
@@ -372,6 +385,7 @@ class UnknownStatus(StatusBase):
     def __init__(self):
         # Unknown status cannot be set and does not have a message associated with it.
         super().__init__('')
+
 
 class WaitingStatus(StatusBase):
     """A unit is unable to progress.
@@ -410,10 +424,61 @@ class Pod:
         self._backend.pod_spec_set(spec, k8s_resources)
 
 
+class StorageMapping(Mapping):
+    """Map of storage names to lists of Storage instances."""
+
+    def __init__(self, storage_names, backend):
+        self._backend = backend
+        self._storage_map = {storage_name: None for storage_name in storage_names}
+
+    def __contains__(self, key):
+        return key in self._storage_map
+
+    def __len__(self):
+        return len(self._storage_map)
+
+    def __iter__(self):
+        return iter(self._storage_map)
+
+    def __getitem__(self, storage_name):
+        storage_list = self._storage_map[storage_name]
+        if storage_list is None:
+            storage_list = self._storage_map[storage_name] = []
+            for storage_id in self._backend.storage_list(storage_name):
+                storage_list.append(Storage(storage_name, storage_id, self._backend))
+        return storage_list
+
+    def request(self, storage_name, count=1):
+        """Requests new storage instances of a given name.
+
+        Uses storage-add tool to request additional storage. Juju will notify the unit
+        via <storage-name>-storage-attached events when it becomes available.
+        """
+        if storage_name not in self._storage_map:
+            raise ModelError(f'cannot add storage with {storage_name} as it is not present in the charm metadata')
+        self._backend.storage_add(storage_name, count)
+
+
+class Storage:
+
+    def __init__(self, storage_name, storage_id, backend):
+        self.name = storage_name
+        self.id = storage_id
+        self._backend = backend
+        self._location = None
+
+    @property
+    def location(self):
+        if self._location is None:
+            self._location = Path(self._backend.storage_get(f'{self.name}/{self.id}', "location"))
+        return self._location
+
+
 class ModelError(Exception):
     pass
 
-class TooManyRelatedApps(ModelError):
+
+class TooManyRelatedAppsError(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
         super().__init__(f'Too many remote applications on {relation_name} ({num_related} > {max_supported})')
         self.relation_name = relation_name
@@ -476,7 +541,7 @@ class ModelBackend:
 
     def relation_get(self, relation_id, member_name, is_app):
         if not isinstance(is_app, bool):
-            raise RuntimeError('is_app parameter to relation_get must be a boolean')
+            raise TypeError('is_app parameter to relation_get must be a boolean')
 
         try:
             return self._run('relation-get', '-r', str(relation_id), '-', member_name, f'--app={is_app}', return_output=True, use_json=True)
@@ -487,7 +552,7 @@ class ModelBackend:
 
     def relation_set(self, relation_id, key, value, is_app):
         if not isinstance(is_app, bool):
-            raise RuntimeError('is_app parameter to relation_set must be a boolean')
+            raise TypeError('is_app parameter to relation_set must be a boolean')
 
         try:
             return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}')
@@ -542,5 +607,16 @@ class ModelBackend:
         app -- A boolean indicating whether the status should be set for a unit or an application.
         """
         if not isinstance(is_app, bool):
-            raise RuntimeError('is_app parameter must be boolean')
+            raise TypeError('is_app parameter must be boolean')
         return self._run('status-set', f'--application={is_app}', status, message)
+
+    def storage_list(self, name):
+        return [int(s.split('/')[1]) for s in self._run('storage-list', name, return_output=True, use_json=True)]
+
+    def storage_get(self, storage_name_id, attribute):
+        return self._run('storage-get', '-s', storage_name_id, attribute, return_output=True, use_json=True)
+
+    def storage_add(self, name, count=1):
+        if not isinstance(count, int) or isinstance(count, bool):
+            raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
+        self._run('storage-add', f'{name}={count}')
