@@ -448,10 +448,11 @@ class StorageMapping(Mapping):
                 storage_list.append(Storage(storage_name, storage_id, self._backend))
         return storage_list
 
-    def add(self, storage_name, count=1):
-        """Adds new storage instances of a given name.
+    def request(self, storage_name, count=1):
+        """Requests new storage instances of a given name.
 
-        Juju will notify the unit via <storage-name>-storage-attached events when it becomes available.
+        Uses storage-add tool to request additional storage. Juju will notify the unit
+        via <storage-name>-storage-attached events when it becomes available.
         """
         if storage_name not in self._storage_map:
             raise ModelError(f'cannot add storage with {storage_name} as it is not present in the charm metadata')

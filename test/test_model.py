@@ -635,7 +635,7 @@ class TestModel(unittest.TestCase):
         ])
 
         self.assertSequenceEqual(self.model.storages['data'], [])
-        self.model.storages.add('data', count=3)
+        self.model.storages.request('data', count=3)
         self.assertEqual(fake_script_calls(self), [
             ['storage-list', 'data', '--format=json'],
             ['storage-add', 'data=3'],
@@ -643,12 +643,12 @@ class TestModel(unittest.TestCase):
 
         # Try to add storage not present in charm metadata.
         with self.assertRaises(op.model.ModelError):
-            self.model.storages.add('deadbeef')
+            self.model.storages.request('deadbeef')
 
         # Invalid count parameter types.
         for count_v in [None, False, 2.0, 'a', b'beef', object]:
             with self.assertRaises(TypeError):
-                self.model.storages.add('data', count_v)
+                self.model.storages.request('data', count_v)
 
 
 class TestModelBackend(unittest.TestCase):
