@@ -460,7 +460,6 @@ class StorageMapping(Mapping):
 
 
 class Storage:
-    """A storage unit."""
 
     def __init__(self, storage_name, storage_id, backend):
         self.name = storage_name
