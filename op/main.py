@@ -33,7 +33,7 @@ def _load_metadata(charm_dir):
     return metadata
 
 
-def _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event):
+def _create_event_link(charm_dir, event_dir, target_path, bound_event):
     """Create a symlink for a particular event.
 
     charm_dir -- A root directory of the charm
@@ -53,8 +53,8 @@ def _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event):
     event_path = event_dir / bound_event.event_kind.replace('_', '-')
     if not event_path.exists():
         # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
-        debugf(f'Creating a new relative symlink at {event_path} pointing to {charm_code_link}')
-        event_path.symlink_to(charm_code_link)
+        debugf(f'Creating a new relative symlink at {event_path} pointing to {target_path}')
+        event_path.symlink_to(target_path)
 
 
 def _setup_event_links(charm_dir, charm):
@@ -71,13 +71,13 @@ def _setup_event_links(charm_dir, charm):
     """
     # CPython has different implementations for populating sys.argv[0] for Linux and Windows. For Windows
     # it is always an absolute path (any symlinks are resolved) while for Linux it can be a relative path.
-    charm_code_link = os.path.relpath(os.path.realpath(sys.argv[0]), charm_dir / 'hooks')
+    charm_exec_path = os.path.relpath(os.path.realpath(sys.argv[0]), charm_dir / 'hooks')
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         # TODO: handle function/action events here.
         if issubclass(bound_event.event_type, op.charm.HookEvent):
             event_dir = charm_dir / 'hooks'
-            _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event)
+            _create_event_link(charm_dir, event_dir, charm_exec_path, bound_event)
 
 
 def _emit_charm_event(charm, event_name):

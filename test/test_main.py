@@ -266,7 +266,32 @@ class TestMain(unittest.TestCase):
         """
         event_hooks = [f'hooks/{e.replace("_", "-")}' for e in charm.Charm.on.events().keys()]
 
-        def _assess_initial_event_links(initial_event_specs):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+
+        initial_event_combinations = [(
+                # 'install' comes first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
+                EventSpec(InstallEvent, 'install', charm_config=charm_config),
+        ), (
+                # Storage hooks run before "install" so this case needs to be checked as well.
+                EventSpec(InstallEvent, 'install', charm_config=charm_config),
+                EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+        ), (    # Similar to the above test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
+                EventSpec(StartEvent, 'start', charm_config=charm_config),
+        ), (
+                EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+                EventSpec(StartEvent, 'start', charm_config=charm_config),
+        )]
+
+        other_events = (
+                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
+                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
+                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+        )
+
+        def _initial_links_exist(initial_event_specs):
             for event_spec in initial_event_specs:
                 event_link_path = JUJU_CHARM_DIR / 'hooks' / event_spec.event_name
                 # The symlink is expected to be present in the source tree.
@@ -288,58 +313,14 @@ class TestMain(unittest.TestCase):
                 self.assertTrue(os.path.exists(event_hook))
                 self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
 
-        charm_config = base64.b64encode(pickle.dumps({
-            'STATE_FILE': self._state_file,
-        }))
+        for initial_events in initial_event_combinations:
+            # Validate that the initial symlinks exist before event simulation.
+            _initial_links_exist(initial_events)
 
-        test_cases = [(
-            [
-                # Assess 'install' first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
-                EventSpec(InstallEvent, 'install', charm_config=charm_config),
-            ], [
-                EventSpec(StartEvent, 'start', charm_config=charm_config),
-                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
-            ]
-        ), (
-            [
-                # Storage hooks run before "install" so this case needs to be checked as well.
-                EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-                EventSpec(InstallEvent, 'install', charm_config=charm_config),
-            ], [
-                EventSpec(StartEvent, 'start', charm_config=charm_config),
-                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
-            ]
-        ), (  # Do the above two test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
-            [
-                EventSpec(StartEvent, 'start', charm_config=charm_config),
-            ], [
-                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
-            ]
-        ), (
-            [
-                EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-                EventSpec(StartEvent, 'start', charm_config=charm_config),
-            ], [
-                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
-            ]
-        )]
-
-        for initial_events, other_events in test_cases:
-            # Before doing anything, make sure symlinks for initial events are present and correct.
-            _assess_initial_event_links(initial_events)
-            for event_name in initial_events + other_events:
+            # Simulate all events and make sure all (initial and other) event symlinks are present and have the correct target
+            # after each event.
+            events_to_assess = initial_events + other_events
+            for event_name in events_to_assess:
                 _assess_event_links(event_name)
             self._clear_symlinks()
 
