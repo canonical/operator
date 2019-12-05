@@ -12,9 +12,11 @@ import weakref
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
 
-    Two instances of an object in memory with the same handle path represent the
-    same object in the system. An example of this would be two copies of the same
-    event being delivered to two different observers.
+    If two object instances in memory have the same handle path, they represent
+    the same underlying object. This should be avoided, but if required (e.g.,
+    sending the same event to multiple observers), care should be taken to ensure
+    that they are not independently modified and saved, as this would lead to
+    lost data in the persistent storage.
 
     The provided parent is the object (or that object's handle) that this handle
     sits under, or None if the object identified by this handle stands by itself
