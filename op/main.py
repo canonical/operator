@@ -42,8 +42,7 @@ def _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event):
     # TODO: Handle function/action events here.
     if not issubclass(bound_event.event_type, op.charm.HookEvent):
         raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
-
-    if issubclass(bound_event.event_type, op.charm.InstallEvent):
+    elif issubclass(bound_event.event_type, op.charm.InstallEvent):
         # We don't set up the link for install events, since we assume it's already in place
         # (otherwise, we would never have been called).
         return
@@ -52,18 +51,8 @@ def _handle_event_link(charm_dir, event_dir, charm_code_link, bound_event):
         raise RuntimeError(f'cannot create event symlink: {event_dir} directory does not exist')
 
     event_path = event_dir / bound_event.event_kind.replace('_', '-')
-    create_link = True
-    if event_path.exists():
-        if not event_path.is_symlink():
-            # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
-            create_link = False
-        elif os.readlink(event_path) != charm_code_link:
-            debugf(f'Removing path {event_path} as it does not point to {charm_code_link}')
-            event_path.unlink()
-        else:
-            create_link = False
-
-    if create_link:
+    if not event_path.exists():
+        # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
         debugf(f'Creating a new relative symlink at {event_path} pointing to {charm_code_link}')
         event_path.symlink_to(charm_code_link)
 
@@ -152,8 +141,6 @@ def main(charm_class):
     # of events from debugging sessions.
     # TODO: For Windows, when symlinks are used, this is not a valid method of getting an event name (see LP: #1854505).
     juju_event_name = Path(sys.argv[0]).name
-    if not juju_event_name:
-        raise RuntimeError('cannot to determine an event name based on environment variables')
 
     meta = op.charm.CharmMeta(_load_metadata(charm_dir))
     unit_name = os.environ['JUJU_UNIT_NAME']
