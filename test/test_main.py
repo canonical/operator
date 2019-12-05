@@ -52,14 +52,13 @@ class SymlinkTargetError(Exception):
 
 class EventSpec:
     def __init__(self, event_type, event_name, relation_id=None, remote_app=None, remote_unit=None,
-                 charm_config=None, is_initial_event=False):
+                 charm_config=None):
         self.event_type = event_type
         self.event_name = event_name
         self.relation_id = relation_id
         self.remote_app = remote_app
         self.remote_unit = remote_unit
         self.charm_config = charm_config
-        self.is_initial_event = is_initial_event
 
 
 class TestMain(unittest.TestCase):
@@ -264,14 +263,13 @@ class TestMain(unittest.TestCase):
         """
         event_hooks = [f'hooks/{e.replace("_", "-")}' for e in charm.Charm.on.events().keys()]
 
-        def _assess_initial_event_links(event_specs):
-            for event_spec in event_specs:
-                if event_spec.is_initial_event:
-                    event_link_path = JUJU_CHARM_DIR / 'hooks' / event_spec.event_name
-                    # The symlink is expected to be present in the source tree.
-                    self.assertTrue(event_link_path.exists())
-                    # It has to point to the charm code file.
-                    self.assertEqual(os.readlink(event_link_path), self.CHARM_PY_RELPATH)
+        def _assess_initial_event_links(initial_event_specs):
+            for event_spec in initial_event_specs:
+                event_link_path = JUJU_CHARM_DIR / 'hooks' / event_spec.event_name
+                # The symlink is expected to be present in the source tree.
+                self.assertTrue(event_link_path.exists())
+                # It has to point to the charm code file.
+                self.assertEqual(os.readlink(event_link_path), self.CHARM_PY_RELPATH)
 
         def _assess_event_links(event_spec):
             event_hook = JUJU_CHARM_DIR / f'hooks/{event_spec.event_name}'
@@ -292,41 +290,53 @@ class TestMain(unittest.TestCase):
         }))
 
         test_cases = [(
-            # Assess 'install' first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
-            EventSpec(InstallEvent, 'install', charm_config=charm_config, is_initial_event=True),
-            EventSpec(StartEvent, 'start', charm_config=charm_config),
-            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            [
+                # Assess 'install' first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
+                EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            ], [
+                EventSpec(StartEvent, 'start', charm_config=charm_config),
+                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
+                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
+                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            ]
         ), (
-            # Storage hooks run before "install" so this case needs to be checked as well.
-            EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config, is_initial_event=True),
-            EventSpec(InstallEvent, 'install', charm_config=charm_config, is_initial_event=True),
-            EventSpec(StartEvent, 'start', charm_config=charm_config),
-            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            [
+                # Storage hooks run before "install" so this case needs to be checked as well.
+                EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+                EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            ], [
+                EventSpec(StartEvent, 'start', charm_config=charm_config),
+                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
+                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
+                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            ]
         ), (  # Do the above two test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
-            EventSpec(StartEvent, 'start', charm_config=charm_config, is_initial_event=True),
-            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            [
+                EventSpec(StartEvent, 'start', charm_config=charm_config),
+            ], [
+                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
+                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
+                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            ]
         ), (
-            EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config, is_initial_event=True),
-            EventSpec(StartEvent, 'start', charm_config=charm_config, is_initial_event=True),
-            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            [
+                EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+                EventSpec(StartEvent, 'start', charm_config=charm_config),
+            ], [
+                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
+                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
+                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            ]
         )]
 
-        for events_to_assess in test_cases:
+        for initial_events, other_events in test_cases:
             # Before doing anything, make sure symlinks for initial events are present and correct.
-            _assess_initial_event_links(events_to_assess)
-            for event_name in events_to_assess:
+            _assess_initial_event_links(initial_events)
+            for event_name in initial_events + other_events:
                 _assess_event_links(event_name)
             self._clear_symlinks()
 
