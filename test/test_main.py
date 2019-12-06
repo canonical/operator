@@ -278,8 +278,8 @@ class TestMain(unittest.TestCase):
             ),
             'hooks_iaas_storage': (
                 # Storage hooks run before "install" so this case needs to be checked as well.
-                EventSpec(InstallEvent, 'install', charm_config=charm_config),
                 EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+                EventSpec(InstallEvent, 'install', charm_config=charm_config),
             ),  # Similar to the above test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
             'hooks_caas': (
                 EventSpec(StartEvent, 'start', charm_config=charm_config),
