@@ -489,7 +489,6 @@ class Framework(Object):
         # TODO Validate that the method has the right signature here.
 
         # TODO Prevent the exact same parameters from being registered more than once.
-        # If there was an object going away at 'path' this is a new object at 'path' and should be considered as such
         if self._stale_observer_paths:
             # Make sure we've processed any objects that have been removed before we add a new object.
             self._cleanup_observer_paths()
