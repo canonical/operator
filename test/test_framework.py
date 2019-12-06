@@ -371,6 +371,40 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(len(framework._observer), 0)
         self.assertEqual(len(framework._observers), 0)
 
+    def test_cleanup_and_reregister_observer(self):
+        framework = self.create_framework()
+
+        observed_events = []
+
+        class MyEvent(EventBase):
+            pass
+
+        class MyEvents(EventsBase):
+            foo = Event(MyEvent)
+
+        class MyNotifier(Object):
+            on = MyEvents()
+
+        class MyObserver(Object):
+            def __init__(self, framework, key):
+                super().__init__(framework, key)
+                self.key = key
+
+            def on_foo(self, event):
+                observed_events.append(f"foo-{self.key}")
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "2")
+        framework.observe(pub.on.foo, obs)
+        pub.on.foo.emit()
+        self.assertEqual(observed_events, ["foo-2"])
+        # Now, we delete the existing obs, which would cause it to be removed from observers,
+        # and then immediately register a new obs at the same path using a new object
+        del obs
+        new_obs = MyObserver(framework, "2")
+        framework.observe(pub.on.foo, new_obs)
+        pub.on.foo.emit()
+        self.assertEqual(observed_events, ["foo-2", "foo-2"])
+
     def test_events_base(self):
         framework = self.create_framework()
 
