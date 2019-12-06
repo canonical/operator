@@ -22,9 +22,8 @@ from op.charm import (
     HookEvent,
     InstallEvent,
     StartEvent,
-    LeaderElectedEvent,
-    UpgradeCharmEvent,
     ConfigChangedEvent,
+    UpgradeCharmEvent,
     UpdateStatusEvent,
     LeaderSettingsChangedEvent,
     RelationJoinedEvent,
@@ -271,54 +270,35 @@ class TestMain(unittest.TestCase):
             'STATE_FILE': self._state_file,
         }))
 
-        initial_combinations = {
-            'hooks_iaas': (
-                # 'install' comes first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
-                EventSpec(InstallEvent, 'install', charm_config=charm_config),
-            ),
-            'hooks_iaas_storage': (
-                # Storage hooks run before "install" so this case needs to be checked as well.
-                EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-                EventSpec(InstallEvent, 'install', charm_config=charm_config),
-            ),  # Similar to the above test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
-            'hooks_caas': (
-                EventSpec(StartEvent, 'start', charm_config=charm_config),
-            ),
-            'hooks_caas_storage': (
-                EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-                EventSpec(StartEvent, 'start', charm_config=charm_config),
-            ),
+        initial_events = {
+            # 'install' comes first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
+            'hooks_iaas': EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            # Storage hooks run before "install" so this case needs to be checked as well.
+            'hooks_iaas_storage':  EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+            # Similar to the above test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
+            'hooks_caas': EventSpec(StartEvent, 'start', charm_config=charm_config),
+            'hooks_caas_storage': EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+            'hooks_upgrade': EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
         }
 
-        other_events = (
-            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
-        )
-
-        def _assess_event_links(event_spec, events_to_assess):
+        def _assess_event_links(event_spec):
             event_hook = JUJU_CHARM_DIR / f'hooks/{event_spec.event_name}'
-
             # Simulate a fork + exec of a hook from a unit agent.
             self._simulate_event(event_spec)
 
             r, _, files = next(os.walk(JUJU_CHARM_DIR / 'hooks'))
-
             self.assertTrue(event_spec.event_name in files)
 
             for event_hook in event_hooks:
                 self.assertTrue(os.path.exists(event_hook))
                 self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
 
-        for init_hooks_kind, initial_events in initial_combinations.items():
+        for init_hooks_kind, initial_event in initial_events.items():
             self._clear_hooks()
             self._prepare_hooks(init_hooks_kind)
-            # Simulate all events and make sure all (initial and other) event symlinks are present and have the correct target
-            # after each event.
-            events_to_assess = initial_events + other_events
-            for event_name in events_to_assess:
-                _assess_event_links(event_name, events_to_assess)
+            _assess_event_links(initial_event)
+            # Make sure it is idempotent.
+            _assess_event_links(initial_event)
 
 
 if __name__ == "__main__":
