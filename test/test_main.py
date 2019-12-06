@@ -291,10 +291,10 @@ class TestMain(unittest.TestCase):
         }
 
         other_events = (
-                EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-                EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-                EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-                EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
+            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
+            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
+            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
         )
 
         def _assess_event_links(event_spec, events_to_assess):
