@@ -274,7 +274,7 @@ class TestMain(unittest.TestCase):
             # 'install' comes first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
             'hooks_iaas': EventSpec(InstallEvent, 'install', charm_config=charm_config),
             # Storage hooks run before "install" so this case needs to be checked as well.
-            'hooks_iaas_storage':  EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+            'hooks_iaas_storage': EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
             # Similar to the above test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
             'hooks_caas': EventSpec(StartEvent, 'start', charm_config=charm_config),
             'hooks_caas_storage': EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
