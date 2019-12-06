@@ -321,6 +321,49 @@ class TestFramework(unittest.TestCase):
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo"])
 
+    def test_cleanup_observers(self):
+        # Setup many observers that go out of scope. Ensure that the observers list does
+        # eventually get cleaned up rather than growing without bound
+        framework = self.create_framework()
+
+        observed_events = []
+
+        class MyEvent(EventBase):
+            pass
+
+        class MyEvents(EventsBase):
+            foo = Event(MyEvent)
+
+        class MyNotifier(Object):
+            on = MyEvents()
+
+        class MyObserver(Object):
+            def __init__(self, framework, key):
+                super().__init__(framework, key)
+                self.key = key
+
+            def on_foo(self, event):
+                observed_events.append(f"foo-{self.key}")
+
+        pub = MyNotifier(framework, "1")
+        observers = []
+        for i in range(2, 10):
+            obs = MyObserver(framework, str(i))
+            observers.append(obs)
+            framework.observe(pub.on.foo, obs)
+            del obs
+        self.assertEqual(len(framework._observers), 8)
+        self.assertEqual(len(framework._observer), 8)
+        pub.on.foo.emit()
+        self.assertEqual(observed_events, ["foo-2", "foo-3", "foo-4", "foo-5", "foo-6", "foo-7", "foo-8", "foo-9"])
+        del observers
+        gc.collect()
+        pub.on.foo.emit()
+        # No new notices, and the number of _observers has been trimmed
+        self.assertEqual(observed_events, ["foo-2", "foo-3", "foo-4", "foo-5", "foo-6", "foo-7", "foo-8", "foo-9"])
+        self.assertEqual(len(framework._observer), 0)
+        self.assertEqual(len(framework._observers), 0)
+
     def test_events_base(self):
         framework = self.create_framework()
 

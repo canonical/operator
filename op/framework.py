@@ -492,6 +492,14 @@ class Framework(Object):
         self._observer[observer.handle.path] = observer
         self._observers.append((observer.handle.path, method_name, emitter_path, event_kind))
 
+    def _cleanup_observer_paths(self, stale):
+        new_observers = []
+        for observer_path, method_name, _parent_path, _event_kind in self._observers:
+            if observer_path in stale:
+                continue
+            new_observers.append(observer_path, method_name, _parent_path, _event_kind)
+        self._observers = new_observers
+
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""
 
@@ -501,14 +509,21 @@ class Framework(Object):
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent_path = event.handle.parent.path
-        # TODO Track observers by (parent_path, event_kind) rather than as a list of all observers. Avoiding linear search through all observers for every event
+        stale_observer_paths = set()
+        # TODO Track observers by (parent_path, event_kind) rather than as a list of all observers.
+        #  Avoiding linear search through all observers for every event
         for observer_path, method_name, _parent_path, _event_kind in self._observers:
+            if observer_path not in self._observer:
+                stale_observer_paths.add(observer_path)
+                continue
             if _parent_path != parent_path:
                 continue
             if _event_kind and _event_kind != event_kind:
                 continue
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
+        if stale_observer_paths:
+            self._cleanup_observer_paths(stale_observer_paths)
         self._reemit(event_path)
 
     def reemit(self):
