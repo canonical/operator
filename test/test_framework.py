@@ -144,6 +144,36 @@ class TestFramework(unittest.TestCase):
 
         self.assertEqual(obs.seen, ["on_any:foo", "on_foo:foo", "on_any:bar"])
 
+    def test_bad_sig_observer(self):
+
+        class MyEvent(EventBase):
+            pass
+
+        class MyNotifier(Object):
+            foo = Event(MyEvent)
+            bar = Event(MyEvent)
+            qux = Event(MyEvent)
+
+        class MyObserver(Object):
+            def on_foo(self):
+                assert False, 'should not be reached'
+
+            def on_bar(self, event, extra):
+                assert False, 'should not be reached'
+
+            def on_qux(self, event, extra=None):
+                assert False, 'should not be reached'
+
+        framework = self.create_framework()
+        pub = MyNotifier(framework, "pub")
+        obs = MyObserver(framework, "obs")
+
+        with self.assertRaises(TypeError):
+            framework.observe(pub.foo, obs)
+        with self.assertRaises(TypeError):
+            framework.observe(pub.bar, obs)
+        framework.observe(pub.qux, obs)
+
     def test_on_pre_commit_emitted(self):
         framework = self.create_framework()
 
