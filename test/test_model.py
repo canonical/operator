@@ -402,15 +402,18 @@ class TestModel(unittest.TestCase):
                     cat $2 > $(dirname $0)/spec.json
                     [[ -n $4 ]] && cat $4 > $(dirname $0)/k8s_res.json || true
                     """)
+        fake_script(self, 'is-leader', 'echo true')
         spec_path = self.fake_script_path / 'spec.json'
         k8s_res_path = self.fake_script_path / 'k8s_res.json'
 
         def check_calls(calls):
-            self.assertEqual(len(fake_calls), 1)
-            self.assertEqual(fake_calls[0][:2], ['pod-spec-set', '--file'])
+            # There may 1 or 2 calls because of is-leader.
+            self.assertLessEqual(len(fake_calls), 2)
+            pod_spec_call = next(filter(lambda c: c[0] == 'pod-spec-set', calls))
+            self.assertEqual(pod_spec_call[:2], ['pod-spec-set', '--file'])
             # 8 bytes are used as of python 3.4.0, see Python bug #12015.
             # Other characters are from POSIX 3.282 (Portable Filename Character Set) a subset of which Python's mkdtemp uses.
-            self.assertTrue(re.match('/tmp/tmp[A-Za-z0-9._-]{8}-pod-spec-set', fake_calls[0][2]))
+            self.assertTrue(re.match('/tmp/tmp[A-Za-z0-9._-]{8}-pod-spec-set', pod_spec_call[2]))
 
         self.model.pod.set_spec({'foo': 'bar'})
         self.assertEqual(spec_path.read_text(), '{"foo": "bar"}')
@@ -425,6 +428,14 @@ class TestModel(unittest.TestCase):
 
         fake_calls = fake_script_calls(self, clear=True)
         check_calls(fake_calls)
+
+        # Create a new model to drop is-leader caching result.
+        self.backend = op.model.ModelBackend()
+        meta = op.charm.CharmMeta()
+        self.model = op.model.Model('myapp/0', meta, self.backend)
+        fake_script(self, 'is-leader', 'echo false')
+        with self.assertRaises(op.model.ModelError):
+            self.model.pod.set_spec({'foo': 'bar'})
 
     def test_base_status_instance_raises(self):
         with self.assertRaises(TypeError):

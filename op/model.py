@@ -421,6 +421,8 @@ class Pod:
         self._backend = backend
 
     def set_spec(self, spec, k8s_resources=None):
+        if not self._backend.is_leader():
+            raise ModelError('cannot set a pod spec as this unit is not a leader')
         self._backend.pod_spec_set(spec, k8s_resources)
 
 
