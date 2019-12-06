@@ -375,6 +375,7 @@ class Framework(Object):
         self.meta = meta
         self.model = model
         self._event_count = 0
+        self._stale_observer_paths = []
         self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
         self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}
         self._type_registry = {}  # {(parent_path, kind): cls}
@@ -488,16 +489,21 @@ class Framework(Object):
         # TODO Validate that the method has the right signature here.
 
         # TODO Prevent the exact same parameters from being registered more than once.
-
         self._observer[observer.handle.path] = observer
+        weakref.finalize(observer, self._stale_observer_paths.append, observer.handle.path)
         self._observers.append((observer.handle.path, method_name, emitter_path, event_kind))
 
-    def _cleanup_observer_paths(self, stale):
+    def _cleanup_observer_paths(self):
+        if len(self._stale_observer_paths) == 0:
+            return
+        stale = set(self._stale_observer_paths)
         new_observers = []
         for observer_path, method_name, _parent_path, _event_kind in self._observers:
             if observer_path in stale:
                 continue
-            new_observers.append(observer_path, method_name, _parent_path, _event_kind)
+            new_observers.append((observer_path, method_name, _parent_path, _event_kind))
+        # Don't change the list, as the original list.append() is being used.
+        self._stale_observer_paths.clear()
         self._observers = new_observers
 
     def _emit(self, event):
@@ -509,21 +515,17 @@ class Framework(Object):
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent_path = event.handle.parent.path
-        stale_observer_paths = set()
+        if self._stale_observer_paths:
+            self._cleanup_observer_paths()
         # TODO Track observers by (parent_path, event_kind) rather than as a list of all observers.
         #  Avoiding linear search through all observers for every event
         for observer_path, method_name, _parent_path, _event_kind in self._observers:
-            if observer_path not in self._observer:
-                stale_observer_paths.add(observer_path)
-                continue
             if _parent_path != parent_path:
                 continue
             if _event_kind and _event_kind != event_kind:
                 continue
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
-        if stale_observer_paths:
-            self._cleanup_observer_paths(stale_observer_paths)
         self._reemit(event_path)
 
     def reemit(self):

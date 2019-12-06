@@ -356,11 +356,18 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(len(framework._observer), 8)
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo-2", "foo-3", "foo-4", "foo-5", "foo-6", "foo-7", "foo-8", "foo-9"])
+        # Remove some, but not all, observers, see the remaining ones are still triggering
+        observers = observers[:2]
+        gc.collect()
+        pub.on.foo.emit()
+        self.assertEqual(observed_events, ["foo-2", "foo-3", "foo-4", "foo-5", "foo-6", "foo-7", "foo-8", "foo-9", "foo-2", "foo-3"])
+        self.assertEqual(len(framework._observer), 2)
+        self.assertEqual(len(framework._observers), 2)
+        # Delete the rest, and see that there are no new triggers
         del observers
         gc.collect()
         pub.on.foo.emit()
-        # No new notices, and the number of _observers has been trimmed
-        self.assertEqual(observed_events, ["foo-2", "foo-3", "foo-4", "foo-5", "foo-6", "foo-7", "foo-8", "foo-9"])
+        self.assertEqual(observed_events, ["foo-2", "foo-3", "foo-4", "foo-5", "foo-6", "foo-7", "foo-8", "foo-9", "foo-2", "foo-3"])
         self.assertEqual(len(framework._observer), 0)
         self.assertEqual(len(framework._observers), 0)
 
