@@ -42,10 +42,6 @@ def _create_event_link(charm_dir, event_dir, target_path, bound_event):
     # TODO: Handle function/action events here.
     if not issubclass(bound_event.event_type, op.charm.HookEvent):
         raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
-    elif issubclass(bound_event.event_type, op.charm.InstallEvent):
-        # We don't set up the link for install events, since we assume it's already in place
-        # (otherwise, we would never have been called).
-        return
 
     if not event_dir.exists():
         raise RuntimeError(f'cannot create event symlink: {event_dir} directory does not exist')

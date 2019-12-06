@@ -8,6 +8,7 @@ import subprocess
 import pickle
 import base64
 import tempfile
+import shutil
 
 import importlib.util
 
@@ -73,7 +74,8 @@ class TestMain(unittest.TestCase):
 
     def setUp(self):
         self._clear_unit_db()
-        self._clear_symlinks()
+        self._clear_hooks()
+        self._prepare_hooks()
 
         # Change cwd for the current process to the test charm directory
         # as it is preserved across fork + exec.
@@ -91,20 +93,19 @@ class TestMain(unittest.TestCase):
 
         def cleanup():
             self._clear_unit_db()
-            self._clear_symlinks()
+            self._clear_hooks()
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
     @classmethod
-    def _clear_symlinks(cls):
-        r, _, files = next(os.walk(JUJU_CHARM_DIR / 'hooks'))
-        for f in files:
-            absolute_path = Path(r) / f
-            if absolute_path.name in ('install', 'start') or absolute_path.name.endswith('-storage-attached') and absolute_path.is_symlink():
-                if os.readlink(absolute_path) != cls.CHARM_PY_RELPATH:
-                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {cls.CHARM_PY_RELPATH}')
-            else:
-                absolute_path.unlink()
+    def _prepare_hooks(cls, kind='hooks_iaas'):
+        shutil.copytree(Path(__file__).parent / 'test_hooks' / kind, JUJU_CHARM_DIR / 'hooks', symlinks=True)
+
+    @classmethod
+    def _clear_hooks(cls):
+        hooks_path = JUJU_CHARM_DIR / 'hooks'
+        if hooks_path.exists():
+            shutil.rmtree(hooks_path)
 
     def _read_and_clear_state(self):
         state = None
@@ -270,19 +271,24 @@ class TestMain(unittest.TestCase):
             'STATE_FILE': self._state_file,
         }))
 
-        initial_event_combinations = [(
+        initial_combinations = {
+            'hooks_iaas': (
                 # 'install' comes first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
                 EventSpec(InstallEvent, 'install', charm_config=charm_config),
-        ), (
+            ),
+            'hooks_iaas_storage': (
                 # Storage hooks run before "install" so this case needs to be checked as well.
                 EventSpec(InstallEvent, 'install', charm_config=charm_config),
                 EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-        ), (    # Similar to the above test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
+            ),  # Similar to the above test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
+            'hooks_caas': (
                 EventSpec(StartEvent, 'start', charm_config=charm_config),
-        ), (
+            ),
+            'hooks_caas_storage': (
                 EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
                 EventSpec(StartEvent, 'start', charm_config=charm_config),
-        )]
+            ),
+        }
 
         other_events = (
                 EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
@@ -291,15 +297,7 @@ class TestMain(unittest.TestCase):
                 EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
         )
 
-        def _initial_links_exist(initial_event_specs):
-            for event_spec in initial_event_specs:
-                event_link_path = JUJU_CHARM_DIR / 'hooks' / event_spec.event_name
-                # The symlink is expected to be present in the source tree.
-                self.assertTrue(event_link_path.exists())
-                # It has to point to the charm code file.
-                self.assertEqual(os.readlink(event_link_path), self.CHARM_PY_RELPATH)
-
-        def _assess_event_links(event_spec):
+        def _assess_event_links(event_spec, events_to_assess):
             event_hook = JUJU_CHARM_DIR / f'hooks/{event_spec.event_name}'
 
             # Simulate a fork + exec of a hook from a unit agent.
@@ -313,16 +311,14 @@ class TestMain(unittest.TestCase):
                 self.assertTrue(os.path.exists(event_hook))
                 self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
 
-        for initial_events in initial_event_combinations:
-            # Validate that the initial symlinks exist before event simulation.
-            _initial_links_exist(initial_events)
-
+        for init_hooks_kind, initial_events in initial_combinations.items():
+            self._clear_hooks()
+            self._prepare_hooks(init_hooks_kind)
             # Simulate all events and make sure all (initial and other) event symlinks are present and have the correct target
             # after each event.
             events_to_assess = initial_events + other_events
             for event_name in events_to_assess:
-                _assess_event_links(event_name)
-            self._clear_symlinks()
+                _assess_event_links(event_name, events_to_assess)
 
 
 if __name__ == "__main__":
