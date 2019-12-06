@@ -74,7 +74,7 @@ class TestMain(unittest.TestCase):
     def setUp(self):
         self._clear_unit_db()
         self._clear_hooks()
-        self._prepare_hooks()
+        self._prepare_initial_hooks()
 
         # Change cwd for the current process to the test charm directory
         # as it is preserved across fork + exec.
@@ -97,8 +97,8 @@ class TestMain(unittest.TestCase):
         self.addCleanup(cleanup)
 
     @classmethod
-    def _prepare_hooks(cls, kind='hooks_iaas'):
-        shutil.copytree(Path(__file__).parent / 'test_hooks' / kind, JUJU_CHARM_DIR / 'hooks', symlinks=True)
+    def _prepare_initial_hooks(cls):
+        shutil.copytree(Path(__file__).parent / 'test_hooks', JUJU_CHARM_DIR / 'hooks', symlinks=True)
 
     @classmethod
     def _clear_hooks(cls):
@@ -262,42 +262,34 @@ class TestMain(unittest.TestCase):
                       ' results in a non-zero exit code returned')
 
     def test_setup_event_links(self):
-        """Test auto-creation of symlinks for supported events.
+        """Test auto-creation of symlinks caused by initial events.
         """
-        event_hooks = [f'hooks/{e.replace("_", "-")}' for e in charm.Charm.on.events().keys()]
-
+        all_event_hooks = [f'hooks/{e.replace("_", "-")}' for e in charm.Charm.on.events().keys()]
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
-
         initial_events = {
-            # 'install' comes first because upgrade-charm or other events cannot be handled before install creates symlinks for them.
-            'hooks_iaas': EventSpec(InstallEvent, 'install', charm_config=charm_config),
-            # Storage hooks run before "install" so this case needs to be checked as well.
-            'hooks_iaas_storage': EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-            # Similar to the above test cases for Kubernetes charms which do not get the install event executed (see LP: #1854635).
-            'hooks_caas': EventSpec(StartEvent, 'start', charm_config=charm_config),
-            'hooks_caas_storage': EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-            'hooks_upgrade': EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+            EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+            EventSpec(StartEvent, 'start', charm_config=charm_config),
+            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
         }
 
         def _assess_event_links(event_spec):
-            event_hook = JUJU_CHARM_DIR / f'hooks/{event_spec.event_name}'
-            # Simulate a fork + exec of a hook from a unit agent.
-            self._simulate_event(event_spec)
-
             r, _, files = next(os.walk(JUJU_CHARM_DIR / 'hooks'))
             self.assertTrue(event_spec.event_name in files)
-
-            for event_hook in event_hooks:
+            for event_hook in all_event_hooks:
                 self.assertTrue(os.path.exists(event_hook))
                 self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
 
-        for init_hooks_kind, initial_event in initial_events.items():
+        for initial_event in initial_events:
             self._clear_hooks()
-            self._prepare_hooks(init_hooks_kind)
+            self._prepare_initial_hooks()
+
+            self._simulate_event(initial_event)
             _assess_event_links(initial_event)
             # Make sure it is idempotent.
+            self._simulate_event(initial_event)
             _assess_event_links(initial_event)
 
 
