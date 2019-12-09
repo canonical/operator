@@ -8,6 +8,7 @@ import subprocess
 import pickle
 import base64
 import tempfile
+import shutil
 
 import importlib.util
 
@@ -21,9 +22,8 @@ from op.charm import (
     HookEvent,
     InstallEvent,
     StartEvent,
-    LeaderElectedEvent,
-    UpgradeCharmEvent,
     ConfigChangedEvent,
+    UpgradeCharmEvent,
     UpdateStatusEvent,
     LeaderSettingsChangedEvent,
     RelationJoinedEvent,
@@ -73,7 +73,8 @@ class TestMain(unittest.TestCase):
 
     def setUp(self):
         self._clear_unit_db()
-        self._clear_symlinks()
+        self._clear_hooks()
+        self._prepare_initial_hooks()
 
         # Change cwd for the current process to the test charm directory
         # as it is preserved across fork + exec.
@@ -91,23 +92,25 @@ class TestMain(unittest.TestCase):
 
         def cleanup():
             self._clear_unit_db()
-            self._clear_symlinks()
+            self._clear_hooks()
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
     @classmethod
-    def _clear_symlinks(cls):
-        r, _, files = next(os.walk(JUJU_CHARM_DIR / 'hooks'))
-        for f in files:
-            absolute_path = Path(r) / f
-            if absolute_path.name == 'install' and absolute_path.is_symlink():
-                if os.readlink(absolute_path) != cls.CHARM_PY_RELPATH:
-                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to {cls.CHARM_PY_RELPATH}')
-            elif absolute_path.name.endswith('-storage-attached') and absolute_path.is_symlink():
-                if os.readlink(absolute_path) != 'install':
-                    raise SymlinkTargetError(f'"{absolute_path.name}" link does not point to "install"')
-            else:
-                absolute_path.unlink()
+    def _prepare_initial_hooks(cls):
+        initial_hooks = ('install', 'start', 'upgrade-charm', 'disks-storage-attached')
+        hooks_dir = JUJU_CHARM_DIR / 'hooks'
+        hooks_dir.mkdir()
+        charm_exec_path = os.path.relpath(JUJU_CHARM_DIR / 'lib/charm.py', hooks_dir)
+        for hook in initial_hooks:
+            hook_path = hooks_dir / hook
+            hook_path.symlink_to(charm_exec_path)
+
+    @classmethod
+    def _clear_hooks(cls):
+        hooks_path = JUJU_CHARM_DIR / 'hooks'
+        if hooks_path.exists():
+            shutil.rmtree(hooks_path)
 
     def _read_and_clear_state(self):
         state = None
@@ -178,6 +181,9 @@ class TestMain(unittest.TestCase):
         # and with endpoints from different sections of metadata.yaml
         events_under_test = [(
             EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            {},
+        ), (
+            EventSpec(StartEvent, 'start', charm_config=charm_config),
             {},
         ), (
             EventSpec(UpdateStatusEvent, 'update_status', charm_config=charm_config),
@@ -261,69 +267,36 @@ class TestMain(unittest.TestCase):
             self.fail('Event simulation for an unsupported event'
                       ' results in a non-zero exit code returned')
 
-    def test_setup_hooks(self):
-        """Test auto-creation of symlinks for supported events.
+    def test_setup_event_links(self):
+        """Test auto-creation of symlinks caused by initial events.
         """
-        event_hooks = [f'hooks/{e.replace("_", "-")}'
-                       for e in charm.Charm.on.events().keys()
-                       if e != 'install']
-
-        install_link_path = JUJU_CHARM_DIR / 'hooks/install'
-
-        # The symlink is expected to be present in the source tree.
-        self.assertTrue(install_link_path.exists())
-        # It has to point to main.py in the lib directory of the charm.
-        self.assertEqual(os.readlink(install_link_path), self.CHARM_PY_RELPATH)
-
-        def _assess_setup_hooks(event_spec):
-            event_hook = JUJU_CHARM_DIR / f'hooks/{event_spec.event_name}'
-
-            # Simulate a fork + exec of a hook from a unit agent.
-            self._simulate_event(event_spec)
-
-            r, _, files = next(os.walk(JUJU_CHARM_DIR / 'hooks'))
-
-            self.assertTrue(event_spec.event_name in files)
-
-            for event_hook in event_hooks:
-                self.assertTrue(os.path.exists(event_hook))
-                self.assertEqual(os.readlink(event_hook), 'install')
-                self.assertEqual(os.readlink('hooks/install'),
-                                 self.CHARM_PY_RELPATH)
-
+        all_event_hooks = [f'hooks/{e.replace("_", "-")}' for e in charm.Charm.on.events().keys()]
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
-
-        # Assess 'install' first because upgrade-charm or other
-        # events cannot be handled before install creates symlinks for them.
-        events_to_assess = (
+        initial_events = {
             EventSpec(InstallEvent, 'install', charm_config=charm_config),
-            EventSpec(StartEvent, 'start', charm_config=charm_config),
-            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
-        )
-
-        for event_spec in events_to_assess:
-            _assess_setup_hooks(event_spec)
-
-        self._clear_symlinks()
-
-        # Storage hooks run before "install" so this case needs to be checked as well.
-        events_to_assess = (
             EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-            EventSpec(InstallEvent, 'install', charm_config=charm_config),
             EventSpec(StartEvent, 'start', charm_config=charm_config),
-            EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config),
-            EventSpec(LeaderElectedEvent, 'leader-elected', charm_config=charm_config),
             EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-            EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config),
-        )
+        }
 
-        for event_spec in events_to_assess:
-            _assess_setup_hooks(event_spec)
+        def _assess_event_links(event_spec):
+            hooks_dir = JUJU_CHARM_DIR / 'hooks'
+            self.assertTrue(hooks_dir / event_spec.event_name in hooks_dir.iterdir())
+            for event_hook in all_event_hooks:
+                self.assertTrue(os.path.exists(event_hook))
+                self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
+
+        for initial_event in initial_events:
+            self._clear_hooks()
+            self._prepare_initial_hooks()
+
+            self._simulate_event(initial_event)
+            _assess_event_links(initial_event)
+            # Make sure it is idempotent.
+            self._simulate_event(initial_event)
+            _assess_event_links(initial_event)
 
 
 if __name__ == "__main__":
