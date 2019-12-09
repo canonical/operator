@@ -12,8 +12,6 @@ import shutil
 
 import importlib.util
 
-import op.main
-
 from pathlib import Path
 
 from op.charm import (
@@ -34,14 +32,8 @@ from op.charm import (
     StorageAttachedEvent,
 )
 
-# This relies on the expected repository structure to find
-# a path to the charm under test.
-JUJU_CHARM_DIR = Path(f'{__file__}/../charms/test_main').resolve()
-
-charm_spec = importlib.util.spec_from_file_location("charm", str(JUJU_CHARM_DIR / 'lib/charm.py'))
-charm = importlib.util.module_from_spec(charm_spec)
-charm_spec.loader.exec_module(charm)
-
+# This relies on the expected repository structure to find a path to source of the charm under test.
+TEST_CHARM_DIR = Path(f'{__file__}/../charms/test_main').resolve()
 
 logger = logging.getLogger(__name__)
 
@@ -63,23 +55,10 @@ class EventSpec:
 
 class TestMain(unittest.TestCase):
 
-    CHARM_PY_RELPATH = '../lib/charm.py'
-
-    @classmethod
-    def _clear_unit_db(cls):
-        charm_state_file = JUJU_CHARM_DIR / op.main.CHARM_STATE_FILE
-        if charm_state_file.exists():
-            charm_state_file.unlink()
-
     def setUp(self):
-        self._clear_unit_db()
-        self._clear_hooks()
-        self._prepare_initial_hooks()
-
-        # Change cwd for the current process to the test charm directory
-        # as it is preserved across fork + exec.
         self.addCleanup(os.chdir, os.curdir)
-        os.chdir(JUJU_CHARM_DIR)
+        self._setup_charm_dir()
+
         _, tmp_file = tempfile.mkstemp()
         self._state_file = Path(tmp_file)
         self.addCleanup(self._state_file.unlink)
@@ -91,26 +70,31 @@ class TestMain(unittest.TestCase):
         CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            self._clear_unit_db()
-            self._clear_hooks()
+            shutil.rmtree(self.JUJU_CHARM_DIR)
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
-    @classmethod
-    def _prepare_initial_hooks(cls):
-        initial_hooks = ('install', 'start', 'upgrade-charm', 'disks-storage-attached')
-        hooks_dir = JUJU_CHARM_DIR / 'hooks'
-        hooks_dir.mkdir()
-        charm_exec_path = os.path.relpath(JUJU_CHARM_DIR / 'lib/charm.py', hooks_dir)
-        for hook in initial_hooks:
-            hook_path = hooks_dir / hook
-            hook_path.symlink_to(charm_exec_path)
+    def _setup_charm_dir(self):
+        self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
+        self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
+        self.charm_exec_path = os.path.relpath(self.JUJU_CHARM_DIR / 'lib/charm.py', self.hooks_dir)
+        shutil.copytree(TEST_CHARM_DIR, self.JUJU_CHARM_DIR)
+        # Change cwd for the current process to the test charm directory
+        # as it is preserved across fork + exec.
+        os.chdir(self.JUJU_CHARM_DIR)
 
-    @classmethod
-    def _clear_hooks(cls):
-        hooks_path = JUJU_CHARM_DIR / 'hooks'
-        if hooks_path.exists():
-            shutil.rmtree(hooks_path)
+        charm_spec = importlib.util.spec_from_file_location("charm", str(self.JUJU_CHARM_DIR / 'lib/charm.py'))
+        self.charm_module = importlib.util.module_from_spec(charm_spec)
+        charm_spec.loader.exec_module(self.charm_module)
+
+        self._prepare_initial_hooks()
+
+    def _prepare_initial_hooks(self):
+        initial_hooks = ('install', 'start', 'upgrade-charm', 'disks-storage-attached')
+        self.hooks_dir.mkdir()
+        for hook in initial_hooks:
+            hook_path = self.hooks_dir / hook
+            hook_path.symlink_to(self.charm_exec_path)
 
     def _read_and_clear_state(self):
         state = None
@@ -121,10 +105,10 @@ class TestMain(unittest.TestCase):
         return state
 
     def _simulate_event(self, event_spec):
-        event_hook = JUJU_CHARM_DIR / f"hooks/{event_spec.event_name.replace('_', '-')}"
+        event_hook = self.JUJU_CHARM_DIR / f"hooks/{event_spec.event_name.replace('_', '-')}"
         env = {
             'PATH': str(Path(__file__).parent / 'bin'),
-            'JUJU_CHARM_DIR': JUJU_CHARM_DIR,
+            'JUJU_CHARM_DIR': self.JUJU_CHARM_DIR,
             'JUJU_UNIT_NAME': 'test_main/0',
             'CHARM_CONFIG': event_spec.charm_config,
         }
@@ -257,7 +241,7 @@ class TestMain(unittest.TestCase):
 
         # Simulate a scenario where there is a symlink for an event that
         # a charm does not know how to handle.
-        hook_path = JUJU_CHARM_DIR / 'hooks/not-implemented-event'
+        hook_path = self.JUJU_CHARM_DIR / 'hooks/not-implemented-event'
         # This will be cleared up in tearDown.
         hook_path.symlink_to('install')
 
@@ -270,7 +254,7 @@ class TestMain(unittest.TestCase):
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events.
         """
-        all_event_hooks = [f'hooks/{e.replace("_", "-")}' for e in charm.Charm.on.events().keys()]
+        all_event_hooks = [f'hooks/{e.replace("_", "-")}' for e in self.charm_module.Charm.on.events().keys()]
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
@@ -282,15 +266,13 @@ class TestMain(unittest.TestCase):
         }
 
         def _assess_event_links(event_spec):
-            hooks_dir = JUJU_CHARM_DIR / 'hooks'
-            self.assertTrue(hooks_dir / event_spec.event_name in hooks_dir.iterdir())
+            self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
-                self.assertTrue(os.path.exists(event_hook))
-                self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
+                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists())
+                self.assertEqual(os.readlink(event_hook), self.charm_exec_path)
 
         for initial_event in initial_events:
-            self._clear_hooks()
-            self._prepare_initial_hooks()
+            self._setup_charm_dir()
 
             self._simulate_event(initial_event)
             _assess_event_links(initial_event)
