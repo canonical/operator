@@ -56,7 +56,6 @@ class EventSpec:
 class TestMain(unittest.TestCase):
 
     def setUp(self):
-        self.addCleanup(os.chdir, os.curdir)
         self._setup_charm_dir()
 
         _, tmp_file = tempfile.mkstemp()
@@ -79,9 +78,6 @@ class TestMain(unittest.TestCase):
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
         self.charm_exec_path = os.path.relpath(self.JUJU_CHARM_DIR / 'lib/charm.py', self.hooks_dir)
         shutil.copytree(TEST_CHARM_DIR, self.JUJU_CHARM_DIR)
-        # Change cwd for the current process to the test charm directory
-        # as it is preserved across fork + exec.
-        os.chdir(self.JUJU_CHARM_DIR)
 
         charm_spec = importlib.util.spec_from_file_location("charm", str(self.JUJU_CHARM_DIR / 'lib/charm.py'))
         self.charm_module = importlib.util.module_from_spec(charm_spec)
@@ -136,7 +132,7 @@ class TestMain(unittest.TestCase):
             })
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call([sys.executable, event_hook], env=env)
+        subprocess.check_call([sys.executable, event_hook], env=env, cwd=self.JUJU_CHARM_DIR)
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -269,7 +265,7 @@ class TestMain(unittest.TestCase):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists())
-                self.assertEqual(os.readlink(event_hook), self.charm_exec_path)
+                self.assertEqual(os.readlink(self.JUJU_CHARM_DIR / event_hook), self.charm_exec_path)
 
         for initial_event in initial_events:
             self._setup_charm_dir()
