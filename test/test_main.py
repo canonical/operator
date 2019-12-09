@@ -276,8 +276,8 @@ class TestMain(unittest.TestCase):
         }
 
         def _assess_event_links(event_spec):
-            r, _, files = next(os.walk(JUJU_CHARM_DIR / 'hooks'))
-            self.assertTrue(event_spec.event_name in files)
+            hooks_dir = JUJU_CHARM_DIR / 'hooks'
+            self.assertTrue(hooks_dir / event_spec.event_name in hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 self.assertTrue(os.path.exists(event_hook))
                 self.assertEqual(os.readlink(event_hook), self.CHARM_PY_RELPATH)
