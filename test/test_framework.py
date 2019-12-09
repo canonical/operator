@@ -400,6 +400,7 @@ class TestFramework(unittest.TestCase):
         # Now, we delete the existing obs, which would cause it to be removed from observers,
         # and then immediately register a new obs at the same path using a new object
         del obs
+        gc.collect()
         new_obs = MyObserver(framework, "2")
         framework.observe(pub.on.foo, new_obs)
         pub.on.foo.emit()
