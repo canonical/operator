@@ -156,7 +156,7 @@ class BoundEvent:
         The current storage state is committed before and after each observer is notified.
         """
         framework = self.emitter.framework
-        key = str(framework.event_count)
+        key = str(framework._stored['event_count'])
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         framework._emit(event)
 
@@ -379,17 +379,13 @@ class Framework(Object):
 
         self._storage = SQLiteStorage(data_path)
 
-        # Note: we can't use the higher-level StoredData because it relies on events.
+        # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
         self._stored = StoredStateData(self, '_stored')
         try:
             self._stored = self.load_snapshot(self._stored.handle)
         except NoSnapshotError:
             self._stored['event_count'] = 0
-
-    @property
-    def event_count(self):
-        return self._stored['event_count']
 
     def close(self):
         self._storage.close()
