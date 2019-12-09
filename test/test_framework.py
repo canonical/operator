@@ -152,6 +152,7 @@ class TestFramework(unittest.TestCase):
         class MyNotifier(Object):
             foo = Event(MyEvent)
             bar = Event(MyEvent)
+            baz = Event(MyEvent)
             qux = Event(MyEvent)
 
         class MyObserver(Object):
@@ -159,6 +160,9 @@ class TestFramework(unittest.TestCase):
                 assert False, 'should not be reached'
 
             def on_bar(self, event, extra):
+                assert False, 'should not be reached'
+
+            def on_baz(self, event, extra=None, *, k):
                 assert False, 'should not be reached'
 
             def on_qux(self, event, extra=None):
@@ -172,6 +176,8 @@ class TestFramework(unittest.TestCase):
             framework.observe(pub.foo, obs)
         with self.assertRaises(TypeError):
             framework.observe(pub.bar, obs)
+        with self.assertRaises(TypeError):
+            framework.observe(pub.baz, obs)
         framework.observe(pub.qux, obs)
 
     def test_on_pre_commit_emitted(self):

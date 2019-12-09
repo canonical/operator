@@ -499,14 +499,14 @@ class Framework(Object):
 
         # Validate that the method has an acceptable call signature.
         sig = inspect.signature(getattr(observer, method_name))
-        if len(sig.parameters) < 1:  # Note: self isn't included.
+        # Self isn't included in the params list, so the first arg will be the event.
+        extra_params = list(sig.parameters.values())[1:]
+        if not sig.parameters:
             raise TypeError(f'{type(observer).__name__}.{method_name} must accept event parameter')
-        elif len(sig.parameters) > 1:
-            # Allow for additional optional params, since there's no reason to exclude them. Note: we only
-            # need to check the second, because once you start allowing optional params, you have to continue.
-            second_param = list(sig.parameters.values())[1]
-            if second_param.default is inspect.Parameter.empty:
-                raise TypeError(f'{type(observer).__name__}.{method_name} requires too many parameters')
+        elif any(param.default is inspect.Parameter.empty for param in extra_params):
+            # Allow for additional optional params, since there's no reason to exclude them, but
+            # required params will break.
+            raise TypeError(f'{type(observer).__name__}.{method_name} has extra required parameter')
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
