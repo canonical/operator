@@ -98,7 +98,13 @@ class TestMain(unittest.TestCase):
 
     @classmethod
     def _prepare_initial_hooks(cls):
-        shutil.copytree(Path(__file__).parent / 'test_hooks', JUJU_CHARM_DIR / 'hooks', symlinks=True)
+        initial_hooks = ('install', 'start', 'upgrade-charm', 'disks-storage-attached')
+        hooks_dir = JUJU_CHARM_DIR / 'hooks'
+        hooks_dir.mkdir()
+        hook_paths = (hooks_dir / hook for hook in initial_hooks)
+        charm_exec_path = os.path.relpath(JUJU_CHARM_DIR / 'lib/charm.py', hooks_dir)
+        for p in hook_paths:
+            p.symlink_to(charm_exec_path)
 
     @classmethod
     def _clear_hooks(cls):
