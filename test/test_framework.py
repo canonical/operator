@@ -8,7 +8,7 @@ import gc
 from pathlib import Path
 
 from ops.framework import (
-    Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
+    Framework, Handle, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
     NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData
 )
 
@@ -110,9 +110,9 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
-            bar = Event(MyEvent)
-            baz = Event(MyEvent)
+            foo = MyEvent
+            bar = MyEvent
+            baz = MyEvent
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -150,10 +150,10 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
-            bar = Event(MyEvent)
-            baz = Event(MyEvent)
-            qux = Event(MyEvent)
+            foo = MyEvent
+            bar = MyEvent
+            baz = MyEvent
+            qux = MyEvent
 
         class MyObserver(Object):
             def on_foo(self):
@@ -231,11 +231,11 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier1(Object):
-            a = Event(MyEvent)
-            b = Event(MyEvent)
+            a = MyEvent
+            b = MyEvent
 
         class MyNotifier2(Object):
-            c = Event(MyEvent)
+            c = MyEvent
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -305,7 +305,7 @@ class TestFramework(unittest.TestCase):
                 self.my_n = snapshot["My N!"] + 1
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
+            foo = MyEvent
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -346,7 +346,7 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyEvents(EventsBase):
-            foo = Event(MyEvent)
+            foo = MyEvent
 
         class MyNotifier(Object):
             on = MyEvents()
@@ -375,7 +375,7 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyEvents(EventsBase):
-            foo = Event(MyEvent)
+            foo = MyEvent
 
         class MyNotifier(Object):
             on = MyEvents()
@@ -398,29 +398,44 @@ class TestFramework(unittest.TestCase):
 
         self.assertEqual(obs.seen, ["on_foo:foo"])
 
-    def test_conflicting_event_attributes(self):
+    def test_reused_event_types(self):
         class MyEvent(EventBase):
             pass
 
-        event = Event(MyEvent)
+        event = MyEvent
 
         class MyEvents(EventsBase):
             foo = event
 
-        with self.assertRaises(RuntimeError) as cm:
-            class OtherEvents(EventsBase):
-                foo = event
-        self.assertEqual(
-            str(cm.exception.__cause__),
-            "Event(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
+        class SubEvents(MyEvents):
+            qux = MyEvent
 
-        with self.assertRaises(RuntimeError) as cm:
-            class MyNotifier(Object):
-                on = MyEvents()
-                bar = event
-        self.assertEqual(
-            str(cm.exception.__cause__),
-            "Event(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
+        class OtherEvents(EventsBase):
+            foo = event
+
+        class MyCharm(Object):
+            on = SubEvents()
+            other = OtherEvents()
+            bar = event
+
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self.framework.observe(self.on.foo, self.on_any)
+                self.framework.observe(self.on.qux, self.on_any)
+                self.framework.observe(self.other.foo, self.on_any)
+                self.framework.observe(self.bar, self.on_any)
+                self.seen = []
+
+            def on_any(self, event):
+                self.seen.append(event.handle.path)
+
+        framework = self.create_framework()
+        charm = MyCharm(framework, None)
+        charm.on.foo.emit()
+        charm.on.qux.emit()
+        charm.other.foo.emit()
+        charm.bar.emit()
+        self.assertEqual(charm.seen, ['MyCharm/on/foo[1]', 'MyCharm/on/qux[2]', 'MyCharm/other/foo[3]', 'MyCharm/bar[4]'])
 
     def test_reemit_ignores_unknown_event_type(self):
         # The event type may have been gone for good, and nobody cares,
@@ -432,7 +447,7 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
+            foo = MyEvent
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -474,11 +489,11 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyEvents(EventsBase):
-            foo = Event(MyFoo)
+            foo = MyFoo
 
         class MyNotifier(Object):
             on = MyEvents()
-            bar = Event(MyBar)
+            bar = MyBar
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -588,7 +603,7 @@ class TestFramework(unittest.TestCase):
                 self.value = value
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
+            foo = MyEvent
 
         class MyObserver(Object):
             has_deferred = False
