@@ -1,4 +1,4 @@
-from op.framework import Object, Event, EventBase, EventsBase
+from ops.framework import Object, Event, EventBase, EventsBase
 
 
 class HookEvent(EventBase):

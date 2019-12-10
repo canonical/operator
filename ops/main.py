@@ -6,9 +6,9 @@ from pathlib import Path
 
 import yaml
 
-import op.charm
-import op.framework
-import op.model
+import ops.charm
+import ops.framework
+import ops.model
 
 CHARM_STATE_FILE = '.unit-state.db'
 
@@ -40,7 +40,7 @@ def _create_event_link(charm_dir, event_dir, target_path, bound_event):
     bound_event -- An event for which to create a symlink.
     """
     # TODO: Handle function/action events here.
-    if not issubclass(bound_event.event_type, op.charm.HookEvent):
+    if not issubclass(bound_event.event_type, ops.charm.HookEvent):
         raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
 
     if not event_dir.exists():
@@ -71,7 +71,7 @@ def _setup_event_links(charm_dir, charm):
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         # TODO: handle function/action events here.
-        if issubclass(bound_event.event_type, op.charm.HookEvent):
+        if issubclass(bound_event.event_type, ops.charm.HookEvent):
             event_dir = charm_dir / 'hooks'
             _create_event_link(charm_dir, event_dir, charm_exec_path, bound_event)
 
@@ -101,7 +101,7 @@ def _get_event_args(charm, bound_event):
     event_type = bound_event.event_type
     model = charm.framework.model
 
-    if issubclass(event_type, op.charm.RelationEvent):
+    if issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
         relation = model.get_relation(relation_name, relation_id)
@@ -138,15 +138,15 @@ def main(charm_class):
     # TODO: For Windows, when symlinks are used, this is not a valid method of getting an event name (see LP: #1854505).
     juju_event_name = Path(sys.argv[0]).name
 
-    meta = op.charm.CharmMeta(_load_metadata(charm_dir))
+    meta = ops.charm.CharmMeta(_load_metadata(charm_dir))
     unit_name = os.environ['JUJU_UNIT_NAME']
-    model = op.model.Model(unit_name, meta, op.model.ModelBackend())
+    model = ops.model.Model(unit_name, meta, ops.model.ModelBackend())
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
-    framework = op.framework.Framework(charm_state_path, charm_dir, meta, model)
+    framework = ops.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
         charm = charm_class(framework, None)
 

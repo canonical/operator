@@ -4,8 +4,8 @@ import os
 import base64
 import pickle
 
-from op.charm import CharmBase
-from op.main import main
+from ops.charm import CharmBase
+from ops.main import main
 
 import logging
 
