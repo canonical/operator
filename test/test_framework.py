@@ -562,7 +562,7 @@ class TestFramework(unittest.TestCase):
         obs1 = MyObserver(framework1, "obs")
         framework1.observe(pub1.foo, obs1)
         pub1.foo.emit('first')
-        self.assertEqual(obs1.seen, [('0', 'first')])
+        self.assertEqual(obs1.seen, [('1', 'first')])
 
         framework1.commit()
         framework1.close()
@@ -576,10 +576,10 @@ class TestFramework(unittest.TestCase):
         framework2.reemit()
 
         # First observer didn't get updated, since framework it was bound to is gone.
-        self.assertEqual(obs1.seen, [('0', 'first')])
+        self.assertEqual(obs1.seen, [('1', 'first')])
         # Second observer saw the new event plus the reemit of the first event.
         # (The event key goes up by 2 due to the pre-commit and commit events.)
-        self.assertEqual(obs2.seen, [('3', 'second'), ('0', 'first')])
+        self.assertEqual(obs2.seen, [('4', 'second'), ('1', 'first')])
 
 
 class TestStoredState(unittest.TestCase):

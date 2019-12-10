@@ -156,7 +156,7 @@ class BoundEvent:
         The current storage state is committed before and after each observer is notified.
         """
         framework = self.emitter.framework
-        key = str(framework._stored['event_count'])
+        key = framework._next_event_key()
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         framework._emit(event)
 
@@ -499,11 +499,14 @@ class Framework(Object):
         self._observer[observer.handle.path] = observer
         self._observers.append((observer.handle.path, method_name, emitter_path, event_kind))
 
+    def _next_event_key(self):
+        """Return the next event key that should be used, incrementing the internal counter."""
+        # Increment the count first; this means the keys will start at 1, and 0 means no events have been emitted.
+        self._stored['event_count'] += 1
+        return str(self._stored['event_count'])
+
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""
-
-        # Count another event having been emitted.
-        self._stored['event_count'] += 1
 
         # Save the event for all known observers before the first notification
         # takes place, so that either everyone interested sees it, or nobody does.
