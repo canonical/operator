@@ -168,9 +168,7 @@ class BoundEvent:
         The current storage state is committed before and after each observer is notified.
         """
         framework = self.emitter.framework
-        # TODO This needs to be persisted.
-        framework._event_count += 1
-        key = str(framework._event_count)
+        key = framework._next_event_key()
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         framework._emit(event)
 
@@ -386,13 +384,20 @@ class Framework(Object):
         self.charm_dir = charm_dir
         self.meta = meta
         self.model = model
-        self._event_count = 0
         self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
         self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}
         self._type_registry = {}  # {(parent_path, kind): cls}
         self._type_known = set()  # {cls}
 
         self._storage = SQLiteStorage(data_path)
+
+        # We can't use the higher-level StoredState because it relies on events.
+        self.register_type(StoredStateData, None, StoredStateData.handle_kind)
+        self._stored = StoredStateData(self, '_stored')
+        try:
+            self._stored = self.load_snapshot(self._stored.handle)
+        except NoSnapshotError:
+            self._stored['event_count'] = 0
 
     def close(self):
         self._storage.close()
@@ -403,6 +408,8 @@ class Framework(Object):
         # Make sure snapshots are saved by instances of StoredStateData. Any possible state
         # modifications in on_commit handlers of instances of other classes will not be persisted.
         self.on.commit.emit()
+        # Save our event count after all events have been emitted.
+        self.save_snapshot(self._stored)
         self._storage.commit()
 
     def register_type(self, cls, parent, kind=None):
@@ -512,6 +519,12 @@ class Framework(Object):
 
         self._observer[observer.handle.path] = observer
         self._observers.append((observer.handle.path, method_name, emitter_path, event_kind))
+
+    def _next_event_key(self):
+        """Return the next event key that should be used, incrementing the internal counter."""
+        # Increment the count first; this means the keys will start at 1, and 0 means no events have been emitted.
+        self._stored['event_count'] += 1
+        return str(self._stored['event_count'])
 
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""

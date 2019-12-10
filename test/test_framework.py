@@ -575,6 +575,59 @@ class TestFramework(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             pub.on_a.define_event("foo", MyFoo)
 
+    def test_event_key_roundtrip(self):
+        class MyEvent(EventBase):
+            def __init__(self, handle, value):
+                super().__init__(handle)
+                self.value = value
+
+            def snapshot(self):
+                return self.value
+
+            def restore(self, value):
+                self.value = value
+
+        class MyNotifier(Object):
+            foo = Event(MyEvent)
+
+        class MyObserver(Object):
+            has_deferred = False
+
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self.seen = []
+
+            def on_foo(self, event):
+                self.seen.append((event.handle.key, event.value))
+                # Only defer the first event and once.
+                if not MyObserver.has_deferred:
+                    event.defer()
+                    MyObserver.has_deferred = True
+
+        framework1 = self.create_framework()
+        pub1 = MyNotifier(framework1, "pub")
+        obs1 = MyObserver(framework1, "obs")
+        framework1.observe(pub1.foo, obs1)
+        pub1.foo.emit('first')
+        self.assertEqual(obs1.seen, [('1', 'first')])
+
+        framework1.commit()
+        framework1.close()
+        del framework1
+
+        framework2 = self.create_framework()
+        pub2 = MyNotifier(framework2, "pub")
+        obs2 = MyObserver(framework2, "obs")
+        framework2.observe(pub2.foo, obs2)
+        pub2.foo.emit('second')
+        framework2.reemit()
+
+        # First observer didn't get updated, since framework it was bound to is gone.
+        self.assertEqual(obs1.seen, [('1', 'first')])
+        # Second observer saw the new event plus the reemit of the first event.
+        # (The event key goes up by 2 due to the pre-commit and commit events.)
+        self.assertEqual(obs2.seen, [('4', 'second'), ('1', 'first')])
+
 
 class TestStoredState(unittest.TestCase):
 
