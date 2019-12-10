@@ -497,7 +497,16 @@ class Framework(Object):
             if not hasattr(observer, method_name):
                 raise RuntimeError(f'Observer method not provided explicitly and {type(observer).__name__} type has no "{method_name}" method')
 
-        # TODO Validate that the method has the right signature here.
+        # Validate that the method has an acceptable call signature.
+        sig = inspect.signature(getattr(observer, method_name))
+        # Self isn't included in the params list, so the first arg will be the event.
+        extra_params = list(sig.parameters.values())[1:]
+        if not sig.parameters:
+            raise TypeError(f'{type(observer).__name__}.{method_name} must accept event parameter')
+        elif any(param.default is inspect.Parameter.empty for param in extra_params):
+            # Allow for additional optional params, since there's no reason to exclude them, but
+            # required params will break.
+            raise TypeError(f'{type(observer).__name__}.{method_name} has extra required parameter')
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
