@@ -24,6 +24,10 @@ class Model:
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
+        if self._backend.function_name is not None:
+            self.function = Function(self._backend)
+        else:
+            self.function = None
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -476,6 +480,45 @@ class Storage:
         return self._location
 
 
+class Function:
+    def __init__(self, backend):
+        self.name = backend.function_name
+        self.parameters = FunctionParameters(backend)
+        self.results = FunctionResults(backend)
+        self._backend = backend
+
+    def fail(self, message=''):
+        self._backend.function_fail(message)
+
+
+class FunctionParameters(LazyMapping):
+
+    def __init__(self, backend):
+        self._backend = backend
+
+    def _load(self):
+        return self._backend.function_get()
+
+
+class FunctionResults(LazyMapping, MutableMapping):
+
+    def __init__(self, backend):
+        self._backend = backend
+
+    def _load(self):
+        return {}
+
+    def __setitem__(self, key, value):
+        self._backend.function_set(**{key: value})
+        if value == '':
+            del self._data[key]
+        else:
+            self._data[key] = value
+
+    def __delitem__(self, key):
+        self.__setitem__(key, '')
+
+
 class ModelError(Exception):
     pass
 
@@ -507,6 +550,8 @@ class ModelBackend:
     def __init__(self):
         self.unit_name = os.environ['JUJU_UNIT_NAME']
         self.app_name = self.unit_name.split('/')[0]
+        self.function_name = os.environ.get('JUJU_FUNCTION_NAME',
+                                            os.environ.get('JUJU_ACTION_NAME'))
 
         self._is_leader = None
         self._leader_check_time = 0
@@ -622,3 +667,21 @@ class ModelBackend:
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
         self._run('storage-add', f'{name}={count}')
+
+    def function_get(self):
+        command_name = 'function-get'
+        if not shutil.which(command_name):
+            command_name = 'action-get'
+        return self._run(command_name, return_output=True, use_json=True)
+
+    def function_set(self, **kwargs):
+        command_name = 'function-set'
+        if not shutil.which(command_name):
+            command_name = 'action-set'
+        self._run(command_name, *[f"{k}='{v}'" for k, v in kwargs.items()])
+
+    def function_fail(self, message=''):
+        command_name = 'function-fail'
+        if not shutil.which(command_name):
+            command_name = 'action-fail'
+        self._run(command_name, f"'{message}'")

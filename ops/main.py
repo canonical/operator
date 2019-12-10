@@ -30,6 +30,13 @@ def _get_charm_dir():
 def _load_metadata(charm_dir):
     with open(charm_dir / 'metadata.yaml') as f:
         metadata = yaml.load(f, Loader=yaml.SafeLoader)
+
+    functions_meta = charm_dir / 'functions.yaml'
+    if not functions_meta.exists():
+        functions_meta = charm_dir / 'actions.yaml'
+    if functions_meta.exists():
+        with open(functions_meta) as f:
+            metadata['functions'] = yaml.load(f, Loader=yaml.SafeLoader)
     return metadata
 
 
@@ -40,7 +47,7 @@ def _create_event_link(charm_dir, event_dir, target_path, bound_event):
     bound_event -- An event for which to create a symlink.
     """
     # TODO: Handle function/action events here.
-    if not issubclass(bound_event.event_type, ops.charm.HookEvent):
+    if not (issubclass(bound_event.event_type, ops.charm.HookEvent) or issubclass(bound_event.event_type, ops.charm.FunctionEvent)):
         raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
 
     if not event_dir.exists():
@@ -70,19 +77,26 @@ def _setup_event_links(charm_dir, charm):
     charm_exec_path = os.path.relpath(os.path.realpath(sys.argv[0]), charm_dir / 'hooks')
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
-        # TODO: handle function/action events here.
         if issubclass(bound_event.event_type, ops.charm.HookEvent):
             event_dir = charm_dir / 'hooks'
             _create_event_link(charm_dir, event_dir, charm_exec_path, bound_event)
+        elif issubclass(bound_event.event_type, ops.charm.FunctionEvent):
+            event_dir = Path(charm_dir / 'functions')
+            if not event_dir.exists():
+                event_dir = Path(charm_dir / 'actions')
+            _create_event_link(charm_dir, event_dir, charm_exec_path, bound_event)
 
 
-def _emit_charm_event(charm, event_name):
+def _emit_charm_event(charm, event_name, is_function=False):
     """Emits a charm event based on a Juju event name.
 
     charm -- A charm instance to emit an event from.
     event_name -- A Juju event name to emit on a charm.
+    is_function -- Indicates whether this event is a function or not.
     """
     formatted_event_name = event_name.replace('-', '_')
+    if is_function:
+        formatted_event_name = f'{formatted_event_name}_function'
     event_to_emit = None
     try:
         event_to_emit = getattr(charm.on, formatted_event_name)
@@ -132,11 +146,12 @@ def main(charm_class):
 
     charm_dir = _get_charm_dir()
 
+    juju_function_name = os.environ.get('JUJU_FUNCTION_NAME',
+                                        os.environ.get('JUJU_ACTION_NAME'))
+    is_function = juju_function_name is not None
     # Process the Juju event relevant to the current hook execution
-    # JUJU_HOOK_NAME or JUJU_ACTION_NAME are not used to support simulation
-    # of events from debugging sessions.
     # TODO: For Windows, when symlinks are used, this is not a valid method of getting an event name (see LP: #1854505).
-    juju_event_name = Path(sys.argv[0]).name
+    juju_event_name = juju_function_name if is_function else Path(sys.argv[0]).name
 
     meta = ops.charm.CharmMeta(_load_metadata(charm_dir))
     unit_name = os.environ['JUJU_UNIT_NAME']
@@ -159,7 +174,7 @@ def main(charm_class):
 
         framework.reemit()
 
-        _emit_charm_event(charm, juju_event_name)
+        _emit_charm_event(charm, juju_event_name, is_function)
 
         framework.commit()
     finally:

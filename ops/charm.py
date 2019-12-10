@@ -5,6 +5,10 @@ class HookEvent(EventBase):
     pass
 
 
+class FunctionEvent(EventBase):
+    pass
+
+
 class InstallEvent(HookEvent):
     pass
 
@@ -144,6 +148,10 @@ class CharmBase(Object):
             self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
 
+        for function_name in self.framework.meta.functions:
+            function_name = function_name.replace('-', '_')
+            self.on.define_event(f'{function_name}_function', FunctionEvent)
+
 
 class CharmMeta:
     """Object containing the metadata for the charm.
@@ -190,6 +198,7 @@ class CharmMeta:
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', [])
+        self.functions = {name: FunctionMeta(name, function) for name, function in raw.get('functions', {}).items()}
 
 
 class RelationMeta:
@@ -239,3 +248,15 @@ class PayloadMeta:
     def __init__(self, name, raw):
         self.payload_name = name
         self.type = raw['type']
+
+
+class FunctionMeta:
+    """An object containing metadata about an function"""
+
+    def __init__(self, name, raw=None):
+        raw = raw or {}
+        self.function_name = name
+        self.title = raw.get('title', '')
+        self.description = raw.get('description', '')
+        self.parameters = raw.get('params', {})  # <parameter name>: <JSON-schema>
+        self.required = raw.get('required', [])  # A list of required parameters.

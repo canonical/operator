@@ -16,8 +16,12 @@ import ops.charm
 class TestModel(unittest.TestCase):
 
     def setUp(self):
+        def restore_env(env):
+            os.environ.clear()
+            os.environ.update(env)
+        self.addCleanup(restore_env, os.environ.copy())
+
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
-        self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
 
         self.backend = ops.model.ModelBackend()
         meta = ops.charm.CharmMeta()
@@ -660,6 +664,87 @@ class TestModel(unittest.TestCase):
             with self.assertRaises(TypeError):
                 self.model.storages.request('data', count_v)
 
+    def test_function_get(self):
+        fake_script(self, 'function-get', """echo '{"foo-name": "bar", "silent": false}'""")
+        os.environ['JUJU_FUNCTION_NAME'] = 'foo-bar'
+        self.backend = ops.model.ModelBackend()
+        meta = ops.charm.CharmMeta()
+        meta.functions = {'start': None, 'foo-bar': None}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        self.assertEqual(self.model.function.parameters['foo-name'], 'bar')
+        self.assertEqual(self.model.function.parameters['silent'], False)
+        self.assertEqual(fake_script_calls(self), [['function-get', '--format=json']])
+
+    def test_function_get_legacy(self):
+        fake_script(self, 'action-get', """echo '{"foo-name": "bar", "silent": false}'""")
+        os.environ['JUJU_ACTION_NAME'] = 'foo-bar'
+        self.backend = ops.model.ModelBackend()
+        meta = ops.charm.CharmMeta()
+        meta.functions = {'start': None, 'foo-bar': None}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        self.assertEqual(self.model.function.parameters['foo-name'], 'bar')
+        self.assertEqual(self.model.function.parameters['silent'], False)
+        self.assertEqual(fake_script_calls(self), [['action-get', '--format=json']])
+
+    def test_function_set(self):
+        fake_script(self, 'function-set', 'exit 0')
+        os.environ['JUJU_FUNCTION_NAME'] = 'foo-bar'
+        self.backend = ops.model.ModelBackend()
+        meta = ops.charm.CharmMeta()
+        meta.functions = {'start': None, 'foo-bar': None}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        self.model.function.results['x'] = 'bar'
+        self.model.function.results['y'] = 1
+        self.assertEqual(self.model.function.results['x'], 'bar')
+        self.assertEqual(self.model.function.results['y'], 1)
+        self.assertEqual(fake_script_calls(self), [
+            ['function-set', "x='bar'"],
+            ['function-set', "y='1'"]
+        ])
+
+    def test_function_set_legacy(self):
+        fake_script(self, 'action-set', 'exit 0')
+        os.environ['JUJU_ACTION_NAME'] = 'foo-bar'
+        self.addCleanup(os.environ.pop, 'JUJU_ACTION_NAME')
+        self.backend = ops.model.ModelBackend()
+        meta = ops.charm.CharmMeta()
+        meta.functions = {'start': None, 'foo-bar': None}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        self.model.function.results['x'] = 'bar'
+        self.model.function.results['y'] = 1
+        self.assertEqual(self.model.function.results['x'], 'bar')
+        self.assertEqual(self.model.function.results['y'], 1)
+        self.assertEqual(fake_script_calls(self), [
+            ['action-set', "x='bar'"],
+            ['action-set', "y='1'"]
+        ])
+
+    def test_function_fail(self):
+        fake_script(self, 'function-fail', 'exit 0')
+        os.environ['JUJU_FUNCTION_NAME'] = 'foo-bar'
+        self.backend = ops.model.ModelBackend()
+        meta = ops.charm.CharmMeta()
+        meta.functions = {'start': None, 'foo-bar': None}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        self.model.function.fail('error 42')
+        self.assertEqual(fake_script_calls(self), [['function-fail', "'error 42'"]])
+
+    def test_function_fail_legacy(self):
+        fake_script(self, 'action-fail', 'exit 0')
+        os.environ['JUJU_FUNCTION_NAME'] = 'foo-bar'
+        self.backend = ops.model.ModelBackend()
+        meta = ops.charm.CharmMeta()
+        meta.functions = {'start': None, 'foo-bar': None}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        self.model.function.fail('error 42')
+        self.assertEqual(fake_script_calls(self), [['action-fail', "'error 42'"]])
+
 
 class TestModelBackend(unittest.TestCase):
 
@@ -751,6 +836,52 @@ class TestModelBackend(unittest.TestCase):
             lambda: self.backend.storage_add('foobar', count=True),
             TypeError,
             [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+        )]
+        for do_fake, run, exception, calls in test_cases:
+            do_fake()
+            with self.assertRaises(exception):
+                run()
+            self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_function_tool_errors(self):
+        test_cases = [(
+            lambda: fake_script(self, 'function-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.function_get(),
+            ops.model.ModelError,
+            [['function-get', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'function-set', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.function_set(foo='bar', dead='beef'),
+            ops.model.ModelError,
+            [["function-set", "foo='bar'", "dead='beef'"]],
+        ), (
+            lambda: fake_script(self, 'function-fail', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.function_fail('fail-message'),
+            ops.model.ModelError,
+            [["function-fail", "'fail-message'"]],
+        )]
+        for do_fake, run, exception, calls in test_cases:
+            do_fake()
+            with self.assertRaises(exception):
+                run()
+            self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_function_tool_errors_legacy(self):
+        test_cases = [(
+            lambda: fake_script(self, 'action-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.function_get(),
+            ops.model.ModelError,
+            [['action-get', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'action-set', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.function_set(foo='bar', dead='beef'),
+            ops.model.ModelError,
+            [["action-set", "foo='bar'", "dead='beef'"]],
+        ), (
+            lambda: fake_script(self, 'action-fail', f'echo fooerror >&2 ; exit 1'),
+            lambda: self.backend.function_fail('fail-message'),
+            ops.model.ModelError,
+            [["action-fail", "'fail-message'"]],
         )]
         for do_fake, run, exception, calls in test_cases:
             do_fake()

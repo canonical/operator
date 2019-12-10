@@ -30,6 +30,7 @@ from ops.charm import (
     RelationBrokenEvent,
     RelationEvent,
     StorageAttachedEvent,
+    FunctionEvent,
 )
 
 # This relies on the expected repository structure to find a path to source of the charm under test.
@@ -43,10 +44,11 @@ class SymlinkTargetError(Exception):
 
 
 class EventSpec:
-    def __init__(self, event_type, event_name, relation_id=None, remote_app=None, remote_unit=None,
+    def __init__(self, event_type, event_name, event_envar_name=None, relation_id=None, remote_app=None, remote_unit=None,
                  charm_config=None):
         self.event_type = event_type
         self.event_name = event_name
+        self.envar_name = event_envar_name
         self.relation_id = relation_id
         self.remote_app = remote_app
         self.remote_unit = remote_unit
@@ -92,6 +94,38 @@ class TestMain(unittest.TestCase):
             hook_path = self.hooks_dir / hook
             hook_path.symlink_to(self.charm_exec_path)
 
+    def _prepare_functions(self, legacy=False):
+        functions_meta = '''
+foo-bar:
+  description: Foos the bar.
+  title: foo-bar
+  params:
+    foo-name:
+      type: string
+      description: A foo name to bar.
+    silent:
+      type: boolean
+      description:
+      default: false
+  required:
+    - foo-name
+start:
+    description: Start the unit.'''
+        if legacy:
+            functions_dir_name = 'actions'
+            functions_meta_file = 'actions.yaml'
+        else:
+            functions_dir_name = 'functions'
+            functions_meta_file = 'functions.yaml'
+
+        with open(self.JUJU_CHARM_DIR / functions_meta_file, 'w+') as f:
+            f.write(functions_meta)
+        functions_dir = self.JUJU_CHARM_DIR / functions_dir_name
+        functions_dir.mkdir()
+        for function_name in ('start', 'foo-bar'):
+            function_path = functions_dir / function_name
+            function_path.symlink_to(self.charm_exec_path)
+
     def _read_and_clear_state(self):
         state = None
         if self._state_file.stat().st_size:
@@ -101,7 +135,6 @@ class TestMain(unittest.TestCase):
         return state
 
     def _simulate_event(self, event_spec):
-        event_hook = self.JUJU_CHARM_DIR / f"hooks/{event_spec.event_name.replace('_', '-')}"
         env = {
             'PATH': str(Path(__file__).parent / 'bin'),
             'JUJU_CHARM_DIR': self.JUJU_CHARM_DIR,
@@ -124,15 +157,27 @@ class TestMain(unittest.TestCase):
                 remote_unit = ''
 
             env['JUJU_REMOTE_UNIT'] = remote_unit
-
         else:
             env.update({
                 'JUJU_REMOTE_UNIT': '',
                 'JUJU_REMOTE_APP': '',
             })
+        if issubclass(event_spec.event_type, FunctionEvent):
+            env.update({
+                event_spec.envar_name: event_spec.event_name,
+            })
+            if event_spec.envar_name == 'JUJU_FUNCTION_NAME':
+                event_dir = 'functions'
+            elif event_spec.envar_name == 'JUJU_ACTION_NAME':
+                event_dir = 'actions'
+            else:
+                raise RuntimeError('invalid envar name specified for a function event')
+        else:
+            event_dir = 'hooks'
+        event_file = self.JUJU_CHARM_DIR / f"{event_dir}/{event_spec.event_name.replace('_', '-')}"
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call([sys.executable, event_hook], env=env, cwd=self.JUJU_CHARM_DIR)
+        subprocess.check_call([sys.executable, event_file], env=env, cwd=self.JUJU_CHARM_DIR)
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -153,8 +198,14 @@ class TestMain(unittest.TestCase):
         self.assertEqual(state['observed_event_types'], [ConfigChangedEvent, UpdateStatusEvent])
 
     def test_multiple_events_handled(self):
+        self._prepare_functions()
+
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
+        }))
+        functions_charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+            'USE_FUNCTIONS': True,
         }))
 
         # Sample events with a different amount of dashes used
@@ -204,6 +255,12 @@ class TestMain(unittest.TestCase):
             EventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2,
                       remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
+        ), (
+            EventSpec(FunctionEvent, 'start', event_envar_name='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
+            {},
+        ), (
+            EventSpec(FunctionEvent, 'foo_bar', event_envar_name='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
+            {},
         )]
 
         logger.debug(f'Expected events {events_under_test}')
@@ -215,7 +272,10 @@ class TestMain(unittest.TestCase):
         for event_spec, expected_event_data in events_under_test:
             state = self._simulate_event(event_spec)
 
-            handled_events = state.get(f'on_{event_spec.event_name}', [])
+            state_key = f'on_{event_spec.event_name}'
+            if issubclass(event_spec.event_type, FunctionEvent):
+                state_key = f'{state_key}_function'
+            handled_events = state.get(state_key, [])
 
             # Make sure that a handler for that event was called once.
             self.assertEqual(len(handled_events), 1)
@@ -227,6 +287,23 @@ class TestMain(unittest.TestCase):
 
             if event_spec.event_name in expected_event_data:
                 self.assertEqual(state[f'{event_spec.event_name}_data'], expected_event_data[event_spec.event_name])
+
+    def test_legacy_function(self):
+        self._prepare_functions(legacy=True)
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+            'USE_FUNCTIONS': True,
+        }))
+
+        # First run "install" to make sure all hooks are set up.
+        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        event_spec = EventSpec(FunctionEvent, 'foo_bar', event_envar_name='JUJU_ACTION_NAME', charm_config=charm_config)
+        state = self._simulate_event(event_spec)
+        handled_events = state.get(f'on_{event_spec.event_name}_function', [])
+        self.assertEqual(len(handled_events), 1)
+        handled_event_type = handled_events[0]
+        self.assertEqual(handled_event_type, event_spec.event_type)
+        self.assertEqual(state['observed_event_types'], [event_spec.event_type])
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit.
