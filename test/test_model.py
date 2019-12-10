@@ -725,7 +725,7 @@ class TestModelBackend(unittest.TestCase):
             with self.assertRaises(TypeError):
                 case()
 
-    def storage_tool_errors(self):
+    def test_storage_tool_errors(self):
         test_cases = [(
             lambda: fake_script(self, 'storage-list', f'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_list('foobar'),
@@ -740,17 +740,17 @@ class TestModelBackend(unittest.TestCase):
             lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=2),
             ops.model.ModelError,
-            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+            [['storage-add', 'foobar=2']],
         ), (
             lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=object),
             TypeError,
-            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+            [],
         ), (
             lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=True),
             TypeError,
-            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+            [],
         )]
         for do_fake, run, exception, calls in test_cases:
             do_fake()
