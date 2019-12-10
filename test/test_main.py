@@ -14,7 +14,7 @@ import importlib.util
 
 from pathlib import Path
 
-from op.charm import (
+from ops.charm import (
     CharmBase,
     CharmEvents,
     HookEvent,

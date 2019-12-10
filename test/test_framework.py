@@ -7,7 +7,7 @@ import gc
 
 from pathlib import Path
 
-from op.framework import (
+from ops.framework import (
     Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
     NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData
 )
