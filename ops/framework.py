@@ -199,6 +199,10 @@ class Object:
         else:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
+        if parent is not self:
+            if self.handle.path in self.framework._objects:
+                raise RuntimeError(f"two objects claiming to be {self.handle.path} have been created")
+            self.framework._objects[self.handle.path] = self
 
         # TODO This can probably be dropped, because the event type is only
         # really relevant if someone is either emitting the event or observing
@@ -386,6 +390,7 @@ class Framework(Object):
         self.model = model
         self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
         self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}
+        self._objects = weakref.WeakValueDictionary()
         self._type_registry = {}  # {(parent_path, kind): cls}
         self._type_known = set()  # {cls}
 
@@ -401,6 +406,14 @@ class Framework(Object):
 
     def close(self):
         self._storage.close()
+
+    def _forget(self, object):
+        """When you are done using an object, Framework._forget() ensures we stop tracking it.
+
+        There should only ever be one object at a given path in a framework. For areas where
+        we intentionally create clean copies of an object, we can explicitly _forget the old copy.
+        """
+        self._objects.pop(object.handle.path, None)
 
     def commit(self):
         # Give a chance for objects to persist data they want to before a commit is made.
@@ -457,6 +470,8 @@ class Framework(Object):
         obj.framework = self
         obj.handle = handle
         obj.restore(data)
+        # TODO: Do we want to do something if the object already exists at that path?
+        self._objects[handle.path] = obj
         return obj
 
     def drop_snapshot(self, handle):

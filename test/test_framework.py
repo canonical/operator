@@ -870,6 +870,7 @@ class TestStoredState(unittest.TestCase):
             obj.state.a = get_a()
             framework.commit()
 
+            framework._forget(obj)
             obj_copy1 = SomeObject(framework, '1')
             self.assertEqual(obj_copy1.state.a, get_a())
 
@@ -892,6 +893,7 @@ class TestStoredState(unittest.TestCase):
             framework_copy.save_snapshot(StoredStateData(obj_copy2, 'state'))
             framework_copy.commit()
 
+            framework_copy._forget(obj_copy2)
             obj_copy3 = SomeObject(framework_copy, '1')
 
             # Now make sure that the modification was not saved as the state holding it was not dirty.
@@ -985,8 +987,8 @@ class TestStoredState(unittest.TestCase):
 
         framework = self.create_framework()
 
-        for a, b, op, op_ab, op_ba in test_operations:
-            obj = SomeObject(framework, "1")
+        for i, (a, b, op, op_ab, op_ba) in enumerate(test_operations):
+            obj = SomeObject(framework, str(i))
             obj.state.a = a
             self.assertEqual(op(obj.state.a, b), op_ab)
             self.assertEqual(op(b, obj.state.a), op_ba)
@@ -1026,8 +1028,8 @@ class TestStoredState(unittest.TestCase):
 
         # Validate that operations between StoredSet and built-in sets only result in built-in sets being returned.
         # Make sure that commutativity is preserved and that the original sets are not changed or used as a result.
-        for variable_operand, operation, ab_res, ba_res in test_operations:
-            obj = SomeObject(framework, "2")
+        for i, (variable_operand, operation, ab_res, ba_res) in enumerate(test_operations):
+            obj = SomeObject(framework, str(i))
             obj.state.set = {"a", "b"}
 
             for a, b, expected in [(obj.state.set, variable_operand, ab_res), (variable_operand, obj.state.set, ba_res)]:
