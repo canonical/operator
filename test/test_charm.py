@@ -7,8 +7,13 @@ import shutil
 
 from pathlib import Path
 
-from ops.charm import CharmBase, CharmMeta
-from ops.charm import CharmEvents
+from ops.charm import (
+    CharmBase,
+    CharmMeta,
+    CharmEvents,
+    FunctionEventContextError,
+    NonDeferrableEventError,
+)
 from ops.framework import Framework, Event, EventBase
 from ops.model import Model, ModelBackend
 
@@ -16,9 +21,12 @@ from ops.model import Model, ModelBackend
 class TestCharm(unittest.TestCase):
 
     def setUp(self):
-        self._path = os.environ['PATH']
-        os.environ['PATH'] = str(Path(__file__).parent / 'bin')
+        def restore_env(env):
+            os.environ.clear()
+            os.environ.update(env)
+        self.addCleanup(restore_env, os.environ.copy())
 
+        os.environ['PATH'] = str(Path(__file__).parent / 'bin')
         os.environ['JUJU_UNIT_NAME'] = 'local/0'
 
         self.tmpdir = Path(tempfile.mkdtemp())
@@ -36,8 +44,6 @@ class TestCharm(unittest.TestCase):
         CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            os.environ['PATH'] = self._path
-            del os.environ['JUJU_UNIT_NAME']
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
@@ -192,6 +198,98 @@ class TestCharm(unittest.TestCase):
             'StorageAttachedEvent',
             'StorageAttachedEvent',
         ])
+
+    @classmethod
+    def _get_function_test_meta(cls):
+        return CharmMeta({
+            'name': 'my-charm',
+            'functions': {
+                'foo-bar': {
+                    'description': 'Foos the bar.',
+                    'title': 'foo-bar',
+                    'required': 'foo-bar',
+                    'params': {
+                        'foo-name': {
+                            'type': 'string',
+                            'description': 'A foo name to bar',
+                        },
+                        'silent': {
+                            'type': 'boolean',
+                            'description': '',
+                            'default': False,
+                        },
+                    },
+                },
+                'start': {
+                    'description': 'Start the unit.'
+                }
+            },
+        })
+
+    def _test_function_events(self, envar):
+
+        class MyCharm(CharmBase):
+
+            def __init__(self, *args):
+                super().__init__(*args)
+                framework.observe(self.on.foo_bar_function, self)
+                framework.observe(self.on.start_function, self)
+
+            def on_foo_bar_function(self, event):
+                self.seen_function_name = event.function.name
+
+            def on_start_function(self, event):
+                event.defer()
+
+        self.meta = self._get_function_test_meta()
+
+        os.environ[envar] = 'foo-bar'
+        framework = self.create_framework()
+        charm = MyCharm(framework, None)
+
+        events = list(MyCharm.on.events())
+        self.assertIn('foo_bar_function', events)
+        self.assertIn('start_function', events)
+
+        charm.on.foo_bar_function.emit(framework.model.function)
+        self.assertEqual(charm.seen_function_name, 'foo-bar')
+
+        # Make sure that function events that do not match the current context are
+        # not possible to emit by hand.
+        with self.assertRaises(FunctionEventContextError):
+            charm.on.start_function.emit(framework.model.function)
+
+    def test_function_events(self):
+        self._test_function_events('JUJU_FUNCTION_NAME')
+
+    def test_function_events_legacy(self):
+        self._test_function_events('JUJU_ACTION_NAME')
+
+    def _test_function_event_defer_fails(self, envar):
+
+        class MyCharm(CharmBase):
+
+            def __init__(self, *args):
+                super().__init__(*args)
+                framework.observe(self.on.start_function, self)
+
+            def on_start_function(self, event):
+                event.defer()
+
+        self.meta = self._get_function_test_meta()
+
+        os.environ[envar] = 'start'
+        framework = self.create_framework()
+        charm = MyCharm(framework, None)
+
+        with self.assertRaises(NonDeferrableEventError):
+            charm.on.start_function.emit(framework.model.function)
+
+    def test_function_event_defer_fails(self):
+        self._test_function_event_defer_fails('JUJU_FUNCTION_NAME')
+
+    def test_function_event_defer_legacy(self):
+        self._test_function_event_defer_fails('JUJU_ACTION_NAME')
 
 
 if __name__ == "__main__":

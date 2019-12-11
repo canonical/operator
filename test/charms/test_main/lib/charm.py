@@ -125,11 +125,13 @@ class Charm(CharmBase):
         self._write_state()
 
     def on_start_function(self, event):
+        assert event.function.name == 'start', 'event function name cannot be different from the one being handled'
         self._state['on_start_function'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
 
     def on_foo_bar_function(self, event):
+        assert event.function.name == 'foo_bar', 'event function name cannot be different from the one being handled'
         self._state['on_foo_bar_function'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()

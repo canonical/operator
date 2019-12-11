@@ -6,6 +6,27 @@ class HookEvent(EventBase):
 
 
 class FunctionEvent(EventBase):
+
+    def __init__(self, handle, function):
+        super().__init__(handle)
+        # A reference to the current function object.
+        self.function = function
+
+        if not self.function.name.replace('-', '_') in self.handle.kind:
+            raise FunctionEventContextError('a function name of the current context cannot differ from the function event attribute name')
+
+    def defer(self):
+        raise NonDeferrableEventError('cannot defer function events')
+
+    def restore(self, snapshot):
+        self.function = self.framework.model.function
+
+
+class FunctionEventContextError(Exception):
+    pass
+
+
+class NonDeferrableEventError(Exception):
     pass
 
 
