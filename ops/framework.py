@@ -201,7 +201,7 @@ class Object:
 
         # TODO This can probably be dropped, because the event type is only
         # really relevant if someone is either emitting the event or observing
-        # it. Specifically, this could be done in Event.__get__ instead.
+        # it.
         for attr_name, attr_value in inspect.getmembers(type(self)):
             if isinstance(attr_value, Event):
                 event_type = attr_value.event_type
