@@ -408,22 +408,22 @@ class TestFramework(unittest.TestCase):
             foo = event
 
         class SubEvents(MyEvents):
-            qux = MyEvent
+            bar = MyEvent
 
         class OtherEvents(EventsBase):
-            foo = event
+            qux = event
 
         class MyCharm(Object):
             on = SubEvents()
             other = OtherEvents()
-            bar = event
+            ham = event
 
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.framework.observe(self.on.foo, self.on_any)
-                self.framework.observe(self.on.qux, self.on_any)
-                self.framework.observe(self.other.foo, self.on_any)
-                self.framework.observe(self.bar, self.on_any)
+                self.framework.observe(self.on.bar, self.on_any)
+                self.framework.observe(self.other.qux, self.on_any)
+                self.framework.observe(self.ham, self.on_any)
                 self.seen = []
 
             def on_any(self, event):
@@ -432,10 +432,10 @@ class TestFramework(unittest.TestCase):
         framework = self.create_framework()
         charm = MyCharm(framework, None)
         charm.on.foo.emit()
-        charm.on.qux.emit()
-        charm.other.foo.emit()
-        charm.bar.emit()
-        self.assertEqual(charm.seen, ['MyCharm/on/foo[1]', 'MyCharm/on/qux[2]', 'MyCharm/other/foo[3]', 'MyCharm/bar[4]'])
+        charm.on.bar.emit()
+        charm.other.qux.emit()
+        charm.ham.emit()
+        self.assertEqual(charm.seen, ['MyCharm/on/foo[1]', 'MyCharm/on/bar[2]', 'MyCharm/on/qux[3]', 'MyCharm/ham[4]'])
 
     def test_reemit_ignores_unknown_event_type(self):
         # The event type may have been gone for good, and nobody cares,

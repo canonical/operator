@@ -88,48 +88,16 @@ class Handle:
         return handle
 
 
-class UnassignedEvent(type):
-    """Metaclass for events which have not yet been assigned to an emitter type.
-
-    Without being assigned and bound to an emitter, unassigned events cannot be emitted.
+class EventMetaType(type):
+    """Metaclass for event types which automatically applies the Event descriptor when the
+    event type is assigned in an emitter class definition.
     """
 
     def __set_name__(event_type, emitter_type, event_kind):
-        # Permanently assign the event for this emitter type.
-        setattr(emitter_type, event_kind, AssignedEvent(event_type, event_kind, emitter_type))
+        setattr(emitter_type, event_kind, Event(event_type, event_kind, emitter_type))
 
 
-class AssignedEvent:
-    """An event which has been assigned to an emitter type with a name.
-
-    The assigned event is still not bound to an emitter instance, and thus cannot be emitted.
-    """
-
-    def __repr__(self):
-        return (f'<AssignedEvent {self.event_type.__name__} assigned as '
-                f'{self.event_kind} to {self.emitter_type} '
-                f'at {hex(id(self))}')
-
-    def __init__(self, event_type, event_kind, emitter_type):
-        self.event_type = event_type
-        self.event_kind = event_kind
-        self.emitter_type = emitter_type
-
-    def __get__(self, emitter, emitter_type):
-        if emitter:
-            # Permanently bind the event for this emitter.
-            bound_event = BoundEvent(emitter, self.event_type, self.event_kind)
-            setattr(emitter, self.event_kind, bound_event)
-            if emitter.framework:
-                # Register the event with the framework now that it is bound. The framework might not
-                # be bound if the event is accessed as a class attribute for introspection purposes.
-                emitter.framework.register_type(self.event_type, emitter, self.event_kind)
-            return bound_event
-        else:
-            return self
-
-
-class EventBase(metaclass=UnassignedEvent):
+class EventBase(metaclass=EventMetaType):
 
     def __init__(self, handle):
         self.handle = handle
@@ -153,8 +121,35 @@ class EventBase(metaclass=UnassignedEvent):
         self.deferred = False
 
 
+class Event:
+    """Event creates class descriptors to operate with events.
+
+    It is automatically applied by the EventMetaType and causes the event types to
+    be wrapped in BoundEvents when accessed from an emitter instance. The BoundEvent
+    wrapper allows the event to be emitted and observed via the emitter instance's
+    framework reference.
+    """
+
+    def __init__(self, event_type, event_kind, emitter_type):
+        if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
+            raise RuntimeError(f"Event requires a subclass of EventBase as an argument, got {event_type}")
+        self.event_type = event_type
+        self.event_kind = event_kind
+        self.emitter_type = emitter_type
+
+    def __get__(self, emitter, emitter_type=None):
+        if emitter is None:
+            return self
+        return BoundEvent(emitter, self.event_type, self.event_kind)
+
+    def __repr__(self):
+        return (f'<Event {self.event_type.__name__} assigned as '
+                f'{self.event_kind} to {self.emitter_type} '
+                f'at {hex(id(self))}')
+
+
 class BoundEvent:
-    """An event which is bound to an emitter instance and can thus be emitted."""
+    """An event bound to an emitter."""
 
     def __repr__(self):
         return (f'<BoundEvent {self.event_type.__name__} bound to '
@@ -172,8 +167,6 @@ class BoundEvent:
         The current storage state is committed before and after each observer is notified.
         """
         framework = self.emitter.framework
-        if not framework:
-            raise RuntimeError(f'{self.emitter} is not bound to a framework instance')
         key = framework._next_event_key()
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         framework._emit(event)
@@ -206,34 +199,34 @@ class Object:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
 
+        # TODO This can probably be dropped, because the event type is only
+        # really relevant if someone is either emitting the event or observing
+        # it. Specifically, this could be done in Event.__get__ instead.
+        for attr_name, attr_value in inspect.getmembers(type(self)):
+            if isinstance(attr_value, Event):
+                event_type = attr_value.event_type
+                event_kind = attr_name
+                emitter = self
+                self.framework.register_type(event_type, emitter, event_kind)
+
         # TODO Detect conflicting handles here.
 
 
 class EventsBase(Object):
     """Convenience type to allow defining .on attributes at class level."""
 
-    def __init__(self, parent=None, key=None, handle_kind="on"):
-        self.handle_kind = handle_kind
-        # Start off with an empty framework, with the assumption that it will be bound before use.
-        self.framework = None
-        # Allow the class to be instantiated without a parent so that it can be used at the class level.
-        # It will be reinstantiated later via __get__ to properly bind it to an emitter.
+    handle_kind = "on"
+
+    def __init__(self, parent=None, key=None):
         if parent is not None:
             super().__init__(parent, key)
-
-    def __set_name__(self, owner, name):
-        # Allow the handle_kind to be overridden, in case it is assigned to something other than "on".
-        self.handle_kind = name
 
     def __get__(self, emitter, emitter_type):
         # Same type, different instance, more data. Doing this unusual construct
         # means people can subclass just this one class to have their own 'on'.
         if emitter is None:
             return self
-        new_instance = type(self)(emitter, None, self.handle_kind)
-        # Permanently bind the new instance to the emitter, so that we avoid creating and throwing away instances.
-        setattr(emitter, new_instance.handle_kind, new_instance)
-        return new_instance
+        return type(self)(emitter)
 
     @classmethod
     def define_event(cls, event_kind, event_type):
@@ -253,7 +246,8 @@ class EventsBase(Object):
         except AttributeError:
             pass
 
-        setattr(cls, event_kind, AssignedEvent(event_type, event_kind, cls))
+        event_descriptor = Event(event_type, event_kind, cls)
+        setattr(cls, event_kind, event_descriptor)
 
     def events(self):
         """Return a mapping of event_kinds to bound_events for all available events.
@@ -262,7 +256,7 @@ class EventsBase(Object):
         # We have to iterate over the class rather than instance to allow for properties which
         # might call this method (e.g., event views), leading to infinite recursion.
         for attr_name, attr_value in inspect.getmembers(type(self)):
-            if isinstance(attr_value, AssignedEvent):
+            if isinstance(attr_value, Event):
                 # We actually care about the bound_event, however, since it
                 # provides the most info for users of this method.
                 event_kind = attr_name
