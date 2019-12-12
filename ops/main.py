@@ -46,7 +46,6 @@ def _create_event_link(charm_dir, event_dir, target_path, bound_event):
     charm_dir -- A root directory of the charm
     bound_event -- An event for which to create a symlink.
     """
-    # TODO: Handle function/action events here.
     if not (issubclass(bound_event.event_type, ops.charm.HookEvent) or issubclass(bound_event.event_type, ops.charm.FunctionEvent)):
         raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
 
