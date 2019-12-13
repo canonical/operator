@@ -1,19 +1,29 @@
-# Operators Framework for Charms
+# Operator Framework for Charms
 
 This framework is not yet stable and is subject to change, but is available
 for early testing.
 
 ## Getting Started
 
-The best way to get started is to download a copy of the [skeleton charm][].
-Once you have a copy, you will first need to install the framework into the
-`lib/` directory:
+Start by creating a charm directory with at least the following files:
+
+* `lib/charm.py` (must be executable and use Python 3.6+)
+* `hooks/install` (or `hooks/start` for K8s charms) sym-linked to `../lib/charm.py`
+* `metadata.yaml`
+
+Then install the framework into the `lib/` directory using:
 
 ```
 pip install -t lib/ https://github.com/canonical/operator
 ```
 
-You can then modify the `lib/charm.py` code and, once ready, deploy the charm:
+In your `lib/charm.py` file, you will need to define a class subclassed from
+`ops.charm.CharmBase` which observes and handles at least `self.on.install`
+(or `self.on.start` for K8s charms). You will then need to call the
+`ops.main.main(YourCharm)` function, passing in the charm class that you
+defined.
+
+Once ready your charm code is ready, deploy the charm as normal with:
 
 ```
 juju deploy .
@@ -21,6 +31,3 @@ juju deploy .
 
 You can sync subsequent changes from the framework by running the `pip`
 command again with `--upgrade`.
-
-
-[skeleton charm]: https://github.com/johnsca/charm-skeleton
