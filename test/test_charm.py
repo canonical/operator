@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ops.charm import CharmBase, CharmMeta
 from ops.charm import CharmEvents
-from ops.framework import Framework, Event, EventBase
+from ops.framework import Framework, EventSource, EventBase
 from ops.model import Model, ModelBackend
 
 
@@ -29,7 +29,7 @@ class TestCharm(unittest.TestCase):
             pass
 
         class TestCharmEvents(CharmEvents):
-            custom = Event(CustomEvent)
+            custom = EventSource(CustomEvent)
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.

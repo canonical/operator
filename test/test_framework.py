@@ -8,7 +8,7 @@ import gc
 from pathlib import Path
 
 from ops.framework import (
-    Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
+    Framework, Handle, EventSource, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
     NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData
 )
 
@@ -110,9 +110,9 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
-            bar = Event(MyEvent)
-            baz = Event(MyEvent)
+            foo = EventSource(MyEvent)
+            bar = EventSource(MyEvent)
+            baz = EventSource(MyEvent)
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -150,10 +150,10 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
-            bar = Event(MyEvent)
-            baz = Event(MyEvent)
-            qux = Event(MyEvent)
+            foo = EventSource(MyEvent)
+            bar = EventSource(MyEvent)
+            baz = EventSource(MyEvent)
+            qux = EventSource(MyEvent)
 
         class MyObserver(Object):
             def on_foo(self):
@@ -231,11 +231,11 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier1(Object):
-            a = Event(MyEvent)
-            b = Event(MyEvent)
+            a = EventSource(MyEvent)
+            b = EventSource(MyEvent)
 
         class MyNotifier2(Object):
-            c = Event(MyEvent)
+            c = EventSource(MyEvent)
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -305,7 +305,7 @@ class TestFramework(unittest.TestCase):
                 self.my_n = snapshot["My N!"] + 1
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
+            foo = EventSource(MyEvent)
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -346,7 +346,7 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyEvents(EventsBase):
-            foo = Event(MyEvent)
+            foo = EventSource(MyEvent)
 
         class MyNotifier(Object):
             on = MyEvents()
@@ -375,7 +375,7 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyEvents(EventsBase):
-            foo = Event(MyEvent)
+            foo = EventSource(MyEvent)
 
         class MyNotifier(Object):
             on = MyEvents()
@@ -402,7 +402,7 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
-        event = Event(MyEvent)
+        event = EventSource(MyEvent)
 
         class MyEvents(EventsBase):
             foo = event
@@ -412,7 +412,7 @@ class TestFramework(unittest.TestCase):
                 foo = event
         self.assertEqual(
             str(cm.exception.__cause__),
-            "Event(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
+            "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
         with self.assertRaises(RuntimeError) as cm:
             class MyNotifier(Object):
@@ -420,7 +420,7 @@ class TestFramework(unittest.TestCase):
                 bar = event
         self.assertEqual(
             str(cm.exception.__cause__),
-            "Event(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
+            "EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
 
     def test_reemit_ignores_unknown_event_type(self):
         # The event type may have been gone for good, and nobody cares,
@@ -432,7 +432,7 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
+            foo = EventSource(MyEvent)
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -474,11 +474,11 @@ class TestFramework(unittest.TestCase):
             pass
 
         class MyEvents(EventsBase):
-            foo = Event(MyFoo)
+            foo = EventSource(MyFoo)
 
         class MyNotifier(Object):
             on = MyEvents()
-            bar = Event(MyBar)
+            bar = EventSource(MyBar)
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -588,7 +588,7 @@ class TestFramework(unittest.TestCase):
                 self.value = value
 
         class MyNotifier(Object):
-            foo = Event(MyEvent)
+            foo = EventSource(MyEvent)
 
         class MyObserver(Object):
             has_deferred = False
