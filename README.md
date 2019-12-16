@@ -17,9 +17,9 @@ Then install the framework into the `lib/` directory using:
 pip install -t lib/ https://github.com/canonical/operator
 ```
 
-Your `lib/charm.py` is the entry point for your charm logic. The minimum it
-needs to do is define a subclass of `CharmBase` and call the framework's main
-function:
+Your `lib/charm.py` is the entry point for your charm logic. At a minimum, it
+needs to define a subclass of `CharmBase` and pass that into the framework's
+`main` function:
 
 ```python
 from ops.charm import CharmBase
@@ -28,12 +28,13 @@ from ops.main import main
 class MyCharm(CharmBase):
     pass
 
+
 if __name__ == "__main__":
     main(MyCharm)
 ```
 
-This charm does nothing, though. Typically, you'll want to observe specific
-Juju events with logic similar to this:
+This charm does nothing, though, so you'll typically want to observe some Juju
+events, such as `start`:
 
 ```python
 class MyCharm(CharmBase):
@@ -45,10 +46,10 @@ class MyCharm(CharmBase):
         # Handle the event here.
 ```
 
-Every standard event in juju may observed that way, and you can also easily
+Every standard event in Juju may observed that way, and you can also easily
 define your own events in your custom types.
 
-Once ready your charm code is ready, deploy the charm as normal with:
+Once your charm is ready, deploy it as normal with:
 
 ```
 juju deploy .
