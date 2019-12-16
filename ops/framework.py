@@ -398,11 +398,11 @@ class Framework(Object):
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
-        self._stored = StoredStateData(self, '_stored')
-        self._forget(self._stored)  # we will replace this with the loaded value
+        stored_handle = Handle(None, StoredStateData.handle_kind, '_stored')
         try:
-            self._stored = self.load_snapshot(self._stored.handle)
+            self._stored = self.load_snapshot(stored_handle)
         except NoSnapshotError:
+            self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
 
     def close(self):
