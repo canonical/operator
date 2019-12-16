@@ -202,6 +202,7 @@ class Object:
         if parent is not self:
             if self.handle.path in self.framework._objects:
                 raise RuntimeError(f"two objects claiming to be {self.handle.path} have been created")
+            self.framework._objects[self.handle.path] = self
 
         # TODO This can probably be dropped, because the event type is only
         # really relevant if someone is either emitting the event or observing
@@ -398,6 +399,7 @@ class Framework(Object):
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
         self._stored = StoredStateData(self, '_stored')
+        self._forget(self._stored)  # we will replace this with the loaded value
         try:
             self._stored = self.load_snapshot(self._stored.handle)
         except NoSnapshotError:
