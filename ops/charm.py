@@ -229,7 +229,7 @@ class ResourceMeta:
     def __init__(self, name, raw):
         self.resource_name = name
         self.type = raw['type']
-        self.filename = raw['filename']
+        self.filename = raw.get('filename', None)
         self.description = raw.get('description', '')
 
 
