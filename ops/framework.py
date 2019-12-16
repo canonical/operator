@@ -113,7 +113,7 @@ class EventBase:
 
 
 class EventSource:
-    """EventSource wraps an event type with a descriptor to facilitate binding and emitting.
+    """EventSource wraps an event type with a descriptor to facilitate observing and emitting.
 
     It is generally used as:
 
