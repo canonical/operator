@@ -113,16 +113,15 @@ class EventBase:
 
 
 class EventSource:
-    """EventSource creates class descriptors to operate with events.
+    """EventSource wraps an event type with a descriptor to facilitate binding and emitting.
 
     It is generally used as:
 
         class SomethingHappened(EventBase):
             pass
 
-        class SomeObject:
+        class SomeObject(Object):
             something_happened = EventSource(SomethingHappened)
-
 
     With that, instances of that type will offer the someobj.something_happened
     attribute which is a BoundEvent and may be used to emit and observe the event.
