@@ -890,6 +890,9 @@ class TestStoredState(unittest.TestCase):
             # it still contains the old value at this point. State is overridden here via save_snapshot to validate that
             # the modification will not be saved when StoredStateData is not dirty. This check assumes that the artificially
             # created StoredStateData does not observe the on_commit event.
+            # This is the one place where we intentionally create a second object for the framework.
+            # User code should never be doing this, and we need it to test the side effect that 'commit()' is a no-op
+            framework_copy._objects.pop(obj_copy2.handle.path + "/StoredStateData[state]")
             framework_copy.save_snapshot(StoredStateData(obj_copy2, 'state'))
             framework_copy.commit()
 
