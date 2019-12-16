@@ -17,11 +17,36 @@ Then install the framework into the `lib/` directory using:
 pip install -t lib/ https://github.com/canonical/operator
 ```
 
-In your `lib/charm.py` file, you will need to define a class subclassed from
-`ops.charm.CharmBase` which observes and handles at least `self.on.install`
-(or `self.on.start` for K8s charms). You will then need to call the
-`ops.main.main(YourCharm)` function, passing in the charm class that you
-defined.
+Your `lib/charm.py` is the entry point for your charm logic. The minimum it
+needs to do is define a subclass of `CharmBase` and call the framework's main
+function:
+
+```python
+from ops.charm import CharmBase
+from ops.main import main
+
+class MyCharm(CharmBase):
+    pass
+
+if __name__ == "__main__":
+    main(MyCharm)
+```
+
+This charm does nothing, though. Typically, you'll want to observe specific
+Juju events with logic similar to this:
+
+```python
+class MyCharm(CharmBase):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.framework.observe(self.on.start, self.on_start)
+
+     def on_start(self, event):
+        # Handle the event here.
+```
+
+Every standard event in juju may observed that way, and you can also easily
+define your own events in your custom types.
 
 Once ready your charm code is ready, deploy the charm as normal with:
 
