@@ -90,6 +90,7 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(event2.my_n, 2)
 
         framework2.save_snapshot(event2)
+        framework2._forget(event)
         event3 = framework2.load_snapshot(handle)
         self.assertEqual(event3.my_n, 3)
 
@@ -264,9 +265,14 @@ class TestFramework(unittest.TestCase):
         pub2.c.emit()
 
         # Events remain stored because they were deferred.
+        # We are creating a local copy so we can do comparisons, but
+        # we don't want the framework to track them
         ev_a = framework.load_snapshot(Handle(pub1, "a", "1"))
+        framework._forget(ev_a)
         ev_b = framework.load_snapshot(Handle(pub1, "b", "2"))
+        framework._forget(ev_b)
         ev_c = framework.load_snapshot(Handle(pub2, "c", "3"))
+        framework._forget(ev_c)
 
         framework.reemit()
         obs1.done["a"] = True
@@ -871,6 +877,7 @@ class TestStoredState(unittest.TestCase):
             framework.commit()
 
             framework._forget(obj)
+            framework._forget(obj.state._data)
             obj_copy1 = SomeObject(framework, '1')
             self.assertEqual(obj_copy1.state.a, get_a())
 

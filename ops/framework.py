@@ -202,7 +202,6 @@ class Object:
         if parent is not self:
             if self.handle.path in self.framework._objects:
                 raise RuntimeError(f"two objects claiming to be {self.handle.path} have been created")
-            self.framework._objects[self.handle.path] = self
 
         # TODO This can probably be dropped, because the event type is only
         # really relevant if someone is either emitting the event or observing
@@ -470,7 +469,8 @@ class Framework(Object):
         obj.framework = self
         obj.handle = handle
         obj.restore(data)
-        # TODO: Do we want to do something if the object already exists at that path?
+        if handle.path in self._objects:
+            raise RuntimeError(f"two objects claiming to be {handle.path} have been created")
         self._objects[handle.path] = obj
         return obj
 
@@ -599,6 +599,8 @@ class Framework(Object):
                 deferred = True
             else:
                 self._storage.drop_notice(event_path, observer_path, method_name)
+            # We intentionally consider this event to be dead and reload it from scratch in the next path.
+            self.framework._forget(event)
 
         if not deferred:
             self._storage.drop_snapshot(last_event_path)
