@@ -200,6 +200,7 @@ class Object:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
         if parent is not self:
+            # Framework is the only case where parent is self, don't track yourself.
             if self.handle.path in self.framework._objects:
                 raise RuntimeError(f"two objects claiming to be {self.handle.path} have been created")
             self.framework._objects[self.handle.path] = self
