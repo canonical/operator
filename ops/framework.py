@@ -200,7 +200,7 @@ class Object:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
         if parent is not self:
-            # Framework is the only case where parent is self, don't track yourself.
+            # Framework.__init__ passes parent=self, and we don't want to track ourself (also framework._objects may not be initialized yet)
             if self.handle.path in self.framework._objects:
                 raise RuntimeError(f"two objects claiming to be {self.handle.path} have been created")
             self.framework._objects[self.handle.path] = self
