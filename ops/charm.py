@@ -1,4 +1,4 @@
-from ops.framework import Object, Event, EventBase, EventsBase
+from ops.framework import Object, EventSource, EventBase, EventsBase
 
 
 class HookEvent(EventBase):
@@ -138,16 +138,16 @@ class StorageDetachingEvent(StorageEvent):
 
 class CharmEvents(EventsBase):
 
-    install = Event(InstallEvent)
-    start = Event(StartEvent)
-    stop = Event(StopEvent)
-    update_status = Event(UpdateStatusEvent)
-    config_changed = Event(ConfigChangedEvent)
-    upgrade_charm = Event(UpgradeCharmEvent)
-    pre_series_upgrade = Event(PreSeriesUpgradeEvent)
-    post_series_upgrade = Event(PostSeriesUpgradeEvent)
-    leader_elected = Event(LeaderElectedEvent)
-    leader_settings_changed = Event(LeaderSettingsChangedEvent)
+    install = EventSource(InstallEvent)
+    start = EventSource(StartEvent)
+    stop = EventSource(StopEvent)
+    update_status = EventSource(UpdateStatusEvent)
+    config_changed = EventSource(ConfigChangedEvent)
+    upgrade_charm = EventSource(UpgradeCharmEvent)
+    pre_series_upgrade = EventSource(PreSeriesUpgradeEvent)
+    post_series_upgrade = EventSource(PostSeriesUpgradeEvent)
+    leader_elected = EventSource(LeaderElectedEvent)
+    leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
 
 
 class CharmBase(Object):

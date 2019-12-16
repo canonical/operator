@@ -112,17 +112,16 @@ class EventBase:
         self.deferred = False
 
 
-class Event:
-    """Event creates class descriptors to operate with events.
+class EventSource:
+    """EventSource wraps an event type with a descriptor to facilitate observing and emitting.
 
     It is generally used as:
 
         class SomethingHappened(EventBase):
             pass
 
-        class SomeObject:
-            something_happened = Event(SomethingHappened)
-
+        class SomeObject(Object):
+            something_happened = EventSource(SomethingHappened)
 
     With that, instances of that type will offer the someobj.something_happened
     attribute which is a BoundEvent and may be used to emit and observe the event.
@@ -138,7 +137,7 @@ class Event:
     def __set_name__(self, emitter_type, event_kind):
         if self.event_kind is not None:
             raise RuntimeError(
-                f'Event({self.event_type.__name__}) reused as '
+                f'EventSource({self.event_type.__name__}) reused as '
                 f'{self.emitter_type.__name__}.{self.event_kind} and '
                 f'{emitter_type.__name__}.{event_kind}')
         self.event_kind = event_kind
@@ -204,7 +203,7 @@ class Object:
         # really relevant if someone is either emitting the event or observing
         # it.
         for attr_name, attr_value in inspect.getmembers(type(self)):
-            if isinstance(attr_value, Event):
+            if isinstance(attr_value, EventSource):
                 event_type = attr_value.event_type
                 event_kind = attr_name
                 emitter = self
@@ -247,7 +246,7 @@ class EventsBase(Object):
         except AttributeError:
             pass
 
-        event_descriptor = Event(event_type)
+        event_descriptor = EventSource(event_type)
         event_descriptor.__set_name__(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
 
@@ -258,7 +257,7 @@ class EventsBase(Object):
         # We have to iterate over the class rather than instance to allow for properties which
         # might call this method (e.g., event views), leading to infinite recursion.
         for attr_name, attr_value in inspect.getmembers(type(self)):
-            if isinstance(attr_value, Event):
+            if isinstance(attr_value, EventSource):
                 # We actually care about the bound_event, however, since it
                 # provides the most info for users of this method.
                 event_kind = attr_name
@@ -289,8 +288,8 @@ class CommitEvent(EventBase):
 
 
 class FrameworkEvents(EventsBase):
-    pre_commit = Event(PreCommitEvent)
-    commit = Event(CommitEvent)
+    pre_commit = EventSource(PreCommitEvent)
+    commit = EventSource(CommitEvent)
 
 
 class NoSnapshotError(Exception):
@@ -594,7 +593,7 @@ class StoredStateChanged(EventBase):
 
 
 class StoredStateEvents(EventsBase):
-    changed = Event(StoredStateChanged)
+    changed = EventSource(StoredStateChanged)
 
 
 class StoredStateData(Object):
