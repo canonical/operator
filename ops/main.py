@@ -80,9 +80,12 @@ def _setup_event_links(charm_dir, charm):
             event_dir = charm_dir / 'hooks'
             _create_event_link(charm_dir, event_dir, charm_exec_path, bound_event)
         elif issubclass(bound_event.event_type, ops.charm.FunctionEvent):
-            event_dir = Path(charm_dir / 'functions')
-            if not event_dir.exists():
-                event_dir = Path(charm_dir / 'actions')
+            funcs_dir = Path(charm_dir / 'functions')
+            actions_dir = Path(charm_dir / 'actions')
+            if funcs_dir.exists() or not actions_dir.exists():
+                event_dir = funcs_dir
+            else:
+                event_dir = actions_dir
             _create_event_link(charm_dir, event_dir, charm_exec_path, bound_event)
 
 
