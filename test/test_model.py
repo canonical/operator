@@ -843,51 +843,47 @@ class TestModelBackend(unittest.TestCase):
                 run()
             self.assertEqual(fake_script_calls(self, clear=True), calls)
 
-    def test_function_tool_errors(self):
-        test_cases = [(
-            lambda: fake_script(self, 'function-get', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.function_get(),
-            ops.model.ModelError,
-            [['function-get', '--format=json']],
-        ), (
-            lambda: fake_script(self, 'function-set', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.function_set(foo='bar', dead='beef'),
-            ops.model.ModelError,
-            [["function-set", "foo='bar'", "dead='beef'"]],
-        ), (
-            lambda: fake_script(self, 'function-fail', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.function_fail('fail-message'),
-            ops.model.ModelError,
-            [["function-fail", "'fail-message'"]],
-        )]
-        for do_fake, run, exception, calls in test_cases:
-            do_fake()
-            with self.assertRaises(exception):
-                run()
-            self.assertEqual(fake_script_calls(self, clear=True), calls)
+    def test_function_get_error(self):
+        fake_script(self, 'function-get', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_get()
+        calls = [['function-get', '--format=json']]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
-    def test_function_tool_errors_legacy(self):
-        test_cases = [(
-            lambda: fake_script(self, 'action-get', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.function_get(),
-            ops.model.ModelError,
-            [['action-get', '--format=json']],
-        ), (
-            lambda: fake_script(self, 'action-set', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.function_set(foo='bar', dead='beef'),
-            ops.model.ModelError,
-            [["action-set", "foo='bar'", "dead='beef'"]],
-        ), (
-            lambda: fake_script(self, 'action-fail', f'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.function_fail('fail-message'),
-            ops.model.ModelError,
-            [["action-fail", "'fail-message'"]],
-        )]
-        for do_fake, run, exception, calls in test_cases:
-            do_fake()
-            with self.assertRaises(exception):
-                run()
-            self.assertEqual(fake_script_calls(self, clear=True), calls)
+    def test_function_set_error(self):
+        fake_script(self, 'function-set', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_set(foo='bar', dead='beef')
+        calls = [["function-set", "foo='bar'", "dead='beef'"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_function_fail_error(self):
+        fake_script(self, 'function-fail', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_fail('fail-message')
+        calls = [["function-fail", "'fail-message'"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_function_get_error_legacy(self):
+        fake_script(self, 'action-get', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_get()
+        calls = [['action-get', '--format=json']]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_function_set_error_legacy(self):
+        fake_script(self, 'action-set', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_set(foo='bar', dead='beef')
+        calls = [["action-set", "foo='bar'", "dead='beef'"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_function_fail_error_legacy(self):
+        fake_script(self, 'action-fail', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_fail('fail-message')
+        calls = [["action-fail", "'fail-message'"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
 
 def fake_script(test_case, name, content):
