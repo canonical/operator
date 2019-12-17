@@ -49,10 +49,11 @@ def _create_event_link(charm_dir, event_dir, target_path, bound_event):
     if not (issubclass(bound_event.event_type, ops.charm.HookEvent) or issubclass(bound_event.event_type, ops.charm.FunctionEvent)):
         raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
 
-    if not event_dir.exists():
-        raise RuntimeError(f'cannot create event symlink: {event_dir} directory does not exist')
-
-    event_path = event_dir / bound_event.event_kind.replace('_', '-')
+    event_dir.mkdir(exist_ok=True)
+    event_file = bound_event.event_kind.replace('_', '-')
+    if issubclass(bound_event.event_type, ops.charm.FunctionEvent):
+        event_file = event_file[:-len('-function')]
+    event_path = event_dir / event_file
     if not event_path.exists():
         # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
         debugf(f'Creating a new relative symlink at {event_path} pointing to {target_path}')

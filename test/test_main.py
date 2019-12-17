@@ -341,7 +341,7 @@ start:
         def _assess_event_links(event_spec):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
-                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists())
+                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists(), f'Missing hook: {event_hook}')
                 self.assertEqual(os.readlink(self.JUJU_CHARM_DIR / event_hook), self.charm_exec_path)
 
         for initial_event in initial_events:
@@ -352,6 +352,16 @@ start:
             # Make sure it is idempotent.
             self._simulate_event(initial_event)
             _assess_event_links(initial_event)
+
+    def test_setup_function_links(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        functions_yaml = self.JUJU_CHARM_DIR / 'functions.yaml'
+        functions_yaml.write_text('test: {}')
+        self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        function_hook = self.JUJU_CHARM_DIR / 'functions' / 'test'
+        self.assertTrue(function_hook.exists())
 
 
 if __name__ == "__main__":
