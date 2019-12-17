@@ -396,6 +396,7 @@ class TestFramework(unittest.TestCase):
         # Or using a second framework
         framework_copy = self.create_framework()
         o_copy = MyObject(framework_copy, "path")
+        self.assertEqual(o1.handle.path, o_copy.handle.path)
 
     def test_multiple_objects_with_load_snapshot(self):
         framework = self.create_framework()
@@ -421,20 +422,22 @@ class TestFramework(unittest.TestCase):
         o2 = framework.load_snapshot(o_handle)
         # Trying to load_snapshot a second object at the same path should fail with RuntimeError
         with self.assertRaises(RuntimeError):
-            o3 = framework.load_snapshot(o_handle)
+            framework.load_snapshot(o_handle)
         # Unless we _forget the object first
         framework._forget(o2)
         o3 = framework.load_snapshot(o_handle)
         self.assertEqual(o2.value, o3.value)
         # A loaded object also prevents direct creation of an object
         with self.assertRaises(RuntimeError):
-            o4 = MyObject(framework, "path")
+            MyObject(framework, "path")
         # But we can create an object, or load a snapshot in a copy of the framework
         framework_copy1 = self.create_framework()
         o_copy1 = MyObject(framework_copy1, "path")
+        self.assertEqual(o_copy1.value, "path")
         framework_copy2 = self.create_framework()
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
+        self.assertEqual(o_copy2.value, "path")
 
     def test_events_base(self):
         framework = self.create_framework()
