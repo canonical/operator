@@ -264,12 +264,10 @@ class PayloadMeta:
 
 
 class FunctionMeta:
-    """An object containing metadata about an function"""
-
     def __init__(self, name, raw=None):
         raw = raw or {}
         self.function_name = name
         self.title = raw.get('title', '')
         self.description = raw.get('description', '')
-        self.parameters = raw.get('params', {})  # <parameter name>: <JSON-schema>
-        self.required = raw.get('required', [])  # A list of required parameters.
+        self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
+        self.required = raw.get('required', [])  # [<parameter name>, ...]
