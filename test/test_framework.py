@@ -374,6 +374,68 @@ class TestFramework(unittest.TestCase):
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo"])
 
+    def test_multiple_objects(self):
+        framework = self.create_framework()
+
+        class MyObject(Object):
+            pass
+
+        o1 = MyObject(framework, "path")
+        # Creating a second object at the same path should fail with RuntimeError
+        with self.assertRaises(RuntimeError):
+            o2 = MyObject(framework, "path")
+        # Unless we _forget the object first
+        framework._forget(o1)
+        o2 = MyObject(framework, "path")
+        self.assertEqual(o1.handle.path, o2.handle.path)
+        # Deleting the tracked object should also work
+        del o2
+        gc.collect()
+        o3 = MyObject(framework, "path")
+        self.assertEqual(o1.handle.path, o3.handle.path)
+        # Or using a second framework
+        framework_copy = self.create_framework()
+        o_copy = MyObject(framework_copy, "path")
+
+    def test_multiple_objects_with_load_snapshot(self):
+        framework = self.create_framework()
+
+        class MyObject(Object):
+            def __init__(self, parent, name):
+                super().__init__(parent, name)
+                self.value = name
+
+            def snapshot(self):
+                return self.value
+
+            def restore(self, value):
+                self.value = value
+
+        framework.register_type(MyObject, None, MyObject.handle_kind)
+        o1 = MyObject(framework, "path")
+        framework.save_snapshot(o1)
+        framework.commit()
+        o_handle = o1.handle
+        del o1
+        gc.collect()
+        o2 = framework.load_snapshot(o_handle)
+        # Trying to load_snapshot a second object at the same path should fail with RuntimeError
+        with self.assertRaises(RuntimeError):
+            o3 = framework.load_snapshot(o_handle)
+        # Unless we _forget the object first
+        framework._forget(o2)
+        o3 = framework.load_snapshot(o_handle)
+        self.assertEqual(o2.value, o3.value)
+        # A loaded object also prevents direct creation of an object
+        with self.assertRaises(RuntimeError):
+            o4 = MyObject(framework, "path")
+        # But we can create an object, or load a snapshot in a copy of the framework
+        framework_copy1 = self.create_framework()
+        o_copy1 = MyObject(framework_copy1, "path")
+        framework_copy2 = self.create_framework()
+        framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
+        o_copy2 = framework_copy2.load_snapshot(o_handle)
+
     def test_events_base(self):
         framework = self.create_framework()
 
@@ -876,19 +938,18 @@ class TestStoredState(unittest.TestCase):
             obj.state.a = get_a()
             framework.commit()
 
-            framework._forget(obj)
-            framework._forget(obj.state._data)
-            obj_copy1 = SomeObject(framework, '1')
+            framework_copy = self.create_framework()
+            obj_copy1 = SomeObject(framework_copy, '1')
             self.assertEqual(obj_copy1.state.a, get_a())
 
             op(obj_copy1.state.a, b)
             validate_op(obj_copy1.state.a, expected_res)
 
-            framework.commit()
+            framework_copy.commit()
 
-            framework_copy = self.create_framework()
+            framework_copy2 = self.create_framework()
 
-            obj_copy2 = SomeObject(framework_copy, '1')
+            obj_copy2 = SomeObject(framework_copy2, '1')
 
             validate_op(obj_copy2.state.a, expected_res)
 
@@ -899,16 +960,17 @@ class TestStoredState(unittest.TestCase):
             # created StoredStateData does not observe the on_commit event.
             # This is the one place where we intentionally create a second object for the framework.
             # User code should never be doing this, and we need it to test the side effect that 'commit()' is a no-op
-            framework_copy._forget(obj_copy2.state._data)
-            framework_copy.save_snapshot(StoredStateData(obj_copy2, 'state'))
-            framework_copy.commit()
+            framework_copy2._forget(obj_copy2.state._data)
+            framework_copy2.save_snapshot(StoredStateData(obj_copy2, 'state'))
+            framework_copy2.commit()
 
-            framework_copy._forget(obj_copy2)
-            obj_copy3 = SomeObject(framework_copy, '1')
+            framework_copy3 = self.create_framework()
+            obj_copy3 = SomeObject(framework_copy3, '1')
 
             # Now make sure that the modification was not saved as the state holding it was not dirty.
             with self.assertRaises(AttributeError):
                 obj_copy3.state.a
+            framework_copy3.close()
 
     def test_comparison_operations(self):
         test_operations = [(

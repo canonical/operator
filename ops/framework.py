@@ -199,11 +199,7 @@ class Object:
         else:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
-        if parent is not self:
-            # Framework.__init__ passes parent=self, and we don't want to track ourself (also framework._objects may not be initialized yet)
-            if self.handle.path in self.framework._objects:
-                raise RuntimeError(f"two objects claiming to be {self.handle.path} have been created")
-            self.framework._objects[self.handle.path] = self
+        self.framework._track(self)
 
         # TODO This can probably be dropped, because the event type is only
         # really relevant if someone is either emitting the event or observing
@@ -409,13 +405,18 @@ class Framework(Object):
     def close(self):
         self._storage.close()
 
-    def _forget(self, object):
-        """When you are done using an object, Framework._forget() ensures we stop tracking it.
+    def _track(self, obj: Object) -> None:
+        """Track object and ensure it is the only object created using its handle path."""
+        if obj is self:
+            # Framework objects don't track themselves
+            return
+        if obj.handle.path in self.framework._objects:
+            raise RuntimeError(f"two objects claiming to be {obj.handle.path} have been created")
+        self._objects[obj.handle.path] = obj
 
-        There should only ever be one object at a given path in a framework. For areas where
-        we intentionally create clean copies of an object, we can explicitly _forget the old copy.
-        """
-        self._objects.pop(object.handle.path, None)
+    def _forget(self, obj):
+        """Stop tracking the given object. See also _track."""
+        self._objects.pop(obj.handle.path, None)
 
     def commit(self):
         # Give a chance for objects to persist data they want to before a commit is made.
