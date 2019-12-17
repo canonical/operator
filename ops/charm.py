@@ -13,21 +13,13 @@ class FunctionEvent(EventBase):
         self.function = function
 
         if not self.function.name.replace('-', '_') in self.handle.kind:
-            raise FunctionEventContextError('a function name of the current context cannot differ from the function event attribute name')
+            raise RuntimeError('a function name of the current context cannot differ from the function event attribute name')
 
     def defer(self):
-        raise NonDeferrableEventError('cannot defer function events')
+        raise RuntimeError('cannot defer function events')
 
     def restore(self, snapshot):
         self.function = self.framework.model.function
-
-
-class FunctionEventContextError(Exception):
-    pass
-
-
-class NonDeferrableEventError(Exception):
-    pass
 
 
 class InstallEvent(HookEvent):

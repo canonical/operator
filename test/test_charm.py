@@ -11,8 +11,6 @@ from ops.charm import (
     CharmBase,
     CharmMeta,
     CharmEvents,
-    FunctionEventContextError,
-    NonDeferrableEventError,
 )
 from ops.framework import Framework, EventSource, EventBase
 from ops.model import Model, ModelBackend
@@ -256,7 +254,7 @@ class TestCharm(unittest.TestCase):
 
         # Make sure that function events that do not match the current context are
         # not possible to emit by hand.
-        with self.assertRaises(FunctionEventContextError):
+        with self.assertRaises(RuntimeError):
             charm.on.start_function.emit(framework.model.function)
 
     def test_function_events(self):
@@ -282,7 +280,7 @@ class TestCharm(unittest.TestCase):
         framework = self.create_framework()
         charm = MyCharm(framework, None)
 
-        with self.assertRaises(NonDeferrableEventError):
+        with self.assertRaises(RuntimeError):
             charm.on.start_function.emit(framework.model.function)
 
     def test_function_event_defer_fails(self):
