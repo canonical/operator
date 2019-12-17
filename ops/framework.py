@@ -405,7 +405,7 @@ class Framework(Object):
     def close(self):
         self._storage.close()
 
-    def _track(self, obj: Object) -> None:
+    def _track(self, obj):
         """Track object and ensure it is the only object created using its handle path."""
         if obj is self:
             # Framework objects don't track themselves
