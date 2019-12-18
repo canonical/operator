@@ -211,6 +211,7 @@ class CharmMeta:
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', [])
+        self.functions_type = raw.get('functions_type', None)
         self.functions = {name: FunctionMeta(name, function) for name, function in raw.get('functions', {}).items()}
 
 

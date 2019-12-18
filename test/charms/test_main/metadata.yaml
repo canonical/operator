@@ -8,6 +8,7 @@ series:
     - bionic
     - cosmic
     - disco
+min-juju-version: 2.7.1
 provides:
     db:
         interface: db
