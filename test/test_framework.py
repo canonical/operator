@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ops.framework import (
     Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
-    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData
+    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateChanged, StoredStateData
 )
 
 
@@ -927,9 +927,26 @@ class TestStoredState(unittest.TestCase):
         class SomeObject(Object):
             state = StoredState()
 
+        class WrappedFramework(Framework):
+            def __init__(self, framework):
+                object.__setattr__(self, '_framework', framework)
+                object.__setattr__(self, 'snapshots', [])
+
+            def __getattr__(self, item):
+                return getattr(self._framework, item)
+
+            def __setattr__(self, key, value):
+                return setattr(self._framework, key, value)
+
+            def save_snapshot(self, value):
+                snap = value.snapshot()
+                if isinstance(snap, dict) and 'a' in snap:
+                    self.snapshots.append((type(value), value.snapshot()))
+                return self._framework.save_snapshot(value)
+
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
-            framework = self.create_framework()
+            framework = WrappedFramework(self.create_framework())
             obj = SomeObject(framework, '1')
 
             obj.state.a = get_a()
@@ -940,6 +957,10 @@ class TestStoredState(unittest.TestCase):
 
             obj.state.a = get_a()
             framework.commit()
+            # We should see an update for initializing a
+            self.assertEqual(framework.snapshots, [
+                (StoredStateData, {'a': get_a()}),
+            ])
             del obj
             gc.collect()
             obj_copy1 = SomeObject(framework, '1')
@@ -947,32 +968,18 @@ class TestStoredState(unittest.TestCase):
 
             op(obj_copy1.state.a, b)
             validate_op(obj_copy1.state.a, expected_res)
-
             framework.commit()
 
-            framework_copy = self.create_framework()
+            framework_copy = WrappedFramework(self.create_framework())
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
             validate_op(obj_copy2.state.a, expected_res)
 
-            # Validate the dirty state functionality.
-            # obj_copy2 state is not dirty because it was not modified in any supported way since the last commit so
-            # it still contains the old value at this point. State is overridden here via save_snapshot to validate that
-            # the modification will not be saved when StoredStateData is not dirty. This check assumes that the artificially
-            # created StoredStateData does not observe the on_commit event.
-            framework_copy._forget(obj_copy2.state._data)
-            framework_copy.save_snapshot(StoredStateData(obj_copy2, 'state'))
+            # Commit saves the pre-commit and commit events, and the framework event counter, but shouldn't update the stored state of my object
+            framework.snapshots.clear()
             framework_copy.commit()
-
-            del obj_copy2
-            gc.collect()
-            obj_copy3 = SomeObject(framework_copy, '1')
-
-            # Now make sure that the modification was not saved as the state holding it was not dirty.
-            with self.assertRaises(AttributeError):
-                obj_copy3.state.a
-            framework_copy.close()
+            self.assertEqual(framework_copy.snapshots, [])
 
     def test_comparison_operations(self):
         test_operations = [(
