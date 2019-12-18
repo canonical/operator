@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ops.framework import (
     Framework, Handle, Event, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
-    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateChanged, StoredStateData
+    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData
 )
 
 
@@ -90,7 +90,8 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(event2.my_n, 2)
 
         framework2.save_snapshot(event2)
-        framework2._forget(event)
+        del event2
+        gc.collect()
         event3 = framework2.load_snapshot(handle)
         self.assertEqual(event3.my_n, 3)
 
@@ -265,14 +266,14 @@ class TestFramework(unittest.TestCase):
         pub2.c.emit()
 
         # Events remain stored because they were deferred.
-        # We are creating a local copy so we can do comparisons, but
-        # we don't want the framework to track them
-        ev_a = framework.load_snapshot(Handle(pub1, "a", "1"))
-        framework._forget(ev_a)
-        ev_b = framework.load_snapshot(Handle(pub1, "b", "2"))
-        framework._forget(ev_b)
-        ev_c = framework.load_snapshot(Handle(pub2, "c", "3"))
-        framework._forget(ev_c)
+        ev_a_handle = Handle(pub1, "a", "1")
+        framework.load_snapshot(ev_a_handle)
+        ev_b_handle = Handle(pub1, "b", "2")
+        framework.load_snapshot(ev_b_handle)
+        ev_c_handle = Handle(pub2, "c", "3")
+        framework.load_snapshot(ev_c_handle)
+        # make sure the objects are gone before we reemit them
+        gc.collect()
 
         framework.reemit()
         obs1.done["a"] = True
@@ -291,9 +292,9 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(" ".join(obs2.seen), "a b c a b c a b c a c a c c")
 
         # Now the event objects must all be gone from storage.
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_a.handle)
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_b.handle)
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_c.handle)
+        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_a_handle)
+        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_b_handle)
+        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
 
     def test_custom_event_data(self):
         framework = self.create_framework()
@@ -374,7 +375,7 @@ class TestFramework(unittest.TestCase):
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo"])
 
-    def test_multiple_objects(self):
+    def test_forget_and_multiple_objects(self):
         framework = self.create_framework()
 
         class MyObject(Object):
@@ -398,7 +399,7 @@ class TestFramework(unittest.TestCase):
         o_copy = MyObject(framework_copy, "path")
         self.assertEqual(o1.handle.path, o_copy.handle.path)
 
-    def test_multiple_objects_with_load_snapshot(self):
+    def test_forget_and_multiple_objects_with_load_snapshot(self):
         framework = self.create_framework()
 
         class MyObject(Object):
@@ -939,8 +940,7 @@ class TestStoredState(unittest.TestCase):
                 return setattr(self._framework, key, value)
 
             def save_snapshot(self, value):
-                snap = value.snapshot()
-                if isinstance(snap, dict) and 'a' in snap:
+                if value.handle.path == 'SomeObject[1]/StoredStateData[state]':
                     self.snapshots.append((type(value), value.snapshot()))
                 return self._framework.save_snapshot(value)
 
