@@ -955,7 +955,6 @@ class TestStoredState(unittest.TestCase):
             obj_copy2 = SomeObject(framework_copy, '1')
 
             validate_op(obj_copy2.state.a, expected_res)
-            framework_copy.commit()
 
             # Validate the dirty state functionality.
             # obj_copy2 state is not dirty because it was not modified in any supported way since the last commit so
