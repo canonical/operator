@@ -940,40 +940,40 @@ class TestStoredState(unittest.TestCase):
 
             obj.state.a = get_a()
             framework.commit()
-
-            framework_copy = self.create_framework()
-            obj_copy1 = SomeObject(framework_copy, '1')
+            del obj
+            gc.collect()
+            obj_copy1 = SomeObject(framework, '1')
             self.assertEqual(obj_copy1.state.a, get_a())
 
             op(obj_copy1.state.a, b)
             validate_op(obj_copy1.state.a, expected_res)
 
-            framework_copy.commit()
+            framework.commit()
 
-            framework_copy2 = self.create_framework()
+            framework_copy = self.create_framework()
 
-            obj_copy2 = SomeObject(framework_copy2, '1')
+            obj_copy2 = SomeObject(framework_copy, '1')
 
             validate_op(obj_copy2.state.a, expected_res)
+            framework_copy.commit()
 
             # Validate the dirty state functionality.
             # obj_copy2 state is not dirty because it was not modified in any supported way since the last commit so
             # it still contains the old value at this point. State is overridden here via save_snapshot to validate that
             # the modification will not be saved when StoredStateData is not dirty. This check assumes that the artificially
             # created StoredStateData does not observe the on_commit event.
-            # This is the one place where we intentionally create a second object for the framework.
-            # User code should never be doing this, and we need it to test the side effect that 'commit()' is a no-op
-            framework_copy2._forget(obj_copy2.state._data)
-            framework_copy2.save_snapshot(StoredStateData(obj_copy2, 'state'))
-            framework_copy2.commit()
+            framework_copy._forget(obj_copy2.state._data)
+            framework_copy.save_snapshot(StoredStateData(obj_copy2, 'state'))
+            framework_copy.commit()
 
-            framework_copy3 = self.create_framework()
-            obj_copy3 = SomeObject(framework_copy3, '1')
+            del obj_copy2
+            gc.collect()
+            obj_copy3 = SomeObject(framework_copy, '1')
 
             # Now make sure that the modification was not saved as the state holding it was not dirty.
             with self.assertRaises(AttributeError):
                 obj_copy3.state.a
-            framework_copy3.close()
+            framework_copy.close()
 
     def test_comparison_operations(self):
         test_operations = [(
