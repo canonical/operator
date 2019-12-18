@@ -58,18 +58,15 @@ def _create_event_link(charm, bound_event):
     """
     if issubclass(bound_event.event_type, ops.charm.HookEvent):
         event_dir = charm.framework.charm_dir / 'hooks'
+        event_path = event_dir / bound_event.event_kind.replace('_', '-')
     elif issubclass(bound_event.event_type, ops.charm.FunctionEvent):
         event_dir = charm.framework.charm_dir / charm.framework.meta.functions_type
+        # The event_kind is suffixed with "_function" while the executable is not.
+        event_path = event_dir / bound_event.event_kind[:-len('_function')].replace('_', '-')
     else:
         raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
 
     event_dir.mkdir(exist_ok=True)
-
-    if issubclass(bound_event.event_type, ops.charm.FunctionEvent):
-        # The event_kind is suffixed with "_function" while the executable is not.
-        event_path = event_dir / bound_event.event_kind[:-len('_function')].replace('_', '-')
-    else:
-        event_path = event_dir / bound_event.event_kind.replace('_', '-')
     if not event_path.exists():
         # CPython has different implementations for populating sys.argv[0] for Linux and Windows. For Windows
         # it is always an absolute path (any symlinks are resolved) while for Linux it can be a relative path.
@@ -155,12 +152,14 @@ def main(charm_class):
 
     charm_dir = _get_charm_dir()
 
-    juju_function_name = os.environ.get('JUJU_FUNCTION_NAME',
-                                        os.environ.get('JUJU_ACTION_NAME'))
     # Process the Juju event relevant to the current hook execution
-    # TODO: For Windows, when symlinks are used, this is not a valid method of getting an event name (see LP: 1854505).
-    juju_event_name = f'{juju_function_name}_function' if juju_function_name else Path(sys.argv[0]).name
-    juju_event_name = juju_event_name.replace('-', '_')
+    # JUJU_HOOK_NAME, JUJU_FUNCTION_NAME, and JUJU_ACTION_NAME are not used
+    # in order to support simulation of events from debugging sessions.
+    # TODO: For Windows, when symlinks are used, this is not a valid method of getting an event name (see LP: #1854505).
+    juju_exec_path = Path(sys.argv[0])
+    juju_event_name = juju_exec_path.name.replace('-', '_')
+    if juju_exec_path.parent.name in ('functions', 'actions'):
+        juju_event_name = f'{juju_event_name}_function'
 
     meta = ops.charm.CharmMeta(_load_metadata(charm_dir))
     unit_name = os.environ['JUJU_UNIT_NAME']
