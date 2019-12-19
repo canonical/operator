@@ -707,8 +707,8 @@ class TestStoredState(unittest.TestCase):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmpdir)
 
-    def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)
+    def create_framework(self, cls=Framework):
+        framework = cls(self.tmpdir / "framework.data", self.tmpdir, None, None)
         self.addCleanup(framework.close)
         return framework
 
@@ -929,24 +929,18 @@ class TestStoredState(unittest.TestCase):
             state = StoredState()
 
         class WrappedFramework(Framework):
-            def __init__(self, framework):
-                object.__setattr__(self, '_framework', framework)
-                object.__setattr__(self, 'snapshots', [])
-
-            def __getattr__(self, item):
-                return getattr(self._framework, item)
-
-            def __setattr__(self, key, value):
-                return setattr(self._framework, key, value)
+            def __init__(self, data_path, charm_dir, meta, model):
+                super().__init__(data_path, charm_dir, meta, model)
+                self.snapshots = []
 
             def save_snapshot(self, value):
                 if value.handle.path == 'SomeObject[1]/StoredStateData[state]':
                     self.snapshots.append((type(value), value.snapshot()))
-                return self._framework.save_snapshot(value)
+                return super().save_snapshot(value)
 
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
-            framework = WrappedFramework(self.create_framework())
+            framework = self.create_framework(cls=WrappedFramework)
             obj = SomeObject(framework, '1')
 
             obj.state.a = get_a()
@@ -970,7 +964,7 @@ class TestStoredState(unittest.TestCase):
             validate_op(obj_copy1.state.a, expected_res)
             framework.commit()
 
-            framework_copy = WrappedFramework(self.create_framework())
+            framework_copy = self.create_framework(cls=WrappedFramework)
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
