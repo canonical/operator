@@ -33,6 +33,8 @@ from ops.charm import (
     FunctionEvent,
 )
 
+from .test_helpers import fake_script
+
 # This relies on the expected repository structure to find a path to source of the charm under test.
 TEST_CHARM_DIR = Path(f'{__file__}/../charms/test_main').resolve()
 
@@ -136,7 +138,7 @@ start:
 
     def _simulate_event(self, event_spec):
         env = {
-            'PATH': str(Path(__file__).parent / 'bin'),
+            'PATH': f"{str(Path(__file__).parent / 'bin')}:{os.environ['PATH']}",
             'JUJU_CHARM_DIR': self.JUJU_CHARM_DIR,
             'JUJU_UNIT_NAME': 'test_main/0',
             'CHARM_CONFIG': event_spec.charm_config,
@@ -163,8 +165,9 @@ start:
                 'JUJU_REMOTE_APP': '',
             })
         if issubclass(event_spec.event_type, FunctionEvent):
+            event_filename = event_spec.event_name[:-len('_function')].replace('_', '-')
             env.update({
-                event_spec.envar_name: event_spec.event_name,
+                event_spec.envar_name: event_filename,
             })
             if event_spec.envar_name == 'JUJU_FUNCTION_NAME':
                 event_dir = 'functions'
@@ -173,8 +176,9 @@ start:
             else:
                 raise RuntimeError('invalid envar name specified for a function event')
         else:
+            event_filename = event_spec.event_name.replace('_', '-')
             event_dir = 'hooks'
-        event_file = self.JUJU_CHARM_DIR / f"{event_dir}/{event_spec.event_name.replace('_', '-')}"
+        event_file = self.JUJU_CHARM_DIR / event_dir / event_filename
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
         subprocess.check_call([sys.executable, event_file], env=env, cwd=self.JUJU_CHARM_DIR)
@@ -207,6 +211,8 @@ start:
             'STATE_FILE': self._state_file,
             'USE_FUNCTIONS': True,
         }))
+
+        fake_script(self, 'function-get', "echo '{}'")
 
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
@@ -256,10 +262,10 @@ start:
                       remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
-            EventSpec(FunctionEvent, 'start', event_envar_name='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
+            EventSpec(FunctionEvent, 'start_function', event_envar_name='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
             {},
         ), (
-            EventSpec(FunctionEvent, 'foo_bar', event_envar_name='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
+            EventSpec(FunctionEvent, 'foo_bar_function', event_envar_name='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
             {},
         )]
 
@@ -273,8 +279,6 @@ start:
             state = self._simulate_event(event_spec)
 
             state_key = f'on_{event_spec.event_name}'
-            if issubclass(event_spec.event_type, FunctionEvent):
-                state_key = f'{state_key}_function'
             handled_events = state.get(state_key, [])
 
             # Make sure that a handler for that event was called once.
@@ -295,11 +299,13 @@ start:
             'USE_FUNCTIONS': True,
         }))
 
+        fake_script(self, 'action-get', "echo '{}'")
+
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-        event_spec = EventSpec(FunctionEvent, 'foo_bar', event_envar_name='JUJU_ACTION_NAME', charm_config=charm_config)
+        event_spec = EventSpec(FunctionEvent, 'foo_bar_function', event_envar_name='JUJU_ACTION_NAME', charm_config=charm_config)
         state = self._simulate_event(event_spec)
-        handled_events = state.get(f'on_{event_spec.event_name}_function', [])
+        handled_events = state.get(f'on_{event_spec.event_name}', [])
         self.assertEqual(len(handled_events), 1)
         handled_event_type = handled_events[0]
         self.assertEqual(handled_event_type, event_spec.event_type)

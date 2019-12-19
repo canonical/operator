@@ -7,19 +7,25 @@ class HookEvent(EventBase):
 
 class FunctionEvent(EventBase):
 
-    def __init__(self, handle, function):
-        super().__init__(handle)
-        # A reference to the current function object.
-        self.function = function
-
-        if not self.function.name.replace('-', '_') in self.handle.kind:
-            raise RuntimeError('a function name of the current context cannot differ from the function event attribute name')
-
     def defer(self):
         raise RuntimeError('cannot defer function events')
 
     def restore(self, snapshot):
-        self.function = self.framework.model.function
+        event_function_name = self.handle.kind[:-len('_function')].replace('_', '-')
+        if event_function_name != self.framework.model._backend.function_name:
+            # This could only happen if the dev manually emits the function, or from a bug.
+            raise RuntimeError('function event kind does not match current function')
+        # Parms are loaded at restore rather than __init__ because the model is not available in __init__.
+        self.params = self.framework.model._backend.function_get()
+
+    def set_results(self, results):
+        self.framework.model._backend.function_set(results)
+
+    def log(self, message):
+        self.framework.model._backend.function_log(message)
+
+    def fail(self, message=''):
+        self.framework.model._backend.function_fail(message)
 
 
 class InstallEvent(HookEvent):
