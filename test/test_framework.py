@@ -90,6 +90,8 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(event2.my_n, 2)
 
         framework2.save_snapshot(event2)
+        del event2
+        gc.collect()
         event3 = framework2.load_snapshot(handle)
         self.assertEqual(event3.my_n, 3)
 
@@ -264,9 +266,14 @@ class TestFramework(unittest.TestCase):
         pub2.c.emit()
 
         # Events remain stored because they were deferred.
-        ev_a = framework.load_snapshot(Handle(pub1, "a", "1"))
-        ev_b = framework.load_snapshot(Handle(pub1, "b", "2"))
-        ev_c = framework.load_snapshot(Handle(pub2, "c", "3"))
+        ev_a_handle = Handle(pub1, "a", "1")
+        framework.load_snapshot(ev_a_handle)
+        ev_b_handle = Handle(pub1, "b", "2")
+        framework.load_snapshot(ev_b_handle)
+        ev_c_handle = Handle(pub2, "c", "3")
+        framework.load_snapshot(ev_c_handle)
+        # make sure the objects are gone before we reemit them
+        gc.collect()
 
         framework.reemit()
         obs1.done["a"] = True
@@ -285,9 +292,9 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(" ".join(obs2.seen), "a b c a b c a b c a c a c c")
 
         # Now the event objects must all be gone from storage.
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_a.handle)
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_b.handle)
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_c.handle)
+        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_a_handle)
+        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_b_handle)
+        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
 
     def test_custom_event_data(self):
         framework = self.create_framework()
@@ -367,6 +374,71 @@ class TestFramework(unittest.TestCase):
         gc.collect()
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo"])
+
+    def test_forget_and_multiple_objects(self):
+        framework = self.create_framework()
+
+        class MyObject(Object):
+            pass
+
+        o1 = MyObject(framework, "path")
+        # Creating a second object at the same path should fail with RuntimeError
+        with self.assertRaises(RuntimeError):
+            o2 = MyObject(framework, "path")
+        # Unless we _forget the object first
+        framework._forget(o1)
+        o2 = MyObject(framework, "path")
+        self.assertEqual(o1.handle.path, o2.handle.path)
+        # Deleting the tracked object should also work
+        del o2
+        gc.collect()
+        o3 = MyObject(framework, "path")
+        self.assertEqual(o1.handle.path, o3.handle.path)
+        # Or using a second framework
+        framework_copy = self.create_framework()
+        o_copy = MyObject(framework_copy, "path")
+        self.assertEqual(o1.handle.path, o_copy.handle.path)
+
+    def test_forget_and_multiple_objects_with_load_snapshot(self):
+        framework = self.create_framework()
+
+        class MyObject(Object):
+            def __init__(self, parent, name):
+                super().__init__(parent, name)
+                self.value = name
+
+            def snapshot(self):
+                return self.value
+
+            def restore(self, value):
+                self.value = value
+
+        framework.register_type(MyObject, None, MyObject.handle_kind)
+        o1 = MyObject(framework, "path")
+        framework.save_snapshot(o1)
+        framework.commit()
+        o_handle = o1.handle
+        del o1
+        gc.collect()
+        o2 = framework.load_snapshot(o_handle)
+        # Trying to load_snapshot a second object at the same path should fail with RuntimeError
+        with self.assertRaises(RuntimeError):
+            framework.load_snapshot(o_handle)
+        # Unless we _forget the object first
+        framework._forget(o2)
+        o3 = framework.load_snapshot(o_handle)
+        self.assertEqual(o2.value, o3.value)
+        # A loaded object also prevents direct creation of an object
+        with self.assertRaises(RuntimeError):
+            MyObject(framework, "path")
+        # But we can create an object, or load a snapshot in a copy of the framework
+        framework_copy1 = self.create_framework()
+        o_copy1 = MyObject(framework_copy1, "path")
+        self.assertEqual(o_copy1.value, "path")
+        framework_copy2 = self.create_framework()
+        framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
+        o_copy2 = framework_copy2.load_snapshot(o_handle)
+        self.assertEqual(o_copy2.value, "path")
 
     def test_events_base(self):
         framework = self.create_framework()
@@ -635,8 +707,8 @@ class TestStoredState(unittest.TestCase):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmpdir)
 
-    def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)
+    def create_framework(self, cls=Framework):
+        framework = cls(self.tmpdir / "framework.data", self.tmpdir, None, None)
         self.addCleanup(framework.close)
         return framework
 
@@ -856,9 +928,19 @@ class TestStoredState(unittest.TestCase):
         class SomeObject(Object):
             state = StoredState()
 
+        class WrappedFramework(Framework):
+            def __init__(self, data_path, charm_dir, meta, model):
+                super().__init__(data_path, charm_dir, meta, model)
+                self.snapshots = []
+
+            def save_snapshot(self, value):
+                if value.handle.path == 'SomeObject[1]/StoredStateData[state]':
+                    self.snapshots.append((type(value), value.snapshot()))
+                return super().save_snapshot(value)
+
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
-            framework = self.create_framework()
+            framework = self.create_framework(cls=WrappedFramework)
             obj = SomeObject(framework, '1')
 
             obj.state.a = get_a()
@@ -869,34 +951,29 @@ class TestStoredState(unittest.TestCase):
 
             obj.state.a = get_a()
             framework.commit()
-
+            # We should see an update for initializing a
+            self.assertEqual(framework.snapshots, [
+                (StoredStateData, {'a': get_a()}),
+            ])
+            del obj
+            gc.collect()
             obj_copy1 = SomeObject(framework, '1')
             self.assertEqual(obj_copy1.state.a, get_a())
 
             op(obj_copy1.state.a, b)
             validate_op(obj_copy1.state.a, expected_res)
-
             framework.commit()
 
-            framework_copy = self.create_framework()
+            framework_copy = self.create_framework(cls=WrappedFramework)
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
             validate_op(obj_copy2.state.a, expected_res)
 
-            # Validate the dirty state functionality.
-            # obj_copy2 state is not dirty because it was not modified in any supported way since the last commit so
-            # it still contains the old value at this point. State is overridden here via save_snapshot to validate that
-            # the modification will not be saved when StoredStateData is not dirty. This check assumes that the artificially
-            # created StoredStateData does not observe the on_commit event.
-            framework_copy.save_snapshot(StoredStateData(obj_copy2, 'state'))
+            # Commit saves the pre-commit and commit events, and the framework event counter, but shouldn't update the stored state of my object
+            framework.snapshots.clear()
             framework_copy.commit()
-
-            obj_copy3 = SomeObject(framework_copy, '1')
-
-            # Now make sure that the modification was not saved as the state holding it was not dirty.
-            with self.assertRaises(AttributeError):
-                obj_copy3.state.a
+            self.assertEqual(framework_copy.snapshots, [])
 
     def test_comparison_operations(self):
         test_operations = [(
@@ -985,8 +1062,8 @@ class TestStoredState(unittest.TestCase):
 
         framework = self.create_framework()
 
-        for a, b, op, op_ab, op_ba in test_operations:
-            obj = SomeObject(framework, "1")
+        for i, (a, b, op, op_ab, op_ba) in enumerate(test_operations):
+            obj = SomeObject(framework, str(i))
             obj.state.a = a
             self.assertEqual(op(obj.state.a, b), op_ab)
             self.assertEqual(op(b, obj.state.a), op_ba)
@@ -1026,8 +1103,8 @@ class TestStoredState(unittest.TestCase):
 
         # Validate that operations between StoredSet and built-in sets only result in built-in sets being returned.
         # Make sure that commutativity is preserved and that the original sets are not changed or used as a result.
-        for variable_operand, operation, ab_res, ba_res in test_operations:
-            obj = SomeObject(framework, "2")
+        for i, (variable_operand, operation, ab_res, ba_res) in enumerate(test_operations):
+            obj = SomeObject(framework, str(i))
             obj.state.set = {"a", "b"}
 
             for a, b, expected in [(obj.state.set, variable_operand, ab_res), (variable_operand, obj.state.set, ba_res)]:

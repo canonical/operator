@@ -198,6 +198,7 @@ class Object:
         else:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
+        self.framework._track(self)
 
         # TODO This can probably be dropped, because the event type is only
         # really relevant if someone is either emitting the event or observing
@@ -385,6 +386,7 @@ class Framework(Object):
         self.model = model
         self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
         self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}
+        self._objects = weakref.WeakValueDictionary()
         self._type_registry = {}  # {(parent_path, kind): cls}
         self._type_known = set()  # {cls}
 
@@ -392,14 +394,28 @@ class Framework(Object):
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
-        self._stored = StoredStateData(self, '_stored')
+        stored_handle = Handle(None, StoredStateData.handle_kind, '_stored')
         try:
-            self._stored = self.load_snapshot(self._stored.handle)
+            self._stored = self.load_snapshot(stored_handle)
         except NoSnapshotError:
+            self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
 
     def close(self):
         self._storage.close()
+
+    def _track(self, obj):
+        """Track object and ensure it is the only object created using its handle path."""
+        if obj is self:
+            # Framework objects don't track themselves
+            return
+        if obj.handle.path in self.framework._objects:
+            raise RuntimeError(f"two objects claiming to be {obj.handle.path} have been created")
+        self._objects[obj.handle.path] = obj
+
+    def _forget(self, obj):
+        """Stop tracking the given object. See also _track."""
+        self._objects.pop(obj.handle.path, None)
 
     def commit(self):
         # Give a chance for objects to persist data they want to before a commit is made.
@@ -456,6 +472,7 @@ class Framework(Object):
         obj.framework = self
         obj.handle = handle
         obj.restore(data)
+        self._track(obj)
         return obj
 
     def drop_snapshot(self, handle):
@@ -583,6 +600,8 @@ class Framework(Object):
                 deferred = True
             else:
                 self._storage.drop_notice(event_path, observer_path, method_name)
+            # We intentionally consider this event to be dead and reload it from scratch in the next path.
+            self.framework._forget(event)
 
         if not deferred:
             self._storage.drop_snapshot(last_event_path)
