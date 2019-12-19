@@ -50,7 +50,7 @@ class MyCharm(CharmBase):
         # Handle the event here.
 ```
 
-Every standard event in Juju may observed that way, and you can also easily
+Every standard event in Juju may be observed that way, and you can also easily
 define your own events in your custom types.
 
 Once your charm is ready, deploy it as normal with:
