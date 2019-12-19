@@ -7,21 +7,25 @@ for early testing.
 
 Start by creating a charm directory with at least the following files:
 
-* `lib/charm.py` (must be executable and use Python 3.6+)
-* `hooks/install` (or `hooks/start` for K8s charms) sym-linked to `../lib/charm.py`
+* `src/charm.py` (must be executable and use Python 3.6+)
+* `hooks/install` (or `hooks/start` for K8s charms) sym-linked to `../src/charm.py`
 * `metadata.yaml`
 
 Then install the framework into the `lib/` directory using:
 
 ```
+mkdir lib/
 pip install -t lib/ https://github.com/canonical/operator
 ```
 
-Your `lib/charm.py` is the entry point for your charm logic. At a minimum, it
+Your `src/charm.py` is the entry point for your charm logic. At a minimum, it
 needs to define a subclass of `CharmBase` and pass that into the framework's
 `main` function:
 
 ```python
+import sys
+sys.path.insert.append('lib')
+
 from ops.charm import CharmBase
 from ops.main import main
 
