@@ -473,9 +473,7 @@ class Framework(Object):
         obj.framework = self
         obj.handle = handle
         obj.restore(data)
-        if handle.path in self._objects:
-            raise RuntimeError(f"two objects claiming to be {handle.path} have been created")
-        self._objects[handle.path] = obj
+        self._track(obj)
         return obj
 
     def drop_snapshot(self, handle):
