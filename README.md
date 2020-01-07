@@ -15,8 +15,12 @@ Then install the framework into the `lib/` directory using:
 
 ```
 mkdir lib/
-pip install -t lib/ git+https://github.com/canonical/operator
+pip3 install -t lib/ git+https://github.com/canonical/operator
 ```
+
+> Note: Due to [pip#3826](https://github.com/pypa/pip/issues/3826), you may get
+> a "can't combine user with prefix" if you are using pip3 provided by Ubuntu
+> prior to 19.04, in which case you simply need to add `--system` to the command.
 
 Your `src/charm.py` is the entry point for your charm logic. At a minimum, it
 needs to define a subclass of `CharmBase` and pass that into the framework's
