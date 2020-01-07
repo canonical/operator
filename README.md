@@ -15,7 +15,7 @@ Then install the framework into the `lib/` directory using:
 
 ```
 mkdir lib/
-pip3 install -t lib/ git+https://github.com/canonical/operator
+pip3 install -t lib/ https://github.com/canonical/operator/archive/master.zip
 ```
 
 > Note: Due to [pip#3826](https://github.com/pypa/pip/issues/3826), you may get
@@ -28,7 +28,7 @@ needs to define a subclass of `CharmBase` and pass that into the framework's
 
 ```python
 import sys
-sys.path.insert.append('lib')
+sys.path.append('lib')
 
 from ops.charm import CharmBase
 from ops.main import main
