@@ -448,6 +448,7 @@ class TestFramework(unittest.TestCase):
 
         class MyEvents(EventsBase):
             foo = EventSource(MyEvent)
+            bar = EventSource(MyEvent)
 
         class MyNotifier(Object):
             on = MyEvents()
@@ -461,11 +462,18 @@ class TestFramework(unittest.TestCase):
                 self.seen.append(f"on_foo:{event.handle.kind}")
                 event.defer()
 
+            def on_bar(self, event):
+                self.seen.append(f"on_bar:{event.handle.kind}")
+
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
 
-        framework.observe(pub.on.foo, obs)
+        # Confirm that temporary persistence of BoundEvents doesn't cause errors,
+        # and that events can be observed.
+        for bound_event in [pub.on.foo, pub.on.bar]:
+            framework.observe(bound_event, obs)
 
+        # Confirm that events can be emitted and seen.
         pub.on.foo.emit()
 
         self.assertEqual(obs.seen, ["on_foo:foo"])
