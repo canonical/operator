@@ -5,24 +5,39 @@ for early testing.
 
 ## Getting Started
 
-Start by creating a charm directory with at least the following files:
-
-* `src/charm.py` (must be executable and use Python 3.6+)
-* `hooks/install` (or `hooks/start` for K8s charms) sym-linked to `../src/charm.py`
-* `metadata.yaml`
-
-Then use git submodules to bring the operator framework dependency into your charm,
-and symlink it for import by your charm code:
+Your charm directory should have the following overall structure:
 
 ```
-mkdir mod/ lib/
+.
++-- metadata.yaml
++-- mod/
++-- lib/
+|   +-- ops -> ../mod/operator/ops
++-- src/
+|   +-- charm.py
++-- hooks/
+    +-- install -> ../src/charm.py
+```
+
+The `mod/` directory will contain the operator framework dependency as a git
+submodule:
+
+```
 git submodule add https://github.com/canonical/operator mod/operator
+```
+
+Other dependencies included as git submodules can be added there as well.
+
+The `lib/` directory will then contain symlinks to subdirectories of your
+submodule dependencies to enable them to be imported into the charm:
+
+```
 ln -s ../mod/operator/ops lib/ops
 ```
 
-Your `src/charm.py` is the entry point for your charm logic. At a minimum, it
-needs to define a subclass of `CharmBase` and pass that into the framework's
-`main` function:
+Your `src/charm.py` is the entry point for your charm logic. It should be set
+to executable and use Python 3.6 or greater. At a minimum, it needs to define a
+subclass of `CharmBase` and pass that into the framework's `main` function:
 
 ```python
 import sys
@@ -55,11 +70,20 @@ class MyCharm(CharmBase):
 Every standard event in Juju may be observed that way, and you can also easily
 define your own events in your custom types.
 
+The `hooks/` directory will then contain symlinks to your `src/charm.py` entry
+point so that Juju can call it. You only need to set up the `hooks/install` link
+(`hooks/start` for K8s charms, until [lp#1854635](https://bugs.launchpad.net/juju/+bug/1854635)
+is resolved), and the framework will fill out all others at runtime.
+
 Once your charm is ready, deploy it as normal with:
 
 ```
 juju deploy .
 ```
 
-You can sync subsequent changes from the framework by running the `pip`
-command again with `--upgrade`.
+You can sync subsequent changes from the framework and other submodule
+dependencies by running:
+
+```
+git submodule update
+```
