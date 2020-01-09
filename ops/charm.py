@@ -15,7 +15,7 @@ class FunctionEvent(EventBase):
         if event_function_name != self.framework.model._backend.function_name:
             # This could only happen if the dev manually emits the function, or from a bug.
             raise RuntimeError('function event kind does not match current function')
-        # Parms are loaded at restore rather than __init__ because the model is not available in __init__.
+        # Params are loaded at restore rather than __init__ because the model is not available in __init__.
         self.params = self.framework.model._backend.function_get()
 
     def set_results(self, results):

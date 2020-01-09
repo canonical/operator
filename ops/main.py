@@ -53,7 +53,7 @@ def _load_metadata(charm_dir):
 def _create_event_link(charm, bound_event):
     """Create a symlink for a particular event.
 
-    charm_dir -- A root directory of the charm
+    charm -- A charm object.
     bound_event -- An event for which to create a symlink.
     """
     if issubclass(bound_event.event_type, ops.charm.HookEvent):
