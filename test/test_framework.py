@@ -596,9 +596,11 @@ class TestFramework(unittest.TestCase):
         class MyEventsB(EventsBase):
             pass
 
-        class MyNotifier(Object):
-            on_a = MyEventsA()
-            on_b = MyEventsB()
+        class MyNotifierA(Object):
+            on = MyEventsA()
+
+        class MyNotifierB(Object):
+            on = MyEventsB()
 
         class MyObserver(Object):
             def __init__(self, parent, key):
@@ -613,8 +615,9 @@ class TestFramework(unittest.TestCase):
                 self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
                 event.defer()
 
-        pub = MyNotifier(framework, "1")
-        obs = MyObserver(framework, "1")
+        pub_a = MyNotifierA(framework, "pub_a")
+        pub_b = MyNotifierB(framework, "pub_b")
+        obs = MyObserver(framework, "obs")
 
         class MyFoo(EventBase):
             pass
@@ -628,32 +631,32 @@ class TestFramework(unittest.TestCase):
         class NoneEvent(EventBase):
             pass
 
-        pub.on_a.define_event("foo", MyFoo)
-        pub.on_b.define_event("bar", MyBar)
+        pub_a.on.define_event("foo", MyFoo)
+        pub_b.on.define_event("bar", MyBar)
 
-        framework.observe(pub.on_a.foo, obs)
-        framework.observe(pub.on_b.bar, obs)
+        framework.observe(pub_a.on.foo, obs)
+        framework.observe(pub_b.on.bar, obs)
 
-        pub.on_a.foo.emit()
-        pub.on_b.bar.emit()
+        pub_a.on.foo.emit()
+        pub_b.on.bar.emit()
 
         self.assertEqual(obs.seen, ["on_foo:MyFoo:foo", "on_bar:MyBar:bar"])
 
         # Definitions remained local to the specific type.
-        self.assertRaises(AttributeError, lambda: pub.on_a.bar)
-        self.assertRaises(AttributeError, lambda: pub.on_b.foo)
+        self.assertRaises(AttributeError, lambda: pub_a.on.bar)
+        self.assertRaises(AttributeError, lambda: pub_b.on.foo)
 
         # Try to use an event name which is not a valid python identifier.
         with self.assertRaises(RuntimeError):
-            pub.on_a.define_event("dead-beef", DeadBeefEvent)
+            pub_a.on.define_event("dead-beef", DeadBeefEvent)
 
         # Try to use a python keyword for an event name.
         with self.assertRaises(RuntimeError):
-            pub.on_a.define_event("None", NoneEvent)
+            pub_a.on.define_event("None", NoneEvent)
 
         # Try to override an existing attribute.
         with self.assertRaises(RuntimeError):
-            pub.on_a.define_event("foo", MyFoo)
+            pub_a.on.define_event("foo", MyFoo)
 
     def test_event_key_roundtrip(self):
         class MyEvent(EventBase):
