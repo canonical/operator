@@ -146,6 +146,11 @@ class EventSource:
     def __get__(self, emitter, emitter_type=None):
         if emitter is None:
             return self
+        # Framework might not be available if accessed as CharmClass.on.event rather than charm_instance.on.event,
+        # but in that case it couldn't be emitted anyway, so there's no point to registering it.
+        framework = getattr(emitter, 'framework', None)
+        if framework is not None:
+            framework.register_type(self.event_type, emitter, self.event_kind)
         return BoundEvent(emitter, self.event_type, self.event_kind)
 
 
@@ -202,16 +207,6 @@ class Object:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
         self.framework._track(self)
-
-        # TODO This can probably be dropped, because the event type is only
-        # really relevant if someone is either emitting the event or observing
-        # it.
-        for attr_name, attr_value in inspect.getmembers(type(self)):
-            if isinstance(attr_value, EventSource):
-                event_type = attr_value.event_type
-                event_kind = attr_name
-                emitter = self
-                self.framework.register_type(event_type, emitter, event_kind)
 
         # TODO Detect conflicting handles here.
 
