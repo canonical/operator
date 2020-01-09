@@ -232,11 +232,12 @@ class EventsBase(Object):
     """Convenience type to allow defining .on attributes at class level."""
 
     handle_kind = "on"
-    _cache = weakref.WeakKeyDictionary()
 
     def __init__(self, parent=None, key=None):
         if parent is not None:
             super().__init__(parent, key)
+        else:
+            self._cache = weakref.WeakKeyDictionary()
 
     def __get__(self, emitter, emitter_type):
         # Same type, different instance, more data. Doing this unusual construct
