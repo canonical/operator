@@ -133,7 +133,6 @@ class EventSource:
         self.event_type = event_type
         self.event_kind = None
         self.emitter_type = None
-        self._bound_event = None
 
     def __set_name__(self, emitter_type, event_kind):
         if self.event_kind is not None:
@@ -147,9 +146,7 @@ class EventSource:
     def __get__(self, emitter, emitter_type=None):
         if emitter is None:
             return self
-        if self._bound_event is None:
-            self._bound_event = BoundEvent(emitter, self.event_type, self.event_kind)
-        return self._bound_event
+        return BoundEvent(emitter, self.event_type, self.event_kind)
 
 
 class BoundEvent:
@@ -160,7 +157,7 @@ class BoundEvent:
                 f'at {hex(id(self))}>')
 
     def __init__(self, emitter, event_type, event_kind):
-        self.emitter = weakref.proxy(emitter)
+        self.emitter = emitter
         self.event_type = event_type
         self.event_kind = event_kind
 
@@ -235,13 +232,11 @@ class EventsBase(Object):
     """Convenience type to allow defining .on attributes at class level."""
 
     handle_kind = "on"
+    _cache = weakref.WeakKeyDictionary()
 
     def __init__(self, parent=None, key=None):
         if parent is not None:
             super().__init__(parent, key)
-            self._cache = None
-        else:
-            self._cache = weakref.WeakKeyDictionary()
 
     def __get__(self, emitter, emitter_type):
         # Same type, different instance, more data. Doing this unusual construct
