@@ -700,6 +700,16 @@ class TestFramework(unittest.TestCase):
         # (The event key goes up by 2 due to the pre-commit and commit events.)
         self.assertEqual(obs2.seen, [('4', 'second'), ('1', 'first')])
 
+    def test_helper_properties(self):
+        framework = self.create_framework()
+        framework.model = 'test-model'
+        framework.meta = 'test-meta'
+
+        my_obj = Object(framework, 'my_obj')
+        self.assertEqual(my_obj.model, framework.model)
+        self.assertEqual(my_obj.meta, framework.meta)
+        self.assertEqual(my_obj.charm_dir, framework.charm_dir)
+
 
 class TestStoredState(unittest.TestCase):
 
