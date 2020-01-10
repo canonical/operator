@@ -32,18 +32,14 @@ def _load_metadata(charm_dir):
         metadata = yaml.load(f, Loader=yaml.SafeLoader)
 
     functions_meta = charm_dir / 'functions.yaml'
-    functions_dir = charm_dir / 'functions'
     actions_meta = charm_dir / 'actions.yaml'
-    actions_dir = charm_dir / 'actions'
     if functions_meta.exists():
         # TODO: add a version check and a warning here to make sure functions are not skipped without notice pre-2.7.0 Juju versions.
-        if actions_meta.exists() or actions_dir.exists():
-            raise RuntimeError('charm must not mix functions and actions')
+        if actions_meta.exists():
+            raise RuntimeError('charm must not mix functions and actions metadata')
         metadata['functions_type'] = 'functions'
         metadata['functions'] = yaml.safe_load(functions_meta.read_text())
     elif actions_meta.exists():
-        if functions_dir.exists():
-            raise RuntimeError('charm must not mix functions and actions')
         metadata['functions_type'] = 'actions'
         metadata['functions'] = yaml.safe_load(actions_meta.read_text())
     return metadata

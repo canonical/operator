@@ -181,7 +181,7 @@ start:
         event_file = self.JUJU_CHARM_DIR / event_dir / event_filename
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call([sys.executable, event_file], env=env, cwd=self.JUJU_CHARM_DIR)
+        subprocess.check_call([sys.executable, event_file], env=env, cwd=self.JUJU_CHARM_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -368,6 +368,16 @@ start:
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
         function_hook = self.JUJU_CHARM_DIR / 'functions' / 'test'
         self.assertTrue(function_hook.exists())
+
+    def test_functions_actions_mutually_exclusive(self):
+        self._prepare_functions()
+        self._prepare_functions(legacy=True)
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+            'USE_FUNCTIONS': True,
+        }))
+        with self.assertRaises(subprocess.CalledProcessError):
+            self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
 
 
 if __name__ == "__main__":
