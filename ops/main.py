@@ -36,8 +36,7 @@ def _load_metadata(charm_dir):
     actions_meta = charm_dir / 'actions.yaml'
     actions_dir = charm_dir / 'actions'
     if functions_meta.exists():
-        if 'min-juju-version' not in metadata:
-            raise RuntimeError('charm uses functions.yaml which requires Juju 2.7+ but does not specify a min-juju-version')
+        # TODO: add a version check and a warning here to make sure functions are not skipped without notice pre-2.7.0 Juju versions.
         if actions_meta.exists() or actions_dir.exists():
             raise RuntimeError('charm must not mix functions and actions')
         metadata['functions_type'] = 'functions'
