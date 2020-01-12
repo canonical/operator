@@ -352,22 +352,48 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
+        class MyOtherEvent(EventBase):
+            pass
+
         class MyEvents(EventsBase):
             foo = EventSource(MyEvent)
+            bar = EventSource(MyOtherEvent)
 
         class MyNotifier(Object):
             on = MyEvents()
+
+            def on_foo(self, event):
+                self.on.bar.emit()
+
+            def on_bar(self, event):
+                pass
 
         class MyObserver(Object):
             def on_foo(self, event):
                 observed_events.append("foo")
 
+            def on_bar(self, event):
+                observed_events.append("bar")
+
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "2")
 
         framework.observe(pub.on.foo, obs)
+
+        framework.observe(pub.on.foo, pub)
+        framework.observe(pub.on.bar, pub)
+
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo"])
+
+        # NOTE: the issue is also triggered by this
+        # for e in (pub.on.foo,
+        #           pub.on.bar):
+        #     framework.observe(e, obs)
+        # But not this:
+        # framework.observe(pub.on.foo, obs)
+        # framework.observe(pub.on.bar, obs)
+
         # Now delete the observer, and note that when we emit the event, it
         # doesn't update the local slice again
         del obs
