@@ -24,7 +24,7 @@ needs to define a subclass of `CharmBase` and pass that into the framework's
 
 ```python
 import sys
-sys.path.insert.append('lib')
+sys.path.append('lib')
 
 from ops.charm import CharmBase
 from ops.main import main
