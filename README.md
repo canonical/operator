@@ -15,7 +15,7 @@ Then install the framework into the `lib/` directory using:
 
 ```
 mkdir lib/
-pip install -t lib/ https://github.com/canonical/operator
+pip install -t lib/ git+https://github.com/canonical/operator
 ```
 
 Your `src/charm.py` is the entry point for your charm logic. At a minimum, it
