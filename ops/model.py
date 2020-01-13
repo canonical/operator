@@ -622,3 +622,14 @@ class ModelBackend:
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
         self._run('storage-add', f'{name}={count}')
+
+    def network_get(self, endpoint_name, relation_id=None):
+        """Return network info provided by network-get for a given endpoint.
+
+        endpoint_name -- A name of an endpoint (relation name or extra-binding name).
+        relation_id -- An optional relation id to get network info for.
+        """
+        cmd = ['network-get', endpoint_name]
+        if relation_id is not None:
+            cmd.extend(['-r', str(relation_id)])
+        return self._run(*cmd, return_output=True, use_json=True)

@@ -8,6 +8,7 @@ import shutil
 import unittest
 import time
 import re
+import json
 
 import ops.model
 import ops.charm
@@ -751,6 +752,40 @@ class TestModelBackend(unittest.TestCase):
             lambda: self.backend.storage_add('foobar', count=True),
             TypeError,
             [],
+        )]
+        for do_fake, run, exception, calls in test_cases:
+            do_fake()
+            with self.assertRaises(exception):
+                run()
+            self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_network_get(self):
+        network_get_out = ('{"bind-addresses":[{"mac-address":"","interface-name":"",'
+                           '"addresses":[{"hostname":"","value":"192.0.2.2","cidr":""}]}]'
+                           ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
+        fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
+        network_info = self.backend.network_get('deadbeef')
+        self.assertEqual(network_info, json.loads(network_get_out))
+        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'deadbeef', '--format=json']])
+
+        network_info = self.backend.network_get('deadbeef', 1)
+        self.assertEqual(network_info, json.loads(network_get_out))
+        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'deadbeef', '-r', '1', '--format=json']])
+
+    def test_network_get_errors(self):
+        err_no_endpoint = "ERROR no network config found for binding \"$2\""
+        err_no_rel = "ERROR invalid value \"$3\" for option -r: relation not found"
+
+        test_cases = [(
+            lambda: fake_script(self, 'network-get', f'echo {err_no_endpoint} >&2 ; exit 1'),
+            lambda: self.backend.network_get("deadbeef"),
+            ops.model.ModelError,
+            [['network-get', 'deadbeef', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'network-get', f'echo {err_no_rel} >&2 ; exit 2'),
+            lambda: self.backend.network_get("deadbeef", 3),
+            ops.model.ModelError,
+            [['network-get', 'deadbeef', '-r', '3', '--format=json']],
         )]
         for do_fake, run, exception, calls in test_cases:
             do_fake()
