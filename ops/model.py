@@ -17,6 +17,7 @@ class Model:
     def __init__(self, unit_name, meta, backend):
         self._cache = ModelCache(backend)
         self._backend = backend
+        self._meta = meta
         self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
@@ -24,6 +25,7 @@ class Model:
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
+        self._endpoints = None
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -59,6 +61,16 @@ class Model:
 
     def get_app(self, app_name):
         return self._cache.get(Application, app_name)
+
+    @property
+    def endpoints(self):
+        if self._endpoints is None:
+            endpoint_keys = list(self._meta.relations) + self._meta.extra_bindings
+            for endpoint_relations in self.relations.values():
+                if endpoint_relations:
+                    endpoint_keys.extend(endpoint_relations)
+            self._endpoints = EndpointMapping(endpoint_keys, self._backend)
+        return self._endpoints
 
 
 class ModelCache:
@@ -221,6 +233,73 @@ class RelationMapping(Mapping):
         return relation_list
 
 
+class EndpointMapping(Mapping):
+    """Map of Relation objects and endpoint names from extra-bindings to endpoints."""
+
+    def __init__(self, keys, backend):
+        """
+        keys - Relation objects, relation names or endpoint names from extra-bindings.
+        """
+        self._data = {}
+        for k in keys:
+            if isinstance(k, Relation):
+                self._data[k] = Endpoint(k.name, k.id, backend)
+            elif isinstance(k, str):
+                # A relation name or an endpoint name from extra-bindings section.
+                self._data[k] = Endpoint(k, None, backend)
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __len__(self):
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+
+class Endpoint:
+    """Network endpoint representation."""
+
+    def __init__(self, name, relation_id, backend):
+        self.name = name
+        self.relation_id = relation_id
+        self._network_info = None
+        self._backend = backend
+
+    def _cache_network_info(self):
+        try:
+            if self.relation_id is None:
+                self._network_info = self._backend.network_get(self.name)
+            else:
+                self._network_info = self._backend.network_get(self.name, self.relation_id)
+        except RelationNotFoundError:
+            # If a relation is dead, we can still get network info associated with an endpoint itself
+            # not associated with a particular relation id.
+            self._network_info = self._backend.network_get(self.name)
+
+    @property
+    def network_info(self):
+        if not self._network_info:
+            self._cache_network_info()
+        return self._network_info
+
+    @property
+    def bind_address(self):
+        return self.network_info['bind-addresses'][0]['addresses'][0]['value']
+
+    @property
+    def ingress_address(self):
+        return self.network_info['ingress-addresses'][0]
+
+    @property
+    def egress_subnets(self):
+        return self.network_info['egress-subnets']
+
+
 class Relation:
     def __init__(self, relation_name, relation_id, our_unit, backend, cache):
         self.name = relation_name
@@ -240,6 +319,9 @@ class Relation:
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
+
+    def __hash__(self):
+        return hash((self.name, self.id))
 
 
 class RelationData(Mapping):

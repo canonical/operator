@@ -23,6 +23,7 @@ class TestModel(unittest.TestCase):
         self.backend = ops.model.ModelBackend()
         meta = ops.charm.CharmMeta()
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        fake_script(self, 'relation-ids', """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
     def test_model(self):
@@ -660,6 +661,46 @@ class TestModel(unittest.TestCase):
         for count_v in [None, False, 2.0, 'a', b'beef', object]:
             with self.assertRaises(TypeError):
                 self.model.storages.request('data', count_v)
+
+    def test_relation_endpoints(self):
+        meta = ops.charm.CharmMeta()
+        meta.relations = {'db0': None}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        fake_script(self, 'relation-ids',
+                    """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
+        network_get_out = ('{"bind-addresses":[{"mac-address":"","interface-name":"",'
+                           '"addresses":[{"hostname":"","value":"192.0.2.2","cidr":""}]}]'
+                           ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
+        fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1''')
+
+        ep = self.model.endpoints['db0']
+
+        for ep in (self.model.endpoints['db0'], self.model.endpoints[self.model.get_relation('db0')]):
+            self.assertEqual(ep.name, 'db0')
+            self.assertEqual(ep.bind_address, '192.0.2.2')
+            self.assertEqual(ep.ingress_address, '192.0.2.2')
+            self.assertEqual(ep.egress_subnets, ['192.0.2.2/32'])
+            self.assertEqual(ep.network_info, json.loads(network_get_out))
+            # TODO: check calls
+
+    def test_extra_binding_endpoints(self):
+        meta = ops.charm.CharmMeta()
+        meta.extra_bindings = ['deadbeef']
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        network_get_out = ('{"bind-addresses":[{"mac-address":"","interface-name":"",'
+                           '"addresses":[{"hostname":"","value":"192.0.2.2","cidr":""}]}]'
+                           ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
+        fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
+        ep = self.model.endpoints['deadbeef']
+        self.assertEqual(ep.name, 'deadbeef')
+        self.assertEqual(ep.bind_address, '192.0.2.2')
+        self.assertEqual(ep.ingress_address, '192.0.2.2')
+        self.assertEqual(ep.egress_subnets, ['192.0.2.2/32'])
+        self.assertEqual(ep.network_info, json.loads(network_get_out))
+        # TODO: check calls
 
 
 class TestModelBackend(unittest.TestCase):
