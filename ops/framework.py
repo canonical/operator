@@ -194,6 +194,9 @@ class Object:
         kind = self.handle_kind
         if isinstance(parent, Framework):
             self.framework = parent
+            # Avoid Framework instances having a circular reference to themselves.
+            if self.framework is self:
+                self.framework = weakref.proxy(self.framework)
             self.handle = Handle(None, kind, key)
         else:
             self.framework = parent.framework
@@ -211,6 +214,18 @@ class Object:
                 self.framework.register_type(event_type, emitter, event_kind)
 
         # TODO Detect conflicting handles here.
+
+    @property
+    def model(self):
+        return self.framework.model
+
+    @property
+    def meta(self):
+        return self.framework.meta
+
+    @property
+    def charm_dir(self):
+        return self.framework.charm_dir
 
 
 class EventsBase(Object):
@@ -375,6 +390,11 @@ class SQLiteStorage:
 class Framework(Object):
 
     on = FrameworkEvents()
+
+    # Override properties from Object so that we can set them in __init__.
+    model = None
+    meta = None
+    charm_dir = None
 
     def __init__(self, data_path, charm_dir, meta, model):
 
