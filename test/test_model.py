@@ -784,7 +784,7 @@ class TestModelBackend(unittest.TestCase):
         ), (
             lambda: fake_script(self, 'network-get', f'echo {err_no_rel} >&2 ; exit 2'),
             lambda: self.backend.network_get("deadbeef", 3),
-            ops.model.ModelError,
+            ops.model.RelationNotFoundError,
             [['network-get', 'deadbeef', '-r', '3', '--format=json']],
         )]
         for do_fake, run, exception, calls in test_cases:

@@ -632,4 +632,9 @@ class ModelBackend:
         cmd = ['network-get', endpoint_name]
         if relation_id is not None:
             cmd.extend(['-r', str(relation_id)])
-        return self._run(*cmd, return_output=True, use_json=True)
+        try:
+            return self._run(*cmd, return_output=True, use_json=True)
+        except ModelError as e:
+            if 'relation not found' in str(e):
+                raise RelationNotFoundError() from e
+            raise
