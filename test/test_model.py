@@ -81,6 +81,20 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '6', '--format=json']
         ])
 
+    def test_peer_relation_app(self):
+        meta = ops.charm.CharmMeta()
+        meta.relations = {'dbpeer': None}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
+        fake_script(self, 'relation-ids',
+                    """([ "$1" = dbpeer ] && echo '["dbpeer:0"]') || echo '[]'""")
+        fake_script(self, 'relation-list',
+                    f"""([ "$2" = 0 ] && echo '[]') || (echo {err_msg} >&2 ; exit 2)""")
+
+        db1_4 = self.model.get_relation('dbpeer')
+        self.assertEqual(db1_4.app, self.model.app)
+
     def test_remote_units_is_our(self):
         fake_script(self, 'relation-ids',
                     """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")

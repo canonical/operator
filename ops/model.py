@@ -236,6 +236,10 @@ class Relation:
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
+        # If an application has not been determined based on a remote unit, the only remaining
+        # case is a single unit and its peer relation where the application is our unit's application.
+        if self.app is None:
+            self.app = our_unit.app
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
