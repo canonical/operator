@@ -15,11 +15,12 @@ from subprocess import run, PIPE, CalledProcessError
 class Model:
 
     def __init__(self, unit_name, meta, backend):
+        self._meta = meta
         self._cache = ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
-        self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
+        self.relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
@@ -42,7 +43,7 @@ class Model:
                     return relation
             else:
                 # The relation may be dead, but it is not forgotten.
-                return Relation(relation_name, relation_id, self.unit, self._backend, self._cache)
+                return Relation(relation_name, relation_id, self._meta.relations[relation_name].role, self.unit, self._backend, self._cache)
         else:
             num_related = len(self.relations[relation_name])
             if num_related == 0:
@@ -197,11 +198,12 @@ class LazyMapping(Mapping, ABC):
 class RelationMapping(Mapping):
     """Map of relation names to lists of Relation instances."""
 
-    def __init__(self, relation_names, our_unit, backend, cache):
+    def __init__(self, relations_meta, our_unit, backend, cache):
+        self._relations_meta = relations_meta
         self._our_unit = our_unit
         self._backend = backend
         self._cache = cache
-        self._data = {relation_name: None for relation_name in relation_names}
+        self._data = {relation_name: None for relation_name in list(relations_meta)}
 
     def __contains__(self, key):
         return key in self._data
@@ -217,16 +219,23 @@ class RelationMapping(Mapping):
         if relation_list is None:
             relation_list = self._data[relation_name] = []
             for relation_id in self._backend.relation_ids(relation_name):
-                relation_list.append(Relation(relation_name, relation_id, self._our_unit, self._backend, self._cache))
+                relation_role = self._relations_meta[relation_name].role
+                relation_list.append(Relation(relation_name, relation_id, relation_role, self._our_unit, self._backend, self._cache))
         return relation_list
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, our_unit, backend, cache):
+    def __init__(self, relation_name, relation_id, role, our_unit, backend, cache):
         self.name = relation_name
         self.id = relation_id
+        self.role = role
         self.app = None
         self.units = set()
+
+        # For peer relations an app of a remote unit is a local app so the remote app becomes a local app. When there
+        # is only one unit present, there are no remote units to draw a remote app from so it can be done from our unit instead.
+        if self.role == 'peers':
+            self.app = our_unit.app
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
@@ -236,10 +245,6 @@ class Relation:
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
-        # If an application has not been determined based on a remote unit, the only remaining
-        # case is a single unit and its peer relation where the application is our unit's application.
-        if self.app is None:
-            self.app = our_unit.app
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):

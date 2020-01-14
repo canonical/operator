@@ -8,6 +8,7 @@ import re
 
 import ops.model
 import ops.charm
+from ops.charm import RelationMeta
 
 from .test_helpers import fake_script, fake_script_calls
 
@@ -24,7 +25,11 @@ class TestModel(unittest.TestCase):
 
         self.backend = ops.model.ModelBackend()
         meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        meta.relations = {
+            'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
+        }
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
     def test_model(self):
@@ -83,7 +88,7 @@ class TestModel(unittest.TestCase):
 
     def test_peer_relation_app(self):
         meta = ops.charm.CharmMeta()
-        meta.relations = {'dbpeer': None}
+        meta.relations = {'dbpeer': RelationMeta('peers', 'dbpeer', {'interface': 'dbpeer', 'scope': 'global'})}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
         err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
@@ -132,11 +137,6 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_remote_app_relation_data(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
         fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = remoteapp1 ] && echo '{"secret": "cafedeadbeef"}' || exit 2""")
@@ -194,11 +194,6 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_app_relation_data_modify_local_as_leader(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
         fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
@@ -223,11 +218,6 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_app_relation_data_modify_local_as_minion(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
         fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
@@ -364,7 +354,11 @@ class TestModel(unittest.TestCase):
         # Create a new model and backend to drop a cached is-leader output.
         self.backend = ops.model.ModelBackend()
         meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        meta.relations = {
+            'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
+        }
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'is-leader', 'echo false')
@@ -577,11 +571,6 @@ class TestModel(unittest.TestCase):
                 self.backend.status_set(ops.model.ActiveStatus, is_app=is_app_v)
 
     def test_remote_unit_status(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
 
