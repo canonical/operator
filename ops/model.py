@@ -218,8 +218,8 @@ class RelationMapping(Mapping):
         relation_list = self._data[relation_name]
         if relation_list is None:
             relation_list = self._data[relation_name] = []
+            relation_role = self._relations_meta[relation_name].role
             for relation_id in self._backend.relation_ids(relation_name):
-                relation_role = self._relations_meta[relation_name].role
                 relation_list.append(Relation(relation_name, relation_id, relation_role, self._our_unit, self._backend, self._cache))
         return relation_list
 
@@ -232,8 +232,7 @@ class Relation:
         self.app = None
         self.units = set()
 
-        # For peer relations an app of a remote unit is a local app so the remote app becomes a local app. When there
-        # is only one unit present, there are no remote units to draw a remote app from so it can be done from our unit instead.
+        # For peer relations, both the remote and the local app are the same.
         if self.role == 'peers':
             self.app = our_unit.app
         try:
