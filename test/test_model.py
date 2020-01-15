@@ -779,8 +779,8 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'function-get', '')
         fake_script(self, 'function-set', f'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
-            self.backend.function_set({'foo': 'bar', 'dead': 'beef'})
-        calls = [["function-set", "foo='bar'", "dead='beef'"]]
+            self.backend.function_set({'foo': 'bar', 'dead': 'beef cafe'})
+        calls = [["function-set", "foo=bar", "dead=beef cafe"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_function_log_error(self):
@@ -809,8 +809,8 @@ class TestModelBackend(unittest.TestCase):
     def test_function_set_error_legacy(self):
         fake_script(self, 'action-set', f'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
-            self.backend.function_set({'foo': 'bar', 'dead': 'beef'})
-        calls = [["action-set", "foo='bar'", "dead='beef'"]]
+            self.backend.function_set({'foo': 'bar', 'dead': 'beef cafe'})
+        calls = [["action-set", "foo=bar", "dead=beef cafe"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_function_fail_error_legacy(self):

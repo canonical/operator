@@ -34,7 +34,6 @@ def _load_metadata(charm_dir):
     functions_meta = charm_dir / 'functions.yaml'
     actions_meta = charm_dir / 'actions.yaml'
     if functions_meta.exists():
-        # TODO: add a version check and a warning here to make sure functions are not skipped without notice pre-2.7.0 Juju versions.
         if actions_meta.exists():
             raise RuntimeError('charm must not mix functions and actions metadata')
         metadata['functions_type'] = 'functions'
@@ -55,6 +54,8 @@ def _create_event_link(charm, bound_event):
         event_dir = charm.framework.charm_dir / 'hooks'
         event_path = event_dir / bound_event.event_kind.replace('_', '-')
     elif issubclass(bound_event.event_type, ops.charm.FunctionEvent):
+        if not bound_event.event_kind.endswith("_function"):
+            raise RuntimeError(f"function event name {bound_event.event_kind} needs _function suffix")
         event_dir = charm.framework.charm_dir / charm.framework.meta.functions_type
         # The event_kind is suffixed with "_function" while the executable is not.
         event_path = event_dir / bound_event.event_kind[:-len('_function')].replace('_', '-')

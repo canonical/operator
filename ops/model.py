@@ -507,8 +507,6 @@ class ModelBackend:
     def __init__(self):
         self.unit_name = os.environ['JUJU_UNIT_NAME']
         self.app_name = self.unit_name.split('/')[0]
-        self.function_name = os.environ.get('JUJU_FUNCTION_NAME',
-                                            os.environ.get('JUJU_ACTION_NAME'))
 
         if shutil.which('function-get'):
             self._function_cmd_prefix = 'function'
@@ -633,7 +631,7 @@ class ModelBackend:
         return self._run(f'{self._function_cmd_prefix}-get', return_output=True, use_json=True)
 
     def function_set(self, results):
-        self._run(f'{self._function_cmd_prefix}-set', *[f"{k}='{v}'" for k, v in results.items()])
+        self._run(f'{self._function_cmd_prefix}-set', *[f"{k}={v}" for k, v in results.items()])
 
     def function_log(self, message):
         self._run(f'{self._function_cmd_prefix}-log', f"'{message}'")

@@ -1,3 +1,5 @@
+import os
+
 from ops.framework import Object, EventSource, EventBase, EventsBase
 
 
@@ -11,8 +13,9 @@ class FunctionEvent(EventBase):
         raise RuntimeError('cannot defer function events')
 
     def restore(self, snapshot):
+        env_function_name = os.environ.get('JUJU_FUNCTION_NAME', os.environ.get('JUJU_ACTION_NAME'))
         event_function_name = self.handle.kind[:-len('_function')].replace('_', '-')
-        if event_function_name != self.framework.model._backend.function_name:
+        if event_function_name != env_function_name:
             # This could only happen if the dev manually emits the function, or from a bug.
             raise RuntimeError('function event kind does not match current function')
         # Params are loaded at restore rather than __init__ because the model is not available in __init__.
@@ -271,9 +274,10 @@ class PayloadMeta:
 
 
 class FunctionMeta:
+
     def __init__(self, name, raw=None):
         raw = raw or {}
-        self.function_name = name
+        self.name = name
         self.title = raw.get('title', '')
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}

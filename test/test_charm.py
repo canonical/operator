@@ -238,7 +238,7 @@ class TestCharm(unittest.TestCase):
             def on_foo_bar_function(self, event):
                 self.seen_function_params = event.params
                 event.log('test-log')
-                event.set_results({'res': 'val'})
+                event.set_results({'res': 'val with spaces'})
                 event.fail('test-fail')
 
             def on_start_function(self, event):
@@ -263,7 +263,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [
             [f'{cmd_type}-get', '--format=json'],
             [f'{cmd_type}-log', "'test-log'"],
-            [f'{cmd_type}-set', "res='val'"],
+            [f'{cmd_type}-set', "res=val with spaces"],
             [f'{cmd_type}-fail', "'test-fail'"],
         ])
 
