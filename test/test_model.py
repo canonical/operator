@@ -662,7 +662,7 @@ class TestModel(unittest.TestCase):
             with self.assertRaises(TypeError):
                 self.model.storages.request('data', count_v)
 
-    def test_relation_endpoints(self):
+    def test_relation_endpoint_bindings(self):
         meta = ops.charm.CharmMeta()
         meta.relations = {'db0': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
@@ -675,9 +675,9 @@ class TestModel(unittest.TestCase):
                            ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
         fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1''')
 
-        ep = self.model.endpoints['db0']
+        ep = self.model.bindings['db0']
 
-        for ep in (self.model.endpoints['db0'], self.model.endpoints[self.model.get_relation('db0')]):
+        for ep in (self.model.bindings['db0'], self.model.bindings[self.model.get_relation('db0')]):
             self.assertEqual(ep.name, 'db0')
             self.assertEqual(ep.bind_address, '192.0.2.2')
             self.assertEqual(ep.ingress_address, '192.0.2.2')
@@ -685,7 +685,7 @@ class TestModel(unittest.TestCase):
             self.assertEqual(ep.network_info, json.loads(network_get_out))
             # TODO: check calls
 
-    def test_extra_binding_endpoints(self):
+    def test_extra_bindings(self):
         meta = ops.charm.CharmMeta()
         meta.extra_bindings = ['deadbeef']
         self.model = ops.model.Model('myapp/0', meta, self.backend)
@@ -694,7 +694,7 @@ class TestModel(unittest.TestCase):
                            '"addresses":[{"hostname":"","value":"192.0.2.2","cidr":""}]}]'
                            ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
         fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
-        ep = self.model.endpoints['deadbeef']
+        ep = self.model.bindings['deadbeef']
         self.assertEqual(ep.name, 'deadbeef')
         self.assertEqual(ep.bind_address, '192.0.2.2')
         self.assertEqual(ep.ingress_address, '192.0.2.2')

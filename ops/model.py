@@ -25,7 +25,7 @@ class Model:
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
-        self._endpoints = None
+        self._bindings = None
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -63,14 +63,14 @@ class Model:
         return self._cache.get(Application, app_name)
 
     @property
-    def endpoints(self):
-        if self._endpoints is None:
-            endpoint_keys = list(self._meta.relations) + self._meta.extra_bindings
+    def bindings(self):
+        if self._bindings is None:
+            binding_keys = list(self._meta.relations) + self._meta.extra_bindings
             for endpoint_relations in self.relations.values():
                 if endpoint_relations:
-                    endpoint_keys.extend(endpoint_relations)
-            self._endpoints = EndpointMapping(endpoint_keys, self._backend)
-        return self._endpoints
+                    binding_keys.extend(endpoint_relations)
+            self._bindings = BindingMapping(binding_keys, self._backend)
+        return self._bindings
 
 
 class ModelCache:
@@ -233,20 +233,20 @@ class RelationMapping(Mapping):
         return relation_list
 
 
-class EndpointMapping(Mapping):
-    """Map of Relation objects and endpoint names from extra-bindings to endpoints."""
+class BindingMapping(Mapping):
+    """Map of Relation objects, relation endpoint names and names from extra-bindings to Binding objects."""
 
     def __init__(self, keys, backend):
         """
-        keys - Relation objects, relation names or endpoint names from extra-bindings.
+        keys - Relation objects, relation endpoint names or names from extra-bindings.
         """
         self._data = {}
         for k in keys:
             if isinstance(k, Relation):
-                self._data[k] = Endpoint(k.name, k.id, backend)
+                self._data[k] = Binding(k.name, k.id, backend)
             elif isinstance(k, str):
                 # A relation name or an endpoint name from extra-bindings section.
-                self._data[k] = Endpoint(k, None, backend)
+                self._data[k] = Binding(k, None, backend)
 
     def __contains__(self, key):
         return key in self._data
@@ -261,8 +261,8 @@ class EndpointMapping(Mapping):
         return self._data[key]
 
 
-class Endpoint:
-    """Network endpoint representation."""
+class Binding:
+    """A representation of a binding to a space."""
 
     def __init__(self, name, relation_id, backend):
         self.name = name
@@ -705,13 +705,13 @@ class ModelBackend:
             raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
         self._run('storage-add', f'{name}={count}')
 
-    def network_get(self, endpoint_name, relation_id=None):
-        """Return network info provided by network-get for a given endpoint.
+    def network_get(self, binding_name, relation_id=None):
+        """Return network info provided by network-get for a given binding.
 
-        endpoint_name -- A name of an endpoint (relation name or extra-binding name).
+        binding_name -- A name of a binding (relation name or extra-binding name).
         relation_id -- An optional relation id to get network info for.
         """
-        cmd = ['network-get', endpoint_name]
+        cmd = ['network-get', binding_name]
         if relation_id is not None:
             cmd.extend(['-r', str(relation_id)])
         try:
