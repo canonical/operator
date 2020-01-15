@@ -245,7 +245,7 @@ class BindingMapping(Mapping):
             if isinstance(k, Relation):
                 self._data[k] = Binding(k.name, k.id, backend)
             elif isinstance(k, str):
-                # A relation name or an endpoint name from extra-bindings section.
+                # A binding from a relation endpoint name or an extra-binding name.
                 self._data[k] = Binding(k, None, backend)
 
     def __contains__(self, key):
