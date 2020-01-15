@@ -665,42 +665,49 @@ class TestModel(unittest.TestCase):
     def test_relation_endpoint_bindings(self):
         meta = ops.charm.CharmMeta()
         meta.relations = {'db0': None}
+        meta.extra_bindings = ['deadbeef']
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'relation-ids',
                     """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
-        network_get_out = ('{"bind-addresses":[{"mac-address":"","interface-name":"",'
-                           '"addresses":[{"hostname":"","value":"192.0.2.2","cidr":""}]}]'
-                           ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
-        fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1''')
 
-        ep = self.model.bindings['db0']
-
-        for ep in (self.model.bindings['db0'], self.model.bindings[self.model.get_relation('db0')]):
-            self.assertEqual(ep.name, 'db0')
-            self.assertEqual(ep.bind_address, '192.0.2.2')
-            self.assertEqual(ep.ingress_address, '192.0.2.2')
-            self.assertEqual(ep.egress_subnets, ['192.0.2.2/32'])
-            self.assertEqual(ep.network_info, json.loads(network_get_out))
-            # TODO: check calls
-
-    def test_extra_bindings(self):
-        meta = ops.charm.CharmMeta()
-        meta.extra_bindings = ['deadbeef']
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
+        self.model.relations['db0']
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-ids', 'db0', '--format=json'],
+            ['relation-list', '-r', '4', '--format=json'],
+        ])
 
         network_get_out = ('{"bind-addresses":[{"mac-address":"","interface-name":"",'
                            '"addresses":[{"hostname":"","value":"192.0.2.2","cidr":""}]}]'
                            ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
-        fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
-        ep = self.model.bindings['deadbeef']
-        self.assertEqual(ep.name, 'deadbeef')
-        self.assertEqual(ep.bind_address, '192.0.2.2')
-        self.assertEqual(ep.ingress_address, '192.0.2.2')
-        self.assertEqual(ep.egress_subnets, ['192.0.2.2/32'])
-        self.assertEqual(ep.network_info, json.loads(network_get_out))
-        # TODO: check calls
+
+        test_cases = [(
+            lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
+            'db0',
+            lambda binding_name: self.model.bindings[binding_name],
+            [['network-get', 'db0', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
+            'db0',
+            lambda binding_name: self.model.bindings[self.model.get_relation(binding_name)],
+            [['network-get', 'db0', '-r', '4', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1'''),
+            'deadbeef',
+            lambda binding_name: self.model.bindings[binding_name],
+            [['network-get', 'deadbeef', '--format=json']],
+        )]
+
+        for do_fake, binding_name, get_binding, expected_calls in test_cases:
+            do_fake()
+            binding = get_binding(binding_name)
+            self.assertEqual(binding.name, binding_name)
+            self.assertEqual(binding.bind_address, '192.0.2.2')
+            self.assertEqual(binding.ingress_address, '192.0.2.2')
+            self.assertEqual(binding.egress_subnets, ['192.0.2.2/32'])
+            self.assertEqual(binding.network_info, json.loads(network_get_out))
+            self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
 
 class TestModelBackend(unittest.TestCase):
