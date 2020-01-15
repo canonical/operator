@@ -813,3 +813,7 @@ class FakeScriptTest(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), [['bar', 'd e', 'f']])
 
         self.assertEqual(fake_script_calls(self, clear=True), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
