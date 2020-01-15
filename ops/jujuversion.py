@@ -34,7 +34,7 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
-            raise RuntimeError(f"cannot compare Juju version {self} with {other}")
+            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
         return self.major == other.major and self.minor == other.minor\
             and self.tag == other.tag and self.build == other.build and self.patch == other.patch
 
@@ -44,7 +44,7 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
-            raise RuntimeError(f"cannot compare Juju version {self} with {other}")
+            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
 
         if self.major != other.major:
             return self.major < other.major
