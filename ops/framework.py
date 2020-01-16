@@ -375,13 +375,14 @@ class Framework(Object):
 
     on = FrameworkEvents()
 
-    def __init__(self, data_path, charm_dir, meta, model):
+    def __init__(self, data_path, charm_dir, charm_meta, functions_meta, model):
 
         super().__init__(self, None)
 
         self._data_path = data_path
         self.charm_dir = charm_dir
-        self.meta = meta
+        self.charm_meta = charm_meta
+        self.functions_meta = functions_meta
         self.model = model
         self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
         self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}

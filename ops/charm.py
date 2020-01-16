@@ -1,4 +1,5 @@
 import os
+import yaml
 
 from ops.framework import Object, EventSource, EventBase, EventsBase
 
@@ -158,19 +159,19 @@ class CharmBase(Object):
     def __init__(self, framework, key):
         super().__init__(framework, key)
 
-        for relation_name in self.framework.meta.relations:
+        for relation_name in self.framework.charm_meta.relations:
             relation_name = relation_name.replace('-', '_')
             self.on.define_event(f'{relation_name}_relation_joined', RelationJoinedEvent)
             self.on.define_event(f'{relation_name}_relation_changed', RelationChangedEvent)
             self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
             self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
 
-        for storage_name in self.framework.meta.storages:
+        for storage_name in self.framework.charm_meta.storages:
             storage_name = storage_name.replace('-', '_')
             self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
 
-        for function_name in self.framework.meta.functions:
+        for function_name in self.framework.functions_meta.functions:
             function_name = function_name.replace('-', '_')
             self.on.define_event(f'{function_name}_function', FunctionEvent)
 
@@ -188,8 +189,11 @@ class CharmMeta:
     the relation definition can be obtained from its role attribute.
     """
 
-    def __init__(self, raw=None):
-        raw = raw or {}
+    def __init__(self, charm_dir, raw=None):
+        self._charm_dir = charm_dir
+        if raw is None:
+            raw = self._load_metadata()
+
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
@@ -220,8 +224,41 @@ class CharmMeta:
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', [])
-        self.functions_type = raw.get('functions_type', None)
-        self.functions = {name: FunctionMeta(name, function) for name, function in raw.get('functions', {}).items()}
+
+    def _load_metadata(self):
+        return yaml.safe_load((self._charm_dir / 'metadata.yaml').read_text())
+
+
+class FunctionsMeta:
+
+    def __init__(self, charm_dir, raw=None):
+        self._charm_dir = charm_dir
+        if raw is None:
+            raw = self._load_functions_metadata()
+        self.functions = {name: FunctionMeta(name, function) for name, function in raw.items()}
+
+    def _load_functions_metadata(self):
+        functions_meta = self._charm_dir / 'functions.yaml'
+        actions_meta = self._charm_dir / 'actions.yaml'
+        if functions_meta.exists():
+            if actions_meta.exists():
+                raise RuntimeError('charm must not mix functions and actions metadata')
+            metadata = yaml.safe_load(functions_meta.read_text())
+            self._functions_dir = self._charm_dir / 'functions'
+        elif actions_meta.exists():
+            metadata = yaml.safe_load(actions_meta.read_text())
+            self._functions_dir = self._charm_dir / 'actions'
+        else:
+            metadata = {}
+            self._functions_dir = self._charm_dir / 'functions'
+        return metadata
+
+    @property
+    def functions_dir(self):
+        if self._functions_dir is None:
+            return self._charm_dir / 'functions'
+        else:
+            return self._functions_dir
 
 
 class RelationMeta:

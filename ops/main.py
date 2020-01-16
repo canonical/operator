@@ -4,8 +4,6 @@ import os
 import sys
 from pathlib import Path
 
-import yaml
-
 import ops.charm
 import ops.framework
 import ops.model
@@ -27,23 +25,6 @@ def _get_charm_dir():
     return charm_dir
 
 
-def _load_metadata(charm_dir):
-    with open(charm_dir / 'metadata.yaml') as f:
-        metadata = yaml.load(f, Loader=yaml.SafeLoader)
-
-    functions_meta = charm_dir / 'functions.yaml'
-    actions_meta = charm_dir / 'actions.yaml'
-    if functions_meta.exists():
-        if actions_meta.exists():
-            raise RuntimeError('charm must not mix functions and actions metadata')
-        metadata['functions_type'] = 'functions'
-        metadata['functions'] = yaml.safe_load(functions_meta.read_text())
-    elif actions_meta.exists():
-        metadata['functions_type'] = 'actions'
-        metadata['functions'] = yaml.safe_load(actions_meta.read_text())
-    return metadata
-
-
 def _create_event_link(charm, bound_event):
     """Create a symlink for a particular event.
 
@@ -56,7 +37,7 @@ def _create_event_link(charm, bound_event):
     elif issubclass(bound_event.event_type, ops.charm.FunctionEvent):
         if not bound_event.event_kind.endswith("_function"):
             raise RuntimeError(f"function event name {bound_event.event_kind} needs _function suffix")
-        event_dir = charm.framework.charm_dir / charm.framework.meta.functions_type
+        event_dir = charm.framework.functions_meta.functions_dir
         # The event_kind is suffixed with "_function" while the executable is not.
         event_path = event_dir / bound_event.event_kind[:-len('_function')].replace('_', '-')
     else:
@@ -155,15 +136,16 @@ def main(charm_class):
     if juju_exec_path.parent.name in ('functions', 'actions'):
         juju_event_name = f'{juju_event_name}_function'
 
-    meta = ops.charm.CharmMeta(_load_metadata(charm_dir))
+    charm_meta = ops.charm.CharmMeta(charm_dir)
+    functions_meta = ops.charm.FunctionsMeta(charm_dir)
     unit_name = os.environ['JUJU_UNIT_NAME']
-    model = ops.model.Model(unit_name, meta, ops.model.ModelBackend())
+    model = ops.model.Model(unit_name, charm_meta, ops.model.ModelBackend())
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
-    framework = ops.framework.Framework(charm_state_path, charm_dir, meta, model)
+    framework = ops.framework.Framework(charm_state_path, charm_dir, charm_meta, functions_meta, model)
     try:
         charm = charm_class(framework, None)
 

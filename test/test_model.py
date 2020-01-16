@@ -23,7 +23,7 @@ class TestModel(unittest.TestCase):
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
 
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -119,7 +119,7 @@ class TestModel(unittest.TestCase):
 
     def test_remote_app_relation_data(self):
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -181,7 +181,7 @@ class TestModel(unittest.TestCase):
 
     def test_app_relation_data_modify_local_as_leader(self):
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -210,7 +210,7 @@ class TestModel(unittest.TestCase):
 
     def test_app_relation_data_modify_local_as_minion(self):
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -349,7 +349,7 @@ class TestModel(unittest.TestCase):
 
         # Create a new model and backend to drop a cached is-leader output.
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -385,7 +385,7 @@ class TestModel(unittest.TestCase):
         self.assertTrue(self.model.unit.is_leader())
 
     def test_resources(self):
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.resources = {'foo': None, 'bar': None}
         model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -434,7 +434,7 @@ class TestModel(unittest.TestCase):
 
         # Create a new model to drop is-leader caching result.
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         self.model = ops.model.Model('myapp/0', meta, self.backend)
         fake_script(self, 'is-leader', 'echo false')
         with self.assertRaises(ops.model.ModelError):
@@ -450,7 +450,7 @@ class TestModel(unittest.TestCase):
 
     def test_local_set_valid_unit_status(self):
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -483,7 +483,7 @@ class TestModel(unittest.TestCase):
 
     def test_local_set_valid_app_status(self):
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -518,7 +518,7 @@ class TestModel(unittest.TestCase):
 
     def test_set_app_status_non_leader_raises(self):
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -532,7 +532,7 @@ class TestModel(unittest.TestCase):
 
     def test_local_set_invalid_status(self):
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -564,7 +564,7 @@ class TestModel(unittest.TestCase):
 
     def test_remote_unit_status(self):
         self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.relations = {'db0': None, 'db1': None, 'db2': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
@@ -611,7 +611,7 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_storage(self):
-        meta = ops.charm.CharmMeta()
+        meta = ops.charm.CharmMeta('', {})
         meta.storages = {'disks': None, 'data': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
