@@ -201,9 +201,9 @@ class TestCharm(unittest.TestCase):
 
     @classmethod
     def _get_function_test_meta(cls):
-        return CharmMeta({
-            'name': 'my-charm',
-            'functions': {
+        return CharmMeta(
+            {'name': 'my-charm'},
+            {
                 'foo-bar': {
                     'description': 'Foos the bar.',
                     'title': 'foo-bar',
@@ -223,8 +223,8 @@ class TestCharm(unittest.TestCase):
                 'start': {
                     'description': 'Start the unit.'
                 }
-            },
-        })
+            }
+        )
 
     def _test_function_events(self, cmd_type):
 

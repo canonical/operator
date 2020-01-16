@@ -188,8 +188,7 @@ class CharmMeta:
     the relation definition can be obtained from its role attribute.
     """
 
-    def __init__(self, raw=None):
-        raw = raw or {}
+    def __init__(self, raw={}, functions_raw={}):
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
@@ -220,8 +219,7 @@ class CharmMeta:
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', [])
-        self.functions_type = raw.get('functions_type', None)
-        self.functions = {name: FunctionMeta(name, function) for name, function in raw.get('functions', {}).items()}
+        self.functions = {name: FunctionMeta(name, function) for name, function in functions_raw.items()}
 
 
 class RelationMeta:

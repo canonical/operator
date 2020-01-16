@@ -28,23 +28,25 @@ def _get_charm_dir():
 
 
 def _load_metadata(charm_dir):
-    with open(charm_dir / 'metadata.yaml') as f:
-        metadata = yaml.load(f, Loader=yaml.SafeLoader)
+    metadata = yaml.load((charm_dir / 'metadata.yaml').read_text(), Loader=yaml.SafeLoader)
 
     functions_meta = charm_dir / 'functions.yaml'
     actions_meta = charm_dir / 'actions.yaml'
     if functions_meta.exists():
         if actions_meta.exists():
             raise RuntimeError('charm must not mix functions and actions metadata')
-        metadata['functions_type'] = 'functions'
-        metadata['functions'] = yaml.safe_load(functions_meta.read_text())
+        functions_dir = 'functions'
+        functions_metadata = yaml.safe_load(functions_meta.read_text())
     elif actions_meta.exists():
-        metadata['functions_type'] = 'actions'
-        metadata['functions'] = yaml.safe_load(actions_meta.read_text())
-    return metadata
+        functions_dir = 'actions'
+        functions_metadata = yaml.safe_load(actions_meta.read_text())
+    else:
+        functions_dir = 'functions'
+        functions_metadata = {}
+    return metadata, functions_metadata, functions_dir
 
 
-def _create_event_link(charm, bound_event):
+def _create_event_link(charm, bound_event, functions_dir):
     """Create a symlink for a particular event.
 
     charm -- A charm object.
@@ -56,7 +58,7 @@ def _create_event_link(charm, bound_event):
     elif issubclass(bound_event.event_type, ops.charm.FunctionEvent):
         if not bound_event.event_kind.endswith("_function"):
             raise RuntimeError(f"function event name {bound_event.event_kind} needs _function suffix")
-        event_dir = charm.framework.charm_dir / charm.framework.meta.functions_type
+        event_dir = charm.framework.charm_dir / functions_dir
         # The event_kind is suffixed with "_function" while the executable is not.
         event_path = event_dir / bound_event.event_kind[:-len('_function')].replace('_', '-')
     else:
@@ -73,7 +75,7 @@ def _create_event_link(charm, bound_event):
         event_path.symlink_to(target_path)
 
 
-def _setup_event_links(charm_dir, charm):
+def _setup_event_links(charm_dir, charm, functions_dir):
     """Set up links for supported events that originate from Juju.
 
     Whether a charm can handle an event or not can be determined by
@@ -84,11 +86,12 @@ def _setup_event_links(charm_dir, charm):
 
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
+    functions_dir -- A directory where function links will reside.
     """
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         if issubclass(bound_event.event_type, (ops.charm.HookEvent, ops.charm.FunctionEvent)):
-            _create_event_link(charm, bound_event)
+            _create_event_link(charm, bound_event, functions_dir)
 
 
 def _emit_charm_event(charm, event_name):
@@ -155,7 +158,8 @@ def main(charm_class):
     if juju_exec_path.parent.name in ('functions', 'actions'):
         juju_event_name = f'{juju_event_name}_function'
 
-    meta = ops.charm.CharmMeta(_load_metadata(charm_dir))
+    metadata, functions_metadata, functions_dir = _load_metadata(charm_dir)
+    meta = ops.charm.CharmMeta(metadata, functions_metadata)
     unit_name = os.environ['JUJU_UNIT_NAME']
     model = ops.model.Model(unit_name, meta, ops.model.ModelBackend())
 
@@ -172,7 +176,7 @@ def main(charm_class):
         # the hook setup code is not triggered on config-changed.
         # 'start' event is included as Juju does not fire the install event for K8s charms (see LP: #1854635).
         if juju_event_name in ('install', 'start', 'upgrade_charm') or juju_event_name.endswith('_storage_attached'):
-            _setup_event_links(charm_dir, charm)
+            _setup_event_links(charm_dir, charm, functions_dir)
 
         framework.reemit()
 
