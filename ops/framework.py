@@ -235,12 +235,12 @@ class EventsBase(Object):
             self._cache = weakref.WeakKeyDictionary()
 
     def __get__(self, emitter, emitter_type):
-        # Same type, different instance, more data. Doing this unusual construct
-        # means people can subclass just this one class to have their own 'on'.
         if emitter is None:
             return self
         instance = self._cache.get(emitter)
         if instance is None:
+            # Same type, different instance, more data. Doing this unusual construct
+            # means people can subclass just this one class to have their own 'on'.
             instance = self._cache[emitter] = type(self)(emitter)
         return instance
 
