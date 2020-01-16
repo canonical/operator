@@ -10,7 +10,6 @@ from pathlib import Path
 from ops.charm import (
     CharmBase,
     CharmMeta,
-    FunctionsMeta,
     CharmEvents,
 )
 from ops.framework import Framework, EventSource, EventBase
@@ -32,8 +31,7 @@ class TestCharm(unittest.TestCase):
 
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmpdir)
-        self.charm_meta = CharmMeta(self.tmpdir, {})
-        self.functions_meta = FunctionsMeta(self.tmpdir, {})
+        self.meta = CharmMeta()
 
         class CustomEvent(EventBase):
             pass
@@ -50,8 +48,8 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(cleanup)
 
     def create_framework(self):
-        model = Model('local/0', self.charm_meta, ModelBackend())
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.charm_meta, self.functions_meta, model)
+        model = Model('local/0', self.meta, ModelBackend())
+        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.meta, model)
         self.addCleanup(framework.close)
         return framework
 
@@ -96,7 +94,7 @@ class TestCharm(unittest.TestCase):
                 assert event.relation.app.name == 'remote'
                 self.seen.append(type(event).__name__)
 
-        self.charm_meta = CharmMeta(self.tmpdir, {
+        self.meta = CharmMeta({
             'name': 'my-charm',
             'requires': {
                 'req1': {'interface': 'req1'},
@@ -157,7 +155,7 @@ class TestCharm(unittest.TestCase):
             def on_stor_4_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        self.charm_meta = CharmMeta(self.tmpdir, {
+        self.meta = CharmMeta({
             'name': 'my-charm',
             'storage': {
                 'stor1': {'type': 'filesystem'},
@@ -182,10 +180,10 @@ class TestCharm(unittest.TestCase):
             },
         })
 
-        self.assertIsNone(self.charm_meta.storages['stor1'].multiple_range)
-        self.assertEqual(self.charm_meta.storages['stor2'].multiple_range, (2, 2))
-        self.assertEqual(self.charm_meta.storages['stor3'].multiple_range, (2, None))
-        self.assertEqual(self.charm_meta.storages['stor-4'].multiple_range, (2, 4))
+        self.assertIsNone(self.meta.storages['stor1'].multiple_range)
+        self.assertEqual(self.meta.storages['stor2'].multiple_range, (2, 2))
+        self.assertEqual(self.meta.storages['stor3'].multiple_range, (2, None))
+        self.assertEqual(self.meta.storages['stor-4'].multiple_range, (2, 4))
 
         charm = MyCharm(self.create_framework(), None)
 
@@ -202,27 +200,30 @@ class TestCharm(unittest.TestCase):
         ])
 
     @classmethod
-    def _get_function_test_meta(cls, charm_dir):
-        return FunctionsMeta(charm_dir, {
-            'foo-bar': {
-                'description': 'Foos the bar.',
-                'title': 'foo-bar',
-                'required': 'foo-bar',
-                'params': {
-                    'foo-name': {
-                        'type': 'string',
-                        'description': 'A foo name to bar',
-                    },
-                    'silent': {
-                        'type': 'boolean',
-                        'description': '',
-                        'default': False,
+    def _get_function_test_meta(cls):
+        return CharmMeta({
+            'name': 'my-charm',
+            'functions': {
+                'foo-bar': {
+                    'description': 'Foos the bar.',
+                    'title': 'foo-bar',
+                    'required': 'foo-bar',
+                    'params': {
+                        'foo-name': {
+                            'type': 'string',
+                            'description': 'A foo name to bar',
+                        },
+                        'silent': {
+                            'type': 'boolean',
+                            'description': '',
+                            'default': False,
+                        },
                     },
                 },
+                'start': {
+                    'description': 'Start the unit.'
+                }
             },
-            'start': {
-                'description': 'Start the unit.'
-            }
         })
 
     def _test_function_events(self, cmd_type):
@@ -247,7 +248,7 @@ class TestCharm(unittest.TestCase):
         fake_script(self, f'{cmd_type}-set', "")
         fake_script(self, f'{cmd_type}-log', "")
         fake_script(self, f'{cmd_type}-fail', "")
-        self.functions_meta = self._get_function_test_meta(self.tmpdir)
+        self.meta = self._get_function_test_meta()
 
         os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'foo-bar'
         framework = self.create_framework()
@@ -289,7 +290,7 @@ class TestCharm(unittest.TestCase):
                 event.defer()
 
         fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
-        self.functions_meta = self._get_function_test_meta(self.tmpdir)
+        self.meta = self._get_function_test_meta()
 
         os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'start'
         framework = self.create_framework()

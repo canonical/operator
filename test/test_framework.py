@@ -20,7 +20,7 @@ class TestFramework(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmpdir)
 
     def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None, None)
+        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)
         self.addCleanup(framework.close)
         return framework
 
@@ -636,7 +636,7 @@ class TestStoredState(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmpdir)
 
     def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None, None)
+        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)
         self.addCleanup(framework.close)
         return framework
 
