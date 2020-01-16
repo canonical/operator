@@ -80,10 +80,10 @@ class TestMain(unittest.TestCase):
     def _setup_charm_dir(self):
         self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
-        self.charm_exec_path = os.path.relpath(self.JUJU_CHARM_DIR / 'lib/charm.py', self.hooks_dir)
+        self.charm_exec_path = os.path.relpath(self.JUJU_CHARM_DIR / 'src/charm.py', self.hooks_dir)
         shutil.copytree(TEST_CHARM_DIR, self.JUJU_CHARM_DIR)
 
-        charm_spec = importlib.util.spec_from_file_location("charm", str(self.JUJU_CHARM_DIR / 'lib/charm.py'))
+        charm_spec = importlib.util.spec_from_file_location("charm", str(self.JUJU_CHARM_DIR / 'src/charm.py'))
         self.charm_module = importlib.util.module_from_spec(charm_spec)
         charm_spec.loader.exec_module(self.charm_module)
 
