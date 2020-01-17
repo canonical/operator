@@ -189,7 +189,7 @@ class CharmMeta:
                           for name, res in raw.get('resources', {}).items()}
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
-        self.extra_bindings = raw.get('extra-bindings', [])
+        self.extra_bindings = raw.get('extra-bindings', {})
 
 
 class RelationMeta:

@@ -65,7 +65,7 @@ class Model:
     @property
     def bindings(self):
         if self._bindings is None:
-            binding_keys = list(self._meta.relations) + self._meta.extra_bindings
+            binding_keys = list(self._meta.relations) + list(self._meta.extra_bindings)
             for endpoint_relations in self.relations.values():
                 if endpoint_relations:
                     binding_keys.extend(endpoint_relations)
