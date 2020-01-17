@@ -146,6 +146,11 @@ class EventSource:
     def __get__(self, emitter, emitter_type=None):
         if emitter is None:
             return self
+        # Framework might not be available if accessed as CharmClass.on.event rather than charm_instance.on.event,
+        # but in that case it couldn't be emitted anyway, so there's no point to registering it.
+        framework = getattr(emitter, 'framework', None)
+        if framework is not None:
+            framework.register_type(self.event_type, emitter, self.event_kind)
         return BoundEvent(emitter, self.event_type, self.event_kind)
 
 
@@ -203,16 +208,6 @@ class Object:
             self.handle = Handle(parent, kind, key)
         self.framework._track(self)
 
-        # TODO This can probably be dropped, because the event type is only
-        # really relevant if someone is either emitting the event or observing
-        # it.
-        for attr_name, attr_value in inspect.getmembers(type(self)):
-            if isinstance(attr_value, EventSource):
-                event_type = attr_value.event_type
-                event_kind = attr_name
-                emitter = self
-                self.framework.register_type(event_type, emitter, event_kind)
-
         # TODO Detect conflicting handles here.
 
     @property
@@ -236,13 +231,18 @@ class EventsBase(Object):
     def __init__(self, parent=None, key=None):
         if parent is not None:
             super().__init__(parent, key)
+        else:
+            self._cache = weakref.WeakKeyDictionary()
 
     def __get__(self, emitter, emitter_type):
-        # Same type, different instance, more data. Doing this unusual construct
-        # means people can subclass just this one class to have their own 'on'.
         if emitter is None:
             return self
-        return type(self)(emitter)
+        instance = self._cache.get(emitter)
+        if instance is None:
+            # Same type, different instance, more data. Doing this unusual construct
+            # means people can subclass just this one class to have their own 'on'.
+            instance = self._cache[emitter] = type(self)(emitter)
+        return instance
 
     @classmethod
     def define_event(cls, event_kind, event_type):
