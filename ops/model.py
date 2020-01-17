@@ -634,7 +634,7 @@ class ModelBackend:
         self._run(f'{self._function_cmd_prefix}-set', *[f"{k}={v}" for k, v in results.items()])
 
     def function_log(self, message):
-        self._run(f'{self._function_cmd_prefix}-log', f"'{message}'")
+        self._run(f'{self._function_cmd_prefix}-log', f"{message}")
 
     def function_fail(self, message=''):
-        self._run(f'{self._function_cmd_prefix}-fail', f"'{message}'")
+        self._run(f'{self._function_cmd_prefix}-fail', f"{message}")

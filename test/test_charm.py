@@ -262,9 +262,9 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(charm.seen_function_params, {"foo-name": "name", "silent": True})
         self.assertEqual(fake_script_calls(self), [
             [f'{cmd_type}-get', '--format=json'],
-            [f'{cmd_type}-log', "'test-log'"],
+            [f'{cmd_type}-log', "test-log"],
             [f'{cmd_type}-set', "res=val with spaces"],
-            [f'{cmd_type}-fail', "'test-fail'"],
+            [f'{cmd_type}-fail', "test-fail"],
         ])
 
         # Make sure that function events that do not match the current context are

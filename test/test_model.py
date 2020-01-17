@@ -788,7 +788,7 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'function-log', f'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.function_log('log-message')
-        calls = [["function-log", "'log-message'"]]
+        calls = [["function-log", "log-message"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_function_fail_error(self):
@@ -796,7 +796,7 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'function-fail', f'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.function_fail('fail-message')
-        calls = [["function-fail", "'fail-message'"]]
+        calls = [["function-fail", "fail-message"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_function_get_error_legacy(self):
@@ -817,5 +817,52 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-fail', f'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.function_fail('fail-message')
-        calls = [["action-fail", "'fail-message'"]]
+        calls = [["action-fail", "fail-message"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_function_get(self):
+        fake_script(self, 'function-get', """echo '{"foo-name": "bar", "silent": false}'""")
+        params = self.backend.function_get()
+        self.assertEqual(params['foo-name'], 'bar')
+        self.assertEqual(params['silent'], False)
+        self.assertEqual(fake_script_calls(self), [['function-get', '--format=json']])
+
+    def test_function_get_legacy(self):
+        fake_script(self, 'action-get', """echo '{"foo-name": "bar", "silent": false}'""")
+        params = self.backend.function_get()
+        self.assertEqual(params['foo-name'], 'bar')
+        self.assertEqual(params['silent'], False)
+        self.assertEqual(fake_script_calls(self), [['action-get', '--format=json']])
+
+    def test_function_set(self):
+        fake_script(self, 'function-get', 'exit 1')
+        fake_script(self, 'function-set', 'exit 0')
+        self.backend.function_set({'x': 'dead beef', 'y': 1})
+        self.assertEqual(fake_script_calls(self), [['function-set', 'x=dead beef', 'y=1']])
+
+    def test_function_set_legacy(self):
+        fake_script(self, 'action-set', 'exit 0')
+        self.backend.function_set({'x': 'dead beef', 'y': 1})
+        self.assertEqual(fake_script_calls(self), [['action-set', 'x=dead beef', 'y=1']])
+
+    def test_function_fail(self):
+        fake_script(self, 'function-get', 'exit 1')
+        fake_script(self, 'function-fail', 'exit 0')
+        self.backend.function_fail('error 42')
+        self.assertEqual(fake_script_calls(self), [['function-fail', 'error 42']])
+
+    def test_function_fail_legacy(self):
+        fake_script(self, 'action-fail', 'exit 0')
+        self.backend.function_fail('error 42')
+        self.assertEqual(fake_script_calls(self), [['action-fail', 'error 42']])
+
+    def test_function_log(self):
+        fake_script(self, 'function-get', 'exit 1')
+        fake_script(self, 'function-log', 'exit 0')
+        self.backend.function_log('progress: 42%')
+        self.assertEqual(fake_script_calls(self), [['function-log', 'progress: 42%']])
+
+    def test_function_log_legacy(self):
+        fake_script(self, 'action-log', 'exit 0')
+        self.backend.function_log('progress: 42%')
+        self.assertEqual(fake_script_calls(self), [['action-log', 'progress: 42%']])
