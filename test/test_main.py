@@ -46,11 +46,11 @@ class SymlinkTargetError(Exception):
 
 
 class EventSpec:
-    def __init__(self, event_type, event_name, event_envar_name=None, relation_id=None, remote_app=None, remote_unit=None,
+    def __init__(self, event_type, event_name, env_var=None, relation_id=None, remote_app=None, remote_unit=None,
                  charm_config=None):
         self.event_type = event_type
         self.event_name = event_name
-        self.envar_name = event_envar_name
+        self.env_var = env_var
         self.relation_id = relation_id
         self.remote_app = remote_app
         self.remote_unit = remote_unit
@@ -167,11 +167,11 @@ start:
         if issubclass(event_spec.event_type, FunctionEvent):
             event_filename = event_spec.event_name[:-len('_function')].replace('_', '-')
             env.update({
-                event_spec.envar_name: event_filename,
+                event_spec.env_var: event_filename,
             })
-            if event_spec.envar_name == 'JUJU_FUNCTION_NAME':
+            if event_spec.env_var == 'JUJU_FUNCTION_NAME':
                 event_dir = 'functions'
-            elif event_spec.envar_name == 'JUJU_ACTION_NAME':
+            elif event_spec.env_var == 'JUJU_ACTION_NAME':
                 event_dir = 'actions'
             else:
                 raise RuntimeError('invalid envar name specified for a function event')
@@ -262,10 +262,10 @@ start:
                       remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
-            EventSpec(FunctionEvent, 'start_function', event_envar_name='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
+            EventSpec(FunctionEvent, 'start_function', env_var='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
             {},
         ), (
-            EventSpec(FunctionEvent, 'foo_bar_function', event_envar_name='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
+            EventSpec(FunctionEvent, 'foo_bar_function', env_var='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
             {},
         )]
 
@@ -303,7 +303,7 @@ start:
 
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-        event_spec = EventSpec(FunctionEvent, 'foo_bar_function', event_envar_name='JUJU_ACTION_NAME', charm_config=charm_config)
+        event_spec = EventSpec(FunctionEvent, 'foo_bar_function', env_var='JUJU_ACTION_NAME', charm_config=charm_config)
         state = self._simulate_event(event_spec)
         handled_events = state.get(f'on_{event_spec.event_name}', [])
         self.assertEqual(len(handled_events), 1)
