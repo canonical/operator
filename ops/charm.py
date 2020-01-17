@@ -1,8 +1,34 @@
+import os
+
 from ops.framework import Object, EventSource, EventBase, EventsBase
 
 
 class HookEvent(EventBase):
     pass
+
+
+class FunctionEvent(EventBase):
+
+    def defer(self):
+        raise RuntimeError('cannot defer function events')
+
+    def restore(self, snapshot):
+        env_function_name = os.environ.get('JUJU_FUNCTION_NAME', os.environ.get('JUJU_ACTION_NAME'))
+        event_function_name = self.handle.kind[:-len('_function')].replace('_', '-')
+        if event_function_name != env_function_name:
+            # This could only happen if the dev manually emits the function, or from a bug.
+            raise RuntimeError('function event kind does not match current function')
+        # Params are loaded at restore rather than __init__ because the model is not available in __init__.
+        self.params = self.framework.model._backend.function_get()
+
+    def set_results(self, results):
+        self.framework.model._backend.function_set(results)
+
+    def log(self, message):
+        self.framework.model._backend.function_log(message)
+
+    def fail(self, message=''):
+        self.framework.model._backend.function_fail(message)
 
 
 class InstallEvent(HookEvent):
@@ -144,6 +170,10 @@ class CharmBase(Object):
             self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
 
+        for function_name in self.framework.meta.functions:
+            function_name = function_name.replace('-', '_')
+            self.on.define_event(f'{function_name}_function', FunctionEvent)
+
 
 class CharmMeta:
     """Object containing the metadata for the charm.
@@ -158,8 +188,7 @@ class CharmMeta:
     the relation definition can be obtained from its role attribute.
     """
 
-    def __init__(self, raw=None):
-        raw = raw or {}
+    def __init__(self, raw={}, functions_raw={}):
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
@@ -190,6 +219,7 @@ class CharmMeta:
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', [])
+        self.functions = {name: FunctionMeta(name, function) for name, function in functions_raw.items()}
 
 
 class RelationMeta:
@@ -239,3 +269,14 @@ class PayloadMeta:
     def __init__(self, name, raw):
         self.payload_name = name
         self.type = raw['type']
+
+
+class FunctionMeta:
+
+    def __init__(self, name, raw=None):
+        raw = raw or {}
+        self.name = name
+        self.title = raw.get('title', '')
+        self.description = raw.get('description', '')
+        self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
+        self.required = raw.get('required', [])  # [<parameter name>, ...]

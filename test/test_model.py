@@ -1,10 +1,7 @@
 #!/usr/bin/python3
 
 import os
-import tempfile
-import subprocess
 import pathlib
-import shutil
 import unittest
 import time
 import re
@@ -12,12 +9,18 @@ import re
 import ops.model
 import ops.charm
 
+from .test_helpers import fake_script, fake_script_calls
+
 
 class TestModel(unittest.TestCase):
 
     def setUp(self):
+        def restore_env(env):
+            os.environ.clear()
+            os.environ.update(env)
+        self.addCleanup(restore_env, os.environ.copy())
+
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
-        self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
 
         self.backend = ops.model.ModelBackend()
         meta = ops.charm.CharmMeta()
@@ -667,7 +670,13 @@ class TestModelBackend(unittest.TestCase):
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
         self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
 
-        self.backend = ops.model.ModelBackend()
+        self._backend = None
+
+    @property
+    def backend(self):
+        if self._backend is None:
+            self._backend = ops.model.ModelBackend()
+        return self._backend
 
     def test_relation_tool_errors(self):
         err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
@@ -758,58 +767,102 @@ class TestModelBackend(unittest.TestCase):
                 run()
             self.assertEqual(fake_script_calls(self, clear=True), calls)
 
+    def test_function_get_error(self):
+        fake_script(self, 'function-get', '')
+        fake_script(self, 'function-get', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_get()
+        calls = [['function-get', '--format=json']]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
-def fake_script(test_case, name, content):
-    if not hasattr(test_case, 'fake_script_path'):
-        fake_script_path = tempfile.mkdtemp('-fake_script')
-        os.environ['PATH'] = f'{fake_script_path}:{os.environ["PATH"]}'
+    def test_function_set_error(self):
+        fake_script(self, 'function-get', '')
+        fake_script(self, 'function-set', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_set({'foo': 'bar', 'dead': 'beef cafe'})
+        calls = [["function-set", "foo=bar", "dead=beef cafe"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
-        def cleanup():
-            shutil.rmtree(fake_script_path)
-            os.environ['PATH'] = os.environ['PATH'].replace(fake_script_path + ':', '')
+    def test_function_log_error(self):
+        fake_script(self, 'function-get', '')
+        fake_script(self, 'function-log', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_log('log-message')
+        calls = [["function-log", "log-message"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
-        test_case.addCleanup(cleanup)
-        test_case.fake_script_path = pathlib.Path(fake_script_path)
+    def test_function_fail_error(self):
+        fake_script(self, 'function-get', '')
+        fake_script(self, 'function-fail', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_fail('fail-message')
+        calls = [["function-fail", "fail-message"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
-    with open(test_case.fake_script_path / name, "w") as f:
-        # Before executing the provided script, dump the provided arguments in calls.txt.
-        f.write('#!/bin/bash\n{ echo -n $(basename $0); for s in "$@"; do echo -n \\;$s; done; echo; } >> $(dirname $0)/calls.txt\n' + content)
-    os.chmod(test_case.fake_script_path / name, 0o755)
+    def test_function_get_error_legacy(self):
+        fake_script(self, 'action-get', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_get()
+        calls = [['action-get', '--format=json']]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
+    def test_function_set_error_legacy(self):
+        fake_script(self, 'action-set', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_set({'foo': 'bar', 'dead': 'beef cafe'})
+        calls = [["action-set", "foo=bar", "dead=beef cafe"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
-def fake_script_calls(test_case, clear=False):
-    with open(test_case.fake_script_path / 'calls.txt', 'r+') as f:
-        calls = [line.split(';') for line in f.read().splitlines()]
-        if clear:
-            f.truncate(0)
-        return calls
+    def test_function_fail_error_legacy(self):
+        fake_script(self, 'action-fail', f'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.function_fail('fail-message')
+        calls = [["action-fail", "fail-message"]]
+        self.assertEqual(fake_script_calls(self, clear=True), calls)
 
+    def test_function_get(self):
+        fake_script(self, 'function-get', """echo '{"foo-name": "bar", "silent": false}'""")
+        params = self.backend.function_get()
+        self.assertEqual(params['foo-name'], 'bar')
+        self.assertEqual(params['silent'], False)
+        self.assertEqual(fake_script_calls(self), [['function-get', '--format=json']])
 
-class FakeScriptTest(unittest.TestCase):
+    def test_function_get_legacy(self):
+        fake_script(self, 'action-get', """echo '{"foo-name": "bar", "silent": false}'""")
+        params = self.backend.function_get()
+        self.assertEqual(params['foo-name'], 'bar')
+        self.assertEqual(params['silent'], False)
+        self.assertEqual(fake_script_calls(self), [['action-get', '--format=json']])
 
-    def test_fake_script_works(self):
-        fake_script(self, 'foo', 'echo foo runs')
-        fake_script(self, 'bar', 'echo bar runs')
-        output = subprocess.getoutput('foo a "b c"; bar "d e" f')
-        self.assertEqual(output, 'foo runs\nbar runs')
-        self.assertEqual(fake_script_calls(self), [
-            ['foo', 'a', 'b c'],
-            ['bar', 'd e', 'f'],
-        ])
+    def test_function_set(self):
+        fake_script(self, 'function-get', 'exit 1')
+        fake_script(self, 'function-set', 'exit 0')
+        self.backend.function_set({'x': 'dead beef', 'y': 1})
+        self.assertEqual(fake_script_calls(self), [['function-set', 'x=dead beef', 'y=1']])
 
-    def test_fake_script_clear(self):
-        fake_script(self, 'foo', 'echo foo runs')
+    def test_function_set_legacy(self):
+        fake_script(self, 'action-set', 'exit 0')
+        self.backend.function_set({'x': 'dead beef', 'y': 1})
+        self.assertEqual(fake_script_calls(self), [['action-set', 'x=dead beef', 'y=1']])
 
-        output = subprocess.getoutput('foo a "b c"')
-        self.assertEqual(output, 'foo runs')
+    def test_function_fail(self):
+        fake_script(self, 'function-get', 'exit 1')
+        fake_script(self, 'function-fail', 'exit 0')
+        self.backend.function_fail('error 42')
+        self.assertEqual(fake_script_calls(self), [['function-fail', 'error 42']])
 
-        self.assertEqual(fake_script_calls(self, clear=True), [['foo', 'a', 'b c']])
+    def test_function_fail_legacy(self):
+        fake_script(self, 'action-fail', 'exit 0')
+        self.backend.function_fail('error 42')
+        self.assertEqual(fake_script_calls(self), [['action-fail', 'error 42']])
 
-        fake_script(self, 'bar', 'echo bar runs')
+    def test_function_log(self):
+        fake_script(self, 'function-get', 'exit 1')
+        fake_script(self, 'function-log', 'exit 0')
+        self.backend.function_log('progress: 42%')
+        self.assertEqual(fake_script_calls(self), [['function-log', 'progress: 42%']])
 
-        output = subprocess.getoutput('bar "d e" f')
-        self.assertEqual(output, 'bar runs')
-
-        self.assertEqual(fake_script_calls(self, clear=True), [['bar', 'd e', 'f']])
-
-        self.assertEqual(fake_script_calls(self, clear=True), [])
+    def test_function_log_legacy(self):
+        fake_script(self, 'action-log', 'exit 0')
+        self.backend.function_log('progress: 42%')
+        self.assertEqual(fake_script_calls(self), [['action-log', 'progress: 42%']])
