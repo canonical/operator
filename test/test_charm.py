@@ -7,18 +7,26 @@ import shutil
 
 from pathlib import Path
 
-from ops.charm import CharmBase, CharmMeta
-from ops.charm import CharmEvents
+from ops.charm import (
+    CharmBase,
+    CharmMeta,
+    CharmEvents,
+)
 from ops.framework import Framework, EventSource, EventBase
 from ops.model import Model, ModelBackend
+
+from .test_helpers import fake_script, fake_script_calls
 
 
 class TestCharm(unittest.TestCase):
 
     def setUp(self):
-        self._path = os.environ['PATH']
-        os.environ['PATH'] = str(Path(__file__).parent / 'bin')
+        def restore_env(env):
+            os.environ.clear()
+            os.environ.update(env)
+        self.addCleanup(restore_env, os.environ.copy())
 
+        os.environ['PATH'] = f"{str(Path(__file__).parent / 'bin')}:{os.environ['PATH']}"
         os.environ['JUJU_UNIT_NAME'] = 'local/0'
 
         self.tmpdir = Path(tempfile.mkdtemp())
@@ -36,8 +44,6 @@ class TestCharm(unittest.TestCase):
         CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            os.environ['PATH'] = self._path
-            del os.environ['JUJU_UNIT_NAME']
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
@@ -192,6 +198,112 @@ class TestCharm(unittest.TestCase):
             'StorageAttachedEvent',
             'StorageAttachedEvent',
         ])
+
+    @classmethod
+    def _get_function_test_meta(cls):
+        return CharmMeta(
+            {'name': 'my-charm'},
+            {
+                'foo-bar': {
+                    'description': 'Foos the bar.',
+                    'title': 'foo-bar',
+                    'required': 'foo-bar',
+                    'params': {
+                        'foo-name': {
+                            'type': 'string',
+                            'description': 'A foo name to bar',
+                        },
+                        'silent': {
+                            'type': 'boolean',
+                            'description': '',
+                            'default': False,
+                        },
+                    },
+                },
+                'start': {
+                    'description': 'Start the unit.'
+                }
+            }
+        )
+
+    def _test_function_events(self, cmd_type):
+
+        class MyCharm(CharmBase):
+
+            def __init__(self, *args):
+                super().__init__(*args)
+                framework.observe(self.on.foo_bar_function, self)
+                framework.observe(self.on.start_function, self)
+
+            def on_foo_bar_function(self, event):
+                self.seen_function_params = event.params
+                event.log('test-log')
+                event.set_results({'res': 'val with spaces'})
+                event.fail('test-fail')
+
+            def on_start_function(self, event):
+                pass
+
+        fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
+        fake_script(self, f'{cmd_type}-set', "")
+        fake_script(self, f'{cmd_type}-log', "")
+        fake_script(self, f'{cmd_type}-fail', "")
+        self.meta = self._get_function_test_meta()
+
+        os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'foo-bar'
+        framework = self.create_framework()
+        charm = MyCharm(framework, None)
+
+        events = list(MyCharm.on.events())
+        self.assertIn('foo_bar_function', events)
+        self.assertIn('start_function', events)
+
+        charm.on.foo_bar_function.emit()
+        self.assertEqual(charm.seen_function_params, {"foo-name": "name", "silent": True})
+        self.assertEqual(fake_script_calls(self), [
+            [f'{cmd_type}-get', '--format=json'],
+            [f'{cmd_type}-log', "test-log"],
+            [f'{cmd_type}-set', "res=val with spaces"],
+            [f'{cmd_type}-fail', "test-fail"],
+        ])
+
+        # Make sure that function events that do not match the current context are
+        # not possible to emit by hand.
+        with self.assertRaises(RuntimeError):
+            charm.on.start_function.emit()
+
+    def test_function_events(self):
+        self._test_function_events('function')
+
+    def test_function_events_legacy(self):
+        self._test_function_events('action')
+
+    def _test_function_event_defer_fails(self, cmd_type):
+
+        class MyCharm(CharmBase):
+
+            def __init__(self, *args):
+                super().__init__(*args)
+                framework.observe(self.on.start_function, self)
+
+            def on_start_function(self, event):
+                event.defer()
+
+        fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
+        self.meta = self._get_function_test_meta()
+
+        os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'start'
+        framework = self.create_framework()
+        charm = MyCharm(framework, None)
+
+        with self.assertRaises(RuntimeError):
+            charm.on.start_function.emit()
+
+    def test_function_event_defer_fails(self):
+        self._test_function_event_defer_fails('function')
+
+    def test_function_event_defer_legacy(self):
+        self._test_function_event_defer_fails('action')
 
 
 if __name__ == "__main__":

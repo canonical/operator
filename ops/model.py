@@ -508,6 +508,10 @@ class ModelBackend:
         self.unit_name = os.environ['JUJU_UNIT_NAME']
         self.app_name = self.unit_name.split('/')[0]
 
+        if shutil.which('function-get'):
+            self._function_cmd_prefix = 'function'
+        else:
+            self._function_cmd_prefix = 'action'
         self._is_leader = None
         self._leader_check_time = 0
 
@@ -622,6 +626,18 @@ class ModelBackend:
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
         self._run('storage-add', f'{name}={count}')
+
+    def function_get(self):
+        return self._run(f'{self._function_cmd_prefix}-get', return_output=True, use_json=True)
+
+    def function_set(self, results):
+        self._run(f'{self._function_cmd_prefix}-set', *[f"{k}={v}" for k, v in results.items()])
+
+    def function_log(self, message):
+        self._run(f'{self._function_cmd_prefix}-log', f"{message}")
+
+    def function_fail(self, message=''):
+        self._run(f'{self._function_cmd_prefix}-fail', f"{message}")
 
     def network_get(self, endpoint_name, relation_id=None):
         """Return network info provided by network-get for a given endpoint.
