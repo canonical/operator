@@ -812,6 +812,7 @@ class TestModelBackend(unittest.TestCase):
             self.backend.function_set({'foo': 'bar', 'dead': 'beef cafe'})
         calls = [["action-set", "foo=bar", "dead=beef cafe"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
+
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
     def test_function_fail_error_legacy(self):
