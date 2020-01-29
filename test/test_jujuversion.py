@@ -1,31 +1,24 @@
 #!/usr/bin/env python3
 
 import unittest
+
 from ops.jujuversion import JujuVersion
 
 
 class TestJujuVersion(unittest.TestCase):
 
     def test_parsing(self):
-        test_cases = [(
-            "0.0.0", 0, 0, '', 0, 0,
-        ), (
-            "0.0.2", 0, 0, '', 2, 0,
-        ), (
-            "0.1.0", 0, 1, '', 0, 0,
-        ), (
-            "0.2.3", 0, 2, '', 3, 0,
-        ), (
-            "10.234.3456", 10, 234, '', 3456, 0,
-        ), (
-            "10.234.3456.1", 10, 234, '', 3456, 1,
-        ), (
-            "1.21-alpha12", 1, 21, 'alpha', 12, 0,
-        ), (
-            "1.21-alpha1.34", 1, 21, 'alpha', 1, 34,
-        ), (
-            "2.7", 2, 7, '', 0, 0,
-        )]
+        test_cases = [
+            ("0.0.0", 0, 0, '', 0, 0),
+            ("0.0.2", 0, 0, '', 2, 0),
+            ("0.1.0", 0, 1, '', 0, 0),
+            ("0.2.3", 0, 2, '', 3, 0),
+            ("10.234.3456", 10, 234, '', 3456, 0),
+            ("10.234.3456.1", 10, 234, '', 3456, 1),
+            ("1.21-alpha12", 1, 21, 'alpha', 12, 0),
+            ("1.21-alpha1.34", 1, 21, 'alpha', 1, 34),
+            ("2.7", 2, 7, '', 0, 0)
+        ]
 
         for vs, major, minor, tag, patch, build in test_cases:
             v = JujuVersion(vs)
@@ -118,3 +111,7 @@ class TestJujuVersion(unittest.TestCase):
             self.assertEqual(JujuVersion(a) <= b, expected_weak)
             self.assertEqual(b > JujuVersion(a), expected_strict)
             self.assertEqual(b >= JujuVersion(a), expected_weak)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -866,3 +866,7 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-log', 'exit 0')
         self.backend.function_log('progress: 42%')
         self.assertEqual(fake_script_calls(self), [['action-log', 'progress: 42%']])
+
+
+if __name__ == "__main__":
+    unittest.main()
