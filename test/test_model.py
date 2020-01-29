@@ -813,8 +813,6 @@ class TestModelBackend(unittest.TestCase):
         calls = [["action-set", "foo=bar", "dead=beef cafe"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
-        self.assertEqual(fake_script_calls(self, clear=True), [])
-
     def test_function_fail_error_legacy(self):
         fake_script(self, 'action-fail', f'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
