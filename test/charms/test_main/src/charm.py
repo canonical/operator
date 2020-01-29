@@ -3,6 +3,8 @@
 import os
 import base64
 import pickle
+import sys
+sys.path.append('lib')  # noqa
 
 from ops.charm import CharmBase
 from ops.main import main
