@@ -36,6 +36,8 @@ class Charm(CharmBase):
         self._state['on_mon_relation_changed'] = []
         self._state['on_mon_relation_departed'] = []
         self._state['on_ha_relation_broken'] = []
+        self._state['on_foo_bar_function'] = []
+        self._state['on_start_function'] = []
 
         # Observed event types per invocation. A list is used to preserve the order in which charm handlers have observed the events.
         self._state['observed_event_types'] = []
@@ -51,6 +53,10 @@ class Charm(CharmBase):
         self.framework.observe(self.on.mon_relation_changed, self)
         self.framework.observe(self.on.mon_relation_departed, self)
         self.framework.observe(self.on.ha_relation_broken, self)
+
+        if self._charm_config.get('USE_FUNCTIONS'):
+            self.framework.observe(self.on.start_function, self)
+            self.framework.observe(self.on.foo_bar_function, self)
 
     def _write_state(self):
         """Write state variables so that the parent process can read them.
@@ -116,6 +122,18 @@ class Charm(CharmBase):
         self._state['on_ha_relation_broken'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['ha_relation_broken_data'] = event.snapshot()
+        self._write_state()
+
+    def on_start_function(self, event):
+        assert event.handle.kind == 'start_function', 'event function name cannot be different from the one being handled'
+        self._state['on_start_function'].append(type(event))
+        self._state['observed_event_types'].append(type(event))
+        self._write_state()
+
+    def on_foo_bar_function(self, event):
+        assert event.handle.kind == 'foo_bar_function', 'event function name cannot be different from the one being handled'
+        self._state['on_foo_bar_function'].append(type(event))
+        self._state['observed_event_types'].append(type(event))
         self._write_state()
 
 
