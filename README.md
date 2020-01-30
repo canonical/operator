@@ -55,7 +55,8 @@ if __name__ == "__main__":
 ```
 
 This charm does nothing, though, so you'll typically want to observe some Juju
-events, such as `start`:
+events, such as `start` by calling the `observe()` method, passing it the event
+you want to observe and the handler you want to respond to the event:
 
 ```python
 class MyCharm(CharmBase):
@@ -67,20 +68,28 @@ class MyCharm(CharmBase):
         # Handle the event here.
 ```
 
-Every standard event in Juju may be observed that way, and you can also easily
-define your own events in your custom types. If you name your observer with the
-scheme `on_<event-name>` then you can optionally skip explicitly referencing it
-in the `observe()` method's second argument. Example:
+In the above example, we are telling the framework we want to observe the
+`self.on.start` event and that we want the `self.on_start` handler to respond
+to that event. Every standard event in Juju may be observed that way, and you
+can also easily define your own events in your custom types.
+
+Alternatively, if you name your handler with the scheme `on_<event-name>` then
+explicitly referencing said handler is optional and you can just provide the
+handler's parent observer. For example:
 
 ```python
 class MyCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        self.framework.observe(self.on.start, self)  # Just use `self` as the second argument
+        self.framework.observe(self.on.config_changed, self)
 
-     def on_start(self, event):
+     def on_config_changed(self, event):
         # Handle the event here.
 ```
+
+In the above example, we just passed the observer object (`self` in this case)
+as the second argument to `observe()`. The framework will then know to look for
+a method named `on_config_changed` on the observer.
 
 The `hooks/` directory will then contain symlinks to your `src/charm.py` entry
 point so that Juju can call it. You only need to set up the `hooks/install` link
