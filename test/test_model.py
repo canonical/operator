@@ -98,7 +98,7 @@ class TestModel(unittest.TestCase):
                     f"""([ "$2" = 0 ] && echo '[]') || (echo {err_msg} >&2 ; exit 2)""")
 
         db1_4 = self.model.get_relation('dbpeer')
-        self.assertEqual(db1_4.app, self.model.app)
+        self.assertIs(db1_4.app, self.model.app)
 
     def test_remote_units_is_our(self):
         fake_script(self, 'relation-ids',
