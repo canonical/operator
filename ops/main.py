@@ -10,6 +10,9 @@ import ops.charm
 import ops.framework
 import ops.model
 
+import logging
+from ops.jujulog import JujuLogHandler
+
 CHARM_STATE_FILE = '.unit-state.db'
 
 
@@ -137,7 +140,6 @@ def main(charm_class):
 
     The event name is based on the way this executable was called (argv[0]).
     """
-
     charm_dir = _get_charm_dir()
 
     # Process the Juju event relevant to the current hook execution
@@ -149,10 +151,14 @@ def main(charm_class):
     if juju_exec_path.parent.name == 'actions':
         juju_event_name = f'{juju_event_name}_action'
 
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    model_backend = ops.model.ModelBackend()
+    logger.addHandler(JujuLogHandler(model_backend))
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)
     unit_name = os.environ['JUJU_UNIT_NAME']
-    model = ops.model.Model(unit_name, meta, ops.model.ModelBackend())
+    model = ops.model.Model(unit_name, meta, model_backend)
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its

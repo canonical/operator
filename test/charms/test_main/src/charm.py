@@ -41,6 +41,12 @@ class Charm(CharmBase):
         self._state['on_foo_bar_action'] = []
         self._state['on_start_action'] = []
 
+        self._state['on_log_critical_action'] = []
+        self._state['on_log_error_action'] = []
+        self._state['on_log_warning_action'] = []
+        self._state['on_log_info_action'] = []
+        self._state['on_log_debug_action'] = []
+
         # Observed event types per invocation. A list is used to preserve the order in which charm handlers have observed the events.
         self._state['observed_event_types'] = []
 
@@ -59,6 +65,13 @@ class Charm(CharmBase):
         if self._charm_config.get('USE_ACTIONS'):
             self.framework.observe(self.on.start_action, self)
             self.framework.observe(self.on.foo_bar_action, self)
+
+        if self._charm_config.get('USE_LOG_ACTIONS'):
+            self.framework.observe(self.on.log_critical_action, self)
+            self.framework.observe(self.on.log_error_action, self)
+            self.framework.observe(self.on.log_warning_action, self)
+            self.framework.observe(self.on.log_info_action, self)
+            self.framework.observe(self.on.log_debug_action, self)
 
     def _write_state(self):
         """Write state variables so that the parent process can read them.
@@ -137,6 +150,21 @@ class Charm(CharmBase):
         self._state['on_foo_bar_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
+
+    def on_log_critical_action(self, event):
+        logger.critical('super critical')
+
+    def on_log_error_action(self, event):
+        logger.error('grave error')
+
+    def on_log_warning_action(self, event):
+        logger.warning('wise warning')
+
+    def on_log_info_action(self, event):
+        logger.info('useful info')
+
+    def on_log_debug_action(self, event):
+        logger.debug('insightful debug')
 
 
 if __name__ == '__main__':
