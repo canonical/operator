@@ -477,12 +477,22 @@ class Storage:
 
 
 class ModelError(Exception):
-    pass
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
+
+class NoRelatedAppsError(ModelError):
+    def __init__(self, relation_name):
+        super().__init__(relation_name, BlockedStatus(f'Missing relation: {relation_name}'))
+        self.relation_name = relation_name
 
 
 class TooManyRelatedAppsError(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
-        super().__init__(f'Too many remote applications on {relation_name} ({num_related} > {max_supported})')
+        message = f'{relation_name} ({num_related} > {max_supported})'
+        status = BlockedStatus(f'Too many related applications: {message}')
+        super().__init__(message, status)
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
@@ -494,6 +504,11 @@ class RelationDataError(ModelError):
 
 class RelationNotFoundError(ModelError):
     pass
+
+
+class IncompleteRelationError(ModelError):
+    def __init__(self, relation_name):
+        super().__init__(relation_name, WaitingStatus(f'Waiting for relation: {relation_name}'))
 
 
 class InvalidStatusError(ModelError):
@@ -542,7 +557,7 @@ class ModelBackend:
             return self._run('relation-list', '-r', str(relation_id), return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
-                raise RelationNotFoundError() from e
+                raise RelationNotFoundError(relation_id) from e
             raise
 
     def relation_get(self, relation_id, member_name, is_app):
@@ -553,7 +568,7 @@ class ModelBackend:
             return self._run('relation-get', '-r', str(relation_id), '-', member_name, f'--app={is_app}', return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
-                raise RelationNotFoundError() from e
+                raise RelationNotFoundError(relation_id) from e
             raise
 
     def relation_set(self, relation_id, key, value, is_app):
@@ -564,7 +579,7 @@ class ModelBackend:
             return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}')
         except ModelError as e:
             if 'relation not found' in str(e):
-                raise RelationNotFoundError() from e
+                raise RelationNotFoundError(relation_id) from e
             raise
 
     def config_get(self):
