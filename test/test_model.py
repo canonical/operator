@@ -451,9 +451,9 @@ class TestModel(unittest.TestCase):
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
         test_cases = [(
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', '']]),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
@@ -486,9 +486,9 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'is-leader', 'echo true')
 
         test_cases = [(
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertIn(['status-set', '--application=True', 'active', ''], fake_script_calls(self, True)),
+            lambda: self.assertIn(['status-set', '--application=True', 'active', 'Green'], fake_script_calls(self, True)),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
@@ -524,7 +524,7 @@ class TestModel(unittest.TestCase):
             self.model.app.status
 
         with self.assertRaises(RuntimeError):
-            self.model.app.status = ops.model.ActiveStatus()
+            self.model.app.status = ops.model.ActiveStatus('')
 
     def test_local_set_invalid_status(self):
         self.backend = ops.model.ModelBackend()
@@ -571,7 +571,7 @@ class TestModel(unittest.TestCase):
 
         test_statuses = (
             ops.model.UnknownStatus(),
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             ops.model.MaintenanceStatus('Yellow'),
             ops.model.BlockedStatus('Red'),
             ops.model.WaitingStatus('White'),
@@ -592,7 +592,7 @@ class TestModel(unittest.TestCase):
 
         test_statuses = (
             ops.model.UnknownStatus(),
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Everything is running smoothly'),
             ops.model.MaintenanceStatus('Upgrading software'),
             ops.model.BlockedStatus('Awaiting manual resolution'),
             ops.model.WaitingStatus('Awaiting related app updates'),
