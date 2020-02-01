@@ -444,10 +444,6 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(TypeError):
             ops.model.StatusBase('test')
 
-    def test_active_message_raises(self):
-        with self.assertRaises(TypeError):
-            ops.model.ActiveStatus('test')
-
     def test_local_set_valid_unit_status(self):
         self.backend = ops.model.ModelBackend()
         meta = ops.charm.CharmMeta()

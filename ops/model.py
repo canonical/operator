@@ -354,9 +354,6 @@ class ActiveStatus(StatusBase):
     """
     name = 'active'
 
-    def __init__(self):
-        super().__init__('')
-
 
 class BlockedStatus(StatusBase):
     """The unit requires manual intervention.
