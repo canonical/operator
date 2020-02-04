@@ -738,7 +738,7 @@ class StoredState:
                     parent.__dict__[attr_name] = bound
                     break
             else:
-                raise RuntimeError("Cannot find StoredVariable attribute in type {}".format(parent_type.__name__))
+                raise RuntimeError("cannot find StoredVariable attribute in type {}".format(parent_type.__name__))
 
         return bound
 
