@@ -204,11 +204,11 @@ class CharmMeta:
         self.series = raw.get('series', [])
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
-        self.requires = {name: RelationMeta('requirer', name, rel)
+        self.requires = {name: RelationMeta('requires', name, rel)
                          for name, rel in raw.get('requires', {}).items()}
-        self.provides = {name: RelationMeta('provider', name, rel)
+        self.provides = {name: RelationMeta('provides', name, rel)
                          for name, rel in raw.get('provides', {}).items()}
-        self.peers = {name: RelationMeta('peer', name, rel)
+        self.peers = {name: RelationMeta('peers', name, rel)
                       for name, rel in raw.get('peers', {}).items()}
         self.relations = {}
         self.relations.update(self.requires)
