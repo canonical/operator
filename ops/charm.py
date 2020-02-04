@@ -1,5 +1,7 @@
 import os
 
+import yaml
+
 from ops.framework import Object, EventSource, EventBase, EventsBase
 
 
@@ -202,11 +204,11 @@ class CharmMeta:
         self.series = raw.get('series', [])
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
-        self.requires = {name: RelationMeta('requires', name, rel)
+        self.requires = {name: RelationMeta('requirer', name, rel)
                          for name, rel in raw.get('requires', {}).items()}
-        self.provides = {name: RelationMeta('provides', name, rel)
+        self.provides = {name: RelationMeta('provider', name, rel)
                          for name, rel in raw.get('provides', {}).items()}
-        self.peers = {name: RelationMeta('peers', name, rel)
+        self.peers = {name: RelationMeta('peer', name, rel)
                       for name, rel in raw.get('peers', {}).items()}
         self.relations = {}
         self.relations.update(self.requires)
@@ -220,6 +222,14 @@ class CharmMeta:
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', [])
         self.functions = {name: FunctionMeta(name, function) for name, function in functions_raw.items()}
+
+    @classmethod
+    def from_yaml(cls, metadata, actions=None):
+        meta = yaml.safe_load(metadata)
+        raw_actions = {}
+        if actions is not None:
+            raw_actions = yaml.safe_load(actions)
+        return cls(meta, raw_actions)
 
 
 class RelationMeta:
