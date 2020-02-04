@@ -5,6 +5,8 @@ for early testing.
 
 ## Getting Started
 
+### Manual Steps
+
 Your charm directory should have the following overall structure:
 
 ```
@@ -69,6 +71,11 @@ class MyCharm(CharmBase):
 
 Every standard event in Juju may be observed that way, and you can also easily
 define your own events in your custom types.
+
+## mkcharmtree script
+
+This script can be found in the charm_tools directory.
+
 
 The `hooks/` directory will then contain symlinks to your `src/charm.py` entry
 point so that Juju can call it. You only need to set up the `hooks/install` link
