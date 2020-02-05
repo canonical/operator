@@ -9,10 +9,15 @@ class HookEvent(EventBase):
 
 class ActionEvent(EventBase):
 
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._params = None
+
     def defer(self):
         raise RuntimeError('cannot defer action events')
 
     def restore(self, snapshot):
+        self._params = None
         env_action_name = os.environ.get('JUJU_ACTION_NAME')
         event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
         if event_action_name != env_action_name:
@@ -21,8 +26,9 @@ class ActionEvent(EventBase):
 
     @property
     def params(self):
-        # NoneType will be returned if an action has no parameters defined so getattr is used instead of a check for NoneType.
-        self._params = getattr(self, '_params', self.framework.model._backend.action_get())
+        # NoneType will be returned if an action has no parameters defined but in that case this property is unlikely to be used.
+        if self._params is None:
+            self._params = self.framework.model._backend.action_get()
         return self._params
 
     def set_results(self, results):
