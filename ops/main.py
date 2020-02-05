@@ -28,7 +28,7 @@ def _get_charm_dir():
 
 
 def _load_metadata(charm_dir):
-    metadata = yaml.load((charm_dir / 'metadata.yaml').read_text(), Loader=yaml.SafeLoader)
+    metadata = yaml.safe_load((charm_dir / 'metadata.yaml').read_text())
 
     actions_meta = charm_dir / 'actions.yaml'
     if actions_meta.exists():

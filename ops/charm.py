@@ -1,5 +1,7 @@
 import os
 
+import yaml
+
 from ops.framework import Object, EventSource, EventBase, EventsBase
 
 
@@ -220,6 +222,14 @@ class CharmMeta:
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', [])
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw.items()}
+
+    @classmethod
+    def from_yaml(cls, metadata, actions=None):
+        meta = yaml.safe_load(metadata)
+        raw_actions = {}
+        if actions is not None:
+            raw_actions = yaml.safe_load(actions)
+        return cls(meta, raw_actions)
 
 
 class RelationMeta:
