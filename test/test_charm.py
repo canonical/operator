@@ -199,7 +199,7 @@ storage:
         ])
 
     @classmethod
-    def _get_function_test_meta(cls):
+    def _get_action_test_meta(cls):
         # language=YAML
         return CharmMeta.from_yaml(metadata='''
 name: my-charm
@@ -220,40 +220,40 @@ start:
   description: "Start the unit."
 ''')
 
-    def _test_function_events(self, cmd_type):
+    def _test_action_events(self, cmd_type):
 
         class MyCharm(CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
-                framework.observe(self.on.foo_bar_function, self)
-                framework.observe(self.on.start_function, self)
+                framework.observe(self.on.foo_bar_action, self)
+                framework.observe(self.on.start_action, self)
 
-            def on_foo_bar_function(self, event):
-                self.seen_function_params = event.params
+            def on_foo_bar_action(self, event):
+                self.seen_action_params = event.params
                 event.log('test-log')
                 event.set_results({'res': 'val with spaces'})
                 event.fail('test-fail')
 
-            def on_start_function(self, event):
+            def on_start_action(self, event):
                 pass
 
         fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
         fake_script(self, f'{cmd_type}-set', "")
         fake_script(self, f'{cmd_type}-log', "")
         fake_script(self, f'{cmd_type}-fail', "")
-        self.meta = self._get_function_test_meta()
+        self.meta = self._get_action_test_meta()
 
         os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'foo-bar'
         framework = self.create_framework()
         charm = MyCharm(framework, None)
 
         events = list(MyCharm.on.events())
-        self.assertIn('foo_bar_function', events)
-        self.assertIn('start_function', events)
+        self.assertIn('foo_bar_action', events)
+        self.assertIn('start_action', events)
 
-        charm.on.foo_bar_function.emit()
-        self.assertEqual(charm.seen_function_params, {"foo-name": "name", "silent": True})
+        charm.on.foo_bar_action.emit()
+        self.assertEqual(charm.seen_action_params, {"foo-name": "name", "silent": True})
         self.assertEqual(fake_script_calls(self), [
             [f'{cmd_type}-get', '--format=json'],
             [f'{cmd_type}-log', "test-log"],
@@ -261,43 +261,37 @@ start:
             [f'{cmd_type}-fail', "test-fail"],
         ])
 
-        # Make sure that function events that do not match the current context are
+        # Make sure that action events that do not match the current context are
         # not possible to emit by hand.
         with self.assertRaises(RuntimeError):
-            charm.on.start_function.emit()
+            charm.on.start_action.emit()
 
-    def test_function_events(self):
-        self._test_function_events('function')
+    def test_action_events(self):
+        self._test_action_events('action')
 
-    def test_function_events_legacy(self):
-        self._test_function_events('action')
-
-    def _test_function_event_defer_fails(self, cmd_type):
+    def _test_action_event_defer_fails(self, cmd_type):
 
         class MyCharm(CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
-                framework.observe(self.on.start_function, self)
+                framework.observe(self.on.start_action, self)
 
-            def on_start_function(self, event):
+            def on_start_action(self, event):
                 event.defer()
 
         fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
-        self.meta = self._get_function_test_meta()
+        self.meta = self._get_action_test_meta()
 
         os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'start'
         framework = self.create_framework()
         charm = MyCharm(framework, None)
 
         with self.assertRaises(RuntimeError):
-            charm.on.start_function.emit()
+            charm.on.start_action.emit()
 
-    def test_function_event_defer_fails(self):
-        self._test_function_event_defer_fails('function')
-
-    def test_function_event_defer_legacy(self):
-        self._test_function_event_defer_fails('action')
+    def test_action_event_defer_fails(self):
+        self._test_action_event_defer_fails('action')
 
 
 if __name__ == "__main__":
