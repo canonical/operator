@@ -41,14 +41,14 @@ class JujuVersion:
     def _less_than_property(self, other, prop):
         self_prop = getattr(self, prop)
         other_prop = getattr(other, prop)
-        if self_prop != other_prop:
-            if prop == 'tag':
-                if not self_prop:
-                    return False
-                elif not other_prop:
-                    return True
-            return self_prop < other_prop
-        return None
+        if self_prop == other_prop:
+            return None
+        if prop == 'tag':
+            if not self_prop:
+                return False
+            elif not other_prop:
+                return True
+        return self_prop < other_prop
 
     def __lt__(self, other):
         if self is other:

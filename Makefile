@@ -1,7 +1,7 @@
-lint:
-	@flake8
-
 test: lint
 	@python3 -m unittest
 
-.PHONY: test
+lint:
+	@flake8
+
+.PHONY: lint test
