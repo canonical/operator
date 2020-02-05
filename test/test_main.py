@@ -33,8 +33,6 @@ from ops.charm import (
     ActionEvent,
 )
 
-from .test_helpers import fake_script
-
 # This relies on the expected repository structure to find a path to source of the charm under test.
 TEST_CHARM_DIR = Path(f'{__file__}/../charms/test_main').resolve()
 
@@ -205,8 +203,6 @@ start:
             'STATE_FILE': self._state_file,
             'USE_ACTIONS': True,
         }))
-
-        fake_script(self, 'action-get', "echo '{}'")
 
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml

@@ -18,8 +18,12 @@ class ActionEvent(EventBase):
         if event_action_name != env_action_name:
             # This could only happen if the dev manually emits the action, or from a bug.
             raise RuntimeError('action event kind does not match current action')
-        # Params are loaded at restore rather than __init__ because the model is not available in __init__.
-        self.params = self.framework.model._backend.action_get()
+
+    @property
+    def params(self):
+        # NoneType will be returned if an action has no parameters defined so getattr is used instead of a check for NoneType.
+        self._params = getattr(self, '_params', self.framework.model._backend.action_get())
+        return self._params
 
     def set_results(self, results):
         self.framework.model._backend.action_set(results)
