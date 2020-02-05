@@ -43,7 +43,8 @@ class Model:
                     return relation
             else:
                 # The relation may be dead, but it is not forgotten.
-                return Relation(relation_name, relation_id, self._meta.relations[relation_name].role, self.unit, self._backend, self._cache)
+                our_app = self.app if self._meta.relations[relation_name].role == 'peers' else None
+                return Relation(relation_name, relation_id, our_app, self.unit, self._backend, self._cache)
         else:
             num_related = len(self.relations[relation_name])
             if num_related == 0:
@@ -218,23 +219,22 @@ class RelationMapping(Mapping):
         relation_list = self._data[relation_name]
         if relation_list is None:
             relation_list = self._data[relation_name] = []
-            relation_role = self._relations_meta[relation_name].role
+            our_app = self._our_unit.app if self._relations_meta[relation_name].role == 'peers' else None
             for relation_id in self._backend.relation_ids(relation_name):
-                relation_list.append(Relation(relation_name, relation_id, relation_role, self._our_unit, self._backend, self._cache))
+                relation_list.append(Relation(relation_name, relation_id, our_app, self._our_unit, self._backend, self._cache))
         return relation_list
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, role, our_unit, backend, cache):
+    def __init__(self, relation_name, relation_id, our_app, our_unit, backend, cache):
         self.name = relation_name
         self.id = relation_id
-        self.role = role
         self.app = None
         self.units = set()
 
         # For peer relations, both the remote and the local app are the same.
-        if self.role == 'peers':
-            self.app = our_unit.app
+        if our_app is not None:
+            self.app = our_app
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
