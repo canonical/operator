@@ -10,7 +10,7 @@ import ops.model
 import ops.charm
 from ops.charm import RelationMeta
 
-from .test_helpers import fake_script, fake_script_calls
+from test.test_helpers import fake_script, fake_script_calls
 
 
 class TestModel(unittest.TestCase):
@@ -457,11 +457,6 @@ class TestModel(unittest.TestCase):
             ops.model.ActiveStatus('test')
 
     def test_local_set_valid_unit_status(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         test_cases = [(
             ops.model.ActiveStatus(),
             lambda: fake_script(self, 'status-set', 'exit 0'),
@@ -490,13 +485,7 @@ class TestModel(unittest.TestCase):
             check_tool_calls()
 
     def test_local_set_valid_app_status(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'is-leader', 'echo true')
-
         test_cases = [(
             ops.model.ActiveStatus(),
             lambda: fake_script(self, 'status-set', 'exit 0'),
@@ -525,11 +514,6 @@ class TestModel(unittest.TestCase):
             check_tool_calls()
 
     def test_set_app_status_non_leader_raises(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'is-leader', 'echo false')
 
         with self.assertRaises(RuntimeError):
@@ -539,11 +523,6 @@ class TestModel(unittest.TestCase):
             self.model.app.status = ops.model.ActiveStatus()
 
     def test_local_set_invalid_status(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'status-set', 'exit 1')
         fake_script(self, 'is-leader', 'echo true')
 
