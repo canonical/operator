@@ -26,9 +26,12 @@ class ActionEvent(EventBase):
 
     @property
     def params(self):
-        # NoneType will be returned if an action has no parameters defined but in that case this property is unlikely to be used.
+        # None will be returned if an action has no parameters defined but in that case this property is unlikely to be used.
         if self._params is None:
             self._params = self.framework.model._backend.action_get()
+            if self._params is None:
+                # No parameters defined for an action but avoid calling action-get again due to LP: #1862026.
+                self._params = {}
         return self._params
 
     def set_results(self, results):

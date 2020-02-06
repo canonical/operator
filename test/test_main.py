@@ -33,6 +33,8 @@ from ops.charm import (
     ActionEvent,
 )
 
+from .test_helpers import fake_script
+
 # This relies on the expected repository structure to find a path to source of the charm under test.
 TEST_CHARM_DIR = Path(f'{__file__}/../charms/test_main').resolve()
 
@@ -207,54 +209,68 @@ start:
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
         events_under_test = [(
+            [],
             EventSpec(InstallEvent, 'install', charm_config=charm_config),
             {},
         ), (
+            [],
             EventSpec(StartEvent, 'start', charm_config=charm_config),
             {},
         ), (
+            [],
             EventSpec(UpdateStatusEvent, 'update_status', charm_config=charm_config),
             {},
         ), (
+            [],
             EventSpec(LeaderSettingsChangedEvent, 'leader_settings_changed', charm_config=charm_config),
             {},
         ), (
+            [],
             EventSpec(RelationJoinedEvent, 'db_relation_joined', relation_id=1,
                       remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'db', 'relation_id': 1, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
+            [],
             EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
                       remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
+            [],
             EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
                       remote_app='remote', remote_unit=None, charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': None},
         ), (
+            [],
             EventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2,
                       remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
+            [],
             EventSpec(RelationBrokenEvent, 'ha_relation_broken', relation_id=3,
                       charm_config=charm_config),
             {'relation_name': 'ha', 'relation_id': 3},
         ), (
+            [],
             # Events without a remote app specified (for Juju < 2.7).
             EventSpec(RelationJoinedEvent, 'db_relation_joined', relation_id=1,
                       remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'db', 'relation_id': 1, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
+            [],
             EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
                       remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
+            [],
             EventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2,
                       remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
+            [lambda: fake_script(self, 'action-get', "echo '{}'")],
             EventSpec(ActionEvent, 'start_action', env_var='JUJU_ACTION_NAME', charm_config=actions_charm_config),
             {},
         ), (
+            [lambda: fake_script(self, 'action-get', """echo '{"foo-name":"bar","silent":false}'""")],
             EventSpec(ActionEvent, 'foo_bar_action', env_var='JUJU_ACTION_NAME', charm_config=actions_charm_config),
             {},
         )]
@@ -265,7 +281,10 @@ start:
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
 
         # Simulate hook executions for every event.
-        for event_spec, expected_event_data in events_under_test:
+        for fake_scripts, event_spec, expected_event_data in events_under_test:
+            for script in fake_scripts:
+                script()
+
             state = self._simulate_event(event_spec)
 
             state_key = f'on_{event_spec.event_name}'

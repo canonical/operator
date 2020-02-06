@@ -128,12 +128,19 @@ class Charm(CharmBase):
 
     def on_start_action(self, event):
         assert event.handle.kind == 'start_action', 'event action name cannot be different from the one being handled'
+
+        assert event.params == {}
+
         self._state['on_start_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
 
     def on_foo_bar_action(self, event):
         assert event.handle.kind == 'foo_bar_action', 'event action name cannot be different from the one being handled'
+
+        assert event.params['foo-name'] == 'bar'
+        assert event.params['silent'] is False
+
         self._state['on_foo_bar_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
