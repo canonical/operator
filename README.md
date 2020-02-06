@@ -28,13 +28,6 @@ submodule:
 git submodule add https://github.com/canonical/operator mod/operator
 ```
 
-You can sync subsequent changes from the framework and other submodule
-dependencies by running:
-
-```
-git submodule update
-```
-
 Then symlink from the git submodule for the operator framework into the `lib/`
 directory of your charm so it can be imported at run time:
 
@@ -45,6 +38,20 @@ ln -s ../mod/operator/ops lib/ops
 Other dependencies included as git submodules can be added in the `mod/`
 directory and symlinked into `lib/` as well.
 
+You can sync subsequent changes from the framework and other submodule
+dependencies by running:
+
+```
+git submodule update
+```
+
+Those cloning and checking out the source for your charm for the first time
+will need to run:
+
+```
+git submodule update --init
+```
+
 Your `src/charm.py` is the entry point for your charm logic. It should be set
 to executable and use Python 3.6 or greater (as such, operator charms can only
 support Ubuntu 18.04 or later). At a minimum, it needs to define a subclass of
@@ -52,9 +59,10 @@ support Ubuntu 18.04 or later). At a minimum, it needs to define a subclass of
 
 ```python
 import sys
+sys.path.append('lib')  # noqa: E402
 
-from lib.ops.charm import CharmBase
-from lib.ops.main import main
+from ops.charm import CharmBase
+from ops.main import main
 
 
 class MyCharm(CharmBase):
