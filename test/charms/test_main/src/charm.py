@@ -40,6 +40,7 @@ class Charm(CharmBase):
         self._state['on_ha_relation_broken'] = []
         self._state['on_foo_bar_action'] = []
         self._state['on_start_action'] = []
+        self._state['on_test_event_action'] = []
 
         # Observed event types per invocation. A list is used to preserve the order in which charm handlers have observed the events.
         self._state['observed_event_types'] = []
@@ -59,6 +60,7 @@ class Charm(CharmBase):
         if self._charm_config.get('USE_ACTIONS'):
             self.framework.observe(self.on.start_action, self)
             self.framework.observe(self.on.foo_bar_action, self)
+            self.framework.observe(self.on.test_event_action, self)
 
     def _write_state(self):
         """Write state variables so that the parent process can read them.
@@ -128,20 +130,24 @@ class Charm(CharmBase):
 
     def on_start_action(self, event):
         assert event.handle.kind == 'start_action', 'event action name cannot be different from the one being handled'
-
-        assert event.params == {}
-
         self._state['on_start_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
 
     def on_foo_bar_action(self, event):
         assert event.handle.kind == 'foo_bar_action', 'event action name cannot be different from the one being handled'
-
-        assert event.params['foo-name'] == 'bar'
-        assert event.params['silent'] is False
-
         self._state['on_foo_bar_action'].append(type(event))
+        self._state['observed_event_types'].append(type(event))
+        self._write_state()
+
+    def on_test_event_action(self, event):
+        assert event.params['string-param'] == 'foo'
+        assert event.params['bool-param'] is False
+        assert event.params['int-param'] == 0
+        event.set_results({'out': 'something'})
+        event.log('progress-message')
+        event.fail('failure-message')
+        self._state['on_test_event_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
 
