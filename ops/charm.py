@@ -1,5 +1,7 @@
 import os
 
+import yaml
+
 from ops.framework import Object, EventSource, EventBase, EventsBase
 
 
@@ -7,28 +9,28 @@ class HookEvent(EventBase):
     pass
 
 
-class FunctionEvent(EventBase):
+class ActionEvent(EventBase):
 
     def defer(self):
-        raise RuntimeError('cannot defer function events')
+        raise RuntimeError('cannot defer action events')
 
     def restore(self, snapshot):
-        env_function_name = os.environ.get('JUJU_FUNCTION_NAME', os.environ.get('JUJU_ACTION_NAME'))
-        event_function_name = self.handle.kind[:-len('_function')].replace('_', '-')
-        if event_function_name != env_function_name:
-            # This could only happen if the dev manually emits the function, or from a bug.
-            raise RuntimeError('function event kind does not match current function')
+        env_action_name = os.environ.get('JUJU_ACTION_NAME')
+        event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
+        if event_action_name != env_action_name:
+            # This could only happen if the dev manually emits the action, or from a bug.
+            raise RuntimeError('action event kind does not match current action')
         # Params are loaded at restore rather than __init__ because the model is not available in __init__.
-        self.params = self.framework.model._backend.function_get()
+        self.params = self.framework.model._backend.action_get()
 
     def set_results(self, results):
-        self.framework.model._backend.function_set(results)
+        self.framework.model._backend.action_set(results)
 
     def log(self, message):
-        self.framework.model._backend.function_log(message)
+        self.framework.model._backend.action_log(message)
 
     def fail(self, message=''):
-        self.framework.model._backend.function_fail(message)
+        self.framework.model._backend.action_fail(message)
 
 
 class InstallEvent(HookEvent):
@@ -170,9 +172,9 @@ class CharmBase(Object):
             self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
             self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
 
-        for function_name in self.framework.meta.functions:
-            function_name = function_name.replace('-', '_')
-            self.on.define_event(f'{function_name}_function', FunctionEvent)
+        for action_name in self.framework.meta.actions:
+            action_name = action_name.replace('-', '_')
+            self.on.define_event(f'{action_name}_action', ActionEvent)
 
 
 class CharmMeta:
@@ -188,7 +190,7 @@ class CharmMeta:
     the relation definition can be obtained from its role attribute.
     """
 
-    def __init__(self, raw={}, functions_raw={}):
+    def __init__(self, raw={}, actions_raw={}):
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
@@ -219,7 +221,15 @@ class CharmMeta:
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', [])
-        self.functions = {name: FunctionMeta(name, function) for name, function in functions_raw.items()}
+        self.actions = {name: ActionMeta(name, action) for name, action in actions_raw.items()}
+
+    @classmethod
+    def from_yaml(cls, metadata, actions=None):
+        meta = yaml.safe_load(metadata)
+        raw_actions = {}
+        if actions is not None:
+            raw_actions = yaml.safe_load(actions)
+        return cls(meta, raw_actions)
 
 
 class RelationMeta:
@@ -271,7 +281,7 @@ class PayloadMeta:
         self.type = raw['type']
 
 
-class FunctionMeta:
+class ActionMeta:
 
     def __init__(self, name, raw=None):
         raw = raw or {}
