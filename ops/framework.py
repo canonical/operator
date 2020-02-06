@@ -704,6 +704,12 @@ class BoundStoredState:
         self._data[key] = _unwrap_stored(self._data, value)
         self.on.changed.emit()
 
+    def set_default(self, **kwargs):
+        """"Set the value of any given key if it has not already been set"""
+        for k, v in kwargs.items():
+            if k not in self._data:
+                self._data[k] = v
+
 
 class StoredState:
 
@@ -732,7 +738,7 @@ class StoredState:
                     parent.__dict__[attr_name] = bound
                     break
             else:
-                raise RuntimeError("Cannot find StoredVariable attribute in type {}".format(parent_type.__name__))
+                raise RuntimeError("cannot find StoredVariable attribute in type {}".format(parent_type.__name__))
 
         return bound
 

@@ -30,7 +30,7 @@ from ops.charm import (
     RelationBrokenEvent,
     RelationEvent,
     StorageAttachedEvent,
-    FunctionEvent,
+    ActionEvent,
 )
 
 from .test_helpers import fake_script
@@ -80,10 +80,10 @@ class TestMain(unittest.TestCase):
     def _setup_charm_dir(self):
         self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
-        self.charm_exec_path = os.path.relpath(self.JUJU_CHARM_DIR / 'lib/charm.py', self.hooks_dir)
+        self.charm_exec_path = os.path.relpath(self.JUJU_CHARM_DIR / 'src/charm.py', self.hooks_dir)
         shutil.copytree(TEST_CHARM_DIR, self.JUJU_CHARM_DIR)
 
-        charm_spec = importlib.util.spec_from_file_location("charm", str(self.JUJU_CHARM_DIR / 'lib/charm.py'))
+        charm_spec = importlib.util.spec_from_file_location("charm", str(self.JUJU_CHARM_DIR / 'src/charm.py'))
         self.charm_module = importlib.util.module_from_spec(charm_spec)
         charm_spec.loader.exec_module(self.charm_module)
 
@@ -96,8 +96,8 @@ class TestMain(unittest.TestCase):
             hook_path = self.hooks_dir / hook
             hook_path.symlink_to(self.charm_exec_path)
 
-    def _prepare_functions(self, legacy=False):
-        functions_meta = '''
+    def _prepare_actions(self):
+        actions_meta = '''
 foo-bar:
   description: Foos the bar.
   title: foo-bar
@@ -113,20 +113,16 @@ foo-bar:
     - foo-name
 start:
     description: Start the unit.'''
-        if legacy:
-            functions_dir_name = 'actions'
-            functions_meta_file = 'actions.yaml'
-        else:
-            functions_dir_name = 'functions'
-            functions_meta_file = 'functions.yaml'
+        actions_dir_name = 'actions'
+        actions_meta_file = 'actions.yaml'
 
-        with open(self.JUJU_CHARM_DIR / functions_meta_file, 'w+') as f:
-            f.write(functions_meta)
-        functions_dir = self.JUJU_CHARM_DIR / functions_dir_name
-        functions_dir.mkdir()
-        for function_name in ('start', 'foo-bar'):
-            function_path = functions_dir / function_name
-            function_path.symlink_to(self.charm_exec_path)
+        with open(self.JUJU_CHARM_DIR / actions_meta_file, 'w+') as f:
+            f.write(actions_meta)
+        actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
+        actions_dir.mkdir()
+        for action_name in ('start', 'foo-bar'):
+            action_path = actions_dir / action_name
+            action_path.symlink_to(self.charm_exec_path)
 
     def _read_and_clear_state(self):
         state = None
@@ -164,24 +160,22 @@ start:
                 'JUJU_REMOTE_UNIT': '',
                 'JUJU_REMOTE_APP': '',
             })
-        if issubclass(event_spec.event_type, FunctionEvent):
-            event_filename = event_spec.event_name[:-len('_function')].replace('_', '-')
+        if issubclass(event_spec.event_type, ActionEvent):
+            event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
             env.update({
                 event_spec.env_var: event_filename,
             })
-            if event_spec.env_var == 'JUJU_FUNCTION_NAME':
-                event_dir = 'functions'
-            elif event_spec.env_var == 'JUJU_ACTION_NAME':
+            if event_spec.env_var == 'JUJU_ACTION_NAME':
                 event_dir = 'actions'
             else:
-                raise RuntimeError('invalid envar name specified for a function event')
+                raise RuntimeError('invalid envar name specified for a action event')
         else:
             event_filename = event_spec.event_name.replace('_', '-')
             event_dir = 'hooks'
         event_file = self.JUJU_CHARM_DIR / event_dir / event_filename
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call([sys.executable, event_file], env=env, cwd=self.JUJU_CHARM_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.check_call([sys.executable, event_file], env=env, cwd=self.JUJU_CHARM_DIR)
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -202,17 +196,17 @@ start:
         self.assertEqual(state['observed_event_types'], [ConfigChangedEvent, UpdateStatusEvent])
 
     def test_multiple_events_handled(self):
-        self._prepare_functions()
+        self._prepare_actions()
 
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
-        functions_charm_config = base64.b64encode(pickle.dumps({
+        actions_charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
-            'USE_FUNCTIONS': True,
+            'USE_ACTIONS': True,
         }))
 
-        fake_script(self, 'function-get', "echo '{}'")
+        fake_script(self, 'action-get', "echo '{}'")
 
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
@@ -262,10 +256,10 @@ start:
                       remote_unit='remote/0', charm_config=charm_config),
             {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
         ), (
-            EventSpec(FunctionEvent, 'start_function', env_var='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
+            EventSpec(ActionEvent, 'start_action', env_var='JUJU_ACTION_NAME', charm_config=actions_charm_config),
             {},
         ), (
-            EventSpec(FunctionEvent, 'foo_bar_function', env_var='JUJU_FUNCTION_NAME', charm_config=functions_charm_config),
+            EventSpec(ActionEvent, 'foo_bar_action', env_var='JUJU_ACTION_NAME', charm_config=actions_charm_config),
             {},
         )]
 
@@ -291,25 +285,6 @@ start:
 
             if event_spec.event_name in expected_event_data:
                 self.assertEqual(state[f'{event_spec.event_name}_data'], expected_event_data[event_spec.event_name])
-
-    def test_legacy_function(self):
-        self._prepare_functions(legacy=True)
-        charm_config = base64.b64encode(pickle.dumps({
-            'STATE_FILE': self._state_file,
-            'USE_FUNCTIONS': True,
-        }))
-
-        fake_script(self, 'action-get', "echo '{}'")
-
-        # First run "install" to make sure all hooks are set up.
-        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-        event_spec = EventSpec(FunctionEvent, 'foo_bar_function', env_var='JUJU_ACTION_NAME', charm_config=charm_config)
-        state = self._simulate_event(event_spec)
-        handled_events = state.get(f'on_{event_spec.event_name}', [])
-        self.assertEqual(len(handled_events), 1)
-        handled_event_type = handled_events[0]
-        self.assertEqual(handled_event_type, event_spec.event_type)
-        self.assertEqual(state['observed_event_types'], [event_spec.event_type])
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit.
@@ -359,25 +334,15 @@ start:
             self._simulate_event(initial_event)
             _assess_event_links(initial_event)
 
-    def test_setup_function_links(self):
+    def test_setup_action_links(self):
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
-        functions_yaml = self.JUJU_CHARM_DIR / 'functions.yaml'
-        functions_yaml.write_text('test: {}')
+        actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
+        actions_yaml.write_text('test: {}')
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-        function_hook = self.JUJU_CHARM_DIR / 'functions' / 'test'
-        self.assertTrue(function_hook.exists())
-
-    def test_functions_actions_mutually_exclusive(self):
-        self._prepare_functions()
-        self._prepare_functions(legacy=True)
-        charm_config = base64.b64encode(pickle.dumps({
-            'STATE_FILE': self._state_file,
-            'USE_FUNCTIONS': True,
-        }))
-        with self.assertRaises(subprocess.CalledProcessError):
-            self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        action_hook = self.JUJU_CHARM_DIR / 'actions' / 'test'
+        self.assertTrue(action_hook.exists())
 
 
 if __name__ == "__main__":
