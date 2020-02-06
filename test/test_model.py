@@ -816,6 +816,20 @@ class TestModelBackend(unittest.TestCase):
         self.backend.action_log('progress: 42%')
         self.assertEqual(fake_script_calls(self), [['action-log', 'progress: 42%']])
 
+    def test_juju_log(self):
+        fake_script(self, 'juju-log', 'exit 0')
+        self.backend.juju_log('foo', 'WARNING')
+        self.assertEqual(fake_script_calls(self, clear=True), [['juju-log', '--log-level', 'WARNING', 'foo']])
+
+        with self.assertRaises(TypeError):
+            self.backend.juju_log('foo')
+        self.assertEqual(fake_script_calls(self, clear=True), [])
+
+        fake_script(self, 'juju-log', 'exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.juju_log('foo', 'BAR')
+        self.assertEqual(fake_script_calls(self, clear=True), [['juju-log', '--log-level', 'BAR', 'foo']])
+
 
 if __name__ == "__main__":
     unittest.main()

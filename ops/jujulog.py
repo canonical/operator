@@ -10,3 +10,9 @@ class JujuLogHandler(logging.Handler):
 
     def emit(self, record):
         self.model_backend.juju_log(self.format(record), level=record.levelname)
+
+
+def setup_default_logging(model_backend):
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(JujuLogHandler(model_backend))

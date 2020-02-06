@@ -77,6 +77,8 @@ class TestMain(unittest.TestCase):
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
+        fake_script(self, 'juju-log', "exit 0")
+
     def _setup_charm_dir(self):
         self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
@@ -361,28 +363,27 @@ log_debug: {}
 
         test_cases = [(
             EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
-            [['juju-log', '--log-level', 'CRITICAL', 'super critical']],
+            ['juju-log', '--log-level', 'CRITICAL', 'super critical'],
         ), (
             EventSpec(ActionEvent, 'log_error_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
-            [['juju-log', '--log-level', 'ERROR', 'grave error']],
+            ['juju-log', '--log-level', 'ERROR', 'grave error'],
         ), (
             EventSpec(ActionEvent, 'log_warning_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
-            [['juju-log', '--log-level', 'WARNING', 'wise warning']],
+            ['juju-log', '--log-level', 'WARNING', 'wise warning'],
         ), (
             EventSpec(ActionEvent, 'log_info_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
-            [['juju-log', '--log-level', 'INFO', 'useful info']],
+            ['juju-log', '--log-level', 'INFO', 'useful info'],
         ), (
             EventSpec(ActionEvent, 'log_debug_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
-            [['juju-log', '--log-level', 'DEBUG', 'insightful debug']],
+            ['juju-log', '--log-level', 'DEBUG', 'insightful debug'],
         )]
 
-        fake_script(self, 'juju-log', "exit 0")
         # Set up action symlinks.
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
 
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
-            self.assertEqual(fake_script_calls(self, clear=True), calls)
+            self.assertIn(calls, fake_script_calls(self, clear=True))
 
 
 if __name__ == "__main__":
