@@ -1139,6 +1139,29 @@ class TestStoredState(unittest.TestCase):
                 self.assertEqual(a, old_a)
                 self.assertEqual(b, old_b)
 
+    def test_set_default(self):
+        framework = self.create_framework()
+
+        class StatefulObject(Object):
+            state = StoredState()
+        parent = StatefulObject(framework, 'key')
+        parent.state.set_default(foo=1)
+        self.assertEqual(parent.state.foo, 1)
+        parent.state.set_default(foo=2)
+        # foo was already set, so it doesn't get replaced
+        self.assertEqual(parent.state.foo, 1)
+        parent.state.set_default(foo=3, bar=4)
+        self.assertEqual(parent.state.foo, 1)
+        self.assertEqual(parent.state.bar, 4)
+        # reloading the state still leaves things at the default values
+        framework.commit()
+        del parent
+        parent = StatefulObject(framework, 'key')
+        parent.state.set_default(foo=5, bar=6)
+        self.assertEqual(parent.state.foo, 1)
+        self.assertEqual(parent.state.bar, 4)
+        # TODO(jam) 2020-01-30: is there a clean way to tell that parent.state._data.dirty is False?
+
 
 if __name__ == "__main__":
     unittest.main()

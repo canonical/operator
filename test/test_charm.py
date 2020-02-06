@@ -94,21 +94,25 @@ class TestCharm(unittest.TestCase):
                 assert event.relation.app.name == 'remote'
                 self.seen.append(type(event).__name__)
 
-        self.meta = CharmMeta({
-            'name': 'my-charm',
-            'requires': {
-                'req1': {'interface': 'req1'},
-                'req-2': {'interface': 'req2'},
-            },
-            'provides': {
-                'pro1': {'interface': 'pro1'},
-                'pro-2': {'interface': 'pro2'},
-            },
-            'peers': {
-                'peer1': {'interface': 'peer1'},
-                'peer-2': {'interface': 'peer2'},
-            },
-        })
+        # language=YAML
+        self.meta = CharmMeta.from_yaml(metadata='''
+name: my-charm
+requires:
+ req1:
+   interface: req1
+ req-2:
+   interface: req2
+provides:
+ pro1:
+   interface: pro1
+ pro-2:
+   interface: pro2
+peers:
+ peer1:
+   interface: peer1
+ peer-2:
+   interface: peer2
+''')
 
         charm = MyCharm(self.create_framework(), None)
 
@@ -155,30 +159,25 @@ class TestCharm(unittest.TestCase):
             def on_stor_4_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        self.meta = CharmMeta({
-            'name': 'my-charm',
-            'storage': {
-                'stor1': {'type': 'filesystem'},
-                'stor2': {
-                    'type': 'filesystem',
-                    'multiple': {
-                        'range': '2',
-                    },
-                },
-                'stor3': {
-                    'type': 'filesystem',
-                    'multiple': {
-                        'range': '2-',
-                    },
-                },
-                'stor-4': {
-                    'type': 'filesystem',
-                    'multiple': {
-                        'range': '2-4',
-                    },
-                },
-            },
-        })
+        # language=YAML
+        self.meta = CharmMeta.from_yaml('''
+name: my-charm
+storage:
+  stor-4:
+    multiple:
+      range: 2-4
+    type: filesystem
+  stor1:
+    type: filesystem
+  stor2:
+    multiple:
+      range: "2"
+    type: filesystem
+  stor3:
+    multiple:
+      range: 2-
+    type: filesystem
+''')
 
         self.assertIsNone(self.meta.storages['stor1'].multiple_range)
         self.assertEqual(self.meta.storages['stor2'].multiple_range, (2, 2))
@@ -200,66 +199,61 @@ class TestCharm(unittest.TestCase):
         ])
 
     @classmethod
-    def _get_function_test_meta(cls):
-        return CharmMeta(
-            {'name': 'my-charm'},
-            {
-                'foo-bar': {
-                    'description': 'Foos the bar.',
-                    'title': 'foo-bar',
-                    'required': 'foo-bar',
-                    'params': {
-                        'foo-name': {
-                            'type': 'string',
-                            'description': 'A foo name to bar',
-                        },
-                        'silent': {
-                            'type': 'boolean',
-                            'description': '',
-                            'default': False,
-                        },
-                    },
-                },
-                'start': {
-                    'description': 'Start the unit.'
-                }
-            }
-        )
+    def _get_action_test_meta(cls):
+        # language=YAML
+        return CharmMeta.from_yaml(metadata='''
+name: my-charm
+''', actions='''
+foo-bar:
+  description: "Foos the bar."
+  params:
+    foo-name:
+      description: "A foo name to bar"
+      type: string
+    silent:
+      default: false
+      description: ""
+      type: boolean
+  required: foo-bar
+  title: foo-bar
+start:
+  description: "Start the unit."
+''')
 
-    def _test_function_events(self, cmd_type):
+    def _test_action_events(self, cmd_type):
 
         class MyCharm(CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
-                framework.observe(self.on.foo_bar_function, self)
-                framework.observe(self.on.start_function, self)
+                framework.observe(self.on.foo_bar_action, self)
+                framework.observe(self.on.start_action, self)
 
-            def on_foo_bar_function(self, event):
-                self.seen_function_params = event.params
+            def on_foo_bar_action(self, event):
+                self.seen_action_params = event.params
                 event.log('test-log')
                 event.set_results({'res': 'val with spaces'})
                 event.fail('test-fail')
 
-            def on_start_function(self, event):
+            def on_start_action(self, event):
                 pass
 
         fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
         fake_script(self, f'{cmd_type}-set', "")
         fake_script(self, f'{cmd_type}-log', "")
         fake_script(self, f'{cmd_type}-fail', "")
-        self.meta = self._get_function_test_meta()
+        self.meta = self._get_action_test_meta()
 
         os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'foo-bar'
         framework = self.create_framework()
         charm = MyCharm(framework, None)
 
         events = list(MyCharm.on.events())
-        self.assertIn('foo_bar_function', events)
-        self.assertIn('start_function', events)
+        self.assertIn('foo_bar_action', events)
+        self.assertIn('start_action', events)
 
-        charm.on.foo_bar_function.emit()
-        self.assertEqual(charm.seen_function_params, {"foo-name": "name", "silent": True})
+        charm.on.foo_bar_action.emit()
+        self.assertEqual(charm.seen_action_params, {"foo-name": "name", "silent": True})
         self.assertEqual(fake_script_calls(self), [
             [f'{cmd_type}-get', '--format=json'],
             [f'{cmd_type}-log', "test-log"],
@@ -267,43 +261,37 @@ class TestCharm(unittest.TestCase):
             [f'{cmd_type}-fail', "test-fail"],
         ])
 
-        # Make sure that function events that do not match the current context are
+        # Make sure that action events that do not match the current context are
         # not possible to emit by hand.
         with self.assertRaises(RuntimeError):
-            charm.on.start_function.emit()
+            charm.on.start_action.emit()
 
-    def test_function_events(self):
-        self._test_function_events('function')
+    def test_action_events(self):
+        self._test_action_events('action')
 
-    def test_function_events_legacy(self):
-        self._test_function_events('action')
-
-    def _test_function_event_defer_fails(self, cmd_type):
+    def _test_action_event_defer_fails(self, cmd_type):
 
         class MyCharm(CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
-                framework.observe(self.on.start_function, self)
+                framework.observe(self.on.start_action, self)
 
-            def on_start_function(self, event):
+            def on_start_action(self, event):
                 event.defer()
 
         fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
-        self.meta = self._get_function_test_meta()
+        self.meta = self._get_action_test_meta()
 
         os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'start'
         framework = self.create_framework()
         charm = MyCharm(framework, None)
 
         with self.assertRaises(RuntimeError):
-            charm.on.start_function.emit()
+            charm.on.start_action.emit()
 
-    def test_function_event_defer_fails(self):
-        self._test_function_event_defer_fails('function')
-
-    def test_function_event_defer_legacy(self):
-        self._test_function_event_defer_fails('action')
+    def test_action_event_defer_fails(self):
+        self._test_action_event_defer_fails('action')
 
 
 if __name__ == "__main__":
