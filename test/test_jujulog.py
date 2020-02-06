@@ -38,15 +38,15 @@ class TestJujuLog(unittest.TestCase):
         self.assertIsInstance(logger.handlers[0], ops.jujulog.JujuLogHandler)
 
         test_cases = [(
-            lambda: logger.critical('critical'), ('critical', 'CRITICAL')
+            lambda: logger.critical('critical'), ('CRITICAL', 'critical')
         ), (
-            lambda: logger.error('error'), ('error', 'ERROR')
+            lambda: logger.error('error'), ('ERROR', 'error')
         ), (
-            lambda: logger.warning('warning'), ('warning', 'WARNING'),
+            lambda: logger.warning('warning'), ('WARNING', 'warning'),
         ), (
-            lambda: logger.info('info'), ('info', 'INFO'),
+            lambda: logger.info('info'), ('INFO', 'info'),
         ), (
-            lambda: logger.debug('debug'), ('debug', 'DEBUG')
+            lambda: logger.debug('debug'), ('DEBUG', 'debug')
         )]
 
         for do, res in test_cases:

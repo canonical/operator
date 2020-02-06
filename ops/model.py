@@ -635,5 +635,5 @@ class ModelBackend:
     def action_fail(self, message=''):
         self._run(f'action-fail', f"{message}")
 
-    def juju_log(self, message, level):
+    def juju_log(self, level, message):
         self._run('juju-log', '--log-level', level, message)

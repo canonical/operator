@@ -818,16 +818,16 @@ class TestModelBackend(unittest.TestCase):
 
     def test_juju_log(self):
         fake_script(self, 'juju-log', 'exit 0')
-        self.backend.juju_log('foo', 'WARNING')
+        self.backend.juju_log('WARNING', 'foo')
         self.assertEqual(fake_script_calls(self, clear=True), [['juju-log', '--log-level', 'WARNING', 'foo']])
 
         with self.assertRaises(TypeError):
-            self.backend.juju_log('foo')
+            self.backend.juju_log('DEBUG')
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
         fake_script(self, 'juju-log', 'exit 1')
         with self.assertRaises(ops.model.ModelError):
-            self.backend.juju_log('foo', 'BAR')
+            self.backend.juju_log('BAR', 'foo')
         self.assertEqual(fake_script_calls(self, clear=True), [['juju-log', '--log-level', 'BAR', 'foo']])
 
 

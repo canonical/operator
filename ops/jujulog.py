@@ -9,7 +9,7 @@ class JujuLogHandler(logging.Handler):
         self.model_backend = model_backend
 
     def emit(self, record):
-        self.model_backend.juju_log(self.format(record), level=record.levelname)
+        self.model_backend.juju_log(record.levelname, self.format(record))
 
 
 def setup_default_logging(model_backend):
