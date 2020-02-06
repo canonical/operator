@@ -16,13 +16,16 @@ class ActionEvent(EventBase):
     def defer(self):
         raise RuntimeError('cannot defer action events')
 
+    def snapshot(self):
+        return {'params': self._params}
+
     def restore(self, snapshot):
-        self._params = None
         env_action_name = os.environ.get('JUJU_ACTION_NAME')
         event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
         if event_action_name != env_action_name:
             # This could only happen if the dev manually emits the action, or from a bug.
             raise RuntimeError('action event kind does not match current action')
+        self._params = snapshot['params']
 
     @property
     def params(self):
