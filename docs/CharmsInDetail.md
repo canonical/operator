@@ -64,11 +64,21 @@ With the new charm framework we introduce the new interfaces, but continuing wit
 
 ![Old interfaces](./diagrams/charm_interfaces_drawing.jpg)
 
+You can see here that the interfaces provide the decoupling needed for two or more different charms to communicate with each other.
+
+### How we do interfaces in the new framework
+
+In the new framework we have a single file which handles this inter-charm information sharing.
+
+These interfaces need a charm writing doc of their own (todo) the takeaway here is that there is a single import for both charms to be able to communicate with each other.
+
+![New charm interfaces](./diagrams/charm_interfaces_drawing_new.jpg)
+
 ## Charm writing
 
 ### Add interface dependences
 
-Operator charms use Interfaces (Provide link?) as dependencies.
+Operator charms use Interfaces as dependencies.
 
 These dependencies are pulled in as git submodules, and should be added to the `.gitmodules` file, an example file looks like this:
 
@@ -115,11 +125,11 @@ def __init__(self, framework, key)
  1. Obvious! |||||||||  ||||
  2.      A reference to the framework
                               ||||
- 3.                          (todo)
+ 3.                           key (described below)
 
 ```
 
-this is followed by a call to super, looking like this:
+Number 3. Is yet unused in the framework.
 
 ```
     def __init__(self, framework, key):
@@ -174,12 +184,11 @@ sys.path.append('lib')
 
 ## Migrating from the old (reactive) framework
 
-
-
+TODO
 
 # Useful links
 
-[Writing Kubernetes Charms](https://discourse.jujucharms.com/t/writing-a-kubernetes-charm/159)
+TODO
 
 ## Example Charms
 
