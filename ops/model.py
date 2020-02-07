@@ -25,7 +25,7 @@ class Model:
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
-        self._bindings = None
+        self.bindings = BindingMapping(list(self._meta.relations) + list(self._meta.extra_bindings), self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -62,15 +62,17 @@ class Model:
     def get_app(self, app_name):
         return self._cache.get(Application, app_name)
 
-    @property
-    def bindings(self):
-        if self._bindings is None:
-            binding_keys = list(self._meta.relations) + list(self._meta.extra_bindings)
-            for endpoint_relations in self.relations.values():
-                if endpoint_relations:
-                    binding_keys.extend(endpoint_relations)
-            self._bindings = BindingMapping(binding_keys, self._backend)
-        return self._bindings
+    def get_binding(self, binding_name):
+        """Get a binding without specifying a relation id."""
+        return self.bindings._get_unique(binding_name)
+
+    def get_relation_binding(self, relation):
+        """Get a binding for a specific relation.
+
+        Using this method is preferred if you have a Relation object as network info provided by a returned
+        Binding object can be different depending on whether a relation is a cross-model relation or not.
+        """
+        return self.bindings._get_unique(relation.name, relation.id)
 
 
 class ModelCache:
@@ -236,17 +238,12 @@ class RelationMapping(Mapping):
 class BindingMapping(Mapping):
     """Map of Relation objects, relation endpoint names and names from extra-bindings to Binding objects."""
 
-    def __init__(self, keys, backend):
+    def __init__(self, binding_names, backend):
         """
         keys - Relation objects, relation endpoint names or names from extra-bindings.
         """
-        self._data = {}
-        for k in keys:
-            if isinstance(k, Relation):
-                self._data[k] = Binding(k.name, k.id, backend)
-            elif isinstance(k, str):
-                # A binding from a relation endpoint name or an extra-binding name.
-                self._data[k] = Binding(k, None, backend)
+        self._backend = backend
+        self._data = {binding_name: None for binding_name in binding_names}
 
     def __contains__(self, key):
         return key in self._data
@@ -257,8 +254,23 @@ class BindingMapping(Mapping):
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key):
-        return self._data[key]
+    def __getitem__(self, binding_name):
+        binding_list = self._data[binding_name]
+        if binding_list is None:
+            binding_list = self._data[binding_name] = []
+            # A relation id can be None which means a binding is not associated with a relation.
+            binding_list.append(Binding(binding_name, None, self._backend))
+            for relation_id in self._backend.relation_ids(binding_name):
+                binding_list.append(Binding(binding_name, relation_id, self._backend))
+        return binding_list
+
+    def _get_unique(self, binding_name, relation_id=None):
+        if not isinstance(relation_id, (int, type(None))):
+            raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
+        for binding in self[binding_name]:
+            if binding.relation_id == relation_id:
+                return binding
+        raise ModelError(f'a Binding object named "{binding_name}" with a relation id "{relation_id}" does not exist')
 
 
 class Binding:

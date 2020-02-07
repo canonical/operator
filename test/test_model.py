@@ -674,42 +674,81 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids',
                     """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
+        network_get_out = '''{
+  "bind-addresses": [
+    {
+      "mac-address": "",
+      "interface-name": "",
+      "addresses": [
+        {
+          "hostname": "",
+          "value": "192.0.2.2",
+          "cidr": ""
+        }
+      ]
+    }
+  ],
+  "egress-subnets": [
+    "192.0.2.2/32"
+  ],
+  "ingress-addresses": [
+    "192.0.2.2"
+  ]
+}'''
 
-        self.model.relations['db0']
-        self.assertEqual(fake_script_calls(self, clear=True), [
-            ['relation-ids', 'db0', '--format=json'],
-            ['relation-list', '-r', '4', '--format=json'],
-        ])
-
-        network_get_out = ('{"bind-addresses":[{"mac-address":"","interface-name":"",'
-                           '"addresses":[{"hostname":"","value":"192.0.2.2","cidr":""}]}]'
-                           ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
-
-        test_cases = [(
-            lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
-            'db0',
-            lambda binding_name: self.model.bindings[binding_name],
-            [['network-get', 'db0', '--format=json']],
-        ), (
-            lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
-            'db0',
-            lambda binding_name: self.model.bindings[self.model.get_relation(binding_name)],
-            [['network-get', 'db0', '-r', '4', '--format=json']],
-        ), (
-            lambda: fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1'''),
-            'deadbeef',
-            lambda binding_name: self.model.bindings[binding_name],
-            [['network-get', 'deadbeef', '--format=json']],
-        )]
-
-        for do_fake, binding_name, get_binding, expected_calls in test_cases:
-            do_fake()
-            binding = get_binding(binding_name)
+        def check_binding_data(binding_name, binding):
             self.assertEqual(binding.name, binding_name)
             self.assertEqual(binding.bind_address, '192.0.2.2')
             self.assertEqual(binding.ingress_address, '192.0.2.2')
             self.assertEqual(binding.egress_subnets, ['192.0.2.2/32'])
             self.assertEqual(binding.network_info, json.loads(network_get_out))
+
+        # Check that when there is one relation present 2 binding objects are returned during a name-based lookup.
+        fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1''')
+        db0_bindings = self.model.bindings['db0']
+        self.assertTrue(len(db0_bindings), 2)
+        self.assertEqual(fake_script_calls(self, clear=True), [['relation-ids', 'db0', '--format=json']])
+        for binding in db0_bindings:
+            check_binding_data('db0', binding)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+                ['network-get', 'db0', '--format=json'],
+                ['network-get', 'db0', '-r', '4', '--format=json'],
+        ])
+
+        single_binding_test_cases = [(
+            lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
+            'db0',
+            lambda binding_name: self.model.get_binding(binding_name),
+            [
+                ['relation-ids', 'db0', '--format=json'],
+                ['network-get', 'db0', '--format=json'],
+            ],
+        ), (
+            lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
+            'db0',
+            lambda binding_name: self.model.get_relation_binding(self.model.get_relation(binding_name)),
+            [
+                ['relation-ids', 'db0', '--format=json'],
+                # The two invocations below are due to the get_relation call.
+                ['relation-list', '-r', '4', '--format=json'],
+                ['relation-ids', 'db0', '--format=json'],
+                ['network-get', 'db0', '-r', '4', '--format=json'],
+            ],
+        ), (
+            lambda: fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1'''),
+            'deadbeef',
+            lambda binding_name: self.model.get_binding(binding_name),
+            [
+                ['relation-ids', 'deadbeef', '--format=json'],
+                ['network-get', 'deadbeef', '--format=json'],
+            ],
+        )]
+
+        for do_fake, binding_name, get_binding, expected_calls in single_binding_test_cases:
+            self.model = ops.model.Model('myapp/0', meta, self.backend)
+            do_fake()
+            binding = get_binding(binding_name)
+            check_binding_data(binding_name, binding)
             self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
 
