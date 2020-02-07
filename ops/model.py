@@ -331,9 +331,6 @@ class Relation:
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
-    def __hash__(self):
-        return hash((self.name, self.id))
-
 
 class RelationData(Mapping):
     def __init__(self, relation, our_unit, backend):
