@@ -1,7 +1,14 @@
-
 # Getting Started
 
+## Table of contents
+
+[Introduction](##Introduction)
+
+[Charm Creation](##Charm%20Creation)
+
 ## Introduction
+
+### Juju and Charms
 
 The Charm Operator Framework is the companion to [Juju](https://jaas.ai/docs/what-is-juju) charms are the workers, and juju is the orchestrator, together they encapsulate the complexity of Day 0 through to day 3 operations away from the user making infrastructure as a code a reality.
 
