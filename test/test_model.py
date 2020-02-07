@@ -711,8 +711,8 @@ class TestModel(unittest.TestCase):
         for binding in db0_bindings:
             check_binding_data('db0', binding)
         self.assertEqual(fake_script_calls(self, clear=True), [
-                ['network-get', 'db0', '--format=json'],
-                ['network-get', 'db0', '-r', '4', '--format=json'],
+            ['network-get', 'db0', '--format=json'],
+            ['network-get', 'db0', '-r', '4', '--format=json'],
         ])
 
         single_binding_test_cases = [(
