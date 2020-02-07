@@ -817,9 +817,27 @@ class TestModelBackend(unittest.TestCase):
             self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_network_get(self):
-        network_get_out = ('{"bind-addresses":[{"mac-address":"","interface-name":"",'
-                           '"addresses":[{"hostname":"","value":"192.0.2.2","cidr":""}]}]'
-                           ',"egress-subnets":["192.0.2.2/32"],"ingress-addresses":["192.0.2.2"]}')
+        network_get_out = '''{
+  "bind-addresses": [
+    {
+      "mac-address": "",
+      "interface-name": "",
+      "addresses": [
+        {
+          "hostname": "",
+          "value": "192.0.2.2",
+          "cidr": ""
+        }
+      ]
+    }
+  ],
+  "egress-subnets": [
+    "192.0.2.2/32"
+  ],
+  "ingress-addresses": [
+    "192.0.2.2"
+  ]
+}'''
         fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
         network_info = self.backend.network_get('deadbeef')
         self.assertEqual(network_info, json.loads(network_get_out))
@@ -830,8 +848,8 @@ class TestModelBackend(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'deadbeef', '-r', '1', '--format=json']])
 
     def test_network_get_errors(self):
-        err_no_endpoint = "ERROR no network config found for binding \"$2\""
-        err_no_rel = "ERROR invalid value \"$3\" for option -r: relation not found"
+        err_no_endpoint = 'ERROR no network config found for binding "$2"'
+        err_no_rel = 'ERROR invalid value "$3" for option -r: relation not found'
 
         test_cases = [(
             lambda: fake_script(self, 'network-get', f'echo {err_no_endpoint} >&2 ; exit 1'),
