@@ -53,9 +53,8 @@ git submodule update --init
 ```
 
 Your `src/charm.py` is the entry point for your charm logic. It should be set
-to executable and use Python 3.6 or greater (as such, operator charms can only
-support Ubuntu 18.04 or later). At a minimum, it needs to define a subclass of
-`CharmBase` and pass that into the framework's `main` function:
+to executable and use Python 3.6 or greater. At a minimum, it needs to define
+a subclass of `CharmBase` and pass that into the framework's `main` function:
 
 ```python
 import sys
@@ -76,10 +75,10 @@ if __name__ == "__main__":
 This charm does nothing, because the `MyCharm` class passed to the operator
 framework's `main` function is empty. Functionality can be added to the charm
 by instructing it to observe particular Juju events when the `MyCharm` object
-is initialized. In the example below we're observing the `start` event. The
-name of the event is a function of `self.on`, so in this case `self.on.start`
-is passed to `self.framework.observe`. This will look for method named
-`on_start` when that Juju event is triggered.
+is initialized. In the example below we're observing the `start` event; the
+known event sources are all attributes of `<emitter>.on`, so in this case
+`self.on.start` is passed to `self.framework.observe`. This will look for a
+method named `on_start` when that Juju event is triggered.
 
 ```python
 class MyCharm(CharmBase):
@@ -92,22 +91,7 @@ class MyCharm(CharmBase):
 ```
 
 Every standard event in Juju may be observed that way, and you can also easily
-define your own events in your custom types. For example, to observe the
-`config-changed` Juju event:
-
-```python
-class MyCharm(CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.framework.observe(self.on.start, self)
-        self.framework.observe(self.on.config_changed, self)
-
-     def on_start(self, event):
-        # Handle the start event here.
-
-     def on_config_changed(self, event):
-        # Handle the config-changed event here.
-```
+define your own events in your custom types.
 
 The `hooks/` directory must contain a symlink to your `src/charm.py` entry
 point so that Juju can call it. You only need to set up the `hooks/install` link
