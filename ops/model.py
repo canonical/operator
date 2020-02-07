@@ -68,8 +68,8 @@ class Model:
     def get_relation_binding(self, relation):
         """Get a binding for a specific relation.
 
-        Using this method is preferred if you have a Relation object as network info provided by a returned
-        Binding object can be different depending on whether a relation is a cross-model relation or not.
+        Using this method is preferred if a Relation instance can be provided because network info
+        exposed in a Binding instance can be different depending on whether a relation is a cross-model relation or not.
         """
         return self.bindings._get_unique(relation.name, relation.id)
 
@@ -235,11 +235,12 @@ class RelationMapping(Mapping):
 
 
 class BindingMapping(Mapping):
-    """Map of Relation objects, relation endpoint names and names from extra-bindings to Binding objects."""
+    """A map of binding names to lists of Binding instances."""
 
     def __init__(self, binding_names, backend):
         """
-        keys - Relation objects, relation endpoint names or names from extra-bindings.
+        binding_names -- Relation endpoint names and names of extra-bindings.
+        backend -- An instance of a model backend implementation.
         """
         self._backend = backend
         self._data = {binding_name: None for binding_name in binding_names}
