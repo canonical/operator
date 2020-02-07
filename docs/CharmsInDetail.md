@@ -3,7 +3,9 @@
 
 [Best practices](##Best%20practice)
 
-[Charm writing in detail](Charm%20Writing%20in%20detail)
+[Charm writing in detail](##Charm%20Writing%20in%20detail)
+
+[New to charms?](##New%20to%20charms?)
 
 [Example Charms](##Example%20Charms)
 
@@ -17,6 +19,52 @@ The rationale behind this is quick and easy searching of the 1000s of github pro
 
 
 ## Charm Writing in detail
+
+## New to charms?
+
+> Here are some completely reasonable questions to be asking right now
+
+### Why charms?
+
+Charms have a noble goal: take the complication of managing 100s potentially 1000s of configuration files and abstract them as python modules. Thus by abstraction creating a true insfrastructure as code.
+
+But charms are not just limited to setting up configuration, they also handle the installation of charms, and can implement actions thus providing not just configuration, but day zero to day three operations support.
+
+One of the ways that charms achieves this goal is through what are called relations, you can think about this much like the Database relation charts you might have seen in previous roles, or at university, the concept is much the same.
+
+Here's an example from the Juju GUI:
+
+![Openstack relations layout](./diagrams/juju_gui.jpg)
+
+What you are looking at here is a Kubernetes, rendered, using Juju and charms. Each of the circles represents an application, each of the lines represents what we call a relation.
+
+### How do relations work?
+
+Relations between charms at a high level work through what are called interfaces, interfaces are the glue that sticks two or more charms together and allows them to communicate.
+
+#### Some history
+
+In the old framework (reactive) charms were found on github, and used the naming convention of `interface-<interface-name>`. This stays with the new framework.
+
+The major change is the removal of `requires.py` and `provides.py` these are now replaced by a simplied `interface_<interface_name>.py`.
+
+Here's the picture you might have in when you think of charm relations:
+
+![conception of charm relations](./diagrams/conception_of_charm_relations.jpg)
+
+The problem with this conception is what is I want to create a new charm to use somecharm:relation, well then not only do I have to create a new charm, and program the relation into it, I ALSO have to adapt my original charm to work for my new charm. The two components are too closely coupled.
+
+So the charm framework deals with this by decoupling the relations, this is where we move onto the next section.
+
+#### What (tf) are Interfaces?
+
+To decouple the charms from each other and provide abstract, easy to use relations, we have what are called Interfaces.
+
+With the new charm framework we introduce the new interfaces, but continuing with the previous theme, lets see how interfaces **used** to work in the old reactive framework.
+
+![Old interfaces](./diagrams/charm_interfaces_drawing.jpg)
+
+## Charm writing
 
 ### Add interface dependences
 
@@ -55,19 +103,19 @@ ln -s ./mod/interface-mysql/interface_mysql.py ./lib/interface_mysql.py
 
 For all of the required submodules.
 
-### The charm __init__ method
+### The charm `__init__` method
 
 The charm __init__ method has the following signature:
 
 ```
 def __init__(self, framework, key)
-         ^^^^  ^^^^^^^^^  ^^^
-         ||||  |||||||||  ||||
+             ^^^^  ^^^^^^^^^  ^^^
+             ||||  |||||||||  ||||
 
-   1. Obvious! |||||||||  ||||
-   2.      A reference to the framework
-                          ||||
-   3.                    wtf is this? (todo)
+ 1. Obvious! |||||||||  ||||
+ 2.      A reference to the framework
+                              ||||
+ 3.                          (todo)
 
 ```
 
@@ -105,8 +153,11 @@ Charm metadata is retrieved from the meta framework attribute:
 meta = self.framework.meta
 ```
 
+The same can be done for the charm configuration data too:
 
-## New to charms?
+```
+config = self.framework.config
+```
 
 The charm operator framework is imported by adding the framework in the 'lib' diretory and as a submodule:
 
