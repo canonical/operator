@@ -108,3 +108,6 @@ dependencies by running:
 ```
 git submodule update
 ```
+## Moar
+
+[Charms in detail](./CharmsInDetail.md)
