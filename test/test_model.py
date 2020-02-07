@@ -46,12 +46,6 @@ class TestModel(unittest.TestCase):
             unit_from_rel = next(filter(lambda u: u.name == 'myapp/0', relation.data.keys()))
             self.assertIs(self.model.unit, unit_from_rel)
 
-        for relation_key in [('db2', 5), ('db2', 6)]:
-            relation = self.model.relations[relation_key]
-            self.assertIn(self.model.unit, relation.data)
-            unit_from_rel = next(filter(lambda u: u.name == 'myapp/0', relation.data.keys()))
-            self.assertIs(self.model.unit, unit_from_rel)
-
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db2', '--format=json'],
             ['relation-list', '-r', '5', '--format=json'],

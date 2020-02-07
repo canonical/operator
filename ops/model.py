@@ -41,10 +41,7 @@ class Model:
         relation is established only once or None if it is not established. If this
         same relation is established multiple times the error TooManyRelatedAppsError is raised.
         """
-        if relation_id is not None:
-            return self.relations.get((relation_name, relation_id))
-        else:
-            return self.relations._get_unique(relation_name)
+        return self.relations._get_unique(relation_name, relation_id)
 
 
 class ModelCache:
@@ -202,55 +199,37 @@ class RelationMapping(Mapping):
     def __iter__(self):
         return iter(self._data)
 
-    def _decompose_key(self, relation_key):
-        if isinstance(relation_key, tuple):
-            relation_name, relation_id = relation_key
-        elif isinstance(relation_key, str):
-            relation_name = relation_key
-            relation_id = None
-        else:
-            raise ModelError(f'relation key {relation_key} must be a str or (str, int|None) not {type(relation_key).__name__}')
-        if not isinstance(relation_name, str):
-            raise ModelError(f'relation name {relation_name} must be a string not {type(relation_name).__name__}')
-        if not isinstance(relation_id, (int, type(None))):
-            raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
-        return relation_name, relation_id
-
-    def __getitem__(self, relation_key):
-        relation_name, relation_id = self._decompose_key(relation_key)
+    def __getitem__(self, relation_name):
         is_peer = relation_name in self._peers
         relation_list = self._data[relation_name]
-        res = None
         if relation_list is None:
             relation_list = self._data[relation_name] = []
             for rid in self._backend.relation_ids(relation_name):
                 relation = Relation(relation_name, rid, is_peer, self._our_unit, self._backend, self._cache)
                 relation_list.append(relation)
-                if rid == relation_id:
-                    res = relation
-        if res is not None:
-            return res
-        elif relation_id is None:
-            res = relation_list
-        else:
-            for relation in relation_list:
+        return relation_list
+
+    def _get_unique(self, relation_name, relation_id=None):
+        if not isinstance(relation_id, (int, type(None))):
+            raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
+        if relation_id is not None:
+            for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
             else:
                 # The relation may be dead, but it is not forgotten.
-                res = Relation(relation_name, relation_id, is_peer, self._our_unit, self._backend, self._cache)
-        return res
-
-    def _get_unique(self, relation_name):
-        num_related = len(self[relation_name])
-        if num_related == 0:
-            return None
-        elif num_related == 1:
-            return self[relation_name][0]
+                is_peer = relation_name in self._peers
+                return Relation(relation_name, relation_id, is_peer, self._our_unit, self._backend, self._cache)
         else:
-            # TODO: We need something in the framework to catch and gracefully handle
-            # errors, ideally integrating the error catching with Juju's mechanisms.
-            raise TooManyRelatedAppsError(relation_name, num_related, 1)
+            num_related = len(self[relation_name])
+            if num_related == 0:
+                return None
+            elif num_related == 1:
+                return self[relation_name][0]
+            else:
+                # TODO: We need something in the framework to catch and gracefully handle
+                # errors, ideally integrating the error catching with Juju's mechanisms.
+                raise TooManyRelatedAppsError(relation_name, num_related, 1)
 
 
 class Relation:
