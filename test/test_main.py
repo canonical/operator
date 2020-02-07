@@ -351,6 +351,7 @@ start:
             'STATE_FILE': self._state_file,
             'USE_LOG_ACTIONS': True,
         }))
+        fake_script(self, 'action-get', "echo '{}'")
         actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
         actions_yaml.write_text(
             '''
