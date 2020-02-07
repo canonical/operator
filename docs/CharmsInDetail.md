@@ -19,8 +19,22 @@ The rationale behind this is quick and easy searching of the 1000s of github pro
 ## Charm Writing in detail
 
 
+## New to charms?
 
+The charm operator framework is imported by adding the framework in the 'lib' diretory and as a submodule:
 
+```
+git submodule add https://github.com/canonical/operator mod/operator
+ln -s ../mod/operator/ops lib/ops
+```
+
+This system path change must be applied before any framework features can be utilised.
+
+```
+sys.path.append('lib')
+```
+
+## Migrating from the old (reactive) framework
 
 
 
