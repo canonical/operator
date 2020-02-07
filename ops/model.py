@@ -17,7 +17,6 @@ class Model:
     def __init__(self, unit_name, meta, backend):
         self._cache = ModelCache(backend)
         self._backend = backend
-        self._meta = meta
         self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
@@ -25,7 +24,7 @@ class Model:
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
-        self.bindings = BindingMapping(list(self._meta.relations) + list(self._meta.extra_bindings), self._backend)
+        self.bindings = BindingMapping(list(meta.relations) + list(meta.extra_bindings), self._backend)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
