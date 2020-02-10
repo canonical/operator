@@ -7,6 +7,8 @@
 
 [New to charms?](##New%20to%20charms?)
 
+[Charm Writing](#Charm%20writing)
+
 [Example Charms](##Example%20Charms)
 
 ## Best practices
@@ -76,9 +78,18 @@ These interfaces need a charm writing doc of their own (todo) the takeaway here 
 
 ## Charm writing
 
+### Add the operator framework
+
+To begin a new charm, you will need to import the operator framework. The charm operator framework is imported by adding the framework in the 'lib' diretory and as a submodule:
+
+```
+git submodule add https://github.com/canonical/operator mod/operator
+ln -s ../mod/operator/ops lib/ops
+```
+
 ### Add interface dependences
 
-Operator charms use Interfaces as dependencies.
+To begin a new charm we should take note of an Interfaces that might be needed, the operator framework uses Interfaces as dependencies.
 
 These dependencies are pulled in as git submodules, and should be added to the `.gitmodules` file, an example file looks like this:
 
@@ -111,7 +122,49 @@ These commands will pull in the dependencies to mod, although we will be referen
 ln -s ./mod/interface-mysql/interface_mysql.py ./lib/interface_mysql.py
 ```
 
-For all of the required submodules.
+This is requied for all of the required submodules.
+
+> You can learn more about writing Interfaces [here](./WritingCharmInterfaces.md)
+
+## Imports
+
+The operator charms are invoked as scripts on the running machine. As such you will be required to add a shbang at the top of the python file:
+
+```
+#!/usr/bin/env python3
+```
+
+After this, you will then need to adapt the system path to import the framework:
+
+```
+import sys
+sys.path.append('lib')
+```
+
+Once this is done, you can then move on to import the Framework classes
+
+```
+from ops.charm import CharmBase
+from ops.main import main
+from ops.framework import StoredState
+from oci_image import OCIImageResource
+```
+
+Followed by any other imports, for example, interfaces:
+
+```
+from interface_mysql import MySQLClient
+```
+
+## Creating the charm class
+
+All Operator Framework charms should inherit from the `CharmBase` class. This gives them access to the internals
+
+For example:
+
+```
+class MyCharm(CharmBase):
+```
 
 ### The charm `__init__` method
 
@@ -122,7 +175,7 @@ def __init__(self, framework, key)
              ^^^^  ^^^^^^^^^  ^^^
              ||||  |||||||||  ||||
 
- 1. Obvious! |||||||||  ||||
+ 1. Obvious!       |||||||||  ||||
  2.      A reference to the framework
                               ||||
  3.                           key (described below)
@@ -131,12 +184,14 @@ def __init__(self, framework, key)
 
 Number 3. Is yet unused in the framework.
 
+Once you have the above `__init__` signature. You will need to call super:
+
 ```
     def __init__(self, framework, key):
         super.__init__(framework, key)
 ```
 
-We can then follow up the rest of the method with calls to set our state and our required interfaces for example:
+You can then follow up the rest of the method with calls to set our state and our required interfaces for example:
 
 ```
         self.state.set_defaults(is_started=False)
@@ -169,18 +224,52 @@ The same can be done for the charm configuration data too:
 config = self.framework.config
 ```
 
-The charm operator framework is imported by adding the framework in the 'lib' diretory and as a submodule:
+### Hooking into events
+
+In the `__init__` call you can setup events to be called, for example when the database is available:
 
 ```
-git submodule add https://github.com/canonical/operator mod/operator
-ln -s ../mod/operator/ops lib/ops
+	self.framework.observe(
+		self.mysql.on.database_available,
+		self.configure_pod
+	)
 ```
 
-This system path change must be applied before any framework features can be utilised.
+A popular event to track in the framework is the `config_changed` event:
 
 ```
-sys.path.append('lib')
+	self.framework.observe(self.on.config_changed, self.configure_pod)
 ```
+
+> To get a list of events for an interface you will need to check the docs of that interface. For framework events see [here](./FrameworkEvents.md)
+
+Your event listener methods should accept the event as an arguement. The required signature is below:
+
+```
+def my_event_listener(self, event):
+    pass
+```
+
+You are able to add additional params if you so wish but they __must__ be optional, otherwise a `TypeError` will be thrown.
+
+#### Deferring events
+
+In the new framework events can now be deferred. When an event is deferred:
+
+- Parameters will be saved when events are deferred;
+- Parameters will be restored when events are reemitted;
+
+To defer an event, all you need to is called `defer()`. An example of this can be found below:
+
+```
+def on_db_peer_relation_changed(self, event):
+    if not self.state.ready:
+        event.defer()
+        return
+```
+
+> NOTE: ActionEvents cannot be deferred. Doing so will trigger a `RuntimeError`.
+
 
 ## Migrating from the old (reactive) framework
 
