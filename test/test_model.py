@@ -649,7 +649,7 @@ class TestModel(unittest.TestCase):
 
     def test_relation_endpoint_bindings(self):
         meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None}
+        meta.relations = {'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'})}
         meta.extra_bindings = {'deadbeef': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
