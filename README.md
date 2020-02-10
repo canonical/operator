@@ -5,10 +5,11 @@ for early testing.
 
 ## Getting Started
 
-Your charm directory should have the following overall structure:
+The following overall structure for your charm directory is recommended:
 
 ```
 .
++-- config.yaml
 +-- metadata.yaml
 +-- mod/
 +-- lib/
@@ -17,34 +18,51 @@ Your charm directory should have the following overall structure:
 |   +-- charm.py
 +-- hooks/
     +-- install -> ../src/charm.py
+    +-- start -> ../src/charm.py  # for k8s charms per below
 ```
 
-The `mod/` directory will contain the operator framework dependency as a git
+The `mod/` directory should contain the operator framework dependency as a git
 submodule:
 
 ```
 git submodule add https://github.com/canonical/operator mod/operator
 ```
 
-Other dependencies included as git submodules can be added there as well.
-
-The `lib/` directory will then contain symlinks to subdirectories of your
-submodule dependencies to enable them to be imported into the charm:
+Then symlink from the git submodule for the operator framework into the `lib/`
+directory of your charm so it can be imported at run time:
 
 ```
 ln -s ../mod/operator/ops lib/ops
 ```
 
+Other dependencies included as git submodules can be added in the `mod/`
+directory and symlinked into `lib/` as well.
+
+You can sync subsequent changes from the framework and other submodule
+dependencies by running:
+
+```
+git submodule update
+```
+
+Those cloning and checking out the source for your charm for the first time
+will need to run:
+
+```
+git submodule update --init
+```
+
 Your `src/charm.py` is the entry point for your charm logic. It should be set
-to executable and use Python 3.6 or greater. At a minimum, it needs to define a
-subclass of `CharmBase` and pass that into the framework's `main` function:
+to executable and use Python 3.6 or greater. At a minimum, it needs to define
+a subclass of `CharmBase` and pass that into the framework's `main` function:
 
 ```python
 import sys
-sys.path.append('lib')
+sys.path.append('lib')  # noqa: E402
 
 from ops.charm import CharmBase
 from ops.main import main
+
 
 class MyCharm(CharmBase):
     pass
@@ -54,8 +72,10 @@ if __name__ == "__main__":
     main(MyCharm)
 ```
 
-This charm does nothing, though, so you'll typically want to observe some Juju
-events, such as `start`:
+This charm does nothing, because the `MyCharm` class passed to the operator
+framework's `main` function is empty. Functionality can be added to the charm
+by instructing it to observe particular Juju events when the `MyCharm` object
+is initialized. For example,
 
 ```python
 class MyCharm(CharmBase):
@@ -64,26 +84,37 @@ class MyCharm(CharmBase):
         self.framework.observe(self.on.start, self.on_start)
 
      def on_start(self, event):
-        # Handle the event here.
+        # Handle the start event here.
 ```
 
 Every standard event in Juju may be observed that way, and you can also easily
 define your own events in your custom types.
 
-The `hooks/` directory will then contain symlinks to your `src/charm.py` entry
+> The second argument to `observe` can be either the handler as a bound
+> method, or the observer itself if the handler is a method of the observer
+> that follows the conventional naming pattern. That is, in this case, we
+> could have called just `self.framework.obseve(self.on.start, self)`.
+
+The `hooks/` directory must contain a symlink to your `src/charm.py` entry
 point so that Juju can call it. You only need to set up the `hooks/install` link
 (`hooks/start` for K8s charms, until [lp#1854635](https://bugs.launchpad.net/juju/+bug/1854635)
-is resolved), and the framework will fill out all others at runtime.
+is resolved), and the framework will create all others at runtime.
 
-Once your charm is ready, deploy it as normal with:
+Once your charm is ready, upload it to the charm store and deploy it as
+normal with:
+
+```
+# Replace ${CHARM} with the name of the charm.
+charm push . cs:~${USER}/${CHARM}
+# Replace ${VERSION} with the version created by `charm push`.
+charm release cs:~${USER}/${CHARM}-${VERSION}
+charm grant cs:~${USER}/${CHARM}-${VERSION} everyone
+# And now deploy your charm.
+juju deploy cs:~${USER}/$CHARM
+```
+
+Alternatively, to deploy directly from local disk, run:
 
 ```
 juju deploy .
-```
-
-You can sync subsequent changes from the framework and other submodule
-dependencies by running:
-
-```
-git submodule update
 ```
