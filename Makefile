@@ -3,6 +3,6 @@ test: lint
 
 lint:
 	@autopep8 -r --aggressive --diff --exit-code .
-	@flake8
+	@flake8 --config=.flake8
 
 .PHONY: lint test
