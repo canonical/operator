@@ -93,9 +93,9 @@ class TestModel(unittest.TestCase):
 
         err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
         fake_script(self, 'relation-ids',
-                    """([ "$1" = dbpeer ] && echo '["dbpeer:0"]') || echo '[]'""")
+                    '''([ "$1" = dbpeer ] && echo '["dbpeer:0"]') || echo "[]"''')
         fake_script(self, 'relation-list',
-                    f"""([ "$2" = 0 ] && echo '[]') || (echo {err_msg} >&2 ; exit 2)""")
+                    f'''([ "$2" = 0 ] && echo "[]") || (echo {err_msg} >&2 ; exit 2)''')
 
         db1_4 = self.model.get_relation('dbpeer')
         self.assertIs(db1_4.app, self.model.app)
