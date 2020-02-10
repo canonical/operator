@@ -75,10 +75,7 @@ if __name__ == "__main__":
 This charm does nothing, because the `MyCharm` class passed to the operator
 framework's `main` function is empty. Functionality can be added to the charm
 by instructing it to observe particular Juju events when the `MyCharm` object
-is initialized. In the example below we're observing the `start` event; the
-known event sources are all attributes of `<emitter>.on`, so in this case
-`self.on.start` is passed to `self.framework.observe`. This will look for a
-method named `on_start` when that Juju event is triggered.
+is initialized. For example,
 
 ```python
 class MyCharm(CharmBase):
@@ -90,13 +87,13 @@ class MyCharm(CharmBase):
         # Handle the start event here.
 ```
 
+Every standard event in Juju may be observed that way, and you can also easily
+define your own events in your custom types.
+
 > The second argument to `observe` can be either the handler as a bound
 > method, or the observer itself if the handler is a method of the observer
 > that follows the conventional naming pattern. That is, in this case, we
 > could have called just `self.framework.obseve(self.on.start, self)`.
-
-Every standard event in Juju may be observed that way, and you can also easily
-define your own events in your custom types.
 
 The `hooks/` directory must contain a symlink to your `src/charm.py` entry
 point so that Juju can call it. You only need to set up the `hooks/install` link
