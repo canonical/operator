@@ -24,7 +24,7 @@ class Model:
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
-        self.bindings = BindingMapping(list(meta.relations) + list(meta.extra_bindings), self._backend)
+        self._bindings = BindingMapping(list(meta.relations) + list(meta.extra_bindings), self._backend)
 
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
@@ -43,17 +43,21 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_name):
-        """Get a binding without specifying a relation id."""
-        return self.bindings._get_unique(binding_name)
+    def get_binding(self, binding_key):
+        """Get a network space binding.
 
-    def get_relation_binding(self, relation):
-        """Get a binding for a specific relation.
+        Providing a Relation instance is preferred because network info exposed in a Binding instance
+        can be different depending on whether a relation is a cross-model relation or not.
 
-        Using this method is preferred if a Relation instance can be provided because network info
-        exposed in a Binding instance can be different depending on whether a relation is a cross-model relation or not.
+        binding_key -- a name of a relation, extra-binding or a Relation object.
         """
-        return self.bindings._get_unique(relation.name, relation.id)
+        if isinstance(binding_key, Relation):
+            relation = binding_key
+            return self._bindings._get_unique(relation.name, relation.id)
+        elif isinstance(binding_key, str):
+            return self._bindings._get_unique(binding_key)
+        else:
+            raise ModelError(f'a binding key must be either str or Relation, not type({binding_key}).__name__')
 
 
 class ModelCache:

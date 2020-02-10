@@ -685,17 +685,9 @@ class TestModel(unittest.TestCase):
             self.assertEqual(binding.egress_subnets, ['192.0.2.2/32'])
             self.assertEqual(binding.network_info, json.loads(network_get_out))
 
-        # Check that when there is one relation present 2 binding objects are returned during a name-based lookup.
-        fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1''')
-        db0_bindings = self.model.bindings['db0']
-        self.assertTrue(len(db0_bindings), 2)
-        self.assertEqual(fake_script_calls(self, clear=True), [['relation-ids', 'db0', '--format=json']])
-        for binding in db0_bindings:
-            check_binding_data('db0', binding)
-        self.assertEqual(fake_script_calls(self, clear=True), [
-            ['network-get', 'db0', '--format=json'],
-            ['network-get', 'db0', '-r', '4', '--format=json'],
-        ])
+        # Basic validation for passing an invalid key.
+        with self.assertRaises(ops.model.ModelError):
+            self.model.get_binding(object)
 
         single_binding_test_cases = [(
             lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
@@ -708,7 +700,7 @@ class TestModel(unittest.TestCase):
         ), (
             lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
             'db0',
-            lambda binding_name: self.model.get_relation_binding(self.model.get_relation(binding_name)),
+            lambda binding_name: self.model.get_binding(self.model.get_relation(binding_name)),
             [
                 ['relation-ids', 'db0', '--format=json'],
                 # The two invocations below are due to the get_relation call.
