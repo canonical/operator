@@ -209,9 +209,9 @@ class RelationMapping(Mapping):
         return relation_list
 
     def _get_unique(self, relation_name, relation_id=None):
-        if not isinstance(relation_id, (int, type(None))):
-            raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
         if relation_id is not None:
+            if not isinstance(relation_id, int):
+                raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
             for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
@@ -219,16 +219,15 @@ class RelationMapping(Mapping):
                 # The relation may be dead, but it is not forgotten.
                 is_peer = relation_name in self._peers
                 return Relation(relation_name, relation_id, is_peer, self._our_unit, self._backend, self._cache)
+        num_related = len(self[relation_name])
+        if num_related == 0:
+            return None
+        elif num_related == 1:
+            return self[relation_name][0]
         else:
-            num_related = len(self[relation_name])
-            if num_related == 0:
-                return None
-            elif num_related == 1:
-                return self[relation_name][0]
-            else:
-                # TODO: We need something in the framework to catch and gracefully handle
-                # errors, ideally integrating the error catching with Juju's mechanisms.
-                raise TooManyRelatedAppsError(relation_name, num_related, 1)
+            # TODO: We need something in the framework to catch and gracefully handle
+            # errors, ideally integrating the error catching with Juju's mechanisms.
+            raise TooManyRelatedAppsError(relation_name, num_related, 1)
 
 
 class Relation:
