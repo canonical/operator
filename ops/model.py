@@ -15,7 +15,6 @@ from subprocess import run, PIPE, CalledProcessError
 class Model:
 
     def __init__(self, unit_name, meta, backend):
-        self._meta = meta
         self._cache = ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(unit_name)
