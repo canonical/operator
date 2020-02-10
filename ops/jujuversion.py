@@ -60,3 +60,4 @@ class JujuVersion:
             return self.patch < other.patch
         elif self.build != other.build:
             return self.build < other.build
+        return False
