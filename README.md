@@ -84,11 +84,16 @@ method named `on_start` when that Juju event is triggered.
 class MyCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        self.framework.observe(self.on.start, self)
+        self.framework.observe(self.on.start, self.on_start)
 
      def on_start(self, event):
         # Handle the start event here.
 ```
+
+> The second argument to `observe` can be either the handler as a bound
+> method, or the observer itself if the handler is a method of the observer
+> that follows the conventional naming pattern. That is, in this case, we
+> could have called just `self.framework.obseve(self.on.start, self)`.
 
 Every standard event in Juju may be observed that way, and you can also easily
 define your own events in your custom types.
