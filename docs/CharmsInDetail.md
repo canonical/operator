@@ -28,9 +28,9 @@ The rationale behind this is quick and easy searching of the 1000s of github pro
 
 ### Why charms?
 
-Charms have a noble goal: take the complication of managing 100s potentially 1000s of configuration files and abstract them as python modules. Thus by abstraction creating a true insfrastructure as code.
+The objective of charms is the following: take the complication of managing 100s potentially 1000s of configuration files and abstract them as python modules. Thus by abstraction creating a true insfrastructure as code.
 
-But charms are not just limited to setting up configuration, they also handle the installation of charms, and can implement actions thus providing not just configuration, but day zero to day three operations support.
+But charms are not just limited to setting up configuration, they also handle the installation of charms, and can implement actions thus providing not just configuration, but day zero to day two operations support.
 
 One of the ways that charms achieves this goal is through what are called relations, you can think about this much like the Database relation charts you might have seen in previous roles, or at university, the concept is much the same.
 
@@ -54,15 +54,15 @@ Here's the picture you might have in when you think of charm relations:
 
 ![conception of charm relations](./diagrams/conception_of_charm_relations.jpg)
 
-The problem with this conception is what is I want to create a new charm to use somecharm:relation, well then not only do I have to create a new charm, and program the relation into it, I ALSO have to adapt my original charm to work for my new charm. The two components are too closely coupled.
+The problem with this conception is what if want to create a new charm to use somecharm:relation, well then not only do I have to create a new charm, and program the relation into it, I __also__ have to adapt my original charm to work for my new charm. The two components are too closely coupled.
 
 So the charm framework deals with this by decoupling the relations, this is where we move onto the next section.
 
-#### What (tf) are Interfaces?
+#### What are Interfaces?
 
 To decouple the charms from each other and provide abstract, easy to use relations, we have what are called Interfaces.
 
-With the new charm framework we introduce the new interfaces, but continuing with the previous theme, lets see how interfaces **used** to work in the old reactive framework.
+With the Operator Framework we introduce the new interfaces, but continuing with the previous theme, lets see how interfaces **used** to work in the old reactive framework.
 
 ![Old interfaces](./diagrams/charm_interfaces_drawing.jpg)
 
@@ -75,6 +75,8 @@ In the new framework we have a single file which handles this inter-charm inform
 These interfaces need a charm writing doc of their own (todo) the takeaway here is that there is a single import for both charms to be able to communicate with each other.
 
 ![New charm interfaces](./diagrams/charm_interfaces_drawing_new.jpg)
+
+That's enough background for now, you can move onto Charm Writing in detail.
 
 ## Charm writing
 
@@ -274,6 +276,10 @@ def on_db_peer_relation_changed(self, event):
 ## Migrating from the old (reactive) framework
 
 TODO
+
+## Testing
+
+Please find the testing guide [here](./Testing.md)
 
 # Useful links
 

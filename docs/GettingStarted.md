@@ -18,7 +18,7 @@ Yes, but, diagrams? Sure:
 
 ![Juju and charms](./diagrams/juju_charms.png)
 
-## Charm Creation
+## Charm Creation Quick Start
 
 There are currently two types of Charm, IAAS charms and Kubernetes (K8s) charms.
 
