@@ -367,8 +367,8 @@ class ActiveStatus(StatusBase):
     """
     name = 'active'
 
-    def __init__(self):
-        super().__init__('')
+    def __init__(self, message=None):
+        super().__init__(message or '')
 
 
 class BlockedStatus(StatusBase):

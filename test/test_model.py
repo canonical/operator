@@ -453,15 +453,14 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(TypeError):
             ops.model.StatusBase('test')
 
-    def test_active_message_raises(self):
-        with self.assertRaises(TypeError):
-            ops.model.ActiveStatus('test')
+    def test_active_message_default(self):
+        self.assertEqual(ops.model.ActiveStatus().message, '')
 
     def test_local_set_valid_unit_status(self):
         test_cases = [(
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', '']]),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
@@ -488,9 +487,9 @@ class TestModel(unittest.TestCase):
     def test_local_set_valid_app_status(self):
         fake_script(self, 'is-leader', 'echo true')
         test_cases = [(
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertIn(['status-set', '--application=True', 'active', ''], fake_script_calls(self, True)),
+            lambda: self.assertIn(['status-set', '--application=True', 'active', 'Green'], fake_script_calls(self, True)),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
@@ -558,7 +557,7 @@ class TestModel(unittest.TestCase):
 
         test_statuses = (
             ops.model.UnknownStatus(),
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             ops.model.MaintenanceStatus('Yellow'),
             ops.model.BlockedStatus('Red'),
             ops.model.WaitingStatus('White'),
