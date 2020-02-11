@@ -783,7 +783,7 @@ class TestStoredState(unittest.TestCase):
                 pass
             obj.state.foo = CustomObject()
         except AttributeError as e:
-            self.assertEqual(str(e), 'attribute \'foo\' cannot be set to CustomObject: must be int/dict/list/etc')
+            self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/dict/list/etc")
         else:
             self.fail('AttributeError not raised')
 
