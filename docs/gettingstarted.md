@@ -10,11 +10,11 @@
 
 ### Juju and Charms
 
-The Charm Operator Framework is the companion to [Juju](https://jaas.ai/docs/what-is-juju) charms are the workers, and juju is the orchestrator, together they encapsulate the complexity of Day 0 through to day 3 operations away from the user making infrastructure as a code a reality.
+The Charm Operator Framework is the companion to [Juju](https://jaas.ai/docs/what-is-juju) charms are the workers, and juju is the orchestrator, together they encapsulate the complexity of Day zero through to day three operations away from the user making infrastructure as a code a reality.
 
 The charm operator framework was created to answer this not just for VM/Baremetal scenario but for containers also.
 
-Yes, but, diagrams? Sure:
+Here is a diagram of how juju and charms work together:
 
 ![Juju and charms](./diagrams/juju_charms.png)
 
@@ -108,6 +108,6 @@ dependencies by running:
 ```
 git submodule update
 ```
-## Moar
+## More Links
 
-[Charms in detail](./CharmsInDetail.md)
+[Charms in detail](./charmsindetail.md)

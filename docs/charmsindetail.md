@@ -24,7 +24,7 @@ The rationale behind this is quick and easy searching of the 1000s of github pro
 
 ## New to charms?
 
-> Here are some completely reasonable questions to be asking right now
+> This covers aspects of charming which will be useful when creating them
 
 ### Why charms?
 
@@ -126,7 +126,7 @@ ln -s ./mod/interface-mysql/interface_mysql.py ./lib/interface_mysql.py
 
 This is requied for all of the required submodules.
 
-> You can learn more about writing Interfaces [here](./WritingCharmInterfaces.md)
+> You can learn more about writing Interfaces [here](./CharmInterfaces.md)
 
 ## Imports
 
@@ -243,7 +243,7 @@ A popular event to track in the framework is the `config_changed` event:
 	self.framework.observe(self.on.config_changed, self.configure_pod)
 ```
 
-> To get a list of events for an interface you will need to check the docs of that interface. For framework events see [here](./FrameworkEvents.md)
+> To get a list of events for an interface you will need to check the docs of that interface. For framework events see [here](./frameworkevents.md)
 
 Your event listener methods should accept the event as an arguement. The required signature is below:
 
@@ -272,6 +272,12 @@ def on_db_peer_relation_changed(self, event):
 
 > NOTE: ActionEvents cannot be deferred. Doing so will trigger a `RuntimeError`.
 
+## Subordinate Charms
+
+
+## Charm Actions
+
+TODO
 
 ## Migrating from the old (reactive) framework
 
