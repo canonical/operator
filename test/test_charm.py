@@ -39,7 +39,7 @@ class TestCharm(unittest.TestCase):
             os.environ.update(env)
         self.addCleanup(restore_env, os.environ.copy())
 
-        os.environ['PATH'] = f"{str(Path(__file__).parent / 'bin')}:{os.environ['PATH']}"
+        os.environ['PATH'] = "{}:{}".format(Path(__file__).parent / 'bin', os.environ['PATH'])
         os.environ['JUJU_UNIT_NAME'] = 'local/0'
 
         self.tmpdir = Path(tempfile.mkdtemp())
@@ -161,16 +161,16 @@ peers:
                 self.framework.observe(self.on['stor-4'].storage_attached, self)
 
             def on_stor1_storage_attached(self, event):
-                self.seen.append(f'{type(event).__name__}')
+                self.seen.append(type(event).__name__)
 
             def on_stor2_storage_detaching(self, event):
-                self.seen.append(f'{type(event).__name__}')
+                self.seen.append(type(event).__name__)
 
             def on_stor3_storage_attached(self, event):
-                self.seen.append(f'{type(event).__name__}')
+                self.seen.append(type(event).__name__)
 
             def on_stor_4_storage_attached(self, event):
-                self.seen.append(f'{type(event).__name__}')
+                self.seen.append(type(event).__name__)
 
         # language=YAML
         self.meta = CharmMeta.from_yaml('''
@@ -251,13 +251,13 @@ start:
             def on_start_action(self, event):
                 pass
 
-        fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
-        fake_script(self, f'{cmd_type}-set', "")
-        fake_script(self, f'{cmd_type}-log', "")
-        fake_script(self, f'{cmd_type}-fail', "")
+        fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
+        fake_script(self, cmd_type + '-set', "")
+        fake_script(self, cmd_type + '-log', "")
+        fake_script(self, cmd_type + '-fail', "")
         self.meta = self._get_action_test_meta()
 
-        os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'foo-bar'
+        os.environ['JUJU_{}_NAME'.format(cmd_type.upper())] = 'foo-bar'
         framework = self.create_framework()
         charm = MyCharm(framework, None)
 
@@ -268,10 +268,10 @@ start:
         charm.on.foo_bar_action.emit()
         self.assertEqual(charm.seen_action_params, {"foo-name": "name", "silent": True})
         self.assertEqual(fake_script_calls(self), [
-            [f'{cmd_type}-get', '--format=json'],
-            [f'{cmd_type}-log', "test-log"],
-            [f'{cmd_type}-set', "res=val with spaces"],
-            [f'{cmd_type}-fail', "test-fail"],
+            [cmd_type + '-get', '--format=json'],
+            [cmd_type + '-log', "test-log"],
+            [cmd_type + '-set', "res=val with spaces"],
+            [cmd_type + '-fail', "test-fail"],
         ])
 
         # Make sure that action events that do not match the current context are
@@ -293,10 +293,10 @@ start:
             def on_start_action(self, event):
                 event.defer()
 
-        fake_script(self, f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
+        fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
         self.meta = self._get_action_test_meta()
 
-        os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'start'
+        os.environ['JUJU_{}_NAME'.format(cmd_type.upper())] = 'start'
         framework = self.create_framework()
         charm = MyCharm(framework, None)
 

@@ -23,7 +23,7 @@ import unittest
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
-        os.environ['PATH'] = f'{fake_script_path}:{os.environ["PATH"]}'
+        os.environ['PATH'] = '{}:{}'.format(fake_script_path, os.environ["PATH"])
 
         def cleanup():
             shutil.rmtree(fake_script_path)

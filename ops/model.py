@@ -107,10 +107,10 @@ class Application:
     @status.setter
     def status(self, value):
         if not isinstance(value, StatusBase):
-            raise InvalidStatusError(f'invalid value provided for application {self} status: {value}')
+            raise InvalidStatusError('invalid value provided for application {} status: {}'.format(self, value))
 
         if not self._is_our_app:
-            raise RuntimeError(f'cannot to set status for a remote application {self}')
+            raise RuntimeError('cannot to set status for a remote application {}'.format(self))
 
         if not self._backend.is_leader():
             raise RuntimeError('cannot set application status as a non-leader unit')
@@ -119,7 +119,7 @@ class Application:
         self._status = value
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
+        return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
 
 
 class Unit:
@@ -150,16 +150,16 @@ class Unit:
     @status.setter
     def status(self, value):
         if not isinstance(value, StatusBase):
-            raise InvalidStatusError(f'invalid value provided for unit {self} status: {value}')
+            raise InvalidStatusError('invalid value provided for unit {} status: {}'.format(self, value))
 
         if not self._is_our_unit:
-            raise RuntimeError(f'cannot set status for a remote unit {self}')
+            raise RuntimeError('cannot set status for a remote unit {}'.format(self))
 
         self._backend.status_set(value.name, value.message, is_app=False)
         self._status = value
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
+        return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
 
     def is_leader(self):
         if self._is_our_unit:
@@ -167,7 +167,7 @@ class Unit:
             # of a hook execution.
             return self._backend.is_leader()
         else:
-            raise RuntimeError(f"cannot determine leadership status for remote applications: {self}")
+            raise RuntimeError("cannot determine leadership status for remote applications: {}".format(self))
 
 
 class LazyMapping(Mapping, ABC):
@@ -233,7 +233,7 @@ class RelationMapping(Mapping):
     def _get_unique(self, relation_name, relation_id=None):
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError(f'relation id {relation_id} must be int or None not {type(relation_id).__name__}')
+                raise ModelError('relation id {} must be int or None not {}'.format(relation_id, type(relation_id).__name__))
             for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
@@ -260,7 +260,7 @@ class BindingMapping:
 
     def get(self, relation):
         if not isinstance(relation, Relation):
-            raise ModelError(f'expected Relation instance, got {type(relation).__name__}')
+            raise ModelError('expected Relation instance, got {}'.format(type(relation).__name__))
         binding = self._data.get(relation)
         if binding is None:
             self._data[relation] = binding = Binding(relation.name, relation.id, self._backend)
@@ -346,7 +346,7 @@ class Relation:
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
+        return '<{}.{} {}:{}>'.format(type(self).__module__, type(self).__name__, self.name, self.id)
 
 
 class RelationData(Mapping):
@@ -405,7 +405,7 @@ class RelationDataContent(LazyMapping, MutableMapping):
 
     def __setitem__(self, key, value):
         if not self._is_mutable():
-            raise RelationDataError(f'cannot set relation data for {self._entity.name}')
+            raise RelationDataError('cannot set relation data for {}'.format(self._entity.name))
         if not isinstance(value, str):
             raise RelationDataError('relation data values must be strings')
 
@@ -517,7 +517,7 @@ class Resources:
         on disk, otherwise it raises a ModelError.
         """
         if name not in self._paths:
-            raise RuntimeError(f'invalid resource name: {name}')
+            raise RuntimeError('invalid resource name: {}'.format(name))
         if self._paths[name] is None:
             self._paths[name] = Path(self._backend.resource_get(name))
         return self._paths[name]
@@ -564,7 +564,7 @@ class StorageMapping(Mapping):
         via <storage-name>-storage-attached events when it becomes available.
         """
         if storage_name not in self._storage_map:
-            raise ModelError(f'cannot add storage with {storage_name} as it is not present in the charm metadata')
+            raise ModelError('cannot add storage with {} as it is not present in the charm metadata'.format(storage_name))
         self._backend.storage_add(storage_name, count)
 
 
@@ -579,7 +579,7 @@ class Storage:
     @property
     def location(self):
         if self._location is None:
-            self._location = Path(self._backend.storage_get(f'{self.name}/{self.id}', "location"))
+            self._location = Path(self._backend.storage_get('{}/{}'.format(self.name, self.id), "location"))
         return self._location
 
 
@@ -589,7 +589,7 @@ class ModelError(Exception):
 
 class TooManyRelatedAppsError(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
-        super().__init__(f'Too many remote applications on {relation_name} ({num_related} > {max_supported})')
+        super().__init__('Too many remote applications on {} ({} > {})'.format(relation_name, num_related, max_supported))
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
@@ -653,7 +653,7 @@ class ModelBackend:
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         try:
-            return self._run('relation-get', '-r', str(relation_id), '-', member_name, f'--app={is_app}', return_output=True, use_json=True)
+            return self._run('relation-get', '-r', str(relation_id), '-', member_name, '--app={}'.format(is_app), return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
@@ -664,7 +664,7 @@ class ModelBackend:
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
         try:
-            return self._run('relation-set', '-r', str(relation_id), f'{key}={value}', f'--app={is_app}')
+            return self._run('relation-set', '-r', str(relation_id), '{}={}'.format(key, value), '--app={}'.format(is_app))
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
@@ -713,7 +713,7 @@ class ModelBackend:
         """Get a status of a unit or an application.
         app -- A boolean indicating whether the status should be retrieved for a unit or an application.
         """
-        return self._run('status-get', '--include-data', f'--application={is_app}')
+        return self._run('status-get', '--include-data', '--application={}'.format(is_app))
 
     def status_set(self, status, message='', *, is_app=False):
         """Set a status of a unit or an application.
@@ -721,7 +721,7 @@ class ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
-        return self._run('status-set', f'--application={is_app}', status, message)
+        return self._run('status-set', '--application={}'.format(is_app), status, message)
 
     def storage_list(self, name):
         return [int(s.split('/')[1]) for s in self._run('storage-list', name, return_output=True, use_json=True)]
@@ -731,20 +731,20 @@ class ModelBackend:
 
     def storage_add(self, name, count=1):
         if not isinstance(count, int) or isinstance(count, bool):
-            raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
-        self._run('storage-add', f'{name}={count}')
+            raise TypeError('storage count must be integer, got: {} ({})'.format(count, type(count)))
+        self._run('storage-add', '{}={}'.format(name, count))
 
     def action_get(self):
-        return self._run(f'action-get', return_output=True, use_json=True)
+        return self._run('action-get', return_output=True, use_json=True)
 
     def action_set(self, results):
-        self._run(f'action-set', *[f"{k}={v}" for k, v in results.items()])
+        self._run('action-set', *["{}={}".format(k, v) for k, v in results.items()])
 
     def action_log(self, message):
-        self._run(f'action-log', f"{message}")
+        self._run('action-log', message)
 
     def action_fail(self, message=''):
-        self._run(f'action-fail', f"{message}")
+        self._run('action-fail', message)
 
     def juju_log(self, level, message):
         self._run('juju-log', '--log-level', level, message)
@@ -773,14 +773,14 @@ class ModelBackend:
             for k, v in labels.items():
                 _ModelBackendValidator.validate_metric_label(k)
                 _ModelBackendValidator.validate_label_value(k, v)
-                label_args.append(f'{k}={v}')
+                label_args.append('{}={}'.format(k, v))
             cmd.extend(['--labels', ','.join(label_args)])
 
         metric_args = []
         for k, v in metrics.items():
             _ModelBackendValidator.validate_metric_key(k)
             metric_value = _ModelBackendValidator.format_metric_value(v)
-            metric_args.append(f'{k}={metric_value}')
+            metric_args.append('{}={}'.format(k, metric_value))
         cmd.extend(metric_args)
         self._run(*cmd)
 
@@ -793,28 +793,28 @@ class _ModelBackendValidator:
     @classmethod
     def validate_metric_key(cls, key):
         if cls.METRIC_KEY_REGEX.match(key) is None:
-            raise ModelError(f'invalid metric key {repr(key)}: must match {cls.METRIC_KEY_REGEX.pattern}')
+            raise ModelError('invalid metric key {!r}: must match {}'.format(key, cls.METRIC_KEY_REGEX.pattern))
 
     @classmethod
     def validate_metric_label(cls, label_name):
         if cls.METRIC_KEY_REGEX.match(label_name) is None:
-            raise ModelError(f'invalid metric label name {repr(label_name)}: must match {cls.METRIC_KEY_REGEX.pattern}')
+            raise ModelError('invalid metric label name {!r}: must match {}'.format(label_name, cls.METRIC_KEY_REGEX.pattern))
 
     @classmethod
     def format_metric_value(cls, value):
         try:
             decimal_value = decimal.Decimal.from_float(value)
         except TypeError as e:
-            raise ModelError(f'invalid metric value {repr(value)} provided: must be a positive finite float') from e
+            raise ModelError('invalid metric value {!r} provided: must be a positive finite float'.format(value)) from e
         if decimal_value.is_nan() or decimal_value.is_infinite() or decimal_value < 0:
-            raise ModelError(f'invalid metric value {repr(value)} provided: must be a positive finite float')
+            raise ModelError('invalid metric value {!r} provided: must be a positive finite float'.format(value))
         return str(decimal_value)
 
     @classmethod
     def validate_label_value(cls, label, value):
         # Label values cannot be empty, contain commas or equal signs as those are used by add-metric as separators.
         if not value:
-            raise ModelError('metric label {label} has an empty value, which is not allowed')
+            raise ModelError('metric label {} has an empty value, which is not allowed'.format(label))
         v = str(value)
         if re.search('[,=]', v) is not None:
-            raise ModelError(f'metric label values must not contain "," or "=": {label}={repr(value)}')
+            raise ModelError('metric label values must not contain "," or "=": {}={!r}'.format(label, value))

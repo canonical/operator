@@ -72,9 +72,9 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids',
                     """([ "$1" = db1 ] && echo '["db1:4"]') || ([ "$1" = db2 ] && echo '["db2:5", "db2:6"]') || echo '[]'""")
         fake_script(self, 'relation-list',
-                    f"""([ "$2" = 4 ] && echo '["remoteapp1/0"]') || (echo {err_msg} >&2 ; exit 2)""")
+                    """([ "$2" = 4 ] && echo '["remoteapp1/0"]') || (echo {} >&2 ; exit 2)""".format(err_msg))
         fake_script(self, 'relation-get',
-                    f"""echo {err_msg} >&2 ; exit 2""")
+                    """echo {} >&2 ; exit 2""".format(err_msg))
 
         with self.assertRaises(ops.model.ModelError):
             self.model.get_relation('db1', 'db1:4')
@@ -109,7 +109,7 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids',
                     '''([ "$1" = dbpeer ] && echo '["dbpeer:0"]') || echo "[]"''')
         fake_script(self, 'relation-list',
-                    f'''([ "$2" = 0 ] && echo "[]") || (echo {err_msg} >&2 ; exit 2)''')
+                    '''([ "$2" = 0 ] && echo "[]") || (echo {} >&2 ; exit 2)'''.format(err_msg))
 
         db1_4 = self.model.get_relation('dbpeer')
         self.assertIs(db1_4.app, self.model.app)
@@ -718,7 +718,7 @@ class TestModel(unittest.TestCase):
             with self.assertRaises(ops.model.ModelError):
                 self.model.get_binding(name)
 
-        fake_script(self, 'network-get', f'''[ "$1" = db0 -a "$3" = 4 ] && echo '{network_get_out}' || exit 1'''),
+        fake_script(self, 'network-get', '''[ "$1" = db0 -a "$3" = 4 ] && echo '{}' || exit 1'''.format(network_get_out)),
         # Bindings for dead relations are not supported.
         with self.assertRaises(ops.model.ModelError):
             binding = ops.model.Binding('db0', 42, self.model._backend)
@@ -776,32 +776,32 @@ class TestModelBackend(unittest.TestCase):
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [(
-            lambda: fake_script(self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'relation-list', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_list(3),
             ops.model.ModelError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-list', f'echo {err_msg} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-list', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_list(3),
             ops.model.RelationNotFoundError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-set', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'relation-set', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.ModelError,
             [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
         ), (
-            lambda: fake_script(self, 'relation-set', f'echo {err_msg} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-set', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
         ), (
-            lambda: fake_script(self, 'relation-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'relation-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.ModelError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-get', f'echo {err_msg} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-get', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
@@ -830,27 +830,27 @@ class TestModelBackend(unittest.TestCase):
 
     def test_storage_tool_errors(self):
         test_cases = [(
-            lambda: fake_script(self, 'storage-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-list', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_list('foobar'),
             ops.model.ModelError,
             [['storage-list', 'foobar', '--format=json']],
         ), (
-            lambda: fake_script(self, 'storage-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_get('foobar', 'someattr'),
             ops.model.ModelError,
             [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
         ), (
-            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=2),
             ops.model.ModelError,
             [['storage-add', 'foobar=2']],
         ), (
-            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=object),
             TypeError,
             [],
         ), (
-            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=True),
             TypeError,
             [],
@@ -883,7 +883,7 @@ class TestModelBackend(unittest.TestCase):
     "192.0.2.2"
   ]
 }'''
-        fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
+        fake_script(self, 'network-get', '''[ "$1" = deadbeef ] && echo '{}' || exit 1'''.format(network_get_out))
         network_info = self.backend.network_get('deadbeef')
         self.assertEqual(network_info, json.loads(network_get_out))
         self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'deadbeef', '--format=json']])
@@ -897,12 +897,12 @@ class TestModelBackend(unittest.TestCase):
         err_no_rel = 'ERROR invalid value "$3" for option -r: relation not found'
 
         test_cases = [(
-            lambda: fake_script(self, 'network-get', f'echo {err_no_endpoint} >&2 ; exit 1'),
+            lambda: fake_script(self, 'network-get', 'echo {} >&2 ; exit 1'.format(err_no_endpoint)),
             lambda: self.backend.network_get("deadbeef"),
             ops.model.ModelError,
             [['network-get', 'deadbeef', '--format=json']],
         ), (
-            lambda: fake_script(self, 'network-get', f'echo {err_no_rel} >&2 ; exit 2'),
+            lambda: fake_script(self, 'network-get', 'echo {} >&2 ; exit 2'.format(err_no_rel)),
             lambda: self.backend.network_get("deadbeef", 3),
             ops.model.RelationNotFoundError,
             [['network-get', 'deadbeef', '-r', '3', '--format=json']],
@@ -915,7 +915,7 @@ class TestModelBackend(unittest.TestCase):
 
     def test_action_get_error(self):
         fake_script(self, 'action-get', '')
-        fake_script(self, 'action-get', f'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-get', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_get()
         calls = [['action-get', '--format=json']]
@@ -923,7 +923,7 @@ class TestModelBackend(unittest.TestCase):
 
     def test_action_set_error(self):
         fake_script(self, 'action-get', '')
-        fake_script(self, 'action-set', f'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-set', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_set({'foo': 'bar', 'dead': 'beef cafe'})
         calls = [["action-set", "foo=bar", "dead=beef cafe"]]
@@ -931,7 +931,7 @@ class TestModelBackend(unittest.TestCase):
 
     def test_action_log_error(self):
         fake_script(self, 'action-get', '')
-        fake_script(self, 'action-log', f'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-log', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_log('log-message')
         calls = [["action-log", "log-message"]]

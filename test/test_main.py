@@ -50,7 +50,7 @@ from ops.charm import (
 from .test_helpers import fake_script, fake_script_calls
 
 # This relies on the expected repository structure to find a path to source of the charm under test.
-TEST_CHARM_DIR = Path(f'{__file__}/../charms/test_main').resolve()
+TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ start:
 
     def _simulate_event(self, event_spec):
         env = {
-            'PATH': f"{str(Path(__file__).parent / 'bin')}:{os.environ['PATH']}",
+            'PATH': "{}:{}".format(Path(__file__).parent / 'bin', os.environ['PATH']),
             'JUJU_CHARM_DIR': self.JUJU_CHARM_DIR,
             'JUJU_UNIT_NAME': 'test_main/0',
             'CHARM_CONFIG': event_spec.charm_config,
@@ -297,7 +297,7 @@ start:
             {},
         )]
 
-        logger.debug(f'Expected events {events_under_test}')
+        logger.debug('Expected events {}'.format(events_under_test))
 
         # First run "install" to make sure all hooks are set up.
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
@@ -306,7 +306,7 @@ start:
         for event_spec, expected_event_data in events_under_test:
             state = self._simulate_event(event_spec)
 
-            state_key = f'on_{event_spec.event_name}'
+            state_key = 'on_' + event_spec.event_name
             handled_events = state.get(state_key, [])
 
             # Make sure that a handler for that event was called once.
@@ -318,7 +318,7 @@ start:
             self.assertEqual(state['observed_event_types'], [event_spec.event_type])
 
             if event_spec.event_name in expected_event_data:
-                self.assertEqual(state[f'{event_spec.event_name}_data'], expected_event_data[event_spec.event_name])
+                self.assertEqual(state[event_spec.event_name + '_data'], expected_event_data[event_spec.event_name])
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit.
@@ -342,7 +342,7 @@ start:
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events.
         """
-        all_event_hooks = [f'hooks/{e.replace("_", "-")}' for e in self.charm_module.Charm.on.events().keys()]
+        all_event_hooks = ['hooks/' + e.replace("_", "-") for e in self.charm_module.Charm.on.events().keys()]
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
@@ -356,7 +356,7 @@ start:
         def _assess_event_links(event_spec):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
-                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists(), f'Missing hook: {event_hook}')
+                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists(), 'Missing hook: ' + event_hook)
                 self.assertEqual(os.readlink(self.JUJU_CHARM_DIR / event_hook), self.charm_exec_path)
 
         for initial_event in initial_events:
