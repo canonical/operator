@@ -663,3 +663,10 @@ class ModelBackend:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
             raise
+
+    def add_metric(self, metrics, labels=None):
+        cmd = ['add-metric']
+        if labels:
+            cmd.extend(['--labels', ','.join(f'{k}={v}' for k, v in labels.items())])
+        cmd.extend([*[f'{k}={v}' for k, v in metrics.items()]])
+        self._run(*cmd)

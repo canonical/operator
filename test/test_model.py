@@ -851,6 +851,11 @@ class TestModelBackend(unittest.TestCase):
         self.backend.action_log('progress: 42%')
         self.assertEqual(fake_script_calls(self), [['action-log', 'progress: 42%']])
 
+    def test_metrics(self):
+        fake_script(self, 'add-metric', 'exit 0')
+        self.backend.add_metric({'foo': 1, 'bar': ' baz '}, {'de': 'ad', 'be ': 'ef '})
+        self.assertEqual(fake_script_calls(self), [['add-metric', '--labels', 'de=ad,be =ef ', 'foo=1', 'bar= baz ']])
+
 
 if __name__ == "__main__":
     unittest.main()

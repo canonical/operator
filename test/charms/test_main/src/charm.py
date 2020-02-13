@@ -4,6 +4,8 @@ import os
 import base64
 import pickle
 import sys
+import pathlib
+import fcntl
 sys.path.append('lib')  # noqa
 
 from ops.charm import CharmBase
@@ -40,6 +42,7 @@ class Charm(CharmBase):
         self._state['on_ha_relation_broken'] = []
         self._state['on_foo_bar_action'] = []
         self._state['on_start_action'] = []
+        self._state['on_collect_metrics'] = []
 
         # Observed event types per invocation. A list is used to preserve the order in which charm handlers have observed the events.
         self._state['observed_event_types'] = []
@@ -59,6 +62,9 @@ class Charm(CharmBase):
         if self._charm_config.get('USE_ACTIONS'):
             self.framework.observe(self.on.start_action, self)
             self.framework.observe(self.on.foo_bar_action, self)
+
+        self.framework.observe(self.on.collect_metrics, self)
+        self.framework.observe(self.on.ha_relation_departed, self)
 
     def _write_state(self):
         """Write state variables so that the parent process can read them.
@@ -137,6 +143,19 @@ class Charm(CharmBase):
         self._state['on_foo_bar_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
+
+    def on_collect_metrics(self, event):
+        self._state['on_collect_metrics'].append(type(event))
+        self._state['observed_event_types'].append(type(event))
+        event.add_metrics({'foo': 'bar'}, {'dead': ' beef '})
+        self._write_state()
+
+    def on_ha_relation_departed(self, event):
+        indicator_file = pathlib.Path(self._charm_config['INDICATOR_FILE'])
+        indicator_file.touch()
+        with open(self._state_file, 'w+') as state_fd:
+            fcntl.flock(state_fd, fcntl.LOCK_EX)
+            fcntl.flock(state_fd, fcntl.LOCK_UN)
 
 
 if __name__ == '__main__':

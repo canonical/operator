@@ -73,6 +73,12 @@ class LeaderSettingsChangedEvent(HookEvent):
     pass
 
 
+class CollectMetricsEvent(HookEvent):
+
+    def add_metrics(self, metrics, labels=None):
+        self.framework.model._backend.add_metric(metrics, labels)
+
+
 class RelationEvent(HookEvent):
     def __init__(self, handle, relation, app=None, unit=None):
         super().__init__(handle)
@@ -151,6 +157,7 @@ class CharmEvents(EventsBase):
     post_series_upgrade = EventSource(PostSeriesUpgradeEvent)
     leader_elected = EventSource(LeaderElectedEvent)
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
+    collect_metrics = EventSource(CollectMetricsEvent)
 
 
 class CharmBase(Object):
