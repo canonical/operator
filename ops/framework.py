@@ -46,14 +46,14 @@ class Handle:
         self._key = key
         if parent:
             if key:
-                self._path = f"{parent}/{kind}[{key}]"
+                self._path = "{}/{}[{}]".format(parent, kind, key)
             else:
-                self._path = f"{parent}/{kind}"
+                self._path = "{}/{}".format(parent, kind)
         else:
             if key:
-                self._path = f"{kind}[{key}]"
+                self._path = "{}[{}]".format(kind, key)
             else:
-                self._path = f"{kind}"
+                self._path = "{}".format(kind)
 
     def nest(self, kind, key):
         return Handle(self, kind, key)
@@ -144,7 +144,7 @@ class EventSource:
 
     def __init__(self, event_type):
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
-            raise RuntimeError(f"Event requires a subclass of EventBase as an argument, got {event_type}")
+            raise RuntimeError("Event requires a subclass of EventBase as an argument, got {}".format(event_type))
         self.event_type = event_type
         self.event_kind = None
         self.emitter_type = None
@@ -152,9 +152,13 @@ class EventSource:
     def __set_name__(self, emitter_type, event_kind):
         if self.event_kind is not None:
             raise RuntimeError(
-                f'EventSource({self.event_type.__name__}) reused as '
-                f'{self.emitter_type.__name__}.{self.event_kind} and '
-                f'{emitter_type.__name__}.{event_kind}')
+                'EventSource({}) reused as {}.{} and {}.{}'.format(
+                    self.event_type.__name__,
+                    self.emitter_type.__name__,
+                    self.event_kind,
+                    emitter_type.__name__,
+                    event_kind,
+                ))
         self.event_kind = event_kind
         self.emitter_type = emitter_type
 
@@ -172,9 +176,12 @@ class EventSource:
 class BoundEvent:
 
     def __repr__(self):
-        return (f'<BoundEvent {self.event_type.__name__} bound to '
-                f'{type(self.emitter).__name__}.{self.event_kind} '
-                f'at {hex(id(self))}>')
+        return '<BoundEvent {} bound to {}.{} at {}>'.format(
+            self.event_type.__name__,
+            type(self.emitter).__name__,
+            self.event_kind,
+            hex(id(self)),
+        )
 
     def __init__(self, emitter, event_type, event_kind):
         self.emitter = emitter
@@ -268,12 +275,12 @@ class EventsBase(Object):
         event_type -- a type of the event to define.
         """
         if not event_kind.isidentifier():
-            raise RuntimeError(f'unable to define an event with event_kind that is not a valid python identifier: {event_kind}')
+            raise RuntimeError('unable to define an event with event_kind that is not a valid python identifier: {}'.format(event_kind))
         elif keyword.iskeyword(event_kind):
-            raise RuntimeError(f'unable to define an event with event_kind that is a python keyword: {event_kind}')
+            raise RuntimeError('unable to define an event with event_kind that is a python keyword: {}'.format(event_kind))
         try:
             getattr(cls, event_kind)
-            raise RuntimeError(f'unable to define an event with event_kind that overlaps with an existing type {cls} attribute: {event_kind}')
+            raise RuntimeError('unable to define an event with event_kind that overlaps with an existing type {} attribute: {}'.format(cls, event_kind))
         except AttributeError:
             pass
 
@@ -329,7 +336,7 @@ class NoSnapshotError(Exception):
         self.handle_path = handle_path
 
     def __str__(self):
-        return f'no snapshot data found for {self.handle_path} object'
+        return 'no snapshot data found for {} object'.format(self.handle_path)
 
 
 class NoTypeError(Exception):
@@ -338,7 +345,7 @@ class NoTypeError(Exception):
         self.handle_path = handle_path
 
     def __str__(self):
-        return f"cannot restore {self.handle_path} since no class was registered for it"
+        return "cannot restore {} since no class was registered for it".format(self.handle_path)
 
 
 class SQLiteStorage:
@@ -450,7 +457,7 @@ class Framework(Object):
             # Framework objects don't track themselves
             return
         if obj.handle.path in self.framework._objects:
-            raise RuntimeError(f"two objects claiming to be {obj.handle.path} have been created")
+            raise RuntimeError("two objects claiming to be {} have been created".format(obj.handle.path))
         self._objects[obj.handle.path] = obj
 
     def _forget(self, obj):
@@ -489,7 +496,7 @@ class Framework(Object):
         value.restore(snapshot)    # Restore custom state from prior snapshot.
         """
         if type(value) not in self._type_known:
-            raise RuntimeError(f"cannot save {type(value).__name__} values before registering that type")
+            raise RuntimeError("cannot save {} values before registering that type".format(type(value).__name__))
         data = value.snapshot()
         # Use marshal as a validator, enforcing the use of simple types.
         marshal.dumps(data)
@@ -538,7 +545,7 @@ class Framework(Object):
 
         """
         if not isinstance(bound_event, BoundEvent):
-            raise RuntimeError(f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}')
+            raise RuntimeError('Framework.observe requires a BoundEvent as second parameter, got {}'.format(bound_event))
 
         event_type = bound_event.event_type
         event_kind = bound_event.event_kind
@@ -549,7 +556,7 @@ class Framework(Object):
         if hasattr(emitter, "handle"):
             emitter_path = emitter.handle.path
         else:
-            raise RuntimeError(f'event emitter {type(emitter).__name__} must have a "handle" attribute')
+            raise RuntimeError('event emitter {} must have a "handle" attribute'.format(type(emitter).__name__))
 
         method_name = None
         if isinstance(observer, types.MethodType):
@@ -558,18 +565,18 @@ class Framework(Object):
         else:
             method_name = "on_" + event_kind
             if not hasattr(observer, method_name):
-                raise RuntimeError(f'Observer method not provided explicitly and {type(observer).__name__} type has no "{method_name}" method')
+                raise RuntimeError('Observer method not provided explicitly and {} type has no "{}" method'.format(type(observer).__name__, method_name))
 
         # Validate that the method has an acceptable call signature.
         sig = inspect.signature(getattr(observer, method_name))
         # Self isn't included in the params list, so the first arg will be the event.
         extra_params = list(sig.parameters.values())[1:]
         if not sig.parameters:
-            raise TypeError(f'{type(observer).__name__}.{method_name} must accept event parameter')
+            raise TypeError('{}.{} must accept event parameter'.format(type(observer).__name__, method_name))
         elif any(param.default is inspect.Parameter.empty for param in extra_params):
             # Allow for additional optional params, since there's no reason to exclude them, but
             # required params will break.
-            raise TypeError(f'{type(observer).__name__}.{method_name} has extra required parameter')
+            raise TypeError('{}.{} has extra required parameter'.format(type(observer).__name__, method_name))
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
@@ -709,17 +716,17 @@ class BoundStoredState:
         if key == "on":
             return self._data.on
         if key not in self._data:
-            raise AttributeError(f"attribute '{key}' is not stored")
+            raise AttributeError("attribute '{}' is not stored".format(key))
         return _wrap_stored(self._data, self._data[key])
 
     def __setattr__(self, key, value):
         if key == "on":
-            raise AttributeError(f"attribute 'on' is reserved and cannot be set")
+            raise AttributeError("attribute 'on' is reserved and cannot be set")
 
         value = _unwrap_stored(self._data, value)
 
         if not isinstance(value, (type(None), int, str, bytes, list, dict, set)):
-            raise AttributeError(f"attribute '{key}' cannot be set to {type(value).__name__}: must be int/dict/list/etc")
+            raise AttributeError("attribute '{}' cannot be set to {}: must be int/dict/list/etc".format(key, type(value).__name__))
 
         self._data[key] = _unwrap_stored(self._data, value)
         self.on.changed.emit()
@@ -752,7 +759,7 @@ class StoredState:
                 if attr_value is self:
                     if self.attr_name and attr_name != self.attr_name:
                         parent_tname = parent_type.__name__
-                        raise RuntimeError(f"StoredState shared by {parent_tname}.{self.attr_name} and {parent_tname}.{attr_name}")
+                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(parent_tname, self.attr_name, parent_tname, attr_name))
                     self.attr_name = attr_name
                     bound = BoundStoredState(parent, attr_name)
                     parent.__dict__[attr_name] = bound

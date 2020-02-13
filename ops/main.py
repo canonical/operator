@@ -36,7 +36,7 @@ def _get_charm_dir():
     charm_dir = os.environ.get("JUJU_CHARM_DIR")
     if charm_dir is None:
         # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = Path(f'{__file__}/../../..').resolve()
+        charm_dir = Path('{}/../../..'.format(__file__)).resolve()
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
@@ -64,12 +64,12 @@ def _create_event_link(charm, bound_event):
         event_path = event_dir / bound_event.event_kind.replace('_', '-')
     elif issubclass(bound_event.event_type, ops.charm.ActionEvent):
         if not bound_event.event_kind.endswith("_action"):
-            raise RuntimeError(f"action event name {bound_event.event_kind} needs _action suffix")
+            raise RuntimeError("action event name {} needs _action suffix".format(bound_event.event_kind))
         event_dir = charm.framework.charm_dir / 'actions'
         # The event_kind is suffixed with "_action" while the executable is not.
         event_path = event_dir / bound_event.event_kind[:-len('_action')].replace('_', '-')
     else:
-        raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
+        raise RuntimeError('cannot create a symlink: unsupported event type {}'.format(bound_event.event_type))
 
     event_dir.mkdir(exist_ok=True)
     if not event_path.exists():
@@ -78,7 +78,7 @@ def _create_event_link(charm, bound_event):
         target_path = os.path.relpath(os.path.realpath(sys.argv[0]), event_dir)
 
         # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
-        logger.debug(f'Creating a new relative symlink at {event_path} pointing to {target_path}')
+        logger.debug('Creating a new relative symlink at {} pointing to {}'.format(event_path, target_path))
         event_path.symlink_to(target_path)
 
 
@@ -110,13 +110,13 @@ def _emit_charm_event(charm, event_name):
     try:
         event_to_emit = getattr(charm.on, event_name)
     except AttributeError:
-        logger.debug(f"event {event_name} not defined for {charm}")
+        logger.debug("event {} not defined for {}".format(event_name, charm))
 
     # If the event is not supported by the charm implementation, do
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        logger.debug(f'Emitting Juju event {event_name}')
+        logger.debug('Emitting Juju event {}'.format(event_name))
         event_to_emit.emit(*args, **kwargs)
 
 
@@ -136,7 +136,7 @@ def _get_event_args(charm, bound_event):
     if remote_app_name or remote_unit_name:
         if not remote_app_name:
             if '/' not in remote_unit_name:
-                raise RuntimeError(f'invalid remote unit name: {remote_unit_name}')
+                raise RuntimeError('invalid remote unit name: {}'.format(remote_unit_name))
             remote_app_name = remote_unit_name.split('/')[0]
         args = [relation, model.get_app(remote_app_name)]
         if remote_unit_name:
@@ -161,7 +161,7 @@ def main(charm_class):
     juju_exec_path = Path(sys.argv[0])
     juju_event_name = juju_exec_path.name.replace('-', '_')
     if juju_exec_path.parent.name == 'actions':
-        juju_event_name = f'{juju_event_name}_action'
+        juju_event_name = '{}_action'.format(juju_event_name)
 
     model_backend = ops.model.ModelBackend()
     setup_root_logging(model_backend)

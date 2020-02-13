@@ -341,7 +341,7 @@ class TestFramework(unittest.TestCase):
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(f"on_foo:{event.handle.kind}={event.my_n}")
+                self.seen.append("on_foo:{}={}".format(event.handle.kind, event.my_n))
                 event.defer()
 
         pub = MyNotifier(framework, "1")
@@ -483,11 +483,11 @@ class TestFramework(unittest.TestCase):
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(f"on_foo:{event.handle.kind}")
+                self.seen.append("on_foo:{}".format(event.handle.kind))
                 event.defer()
 
             def on_bar(self, event):
-                self.seen.append(f"on_bar:{event.handle.kind}")
+                self.seen.append("on_bar:{}".format(event.handle.kind))
 
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
@@ -590,11 +590,11 @@ class TestFramework(unittest.TestCase):
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(f"on_foo:{type(event).__name__}:{event.handle.kind}")
+                self.seen.append("on_foo:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
             def on_bar(self, event):
-                self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
+                self.seen.append("on_bar:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
         pub = MyNotifier(framework, "1")
@@ -630,11 +630,11 @@ class TestFramework(unittest.TestCase):
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(f"on_foo:{type(event).__name__}:{event.handle.kind}")
+                self.seen.append("on_foo:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
             def on_bar(self, event):
-                self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
+                self.seen.append("on_bar:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
         pub = MyNotifier(framework, "1")
