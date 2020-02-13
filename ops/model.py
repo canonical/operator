@@ -25,7 +25,7 @@ class Model:
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
-        self._bindings = BindingMapping(list(meta.relations) + list(meta.extra_bindings), self._backend)
+        self._bindings = BindingMapping(self._backend)
 
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
@@ -44,15 +44,14 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_name, relation_id=None):
+    def get_binding(self, binding_name):
         """Get a network space binding.
 
-        Providing a relation id will return a Binding object specific to a relation.
+        Providing a Relation object will return a Binding object specific to a relation.
 
-        binding_name -- a name of a relation, extra-binding.
-        relation_id -- an optional relation id.
+        binding_name -- a name of a relation, extra-binding or a Relation object.
         """
-        return self._bindings._get_unique(binding_name, relation_id)
+        return self._bindings.get(binding_name)
 
 
 class ModelCache:
@@ -242,43 +241,27 @@ class RelationMapping(Mapping):
             raise TooManyRelatedAppsError(relation_name, num_related, 1)
 
 
-class BindingMapping(Mapping):
+class BindingMapping:
     """A map of binding names to lists of Binding instances."""
 
-    def __init__(self, binding_names, backend):
-        """
-        binding_names -- Relation endpoint names and names of extra-bindings.
-        backend -- An instance of a model backend implementation.
-        """
+    def __init__(self, backend):
         self._backend = backend
-        self._data = {binding_name: None for binding_name in binding_names}
+        self._data = {}
 
-    def __contains__(self, key):
-        return key in self._data
-
-    def __len__(self):
-        return len(self._data)
-
-    def __iter__(self):
-        return iter(self._data)
-
-    def __getitem__(self, binding_name):
-        return self._data[binding_name]
-
-    def _get_unique(self, binding_name, relation_id=None):
-        if not isinstance(binding_name, str):
-            raise ModelError(f'binding_name must be a str, not {type(binding_name).__name__}')
-        if relation_id is None:
+    def get(self, binding_name):
+        if isinstance(binding_name, Relation):
             key = binding_name
-            binding = self._data.get(binding_name)
+            name = binding_name.name
+            relation_id = binding_name.id
+        elif isinstance(binding_name, str):
+            name = key = binding_name
+            relation_id = None
         else:
-            if not isinstance(relation_id, int):
-                raise ModelError(f'relation id {relation_id} must be int or None not {type(relation_id).__name__}')
-            key = relation_id
-            binding = self._data.get(relation_id)
+            raise ModelError(f'binding_name must be a str or Relation, not {type(binding_name).__name__}')
+        binding = self._data.get(key)
         if binding is None:
-            binding = Binding(binding_name, relation_id, self._backend)
-        self._data[key] = binding
+            binding = Binding(name, relation_id, self._backend)
+            self._data[key] = binding
         return binding
 
 
@@ -371,6 +354,9 @@ class Relation:
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
+
+    def __hash__(self):
+        return hash((self.id, self.name))
 
 
 class RelationData(Mapping):

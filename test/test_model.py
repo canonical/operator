@@ -688,9 +688,10 @@ class TestModel(unittest.TestCase):
             self.assertEqual(binding.network.devices[0].addresses[0], ipaddress.ip_address('192.0.2.2'))
             self.assertEqual(binding.network.devices[0].cidrs[0], ipaddress.ip_interface('192.0.2.2/24'))
 
-        # Basic validation for passing an invalid key.
-        with self.assertRaises(ops.model.ModelError):
-            self.model.get_binding(object)
+        # Basic validation for passing invalid keys.
+        for name in (object, 0):
+            with self.assertRaises(ops.model.ModelError):
+                self.model.get_binding(name)
 
         single_binding_test_cases = [(
             lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
@@ -700,7 +701,7 @@ class TestModel(unittest.TestCase):
         ), (
             lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
             'db0',
-            lambda binding_name: self.model.get_binding(self.model.get_relation(binding_name).name, self.model.get_relation(binding_name).id),
+            lambda binding_name: self.model.get_binding(self.model.get_relation(binding_name)),
             [
                 ['relation-ids', 'db0', '--format=json'],
                 # The two invocations below are due to the get_relation call.
