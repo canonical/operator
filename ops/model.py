@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import time
 import datetime
+import ipaddress
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
@@ -43,21 +44,15 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_key):
+    def get_binding(self, binding_name, relation_id=None):
         """Get a network space binding.
 
-        Providing a Relation instance is preferred because network info exposed in a Binding instance
-        can be different depending on whether a relation is a cross-model relation or not.
+        Providing a relation id will return a Binding object specific to a relation.
 
-        binding_key -- a name of a relation, extra-binding or a Relation object.
+        binding_name -- a name of a relation, extra-binding.
+        relation_id -- an optional relation id.
         """
-        if isinstance(binding_key, Relation):
-            relation = binding_key
-            return self._bindings._get_unique(relation.name, relation.id)
-        elif isinstance(binding_key, str):
-            return self._bindings._get_unique(binding_key)
-        else:
-            raise ModelError(f'a binding key must be either str or Relation, not type({binding_key}).__name__')
+        return self._bindings._get_unique(binding_name, relation_id)
 
 
 class ModelCache:
@@ -228,7 +223,7 @@ class RelationMapping(Mapping):
     def _get_unique(self, relation_name, relation_id=None):
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
+                raise ModelError(f'relation id {relation_id} must be int or None not {type(relation_id).__name__}')
             for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
@@ -268,22 +263,23 @@ class BindingMapping(Mapping):
         return iter(self._data)
 
     def __getitem__(self, binding_name):
-        binding_list = self._data[binding_name]
-        if binding_list is None:
-            binding_list = self._data[binding_name] = []
-            # A relation id can be None which means a binding is not associated with a relation.
-            binding_list.append(Binding(binding_name, None, self._backend))
-            for relation_id in self._backend.relation_ids(binding_name):
-                binding_list.append(Binding(binding_name, relation_id, self._backend))
-        return binding_list
+        return self._data[binding_name]
 
     def _get_unique(self, binding_name, relation_id=None):
-        if not isinstance(relation_id, (int, type(None))):
-            raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
-        for binding in self[binding_name]:
-            if binding.relation_id == relation_id:
-                return binding
-        raise ModelError(f'a Binding object named "{binding_name}" with a relation id "{relation_id}" does not exist')
+        if not isinstance(binding_name, str):
+            raise ModelError(f'binding_name must be a str, not {type(binding_name).__name__}')
+        if relation_id is None:
+            key = binding_name
+            binding = self._data.get(binding_name)
+        else:
+            if not isinstance(relation_id, int):
+                raise ModelError(f'relation id {relation_id} must be int or None not {type(relation_id).__name__}')
+            key = relation_id
+            binding = self._data.get(relation_id)
+        if binding is None:
+            binding = Binding(binding_name, relation_id, self._backend)
+        self._data[key] = binding
+        return binding
 
 
 class Binding:
@@ -291,38 +287,65 @@ class Binding:
 
     def __init__(self, name, relation_id, backend):
         self.name = name
-        self.relation_id = relation_id
-        self._network_info = None
+        self._relation_id = relation_id
         self._backend = backend
-
-    def _cache_network_info(self):
-        try:
-            if self.relation_id is None:
-                self._network_info = self._backend.network_get(self.name)
-            else:
-                self._network_info = self._backend.network_get(self.name, self.relation_id)
-        except RelationNotFoundError:
-            # If a relation is dead, we can still get network info associated with an endpoint itself
-            # not associated with a particular relation id.
-            self._network_info = self._backend.network_get(self.name)
+        self._network = None
 
     @property
-    def network_info(self):
-        if not self._network_info:
-            self._cache_network_info()
-        return self._network_info
+    def network(self):
+        if self._network is None:
+            try:
+                if self._relation_id is None:
+                    network_info = self._backend.network_get(self.name)
+                else:
+                    network_info = self._backend.network_get(self.name, self._relation_id)
+            except RelationNotFoundError:
+                # If a relation is dead, we can still get network info associated with an endpoint itself
+                # not associated with a particular relation id.
+                network_info = self._backend.network_get(self.name)
+            self._network = Network(network_info['bind-addresses'], network_info['ingress-addresses'], network_info['egress-subnets'])
+        return self._network
+
+
+class Network:
+    """A representation of a unit's view of the network associated with a network space binding."""
+
+    def __init__(self, device_info, ingress_addresses, egress_subnets):
+        self.devices = []
+        for netdev in device_info:
+            self.devices.append(NetworkDevice(netdev['interface-name'], netdev['addresses']))
+
+        self.ingress_addresses = []
+        for address in ingress_addresses:
+            self.ingress_addresses.append(ipaddress.ip_address(address))
+        self.egress_subnets = []
+        for subnet in egress_subnets:
+            self.egress_subnets.append(ipaddress.ip_network(subnet))
 
     @property
     def bind_address(self):
-        return self.network_info['bind-addresses'][0]['addresses'][0]['value']
+        return self.devices[0].addresses[0]
 
     @property
     def ingress_address(self):
-        return self.network_info['ingress-addresses'][0]
+        return self.ingress_addresses[0]
 
-    @property
-    def egress_subnets(self):
-        return self.network_info['egress-subnets']
+
+class NetworkDevice:
+
+    def __init__(self, name, address_info):
+        self.name = name
+        self.addresses = []
+        self.cidrs = []
+        for entry in address_info:
+            address = entry['value']
+            self.addresses.append(ipaddress.ip_address(address))
+            cidr = entry.get('cidr')
+            if cidr:
+                self.cidrs.append(ipaddress.ip_interface(cidr))
+            else:
+                # At least provide a /32 if there is no CIDR provided.
+                self.cidrs.append(ipaddress.ip_interface(entry['value']))
 
 
 class Relation:

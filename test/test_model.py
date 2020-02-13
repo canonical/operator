@@ -6,6 +6,7 @@ import unittest
 import time
 import re
 import json
+import ipaddress
 
 import ops.model
 import ops.charm
@@ -659,13 +660,13 @@ class TestModel(unittest.TestCase):
         network_get_out = '''{
   "bind-addresses": [
     {
-      "mac-address": "",
-      "interface-name": "",
+      "mac-address": "de:ad:be:ef:ca:fe",
+      "interface-name": "lo",
       "addresses": [
         {
           "hostname": "",
           "value": "192.0.2.2",
-          "cidr": ""
+          "cidr": "192.0.2.2/24"
         }
       ]
     }
@@ -680,10 +681,12 @@ class TestModel(unittest.TestCase):
 
         def check_binding_data(binding_name, binding):
             self.assertEqual(binding.name, binding_name)
-            self.assertEqual(binding.bind_address, '192.0.2.2')
-            self.assertEqual(binding.ingress_address, '192.0.2.2')
-            self.assertEqual(binding.egress_subnets, ['192.0.2.2/32'])
-            self.assertEqual(binding.network_info, json.loads(network_get_out))
+            self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
+            self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
+            self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32')])
+            self.assertEqual(binding.network.devices[0].name, 'lo')
+            self.assertEqual(binding.network.devices[0].addresses[0], ipaddress.ip_address('192.0.2.2'))
+            self.assertEqual(binding.network.devices[0].cidrs[0], ipaddress.ip_interface('192.0.2.2/24'))
 
         # Basic validation for passing an invalid key.
         with self.assertRaises(ops.model.ModelError):
@@ -693,29 +696,22 @@ class TestModel(unittest.TestCase):
             lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
             'db0',
             lambda binding_name: self.model.get_binding(binding_name),
-            [
-                ['relation-ids', 'db0', '--format=json'],
-                ['network-get', 'db0', '--format=json'],
-            ],
+            [['network-get', 'db0', '--format=json']],
         ), (
             lambda: fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
             'db0',
-            lambda binding_name: self.model.get_binding(self.model.get_relation(binding_name)),
+            lambda binding_name: self.model.get_binding(self.model.get_relation(binding_name).name, self.model.get_relation(binding_name).id),
             [
                 ['relation-ids', 'db0', '--format=json'],
                 # The two invocations below are due to the get_relation call.
                 ['relation-list', '-r', '4', '--format=json'],
-                ['relation-ids', 'db0', '--format=json'],
                 ['network-get', 'db0', '-r', '4', '--format=json'],
             ],
         ), (
             lambda: fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1'''),
             'deadbeef',
             lambda binding_name: self.model.get_binding(binding_name),
-            [
-                ['relation-ids', 'deadbeef', '--format=json'],
-                ['network-get', 'deadbeef', '--format=json'],
-            ],
+            [['network-get', 'deadbeef', '--format=json']],
         )]
 
         for do_fake, binding_name, get_binding, expected_calls in single_binding_test_cases:
