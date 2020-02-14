@@ -332,10 +332,12 @@ class SQLiteStorage:
     DB_LOCK_TIMEOUT = timedelta(hours=1).total_seconds()
 
     def __init__(self, filename):
+        # The isolation_level argument is set to None such that autocommit behavior of the sqlite3 module is disabled.
         self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT)
         self._setup()
 
     def _setup(self):
+        # Make sure that the database is locked until the connection is closed, not until the transaction ends.
         c = self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
         c = self._db.execute("BEGIN EXCLUSIVE")
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
