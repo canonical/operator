@@ -730,11 +730,10 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(my_obj.charm_dir, framework.charm_dir)
 
     def test_ban_concurrent_frameworks(self):
-        framework = self.create_framework()
+        _ = self.create_framework()
         with self.assertRaises(Exception) as cm:
-            framework_copy = self.create_framework()
-            self.fail(f'frameworks {framework} and {framework_copy} got instantiated successfully')
-        self.assertTrue('database is locked' in str(cm.exception))
+            self.create_framework()
+        self.assertIn('database is locked', str(cm.exception))
 
 
 class TestStoredState(unittest.TestCase):

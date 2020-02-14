@@ -338,7 +338,7 @@ class SQLiteStorage:
 
     def _setup(self):
         # Make sure that the database is locked until the connection is closed, not until the transaction ends.
-        c = self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
+        self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
         c = self._db.execute("BEGIN")
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:
