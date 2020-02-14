@@ -730,7 +730,7 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(my_obj.charm_dir, framework.charm_dir)
 
     def test_ban_concurrent_frameworks(self):
-        _ = self.create_framework()
+        _ = self.create_framework()  # noqa: E841
         with self.assertRaises(Exception) as cm:
             self.create_framework()
         self.assertIn('database is locked', str(cm.exception))
