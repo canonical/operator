@@ -329,18 +329,19 @@ class NoTypeError(Exception):
 class SQLiteStorage:
 
     def __init__(self, filename):
-        self._db = sqlite3.connect(str(filename), isolation_level="EXCLUSIVE")
+        self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=0)
         self._setup()
 
     def _setup(self):
-        c = self._db.cursor()
+        c = self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
+        c = self._db.execute("BEGIN EXCLUSIVE")
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:
             # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
             self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)")
             self._db.execute("CREATE TABLE notice (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_path TEXT, observer_path TEXT, method_name TEXT)")
-            self._db.commit()
+            self.commit()
 
     def close(self):
         self._db.close()
