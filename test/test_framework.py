@@ -4,6 +4,7 @@ import unittest
 import tempfile
 import shutil
 import gc
+import datetime
 
 from pathlib import Path
 
@@ -12,20 +13,17 @@ from ops.framework import (
     NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData, SQLiteStorage
 )
 
-from sqlite3 import OperationalError
-
 
 class TestFramework(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmpdir)
-
         default_timeout = SQLiteStorage.DB_LOCK_TIMEOUT
 
         def timeout_cleanup():
             SQLiteStorage.DB_LOCK_TIMEOUT = default_timeout
-        SQLiteStorage.DB_LOCK_TIMEOUT = 0
+        SQLiteStorage.DB_LOCK_TIMEOUT = datetime.timedelta(0)
         self.addCleanup(timeout_cleanup)
 
     def create_framework(self):
@@ -733,9 +731,10 @@ class TestFramework(unittest.TestCase):
 
     def test_ban_concurrent_frameworks(self):
         framework = self.create_framework()
-        with self.assertRaises(OperationalError):
+        with self.assertRaises(Exception) as cm:
             framework_copy = self.create_framework()
             self.fail(f'frameworks {framework} and {framework_copy} got instantiated successfully')
+        self.assertTrue('database is locked' in str(cm.exception))
 
 
 class TestStoredState(unittest.TestCase):

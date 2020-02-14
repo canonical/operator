@@ -329,24 +329,24 @@ class NoTypeError(Exception):
 
 class SQLiteStorage:
 
-    DB_LOCK_TIMEOUT = timedelta(hours=1).total_seconds()
+    DB_LOCK_TIMEOUT = timedelta(hours=1)
 
     def __init__(self, filename):
         # The isolation_level argument is set to None such that autocommit behavior of the sqlite3 module is disabled.
-        self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT)
+        self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT.total_seconds())
         self._setup()
 
     def _setup(self):
         # Make sure that the database is locked until the connection is closed, not until the transaction ends.
         c = self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
-        c = self._db.execute("BEGIN EXCLUSIVE")
+        c = self._db.execute("BEGIN")
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:
             # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
             self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)")
             self._db.execute("CREATE TABLE notice (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_path TEXT, observer_path TEXT, method_name TEXT)")
-            self.commit()
+            self._db.commit()
 
     def close(self):
         self._db.close()
