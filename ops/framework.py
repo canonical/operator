@@ -333,7 +333,7 @@ class SQLiteStorage:
         self._setup()
 
     def _setup(self):
-        c = self._db.execute("BEGIN")
+        c = self._db.cursor()
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:
             # Keep in mind what might happen if the process dies somewhere below.
