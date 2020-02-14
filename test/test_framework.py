@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ops.framework import (
     Framework, Handle, EventSource, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
-    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData
+    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData, SQLiteStorage
 )
 
 from sqlite3 import OperationalError
@@ -20,6 +20,13 @@ class TestFramework(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmpdir)
+
+        default_timeout = SQLiteStorage.DB_LOCK_TIMEOUT
+
+        def timeout_cleanup():
+            SQLiteStorage.DB_LOCK_TIMEOUT = default_timeout
+        SQLiteStorage.DB_LOCK_TIMEOUT = 0
+        self.addCleanup(timeout_cleanup)
 
     def create_framework(self):
         framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)

@@ -7,6 +7,7 @@ import collections
 import collections.abc
 import keyword
 import weakref
+from datetime import timedelta
 
 
 class Handle:
@@ -328,8 +329,10 @@ class NoTypeError(Exception):
 
 class SQLiteStorage:
 
+    DB_LOCK_TIMEOUT = timedelta(hours=1).total_seconds()
+
     def __init__(self, filename):
-        self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=0)
+        self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT)
         self._setup()
 
     def _setup(self):
