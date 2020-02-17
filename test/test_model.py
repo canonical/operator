@@ -54,7 +54,7 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_get_relation(self):
-        err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
+        err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         fake_script(self, 'relation-ids',
                     """([ "$1" = db1 ] && echo '["db1:4"]') || ([ "$1" = db2 ] && echo '["db2:5", "db2:6"]') || echo '[]'""")
@@ -92,7 +92,7 @@ class TestModel(unittest.TestCase):
         meta.relations = {'dbpeer': RelationMeta('peers', 'dbpeer', {'interface': 'dbpeer', 'scope': 'global'})}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
-        err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
+        err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
         fake_script(self, 'relation-ids',
                     '''([ "$1" = dbpeer ] && echo '["dbpeer:0"]') || echo "[]"''')
         fake_script(self, 'relation-list',
@@ -662,7 +662,7 @@ class TestModelBackend(unittest.TestCase):
         return self._backend
 
     def test_relation_tool_errors(self):
-        err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
+        err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [(
             lambda: fake_script(self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
