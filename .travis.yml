@@ -2,9 +2,14 @@ dist: bionic
 
 language: python
 
+arch:
+    - amd64
+    - arm64
+
 python:
     - "3.6"
     - "3.7"
+    - "3.8"
 
 install:
     - sudo apt update
