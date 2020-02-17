@@ -9,9 +9,6 @@ import pickle
 import base64
 import tempfile
 import shutil
-import fcntl
-import time
-import concurrent.futures
 
 import importlib.util
 
@@ -348,7 +345,7 @@ start:
         action_hook = self.JUJU_CHARM_DIR / 'actions' / 'test'
         self.assertTrue(action_hook.exists())
 
-    def test_collect_metrics_concurrent(self):
+    def test_collect_metrics(self):
         indicator_file = self.JUJU_CHARM_DIR / 'indicator'
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
@@ -356,23 +353,8 @@ start:
         }))
         fake_script(self, 'add-metric', 'exit 0')
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-
-        with open(self._state_file, 'w+') as state_fd:
-            fcntl.flock(state_fd, fcntl.LOCK_EX)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self._simulate_event, EventSpec(RelationDepartedEvent, 'ha_relation_departed',
-                                                                         relation_id=3, charm_config=charm_config))
-                # A simple spinlock to wait until the indicator file appears (avoids inotify as a dependency).
-                while not indicator_file.exists():
-                    time.sleep(0.01)
-                try:
-                    self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics', charm_config=charm_config))
-                except Exception:
-                    fcntl.flock(state_fd, fcntl.LOCK_UN)
-                    self.fail('simulating a concurrent collect-metrics hook resulted in an exception')
-                self.assertEqual(fake_script_calls(self), [['add-metric', '--labels', 'dead= beef ', 'foo=bar']])
-                fcntl.flock(state_fd, fcntl.LOCK_UN)
-                future.result()
+        self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics', charm_config=charm_config))
+        self.assertEqual(fake_script_calls(self), [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
 
 
 if __name__ == "__main__":

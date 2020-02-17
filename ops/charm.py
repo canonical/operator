@@ -76,7 +76,7 @@ class LeaderSettingsChangedEvent(HookEvent):
 class CollectMetricsEvent(HookEvent):
 
     def add_metrics(self, metrics, labels=None):
-        self.framework.model._backend.add_metric(metrics, labels)
+        self.framework.model._backend.add_metrics(metrics, labels)
 
 
 class RelationEvent(HookEvent):

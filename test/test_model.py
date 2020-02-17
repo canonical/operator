@@ -853,8 +853,38 @@ class TestModelBackend(unittest.TestCase):
 
     def test_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
-        self.backend.add_metric({'foo': 1, 'bar': ' baz '}, {'de': 'ad', 'be ': 'ef '})
-        self.assertEqual(fake_script_calls(self), [['add-metric', '--labels', 'de=ad,be =ef ', 'foo=1', 'bar= baz ']])
+        test_cases = [(
+            {'foo': 42, 'bar': 4.2},
+            {'de': 'ad', 'be': 'ef_ -'},
+            [['add-metric', '--labels', 'de=ad,be=ef_ -', 'foo=42', 'bar=4.2']]
+        ), (
+            {'foo1': 0, 'b2r': -4.2},
+            {'d3': 'aд', 'b33f': '3_ -'},
+            [['add-metric', '--labels', 'd3=aд,b33f=3_ -', 'foo1=0', 'b2r=-4.2']],
+        )]
+        for metrics, labels, expected_calls in test_cases:
+            self.backend.add_metrics(metrics, labels)
+            self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
+
+        invalid_inputs = [
+            ({'': 4.2}, {}),
+            ({'123': 4.2}, {}),
+            ({'1foo': 4.2}, {}),
+            ({'foo': 'bar'}, {}),
+            ({'foo': '1O'}, {}),
+            ({'BAЯ': 4.2}, {}),
+            ({'foo': 4.2}, {'': 'baz'}),
+            ({'foo': 4.2}, {'bar': ''}),
+            ({'foo': 4.2}, {',bar': 'baz'}),
+            ({'foo': 4.2}, {'b=a=r': 'baz'}),
+            ({'foo': 4.2}, {'bar': ''}),
+            ({'foo': 4.2}, {'bar': 'b,az'}),
+            ({'foo': 4.2}, {'bar': 'b=az'}),
+            ({'foo': 4.2}, {'BAЯ': 'baz'}),
+        ]
+        for metrics, labels in invalid_inputs:
+            with self.assertRaises(ops.model.ModelError):
+                self.backend.add_metrics(metrics, labels)
 
 
 if __name__ == "__main__":

@@ -4,8 +4,6 @@ import os
 import base64
 import pickle
 import sys
-import pathlib
-import fcntl
 sys.path.append('lib')  # noqa
 
 from ops.charm import CharmBase
@@ -64,7 +62,6 @@ class Charm(CharmBase):
             self.framework.observe(self.on.foo_bar_action, self)
 
         self.framework.observe(self.on.collect_metrics, self)
-        self.framework.observe(self.on.ha_relation_departed, self)
 
     def _write_state(self):
         """Write state variables so that the parent process can read them.
@@ -147,15 +144,8 @@ class Charm(CharmBase):
     def on_collect_metrics(self, event):
         self._state['on_collect_metrics'].append(type(event))
         self._state['observed_event_types'].append(type(event))
-        event.add_metrics({'foo': 'bar'}, {'dead': ' beef '})
+        event.add_metrics({'foo': 42}, {'bar': 4.2})
         self._write_state()
-
-    def on_ha_relation_departed(self, event):
-        indicator_file = pathlib.Path(self._charm_config['INDICATOR_FILE'])
-        indicator_file.touch()
-        with open(self._state_file, 'w+') as state_fd:
-            fcntl.flock(state_fd, fcntl.LOCK_EX)
-            fcntl.flock(state_fd, fcntl.LOCK_UN)
 
 
 if __name__ == '__main__':

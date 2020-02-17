@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import time
 import datetime
+import re
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
@@ -664,9 +665,39 @@ class ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def add_metric(self, metrics, labels=None):
+    def add_metrics(self, metrics, labels=None):
         cmd = ['add-metric']
+        key_re = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]*$')
+
+        def is_valid_metric_value(value):
+            try:
+                float(value)
+                return True
+            except ValueError:
+                return False
+
+        def is_valid_label_value(value):
+            # Label values cannot be empty, contain commas and equal signs those are used by add-metric as separators.
+            return value and all(c not in str(value) for c in ',=')
+
         if labels:
-            cmd.extend(['--labels', ','.join(f'{k}={v}' for k, v in labels.items())])
-        cmd.extend([*[f'{k}={v}' for k, v in metrics.items()]])
+            label_args = []
+            for k, v in labels.items():
+                if not key_re.match(k):
+                    raise ModelError(f'invalid label key "{k}": must start from an ASCII letter and contain alphanumeric characters or underscores only')
+                elif not is_valid_label_value(v):
+                    raise ModelError('metric label values must not contain "," or "=".')
+                else:
+                    label_args.append(f'{k}={v}')
+            cmd.extend(['--labels', ','.join(label_args)])
+
+        metric_args = []
+        for k, v in metrics.items():
+            if not key_re.match(k):
+                raise ModelError(f'invalid metric key "{k}": must start from an ASCII letter and contain alphanumeric characters or underscores only')
+            elif not is_valid_metric_value(v):
+                raise ModelError(f'invalid value "{v}" provided for key "{k}": must be a real number')
+            else:
+                metric_args.append(f'{k}={v}')
+        cmd.extend(metric_args)
         self._run(*cmd)
