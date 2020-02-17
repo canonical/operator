@@ -6,11 +6,11 @@ lint: quotelint
 	@flake8 --config=.flake8
 
 quotelint:
-	@x=$$(grep -rnH --include \*.py "\\\\[\"']");                  \
-	if [ "$$x" ]; then                                             \
-		echo "Please reconsider your choice of quoting for:";  \
-		echo "$$x";                                            \
-		exit 1;                                                \
+	@x=$$(grep -rnH --include \*.py "\\\\[\"']");                         \
+	if [ "$$x" ]; then                                                    \
+		echo "Please fix the quoting to avoid spurious backslashes:"; \
+		echo "$$x";                                                   \
+		exit 1;                                                       \
 	fi >&2
 
 
