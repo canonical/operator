@@ -23,16 +23,15 @@ setup(
     description="The Python library behind great charms",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    license='Apache-2.0',
+    license="Apache-2.0",
     url="https://github.com/canonical/operator",
-    packages=['ops'],
+    packages=["ops"],
     classifiers=[
-        'Development Status :: 4 - Beta',
+        "Development Status :: 4 - Beta",
 
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
 
         "License :: OSI Approved :: Apache Software License",
     ],
