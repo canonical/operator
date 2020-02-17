@@ -677,7 +677,7 @@ class ModelBackend:
                 return False
 
         def is_valid_label_value(value):
-            # Label values cannot be empty, contain commas and equal signs those are used by add-metric as separators.
+            # Label values cannot be empty, contain commas or equal signs as those are used by add-metric as separators.
             return value and all(c not in str(value) for c in ',=')
 
         if labels:
