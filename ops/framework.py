@@ -332,7 +332,7 @@ class SQLiteStorage:
     DB_LOCK_TIMEOUT = timedelta(hours=1)
 
     def __init__(self, filename):
-        # The isolation_level argument is set to None such that autocommit behavior of the sqlite3 module is disabled.
+        # The isolation_level argument is set to None such that the implicit transaction management behavior of the sqlite3 module is disabled.
         self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT.total_seconds())
         self._setup()
 
