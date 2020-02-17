@@ -11,9 +11,14 @@ python:
     - "3.7"
     - "3.8"
 
+addons:
+    apt:
+        update: true
+        packages:
+            - flake8
+            - make
+
 install:
-    - sudo apt update
-    - sudo apt install flake8 make
     - pip3 install pyyaml autopep8
 
 script:
