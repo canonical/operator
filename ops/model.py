@@ -684,9 +684,9 @@ class ModelBackend:
             label_args = []
             for k, v in labels.items():
                 if not key_re.match(k):
-                    raise ModelError(f'invalid label key "{k}": must start from an ASCII letter and contain alphanumeric characters or underscores only')
+                    raise ModelError(f'invalid label key "{repr(k)}": must start with [a-zA-Z] and contain [a-zA-Z0-9_] only')
                 elif not is_valid_label_value(v):
-                    raise ModelError('metric label values must not contain "," or "=".')
+                    raise ModelError('metric label values must not contain "," or "="')
                 else:
                     label_args.append(f'{k}={v}')
             cmd.extend(['--labels', ','.join(label_args)])
@@ -694,9 +694,9 @@ class ModelBackend:
         metric_args = []
         for k, v in metrics.items():
             if not key_re.match(k):
-                raise ModelError(f'invalid metric key "{k}": must start from an ASCII letter and contain alphanumeric characters or underscores only')
+                raise ModelError(f'invalid metric key "{repr(k)}": must start with [a-zA-Z] and contain [a-zA-Z0-9_] only')
             elif not is_valid_metric_value(v):
-                raise ModelError(f'invalid value "{v}" provided for key "{k}": must be a real number')
+                raise ModelError(f'invalid value "{repr(v)}" provided for key "{k}": must be a float number')
             else:
                 metric_args.append(f'{k}={v}')
         cmd.extend(metric_args)
