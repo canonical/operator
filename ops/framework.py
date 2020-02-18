@@ -21,6 +21,7 @@ import collections
 import collections.abc
 import keyword
 import weakref
+from datetime import timedelta
 
 
 class Handle:
@@ -342,11 +343,16 @@ class NoTypeError(Exception):
 
 class SQLiteStorage:
 
+    DB_LOCK_TIMEOUT = timedelta(hours=1)
+
     def __init__(self, filename):
-        self._db = sqlite3.connect(str(filename), isolation_level="EXCLUSIVE")
+        # The isolation_level argument is set to None such that the implicit transaction management behavior of the sqlite3 module is disabled.
+        self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT.total_seconds())
         self._setup()
 
     def _setup(self):
+        # Make sure that the database is locked until the connection is closed, not until the transaction ends.
+        self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
         c = self._db.execute("BEGIN")
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:

@@ -17,12 +17,13 @@ import unittest
 import tempfile
 import shutil
 import gc
+import datetime
 
 from pathlib import Path
 
 from ops.framework import (
     Framework, Handle, EventSource, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
-    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData
+    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData, SQLiteStorage
 )
 
 
@@ -31,6 +32,12 @@ class TestFramework(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmpdir)
+        default_timeout = SQLiteStorage.DB_LOCK_TIMEOUT
+
+        def timeout_cleanup():
+            SQLiteStorage.DB_LOCK_TIMEOUT = default_timeout
+        SQLiteStorage.DB_LOCK_TIMEOUT = datetime.timedelta(0)
+        self.addCleanup(timeout_cleanup)
 
     def create_framework(self):
         framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)
@@ -96,6 +103,7 @@ class TestFramework(unittest.TestCase):
         framework1.register_type(Foo, None, handle.kind)
         framework1.save_snapshot(event)
         framework1.commit()
+        framework1.close()
 
         framework2 = self.create_framework()
         framework2.register_type(Foo, None, handle.kind)
@@ -110,12 +118,11 @@ class TestFramework(unittest.TestCase):
 
         framework2.drop_snapshot(event.handle)
         framework2.commit()
+        framework2.close()
 
         framework3 = self.create_framework()
         framework3.register_type(Foo, None, handle.kind)
 
-        self.assertRaises(NoSnapshotError, framework1.load_snapshot, handle)
-        self.assertRaises(NoSnapshotError, framework2.load_snapshot, handle)
         self.assertRaises(NoSnapshotError, framework3.load_snapshot, handle)
 
     def test_simple_event_observer(self):
@@ -228,6 +235,7 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(obs.state.myinitdata, 41)
         self.assertEqual(obs.state.mydata, 42)
         self.assertTrue(obs.seen, [PreCommitEvent, CommitEvent])
+        framework.close()
 
         other_framework = self.create_framework()
 
@@ -407,6 +415,7 @@ class TestFramework(unittest.TestCase):
         gc.collect()
         o3 = MyObject(framework, "path")
         self.assertEqual(o1.handle.path, o3.handle.path)
+        framework.close()
         # Or using a second framework
         framework_copy = self.create_framework()
         o_copy = MyObject(framework_copy, "path")
@@ -444,10 +453,12 @@ class TestFramework(unittest.TestCase):
         # A loaded object also prevents direct creation of an object
         with self.assertRaises(RuntimeError):
             MyObject(framework, "path")
+        framework.close()
         # But we can create an object, or load a snapshot in a copy of the framework
         framework_copy1 = self.create_framework()
         o_copy1 = MyObject(framework_copy1, "path")
         self.assertEqual(o_copy1.value, "path")
+        framework_copy1.close()
         framework_copy2 = self.create_framework()
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
@@ -731,6 +742,13 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(my_obj.meta, framework.meta)
         self.assertEqual(my_obj.charm_dir, framework.charm_dir)
 
+    def test_ban_concurrent_frameworks(self):
+        f = self.create_framework()
+        with self.assertRaises(Exception) as cm:
+            self.create_framework()
+        self.assertIn('database is locked', str(cm.exception))
+        f.close()
+
 
 class TestStoredState(unittest.TestCase):
 
@@ -796,7 +814,7 @@ class TestStoredState(unittest.TestCase):
                 pass
             obj.state.foo = CustomObject()
         except AttributeError as e:
-            self.assertEqual(str(e), 'attribute \'foo\' cannot be set to CustomObject: must be int/dict/list/etc')
+            self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/dict/list/etc")
         else:
             self.fail('AttributeError not raised')
 
@@ -994,6 +1012,7 @@ class TestStoredState(unittest.TestCase):
             op(obj_copy1.state.a, b)
             validate_op(obj_copy1.state.a, expected_res)
             framework.commit()
+            framework.close()
 
             framework_copy = self.create_framework(cls=WrappedFramework)
 
@@ -1005,6 +1024,7 @@ class TestStoredState(unittest.TestCase):
             framework.snapshots.clear()
             framework_copy.commit()
             self.assertEqual(framework_copy.snapshots, [])
+            framework_copy.close()
 
     def test_comparison_operations(self):
         test_operations = [(
