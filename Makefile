@@ -28,19 +28,13 @@ quotelint:
 	fi >&2
 
 check-copyright:
-	@found="";                                                                        \
-	for f in $$( find . -name \*.py -not -empty -type f -print ); do                  \
-		if ! grep -q "^# Copyright" "$$f"; then                                   \
-			if [ -z "$$found" ]; then                                         \
-				echo "The following files are missing Copyright headers"; \
-				found=yes;                                                \
-			fi;                                                               \
-			echo "$$f";                                                       \
-		fi;                                                                       \
-	done;                                                                             \
-	if [ -n "$$found" ]; then                                                         \
-		exit 1;                                                                   \
-	fi
+	@found="";                                                                              \
+	x=$$(find . -name \*.py -not -empty -type f -print0 | xargs -0 grep -L "^# Copyright"); \
+	if [ "$$x" ]; then                                                                      \
+		echo "Please add copyright headers to the following files:";                    \
+		echo "$$x";                                                                     \
+		exit 1;                                                                         \
+	fi >&2
 
 
 
