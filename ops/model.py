@@ -667,7 +667,7 @@ class ModelBackend:
 
     def add_metrics(self, metrics, labels=None):
         cmd = ['add-metric']
-        key_re = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]*$')
+        key_re = re.compile(r'^[a-zA-Z](?:[a-zA-Z0-9-_]*[a-zA-Z0-9])?$')
 
         def is_valid_metric_value(value):
             try:

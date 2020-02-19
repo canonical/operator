@@ -854,9 +854,9 @@ class TestModelBackend(unittest.TestCase):
     def test_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
         test_cases = [(
-            {'foo': 42, 'bar': 4.2},
+            {'foo': 42, 'b-ar': 4.2, 'ba_-z': 4.2, 'a': 1},
             {'de': 'ad', 'be': 'ef_ -'},
-            [['add-metric', '--labels', 'de=ad,be=ef_ -', 'foo=42', 'bar=4.2']]
+            [['add-metric', '--labels', 'de=ad,be=ef_ -', 'foo=42', 'b-ar=4.2', 'ba_-z=4.2', 'a=1']]
         ), (
             {'foo1': 0, 'b2r': -4.2},
             {'d3': 'aд', 'b33f': '3_ -'},
@@ -868,8 +868,15 @@ class TestModelBackend(unittest.TestCase):
 
         invalid_inputs = [
             ({'': 4.2}, {}),
+            ({'1': 4.2}, {}),
             ({'123': 4.2}, {}),
             ({'1foo': 4.2}, {}),
+            ({'-foo': 4.2}, {}),
+            ({'_foo': 4.2}, {}),
+            ({'foo-': 4.2}, {}),
+            ({'foo_': 4.2}, {}),
+            ({'a-': 4.2}, {}),
+            ({'a_': 4.2}, {}),
             ({'foo': 'bar'}, {}),
             ({'foo': '1O'}, {}),
             ({'BAЯ': 4.2}, {}),
