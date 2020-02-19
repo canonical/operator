@@ -685,8 +685,7 @@ class TestModel(unittest.TestCase):
             self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
             self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32')])
             self.assertEqual(binding.network.devices[0].name, 'lo')
-            self.assertEqual(binding.network.devices[0].addresses[0], ipaddress.ip_address('192.0.2.2'))
-            self.assertEqual(binding.network.devices[0].cidrs[0], ipaddress.ip_interface('192.0.2.2/24'))
+            self.assertEqual(binding.network.devices[0].addresses[0], ipaddress.ip_interface('192.0.2.2/24'))
 
         # Basic validation for passing invalid keys.
         for name in (object, 0):

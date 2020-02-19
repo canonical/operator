@@ -302,7 +302,7 @@ class Network:
 
     @property
     def bind_address(self):
-        return self.devices[0].addresses[0]
+        return self.devices[0].addresses[0].ip
 
     @property
     def ingress_address(self):
@@ -314,16 +314,14 @@ class NetworkDevice:
     def __init__(self, name, address_info):
         self.name = name
         self.addresses = []
-        self.cidrs = []
         for entry in address_info:
             address = entry['value']
-            self.addresses.append(ipaddress.ip_address(address))
             cidr = entry.get('cidr')
             if cidr:
-                self.cidrs.append(ipaddress.ip_interface(cidr))
+                self.addresses.append(ipaddress.ip_interface(cidr))
             else:
                 # At least provide a /32 if there is no CIDR provided.
-                self.cidrs.append(ipaddress.ip_interface(entry['value']))
+                self.addresses.append(ipaddress.ip_interface(address))
 
 
 class Relation:
