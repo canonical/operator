@@ -15,7 +15,7 @@
 test: lint
 	@python3 -m unittest
 
-lint: quotelint
+lint: quotelint check-copyright
 	@autopep8 -r --aggressive --diff --exit-code .
 	@flake8 --config=.flake8
 
@@ -27,6 +27,15 @@ quotelint:
 		exit 1;                                                       \
 	fi >&2
 
+check-copyright:
+	@x=$$(find . -name \*.py -not -empty -type f -print0 | xargs -0 grep -L "^# Copyright"); \
+	if [ "$$x" ]; then                                                                       \
+		echo "Please add copyright headers to the following files:";                     \
+		echo "$$x";                                                                      \
+		exit 1;                                                                          \
+	fi >&2
 
 
-.PHONY: lint test
+
+
+.PHONY: lint test quotelint check-copyright
