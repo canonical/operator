@@ -854,13 +854,13 @@ class TestModelBackend(unittest.TestCase):
     def test_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
         test_cases = [(
-            {'foo': 42, 'b-ar': 4.2, 'ba_-z': 4.2, 'a': 1},
+            {'foo': 42, 'b-ar': 4.5, 'ba_-z': 4.5, 'a': 1},
             {'de': 'ad', 'be': 'ef_ -'},
-            [['add-metric', '--labels', 'de=ad,be=ef_ -', 'foo=42', 'b-ar=4.2', 'ba_-z=4.2', 'a=1']]
+            [['add-metric', '--labels', 'de=ad,be=ef_ -', 'foo=42', 'b-ar=4.5', 'ba_-z=4.5', 'a=1']]
         ), (
-            {'foo1': 0, 'b2r': -4.2},
+            {'foo1': 0, 'b2r': 4.5},
             {'d3': 'aд', 'b33f': '3_ -'},
-            [['add-metric', '--labels', 'd3=aд,b33f=3_ -', 'foo1=0', 'b2r=-4.2']],
+            [['add-metric', '--labels', 'd3=aд,b33f=3_ -', 'foo1=0', 'b2r=4.5']],
         )]
         for metrics, labels, expected_calls in test_cases:
             self.backend.add_metrics(metrics, labels)
@@ -869,6 +869,10 @@ class TestModelBackend(unittest.TestCase):
         invalid_inputs = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
+            ({'1': -4.2}, {}),
+            ({'a': float('+inf')}, {}),
+            ({'a': float('-inf')}, {}),
+            ({'a': float('nan')}, {}),
             ({'123': 4.2}, {}),
             ({'1foo': 4.2}, {}),
             ({'-foo': 4.2}, {}),

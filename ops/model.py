@@ -6,6 +6,7 @@ import tempfile
 import time
 import datetime
 import re
+import decimal
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
@@ -667,37 +668,52 @@ class ModelBackend:
 
     def add_metrics(self, metrics, labels=None):
         cmd = ['add-metric']
-        key_re = re.compile(r'^[a-zA-Z](?:[a-zA-Z0-9-_]*[a-zA-Z0-9])?$')
-
-        def is_valid_metric_value(value):
-            try:
-                float(value)
-                return True
-            except ValueError:
-                return False
-
-        def is_valid_label_value(value):
-            # Label values cannot be empty, contain commas or equal signs as those are used by add-metric as separators.
-            return value and all(c not in str(value) for c in ',=')
 
         if labels:
             label_args = []
             for k, v in labels.items():
-                if not key_re.match(k):
-                    raise ModelError(f'invalid label key "{repr(k)}": must start with [a-zA-Z] and contain [a-zA-Z0-9_] only')
-                elif not is_valid_label_value(v):
-                    raise ModelError('metric label values must not contain "," or "="')
-                else:
-                    label_args.append(f'{k}={v}')
+                _ModelBackendValidator.validate_metric_label(k)
+                _ModelBackendValidator.validate_label_value(v)
+                label_args.append(f'{k}={v}')
             cmd.extend(['--labels', ','.join(label_args)])
 
         metric_args = []
         for k, v in metrics.items():
-            if not key_re.match(k):
-                raise ModelError(f'invalid metric key "{repr(k)}": must start with [a-zA-Z] and contain [a-zA-Z0-9_] only')
-            elif not is_valid_metric_value(v):
-                raise ModelError(f'invalid value "{repr(v)}" provided for key "{k}": must be a float number')
-            else:
-                metric_args.append(f'{k}={v}')
+            _ModelBackendValidator.validate_metric_key(k)
+            metric_value = _ModelBackendValidator.format_metric_value(v)
+            metric_args.append(f'{k}={metric_value}')
         cmd.extend(metric_args)
         self._run(*cmd)
+
+
+class _ModelBackendValidator:
+    """Provides facilities for validating inputs and formatting them for model backends."""
+
+    METRIC_KEY_REGEX = re.compile(r'^[a-zA-Z](?:[a-zA-Z0-9-_]*[a-zA-Z0-9])?$')
+
+    @classmethod
+    def validate_metric_key(cls, key):
+        if cls.METRIC_KEY_REGEX.match(key) is None:
+            raise ModelError(f'invalid metric key {repr(key)}: must start with [a-zA-Z] and contain [a-zA-Z0-9_] only')
+
+    @classmethod
+    def validate_metric_label(cls, label_name):
+        if cls.METRIC_KEY_REGEX.match(label_name) is None:
+            raise ModelError(f'invalid metric label name {repr(label_name)}: must start with [a-zA-Z] and contain [a-zA-Z0-9_] only')
+
+    @classmethod
+    def format_metric_value(cls, value):
+        try:
+            decimal_value = decimal.Decimal.from_float(value)
+        except TypeError as e:
+            raise ModelError(f'invalid metric value {repr(value)} provided') from e
+        if decimal_value.is_nan() or decimal_value.is_infinite() or decimal_value < 0:
+            raise ModelError(f'invalid metric value {repr(value)} provided: must be a positive finite float')
+        return str(decimal_value)
+
+    @classmethod
+    def validate_label_value(cls, value):
+        # Label values cannot be empty, contain commas or equal signs as those are used by add-metric as separators.
+        v = str(value)
+        if not(v and all(c not in v for c in ',=')):
+            raise ModelError('metric label values must not contain "," or "="')
