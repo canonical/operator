@@ -669,7 +669,7 @@ class TestModel(unittest.TestCase):
           "cidr": "192.0.2.0/24"
         },
         {
-          "hostname": "",
+          "hostname": "deadbeef.example",
           "value": "dead:beef::1",
           "cidr": "dead:beef::/64"
         }
