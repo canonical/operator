@@ -666,7 +666,12 @@ class TestModel(unittest.TestCase):
         {
           "hostname": "",
           "value": "192.0.2.2",
-          "cidr": "192.0.2.2/24"
+          "cidr": "192.0.2.0/24"
+        },
+        {
+          "hostname": "",
+          "value": "192.0.3.3",
+          "cidr": "192.0.3.0/24"
         }
       ]
     }
@@ -675,7 +680,8 @@ class TestModel(unittest.TestCase):
     "192.0.2.2/32"
   ],
   "ingress-addresses": [
-    "192.0.2.2"
+    "192.0.2.2",
+    "192.0.3.3"
   ]
 }'''
 
@@ -684,8 +690,12 @@ class TestModel(unittest.TestCase):
             self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
             self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
             self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32')])
-            self.assertEqual(binding.network.devices[0].name, 'lo')
-            self.assertEqual(binding.network.devices[0].addresses[0], ipaddress.ip_interface('192.0.2.2/24'))
+            self.assertEqual(binding.network.interfaces[0].name, 'lo')
+            self.assertEqual(binding.network.interfaces[0].address, ipaddress.ip_address('192.0.2.2'))
+            self.assertEqual(binding.network.interfaces[0].subnet, ipaddress.ip_network('192.0.2.0/24'))
+            self.assertEqual(binding.network.interfaces[1].name, 'lo')
+            self.assertEqual(binding.network.interfaces[1].address, ipaddress.ip_address('192.0.3.3'))
+            self.assertEqual(binding.network.interfaces[1].subnet, ipaddress.ip_network('192.0.3.0/24'))
 
         # Basic validation for passing invalid keys.
         for name in (object, 0):

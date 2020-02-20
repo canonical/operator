@@ -289,10 +289,12 @@ class Network:
     """A representation of a unit's view of the network associated with a network space binding."""
 
     def __init__(self, network_info):
-        self.devices = []
-        for netdev in network_info['bind-addresses']:
-            self.devices.append(NetworkDevice(netdev['interface-name'], netdev['addresses']))
-
+        self.interfaces = []
+        # Treat multiple addresses on an interface as multiple logical interfaces with the same name.
+        for interface_info in network_info['bind-addresses']:
+            interface_name = interface_info['interface-name']
+            for address_info in interface_info['addresses']:
+                self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
         for address in network_info['ingress-addresses']:
             self.ingress_addresses.append(ipaddress.ip_address(address))
@@ -302,26 +304,21 @@ class Network:
 
     @property
     def bind_address(self):
-        return self.devices[0].addresses[0].ip
+        return self.interfaces[0].address
 
     @property
     def ingress_address(self):
         return self.ingress_addresses[0]
 
 
-class NetworkDevice:
+class NetworkInterface:
 
     def __init__(self, name, address_info):
         self.name = name
-        self.addresses = []
-        for entry in address_info:
-            address = entry['value']
-            cidr = entry.get('cidr')
-            if cidr:
-                self.addresses.append(ipaddress.ip_interface(cidr))
-            else:
-                # At least provide a /32 if there is no CIDR provided.
-                self.addresses.append(ipaddress.ip_interface(address))
+        # TODO: expose a hardware address here, see LP: #1864070.
+        self.address = ipaddress.ip_address(address_info['value'])
+        self.subnet = ipaddress.ip_network(address_info['cidr'])
+        # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
 class Relation:
