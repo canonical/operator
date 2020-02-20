@@ -317,7 +317,12 @@ class NetworkInterface:
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
         self.address = ipaddress.ip_address(address_info['value'])
-        self.subnet = ipaddress.ip_network(address_info['cidr'])
+        cidr = address_info['cidr']
+        if not cidr:
+            # The cidr field may be empty, see LP: #1864102. In this case, make it a /32 or /128 IP network.
+            self.subnet = ipaddress.ip_network(address_info['value'])
+        else:
+            self.subnet = ipaddress.ip_network(cidr)
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 

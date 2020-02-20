@@ -670,8 +670,24 @@ class TestModel(unittest.TestCase):
         },
         {
           "hostname": "",
+          "value": "dead:beef::1",
+          "cidr": "dead:beef::/64"
+        }
+      ]
+    },
+    {
+      "mac-address": "",
+      "interface-name": "tun",
+      "addresses": [
+        {
+          "hostname": "",
           "value": "192.0.3.3",
-          "cidr": "192.0.3.0/24"
+          "cidr": ""
+        },
+        {
+          "hostname": "",
+          "value": "2001:db8::3",
+          "cidr": ""
         }
       ]
     }
@@ -694,8 +710,14 @@ class TestModel(unittest.TestCase):
             self.assertEqual(binding.network.interfaces[0].address, ipaddress.ip_address('192.0.2.2'))
             self.assertEqual(binding.network.interfaces[0].subnet, ipaddress.ip_network('192.0.2.0/24'))
             self.assertEqual(binding.network.interfaces[1].name, 'lo')
-            self.assertEqual(binding.network.interfaces[1].address, ipaddress.ip_address('192.0.3.3'))
-            self.assertEqual(binding.network.interfaces[1].subnet, ipaddress.ip_network('192.0.3.0/24'))
+            self.assertEqual(binding.network.interfaces[1].address, ipaddress.ip_address('dead:beef::1'))
+            self.assertEqual(binding.network.interfaces[1].subnet, ipaddress.ip_network('dead:beef::/64'))
+            self.assertEqual(binding.network.interfaces[2].name, 'tun')
+            self.assertEqual(binding.network.interfaces[2].address, ipaddress.ip_address('192.0.3.3'))
+            self.assertEqual(binding.network.interfaces[2].subnet, ipaddress.ip_network('192.0.3.3/32'))
+            self.assertEqual(binding.network.interfaces[3].name, 'tun')
+            self.assertEqual(binding.network.interfaces[3].address, ipaddress.ip_address('2001:db8::3'))
+            self.assertEqual(binding.network.interfaces[3].subnet, ipaddress.ip_network('2001:db8::3/128'))
 
         # Basic validation for passing invalid keys.
         for name in (object, 0):
