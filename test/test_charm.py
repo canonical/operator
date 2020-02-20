@@ -1,4 +1,17 @@
 #!/usr/bin/python3
+# Copyright 2019 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import os
 import unittest
@@ -94,21 +107,25 @@ class TestCharm(unittest.TestCase):
                 assert event.relation.app.name == 'remote'
                 self.seen.append(type(event).__name__)
 
-        self.meta = CharmMeta({
-            'name': 'my-charm',
-            'requires': {
-                'req1': {'interface': 'req1'},
-                'req-2': {'interface': 'req2'},
-            },
-            'provides': {
-                'pro1': {'interface': 'pro1'},
-                'pro-2': {'interface': 'pro2'},
-            },
-            'peers': {
-                'peer1': {'interface': 'peer1'},
-                'peer-2': {'interface': 'peer2'},
-            },
-        })
+        # language=YAML
+        self.meta = CharmMeta.from_yaml(metadata='''
+name: my-charm
+requires:
+ req1:
+   interface: req1
+ req-2:
+   interface: req2
+provides:
+ pro1:
+   interface: pro1
+ pro-2:
+   interface: pro2
+peers:
+ peer1:
+   interface: peer1
+ peer-2:
+   interface: peer2
+''')
 
         charm = MyCharm(self.create_framework(), None)
 
@@ -155,30 +172,25 @@ class TestCharm(unittest.TestCase):
             def on_stor_4_storage_attached(self, event):
                 self.seen.append(f'{type(event).__name__}')
 
-        self.meta = CharmMeta({
-            'name': 'my-charm',
-            'storage': {
-                'stor1': {'type': 'filesystem'},
-                'stor2': {
-                    'type': 'filesystem',
-                    'multiple': {
-                        'range': '2',
-                    },
-                },
-                'stor3': {
-                    'type': 'filesystem',
-                    'multiple': {
-                        'range': '2-',
-                    },
-                },
-                'stor-4': {
-                    'type': 'filesystem',
-                    'multiple': {
-                        'range': '2-4',
-                    },
-                },
-            },
-        })
+        # language=YAML
+        self.meta = CharmMeta.from_yaml('''
+name: my-charm
+storage:
+  stor-4:
+    multiple:
+      range: 2-4
+    type: filesystem
+  stor1:
+    type: filesystem
+  stor2:
+    multiple:
+      range: "2"
+    type: filesystem
+  stor3:
+    multiple:
+      range: 2-
+    type: filesystem
+''')
 
         self.assertIsNone(self.meta.storages['stor1'].multiple_range)
         self.assertEqual(self.meta.storages['stor2'].multiple_range, (2, 2))
@@ -201,30 +213,25 @@ class TestCharm(unittest.TestCase):
 
     @classmethod
     def _get_action_test_meta(cls):
-        return CharmMeta(
-            {'name': 'my-charm'},
-            {
-                'foo-bar': {
-                    'description': 'Foos the bar.',
-                    'title': 'foo-bar',
-                    'required': 'foo-bar',
-                    'params': {
-                        'foo-name': {
-                            'type': 'string',
-                            'description': 'A foo name to bar',
-                        },
-                        'silent': {
-                            'type': 'boolean',
-                            'description': '',
-                            'default': False,
-                        },
-                    },
-                },
-                'start': {
-                    'description': 'Start the unit.'
-                }
-            }
-        )
+        # language=YAML
+        return CharmMeta.from_yaml(metadata='''
+name: my-charm
+''', actions='''
+foo-bar:
+  description: "Foos the bar."
+  params:
+    foo-name:
+      description: "A foo name to bar"
+      type: string
+    silent:
+      default: false
+      description: ""
+      type: boolean
+  required: foo-bar
+  title: foo-bar
+start:
+  description: "Start the unit."
+''')
 
     def _test_action_events(self, cmd_type):
 

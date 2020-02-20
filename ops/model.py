@@ -1,3 +1,17 @@
+# Copyright 2019 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import weakref
 import os
@@ -19,11 +33,17 @@ class Model:
         self._backend = backend
         self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
-        self.relations = RelationMapping(list(meta.relations), self.unit, self._backend, self._cache)
+        self.relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
+
+    def get_unit(self, unit_name):
+        return self._cache.get(Unit, unit_name)
+
+    def get_app(self, app_name):
+        return self._cache.get(Application, app_name)
 
     def get_relation(self, relation_name, relation_id=None):
         """Get a specific Relation instance.
@@ -34,31 +54,7 @@ class Model:
         relation is established only once or None if it is not established. If this
         same relation is established multiple times the error TooManyRelatedAppsError is raised.
         """
-        if relation_id is not None:
-            if not isinstance(relation_id, int):
-                raise ModelError(f'relation id {relation_id} must be an int not {type(relation_id).__name__}')
-            for relation in self.relations[relation_name]:
-                if relation.id == relation_id:
-                    return relation
-            else:
-                # The relation may be dead, but it is not forgotten.
-                return Relation(relation_name, relation_id, self.unit, self._backend, self._cache)
-        else:
-            num_related = len(self.relations[relation_name])
-            if num_related == 0:
-                return None
-            elif num_related == 1:
-                return self.relations[relation_name][0]
-            else:
-                # TODO: We need something in the framework to catch and gracefully handle
-                # errors, ideally integrating the error catching with Juju's mechanisms.
-                raise TooManyRelatedAppsError(relation_name, num_related, 1)
-
-    def get_unit(self, unit_name):
-        return self._cache.get(Unit, unit_name)
-
-    def get_app(self, app_name):
-        return self._cache.get(Application, app_name)
+        return self.relations._get_unique(relation_name, relation_id)
 
 
 class ModelCache:
@@ -197,11 +193,15 @@ class LazyMapping(Mapping, ABC):
 class RelationMapping(Mapping):
     """Map of relation names to lists of Relation instances."""
 
-    def __init__(self, relation_names, our_unit, backend, cache):
+    def __init__(self, relations_meta, our_unit, backend, cache):
+        self._peers = set()
+        for name, relation_meta in relations_meta.items():
+            if relation_meta.role == 'peers':
+                self._peers.add(name)
         self._our_unit = our_unit
         self._backend = backend
         self._cache = cache
-        self._data = {relation_name: None for relation_name in relation_names}
+        self._data = {relation_name: None for relation_name in relations_meta}
 
     def __contains__(self, key):
         return key in self._data
@@ -213,20 +213,47 @@ class RelationMapping(Mapping):
         return iter(self._data)
 
     def __getitem__(self, relation_name):
+        is_peer = relation_name in self._peers
         relation_list = self._data[relation_name]
         if relation_list is None:
             relation_list = self._data[relation_name] = []
-            for relation_id in self._backend.relation_ids(relation_name):
-                relation_list.append(Relation(relation_name, relation_id, self._our_unit, self._backend, self._cache))
+            for rid in self._backend.relation_ids(relation_name):
+                relation = Relation(relation_name, rid, is_peer, self._our_unit, self._backend, self._cache)
+                relation_list.append(relation)
         return relation_list
+
+    def _get_unique(self, relation_name, relation_id=None):
+        if relation_id is not None:
+            if not isinstance(relation_id, int):
+                raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
+            for relation in self[relation_name]:
+                if relation.id == relation_id:
+                    return relation
+            else:
+                # The relation may be dead, but it is not forgotten.
+                is_peer = relation_name in self._peers
+                return Relation(relation_name, relation_id, is_peer, self._our_unit, self._backend, self._cache)
+        num_related = len(self[relation_name])
+        if num_related == 0:
+            return None
+        elif num_related == 1:
+            return self[relation_name][0]
+        else:
+            # TODO: We need something in the framework to catch and gracefully handle
+            # errors, ideally integrating the error catching with Juju's mechanisms.
+            raise TooManyRelatedAppsError(relation_name, num_related, 1)
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, our_unit, backend, cache):
+    def __init__(self, relation_name, relation_id, is_peer, our_unit, backend, cache):
         self.name = relation_name
         self.id = relation_id
         self.app = None
         self.units = set()
+
+        # For peer relations, both the remote and the local app are the same.
+        if is_peer:
+            self.app = our_unit.app
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
@@ -354,8 +381,8 @@ class ActiveStatus(StatusBase):
     """
     name = 'active'
 
-    def __init__(self):
-        super().__init__('')
+    def __init__(self, message=None):
+        super().__init__(message or '')
 
 
 class BlockedStatus(StatusBase):
@@ -637,3 +664,19 @@ class ModelBackend:
 
     def juju_log(self, level, message):
         self._run('juju-log', '--log-level', level, message)
+
+    def network_get(self, endpoint_name, relation_id=None):
+        """Return network info provided by network-get for a given endpoint.
+
+        endpoint_name -- A name of an endpoint (relation name or extra-binding name).
+        relation_id -- An optional relation id to get network info for.
+        """
+        cmd = ['network-get', endpoint_name]
+        if relation_id is not None:
+            cmd.extend(['-r', str(relation_id)])
+        try:
+            return self._run(*cmd, return_output=True, use_json=True)
+        except ModelError as e:
+            if 'relation not found' in str(e):
+                raise RelationNotFoundError() from e
+            raise

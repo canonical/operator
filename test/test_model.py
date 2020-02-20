@@ -1,15 +1,30 @@
 #!/usr/bin/python3
+# Copyright 2019 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import os
 import pathlib
 import unittest
 import time
 import re
+import json
 
 import ops.model
 import ops.charm
+from ops.charm import RelationMeta
 
-from .test_helpers import fake_script, fake_script_calls
+from test.test_helpers import fake_script, fake_script_calls
 
 
 class TestModel(unittest.TestCase):
@@ -24,7 +39,11 @@ class TestModel(unittest.TestCase):
 
         self.backend = ops.model.ModelBackend()
         meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        meta.relations = {
+            'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
+        }
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
     def test_model(self):
@@ -48,7 +67,7 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_get_relation(self):
-        err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
+        err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         fake_script(self, 'relation-ids',
                     """([ "$1" = db1 ] && echo '["db1:4"]') || ([ "$1" = db2 ] && echo '["db2:5", "db2:6"]') || echo '[]'""")
@@ -80,6 +99,20 @@ class TestModel(unittest.TestCase):
             ['relation-list', '-r', '5', '--format=json'],
             ['relation-list', '-r', '6', '--format=json']
         ])
+
+    def test_peer_relation_app(self):
+        meta = ops.charm.CharmMeta()
+        meta.relations = {'dbpeer': RelationMeta('peers', 'dbpeer', {'interface': 'dbpeer', 'scope': 'global'})}
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
+        err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
+        fake_script(self, 'relation-ids',
+                    '''([ "$1" = dbpeer ] && echo '["dbpeer:0"]') || echo "[]"''')
+        fake_script(self, 'relation-list',
+                    f'''([ "$2" = 0 ] && echo "[]") || (echo {err_msg} >&2 ; exit 2)''')
+
+        db1_4 = self.model.get_relation('dbpeer')
+        self.assertIs(db1_4.app, self.model.app)
 
     def test_remote_units_is_our(self):
         fake_script(self, 'relation-ids',
@@ -118,11 +151,6 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_remote_app_relation_data(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
         fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = remoteapp1 ] && echo '{"secret": "cafedeadbeef"}' || exit 2""")
@@ -180,11 +208,6 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_app_relation_data_modify_local_as_leader(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
         fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
@@ -209,11 +232,6 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_app_relation_data_modify_local_as_minion(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
         fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
@@ -350,7 +368,11 @@ class TestModel(unittest.TestCase):
         # Create a new model and backend to drop a cached is-leader output.
         self.backend = ops.model.ModelBackend()
         meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
+        meta.relations = {
+            'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
+        }
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'is-leader', 'echo false')
@@ -444,20 +466,14 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(TypeError):
             ops.model.StatusBase('test')
 
-    def test_active_message_raises(self):
-        with self.assertRaises(TypeError):
-            ops.model.ActiveStatus('test')
+    def test_active_message_default(self):
+        self.assertEqual(ops.model.ActiveStatus().message, '')
 
     def test_local_set_valid_unit_status(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         test_cases = [(
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', '']]),
+            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
@@ -482,17 +498,11 @@ class TestModel(unittest.TestCase):
             check_tool_calls()
 
     def test_local_set_valid_app_status(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'is-leader', 'echo true')
-
         test_cases = [(
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertIn(['status-set', '--application=True', 'active', ''], fake_script_calls(self, True)),
+            lambda: self.assertIn(['status-set', '--application=True', 'active', 'Green'], fake_script_calls(self, True)),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
@@ -517,11 +527,6 @@ class TestModel(unittest.TestCase):
             check_tool_calls()
 
     def test_set_app_status_non_leader_raises(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'is-leader', 'echo false')
 
         with self.assertRaises(RuntimeError):
@@ -531,11 +536,6 @@ class TestModel(unittest.TestCase):
             self.model.app.status = ops.model.ActiveStatus()
 
     def test_local_set_invalid_status(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'status-set', 'exit 1')
         fake_script(self, 'is-leader', 'echo true')
 
@@ -563,11 +563,6 @@ class TestModel(unittest.TestCase):
                 self.backend.status_set(ops.model.ActiveStatus, is_app=is_app_v)
 
     def test_remote_unit_status(self):
-        self.backend = ops.model.ModelBackend()
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': None, 'db1': None, 'db2': None}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
 
@@ -575,7 +570,7 @@ class TestModel(unittest.TestCase):
 
         test_statuses = (
             ops.model.UnknownStatus(),
-            ops.model.ActiveStatus(),
+            ops.model.ActiveStatus('Green'),
             ops.model.MaintenanceStatus('Yellow'),
             ops.model.BlockedStatus('Red'),
             ops.model.WaitingStatus('White'),
@@ -679,7 +674,7 @@ class TestModelBackend(unittest.TestCase):
         return self._backend
 
     def test_relation_tool_errors(self):
-        err_msg = "ERROR invalid value \"$2\" for option -r: relation not found"
+        err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [(
             lambda: fake_script(self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
@@ -760,6 +755,58 @@ class TestModelBackend(unittest.TestCase):
             lambda: self.backend.storage_add('foobar', count=True),
             TypeError,
             [],
+        )]
+        for do_fake, run, exception, calls in test_cases:
+            do_fake()
+            with self.assertRaises(exception):
+                run()
+            self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_network_get(self):
+        network_get_out = '''{
+  "bind-addresses": [
+    {
+      "mac-address": "",
+      "interface-name": "",
+      "addresses": [
+        {
+          "hostname": "",
+          "value": "192.0.2.2",
+          "cidr": ""
+        }
+      ]
+    }
+  ],
+  "egress-subnets": [
+    "192.0.2.2/32"
+  ],
+  "ingress-addresses": [
+    "192.0.2.2"
+  ]
+}'''
+        fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
+        network_info = self.backend.network_get('deadbeef')
+        self.assertEqual(network_info, json.loads(network_get_out))
+        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'deadbeef', '--format=json']])
+
+        network_info = self.backend.network_get('deadbeef', 1)
+        self.assertEqual(network_info, json.loads(network_get_out))
+        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'deadbeef', '-r', '1', '--format=json']])
+
+    def test_network_get_errors(self):
+        err_no_endpoint = 'ERROR no network config found for binding "$2"'
+        err_no_rel = 'ERROR invalid value "$3" for option -r: relation not found'
+
+        test_cases = [(
+            lambda: fake_script(self, 'network-get', f'echo {err_no_endpoint} >&2 ; exit 1'),
+            lambda: self.backend.network_get("deadbeef"),
+            ops.model.ModelError,
+            [['network-get', 'deadbeef', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'network-get', f'echo {err_no_rel} >&2 ; exit 2'),
+            lambda: self.backend.network_get("deadbeef", 3),
+            ops.model.RelationNotFoundError,
+            [['network-get', 'deadbeef', '-r', '3', '--format=json']],
         )]
         for do_fake, run, exception, calls in test_cases:
             do_fake()
