@@ -733,8 +733,8 @@ class TestModel(unittest.TestCase):
             self.assertEqual(binding.network.interfaces[4].address, ipaddress.ip_address('fe80::1:1'))
             self.assertEqual(binding.network.interfaces[4].subnet, ipaddress.ip_network('fe80::/64'))
 
-        # Basic validation for passing invalid keys.
-        for name in (object, 0):
+        # Basic validation for passing invalid keys (including relation names).
+        for name in (object, 0, 'db0'):
             with self.assertRaises(ops.model.ModelError):
                 self.model.get_binding(name)
 
