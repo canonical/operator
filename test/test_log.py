@@ -18,7 +18,7 @@ import unittest
 import importlib
 
 import logging
-import ops.jujulog
+import ops.log
 
 
 class FakeModelBackend:
@@ -36,7 +36,7 @@ class FakeModelBackend:
         self._calls.append((message, level))
 
 
-class TestJujuLog(unittest.TestCase):
+class TestLogging(unittest.TestCase):
 
     def setUp(self):
         self.backend = FakeModelBackend()
@@ -45,22 +45,20 @@ class TestJujuLog(unittest.TestCase):
         importlib.reload(logging)
 
     def test_default_logging(self):
-        ops.jujulog.setup_default_logging(self.backend)
+        ops.log.setup_root_logging(self.backend)
 
         logger = logging.getLogger()
-        self.assertEqual(logger.level, logging.DEBUG)
-        self.assertIsInstance(logger.handlers[0], ops.jujulog.JujuLogHandler)
+        self.assertEqual(logger.level, logging.INFO)
+        self.assertIsInstance(logger.handlers[0], ops.log.JujuLogHandler)
 
         test_cases = [(
             lambda: logger.critical('critical'), ('CRITICAL', 'critical')
         ), (
             lambda: logger.error('error'), ('ERROR', 'error')
         ), (
-            lambda: logger.warning('warning'), ('WARNING', 'warning'),
+            lambda: logger.warning('warning'), ('WARNING', 'warning')
         ), (
-            lambda: logger.info('info'), ('INFO', 'info'),
-        ), (
-            lambda: logger.debug('debug'), ('DEBUG', 'debug')
+            lambda: logger.info('info'), ('INFO', 'info')
         )]
 
         for do, res in test_cases:
@@ -68,13 +66,19 @@ class TestJujuLog(unittest.TestCase):
             calls = self.backend.calls(clear=True)
             self.assertEqual(len(calls), 1)
             self.assertEqual(calls[0], res)
+        else:
+            logger.debug('debug')
+            calls = self.backend.calls(clear=True)
+            self.assertEqual(len(calls), 0)
 
     def test_handler_filtering(self):
         logger = logging.getLogger()
         logger.setLevel(logging.INFO)
-        logger.addHandler(ops.jujulog.JujuLogHandler(self.backend, logging.WARNING))
-        logger.info('debug')
+        logger.addHandler(ops.log.JujuLogHandler(self.backend, logging.WARNING))
+        logger.info('foo')
         self.assertEqual(self.backend.calls(), [])
+        logger.warning('bar')
+        self.assertEqual(self.backend.calls(), [('WARNING', 'bar')])
 
 
 if __name__ == '__main__':

@@ -24,7 +24,7 @@ import ops.framework
 import ops.model
 import logging
 
-from ops.jujulog import setup_default_logging
+from ops.log import setup_root_logging
 
 CHARM_STATE_FILE = '.unit-state.db'
 
@@ -164,7 +164,7 @@ def main(charm_class):
         juju_event_name = f'{juju_event_name}_action'
 
     model_backend = ops.model.ModelBackend()
-    setup_default_logging(model_backend)
+    setup_root_logging(model_backend)
 
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)

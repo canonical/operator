@@ -387,9 +387,6 @@ log_debug: {}
         ), (
             EventSpec(ActionEvent, 'log_info_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
             ['juju-log', '--log-level', 'INFO', 'useful info'],
-        ), (
-            EventSpec(ActionEvent, 'log_debug_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
-            ['juju-log', '--log-level', 'DEBUG', 'insightful debug'],
         )]
 
         # Set up action symlinks.
