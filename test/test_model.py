@@ -649,10 +649,6 @@ class TestModel(unittest.TestCase):
                 self.model.storages.request('data', count_v)
 
     def test_relation_endpoint_bindings(self):
-        meta = ops.charm.CharmMeta()
-        meta.relations = {'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'})}
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
-
         fake_script(self, 'relation-ids',
                     """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
