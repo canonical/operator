@@ -688,6 +688,11 @@ class TestModel(unittest.TestCase):
           "hostname": "",
           "value": "2001:db8::3",
           "cidr": ""
+        },
+        {
+          "hostname": "deadbeef.local",
+          "value": "fe80::1:1",
+          "cidr": "fe80::/64"
         }
       ]
     }
@@ -718,6 +723,9 @@ class TestModel(unittest.TestCase):
             self.assertEqual(binding.network.interfaces[3].name, 'tun')
             self.assertEqual(binding.network.interfaces[3].address, ipaddress.ip_address('2001:db8::3'))
             self.assertEqual(binding.network.interfaces[3].subnet, ipaddress.ip_network('2001:db8::3/128'))
+            self.assertEqual(binding.network.interfaces[4].name, 'tun')
+            self.assertEqual(binding.network.interfaces[4].address, ipaddress.ip_address('fe80::1:1'))
+            self.assertEqual(binding.network.interfaces[4].subnet, ipaddress.ip_network('fe80::/64'))
 
         # Basic validation for passing invalid keys.
         for name in (object, 0):
