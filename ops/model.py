@@ -44,13 +44,10 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_key):
-        """Get a network space binding.
-
-        binding_key -- a name of a relation, extra-binding or a Relation object. Providing a Relation object will return
-                       a Binding object specific to a relation.
+    def get_binding(self, relation):
+        """Get a network space binding for a Relation object.
         """
-        return self._bindings.get(binding_key)
+        return self._bindings.get(relation)
 
 
 class ModelCache:
@@ -247,19 +244,12 @@ class BindingMapping:
         self._backend = backend
         self._data = {}
 
-    def get(self, binding_key):
-        if isinstance(binding_key, Relation):
-            binding_name = binding_key.name
-            relation_id = binding_key.id
-        elif isinstance(binding_key, str):
-            binding_name = binding_key
-            relation_id = None
-        else:
-            raise ModelError(f'a binding key must be a str or Relation, not {type(binding_key).__name__}')
-        binding = self._data.get(binding_key)
+    def get(self, relation):
+        if not isinstance(relation, Relation):
+            raise ModelError(f'a relation argument passed is not a Relation: {type(relation).__name__}')
+        binding = self._data.get(relation)
         if binding is None:
-            binding = Binding(binding_name, relation_id, self._backend)
-            self._data[binding_key] = binding
+            self._data[relation] = binding = Binding(relation.name, relation.id, self._backend)
         return binding
 
 
