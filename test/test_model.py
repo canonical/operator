@@ -698,7 +698,10 @@ class TestModel(unittest.TestCase):
     }
   ],
   "egress-subnets": [
-    "192.0.2.2/32"
+    "192.0.2.2/32",
+    "192.0.3.0/24",
+    "dead:beef::/64",
+    "2001:db8::3/128"
   ],
   "ingress-addresses": [
     "192.0.2.2",
@@ -710,7 +713,11 @@ class TestModel(unittest.TestCase):
             self.assertEqual(binding.name, binding_name)
             self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
             self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
-            self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32')])
+            # /32 and /128 CIDRs are valid one-address networks for IPv{4,6}Network types respectively.
+            self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32'),
+                                                              ipaddress.ip_network('192.0.3.0/24'),
+                                                              ipaddress.ip_network('dead:beef::/64'),
+                                                              ipaddress.ip_network('2001:db8::3/128')])
             self.assertEqual(binding.network.interfaces[0].name, 'lo')
             self.assertEqual(binding.network.interfaces[0].address, ipaddress.ip_address('192.0.2.2'))
             self.assertEqual(binding.network.interfaces[0].subnet, ipaddress.ip_network('192.0.2.0/24'))
