@@ -45,8 +45,7 @@ class Model:
         return self.relations._get_unique(relation_name, relation_id)
 
     def get_binding(self, relation):
-        """Get a network space binding for a Relation object.
-        """
+        """Get a network space binding for a Relation object."""
         return self._bindings.get(relation)
 
 
@@ -258,6 +257,8 @@ class Binding:
 
     def __init__(self, name, relation_id, backend):
         self.name = name
+        if not isinstance(relation_id, int):
+            raise ModelError(f'relation_id must be an int, not {type(relation_id).__name__}')
         self._relation_id = relation_id
         self._backend = backend
         self._network = None
@@ -265,13 +266,7 @@ class Binding:
     @property
     def network(self):
         if self._network is None:
-            try:
-                network_info = self._backend.network_get(self.name, self._relation_id)
-            except RelationNotFoundError:
-                # If a relation is dead, we can still get network info associated with an endpoint itself
-                # not associated with a particular relation id.
-                network_info = self._backend.network_get(self.name)
-            self._network = Network(network_info)
+            self._network = Network(self._backend.network_get(self.name, self._relation_id))
         return self._network
 
 

@@ -713,14 +713,22 @@ class TestModel(unittest.TestCase):
             with self.assertRaises(ops.model.ModelError):
                 self.model.get_binding(name)
 
-        fake_script(self, 'network-get', f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1'''),
+        fake_script(self, 'network-get', f'''[ "$1" = db0 -a "$3" = 4 ] && echo '{network_get_out}' || exit 1'''),
+        # Bindings without relation IDs are not supported.
+        with self.assertRaises(ops.model.ModelError):
+            ops.model.Binding('db0', None, self.model._backend)
+        # Bindings for dead relations are not supported.
+        with self.assertRaises(ops.model.ModelError):
+            binding = ops.model.Binding('db0', 42, self.model._backend)
+            binding.network
+        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'db0', '-r', '42', '--format=json']])
+
         expected_calls = [
             ['relation-ids', 'db0', '--format=json'],
             # The two invocations below are due to the get_relation call.
             ['relation-list', '-r', '4', '--format=json'],
             ['network-get', 'db0', '-r', '4', '--format=json'],
         ]
-
         binding = self.model.get_binding(self.model.get_relation('db0'))
         self.assertEqual(binding.name, 'db0')
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
