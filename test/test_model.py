@@ -700,7 +700,9 @@ class TestModel(unittest.TestCase):
   ],
   "ingress-addresses": [
     "192.0.2.2",
-    "192.0.3.3"
+    "192.0.3.3",
+    "dead:beef::1",
+    "2001:db8::3"
   ]
 }'''
 
