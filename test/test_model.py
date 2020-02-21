@@ -712,9 +712,6 @@ class TestModel(unittest.TestCase):
                 self.model.get_binding(name)
 
         fake_script(self, 'network-get', f'''[ "$1" = db0 -a "$3" = 4 ] && echo '{network_get_out}' || exit 1'''),
-        # Bindings without relation IDs are not supported.
-        with self.assertRaises(ops.model.ModelError):
-            ops.model.Binding('db0', None, self.model._backend)
         # Bindings for dead relations are not supported.
         with self.assertRaises(ops.model.ModelError):
             binding = ops.model.Binding('db0', 42, self.model._backend)

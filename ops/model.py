@@ -237,7 +237,6 @@ class RelationMapping(Mapping):
 
 
 class BindingMapping:
-    """A map of binding names to lists of Binding instances."""
 
     def __init__(self, backend):
         self._backend = backend
@@ -245,7 +244,7 @@ class BindingMapping:
 
     def get(self, relation):
         if not isinstance(relation, Relation):
-            raise ModelError(f'a relation argument passed is not a Relation: {type(relation).__name__}')
+            raise ModelError(f'expected Relation instance, got {type(relation).__name__}')
         binding = self._data.get(relation)
         if binding is None:
             self._data[relation] = binding = Binding(relation.name, relation.id, self._backend)
@@ -253,12 +252,10 @@ class BindingMapping:
 
 
 class Binding:
-    """A representation of a binding to a space."""
+    """Binding to a network space."""
 
     def __init__(self, name, relation_id, backend):
         self.name = name
-        if not isinstance(relation_id, int):
-            raise ModelError(f'relation_id must be an int, not {type(relation_id).__name__}')
         self._relation_id = relation_id
         self._backend = backend
         self._network = None
@@ -271,7 +268,7 @@ class Binding:
 
 
 class Network:
-    """A representation of a unit's view of the network associated with a network space binding."""
+    """Network space details."""
 
     def __init__(self, network_info):
         self.interfaces = []
@@ -334,9 +331,6 @@ class Relation:
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
-
-    def __hash__(self):
-        return hash((self.id, self.name))
 
 
 class RelationData(Mapping):
