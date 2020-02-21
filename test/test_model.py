@@ -708,31 +708,6 @@ class TestModel(unittest.TestCase):
   ]
 }'''
 
-        def check_binding_data(binding_name, binding):
-            self.assertEqual(binding.name, binding_name)
-            self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
-            self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
-            # /32 and /128 CIDRs are valid one-address networks for IPv{4,6}Network types respectively.
-            self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32'),
-                                                              ipaddress.ip_network('192.0.3.0/24'),
-                                                              ipaddress.ip_network('dead:beef::/64'),
-                                                              ipaddress.ip_network('2001:db8::3/128')])
-            self.assertEqual(binding.network.interfaces[0].name, 'lo')
-            self.assertEqual(binding.network.interfaces[0].address, ipaddress.ip_address('192.0.2.2'))
-            self.assertEqual(binding.network.interfaces[0].subnet, ipaddress.ip_network('192.0.2.0/24'))
-            self.assertEqual(binding.network.interfaces[1].name, 'lo')
-            self.assertEqual(binding.network.interfaces[1].address, ipaddress.ip_address('dead:beef::1'))
-            self.assertEqual(binding.network.interfaces[1].subnet, ipaddress.ip_network('dead:beef::/64'))
-            self.assertEqual(binding.network.interfaces[2].name, 'tun')
-            self.assertEqual(binding.network.interfaces[2].address, ipaddress.ip_address('192.0.3.3'))
-            self.assertEqual(binding.network.interfaces[2].subnet, ipaddress.ip_network('192.0.3.3/32'))
-            self.assertEqual(binding.network.interfaces[3].name, 'tun')
-            self.assertEqual(binding.network.interfaces[3].address, ipaddress.ip_address('2001:db8::3'))
-            self.assertEqual(binding.network.interfaces[3].subnet, ipaddress.ip_network('2001:db8::3/128'))
-            self.assertEqual(binding.network.interfaces[4].name, 'tun')
-            self.assertEqual(binding.network.interfaces[4].address, ipaddress.ip_address('fe80::1:1'))
-            self.assertEqual(binding.network.interfaces[4].subnet, ipaddress.ip_network('fe80::/64'))
-
         # Basic validation for passing invalid keys (including relation names).
         for name in (object, 0, 'db0'):
             with self.assertRaises(ops.model.ModelError):
