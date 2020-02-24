@@ -19,6 +19,7 @@ import unittest
 import time
 import re
 import json
+import ipaddress
 
 import ops.model
 import ops.charm
@@ -45,6 +46,7 @@ class TestModel(unittest.TestCase):
             'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
         }
         self.model = ops.model.Model('myapp/0', meta, self.backend)
+        fake_script(self, 'relation-ids', """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
 
     def test_model(self):
         self.assertIs(self.model.app, self.model.unit.app)
@@ -657,6 +659,108 @@ class TestModel(unittest.TestCase):
         for count_v in [None, False, 2.0, 'a', b'beef', object]:
             with self.assertRaises(TypeError):
                 self.model.storages.request('data', count_v)
+
+    def test_relation_endpoint_bindings(self):
+        fake_script(self, 'relation-ids',
+                    """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
+        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
+        network_get_out = '''{
+  "bind-addresses": [
+    {
+      "mac-address": "de:ad:be:ef:ca:fe",
+      "interface-name": "lo",
+      "addresses": [
+        {
+          "hostname": "",
+          "value": "192.0.2.2",
+          "cidr": "192.0.2.0/24"
+        },
+        {
+          "hostname": "deadbeef.example",
+          "value": "dead:beef::1",
+          "cidr": "dead:beef::/64"
+        }
+      ]
+    },
+    {
+      "mac-address": "",
+      "interface-name": "tun",
+      "addresses": [
+        {
+          "hostname": "",
+          "value": "192.0.3.3",
+          "cidr": ""
+        },
+        {
+          "hostname": "",
+          "value": "2001:db8::3",
+          "cidr": ""
+        },
+        {
+          "hostname": "deadbeef.local",
+          "value": "fe80::1:1",
+          "cidr": "fe80::/64"
+        }
+      ]
+    }
+  ],
+  "egress-subnets": [
+    "192.0.2.2/32",
+    "192.0.3.0/24",
+    "dead:beef::/64",
+    "2001:db8::3/128"
+  ],
+  "ingress-addresses": [
+    "192.0.2.2",
+    "192.0.3.3",
+    "dead:beef::1",
+    "2001:db8::3"
+  ]
+}'''
+
+        # Basic validation for passing invalid keys (including relation names).
+        for name in (object, 0, 'db0'):
+            with self.assertRaises(ops.model.ModelError):
+                self.model.get_binding(name)
+
+        fake_script(self, 'network-get', f'''[ "$1" = db0 -a "$3" = 4 ] && echo '{network_get_out}' || exit 1'''),
+        # Bindings for dead relations are not supported.
+        with self.assertRaises(ops.model.ModelError):
+            binding = ops.model.Binding('db0', 42, self.model._backend)
+            binding.network
+        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'db0', '-r', '42', '--format=json']])
+
+        expected_calls = [
+            ['relation-ids', 'db0', '--format=json'],
+            # The two invocations below are due to the get_relation call.
+            ['relation-list', '-r', '4', '--format=json'],
+            ['network-get', 'db0', '-r', '4', '--format=json'],
+        ]
+        binding = self.model.get_binding(self.model.get_relation('db0'))
+        self.assertEqual(binding.name, 'db0')
+        self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
+        self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
+        # /32 and /128 CIDRs are valid one-address networks for IPv{4,6}Network types respectively.
+        self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32'),
+                                                          ipaddress.ip_network('192.0.3.0/24'),
+                                                          ipaddress.ip_network('dead:beef::/64'),
+                                                          ipaddress.ip_network('2001:db8::3/128')])
+        self.assertEqual(binding.network.interfaces[0].name, 'lo')
+        self.assertEqual(binding.network.interfaces[0].address, ipaddress.ip_address('192.0.2.2'))
+        self.assertEqual(binding.network.interfaces[0].subnet, ipaddress.ip_network('192.0.2.0/24'))
+        self.assertEqual(binding.network.interfaces[1].name, 'lo')
+        self.assertEqual(binding.network.interfaces[1].address, ipaddress.ip_address('dead:beef::1'))
+        self.assertEqual(binding.network.interfaces[1].subnet, ipaddress.ip_network('dead:beef::/64'))
+        self.assertEqual(binding.network.interfaces[2].name, 'tun')
+        self.assertEqual(binding.network.interfaces[2].address, ipaddress.ip_address('192.0.3.3'))
+        self.assertEqual(binding.network.interfaces[2].subnet, ipaddress.ip_network('192.0.3.3/32'))
+        self.assertEqual(binding.network.interfaces[3].name, 'tun')
+        self.assertEqual(binding.network.interfaces[3].address, ipaddress.ip_address('2001:db8::3'))
+        self.assertEqual(binding.network.interfaces[3].subnet, ipaddress.ip_network('2001:db8::3/128'))
+        self.assertEqual(binding.network.interfaces[4].name, 'tun')
+        self.assertEqual(binding.network.interfaces[4].address, ipaddress.ip_address('fe80::1:1'))
+        self.assertEqual(binding.network.interfaces[4].subnet, ipaddress.ip_network('fe80::/64'))
+        self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
 
 class TestModelBackend(unittest.TestCase):
