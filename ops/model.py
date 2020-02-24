@@ -740,6 +740,9 @@ class ModelBackend:
     def action_fail(self, message=''):
         self._run(f'action-fail', f"{message}")
 
+    def juju_log(self, level, message):
+        self._run('juju-log', '--log-level', level, message)
+
     def network_get(self, binding_name, relation_id=None):
         """Return network info provided by network-get for a given binding.
 
