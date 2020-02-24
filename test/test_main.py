@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+# Copyright 2019 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import unittest
 import logging
@@ -77,6 +90,8 @@ class TestMain(unittest.TestCase):
             shutil.rmtree(self.JUJU_CHARM_DIR)
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
+
+        fake_script(self, 'juju-log', "exit 0")
 
     def _setup_charm_dir(self):
         self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
@@ -355,6 +370,43 @@ start:
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
         self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics', charm_config=charm_config))
         self.assertEqual(fake_script_calls(self), [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
+
+    def test_logger(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+            'USE_LOG_ACTIONS': True,
+        }))
+        fake_script(self, 'action-get', "echo '{}'")
+        actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
+        actions_yaml.write_text(
+            '''
+log_critical: {}
+log_error: {}
+log_warning: {}
+log_info: {}
+log_debug: {}
+            ''')
+
+        test_cases = [(
+            EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
+            ['juju-log', '--log-level', 'CRITICAL', 'super critical'],
+        ), (
+            EventSpec(ActionEvent, 'log_error_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
+            ['juju-log', '--log-level', 'ERROR', 'grave error'],
+        ), (
+            EventSpec(ActionEvent, 'log_warning_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
+            ['juju-log', '--log-level', 'WARNING', 'wise warning'],
+        ), (
+            EventSpec(ActionEvent, 'log_info_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
+            ['juju-log', '--log-level', 'INFO', 'useful info'],
+        )]
+
+        # Set up action symlinks.
+        self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+
+        for event_spec, calls in test_cases:
+            self._simulate_event(event_spec)
+            self.assertIn(calls, fake_script_calls(self, clear=True))
 
 
 if __name__ == "__main__":

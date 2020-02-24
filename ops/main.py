@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+# Copyright 2019 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import os
 import sys
@@ -9,12 +22,14 @@ import yaml
 import ops.charm
 import ops.framework
 import ops.model
+import logging
+
+from ops.log import setup_root_logging
 
 CHARM_STATE_FILE = '.unit-state.db'
 
 
-def debugf(format, *args, **kwargs):
-    pass
+logger = logging.getLogger()
 
 
 def _get_charm_dir():
@@ -63,7 +78,7 @@ def _create_event_link(charm, bound_event):
         target_path = os.path.relpath(os.path.realpath(sys.argv[0]), event_dir)
 
         # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
-        debugf(f'Creating a new relative symlink at {event_path} pointing to {target_path}')
+        logger.debug(f'Creating a new relative symlink at {event_path} pointing to {target_path}')
         event_path.symlink_to(target_path)
 
 
@@ -95,13 +110,13 @@ def _emit_charm_event(charm, event_name):
     try:
         event_to_emit = getattr(charm.on, event_name)
     except AttributeError:
-        debugf(f"event {event_name} not defined for {charm}")
+        logger.debug(f"event {event_name} not defined for {charm}")
 
     # If the event is not supported by the charm implementation, do
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        debugf(f'Emitting Juju event {event_name}')
+        logger.debug(f'Emitting Juju event {event_name}')
         event_to_emit.emit(*args, **kwargs)
 
 
@@ -137,7 +152,6 @@ def main(charm_class):
 
     The event name is based on the way this executable was called (argv[0]).
     """
-
     charm_dir = _get_charm_dir()
 
     # Process the Juju event relevant to the current hook execution
@@ -149,10 +163,13 @@ def main(charm_class):
     if juju_exec_path.parent.name == 'actions':
         juju_event_name = f'{juju_event_name}_action'
 
+    model_backend = ops.model.ModelBackend()
+    setup_root_logging(model_backend)
+
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)
     unit_name = os.environ['JUJU_UNIT_NAME']
-    model = ops.model.Model(unit_name, meta, ops.model.ModelBackend())
+    model = ops.model.Model(unit_name, meta, model_backend)
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its

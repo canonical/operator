@@ -1,3 +1,17 @@
+# Copyright 2019 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import weakref
 import os
@@ -6,6 +20,7 @@ import tempfile
 import time
 import datetime
 import re
+import ipaddress
 import decimal
 
 from abc import ABC, abstractmethod
@@ -26,6 +41,7 @@ class Model:
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
+        self._bindings = BindingMapping(self._backend)
 
     def get_unit(self, unit_name):
         return self._cache.get(Unit, unit_name)
@@ -43,6 +59,10 @@ class Model:
         same relation is established multiple times the error TooManyRelatedAppsError is raised.
         """
         return self.relations._get_unique(relation_name, relation_id)
+
+    def get_binding(self, relation):
+        """Get a network space binding for a Relation object."""
+        return self._bindings.get(relation)
 
 
 class ModelCache:
@@ -213,7 +233,7 @@ class RelationMapping(Mapping):
     def _get_unique(self, relation_name, relation_id=None):
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError(f'relation name {relation_id} must be int or None not {type(relation_id).__name__}')
+                raise ModelError(f'relation id {relation_id} must be int or None not {type(relation_id).__name__}')
             for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
@@ -230,6 +250,78 @@ class RelationMapping(Mapping):
             # TODO: We need something in the framework to catch and gracefully handle
             # errors, ideally integrating the error catching with Juju's mechanisms.
             raise TooManyRelatedAppsError(relation_name, num_related, 1)
+
+
+class BindingMapping:
+
+    def __init__(self, backend):
+        self._backend = backend
+        self._data = {}
+
+    def get(self, relation):
+        if not isinstance(relation, Relation):
+            raise ModelError(f'expected Relation instance, got {type(relation).__name__}')
+        binding = self._data.get(relation)
+        if binding is None:
+            self._data[relation] = binding = Binding(relation.name, relation.id, self._backend)
+        return binding
+
+
+class Binding:
+    """Binding to a network space."""
+
+    def __init__(self, name, relation_id, backend):
+        self.name = name
+        self._relation_id = relation_id
+        self._backend = backend
+        self._network = None
+
+    @property
+    def network(self):
+        if self._network is None:
+            self._network = Network(self._backend.network_get(self.name, self._relation_id))
+        return self._network
+
+
+class Network:
+    """Network space details."""
+
+    def __init__(self, network_info):
+        self.interfaces = []
+        # Treat multiple addresses on an interface as multiple logical interfaces with the same name.
+        for interface_info in network_info['bind-addresses']:
+            interface_name = interface_info['interface-name']
+            for address_info in interface_info['addresses']:
+                self.interfaces.append(NetworkInterface(interface_name, address_info))
+        self.ingress_addresses = []
+        for address in network_info['ingress-addresses']:
+            self.ingress_addresses.append(ipaddress.ip_address(address))
+        self.egress_subnets = []
+        for subnet in network_info['egress-subnets']:
+            self.egress_subnets.append(ipaddress.ip_network(subnet))
+
+    @property
+    def bind_address(self):
+        return self.interfaces[0].address
+
+    @property
+    def ingress_address(self):
+        return self.ingress_addresses[0]
+
+
+class NetworkInterface:
+
+    def __init__(self, name, address_info):
+        self.name = name
+        # TODO: expose a hardware address here, see LP: #1864070.
+        self.address = ipaddress.ip_address(address_info['value'])
+        cidr = address_info['cidr']
+        if not cidr:
+            # The cidr field may be empty, see LP: #1864102. In this case, make it a /32 or /128 IP network.
+            self.subnet = ipaddress.ip_network(address_info['value'])
+        else:
+            self.subnet = ipaddress.ip_network(cidr)
+        # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
 class Relation:
@@ -369,8 +461,8 @@ class ActiveStatus(StatusBase):
     """
     name = 'active'
 
-    def __init__(self):
-        super().__init__('')
+    def __init__(self, message=None):
+        super().__init__(message or '')
 
 
 class BlockedStatus(StatusBase):
@@ -650,13 +742,16 @@ class ModelBackend:
     def action_fail(self, message=''):
         self._run(f'action-fail', f"{message}")
 
-    def network_get(self, endpoint_name, relation_id=None):
-        """Return network info provided by network-get for a given endpoint.
+    def juju_log(self, level, message):
+        self._run('juju-log', '--log-level', level, message)
 
-        endpoint_name -- A name of an endpoint (relation name or extra-binding name).
+    def network_get(self, binding_name, relation_id=None):
+        """Return network info provided by network-get for a given binding.
+
+        binding_name -- A name of a binding (relation name or extra-binding name).
         relation_id -- An optional relation id to get network info for.
         """
-        cmd = ['network-get', endpoint_name]
+        cmd = ['network-get', binding_name]
         if relation_id is not None:
             cmd.extend(['-r', str(relation_id)])
         try:
