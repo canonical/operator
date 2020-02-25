@@ -19,7 +19,9 @@ import shutil
 import tempfile
 import time
 import datetime
+import re
 import ipaddress
+import decimal
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
@@ -758,3 +760,57 @@ class ModelBackend:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
             raise
+
+    def add_metrics(self, metrics, labels=None):
+        cmd = ['add-metric']
+
+        if labels:
+            label_args = []
+            for k, v in labels.items():
+                _ModelBackendValidator.validate_metric_label(k)
+                _ModelBackendValidator.validate_label_value(k, v)
+                label_args.append(f'{k}={v}')
+            cmd.extend(['--labels', ','.join(label_args)])
+
+        metric_args = []
+        for k, v in metrics.items():
+            _ModelBackendValidator.validate_metric_key(k)
+            metric_value = _ModelBackendValidator.format_metric_value(v)
+            metric_args.append(f'{k}={metric_value}')
+        cmd.extend(metric_args)
+        self._run(*cmd)
+
+
+class _ModelBackendValidator:
+    """Provides facilities for validating inputs and formatting them for model backends."""
+
+    METRIC_KEY_REGEX = re.compile(r'^[a-zA-Z](?:[a-zA-Z0-9-_]*[a-zA-Z0-9])?$')
+
+    @classmethod
+    def validate_metric_key(cls, key):
+        if cls.METRIC_KEY_REGEX.match(key) is None:
+            raise ModelError(f'invalid metric key {repr(key)}: must match {cls.METRIC_KEY_REGEX.pattern}')
+
+    @classmethod
+    def validate_metric_label(cls, label_name):
+        if cls.METRIC_KEY_REGEX.match(label_name) is None:
+            raise ModelError(f'invalid metric label name {repr(label_name)}: must match {cls.METRIC_KEY_REGEX.pattern}')
+
+    @classmethod
+    def format_metric_value(cls, value):
+        try:
+            decimal_value = decimal.Decimal.from_float(value)
+        except TypeError as e:
+            raise ModelError(f'invalid metric value {repr(value)} provided: must be a positive finite float') from e
+        if decimal_value.is_nan() or decimal_value.is_infinite() or decimal_value < 0:
+            raise ModelError(f'invalid metric value {repr(value)} provided: must be a positive finite float')
+        return str(decimal_value)
+
+    @classmethod
+    def validate_label_value(cls, label, value):
+        # Label values cannot be empty, contain commas or equal signs as those are used by add-metric as separators.
+        if not value:
+            raise ModelError('metric label {label} has an empty value, which is not allowed')
+        v = str(value)
+        if re.search('[,=]', v) is not None:
+            raise ModelError(f'metric label values must not contain "," or "=": {label}={repr(value)}')

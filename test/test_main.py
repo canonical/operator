@@ -44,6 +44,7 @@ from ops.charm import (
     RelationEvent,
     StorageAttachedEvent,
     ActionEvent,
+    CollectMetricsEvent,
 )
 
 from .test_helpers import fake_script, fake_script_calls
@@ -358,6 +359,17 @@ start:
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
         action_hook = self.JUJU_CHARM_DIR / 'actions' / 'test'
         self.assertTrue(action_hook.exists())
+
+    def test_collect_metrics(self):
+        indicator_file = self.JUJU_CHARM_DIR / 'indicator'
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+            'INDICATOR_FILE': indicator_file
+        }))
+        fake_script(self, 'add-metric', 'exit 0')
+        self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics', charm_config=charm_config))
+        self.assertEqual(fake_script_calls(self), [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
 
     def test_logger(self):
         charm_config = base64.b64encode(pickle.dumps({

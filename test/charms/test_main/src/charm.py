@@ -53,6 +53,7 @@ class Charm(CharmBase):
         self._state['on_ha_relation_broken'] = []
         self._state['on_foo_bar_action'] = []
         self._state['on_start_action'] = []
+        self._state['on_collect_metrics'] = []
 
         self._state['on_log_critical_action'] = []
         self._state['on_log_error_action'] = []
@@ -78,6 +79,8 @@ class Charm(CharmBase):
         if self._charm_config.get('USE_ACTIONS'):
             self.framework.observe(self.on.start_action, self)
             self.framework.observe(self.on.foo_bar_action, self)
+
+        self.framework.observe(self.on.collect_metrics, self)
 
         if self._charm_config.get('USE_LOG_ACTIONS'):
             self.framework.observe(self.on.log_critical_action, self)
@@ -162,6 +165,12 @@ class Charm(CharmBase):
         assert event.handle.kind == 'foo_bar_action', 'event action name cannot be different from the one being handled'
         self._state['on_foo_bar_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
+        self._write_state()
+
+    def on_collect_metrics(self, event):
+        self._state['on_collect_metrics'].append(type(event))
+        self._state['observed_event_types'].append(type(event))
+        event.add_metrics({'foo': 42}, {'bar': 4.2})
         self._write_state()
 
     def on_log_critical_action(self, event):
