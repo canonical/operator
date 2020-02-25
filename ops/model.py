@@ -768,7 +768,7 @@ class ModelBackend:
             label_args = []
             for k, v in labels.items():
                 _ModelBackendValidator.validate_metric_label(k)
-                _ModelBackendValidator.validate_label_value(v)
+                _ModelBackendValidator.validate_label_value(k, v)
                 label_args.append(f'{k}={v}')
             cmd.extend(['--labels', ','.join(label_args)])
 
@@ -789,26 +789,28 @@ class _ModelBackendValidator:
     @classmethod
     def validate_metric_key(cls, key):
         if cls.METRIC_KEY_REGEX.match(key) is None:
-            raise ModelError(f'invalid metric key {repr(key)}: must start with [a-zA-Z] and contain [a-zA-Z0-9_] only')
+            raise ModelError(f'invalid metric key {repr(key)}: must match {cls.METRIC_KEY_REGEX.pattern}')
 
     @classmethod
     def validate_metric_label(cls, label_name):
         if cls.METRIC_KEY_REGEX.match(label_name) is None:
-            raise ModelError(f'invalid metric label name {repr(label_name)}: must start with [a-zA-Z] and contain [a-zA-Z0-9_] only')
+            raise ModelError(f'invalid metric label name {repr(label_name)}: must match {cls.METRIC_KEY_REGEX.pattern}')
 
     @classmethod
     def format_metric_value(cls, value):
         try:
             decimal_value = decimal.Decimal.from_float(value)
         except TypeError as e:
-            raise ModelError(f'invalid metric value {repr(value)} provided') from e
+            raise ModelError(f'invalid metric value {repr(value)} provided: must be a positive finite float') from e
         if decimal_value.is_nan() or decimal_value.is_infinite() or decimal_value < 0:
             raise ModelError(f'invalid metric value {repr(value)} provided: must be a positive finite float')
         return str(decimal_value)
 
     @classmethod
-    def validate_label_value(cls, value):
+    def validate_label_value(cls, label, value):
         # Label values cannot be empty, contain commas or equal signs as those are used by add-metric as separators.
+        if not value:
+            raise ModelError('metric label {label} has an empty value, which is not allowed')
         v = str(value)
-        if not(v and all(c not in v for c in ',=')):
-            raise ModelError('metric label values must not contain "," or "="')
+        if re.search('[,=]', v) is not None:
+            raise ModelError(f'metric label values must not contain "," or "=": {label}={repr(value)}')

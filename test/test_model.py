@@ -981,7 +981,7 @@ class TestModelBackend(unittest.TestCase):
             self.backend.juju_log('BAR', 'foo')
         self.assertEqual(fake_script_calls(self, clear=True), [['juju-log', '--log-level', 'BAR', 'foo']])
 
-    def test_metrics(self):
+    def test_valid_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
         test_cases = [(
             {'foo': 42, 'b-ar': 4.5, 'ba_-z': 4.5, 'a': 1},
@@ -996,13 +996,11 @@ class TestModelBackend(unittest.TestCase):
             self.backend.add_metrics(metrics, labels)
             self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
+    def test_invalid_metric_names(self):
         invalid_inputs = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
             ({'1': -4.2}, {}),
-            ({'a': float('+inf')}, {}),
-            ({'a': float('-inf')}, {}),
-            ({'a': float('nan')}, {}),
             ({'123': 4.2}, {}),
             ({'1foo': 4.2}, {}),
             ({'-foo': 4.2}, {}),
@@ -1011,17 +1009,40 @@ class TestModelBackend(unittest.TestCase):
             ({'foo_': 4.2}, {}),
             ({'a-': 4.2}, {}),
             ({'a_': 4.2}, {}),
+            ({'BAЯ': 4.2}, {}),
+        ]
+        for metrics, labels in invalid_inputs:
+            with self.assertRaises(ops.model.ModelError):
+                self.backend.add_metrics(metrics, labels)
+
+    def test_invalid_metric_values(self):
+        invalid_inputs = [
+            ({'a': float('+inf')}, {}),
+            ({'a': float('-inf')}, {}),
+            ({'a': float('nan')}, {}),
             ({'foo': 'bar'}, {}),
             ({'foo': '1O'}, {}),
-            ({'BAЯ': 4.2}, {}),
+        ]
+        for metrics, labels in invalid_inputs:
+            with self.assertRaises(ops.model.ModelError):
+                self.backend.add_metrics(metrics, labels)
+
+    def test_invalid_metric_labels(self):
+        invalid_inputs = [
             ({'foo': 4.2}, {'': 'baz'}),
-            ({'foo': 4.2}, {'bar': ''}),
             ({'foo': 4.2}, {',bar': 'baz'}),
             ({'foo': 4.2}, {'b=a=r': 'baz'}),
+            ({'foo': 4.2}, {'BAЯ': 'baz'}),
+        ]
+        for metrics, labels in invalid_inputs:
+            with self.assertRaises(ops.model.ModelError):
+                self.backend.add_metrics(metrics, labels)
+
+    def test_invalid_metric_label_values(self):
+        invalid_inputs = [
             ({'foo': 4.2}, {'bar': ''}),
             ({'foo': 4.2}, {'bar': 'b,az'}),
             ({'foo': 4.2}, {'bar': 'b=az'}),
-            ({'foo': 4.2}, {'BAЯ': 'baz'}),
         ]
         for metrics, labels in invalid_inputs:
             with self.assertRaises(ops.model.ModelError):
