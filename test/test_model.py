@@ -864,5 +864,25 @@ class TestModelBackend(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [['action-log', 'progress: 42%']])
 
 
+class TestLazyMapping(unittest.TestCase):
+
+    def test_invalidate(self):
+        loaded = []
+
+        class MyLazyMap(ops.model.LazyMapping):
+            def _load(self):
+                loaded.append(1)
+                return {'foo': 'bar'}
+
+        map = MyLazyMap()
+        self.assertEqual(map['foo'], 'bar')
+        self.assertEqual(loaded, [1])
+        self.assertEqual(map['foo'], 'bar')
+        self.assertEqual(loaded, [1])
+        map.invalidate()
+        self.assertEqual(map['foo'], 'bar')
+        self.assertEqual(loaded, [1, 1])
+
+
 if __name__ == "__main__":
     unittest.main()

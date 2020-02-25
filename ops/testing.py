@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from ops import charm, framework, model
+
 
 def builder(framework, meta, charm_cls):
     class TestClass(charm_cls):
@@ -26,15 +28,22 @@ class TestingModelBuilder:
 
     def __init__(self, unit_name):
         self.unit_name = unit_name
-        self._backend = TestingModelBackend(unit_name)
+        self._backend = _TestingModelBackend(unit_name)
         self._relation_id_counter = 0
+        self._charm = None
 
     def get_backend(self):
         return self._backend
 
+    def register_charm(self, charm):
+        if self._charm is not None:
+            raise RuntimeError(f"registering charm {charm} while {self._charm} is already registered")
+        self._charm = charm
+
     def _next_relation_id(self):
         rel_id = self._relation_id_counter
         self._relation_id_counter += 1
+        return rel_id
 
     def add_relation(self, relation_name, remote_app, remote_app_data={}):
         rel_id = self._next_relation_id()
@@ -46,12 +55,19 @@ class TestingModelBuilder:
             self._backend.unit_name: {},
             self._backend.app_name: {},
         }
+        if self._charm is not None:
+            self._charm.framework.model.relations.invalidate(relation_name)
+        return rel_id
 
     def add_relation_unit(self, relation_id, remote_unit, remote_unit_data={}):
         self._backend._relation_list_map[relation_id].append(remote_unit)
         self._backend._relation_data[relation_id][remote_unit] = remote_unit_data
+        if self._charm is not None:
+            relation_name = self._backend._relation_names[relation_id]
+            self._charm.framework.model.relations.invalidate(relation_name)
 
-    def add_relation_and_unit(self, relation_name, remote_unit, initial_unit_data={}, initial_app_data={}, remote_app_data={}, remote_unit_data={}):
+    def add_relation_and_unit(self, relation_name, remote_unit, initial_unit_data={}, initial_app_data={},
+                              remote_app_data={}, remote_unit_data={}):
         """Create a relation visible to your charm.
 
         It will be populated with the initial app and unit data that you have supplied.
@@ -67,26 +83,58 @@ class TestingModelBuilder:
             self._backend.unit_name: initial_unit_data,
             self._backend.app_name: initial_app_data,
         }
+        if self._charm is not None:
+            self._charm.framework.model.relations.invalidate(relation_name)
         return rel_id
 
-    def update_relation_data(self, relation_id, name, **kwargs):
+    def update_relation_data(self, relation_id, unit_or_app, **kwargs):
         """Update the relation data for a given unit or application in a given relation.
 
         :param relation_id: The integer relation_id representing this relation.
-        :param name: The unit or application name that is being updated.
+        :param unit_or_app: The unit or application name that is being updated.
           This can be the local or remote application.
         :param kwargs: Each key/value will be updated in the relation data.
         :return: None
         """
-        existing = self._backend._relation_data[relation_id][name].copy()
-        for k, v in kwargs:
+        new_values = self._backend._relation_data[relation_id][unit_or_app].copy()
+        for k, v in kwargs.items():
             if v == '':
-                existing.pop(k, None)
+                new_values.pop(k, None)
             else:
-                existing[k] = v
+                new_values[k] = v
+        self._backend._relation_data[relation_id][unit_or_app] = new_values
+        # TODO: now that we have new backend data, any cached relation data needs to be invalidated
+        if self._charm is not None:
+            model = self._charm.framework.model
+            relation_name = self._backend._relation_names[relation_id]
+            relation = model.get_relation(relation_name, relation_id)
+            if '/' in unit_or_app:
+                entity = model.get_unit(unit_or_app)
+            else:
+                entity = model.get_app(unit_or_app)
+            relation.data[entity].invalidate()
+
+    def trigger_relation_changed(self, relation_id, app_or_unit):
+        """Trigger a relation_changed event for the given event, triggered by changes from the given unit or app."""
+        if self._charm is None:
+            raise RuntimeError('cannot trigger a relation_changed event without a Charm registered')
+        rel_name = self._backend._relation_names[relation_id]
+        model = self._charm.framework.model
+        relation = model.get_relation(rel_name, relation_id)
+        if '/' in app_or_unit:
+            app_name = app_or_unit.split('/')[0]
+            unit_name = app_or_unit
+            app = model.get_app(app_name)
+            unit = model.get_unit(unit_name)
+            args = (relation, app, unit)
+        else:
+            app_name = app_or_unit
+            app = model.get_app(app_name)
+            args = (relation, app)
+        self._charm.on[rel_name].relation_changed.emit(*args)
 
 
-class TestingModelBackend:
+class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
 
     Use the TestingModelBuilder to populate the model.
@@ -178,3 +226,29 @@ class TestingModelBackend:
 
     def network_get(self, endpoint_name, relation_id=None):
         raise NotImplementedError(self.network_get)
+
+
+def setup_charm(charm_cls, charm_meta_yaml):
+    """When you want to test a Charm implementation, use this to ease testing infrastructure.
+
+    This will build a framework in memory, and a ModelBuilder to drive that framework.
+    """
+    meta = charm.CharmMeta.from_yaml(charm_meta_yaml)
+
+    # The Framework mutates class objects to build attributes for events, etc. That makes attribute access easy.
+    # However, it means you can't register the same class with multiple framework
+    # instances. So instead we dynamically create a new event class and charm class
+    # and register those with the framework.
+    class TestEvents(charm_cls.on.__class__):
+        pass
+
+    class TestCharm(charm_cls):
+        on = TestEvents()
+
+    unit_name = meta.name + '/0'
+    builder = TestingModelBuilder(unit_name)
+    the_model = model.Model(unit_name, meta, builder.get_backend())
+    the_framework = framework.Framework(":memory:", "no-disk-path", meta, the_model)
+    the_charm = TestCharm(the_framework, meta.name)
+    builder.register_charm(the_charm)
+    return the_charm, builder
