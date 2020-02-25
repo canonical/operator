@@ -83,7 +83,7 @@ class MyCharm(CharmBase):
         super().__init__(*args)
         self.framework.observe(self.on.start, self.on_start)
 
-     def on_start(self, event):
+    def on_start(self, event):
         # Handle the start event here.
 ```
 
@@ -93,7 +93,7 @@ define your own events in your custom types.
 > The second argument to `observe` can be either the handler as a bound
 > method, or the observer itself if the handler is a method of the observer
 > that follows the conventional naming pattern. That is, in this case, we
-> could have called just `self.framework.obseve(self.on.start, self)`.
+> could have called just `self.framework.observe(self.on.start, self)`.
 
 The `hooks/` directory must contain a symlink to your `src/charm.py` entry
 point so that Juju can call it. You only need to set up the `hooks/install` link
