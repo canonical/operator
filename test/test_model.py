@@ -16,8 +16,6 @@
 import os
 import pathlib
 import unittest
-import time
-import re
 import json
 import ipaddress
 
@@ -392,20 +390,17 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_is_leader_refresh(self):
-        # A sanity check.
-        self.assertGreater(time.monotonic(), ops.model.ModelBackend.LEASE_RENEWAL_PERIOD.total_seconds())
-
         fake_script(self, 'is-leader', 'echo false')
         self.assertFalse(self.model.unit.is_leader())
 
         # Change the leadership status and force a recheck.
         fake_script(self, 'is-leader', 'echo true')
-        self.backend._leader_check_time = 0
+        self.backend._leader_check_time = None
         self.assertTrue(self.model.unit.is_leader())
 
         # Force a recheck without changing the leadership status.
         fake_script(self, 'is-leader', 'echo true')
-        self.backend._leader_check_time = 0
+        self.backend._leader_check_time = None
         self.assertTrue(self.model.unit.is_leader())
 
     def test_resources(self):
@@ -440,7 +435,7 @@ class TestModel(unittest.TestCase):
             self.assertEqual(pod_spec_call[:2], ['pod-spec-set', '--file'])
             # 8 bytes are used as of python 3.4.0, see Python bug #12015.
             # Other characters are from POSIX 3.282 (Portable Filename Character Set) a subset of which Python's mkdtemp uses.
-            self.assertTrue(re.match('/tmp/tmp[A-Za-z0-9._-]{8}-pod-spec-set', pod_spec_call[2]))
+            self.assertRegex(pod_spec_call[2], '.*/tmp[A-Za-z0-9._-]{8}-pod-spec-set')
 
         self.model.pod.set_spec({'foo': 'bar'})
         self.assertEqual(spec_path.read_text(), '{"foo": "bar"}')
