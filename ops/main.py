@@ -186,6 +186,7 @@ def main(charm_class):
         if juju_event_name in ('install', 'start', 'upgrade_charm') or juju_event_name.endswith('_storage_attached'):
             _setup_event_links(charm_dir, charm)
 
+        # TODO: Remove the collect_metrics check below as soon as the relevant Juju changes are made.
         # Skip reemission of deferred events for collect-metrics events because they do not have the full access
         # to all hook tools.
         if juju_event_name != 'collect_metrics':
