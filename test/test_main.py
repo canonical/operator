@@ -211,6 +211,24 @@ start:
         state = self._simulate_event(EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config))
         self.assertEqual(state['observed_event_types'], [ConfigChangedEvent, UpdateStatusEvent])
 
+    def test_no_reemission_on_collect_metrics(self):
+        # base64 encoding is used to avoid null bytes.
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        fake_script(self, 'add-metric', 'exit 0')
+
+        # First run "install" to make sure all hooks are set up.
+        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        self.assertEqual(state['observed_event_types'], [InstallEvent])
+
+        state = self._simulate_event(EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config))
+        self.assertEqual(state['observed_event_types'], [ConfigChangedEvent])
+
+        # Re-emit should not pick the deferred config-changed because collect-metrics runs in a restricted context.
+        state = self._simulate_event(EventSpec(CollectMetricsEvent, 'collect-metrics', charm_config=charm_config))
+        self.assertEqual(state['observed_event_types'], [CollectMetricsEvent])
+
     def test_multiple_events_handled(self):
         self._prepare_actions()
 
