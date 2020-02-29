@@ -31,7 +31,7 @@ class TestFramework(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmpdir)
+        self.addCleanup(shutil.rmtree, str(self.tmpdir))
         default_timeout = SQLiteStorage.DB_LOCK_TIMEOUT
 
         def timeout_cleanup():
@@ -754,7 +754,7 @@ class TestStoredState(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmpdir)
+        self.addCleanup(shutil.rmtree, str(self.tmpdir))
 
     def create_framework(self, cls=Framework):
         framework = cls(self.tmpdir / "framework.data", self.tmpdir, None, None)

@@ -32,14 +32,14 @@ def fake_script(test_case, name, content):
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)
 
-    with open(test_case.fake_script_path / name, "w") as f:
+    with open(str(test_case.fake_script_path / name), "w") as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
         f.write('#!/bin/bash\n{ echo -n $(basename $0); for s in "$@"; do echo -n \\;"$s"; done; echo; } >> $(dirname $0)/calls.txt\n' + content)
-    os.chmod(test_case.fake_script_path / name, 0o755)
+    os.chmod(str(test_case.fake_script_path / name), 0o755)
 
 
 def fake_script_calls(test_case, clear=False):
-    with open(test_case.fake_script_path / 'calls.txt', 'r+') as f:
+    with open(str(test_case.fake_script_path / 'calls.txt'), 'r+') as f:
         calls = [line.split(';') for line in f.read().splitlines()]
         if clear:
             f.truncate(0)

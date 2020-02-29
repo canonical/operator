@@ -707,7 +707,7 @@ class ModelBackend:
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:
-            shutil.rmtree(tmpdir)
+            shutil.rmtree(str(tmpdir))
 
     def status_get(self, *, is_app=False):
         """Get a status of a unit or an application.
