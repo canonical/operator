@@ -515,7 +515,7 @@ class TestFramework(unittest.TestCase):
             class OtherEvents(EventsBase):
                 foo = event
         self.assertEqual(
-            str(cm.exception.__cause__),
+            str(cm.exception),
             "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
         with self.assertRaises(RuntimeError) as cm:
@@ -523,7 +523,7 @@ class TestFramework(unittest.TestCase):
                 on = MyEvents()
                 bar = event
         self.assertEqual(
-            str(cm.exception.__cause__),
+            str(cm.exception),
             "EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
 
     def test_reemit_ignores_unknown_event_type(self):
