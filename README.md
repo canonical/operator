@@ -105,12 +105,12 @@ normal with:
 
 ```
 # Replace ${CHARM} with the name of the charm.
-$ charm push . cs:~${USER}/${CHARM}
+charm push . cs:~${USER}/${CHARM}
 # Replace ${VERSION} with the version created by `charm push`.
-$ charm release cs:~${USER}/${CHARM}-${VERSION}
-$ charm grant cs:~${USER}/${CHARM}-${VERSION} everyone
+charm release cs:~${USER}/${CHARM}-${VERSION}
+charm grant cs:~${USER}/${CHARM}-${VERSION} everyone
 # And now deploy your charm.
-$ juju deploy cs:~${USER}/$CHARM
+juju deploy cs:~${USER}/$CHARM
 ```
 
 Alternatively, to deploy directly from local disk, run:
