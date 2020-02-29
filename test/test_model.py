@@ -18,6 +18,7 @@ import pathlib
 import unittest
 import json
 import ipaddress
+from collections import OrderedDict
 
 import ops.model
 import ops.charm
@@ -82,7 +83,7 @@ class TestModel(unittest.TestCase):
         self.assertIsInstance(db1_4, ops.model.Relation)
         dead_rel = self.model.get_relation('db1', 7)
         self.assertIsInstance(dead_rel, ops.model.Relation)
-        self.assertEqual(list(dead_rel.data.keys()), [self.model.unit, self.model.unit.app])
+        self.assertEqual(set(dead_rel.data.keys()), {self.model.unit, self.model.unit.app})
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertIsNone(self.model.get_relation('db0'))
         self.assertIs(self.model.get_relation('db1'), db1_4)
@@ -925,7 +926,7 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-get', '')
         fake_script(self, 'action-set', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
-            self.backend.action_set({'foo': 'bar', 'dead': 'beef cafe'})
+            self.backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
         calls = [["action-set", "foo=bar", "dead=beef cafe"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
@@ -947,7 +948,7 @@ class TestModelBackend(unittest.TestCase):
     def test_action_set(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
-        self.backend.action_set({'x': 'dead beef', 'y': 1})
+        self.backend.action_set(OrderedDict([('x', 'dead beef'), ('y', 1)]))
         self.assertEqual(fake_script_calls(self), [['action-set', 'x=dead beef', 'y=1']])
 
     def test_action_fail(self):
@@ -979,12 +980,12 @@ class TestModelBackend(unittest.TestCase):
     def test_valid_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
         test_cases = [(
-            {'foo': 42, 'b-ar': 4.5, 'ba_-z': 4.5, 'a': 1},
-            {'de': 'ad', 'be': 'ef_ -'},
+            OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
+            OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
             [['add-metric', '--labels', 'de=ad,be=ef_ -', 'foo=42', 'b-ar=4.5', 'ba_-z=4.5', 'a=1']]
         ), (
-            {'foo1': 0, 'b2r': 4.5},
-            {'d3': 'aд', 'b33f': '3_ -'},
+            OrderedDict([('foo1', 0), ('b2r', 4.5)]),
+            OrderedDict([('d3', 'aд'), ('b33f', '3_ -')]),
             [['add-metric', '--labels', 'd3=aд,b33f=3_ -', 'foo1=0', 'b2r=4.5']],
         )]
         for metrics, labels, expected_calls in test_cases:
