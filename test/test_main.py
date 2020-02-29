@@ -87,7 +87,7 @@ class TestMain(unittest.TestCase):
         CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            shutil.rmtree(self.JUJU_CHARM_DIR)
+            shutil.rmtree(str(self.JUJU_CHARM_DIR))
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
@@ -96,8 +96,8 @@ class TestMain(unittest.TestCase):
     def _setup_charm_dir(self):
         self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
-        self.charm_exec_path = os.path.relpath(self.JUJU_CHARM_DIR / 'src/charm.py', self.hooks_dir)
-        shutil.copytree(TEST_CHARM_DIR, self.JUJU_CHARM_DIR)
+        self.charm_exec_path = os.path.relpath(str(self.JUJU_CHARM_DIR / 'src/charm.py'), str(self.hooks_dir))
+        shutil.copytree(str(TEST_CHARM_DIR), str(self.JUJU_CHARM_DIR))
 
         charm_spec = importlib.util.spec_from_file_location("charm", str(self.JUJU_CHARM_DIR / 'src/charm.py'))
         self.charm_module = importlib.util.module_from_spec(charm_spec)
@@ -132,7 +132,7 @@ start:
         actions_dir_name = 'actions'
         actions_meta_file = 'actions.yaml'
 
-        with open(self.JUJU_CHARM_DIR / actions_meta_file, 'w+') as f:
+        with open(str(self.JUJU_CHARM_DIR / actions_meta_file), 'w+') as f:
             f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
@@ -143,7 +143,7 @@ start:
     def _read_and_clear_state(self):
         state = None
         if self._state_file.stat().st_size:
-            with open(self._state_file, 'r+b') as state_file:
+            with open(str(self._state_file), 'r+b') as state_file:
                 state = pickle.load(state_file)
                 state_file.truncate()
         return state
@@ -151,7 +151,7 @@ start:
     def _simulate_event(self, event_spec):
         env = {
             'PATH': "{}:{}".format(Path(__file__).parent / 'bin', os.environ['PATH']),
-            'JUJU_CHARM_DIR': self.JUJU_CHARM_DIR,
+            'JUJU_CHARM_DIR': str(self.JUJU_CHARM_DIR),
             'JUJU_UNIT_NAME': 'test_main/0',
             'CHARM_CONFIG': event_spec.charm_config,
         }
@@ -191,7 +191,7 @@ start:
         event_file = self.JUJU_CHARM_DIR / event_dir / event_filename
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call([sys.executable, event_file], env=env, cwd=self.JUJU_CHARM_DIR)
+        subprocess.check_call([sys.executable, str(event_file)], env=env, cwd=str(self.JUJU_CHARM_DIR))
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -357,7 +357,7 @@ start:
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists(), 'Missing hook: ' + event_hook)
-                self.assertEqual(os.readlink(self.JUJU_CHARM_DIR / event_hook), self.charm_exec_path)
+                self.assertEqual(os.readlink(str(self.JUJU_CHARM_DIR / event_hook)), self.charm_exec_path)
 
         for initial_event in initial_events:
             self._setup_charm_dir()

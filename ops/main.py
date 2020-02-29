@@ -75,7 +75,7 @@ def _create_event_link(charm, bound_event):
     if not event_path.exists():
         # CPython has different implementations for populating sys.argv[0] for Linux and Windows. For Windows
         # it is always an absolute path (any symlinks are resolved) while for Linux it can be a relative path.
-        target_path = os.path.relpath(os.path.realpath(sys.argv[0]), event_dir)
+        target_path = os.path.relpath(os.path.realpath(sys.argv[0]), str(event_dir))
 
         # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
         logger.debug('Creating a new relative symlink at {} pointing to {}'.format(event_path, target_path))

@@ -43,7 +43,7 @@ class TestCharm(unittest.TestCase):
         os.environ['JUJU_UNIT_NAME'] = 'local/0'
 
         self.tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmpdir)
+        self.addCleanup(shutil.rmtree, str(self.tmpdir))
         self.meta = CharmMeta()
 
         class CustomEvent(EventBase):
