@@ -616,7 +616,7 @@ class ModelBackend:
         self.app_name = self.unit_name.split('/')[0]
 
         self._is_leader = None
-        self._leader_check_time = 0
+        self._leader_check_time = None
 
     def _run(self, *args, return_output=False, use_json=False):
         kwargs = dict(stdout=PIPE, stderr=PIPE)
@@ -679,8 +679,12 @@ class ModelBackend:
         The value is cached for the duration of a lease which is 30s in Juju.
         """
         now = time.monotonic()
-        time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
-        if time_since_check > self.LEASE_RENEWAL_PERIOD or self._is_leader is None:
+        if self._leader_check_time is None:
+            check = True
+        else:
+            time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
+            check = (time_since_check > self.LEASE_RENEWAL_PERIOD or self._is_leader is None)
+        if check:
             # Current time MUST be saved before running is-leader to ensure the cache
             # is only used inside the window that is-leader itself asserts.
             self._leader_check_time = now
