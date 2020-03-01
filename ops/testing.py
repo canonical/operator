@@ -142,6 +142,11 @@ class TestingModelBuilder:
         if self._charm is not None:
             self._charm.on.config_changed.emit()
 
+    def set_leader(self, is_leader=True):
+        self._backend._is_leader = is_leader
+        if is_leader and self._charm is not None:
+            self._charm.on.leader_elected.emit()
+
 
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
@@ -250,9 +255,13 @@ def setup_charm(charm_cls, charm_meta_yaml):
     # and register those with the framework.
     class TestEvents(charm_cls.on.__class__):
         pass
+    TestEvents.__name__ = charm_cls.on.__class__.__name__
 
     class TestCharm(charm_cls):
         on = TestEvents()
+    # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo, rather than
+    # TestCharm has no attribute foo. It does hide the fact that TestCharm exists, but that is probably for the best.
+    TestCharm.__name__ = charm_cls.__name__
 
     unit_name = meta.name + '/0'
     builder = TestingModelBuilder(unit_name)

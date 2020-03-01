@@ -21,6 +21,9 @@ from ops.charm import (
 from ops.framework import (
     Object,
 )
+from ops.model import (
+    ModelError,
+)
 from ops.testing import TestingModelBuilder, setup_charm
 
 
@@ -125,6 +128,35 @@ name: my-charm
                                          {'name': 'config', 'data': {'a': ''}},
                                          ])
 
+    def test_set_leader(self):
+        charm, builder = setup_charm(RecordingCharm, '''
+name: my-charm
+''')
+        # No event happens here
+        builder.set_leader(False)
+        self.assertFalse(charm.framework.model.unit.is_leader())
+        builder.set_leader(True)
+        self.assertEqual(charm.changes, [{'name': 'leader-elected'}])
+        self.assertTrue(charm.framework.model.unit.is_leader())
+
+    def test_relation_set_app_not_leader(self):
+        charm, builder = setup_charm(RecordingCharm, '''
+name: test-charm
+requires:
+    db:
+        interface: pgsql
+''')
+        builder.set_leader(False)
+        rel_id = builder.add_relation_and_unit('db', 'postgresql/0')
+        rel = charm.framework.model.get_relation('db')
+        with self.assertRaises(ModelError) as cm:
+            rel.data[charm.framework.model.app]['foo'] = 'bar'
+        # The data has not actually been changed
+        self.assertEqual(builder.get_backend()._relation_data[rel_id]['test-charm'], {})
+        builder.set_leader(True)
+        rel.data[charm.framework.model.app]['foo'] = 'bar'
+        self.assertEqual(builder.get_backend()._relation_data[rel_id]['test-charm'], {'foo': 'bar'})
+
 
 class Helper(Object):
     def __init__(self, parent, key):
@@ -159,9 +191,13 @@ class RecordingCharm(CharmBase):
         super().__init__(framework, charm_name)
         self.changes = []
         self.framework.observe(self.on.config_changed, self.on_config_changed)
+        self.framework.observe(self.on.leader_elected, self.on_leader_elected)
 
     def on_config_changed(self, event):
         self.changes.append(dict(name='config', data=dict(self.framework.model.config)))
+
+    def on_leader_elected(self, event):
+        self.changes.append(dict(name='leader-elected'))
 
 
 
