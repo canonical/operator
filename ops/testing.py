@@ -144,6 +144,8 @@ class TestingModelBuilder:
 
     def set_leader(self, is_leader=True):
         self._backend._is_leader = is_leader
+        # Note: jam 2020-03-01 currently is_leader is cached at the ModelBackend level, not in the Model objects,
+        #  so this automatically gets noticed.
         if is_leader and self._charm is not None:
             self._charm.on.leader_elected.emit()
 
