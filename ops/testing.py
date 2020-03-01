@@ -15,11 +15,6 @@
 from ops import charm, framework, model
 
 
-def builder(framework, meta, charm_cls):
-    class TestClass(charm_cls):
-        pass
-
-
 class TestingModelBuilder:
     """This class represents a way to build up the model that will drive a test suite.
 
@@ -87,32 +82,33 @@ class TestingModelBuilder:
             self._charm.framework.model.relations.invalidate(relation_name)
         return rel_id
 
-    def update_relation_data(self, relation_id, unit_or_app, **kwargs):
+    def update_relation_data(self, relation_id, app_or_unit, key_values):
         """Update the relation data for a given unit or application in a given relation.
+        This also triggers the relation_changed event for this relation_id.
 
         :param relation_id: The integer relation_id representing this relation.
-        :param unit_or_app: The unit or application name that is being updated.
+        :param app_or_unit: The unit or application name that is being updated.
           This can be the local or remote application.
-        :param kwargs: Each key/value will be updated in the relation data.
+        :param key_values: Each key/value will be updated in the relation data.
         :return: None
         """
-        new_values = self._backend._relation_data[relation_id][unit_or_app].copy()
-        for k, v in kwargs.items():
+        new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
+        for k, v in key_values.items():
             if v == '':
                 new_values.pop(k, None)
             else:
                 new_values[k] = v
-        self._backend._relation_data[relation_id][unit_or_app] = new_values
-        # TODO: now that we have new backend data, any cached relation data needs to be invalidated
+        self._backend._relation_data[relation_id][app_or_unit] = new_values
         if self._charm is not None:
             model = self._charm.framework.model
             relation_name = self._backend._relation_names[relation_id]
             relation = model.get_relation(relation_name, relation_id)
-            if '/' in unit_or_app:
-                entity = model.get_unit(unit_or_app)
+            if '/' in app_or_unit:
+                entity = model.get_unit(app_or_unit)
             else:
-                entity = model.get_app(unit_or_app)
+                entity = model.get_app(app_or_unit)
             relation.data[entity].invalidate()
+        self.trigger_relation_changed(relation_id, app_or_unit)
 
     def trigger_relation_changed(self, relation_id, app_or_unit):
         """Trigger a relation_changed event for the given event, triggered by changes from the given unit or app."""
@@ -132,6 +128,19 @@ class TestingModelBuilder:
             app = model.get_app(app_name)
             args = (relation, app)
         self._charm.on[rel_name].relation_changed.emit(*args)
+
+    def update_config(self, key_values={}, unset=()):
+        """Update the config as seen by the charm, and trigger a config_changed event."""
+        config = self._backend._config
+        for key, value in key_values.items():
+            config[key] = value
+        for key in unset:
+            config.pop(key, None)
+        # NOTE: jam 2020-03-01 Note that this sort of works 'by accident'. The issue is that Config is a LazyMapping,
+        # but its _load returns a dict and this method mutates the dict that Config is caching.
+        # Arguably we should be doing some sort of charm.framework.model.config.invalidate()
+        if self._charm is not None:
+            self._charm.on.config_changed.emit()
 
 
 class _TestingModelBackend:

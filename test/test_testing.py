@@ -89,23 +89,41 @@ requires:
     interface: pgsql
 ''')
 
-        class DataViewer(Object):
-            def __init__(self, parent, key):
-                super().__init__(parent, key)
-                self.changes = []
-                parent.framework.observe(parent.on.db_relation_changed, self.on_relation_changed)
-
-            def on_relation_changed(self, event):
-                data = event.relation.data[event.unit]
-                self.changes.append(dict(data))
-
-        viewer = DataViewer(charm, 'viewer')
+        viewer = RelationChangedViewer(charm, 'db')
         rel_id = builder.add_relation_and_unit('db', 'postgresql/0', remote_unit_data={'initial': 'data'})
         builder.trigger_relation_changed(rel_id, 'postgresql/0')
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
-        builder.update_relation_data(rel_id, 'postgresql/0', new='value')
-        builder.trigger_relation_changed(rel_id, 'postgresql/0')
+        builder.update_relation_data(rel_id, 'postgresql/0', {'new': 'value'})
         self.assertEqual(viewer.changes, [{'initial': 'data'}, {'initial': 'data', 'new': 'value'}])
+
+    def test_update_relation_remove_data(self):
+        charm, builder = setup_charm(CharmBase, '''
+name: my-charm
+requires:
+  db:
+    interface: pgsql
+''')
+        viewer = RelationChangedViewer(charm, 'db')
+        rel_id = builder.add_relation_and_unit('db', 'postgresql/0', remote_unit_data={'initial': 'data'})
+        builder.trigger_relation_changed(rel_id, 'postgresql/0')
+        builder.update_relation_data(rel_id, 'postgresql/0', {'initial': ''})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}, {}])
+
+    def test_update_config(self):
+        charm, builder = setup_charm(RecordingCharm, '''
+name: my-charm
+''')
+        builder.update_config(key_values={'a': 'foo', 'b': 2})
+        self.assertEqual(charm.changes, [{'name': 'config', 'data': {'a': 'foo', 'b': 2}}])
+        builder.update_config(key_values={'b': 3})
+        self.assertEqual(charm.changes, [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
+                                         {'name': 'config', 'data': {'a': 'foo', 'b': 3}}])
+        # you can set config values to the empty string, you can use unset to actually remove items
+        builder.update_config(key_values={'a': ''}, unset=set('b'))
+        self.assertEqual(charm.changes, [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
+                                         {'name': 'config', 'data': {'a': 'foo', 'b': 3}},
+                                         {'name': 'config', 'data': {'a': ''}},
+                                         ])
 
 
 class Helper(Object):
@@ -116,6 +134,35 @@ class Helper(Object):
 
     def on_relation_changed(self, event):
         self.changes.append((event.relation.id, event.app.name))
+
+
+class RelationChangedViewer(Object):
+    """Helper class that just tracks relation_changed events and saves the data seen in the relation bucket."""
+
+    def __init__(self, charm, relation_name):
+        super().__init__(charm, relation_name)
+        self.changes = []
+        charm.framework.observe(charm.on[relation_name].relation_changed, self.on_relation_changed)
+
+    def on_relation_changed(self, event):
+        if event.unit is not None:
+            data = event.relation.data[event.unit]
+        else:
+            data = event.relation.data[event.app]
+        self.changes.append(dict(data))
+
+
+class RecordingCharm(CharmBase):
+    """Record the events that we see, and any associated data."""
+
+    def __init__(self, framework, charm_name):
+        super().__init__(framework, charm_name)
+        self.changes = []
+        self.framework.observe(self.on.config_changed, self.on_config_changed)
+
+    def on_config_changed(self, event):
+        self.changes.append(dict(name='config', data=dict(self.framework.model.config)))
+
 
 
 if __name__ == "__main__":
