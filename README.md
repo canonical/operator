@@ -1,7 +1,13 @@
-# Operator Framework for Charms
+# The Operator Framework
 
-This framework is not yet stable and is subject to change, but is available
-for early testing.
+The Operator Framework provides a simple, lightweight, and powerful way of encapsulating operational experience in code.
+
+The framework will help you to:
+
+* model the integration of your services
+* manage the lifecycle of your application
+* create reusable and scalable components
+* keep your code simple and readable
 
 ## Getting Started
 
