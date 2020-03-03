@@ -60,9 +60,13 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, relation):
-        """Get a network space binding for a Relation object."""
-        return self._bindings.get(relation)
+    def get_binding(self, binding_key):
+        """Get a network space binding.
+
+        binding_key -- a name of a relation or a Relation object. Providing a Relation object will return
+                       a Binding object specific to a relation.
+        """
+        return self._bindings.get(binding_key)
 
 
 class ModelCache:
@@ -258,12 +262,19 @@ class BindingMapping:
         self._backend = backend
         self._data = {}
 
-    def get(self, relation):
-        if not isinstance(relation, Relation):
-            raise ModelError('expected Relation instance, got {}'.format(type(relation).__name__))
-        binding = self._data.get(relation)
+    def get(self, binding_key):
+        if isinstance(binding_key, Relation):
+            binding_name = binding_key.name
+            relation_id = binding_key.id
+        elif isinstance(binding_key, str):
+            binding_name = binding_key
+            relation_id = None
+        else:
+            raise ModelError(f'a binding key must be a str or Relation, not {type(binding_key).__name__}')
+        binding = self._data.get(binding_key)
         if binding is None:
-            self._data[relation] = binding = Binding(relation.name, relation.id, self._backend)
+            binding = Binding(binding_name, relation_id, self._backend)
+            self._data[binding_key] = binding
         return binding
 
 
@@ -279,7 +290,12 @@ class Binding:
     @property
     def network(self):
         if self._network is None:
-            self._network = Network(self._backend.network_get(self.name, self._relation_id))
+            try:
+                self._network = Network(self._backend.network_get(self.name, self._relation_id))
+            except RelationNotFoundError:
+                # If a relation is dead, we can still get network info associated with an endpoint itself
+                # not associated with a particular relation id.
+                self._network = Network(self._backend.network_get(self.name))
         return self._network
 
 

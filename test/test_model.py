@@ -657,6 +657,13 @@ class TestModel(unittest.TestCase):
                 self.model.storages.request('data', count_v)
 
     def test_relation_endpoint_bindings(self):
+        meta = ops.charm.CharmMeta()
+        meta.relations = {
+            'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
+        }
+
         fake_script(self, 'relation-ids',
                     """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
@@ -714,49 +721,70 @@ class TestModel(unittest.TestCase):
   ]
 }'''
 
-        # Basic validation for passing invalid keys (including relation names).
-        for name in (object, 0, 'db0'):
+        # Basic validation for passing invalid keys.
+        for name in (object, 0):
             with self.assertRaises(ops.model.ModelError):
                 self.model.get_binding(name)
 
-        fake_script(self, 'network-get', '''[ "$1" = db0 -a "$3" = 4 ] && echo '{}' || exit 1'''.format(network_get_out)),
-        # Bindings for dead relations are not supported.
-        with self.assertRaises(ops.model.ModelError):
-            binding = ops.model.Binding('db0', 42, self.model._backend)
-            binding.network
-        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'db0', '-r', '42', '--format=json']])
-
-        expected_calls = [
-            ['relation-ids', 'db0', '--format=json'],
-            # The two invocations below are due to the get_relation call.
-            ['relation-list', '-r', '4', '--format=json'],
-            ['network-get', 'db0', '-r', '4', '--format=json'],
-        ]
-        binding = self.model.get_binding(self.model.get_relation('db0'))
-        self.assertEqual(binding.name, 'db0')
+        fake_script(self, 'network-get', '''[ "$1" = db0 -a "$2" = --format=json ] && echo '{}' || '''.format(network_get_out) +
+                                         '''{ echo ERROR invalid value "$2" for option -r: relation not found >&2 ; exit 2; }'''),
+        # Validate the behavior for dead relations.
+        binding = ops.model.Binding('db0', 42, self.model._backend)
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
-        self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
-        # /32 and /128 CIDRs are valid one-address networks for IPv{4,6}Network types respectively.
-        self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32'),
-                                                          ipaddress.ip_network('192.0.3.0/24'),
-                                                          ipaddress.ip_network('dead:beef::/64'),
-                                                          ipaddress.ip_network('2001:db8::3/128')])
-        self.assertEqual(binding.network.interfaces[0].name, 'lo')
-        self.assertEqual(binding.network.interfaces[0].address, ipaddress.ip_address('192.0.2.2'))
-        self.assertEqual(binding.network.interfaces[0].subnet, ipaddress.ip_network('192.0.2.0/24'))
-        self.assertEqual(binding.network.interfaces[1].name, 'lo')
-        self.assertEqual(binding.network.interfaces[1].address, ipaddress.ip_address('dead:beef::1'))
-        self.assertEqual(binding.network.interfaces[1].subnet, ipaddress.ip_network('dead:beef::/64'))
-        self.assertEqual(binding.network.interfaces[2].name, 'tun')
-        self.assertEqual(binding.network.interfaces[2].address, ipaddress.ip_address('192.0.3.3'))
-        self.assertEqual(binding.network.interfaces[2].subnet, ipaddress.ip_network('192.0.3.3/32'))
-        self.assertEqual(binding.network.interfaces[3].name, 'tun')
-        self.assertEqual(binding.network.interfaces[3].address, ipaddress.ip_address('2001:db8::3'))
-        self.assertEqual(binding.network.interfaces[3].subnet, ipaddress.ip_network('2001:db8::3/128'))
-        self.assertEqual(binding.network.interfaces[4].name, 'tun')
-        self.assertEqual(binding.network.interfaces[4].address, ipaddress.ip_address('fe80::1:1'))
-        self.assertEqual(binding.network.interfaces[4].subnet, ipaddress.ip_network('fe80::/64'))
-        self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['network-get', 'db0', '-r', '42', '--format=json'],
+            ['network-get', 'db0', '--format=json'],
+        ])
+
+        def check_binding_data(binding_name, binding):
+            self.assertEqual(binding.name, binding_name)
+            self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
+            self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
+            # /32 and /128 CIDRs are valid one-address networks for IPv{4,6}Network types respectively.
+            self.assertEqual(binding.network.egress_subnets, [ipaddress.ip_network('192.0.2.2/32'),
+                                                              ipaddress.ip_network('192.0.3.0/24'),
+                                                              ipaddress.ip_network('dead:beef::/64'),
+                                                              ipaddress.ip_network('2001:db8::3/128')])
+            self.assertEqual(binding.network.interfaces[0].name, 'lo')
+            self.assertEqual(binding.network.interfaces[0].address, ipaddress.ip_address('192.0.2.2'))
+            self.assertEqual(binding.network.interfaces[0].subnet, ipaddress.ip_network('192.0.2.0/24'))
+            self.assertEqual(binding.network.interfaces[1].name, 'lo')
+            self.assertEqual(binding.network.interfaces[1].address, ipaddress.ip_address('dead:beef::1'))
+            self.assertEqual(binding.network.interfaces[1].subnet, ipaddress.ip_network('dead:beef::/64'))
+            self.assertEqual(binding.network.interfaces[2].name, 'tun')
+            self.assertEqual(binding.network.interfaces[2].address, ipaddress.ip_address('192.0.3.3'))
+            self.assertEqual(binding.network.interfaces[2].subnet, ipaddress.ip_network('192.0.3.3/32'))
+            self.assertEqual(binding.network.interfaces[3].name, 'tun')
+            self.assertEqual(binding.network.interfaces[3].address, ipaddress.ip_address('2001:db8::3'))
+            self.assertEqual(binding.network.interfaces[3].subnet, ipaddress.ip_network('2001:db8::3/128'))
+            self.assertEqual(binding.network.interfaces[4].name, 'tun')
+            self.assertEqual(binding.network.interfaces[4].address, ipaddress.ip_address('fe80::1:1'))
+            self.assertEqual(binding.network.interfaces[4].subnet, ipaddress.ip_network('fe80::/64'))
+
+        single_binding_test_cases = [(
+            lambda: fake_script(self, 'network-get', '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_get_out)),
+            'db0',
+            lambda binding_name: self.model.get_binding(binding_name),
+            [['network-get', 'db0', '--format=json']],
+        ), (
+            lambda: fake_script(self, 'network-get', '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_get_out)),
+            'db0',
+            lambda binding_name: self.model.get_binding(self.model.get_relation(binding_name)),
+            [
+                ['relation-ids', 'db0', '--format=json'],
+                # The two invocations below are due to the get_relation call.
+                ['relation-list', '-r', '4', '--format=json'],
+                ['network-get', 'db0', '-r', '4', '--format=json'],
+            ],
+        )]
+
+        for do_fake, binding_name, get_binding, expected_calls in single_binding_test_cases:
+            self.backend = ops.model.ModelBackend()
+            self.model = ops.model.Model('myapp/0', meta, self.backend)
+            do_fake()
+            binding = get_binding(binding_name)
+            check_binding_data(binding_name, binding)
+            self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
 
 class TestModelBackend(unittest.TestCase):
