@@ -757,8 +757,8 @@ class BoundStoredState:
 
         value = _unwrap_stored(self._data, value)
 
-        if not isinstance(value, (type(None), int, str, bytes, list, dict, set)):
-            raise AttributeError("attribute '{}' cannot be set to {}: must be int/dict/list/etc".format(key, type(value).__name__))
+        if not isinstance(value, (type(None), int, float, str, bytes, list, dict, set)):
+            raise AttributeError("attribute '{}' cannot be set to {}: must be int/float/dict/list/etc".format(key, type(value).__name__))
 
         self._data[key] = _unwrap_stored(self._data, value)
         self.on.changed.emit()
