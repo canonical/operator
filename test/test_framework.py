@@ -787,6 +787,7 @@ class TestStoredState(unittest.TestCase):
         obj.state.foo = 42
         obj.state.bar = "s"
         obj.state.baz = 4.2
+        obj.state.bing = True
 
         self.assertEqual(obj.state.foo, 42)
 
@@ -803,6 +804,7 @@ class TestStoredState(unittest.TestCase):
         self.assertEqual(obj_copy.state.foo, 42)
         self.assertEqual(obj_copy.state.bar, "s")
         self.assertEqual(obj_copy.state.baz, 4.2)
+        self.assertEqual(obj_copy.state.bing, True)
 
     def test_mutable_types_invalid(self):
         framework = self.create_framework()
