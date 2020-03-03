@@ -88,6 +88,7 @@ class TestJujuVersion(unittest.TestCase):
         for a, b, expected in test_cases:
             self.assertEqual(JujuVersion(a) == JujuVersion(b), expected)
             self.assertEqual(JujuVersion(a) == b, expected)
+            self.assertEqual(a == JujuVersion(b), expected)
 
     def test_comparison(self):
         test_cases = [
@@ -124,6 +125,8 @@ class TestJujuVersion(unittest.TestCase):
             self.assertEqual(JujuVersion(a) <= b, expected_weak)
             self.assertEqual(b > JujuVersion(a), expected_strict)
             self.assertEqual(b >= JujuVersion(a), expected_weak)
+            self.assertEqual(JujuVersion(a) >= b, not expected_strict)
+            self.assertEqual(JujuVersion(a) > b, not expected_weak)
 
 
 if __name__ == "__main__":
