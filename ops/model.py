@@ -270,7 +270,7 @@ class BindingMapping:
             binding_name = binding_key
             relation_id = None
         else:
-            raise ModelError(f'a binding key must be a str or Relation, not {type(binding_key).__name__}')
+            raise ModelError('a binding key must be a str or Relation, not {}'.format(type(binding_key).__name__))
         binding = self._data.get(binding_key)
         if binding is None:
             binding = Binding(binding_name, relation_id, self._backend)
