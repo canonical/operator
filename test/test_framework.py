@@ -786,6 +786,8 @@ class TestStoredState(unittest.TestCase):
         obj.state.foo = 41
         obj.state.foo = 42
         obj.state.bar = "s"
+        obj.state.baz = 4.2
+        obj.state.bing = True
 
         self.assertEqual(obj.state.foo, 42)
 
@@ -801,6 +803,8 @@ class TestStoredState(unittest.TestCase):
         obj_copy = SomeObject(framework_copy, "1")
         self.assertEqual(obj_copy.state.foo, 42)
         self.assertEqual(obj_copy.state.bar, "s")
+        self.assertEqual(obj_copy.state.baz, 4.2)
+        self.assertEqual(obj_copy.state.bing, True)
 
     def test_mutable_types_invalid(self):
         framework = self.create_framework()
@@ -814,7 +818,7 @@ class TestStoredState(unittest.TestCase):
                 pass
             obj.state.foo = CustomObject()
         except AttributeError as e:
-            self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/dict/list/etc")
+            self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/float/dict/list/etc")
         else:
             self.fail('AttributeError not raised')
 
