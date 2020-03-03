@@ -61,7 +61,8 @@ class Charm(CharmBase):
         self._state['on_log_info_action'] = []
         self._state['on_log_debug_action'] = []
 
-        # Observed event types per invocation. A list is used to preserve the order in which charm handlers have observed the events.
+        # Observed event types per invocation. A list is used to preserve the
+        # order in which charm handlers have observed the events.
         self._state['observed_event_types'] = []
 
         self.framework.observe(self.on.install, self)
@@ -134,7 +135,8 @@ class Charm(CharmBase):
     def on_mon_relation_changed(self, event):
         assert event.app is not None, 'application name cannot be None for a relation-changed event'
         if os.environ.get('JUJU_REMOTE_UNIT'):
-            assert event.unit is not None, 'a unit name cannot be None for a relation-changed event associated with a remote unit'
+            assert event.unit is not None, \
+                'a unit name cannot be None for a relation-changed event associated with a remote unit'
         self._state['on_mon_relation_changed'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['mon_relation_changed_data'] = event.snapshot()

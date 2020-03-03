@@ -54,7 +54,19 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids',
                     """[ "$1" = db2 ] && echo '["db2:5", "db2:6"]' || echo '[]'""")
         fake_script(self, 'relation-list',
-                    """([ "$2" = 5 ] && echo '["remoteapp1/0", "remoteapp1/1"]') || ([ "$2" = 6 ] && echo '["remoteapp2/0"]') || exit 2""")
+                    """
+case "$2" in
+    5)
+        echo '["remoteapp1/0", "remoteapp1/1"]'
+        ;;
+    6)
+        echo '["remoteapp2/0"]'
+        ;;
+    *)
+        exit 2
+    ;;
+esac
+""")
 
         for relation in self.model.relations['db2']:
             self.assertIn(self.model.unit, relation.data)
@@ -137,7 +149,13 @@ class TestModel(unittest.TestCase):
     def test_unit_relation_data(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
-        fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]) && echo '{"host": "remoteapp1-0"}' || exit 2""")
+        fake_script(self, 'relation-get', """
+if [ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]; then
+    echo '{"host": "remoteapp1-0"}'
+else
+    exit 2
+fi
+""")
 
         random_unit = self.model._cache.get(ops.model.Unit, 'randomunit/0')
         with self.assertRaises(KeyError):
@@ -154,7 +172,13 @@ class TestModel(unittest.TestCase):
     def test_remote_app_relation_data(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
-        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = remoteapp1 ] && echo '{"secret": "cafedeadbeef"}' || exit 2""")
+        fake_script(self, 'relation-get', """
+if [ "$2" = 4 ] && [ "$4" = remoteapp1 ]; then
+    echo '{"secret": "cafedeadbeef"}'
+else
+    exit 2
+fi
+""")
 
         # Try to get relation data for an invalid remote application.
         random_app = self.model._cache.get(ops.model.Application, 'randomapp')
@@ -173,7 +197,13 @@ class TestModel(unittest.TestCase):
     def test_relation_data_modify_remote(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
-        fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]) && echo '{"host": "remoteapp1-0"}' || exit 2""")
+        fake_script(self, 'relation-get', """
+if [ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]; then
+    echo '{"host": "remoteapp1-0"}'
+else
+    exit 2
+fi
+""")
 
         rel_db1 = self.model.get_relation('db1')
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
@@ -211,7 +241,13 @@ class TestModel(unittest.TestCase):
     def test_app_relation_data_modify_local_as_leader(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
-        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
+        fake_script(self, 'relation-get', """
+if [ "$2" = 4 ] && [ "$4" = myapp ]; then
+    echo '{"password": "deadbeefcafe"}'
+else
+    exit 2
+fi
+""")
         fake_script(self, 'relation-set', """[ "$2" = 4 ] && exit 0 || exit 2""")
         fake_script(self, 'is-leader', 'echo true')
 
@@ -235,7 +271,13 @@ class TestModel(unittest.TestCase):
     def test_app_relation_data_modify_local_as_minion(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
-        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
+        fake_script(self, 'relation-get', """
+if [ "$2" = 4 ] && [ "$4" = myapp ]; then
+    echo '{"password": "deadbeefcafe"}'
+else
+    exit 2
+fi
+""")
         fake_script(self, 'is-leader', 'echo false')
 
         local_app = self.model.unit.app
@@ -471,19 +513,23 @@ class TestModel(unittest.TestCase):
         test_cases = [(
             ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
+            lambda: self.assertEqual(fake_script_calls(self, True),
+                                     [['status-set', '--application=False', 'active', 'Green']]),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'maintenance', 'Yellow']]),
+            lambda: self.assertEqual(fake_script_calls(self, True),
+                                     [['status-set', '--application=False', 'maintenance', 'Yellow']]),
         ), (
             ops.model.BlockedStatus('Red'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'blocked', 'Red']]),
+            lambda: self.assertEqual(fake_script_calls(self, True),
+                                     [['status-set', '--application=False', 'blocked', 'Red']]),
         ), (
             ops.model.WaitingStatus('White'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'waiting', 'White']]),
+            lambda: self.assertEqual(fake_script_calls(self, True),
+                                     [['status-set', '--application=False', 'waiting', 'White']]),
         )]
 
         for target_status, setup_tools, check_tool_calls in test_cases:
@@ -504,7 +550,8 @@ class TestModel(unittest.TestCase):
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'], fake_script_calls(self, True)),
+            lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'],
+                                  fake_script_calls(self, True)),
         ), (
             ops.model.BlockedStatus('Red'),
             lambda: fake_script(self, 'status-set', 'exit 0'),

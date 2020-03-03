@@ -1024,7 +1024,8 @@ class TestStoredState(unittest.TestCase):
 
             validate_op(obj_copy2.state.a, expected_res)
 
-            # Commit saves the pre-commit and commit events, and the framework event counter, but shouldn't update the stored state of my object
+            # Commit saves the pre-commit and commit events, and the framework
+            # event counter, but shouldn't update the stored state of my object
             framework.snapshots.clear()
             framework_copy.commit()
             self.assertEqual(framework_copy.snapshots, [])

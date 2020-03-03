@@ -302,17 +302,23 @@ class EventsBase(Object):
     def define_event(cls, event_kind, event_type):
         """Define an event on this type at runtime.
 
-        cls -- a type to define an event on.
-        event_kind -- an attribute name that will be used to access the event. Must be a valid python identifier, not be a keyword or an existing attribute.
-        event_type -- a type of the event to define.
+        cls: a type to define an event on.
+
+        event_kind: an attribute name that will be used to access the
+                    event. Must be a valid python identifier, not be a keyword
+                    or an existing attribute.
+
+        event_type: a type of the event to define.
+
         """
+        pfx = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
-            raise RuntimeError('unable to define an event with event_kind that is not a valid python identifier: {}'.format(event_kind))
+            raise RuntimeError(pfx + 'is not a valid python identifier: ' + event_kind)
         elif keyword.iskeyword(event_kind):
-            raise RuntimeError('unable to define an event with event_kind that is a python keyword: {}'.format(event_kind))
+            raise RuntimeError(pfx + 'is a python keyword: ' + event_kind)
         try:
             getattr(cls, event_kind)
-            raise RuntimeError('unable to define an event with event_kind that overlaps with an existing type {} attribute: {}'.format(cls, event_kind))
+            raise RuntimeError(pfx + 'overlaps with an existing type {} attribute: {}'.format(cls, event_kind))
         except AttributeError:
             pass
 
@@ -385,7 +391,8 @@ class SQLiteStorage:
     DB_LOCK_TIMEOUT = timedelta(hours=1)
 
     def __init__(self, filename):
-        # The isolation_level argument is set to None such that the implicit transaction management behavior of the sqlite3 module is disabled.
+        # The isolation_level argument is set to None such that the implicit
+        # transaction management behavior of the sqlite3 module is disabled.
         self._db = sqlite3.connect(str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT.total_seconds())
         self._setup()
 
@@ -398,7 +405,11 @@ class SQLiteStorage:
             # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
             self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)")
-            self._db.execute("CREATE TABLE notice (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_path TEXT, observer_path TEXT, method_name TEXT)")
+            self._db.execute("CREATE TABLE notice ("
+                             " sequence INTEGER PRIMARY KEY AUTOINCREMENT,"
+                             " event_path TEXT,"
+                             " observer_path TEXT,"
+                             " method_name TEXT)")
             self._db.commit()
 
     def close(self):
@@ -431,13 +442,15 @@ class SQLiteStorage:
         self._db.execute("INSERT INTO notice VALUES (NULL, ?, ?, ?)", (event_path, observer_path, method_name))
 
     def drop_notice(self, event_path, observer_path, method_name):
-        self._db.execute("DELETE FROM notice WHERE event_path=? AND observer_path=? AND method_name=?", (event_path, observer_path, method_name))
+        self._db.execute("DELETE FROM notice WHERE event_path=? AND observer_path=? AND method_name=?",
+                         (event_path, observer_path, method_name))
 
     def notices(self, event_path):
+        pfx = "SELECT event_path, observer_path, method_name FROM notice "
         if event_path:
-            c = self._db.execute("SELECT event_path, observer_path, method_name FROM notice WHERE event_path=? ORDER BY sequence", (event_path,))
+            c = self._db.execute(pfx + "WHERE event_path=? ORDER BY sequence", (event_path,))
         else:
-            c = self._db.execute("SELECT event_path, observer_path, method_name FROM notice ORDER BY sequence")
+            c = self._db.execute(pfx + "ORDER BY sequence")
         while True:
             rows = c.fetchmany()
             if not rows:
@@ -597,7 +610,8 @@ class Framework(Object):
         else:
             method_name = "on_" + event_kind
             if not hasattr(observer, method_name):
-                raise RuntimeError('Observer method not provided explicitly and {} type has no "{}" method'.format(type(observer).__name__, method_name))
+                raise RuntimeError('Observer method not provided explicitly and {} type has no "{}" method'.format(
+                    type(observer).__name__, method_name))
 
         # Validate that the method has an acceptable call signature.
         sig = inspect.signature(getattr(observer, method_name))
@@ -630,7 +644,8 @@ class Framework(Object):
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent_path = event.handle.parent.path
-        # TODO Track observers by (parent_path, event_kind) rather than as a list of all observers. Avoiding linear search through all observers for every event
+        # TODO Track observers by (parent_path, event_kind) rather than as a list of
+        # all observers. Avoiding linear search through all observers for every event
         for observer_path, method_name, _parent_path, _event_kind in self._observers:
             if _parent_path != parent_path:
                 continue
@@ -758,7 +773,8 @@ class BoundStoredState:
         value = _unwrap_stored(self._data, value)
 
         if not isinstance(value, (type(None), int, float, str, bytes, list, dict, set)):
-            raise AttributeError("attribute '{}' cannot be set to {}: must be int/float/dict/list/etc".format(key, type(value).__name__))
+            raise AttributeError("attribute '{}' cannot be set to {}: must be int/float/dict/list/etc".format(
+                key, type(value).__name__))
 
         self._data[key] = _unwrap_stored(self._data, value)
         self.on.changed.emit()
@@ -791,7 +807,8 @@ class StoredState:
                 if attr_value is self:
                     if self.attr_name and attr_name != self.attr_name:
                         parent_tname = parent_type.__name__
-                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(parent_tname, self.attr_name, parent_tname, attr_name))
+                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(
+                            parent_tname, self.attr_name, parent_tname, attr_name))
                     self.attr_name = attr_name
                     bound = BoundStoredState(parent, attr_name)
                     parent.__dict__[attr_name] = bound

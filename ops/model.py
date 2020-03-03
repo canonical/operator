@@ -653,7 +653,11 @@ class ModelBackend:
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         try:
-            return self._run('relation-get', '-r', str(relation_id), '-', member_name, '--app={}'.format(is_app), return_output=True, use_json=True)
+            return self._run('relation-get',
+                             '-r', str(relation_id),
+                             '-', member_name,
+                             '--app={}'.format(is_app),
+                             return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
