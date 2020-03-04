@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-test: lint
+ENV = $(CURDIR)/env
+PYTHON3 = $(ENV)/bin/python3
+
+test: $(ENV) lint
 	@python3 -m unittest
 
 lint: quotelint check-copyright
-	@autopep8 -r --aggressive --diff --exit-code .
-	@flake8 --config=.flake8
+	${PYTHON3} -m autopep8 -r --aggressive --diff --exit-code ops test
+	${PYTHON3} -m flake8 --config=.flake8 ops test
 
 quotelint:
-	@x=$$(grep -rnH --include \*.py "\\\\[\"']" .);                       \
+	@x=$$(grep -rnH --include \*.py "\\\\[\"']" ops test);                       \
 	if [ "$$x" ]; then                                                    \
 		echo "Please fix the quoting to avoid spurious backslashes:"; \
 		echo "$$x";                                                   \
@@ -28,14 +31,18 @@ quotelint:
 	fi >&2
 
 check-copyright:
-	@x=$$(find . -name \*.py -not -empty -type f -print0 | xargs -0 grep -L "^# Copyright"); \
+	@x=$$(find ops test -name \*.py -not -empty -type f -print0 | xargs -0 grep -L "^# Copyright"); \
 	if [ "$$x" ]; then                                                                       \
 		echo "Please add copyright headers to the following files:";                     \
 		echo "$$x";                                                                      \
 		exit 1;                                                                          \
 	fi >&2
 
+$(ENV):
+	virtualenv $(ENV) --python=python3
+	${PYTHON3} -m pip install -r requirements.txt
 
-
+clean:
+	rm -rf $(ENV)
 
 .PHONY: lint test quotelint check-copyright
