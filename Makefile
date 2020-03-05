@@ -39,8 +39,8 @@ check-copyright:
 	fi >&2
 
 $(ENV):
-	virtualenv $(ENV) --python=python3
-	${PYTHON3} -m pip install -r requirements.txt
+	python3 -m venv $(ENV)
+	${PYTHON3} -m pip install -r requirements-test.txt
 
 clean:
 	rm -rf $(ENV)

@@ -1,3 +1,2 @@
-autopep8
-flake8
+setuptools  # needed by PyYAML 
 PyYAML
