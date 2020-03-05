@@ -13,6 +13,10 @@ for early testing.
 
 ## Introduction
 
+## Charm Creation Quick Start
+
+There are currently two types of charm, IAAS charms and Kubernetes (K8s) charms.
+
 ### Juju and Charms
 
 The Charm Operator Framework is the companion to [Juju](https://jaas.ai/docs/what-is-juju) charms are the workers, and juju is the orchestrator, together they encapsulate the complexity of Day zero through to day three operations away from the user making infrastructure as a code a reality.
@@ -23,9 +27,6 @@ Here is a diagram of how juju and charms work together:
 
 ![Juju and charms](./diagrams/juju_charms.png)
 
-## Charm Creation Quick Start
-
-There are currently two types of Charm, IAAS charms and Kubernetes (K8s) charms.
 
 ### Creating your first charm
 
