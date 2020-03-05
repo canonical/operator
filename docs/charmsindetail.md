@@ -281,11 +281,13 @@ TODO
 
 ## Migrating from the old (reactive) framework
 
-TODO
+For the most part and charm code you write in the old framework may more or less be portable to the new Framework.
+
+
 
 ## Testing
 
-Please find the testing guide [here](./Testing.md)
+Please find the testing guide [here](./testing.md)
 
 # Useful links
 
