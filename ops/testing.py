@@ -38,9 +38,12 @@ def create_harness(charm_cls, charm_meta_yaml):
         you can pass in ops.charm.CharmBase.
     :rtype charm_cls: CharmBase
     :param charm_meta_yaml: The YAML metadata for the charm, defining interfaces, name, etc.
+        This can be either a string or a file.
     :return: (charm, harness)
     :rtype: (CharmBase, TestingHarness)
     """
+    # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
+    #  it would define the default values of config that the charm would see.
     if isinstance(charm_meta_yaml, str):
         charm_meta_yaml = dedent(charm_meta_yaml)
     meta = charm.CharmMeta.from_yaml(charm_meta_yaml)
@@ -160,6 +163,22 @@ class TestingHarness:
             #  juju itself always triggers relation_changed immediately after relation_joined
             self._charm.on[relation_name].relation_changed.emit(relation, remote_unit.app, remote_unit)
 
+    def read_relation_data(self, relation_id, app_or_unit):
+        """Read the relation data bucket for a single app or unit in a given relation.
+
+        This ignores all of the safety checks of who can and can't see data in relations (eg, non leaders can't read
+        their own application's relation data because there are no events that keep that data up-to-date for the unit).
+
+        :param relation_id: The relation whose content we want to look at.
+        :type relation_id: int
+        :param app_or_unit: The name of the application or unit whose data we want to read
+        :type app_or_unit: str
+        :return: a dict containing the relation data for `app_or_unit` or None.
+        :rtype: dict
+        :raises: KeyError if relation_id doesn't exist
+        """
+        return self._backend._relation_data[relation_id].get(app_or_unit, None)
+
     def update_relation_data(self, relation_id, app_or_unit, key_values):
         """Update the relation data for a given unit or application in a given relation.
 
@@ -190,6 +209,7 @@ class TestingHarness:
             if rel_data is not None:
                 # If we have read and cached this data, make sure we invalidate it
                 rel_data._invalidate()
+            # TODO: we only need to trigger relation_changed if it is a remote app or unit
             self._trigger_relation_changed(relation_id, app_or_unit)
 
     def _trigger_relation_changed(self, relation_id, app_or_unit):
