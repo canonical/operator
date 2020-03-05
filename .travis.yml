@@ -17,5 +17,8 @@ matrix:
         - os: osx
           language: generic
 
+install:
+    - pip3 install -r requirements-test.txt
+
 script:
-    - make test
+    - make raw-test

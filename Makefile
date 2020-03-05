@@ -15,7 +15,9 @@
 ENV = $(CURDIR)/env
 PYTHON3 = $(ENV)/bin/python3
 
-test: $(ENV) lint
+test: $(ENV) raw-test
+
+raw-test: $(ENV) lint
 	@python3 -m unittest
 
 lint: quotelint check-copyright
