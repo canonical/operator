@@ -290,14 +290,12 @@ class Binding:
     @property
     def network(self):
         if self._network is None:
-            if self._relation_id is not None:
-                try:
-                    self._network = Network(self._backend.network_get(self.name, self._relation_id))
-                except RelationNotFoundError:
-                    # If a relation is dead, we can still get network info associated with an endpoint itself
-                    # not associated with a particular relation id.
-                    self._network = Network(self._backend.network_get(self.name))
-            else:
+            try:
+                self._network = Network(self._backend.network_get(self.name, self._relation_id))
+            except RelationNotFoundError:
+                if self._relation_id is None:
+                    raise
+                # If a relation is dead, we can still get network info associated with an endpoint itself
                 self._network = Network(self._backend.network_get(self.name))
         return self._network
 
