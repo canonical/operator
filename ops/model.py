@@ -32,7 +32,7 @@ from subprocess import run, PIPE, CalledProcessError
 class Model:
 
     def __init__(self, unit_name, meta, backend):
-        self._cache = ModelCache(backend)
+        self._cache = _ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(unit_name)
         self.app = self.unit.app
@@ -65,7 +65,7 @@ class Model:
         return self._bindings.get(relation)
 
 
-class ModelCache:
+class _ModelCache:
 
     def __init__(self, backend):
         self._backend = backend
