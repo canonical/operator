@@ -19,11 +19,11 @@ test: $(ENV) lint
 	@python3 -m unittest
 
 lint: quotelint check-copyright
-	${PYTHON3} -m autopep8 -r --aggressive --diff --exit-code ops test
-	${PYTHON3} -m flake8 --config=.flake8 ops test
+	${PYTHON3} -m autopep8 -r --aggressive --diff --exit-code --exclude env .
+	${PYTHON3} -m flake8 --config=.flake8 --exclude env .
 
 quotelint:
-	@x=$$(grep -rnH --include \*.py "\\\\[\"']" ops test);                       \
+	@x=$$(grep -rnH --include \*.py "\\\\[\"']" --exclude-dir env .);                       \
 	if [ "$$x" ]; then                                                    \
 		echo "Please fix the quoting to avoid spurious backslashes:"; \
 		echo "$$x";                                                   \
@@ -31,7 +31,7 @@ quotelint:
 	fi >&2
 
 check-copyright:
-	@x=$$(find ops test -name \*.py -not -empty -type f -print0 | xargs -0 grep -L "^# Copyright"); \
+	@x=$$(find . -name env -prune -o -name \*.py -not -empty -type f -print0 | xargs -0 grep -L "^# Copyright"); \
 	if [ "$$x" ]; then                                                                       \
 		echo "Please add copyright headers to the following files:";                     \
 		echo "$$x";                                                                      \
