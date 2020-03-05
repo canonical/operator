@@ -1059,7 +1059,7 @@ class TestLazyMapping(unittest.TestCase):
         self.assertEqual(loaded, [1])
         self.assertEqual(map['foo'], 'bar')
         self.assertEqual(loaded, [1])
-        map.invalidate()
+        map._invalidate()
         self.assertEqual(map['foo'], 'bar')
         self.assertEqual(loaded, [1, 1])
 

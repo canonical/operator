@@ -185,7 +185,7 @@ class LazyMapping(Mapping, ABC):
             data = self._lazy_data = self._load()
         return data
 
-    def invalidate(self):
+    def _invalidate(self):
         self._lazy_data = None
 
     def __contains__(self, key):
@@ -233,7 +233,7 @@ class RelationMapping(Mapping):
                 relation_list.append(relation)
         return relation_list
 
-    def invalidate(self, relation_name):
+    def _invalidate(self, relation_name):
         self._data[relation_name] = None
 
     def _get_unique(self, relation_name, relation_id=None):
