@@ -157,7 +157,9 @@ class TestFramework(unittest.TestCase):
         try:
             framework.observe(pub.baz, obs)
         except RuntimeError as e:
-            self.assertEqual(str(e), 'Observer method not provided explicitly and MyObserver type has no "on_baz" method')
+            self.assertEqual(str(e),
+                             'Observer method not provided explicitly'
+                             ' and MyObserver type has no "on_baz" method')
         else:
             self.fail("RuntimeError not raised")
 
@@ -816,7 +818,9 @@ class TestStoredState(unittest.TestCase):
                 pass
             obj.state.foo = CustomObject()
         except AttributeError as e:
-            self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/float/dict/list/etc")
+            self.assertEqual(
+                str(e),
+                "attribute 'foo' cannot be a CustomObject: must be int/float/dict/list/etc")
         else:
             self.fail('AttributeError not raised')
 
@@ -824,7 +828,8 @@ class TestStoredState(unittest.TestCase):
 
     def test_mutable_types(self):
         # Test and validation functions in a list of 2-tuples.
-        # Assignment and keywords like del are not supported in lambdas so functions are used instead.
+        # Assignment and keywords like del are not supported in lambdas
+        #  so functions are used instead.
         test_operations = [(
             lambda: {},         # Operand A.
             None,               # Operand B.
@@ -1155,13 +1160,17 @@ class TestStoredState(unittest.TestCase):
 
         framework = self.create_framework()
 
-        # Validate that operations between StoredSet and built-in sets only result in built-in sets being returned.
-        # Make sure that commutativity is preserved and that the original sets are not changed or used as a result.
+        # Validate that operations between StoredSet and built-in sets
+        # only result in built-in sets being returned.
+        # Make sure that commutativity is preserved and that the
+        # original sets are not changed or used as a result.
         for i, (variable_operand, operation, ab_res, ba_res) in enumerate(test_operations):
             obj = SomeObject(framework, str(i))
             obj.state.set = {"a", "b"}
 
-            for a, b, expected in [(obj.state.set, variable_operand, ab_res), (variable_operand, obj.state.set, ba_res)]:
+            for a, b, expected in [
+                    (obj.state.set, variable_operand, ab_res),
+                    (variable_operand, obj.state.set, ba_res)]:
                 old_a = set(a)
                 old_b = set(b)
 

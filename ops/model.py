@@ -107,7 +107,9 @@ class Application:
     @status.setter
     def status(self, value):
         if not isinstance(value, StatusBase):
-            raise InvalidStatusError('invalid value provided for application {} status: {}'.format(self, value))
+            raise InvalidStatusError(
+                'invalid value provided for application {} status: {}'.format(self, value)
+            )
 
         if not self._is_our_app:
             raise RuntimeError('cannot to set status for a remote application {}'.format(self))
@@ -150,7 +152,9 @@ class Unit:
     @status.setter
     def status(self, value):
         if not isinstance(value, StatusBase):
-            raise InvalidStatusError('invalid value provided for unit {} status: {}'.format(self, value))
+            raise InvalidStatusError(
+                'invalid value provided for unit {} status: {}'.format(self, value)
+            )
 
         if not self._is_our_unit:
             raise RuntimeError('cannot set status for a remote unit {}'.format(self))
@@ -167,7 +171,9 @@ class Unit:
             # of a hook execution.
             return self._backend.is_leader()
         else:
-            raise RuntimeError("cannot determine leadership status for remote applications: {}".format(self))
+            raise RuntimeError(
+                'cannot determine leadership status for remote applications: {}'.format(self)
+            )
 
 
 class LazyMapping(Mapping, ABC):
@@ -226,21 +232,25 @@ class RelationMapping(Mapping):
         if relation_list is None:
             relation_list = self._data[relation_name] = []
             for rid in self._backend.relation_ids(relation_name):
-                relation = Relation(relation_name, rid, is_peer, self._our_unit, self._backend, self._cache)
+                relation = Relation(relation_name, rid, is_peer,
+                                    self._our_unit, self._backend, self._cache)
                 relation_list.append(relation)
         return relation_list
 
     def _get_unique(self, relation_name, relation_id=None):
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError('relation id {} must be int or None not {}'.format(relation_id, type(relation_id).__name__))
+                raise ModelError('relation id {} must be int or None not {}'.format(
+                    relation_id,
+                    type(relation_id).__name__))
             for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
             else:
                 # The relation may be dead, but it is not forgotten.
                 is_peer = relation_name in self._peers
-                return Relation(relation_name, relation_id, is_peer, self._our_unit, self._backend, self._cache)
+                return Relation(relation_name, relation_id, is_peer,
+                                self._our_unit, self._backend, self._cache)
         num_related = len(self[relation_name])
         if num_related == 0:
             return None
@@ -288,7 +298,8 @@ class Network:
 
     def __init__(self, network_info):
         self.interfaces = []
-        # Treat multiple addresses on an interface as multiple logical interfaces with the same name.
+        # Treat multiple addresses on an interface as multiple logical
+        # interfaces with the same name.
         for interface_info in network_info['bind-addresses']:
             interface_name = interface_info['interface-name']
             for address_info in interface_info['addresses']:
@@ -317,7 +328,8 @@ class NetworkInterface:
         self.address = ipaddress.ip_address(address_info['value'])
         cidr = address_info['cidr']
         if not cidr:
-            # The cidr field may be empty, see LP: #1864102. In this case, make it a /32 or /128 IP network.
+            # The cidr field may be empty, see LP: #1864102.
+            # In this case, make it a /32 or /128 IP network.
             self.subnet = ipaddress.ip_network(address_info['value'])
         else:
             self.subnet = ipaddress.ip_network(cidr)
@@ -346,18 +358,27 @@ class Relation:
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
-        return '<{}.{} {}:{}>'.format(type(self).__module__, type(self).__name__, self.name, self.id)
+        return '<{}.{} {}:{}>'.format(type(self).__module__,
+                                      type(self).__name__,
+                                      self.name,
+                                      self.id)
 
 
 class RelationData(Mapping):
     def __init__(self, relation, our_unit, backend):
         self.relation = weakref.proxy(relation)
-        self._data = {our_unit: RelationDataContent(self.relation, our_unit, backend)}
-        self._data.update({our_unit.app: RelationDataContent(self.relation, our_unit.app, backend)})
-        self._data.update({unit: RelationDataContent(self.relation, unit, backend) for unit in self.relation.units})
+        self._data = {
+            our_unit: RelationDataContent(self.relation, our_unit, backend),
+            our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
+        }
+        self._data.update({
+            unit: RelationDataContent(self.relation, unit, backend)
+            for unit in self.relation.units})
         # The relation might be dead so avoid a None key here.
-        if self.relation.app:
-            self._data.update({self.relation.app: RelationDataContent(self.relation, self.relation.app, backend)})
+        if self.relation.app is not None:
+            self._data.update({
+                self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
+            })
 
     def __contains__(self, key):
         return key in self._data
@@ -394,8 +415,9 @@ class RelationDataContent(LazyMapping, MutableMapping):
             is_our_app = self._backend.app_name == self._entity.name
             if not is_our_app:
                 return False
-            # Whether the application data bag is mutable or not depends on whether this unit is a leader or not,
-            # but this is not guaranteed to be always true during the same hook execution.
+            # Whether the application data bag is mutable or not depends on
+            # whether this unit is a leader or not, but this is not guaranteed
+            # to be always true during the same hook execution.
             return self._backend.is_leader()
         else:
             is_our_unit = self._backend.unit_name == self._entity.name
@@ -414,15 +436,15 @@ class RelationDataContent(LazyMapping, MutableMapping):
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
-                # Match the behavior of Juju, which is that setting the value to an empty string will
-                # remove the key entirely from the relation data.
+                # Match the behavior of Juju, which is that setting the value to an
+                # empty string will remove the key entirely from the relation data.
                 del self._data[key]
             else:
                 self._data[key] = value
 
     def __delitem__(self, key):
-        # Match the behavior of Juju, which is that setting the value to an empty string will
-        # remove the key entirely from the relation data.
+        # Match the behavior of Juju, which is that setting the value to an empty
+        # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
 
 
@@ -476,8 +498,10 @@ class BlockedStatus(StatusBase):
 class MaintenanceStatus(StatusBase):
     """The unit is performing maintenance tasks.
 
-    The unit is not yet providing services, but is actively doing work in preparation for providing those services.
-    This is a "spinning" state, not an error state. It reflects activity on the unit itself, not on peers or related units.
+    The unit is not yet providing services, but is actively doing work in preparation
+    for providing those services.  This is a "spinning" state, not an error state. It
+    reflects activity on the unit itself, not on peers or related units.
+
     """
     name = 'maintenance'
 
@@ -485,7 +509,9 @@ class MaintenanceStatus(StatusBase):
 class UnknownStatus(StatusBase):
     """The unit status is unknown.
 
-    A unit-agent has finished calling install, config-changed and start, but the charm has not called status-set yet.
+    A unit-agent has finished calling install, config-changed and start, but the
+    charm has not called status-set yet.
+
     """
     name = 'unknown'
 
@@ -497,7 +523,9 @@ class UnknownStatus(StatusBase):
 class WaitingStatus(StatusBase):
     """A unit is unable to progress.
 
-    The unit is unable to progress to an active state because an application to which it is related is not running.
+    The unit is unable to progress to an active state because an application to which
+    it is related is not running.
+
     """
     name = 'waiting'
 
@@ -564,7 +592,8 @@ class StorageMapping(Mapping):
         via <storage-name>-storage-attached events when it becomes available.
         """
         if storage_name not in self._storage_map:
-            raise ModelError('cannot add storage with {} as it is not present in the charm metadata'.format(storage_name))
+            raise ModelError(('cannot add storage {!r}:'
+                              ' it is not present in the charm metadata').format(storage_name))
         self._backend.storage_add(storage_name, count)
 
 
@@ -579,7 +608,8 @@ class Storage:
     @property
     def location(self):
         if self._location is None:
-            self._location = Path(self._backend.storage_get('{}/{}'.format(self.name, self.id), "location"))
+            raw = self._backend.storage_get('{}/{}'.format(self.name, self.id), "location")
+            self._location = Path(raw)
         return self._location
 
 
@@ -589,7 +619,8 @@ class ModelError(Exception):
 
 class TooManyRelatedAppsError(ModelError):
     def __init__(self, relation_name, num_related, max_supported):
-        super().__init__('Too many remote applications on {} ({} > {})'.format(relation_name, num_related, max_supported))
+        super().__init__('Too many remote applications on {} ({} > {})'.format(
+            relation_name, num_related, max_supported))
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
@@ -642,7 +673,8 @@ class ModelBackend:
 
     def relation_list(self, relation_id):
         try:
-            return self._run('relation-list', '-r', str(relation_id), return_output=True, use_json=True)
+            return self._run('relation-list', '-r', str(relation_id),
+                             return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
@@ -653,10 +685,8 @@ class ModelBackend:
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         try:
-            return self._run('relation-get',
-                             '-r', str(relation_id),
-                             '-', member_name,
-                             '--app={}'.format(is_app),
+            return self._run('relation-get', '-r', str(relation_id),
+                             '-', member_name, '--app={}'.format(is_app),
                              return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
@@ -668,7 +698,8 @@ class ModelBackend:
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
         try:
-            return self._run('relation-set', '-r', str(relation_id), '{}={}'.format(key, value), '--app={}'.format(is_app))
+            return self._run('relation-set', '-r', str(relation_id),
+                             '{}={}'.format(key, value), '--app={}'.format(is_app))
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
@@ -715,27 +746,34 @@ class ModelBackend:
 
     def status_get(self, *, is_app=False):
         """Get a status of a unit or an application.
-        app -- A boolean indicating whether the status should be retrieved for a unit or an application.
+
+        app -- A boolean indicating whether the status should be retrieved for a unit
+               or an application.
         """
         return self._run('status-get', '--include-data', '--application={}'.format(is_app))
 
     def status_set(self, status, message='', *, is_app=False):
         """Set a status of a unit or an application.
-        app -- A boolean indicating whether the status should be set for a unit or an application.
+
+        app -- A boolean indicating whether the status should be set for a unit or an
+               application.
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
         return self._run('status-set', '--application={}'.format(is_app), status, message)
 
     def storage_list(self, name):
-        return [int(s.split('/')[1]) for s in self._run('storage-list', name, return_output=True, use_json=True)]
+        return [int(s.split('/')[1]) for s in self._run('storage-list', name,
+                                                        return_output=True, use_json=True)]
 
     def storage_get(self, storage_name_id, attribute):
-        return self._run('storage-get', '-s', storage_name_id, attribute, return_output=True, use_json=True)
+        return self._run('storage-get', '-s', storage_name_id, attribute,
+                         return_output=True, use_json=True)
 
     def storage_add(self, name, count=1):
         if not isinstance(count, int) or isinstance(count, bool):
-            raise TypeError('storage count must be integer, got: {} ({})'.format(count, type(count)))
+            raise TypeError('storage count must be integer, got: {} ({})'.format(count,
+                                                                                 type(count)))
         self._run('storage-add', '{}={}'.format(name, count))
 
     def action_get(self):
@@ -797,28 +835,38 @@ class _ModelBackendValidator:
     @classmethod
     def validate_metric_key(cls, key):
         if cls.METRIC_KEY_REGEX.match(key) is None:
-            raise ModelError('invalid metric key {!r}: must match {}'.format(key, cls.METRIC_KEY_REGEX.pattern))
+            raise ModelError(
+                'invalid metric key {!r}: must match {}'.format(
+                    key, cls.METRIC_KEY_REGEX.pattern))
 
     @classmethod
     def validate_metric_label(cls, label_name):
         if cls.METRIC_KEY_REGEX.match(label_name) is None:
-            raise ModelError('invalid metric label name {!r}: must match {}'.format(label_name, cls.METRIC_KEY_REGEX.pattern))
+            raise ModelError(
+                'invalid metric label name {!r}: must match {}'.format(
+                    label_name, cls.METRIC_KEY_REGEX.pattern))
 
     @classmethod
     def format_metric_value(cls, value):
         try:
             decimal_value = decimal.Decimal.from_float(value)
         except TypeError as e:
-            raise ModelError('invalid metric value {!r} provided: must be a positive finite float'.format(value)) from e
+            e2 = ModelError(
+                'invalid metric value {!r} provided: must be a positive finite float'.format(value))
+            raise e2 from e
         if decimal_value.is_nan() or decimal_value.is_infinite() or decimal_value < 0:
-            raise ModelError('invalid metric value {!r} provided: must be a positive finite float'.format(value))
+            raise ModelError(
+                'invalid metric value {!r} provided: must be a positive finite float'.format(value))
         return str(decimal_value)
 
     @classmethod
     def validate_label_value(cls, label, value):
-        # Label values cannot be empty, contain commas or equal signs as those are used by add-metric as separators.
+        # Label values cannot be empty, contain commas or equal signs as those are
+        # used by add-metric as separators.
         if not value:
-            raise ModelError('metric label {} has an empty value, which is not allowed'.format(label))
+            raise ModelError(
+                'metric label {} has an empty value, which is not allowed'.format(label))
         v = str(value)
         if re.search('[,=]', v) is not None:
-            raise ModelError('metric label values must not contain "," or "=": {}={!r}'.format(label, value))
+            raise ModelError(
+                'metric label values must not contain "," or "=": {}={!r}'.format(label, value))

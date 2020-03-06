@@ -51,13 +51,12 @@ class JujuVersion:
 
     """
 
-    _matcher = re.compile(
-        r'''^
-            (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there
-            ((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))? # sometimes with .<patch> or -<tag><patch>
-            (\.(?P<build>\d{1,9}))?$                     # and sometimes with a <build> number.
-        ''',
-        re.VERBOSE).match
+    _matcher = re.compile(r'''^
+    (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there
+    ((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))? # sometimes with .<patch> or -<tag><patch>
+    (\.(?P<build>\d{1,9}))?$                     # and sometimes with a <build> number.
+                          ''',
+                          re.VERBOSE).match
 
     def __init__(self, version):
         # we could inherit from tuple (or namedtuple) but then again we'd have to
