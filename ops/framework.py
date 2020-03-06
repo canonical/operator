@@ -627,8 +627,9 @@ class Framework(Object):
             method_name = "on_" + event_kind
             if not hasattr(observer, method_name):
                 raise RuntimeError(
-                    'Observer method not provided explicitly and {} type has no "{}" method'.format(
-                        type(observer).__name__, method_name))
+                    'Observer method not provided explicitly'
+                    ' and {} type has no {!r} method'.format(type(observer).__name__,
+                                                             method_name))
 
         # Validate that the method has an acceptable call signature.
         sig = inspect.signature(getattr(observer, method_name))

@@ -49,7 +49,8 @@ from ops.charm import (
 
 from .test_helpers import fake_script, fake_script_calls
 
-# This relies on the expected repository structure to find a path to source of the charm under test.
+# This relies on the expected repository structure to find a path to
+# source of the charm under test.
 TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
 
 logger = logging.getLogger(__name__)
@@ -447,7 +448,8 @@ start:
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
         self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics',
                                        charm_config=charm_config))
-        self.assertEqual(fake_script_calls(self), [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
+        self.assertEqual(fake_script_calls(self),
+                         [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
 
     def test_logger(self):
         charm_config = base64.b64encode(pickle.dumps({

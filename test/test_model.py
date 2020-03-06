@@ -1131,7 +1131,8 @@ class TestModelBackend(unittest.TestCase):
         test_cases = [(
             OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
             OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
-            [['add-metric', '--labels', 'de=ad,be=ef_ -', 'foo=42', 'b-ar=4.5', 'ba_-z=4.5', 'a=1']]
+            [['add-metric', '--labels', 'de=ad,be=ef_ -',
+              'foo=42', 'b-ar=4.5', 'ba_-z=4.5', 'a=1']]
         ), (
             OrderedDict([('foo1', 0), ('b2r', 4.5)]),
             OrderedDict([('d3', 'aд'), ('b33f', '3_ -')]),

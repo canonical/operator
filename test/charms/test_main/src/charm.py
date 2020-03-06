@@ -133,7 +133,8 @@ class Charm(CharmBase):
         self._write_state()
 
     def on_mon_relation_changed(self, event):
-        assert event.app is not None, 'application name cannot be None for a relation-changed event'
+        assert event.app is not None, \
+            'application name cannot be None for a relation-changed event'
         if os.environ.get('JUJU_REMOTE_UNIT'):
             assert event.unit is not None, \
                 'a unit name cannot be None for a relation-changed event' \

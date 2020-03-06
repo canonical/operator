@@ -851,12 +851,12 @@ class _ModelBackendValidator:
         try:
             decimal_value = decimal.Decimal.from_float(value)
         except TypeError as e:
-            e2 = ModelError(
-                'invalid metric value {!r} provided: must be a positive finite float'.format(value))
+            e2 = ModelError('invalid metric value {!r} provided:'
+                            ' must be a positive finite float'.format(value))
             raise e2 from e
         if decimal_value.is_nan() or decimal_value.is_infinite() or decimal_value < 0:
-            raise ModelError(
-                'invalid metric value {!r} provided: must be a positive finite float'.format(value))
+            raise ModelError('invalid metric value {!r} provided:'
+                             ' must be a positive finite float'.format(value))
         return str(decimal_value)
 
     @classmethod
