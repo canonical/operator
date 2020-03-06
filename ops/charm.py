@@ -197,6 +197,22 @@ class CharmBase(Object):
             action_name = action_name.replace('-', '_')
             self.on.define_event(action_name + '_action', ActionEvent)
 
+    @property
+    def app(self):
+        return self.framework.model.app
+
+    @property
+    def unit(self):
+        return self.framework.model.unit
+
+    @property
+    def meta(self):
+        return self.framework.meta
+
+    @property
+    def charm_dir(self):
+        return self.framework.charm_dir
+
 
 class CharmMeta:
     """Object containing the metadata for the charm.

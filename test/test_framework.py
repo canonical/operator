@@ -739,8 +739,6 @@ class TestFramework(unittest.TestCase):
 
         my_obj = Object(framework, 'my_obj')
         self.assertEqual(my_obj.model, framework.model)
-        self.assertEqual(my_obj.meta, framework.meta)
-        self.assertEqual(my_obj.charm_dir, framework.charm_dir)
 
     def test_ban_concurrent_frameworks(self):
         f = self.create_framework()

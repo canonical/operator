@@ -268,14 +268,6 @@ class Object(metaclass=_Metaclass):
     def model(self):
         return self.framework.model
 
-    @property
-    def meta(self):
-        return self.framework.meta
-
-    @property
-    def charm_dir(self):
-        return self.framework.charm_dir
-
 
 class EventsBase(Object):
     """Convenience type to allow defining .on attributes at class level."""
