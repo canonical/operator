@@ -95,7 +95,7 @@ class TestingHarness:
 
     def _register_charm(self, charm):
         if self._charm is not None:
-            raise RuntimeError(f"registering charm {charm} while {self._charm} is already registered")
+            raise RuntimeError("registering charm {} while {} is already registered".format(charm, self._charm))
         self._charm = charm
 
     def _next_relation_id(self):
