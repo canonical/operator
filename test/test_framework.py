@@ -1205,8 +1205,8 @@ class TestStoredState(unittest.TestCase):
         parent.state.set_default(foo=5, bar=6)
         self.assertEqual(parent.state.foo, 1)
         self.assertEqual(parent.state.bar, 4)
-        # TODO(jam) 2020-01-30: is there a clean way to tell that
-        #                       parent.state._data.dirty is False?
+        # TODO: jam 2020-01-30 is there a clean way to tell that
+        #       parent.state._data.dirty is False?
 
 
 if __name__ == "__main__":

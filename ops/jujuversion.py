@@ -25,6 +25,9 @@ class _Tag:
     """
 
     def __init__(self, tag):
+        # we could inherit from str but then we'd have to implement
+        # all the rich comparison operations instead of relying on
+        # total_ordering
         self.tag = tag
 
     def __eq__(self, other):
@@ -44,7 +47,7 @@ class _Tag:
 class JujuVersion:
     """JujuVersion can be used to compare different Juju versions.
 
-    Juju uses some convetions for its versions which make comparing them
+    Juju uses some conventions for its versions which make comparing them
     slightly simpler than the generic version compare function you might find
     elsewhere (e.g. apt_pkg.version_compare). This class encapsulates the needed
     logic.

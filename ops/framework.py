@@ -403,11 +403,13 @@ class SQLiteStorage:
             # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
             self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)")
-            self._db.execute("CREATE TABLE notice ("
-                             " sequence INTEGER PRIMARY KEY AUTOINCREMENT,"
-                             " event_path TEXT,"
-                             " observer_path TEXT,"
-                             " method_name TEXT)")
+            self._db.execute('''
+                CREATE TABLE notice (
+                  sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                  event_path TEXT,
+                  observer_path TEXT,
+                  method_name TEXT)
+                ''')
             self._db.commit()
 
     def close(self):
@@ -455,13 +457,13 @@ class SQLiteStorage:
                   FROM notice
                  WHERE event_path=?
                  ORDER BY sequence
-            ''', (event_path,))
+                ''', (event_path,))
         else:
             c = self._db.execute('''
                 SELECT event_path, observer_path, method_name
                   FROM notice
                  ORDER BY sequence
-            ''')
+                ''')
         while True:
             rows = c.fetchmany()
             if not rows:
