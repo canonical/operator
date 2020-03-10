@@ -195,8 +195,8 @@ def main(charm_class):
         #
         # 'start' event is included as Juju does not fire the install event for
         # K8s charms (see LP: #1854635).
-        if juju_event_name in ('install', 'start', 'upgrade_charm') \
-                or juju_event_name.endswith('_storage_attached'):
+        if (juju_event_name in ('install', 'start', 'upgrade_charm')
+                or juju_event_name.endswith('_storage_attached')):
             _setup_event_links(charm_dir, charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant
