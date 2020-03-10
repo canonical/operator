@@ -33,6 +33,8 @@ jobs:
         fi >&2
     - name: lint for quote silliness
       run: |
+        printenv| sort
+        grep -rnH --include \*.py "\\\\[\"']" .
         x=$(grep -rnH --include \*.py "\\\\[\"']" .)
         if [ "$x" ]; then
             echo "Please fix the quoting to avoid spurious backslashes:"
