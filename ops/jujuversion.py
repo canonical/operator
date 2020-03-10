@@ -19,10 +19,14 @@ from functools import total_ordering
 @total_ordering
 class JujuVersion:
 
-    PATTERN = r'^(?P<major>\d{1,9})\.(?P<minor>\d{1,9})((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))?(\.(?P<build>\d{1,9}))?$'
+    PATTERN = r'''^
+    (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there
+    ((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))? # sometimes with .<patch> or -<tag><patch>
+    (\.(?P<build>\d{1,9}))?$                     # and sometimes with a <build> number.
+    '''
 
     def __init__(self, version):
-        m = re.match(self.PATTERN, version)
+        m = re.match(self.PATTERN, version, re.VERBOSE)
         if not m:
             raise RuntimeError('"{}" is not a valid Juju version string'.format(version))
 
@@ -49,8 +53,12 @@ class JujuVersion:
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
             raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
-        return self.major == other.major and self.minor == other.minor\
-            and self.tag == other.tag and self.build == other.build and self.patch == other.patch
+        return (
+            self.major == other.major
+            and self.minor == other.minor
+            and self.tag == other.tag
+            and self.build == other.build
+            and self.patch == other.patch)
 
     def __lt__(self, other):
         if self is other:
