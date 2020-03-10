@@ -25,23 +25,25 @@ lint: quotelint check-copyright
 	${PYTHON3} -m flake8 --config=.flake8 --exclude env .
 
 quotelint:
-	@x=$$(grep -rnH --include \*.py "\\\\[\"']" --exclude-dir env .);                       \
-	if [ "$$x" ]; then                                                    \
-		echo "Please fix the quoting to avoid spurious backslashes:"; \
-		echo "$$x";                                                   \
-		exit 1;                                                       \
+	@x=$$(grep -rnH --include \*.py "\\\\[\"']" --exclude-dir env .);			  \
+	if [ "$$x" ]; then									  \
+		echo "Please fix the quoting to avoid spurious backslashes:";			  \
+		echo "$$x";									  \
+		exit 1;										  \
 	fi >&2
 
 check-copyright:
-	@x=$$(find . -name env -prune -o -name \*.py -not -empty -type f -print0 | xargs -0 grep -L "^# Copyright"); \
-	if [ "$$x" ]; then                                                                       \
-		echo "Please add copyright headers to the following files:";                     \
-		echo "$$x";                                                                      \
-		exit 1;                                                                          \
+	@x=$$(find . -name env -prune -o -name \*.py -not -empty -type f -print0		  \
+		| xargs -0 grep -L "^# Copyright");						  \
+	if [ "$$x" ]; then									  \
+		echo "Please add copyright headers to the following files:";			  \
+		echo "$$x";									  \
+		exit 1;										  \
 	fi >&2
 
 $(ENV):
 	python3 -m venv $(ENV)
+	${PYTHON3} -m pip install wheel # this needs to be installed before requirements
 	${PYTHON3} -m pip install -r requirements-test.txt
 
 clean:
