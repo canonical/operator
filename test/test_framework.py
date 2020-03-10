@@ -157,9 +157,10 @@ class TestFramework(unittest.TestCase):
         try:
             framework.observe(pub.baz, obs)
         except RuntimeError as e:
-            self.assertEqual(str(e),
-                             'Observer method not provided explicitly'
-                             ' and MyObserver type has no "on_baz" method')
+            self.assertEqual(
+                str(e),
+                'Observer method not provided explicitly'
+                ' and MyObserver type has no "on_baz" method')
         else:
             self.fail("RuntimeError not raised")
 
