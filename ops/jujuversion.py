@@ -17,63 +17,22 @@ from functools import total_ordering
 
 
 @total_ordering
-class _Tag:
-    """_Tag is an internal class used to encapsulate how tags sort.
-
-    tags are special because an empty tag sorts after a non-empty tag,
-    which is backwards from string.
-    """
-
-    def __init__(self, tag):
-        # we could inherit from str but then we'd have to implement
-        # all the rich comparison operations instead of relying on
-        # total_ordering
-        self.tag = tag
-
-    def __eq__(self, other):
-        return self.tag == other.tag
-
-    def __lt__(self, other):
-        if self.tag == other.tag:
-            return False
-        if not self.tag:
-            return False
-        if not other.tag:
-            return True
-        return self.tag < other.tag
-
-
-@total_ordering
 class JujuVersion:
-    """JujuVersion can be used to compare different Juju versions.
 
-    Juju uses some conventions for its versions which make comparing them
-    slightly simpler than the generic version compare function you might find
-    elsewhere (e.g. apt_pkg.version_compare). This class encapsulates the needed
-    logic.
-
-    """
-
-    _matcher = re.compile(r'''^
+    PATTERN = r'''^
     (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there
     ((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))? # sometimes with .<patch> or -<tag><patch>
     (\.(?P<build>\d{1,9}))?$                     # and sometimes with a <build> number.
-                          ''',
-                          re.VERBOSE).match
+    '''
 
     def __init__(self, version):
-        # we could inherit from tuple (or namedtuple) but then again we'd have to
-        # implement all the comparison funcs instead of using total_ordering.
-        # end result would be faster and lighter so if performance is an issue start there
-
-        m = self._matcher(version)
+        m = re.match(self.PATTERN, version, re.VERBOSE)
         if not m:
             raise RuntimeError('"{}" is not a valid Juju version string'.format(version))
 
         d = m.groupdict()
-
-        self.major = int(d['major'])
-        self.minor = int(d['minor'])
+        self.major = int(m.group('major'))
+        self.minor = int(m.group('minor'))
         self.tag = d['tag'] or ''
         self.patch = int(d['patch'] or 0)
         self.build = int(d['build'] or 0)
@@ -87,23 +46,36 @@ class JujuVersion:
             s += '.{}'.format(self.build)
         return s
 
-    def _tuple(self):
-        return (self.major, self.minor, _Tag(self.tag), self.patch, self.build)
-
-    def _adapt(self, other):
-        cls = type(self)
-        if isinstance(other, cls):
-            return other
-        if isinstance(other, str):
-            return cls(other)
-        raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
-
     def __eq__(self, other):
         if self is other:
             return True
-        return self._tuple() == self._adapt(other)._tuple()
+        if isinstance(other, str):
+            other = type(self)(other)
+        elif not isinstance(other, JujuVersion):
+            raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
+        return self.major == other.major and self.minor == other.minor\
+            and self.tag == other.tag and self.build == other.build and self.patch == other.patch
 
     def __lt__(self, other):
         if self is other:
             return False
-        return self._tuple() < self._adapt(other)._tuple()
+        if isinstance(other, str):
+            other = type(self)(other)
+        elif not isinstance(other, JujuVersion):
+            raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
+
+        if self.major != other.major:
+            return self.major < other.major
+        elif self.minor != other.minor:
+            return self.minor < other.minor
+        elif self.tag != other.tag:
+            if not self.tag:
+                return False
+            elif not other.tag:
+                return True
+            return self.tag < other.tag
+        elif self.patch != other.patch:
+            return self.patch < other.patch
+        elif self.build != other.build:
+            return self.build < other.build
+        return False
