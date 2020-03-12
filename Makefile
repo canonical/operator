@@ -20,7 +20,7 @@ lint: quotelint check-copyright
 	@flake8 --config=.flake8
 
 quotelint:
-	@x=$$(grep -rnH --include \*.py "\\\\[\"']");                         \
+	@x=$$(grep -rnH --include \*.py "\\\\[\"']" .);                       \
 	if [ "$$x" ]; then                                                    \
 		echo "Please fix the quoting to avoid spurious backslashes:"; \
 		echo "$$x";                                                   \

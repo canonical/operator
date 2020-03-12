@@ -19,12 +19,16 @@ from functools import total_ordering
 @total_ordering
 class JujuVersion:
 
-    PATTERN = r'^(?P<major>\d{1,9})\.(?P<minor>\d{1,9})((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))?(\.(?P<build>\d{1,9}))?$'
+    PATTERN = r'''^
+    (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there
+    ((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))? # sometimes with .<patch> or -<tag><patch>
+    (\.(?P<build>\d{1,9}))?$                     # and sometimes with a <build> number.
+    '''
 
     def __init__(self, version):
-        m = re.match(self.PATTERN, version)
+        m = re.match(self.PATTERN, version, re.VERBOSE)
         if not m:
-            raise RuntimeError(f'"{version}" is not a valid Juju version string')
+            raise RuntimeError('"{}" is not a valid Juju version string'.format(version))
 
         d = m.groupdict()
         self.major = int(m.group('major'))
@@ -35,11 +39,11 @@ class JujuVersion:
 
     def __repr__(self):
         if self.tag:
-            s = f'{self.major}.{self.minor}-{self.tag}{self.patch}'
+            s = '{}.{}-{}{}'.format(self.major, self.minor, self.tag, self.patch)
         else:
-            s = f'{self.major}.{self.minor}.{self.patch}'
+            s = '{}.{}.{}'.format(self.major, self.minor, self.patch)
         if self.build > 0:
-            s += f'.{self.build}'
+            s += '.{}'.format(self.build)
         return s
 
     def __eq__(self, other):
@@ -48,9 +52,13 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
-            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
-        return self.major == other.major and self.minor == other.minor\
-            and self.tag == other.tag and self.build == other.build and self.patch == other.patch
+            raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
+        return (
+            self.major == other.major
+            and self.minor == other.minor
+            and self.tag == other.tag
+            and self.build == other.build
+            and self.patch == other.patch)
 
     def __lt__(self, other):
         if self is other:
@@ -58,7 +66,7 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
-            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
+            raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
 
         if self.major != other.major:
             return self.major < other.major

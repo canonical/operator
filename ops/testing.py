@@ -48,9 +48,10 @@ def create_harness(charm_cls, charm_meta_yaml):
         charm_meta_yaml = dedent(charm_meta_yaml)
     meta = charm.CharmMeta.from_yaml(charm_meta_yaml)
 
-    # The Framework mutates class objects to build attributes for events, etc. That makes attribute access easy.
-    # However, it means you can't register the same class with multiple framework
-    # instances. So instead we dynamically create a new event class and charm class
+    # The Framework mutates class objects to build attributes for events, etc. That makes
+    # attribute access easy. However, it means you can't register the same class with
+    # multiple framework instances. So instead we dynamically create a new event class
+    # and charm class
     # and register those with the framework.
     class TestEvents(charm_cls.on.__class__):
         pass
@@ -60,8 +61,8 @@ def create_harness(charm_cls, charm_meta_yaml):
     class TestCharm(charm_cls):
         on = TestEvents()
 
-    # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo, rather than
-    # TestCharm has no attribute foo. It does hide the fact that TestCharm exists, but that is probably for the best.
+    # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
+    # rather than TestCharm has no attribute foo.
     TestCharm.__name__ = charm_cls.__name__
 
     unit_name = meta.name + '/0'
@@ -79,8 +80,6 @@ class TestingHarness:
     """This class represents a way to build up the model that will drive a test suite.
 
     The model that is created is from the viewpoint of the charm that you are testing.
-
-    :ivar _charm: CharmBase
     """
 
     def __init__(self, unit_name):
@@ -95,7 +94,9 @@ class TestingHarness:
 
     def _register_charm(self, charm):
         if self._charm is not None:
-            raise RuntimeError("registering charm {} while {} is already registered".format(charm, self._charm))
+            raise RuntimeError(
+                "registering charm {} while {} is already registered".format(
+                    charm, self._charm))
         self._charm = charm
 
     def _next_relation_id(self):
@@ -104,13 +105,14 @@ class TestingHarness:
         return rel_id
 
     def add_relation(self, relation_name, remote_app, remote_app_data={}):
-        """Declare that there is a new relation between this app on and `remote_app` on interface `relation_name`.
+        """Declare that there is a new relation between this app and `remote_app`
 
         TODO: Once relation_created exists as a Juju hook, it should be triggered by this code.
 
-        :param relation_name: The relation on Charm that is having an application related to it.
-        :param remote_app_data: Optional data bag that the remote application is sending to this charm.
-          If remote_app_data is not empty, this should trigger ``charm.on[relation_name].relation_changed(app)``
+        :param relation_name: The relation on Charm that is being related to
+        :param remote_app_data: Optional data bag that the remote application is sending
+          If remote_app_data is not empty, this should trigger
+          ``charm.on[relation_name].relation_changed(app)``
         :return: The relation_id created by this add_relation.
         :rtype: int
         """
@@ -126,7 +128,8 @@ class TestingHarness:
         if self._charm is not None:
             # Reload the relation_ids list
             self._charm.framework.model.relations._invalidate(relation_name)
-            # TODO: jam 2020-03-05 We should be triggering relation_changed(app) if remote_app_data isn't empty.
+            # TODO: jam 2020-03-05 We should be triggering relation_changed(app) if
+            # remote_app_data isn't empty.
         return rel_id
 
     def add_relation_unit(self, relation_id, remote_unit_name, remote_unit_data={}):
@@ -143,8 +146,8 @@ class TestingHarness:
         :type relation_id: str
         :param remote_unit_name: A string representing the remote unit that is being added.
         :type remote_unit_name: str
-        :param remote_unit_data: Optional data bag containing data that will be seeded in relation data before
-            relation_changed is triggered.
+        :param remote_unit_data: Optional data bag containing data that will be seeded in
+            relation data before relation_changed is triggered.
         :type remote_unit_data: dict
         :return: None
         """
@@ -152,22 +155,26 @@ class TestingHarness:
         self._backend._relation_data[relation_id][remote_unit_name] = remote_unit_data
         if self._charm is not None:
             relation_name = self._backend._relation_names[relation_id]
-            # Make sure that the Model reloads the relation_list for this relation_id, as well as reloading the
-            # relation data for this unit.
+            # Make sure that the Model reloads the relation_list for this relation_id, as well as
+            # reloading the relation data for this unit.
             self._charm.framework.model.relations._invalidate(relation_name)
             remote_unit = self._charm.model.get_unit(remote_unit_name)
             relation = self._charm.framework.model.get_relation(relation_name, relation_id)
             relation.data[remote_unit]._invalidate()
-            self._charm.on[relation_name].relation_joined.emit(relation, remote_unit.app, remote_unit)
-            # TODO: jam 2020-03-05 Do we only emit relation_changed if remote_unit_data isn't empty?
-            #  juju itself always triggers relation_changed immediately after relation_joined
-            self._charm.on[relation_name].relation_changed.emit(relation, remote_unit.app, remote_unit)
+            self._charm.on[relation_name].relation_joined.emit(
+                relation, remote_unit.app, remote_unit)
+            # TODO: jam 2020-03-05 Do we only emit relation_changed if remote_unit_data isn't
+            #       empty? juju itself always triggers relation_changed immediately after
+            #       relation_joined
+            self._charm.on[relation_name].relation_changed.emit(
+                relation, remote_unit.app, remote_unit)
 
     def read_relation_data(self, relation_id, app_or_unit):
         """Read the relation data bucket for a single app or unit in a given relation.
 
-        This ignores all of the safety checks of who can and can't see data in relations (eg, non leaders can't read
-        their own application's relation data because there are no events that keep that data up-to-date for the unit).
+        This ignores all of the safety checks of who can and can't see data in relations (eg,
+        non-leaders can't read their own application's relation data because there are no events
+        that keep that data up-to-date for the unit).
 
         :param relation_id: The relation whose content we want to look at.
         :type relation_id: int
@@ -213,9 +220,9 @@ class TestingHarness:
             self._trigger_relation_changed(relation_id, app_or_unit)
 
     def _trigger_relation_changed(self, relation_id, app_or_unit):
-        """Trigger a relation_changed event for the given event, triggered by changes from the given unit or app."""
         if self._charm is None:
-            raise RuntimeError('cannot trigger a relation_changed event without a Charm registered')
+            raise RuntimeError(
+                'cannot trigger a relation_changed event without a Charm registered')
         rel_name = self._backend._relation_names[relation_id]
         model = self._charm.framework.model
         relation = model.get_relation(rel_name, relation_id)
@@ -237,8 +244,8 @@ class TestingHarness:
         This will trigger a `config_changed` event.
 
         :param key_values: A dict of key:value pairs to update in config.
-        :param unset: An iterable of keys to remove from Config. (Note that this does not currently reset the
-            config values to the default defined in config.yaml.
+        :param unset: An iterable of keys to remove from Config. (Note that this does
+          not currently reset the config values to the default defined in config.yaml.
         :return: None
         """
         config = self._backend._config
@@ -246,9 +253,10 @@ class TestingHarness:
             config[key] = value
         for key in unset:
             config.pop(key, None)
-        # NOTE: jam 2020-03-01 Note that this sort of works 'by accident'. The issue is that Config is a LazyMapping,
-        # but its _load returns a dict and this method mutates the dict that Config is caching.
-        # Arguably we should be doing some sort of charm.framework.model.config._invalidate()
+        # NOTE: jam 2020-03-01 Note that this sort of works "by accident". Config
+        # is a LazyMapping, but its _load returns a dict and this method mutates
+        # the dict that Config is caching. Arguably we should be doing some sort
+        # of charm.framework.model.config._invalidate()
         if self._charm is not None:
             self._charm.on.config_changed.emit()
 
@@ -262,8 +270,8 @@ class TestingHarness:
         """
         was_leader = self._backend._is_leader
         self._backend._is_leader = is_leader
-        # Note: jam 2020-03-01 currently is_leader is cached at the ModelBackend level, not in the Model objects,
-        #  so this automatically gets noticed.
+        # Note: jam 2020-03-01 currently is_leader is cached at the ModelBackend level, not in
+        # the Model objects, so this automatically gets noticed.
         if is_leader and not was_leader and self._charm is not None:
             self._charm.on.leader_elected.emit()
 

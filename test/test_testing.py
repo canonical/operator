@@ -109,7 +109,8 @@ class TestTestingHarness(unittest.TestCase):
         harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'value'})
-        self.assertEqual(viewer.changes, [{'initial': 'data'}, {'initial': 'data', 'new': 'value'}])
+        self.assertEqual(viewer.changes, [{'initial': 'data'},
+                                          {'initial': 'data', 'new': 'value'}])
 
     def test_update_relation_remove_data(self):
         charm, harness = create_harness(CharmBase, '''
@@ -185,7 +186,7 @@ class DBRelationChangedHelper(Object):
 
 
 class RelationChangedViewer(Object):
-    """Helper class that just tracks relation_changed events and saves the data seen in the relation bucket."""
+    """Track relation_changed events and saves the data seen in the relation bucket."""
 
     def __init__(self, charm, relation_name):
         super().__init__(charm, relation_name)

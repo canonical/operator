@@ -36,7 +36,7 @@ def _get_charm_dir():
     charm_dir = os.environ.get("JUJU_CHARM_DIR")
     if charm_dir is None:
         # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = Path(f'{__file__}/../../..').resolve()
+        charm_dir = Path('{}/../../..'.format(__file__)).resolve()
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
@@ -64,21 +64,26 @@ def _create_event_link(charm, bound_event):
         event_path = event_dir / bound_event.event_kind.replace('_', '-')
     elif issubclass(bound_event.event_type, ops.charm.ActionEvent):
         if not bound_event.event_kind.endswith("_action"):
-            raise RuntimeError(f"action event name {bound_event.event_kind} needs _action suffix")
+            raise RuntimeError(
+                'action event name {} needs _action suffix'.format(bound_event.event_kind))
         event_dir = charm.framework.charm_dir / 'actions'
         # The event_kind is suffixed with "_action" while the executable is not.
         event_path = event_dir / bound_event.event_kind[:-len('_action')].replace('_', '-')
     else:
-        raise RuntimeError(f'cannot create a symlink: unsupported event type {bound_event.event_type}')
+        raise RuntimeError(
+            'cannot create a symlink: unsupported event type {}'.format(bound_event.event_type))
 
     event_dir.mkdir(exist_ok=True)
     if not event_path.exists():
-        # CPython has different implementations for populating sys.argv[0] for Linux and Windows. For Windows
-        # it is always an absolute path (any symlinks are resolved) while for Linux it can be a relative path.
-        target_path = os.path.relpath(os.path.realpath(sys.argv[0]), event_dir)
+        # CPython has different implementations for populating sys.argv[0] for Linux and Windows.
+        # For Windows it is always an absolute path (any symlinks are resolved)
+        # while for Linux it can be a relative path.
+        target_path = os.path.relpath(os.path.realpath(sys.argv[0]), str(event_dir))
 
-        # Ignore the non-symlink files or directories assuming the charm author knows what they are doing.
-        logger.debug(f'Creating a new relative symlink at {event_path} pointing to {target_path}')
+        # Ignore the non-symlink files or directories
+        # assuming the charm author knows what they are doing.
+        logger.debug('Creating a new relative symlink at {} pointing to {}'.format(
+            event_path, target_path))
         event_path.symlink_to(target_path)
 
 
@@ -88,11 +93,13 @@ def _setup_event_links(charm_dir, charm):
     Whether a charm can handle an event or not can be determined by
     introspecting which events are defined on it.
 
-    Hooks or actions are created as symlinks to the charm code file which is determined by inspecting
-    symlinks provided by the charm author at hooks/install or hooks/start.
+    Hooks or actions are created as symlinks to the charm code file
+    which is determined by inspecting symlinks provided by the charm
+    author at hooks/install or hooks/start.
 
     charm_dir -- A root directory of the charm.
     charm -- An instance of the Charm class.
+
     """
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
@@ -110,13 +117,13 @@ def _emit_charm_event(charm, event_name):
     try:
         event_to_emit = getattr(charm.on, event_name)
     except AttributeError:
-        logger.debug(f"event {event_name} not defined for {charm}")
+        logger.debug("event {} not defined for {}".format(event_name, charm))
 
     # If the event is not supported by the charm implementation, do
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        logger.debug(f'Emitting Juju event {event_name}')
+        logger.debug('Emitting Juju event {}'.format(event_name))
         event_to_emit.emit(*args, **kwargs)
 
 
@@ -136,7 +143,7 @@ def _get_event_args(charm, bound_event):
     if remote_app_name or remote_unit_name:
         if not remote_app_name:
             if '/' not in remote_unit_name:
-                raise RuntimeError(f'invalid remote unit name: {remote_unit_name}')
+                raise RuntimeError('invalid remote unit name: {}'.format(remote_unit_name))
             remote_app_name = remote_unit_name.split('/')[0]
         args = [relation, model.get_app(remote_app_name)]
         if remote_unit_name:
@@ -157,11 +164,13 @@ def main(charm_class):
     # Process the Juju event relevant to the current hook execution
     # JUJU_HOOK_NAME, JUJU_FUNCTION_NAME, and JUJU_ACTION_NAME are not used
     # in order to support simulation of events from debugging sessions.
-    # TODO: For Windows, when symlinks are used, this is not a valid method of getting an event name (see LP: #1854505).
+    #
+    # TODO: For Windows, when symlinks are used, this is not a valid
+    #       method of getting an event name (see LP: #1854505).
     juju_exec_path = Path(sys.argv[0])
     juju_event_name = juju_exec_path.name.replace('-', '_')
     if juju_exec_path.parent.name == 'actions':
-        juju_event_name = f'{juju_event_name}_action'
+        juju_event_name = '{}_action'.format(juju_event_name)
 
     model_backend = ops.model.ModelBackend()
     setup_root_logging(model_backend)
@@ -179,14 +188,24 @@ def main(charm_class):
     try:
         charm = charm_class(framework, None)
 
-        # When a charm is force-upgraded and a unit is in an error state Juju does not run upgrade-charm and
-        # instead runs the failed hook followed by config-changed. Given the nature of force-upgrading
-        # the hook setup code is not triggered on config-changed.
-        # 'start' event is included as Juju does not fire the install event for K8s charms (see LP: #1854635).
-        if juju_event_name in ('install', 'start', 'upgrade_charm') or juju_event_name.endswith('_storage_attached'):
+        # When a charm is force-upgraded and a unit is in an error state Juju
+        # does not run upgrade-charm and instead runs the failed hook followed
+        # by config-changed. Given the nature of force-upgrading the hook setup
+        # code is not triggered on config-changed.
+        #
+        # 'start' event is included as Juju does not fire the install event for
+        # K8s charms (see LP: #1854635).
+        if (juju_event_name in ('install', 'start', 'upgrade_charm')
+                or juju_event_name.endswith('_storage_attached')):
             _setup_event_links(charm_dir, charm)
 
-        framework.reemit()
+        # TODO: Remove the collect_metrics check below as soon as the relevant
+        #       Juju changes are made.
+        #
+        # Skip reemission of deferred events for collect-metrics events because
+        # they do not have the full access to all hook tools.
+        if juju_event_name != 'collect_metrics':
+            framework.reemit()
 
         _emit_charm_event(charm, juju_event_name)
 

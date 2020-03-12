@@ -31,7 +31,7 @@ class TestFramework(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmpdir)
+        self.addCleanup(shutil.rmtree, str(self.tmpdir))
         default_timeout = SQLiteStorage.DB_LOCK_TIMEOUT
 
         def timeout_cleanup():
@@ -157,7 +157,10 @@ class TestFramework(unittest.TestCase):
         try:
             framework.observe(pub.baz, obs)
         except RuntimeError as e:
-            self.assertEqual(str(e), 'Observer method not provided explicitly and MyObserver type has no "on_baz" method')
+            self.assertEqual(
+                str(e),
+                'Observer method not provided explicitly'
+                ' and MyObserver type has no "on_baz" method')
         else:
             self.fail("RuntimeError not raised")
 
@@ -341,7 +344,7 @@ class TestFramework(unittest.TestCase):
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(f"on_foo:{event.handle.kind}={event.my_n}")
+                self.seen.append("on_foo:{}={}".format(event.handle.kind, event.my_n))
                 event.defer()
 
         pub = MyNotifier(framework, "1")
@@ -483,11 +486,11 @@ class TestFramework(unittest.TestCase):
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(f"on_foo:{event.handle.kind}")
+                self.seen.append("on_foo:{}".format(event.handle.kind))
                 event.defer()
 
             def on_bar(self, event):
-                self.seen.append(f"on_bar:{event.handle.kind}")
+                self.seen.append("on_bar:{}".format(event.handle.kind))
 
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
@@ -515,7 +518,7 @@ class TestFramework(unittest.TestCase):
             class OtherEvents(EventsBase):
                 foo = event
         self.assertEqual(
-            str(cm.exception.__cause__),
+            str(cm.exception),
             "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
         with self.assertRaises(RuntimeError) as cm:
@@ -523,7 +526,7 @@ class TestFramework(unittest.TestCase):
                 on = MyEvents()
                 bar = event
         self.assertEqual(
-            str(cm.exception.__cause__),
+            str(cm.exception),
             "EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
 
     def test_reemit_ignores_unknown_event_type(self):
@@ -590,11 +593,11 @@ class TestFramework(unittest.TestCase):
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(f"on_foo:{type(event).__name__}:{event.handle.kind}")
+                self.seen.append("on_foo:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
             def on_bar(self, event):
-                self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
+                self.seen.append("on_bar:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
         pub = MyNotifier(framework, "1")
@@ -630,11 +633,11 @@ class TestFramework(unittest.TestCase):
                 self.seen = []
 
             def on_foo(self, event):
-                self.seen.append(f"on_foo:{type(event).__name__}:{event.handle.kind}")
+                self.seen.append("on_foo:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
             def on_bar(self, event):
-                self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
+                self.seen.append("on_bar:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
         pub = MyNotifier(framework, "1")
@@ -739,8 +742,6 @@ class TestFramework(unittest.TestCase):
 
         my_obj = Object(framework, 'my_obj')
         self.assertEqual(my_obj.model, framework.model)
-        self.assertEqual(my_obj.meta, framework.meta)
-        self.assertEqual(my_obj.charm_dir, framework.charm_dir)
 
     def test_ban_concurrent_frameworks(self):
         f = self.create_framework()
@@ -754,7 +755,7 @@ class TestStoredState(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmpdir)
+        self.addCleanup(shutil.rmtree, str(self.tmpdir))
 
     def create_framework(self, cls=Framework):
         framework = cls(self.tmpdir / "framework.data", self.tmpdir, None, None)
@@ -786,6 +787,8 @@ class TestStoredState(unittest.TestCase):
         obj.state.foo = 41
         obj.state.foo = 42
         obj.state.bar = "s"
+        obj.state.baz = 4.2
+        obj.state.bing = True
 
         self.assertEqual(obj.state.foo, 42)
 
@@ -801,6 +804,8 @@ class TestStoredState(unittest.TestCase):
         obj_copy = SomeObject(framework_copy, "1")
         self.assertEqual(obj_copy.state.foo, 42)
         self.assertEqual(obj_copy.state.bar, "s")
+        self.assertEqual(obj_copy.state.baz, 4.2)
+        self.assertEqual(obj_copy.state.bing, True)
 
     def test_mutable_types_invalid(self):
         framework = self.create_framework()
@@ -814,7 +819,9 @@ class TestStoredState(unittest.TestCase):
                 pass
             obj.state.foo = CustomObject()
         except AttributeError as e:
-            self.assertEqual(str(e), "attribute 'foo' cannot be set to CustomObject: must be int/dict/list/etc")
+            self.assertEqual(
+                str(e),
+                "attribute 'foo' cannot be a CustomObject: must be int/float/dict/list/etc")
         else:
             self.fail('AttributeError not raised')
 
@@ -822,7 +829,8 @@ class TestStoredState(unittest.TestCase):
 
     def test_mutable_types(self):
         # Test and validation functions in a list of 2-tuples.
-        # Assignment and keywords like del are not supported in lambdas so functions are used instead.
+        # Assignment and keywords like del are not supported in lambdas
+        #  so functions are used instead.
         test_operations = [(
             lambda: {},         # Operand A.
             None,               # Operand B.
@@ -1020,7 +1028,8 @@ class TestStoredState(unittest.TestCase):
 
             validate_op(obj_copy2.state.a, expected_res)
 
-            # Commit saves the pre-commit and commit events, and the framework event counter, but shouldn't update the stored state of my object
+            # Commit saves the pre-commit and commit events, and the framework
+            # event counter, but shouldn't update the stored state of my object
             framework.snapshots.clear()
             framework_copy.commit()
             self.assertEqual(framework_copy.snapshots, [])
@@ -1152,13 +1161,17 @@ class TestStoredState(unittest.TestCase):
 
         framework = self.create_framework()
 
-        # Validate that operations between StoredSet and built-in sets only result in built-in sets being returned.
-        # Make sure that commutativity is preserved and that the original sets are not changed or used as a result.
+        # Validate that operations between StoredSet and built-in sets
+        # only result in built-in sets being returned.
+        # Make sure that commutativity is preserved and that the
+        # original sets are not changed or used as a result.
         for i, (variable_operand, operation, ab_res, ba_res) in enumerate(test_operations):
             obj = SomeObject(framework, str(i))
             obj.state.set = {"a", "b"}
 
-            for a, b, expected in [(obj.state.set, variable_operand, ab_res), (variable_operand, obj.state.set, ba_res)]:
+            for a, b, expected in [
+                    (obj.state.set, variable_operand, ab_res),
+                    (variable_operand, obj.state.set, ba_res)]:
                 old_a = set(a)
                 old_b = set(b)
 
@@ -1193,7 +1206,8 @@ class TestStoredState(unittest.TestCase):
         parent.state.set_default(foo=5, bar=6)
         self.assertEqual(parent.state.foo, 1)
         self.assertEqual(parent.state.bar, 4)
-        # TODO(jam) 2020-01-30: is there a clean way to tell that parent.state._data.dirty is False?
+        # TODO: jam 2020-01-30 is there a clean way to tell that
+        #       parent.state._data.dirty is False?
 
 
 if __name__ == "__main__":

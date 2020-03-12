@@ -34,7 +34,8 @@ class ActionEvent(EventBase):
         if event_action_name != env_action_name:
             # This could only happen if the dev manually emits the action, or from a bug.
             raise RuntimeError('action event kind does not match current action')
-        # Params are loaded at restore rather than __init__ because the model is not available in __init__.
+        # Params are loaded at restore rather than __init__ because
+        # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()
 
     def set_results(self, results):
@@ -97,8 +98,9 @@ class RelationEvent(HookEvent):
     def __init__(self, handle, relation, app=None, unit=None):
         super().__init__(handle)
 
-        if unit and unit.app != app:
-            raise RuntimeError(f'cannot create RelationEvent with application {app} and unit {unit}')
+        if unit is not None and unit.app != app:
+            raise RuntimeError(
+                'cannot create RelationEvent with application {} and unit {}'.format(app, unit))
 
         self.relation = relation
         self.app = app
@@ -116,7 +118,8 @@ class RelationEvent(HookEvent):
         return snapshot
 
     def restore(self, snapshot):
-        self.relation = self.framework.model.get_relation(snapshot['relation_name'], snapshot['relation_id'])
+        self.relation = self.framework.model.get_relation(
+            snapshot['relation_name'], snapshot['relation_id'])
 
         app_name = snapshot.get('app_name')
         if app_name:
@@ -183,19 +186,35 @@ class CharmBase(Object):
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
-            self.on.define_event(f'{relation_name}_relation_joined', RelationJoinedEvent)
-            self.on.define_event(f'{relation_name}_relation_changed', RelationChangedEvent)
-            self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
-            self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
+            self.on.define_event(relation_name + '_relation_joined', RelationJoinedEvent)
+            self.on.define_event(relation_name + '_relation_changed', RelationChangedEvent)
+            self.on.define_event(relation_name + '_relation_departed', RelationDepartedEvent)
+            self.on.define_event(relation_name + '_relation_broken', RelationBrokenEvent)
 
         for storage_name in self.framework.meta.storages:
             storage_name = storage_name.replace('-', '_')
-            self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
-            self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
+            self.on.define_event(storage_name + '_storage_attached', StorageAttachedEvent)
+            self.on.define_event(storage_name + '_storage_detaching', StorageDetachingEvent)
 
         for action_name in self.framework.meta.actions:
             action_name = action_name.replace('-', '_')
-            self.on.define_event(f'{action_name}_action', ActionEvent)
+            self.on.define_event(action_name + '_action', ActionEvent)
+
+    @property
+    def app(self):
+        return self.framework.model.app
+
+    @property
+    def unit(self):
+        return self.framework.model.unit
+
+    @property
+    def meta(self):
+        return self.framework.meta
+
+    @property
+    def charm_dir(self):
+        return self.framework.charm_dir
 
 
 class CharmMeta:

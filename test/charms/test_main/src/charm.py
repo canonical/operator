@@ -61,7 +61,8 @@ class Charm(CharmBase):
         self._state['on_log_info_action'] = []
         self._state['on_log_debug_action'] = []
 
-        # Observed event types per invocation. A list is used to preserve the order in which charm handlers have observed the events.
+        # Observed event types per invocation. A list is used to preserve the
+        # order in which charm handlers have observed the events.
         self._state['observed_event_types'] = []
 
         self.framework.observe(self.on.install, self)
@@ -95,7 +96,7 @@ class Charm(CharmBase):
         Each invocation will override the previous state which is intentional.
         """
         if self._state_file is not None:
-            with open(self._state_file, 'wb') as f:
+            with open(str(self._state_file), 'wb') as f:
                 pickle.dump(self._state, f)
 
     def on_install(self, event):
@@ -132,37 +133,45 @@ class Charm(CharmBase):
         self._write_state()
 
     def on_mon_relation_changed(self, event):
-        assert event.app is not None, 'application name cannot be None for a relation-changed event'
+        assert event.app is not None, (
+            'application name cannot be None for a relation-changed event')
         if os.environ.get('JUJU_REMOTE_UNIT'):
-            assert event.unit is not None, 'a unit name cannot be None for a relation-changed event associated with a remote unit'
+            assert event.unit is not None, (
+                'a unit name cannot be None for a relation-changed event'
+                ' associated with a remote unit')
         self._state['on_mon_relation_changed'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['mon_relation_changed_data'] = event.snapshot()
         self._write_state()
 
     def on_mon_relation_departed(self, event):
-        assert event.app is not None, 'application name cannot be None for a relation-departed event'
+        assert event.app is not None, (
+            'application name cannot be None for a relation-departed event')
         self._state['on_mon_relation_departed'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['mon_relation_departed_data'] = event.snapshot()
         self._write_state()
 
     def on_ha_relation_broken(self, event):
-        assert event.app is None, 'relation-broken events cannot have a reference to a remote application'
-        assert event.unit is None, 'relation broken events cannot have a reference to a remote unit'
+        assert event.app is None, (
+            'relation-broken events cannot have a reference to a remote application')
+        assert event.unit is None, (
+            'relation broken events cannot have a reference to a remote unit')
         self._state['on_ha_relation_broken'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._state['ha_relation_broken_data'] = event.snapshot()
         self._write_state()
 
     def on_start_action(self, event):
-        assert event.handle.kind == 'start_action', 'event action name cannot be different from the one being handled'
+        assert event.handle.kind == 'start_action', (
+            'event action name cannot be different from the one being handled')
         self._state['on_start_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()
 
     def on_foo_bar_action(self, event):
-        assert event.handle.kind == 'foo_bar_action', 'event action name cannot be different from the one being handled'
+        assert event.handle.kind == 'foo_bar_action', (
+            'event action name cannot be different from the one being handled')
         self._state['on_foo_bar_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
         self._write_state()

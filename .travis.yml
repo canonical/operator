@@ -7,19 +7,18 @@ arch:
     - arm64
 
 python:
+    - "3.5"
     - "3.6"
     - "3.7"
     - "3.8"
 
-addons:
-    apt:
-        update: true
-        packages:
-            - flake8
-            - make
+matrix:
+    include:
+        - os: osx
+          language: generic
 
 install:
-    - pip3 install pyyaml autopep8
+    - pip3 install pyyaml autopep8 flake8
 
 script:
     - make test

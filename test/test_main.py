@@ -49,8 +49,9 @@ from ops.charm import (
 
 from .test_helpers import fake_script, fake_script_calls
 
-# This relies on the expected repository structure to find a path to source of the charm under test.
-TEST_CHARM_DIR = Path(f'{__file__}/../charms/test_main').resolve()
+# This relies on the expected repository structure to find a path to
+# source of the charm under test.
+TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,8 @@ class SymlinkTargetError(Exception):
 
 
 class EventSpec:
-    def __init__(self, event_type, event_name, env_var=None, relation_id=None, remote_app=None, remote_unit=None,
+    def __init__(self, event_type, event_name, env_var=None,
+                 relation_id=None, remote_app=None, remote_unit=None,
                  charm_config=None):
         self.event_type = event_type
         self.event_name = event_name
@@ -87,7 +89,7 @@ class TestMain(unittest.TestCase):
         CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            shutil.rmtree(self.JUJU_CHARM_DIR)
+            shutil.rmtree(str(self.JUJU_CHARM_DIR))
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
@@ -96,10 +98,12 @@ class TestMain(unittest.TestCase):
     def _setup_charm_dir(self):
         self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
-        self.charm_exec_path = os.path.relpath(self.JUJU_CHARM_DIR / 'src/charm.py', self.hooks_dir)
-        shutil.copytree(TEST_CHARM_DIR, self.JUJU_CHARM_DIR)
+        charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
+        self.charm_exec_path = os.path.relpath(charm_path,
+                                               str(self.hooks_dir))
+        shutil.copytree(str(TEST_CHARM_DIR), str(self.JUJU_CHARM_DIR))
 
-        charm_spec = importlib.util.spec_from_file_location("charm", str(self.JUJU_CHARM_DIR / 'src/charm.py'))
+        charm_spec = importlib.util.spec_from_file_location("charm", charm_path)
         self.charm_module = importlib.util.module_from_spec(charm_spec)
         charm_spec.loader.exec_module(self.charm_module)
 
@@ -132,7 +136,7 @@ start:
         actions_dir_name = 'actions'
         actions_meta_file = 'actions.yaml'
 
-        with open(self.JUJU_CHARM_DIR / actions_meta_file, 'w+') as f:
+        with open(str(self.JUJU_CHARM_DIR / actions_meta_file), 'w+') as f:
             f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
@@ -143,15 +147,15 @@ start:
     def _read_and_clear_state(self):
         state = None
         if self._state_file.stat().st_size:
-            with open(self._state_file, 'r+b') as state_file:
+            with open(str(self._state_file), 'r+b') as state_file:
                 state = pickle.load(state_file)
                 state_file.truncate()
         return state
 
     def _simulate_event(self, event_spec):
         env = {
-            'PATH': f"{str(Path(__file__).parent / 'bin')}:{os.environ['PATH']}",
-            'JUJU_CHARM_DIR': self.JUJU_CHARM_DIR,
+            'PATH': "{}:{}".format(Path(__file__).parent / 'bin', os.environ['PATH']),
+            'JUJU_CHARM_DIR': str(self.JUJU_CHARM_DIR),
             'JUJU_UNIT_NAME': 'test_main/0',
             'CHARM_CONFIG': event_spec.charm_config,
         }
@@ -191,7 +195,8 @@ start:
         event_file = self.JUJU_CHARM_DIR / event_dir / event_filename
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call([sys.executable, event_file], env=env, cwd=self.JUJU_CHARM_DIR)
+        subprocess.check_call([sys.executable, str(event_file)],
+                              env=env, cwd=str(self.JUJU_CHARM_DIR))
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -204,12 +209,35 @@ start:
         state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
         self.assertEqual(state['observed_event_types'], [InstallEvent])
 
-        state = self._simulate_event(EventSpec(ConfigChangedEvent, 'config-changed', charm_config=charm_config))
+        state = self._simulate_event(EventSpec(ConfigChangedEvent, 'config-changed',
+                                               charm_config=charm_config))
         self.assertEqual(state['observed_event_types'], [ConfigChangedEvent])
 
         # Re-emit should pick the deferred config-changed.
-        state = self._simulate_event(EventSpec(UpdateStatusEvent, 'update-status', charm_config=charm_config))
+        state = self._simulate_event(EventSpec(UpdateStatusEvent, 'update-status',
+                                               charm_config=charm_config))
         self.assertEqual(state['observed_event_types'], [ConfigChangedEvent, UpdateStatusEvent])
+
+    def test_no_reemission_on_collect_metrics(self):
+        # base64 encoding is used to avoid null bytes.
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        fake_script(self, 'add-metric', 'exit 0')
+
+        # First run "install" to make sure all hooks are set up.
+        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        self.assertEqual(state['observed_event_types'], [InstallEvent])
+
+        state = self._simulate_event(EventSpec(ConfigChangedEvent, 'config-changed',
+                                               charm_config=charm_config))
+        self.assertEqual(state['observed_event_types'], [ConfigChangedEvent])
+
+        # Re-emit should not pick the deferred config-changed because
+        # collect-metrics runs in a restricted context.
+        state = self._simulate_event(EventSpec(CollectMetricsEvent, 'collect-metrics',
+                                               charm_config=charm_config))
+        self.assertEqual(state['observed_event_types'], [CollectMetricsEvent])
 
     def test_multiple_events_handled(self):
         self._prepare_actions()
@@ -227,59 +255,104 @@ start:
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
         events_under_test = [(
-            EventSpec(InstallEvent, 'install', charm_config=charm_config),
-            {},
-        ), (
-            EventSpec(StartEvent, 'start', charm_config=charm_config),
-            {},
-        ), (
-            EventSpec(UpdateStatusEvent, 'update_status', charm_config=charm_config),
-            {},
-        ), (
-            EventSpec(LeaderSettingsChangedEvent, 'leader_settings_changed', charm_config=charm_config),
-            {},
-        ), (
-            EventSpec(RelationJoinedEvent, 'db_relation_joined', relation_id=1,
-                      remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
-            {'relation_name': 'db', 'relation_id': 1, 'app_name': 'remote', 'unit_name': 'remote/0'},
-        ), (
-            EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
-                      remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
-            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
-        ), (
-            EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
-                      remote_app='remote', remote_unit=None, charm_config=charm_config),
-            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': None},
-        ), (
-            EventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2,
-                      remote_app='remote', remote_unit='remote/0', charm_config=charm_config),
-            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
-        ), (
-            EventSpec(RelationBrokenEvent, 'ha_relation_broken', relation_id=3,
+            EventSpec(InstallEvent, 'install',
                       charm_config=charm_config),
-            {'relation_name': 'ha', 'relation_id': 3},
+            {},
+        ), (
+            EventSpec(StartEvent, 'start',
+                      charm_config=charm_config),
+            {},
+        ), (
+            EventSpec(UpdateStatusEvent, 'update_status',
+                      charm_config=charm_config),
+            {},
+        ), (
+            EventSpec(LeaderSettingsChangedEvent, 'leader_settings_changed',
+                      charm_config=charm_config),
+            {},
+        ), (
+            EventSpec(RelationJoinedEvent, 'db_relation_joined',
+                      relation_id=1,
+                      remote_app='remote', remote_unit='remote/0',
+                      charm_config=charm_config),
+            {'relation_name': 'db',
+             'relation_id': 1,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
+        ), (
+            EventSpec(RelationChangedEvent, 'mon_relation_changed',
+                      relation_id=2,
+                      remote_app='remote', remote_unit='remote/0',
+                      charm_config=charm_config),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
+        ), (
+            EventSpec(RelationChangedEvent, 'mon_relation_changed',
+                      relation_id=2,
+                      remote_app='remote', remote_unit=None,
+                      charm_config=charm_config),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': None},
+        ), (
+            EventSpec(RelationDepartedEvent, 'mon_relation_departed',
+                      relation_id=2,
+                      remote_app='remote', remote_unit='remote/0',
+                      charm_config=charm_config),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
+        ), (
+            EventSpec(RelationBrokenEvent, 'ha_relation_broken',
+                      relation_id=3,
+                      charm_config=charm_config),
+            {'relation_name': 'ha',
+             'relation_id': 3},
         ), (
             # Events without a remote app specified (for Juju < 2.7).
-            EventSpec(RelationJoinedEvent, 'db_relation_joined', relation_id=1,
-                      remote_unit='remote/0', charm_config=charm_config),
-            {'relation_name': 'db', 'relation_id': 1, 'app_name': 'remote', 'unit_name': 'remote/0'},
+            EventSpec(RelationJoinedEvent, 'db_relation_joined',
+                      relation_id=1,
+                      remote_unit='remote/0',
+                      charm_config=charm_config),
+            {'relation_name': 'db',
+             'relation_id': 1,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
         ), (
-            EventSpec(RelationChangedEvent, 'mon_relation_changed', relation_id=2,
-                      remote_unit='remote/0', charm_config=charm_config),
-            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
+            EventSpec(RelationChangedEvent, 'mon_relation_changed',
+                      relation_id=2,
+                      remote_unit='remote/0',
+                      charm_config=charm_config),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
         ), (
-            EventSpec(RelationDepartedEvent, 'mon_relation_departed', relation_id=2,
-                      remote_unit='remote/0', charm_config=charm_config),
-            {'relation_name': 'mon', 'relation_id': 2, 'app_name': 'remote', 'unit_name': 'remote/0'},
+            EventSpec(RelationDepartedEvent, 'mon_relation_departed',
+                      relation_id=2,
+                      remote_unit='remote/0',
+                      charm_config=charm_config),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
         ), (
-            EventSpec(ActionEvent, 'start_action', env_var='JUJU_ACTION_NAME', charm_config=actions_charm_config),
+            EventSpec(ActionEvent, 'start_action',
+                      env_var='JUJU_ACTION_NAME',
+                      charm_config=actions_charm_config),
             {},
         ), (
-            EventSpec(ActionEvent, 'foo_bar_action', env_var='JUJU_ACTION_NAME', charm_config=actions_charm_config),
+            EventSpec(ActionEvent, 'foo_bar_action',
+                      env_var='JUJU_ACTION_NAME',
+                      charm_config=actions_charm_config),
             {},
         )]
 
-        logger.debug(f'Expected events {events_under_test}')
+        logger.debug('Expected events {}'.format(events_under_test))
 
         # First run "install" to make sure all hooks are set up.
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
@@ -288,7 +361,7 @@ start:
         for event_spec, expected_event_data in events_under_test:
             state = self._simulate_event(event_spec)
 
-            state_key = f'on_{event_spec.event_name}'
+            state_key = 'on_' + event_spec.event_name
             handled_events = state.get(state_key, [])
 
             # Make sure that a handler for that event was called once.
@@ -300,7 +373,8 @@ start:
             self.assertEqual(state['observed_event_types'], [event_spec.event_type])
 
             if event_spec.event_name in expected_event_data:
-                self.assertEqual(state[f'{event_spec.event_name}_data'], expected_event_data[event_spec.event_name])
+                self.assertEqual(state[event_spec.event_name + '_data'],
+                                 expected_event_data[event_spec.event_name])
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit.
@@ -316,7 +390,8 @@ start:
         hook_path.symlink_to('install')
 
         try:
-            self._simulate_event(EventSpec(HookEvent, 'not-implemented-event', charm_config=charm_config))
+            self._simulate_event(EventSpec(HookEvent, 'not-implemented-event',
+                                           charm_config=charm_config))
         except subprocess.CalledProcessError:
             self.fail('Event simulation for an unsupported event'
                       ' results in a non-zero exit code returned')
@@ -324,7 +399,8 @@ start:
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events.
         """
-        all_event_hooks = [f'hooks/{e.replace("_", "-")}' for e in self.charm_module.Charm.on.events().keys()]
+        all_event_hooks = ['hooks/' + e.replace("_", "-")
+                           for e in self.charm_module.Charm.on.events().keys()]
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
@@ -338,8 +414,10 @@ start:
         def _assess_event_links(event_spec):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
-                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists(), f'Missing hook: {event_hook}')
-                self.assertEqual(os.readlink(self.JUJU_CHARM_DIR / event_hook), self.charm_exec_path)
+                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists(),
+                                'Missing hook: ' + event_hook)
+                self.assertEqual(os.readlink(str(self.JUJU_CHARM_DIR / event_hook)),
+                                 self.charm_exec_path)
 
         for initial_event in initial_events:
             self._setup_charm_dir()
@@ -368,8 +446,10 @@ start:
         }))
         fake_script(self, 'add-metric', 'exit 0')
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-        self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics', charm_config=charm_config))
-        self.assertEqual(fake_script_calls(self), [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
+        self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics',
+                                       charm_config=charm_config))
+        self.assertEqual(fake_script_calls(self),
+                         [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
 
     def test_logger(self):
         charm_config = base64.b64encode(pickle.dumps({
@@ -388,21 +468,29 @@ log_debug: {}
             ''')
 
         test_cases = [(
-            EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
+            EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME',
+                      charm_config=charm_config),
             ['juju-log', '--log-level', 'CRITICAL', 'super critical'],
         ), (
-            EventSpec(ActionEvent, 'log_error_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
+            EventSpec(ActionEvent, 'log_error_action',
+                      env_var='JUJU_ACTION_NAME',
+                      charm_config=charm_config),
             ['juju-log', '--log-level', 'ERROR', 'grave error'],
         ), (
-            EventSpec(ActionEvent, 'log_warning_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
+            EventSpec(ActionEvent, 'log_warning_action',
+                      env_var='JUJU_ACTION_NAME',
+                      charm_config=charm_config),
             ['juju-log', '--log-level', 'WARNING', 'wise warning'],
         ), (
-            EventSpec(ActionEvent, 'log_info_action', env_var='JUJU_ACTION_NAME', charm_config=charm_config),
+            EventSpec(ActionEvent, 'log_info_action',
+                      env_var='JUJU_ACTION_NAME',
+                      charm_config=charm_config),
             ['juju-log', '--log-level', 'INFO', 'useful info'],
         )]
 
         # Set up action symlinks.
-        self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        self._simulate_event(EventSpec(InstallEvent, 'install',
+                                       charm_config=charm_config))
 
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)

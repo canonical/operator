@@ -18,6 +18,7 @@ import pathlib
 import unittest
 import json
 import ipaddress
+from collections import OrderedDict
 
 import ops.model
 import ops.charm
@@ -53,7 +54,19 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids',
                     """[ "$1" = db2 ] && echo '["db2:5", "db2:6"]' || echo '[]'""")
         fake_script(self, 'relation-list',
-                    """([ "$2" = 5 ] && echo '["remoteapp1/0", "remoteapp1/1"]') || ([ "$2" = 6 ] && echo '["remoteapp2/0"]') || exit 2""")
+                    """
+case "$2" in
+    5)
+        echo '["remoteapp1/0", "remoteapp1/1"]'
+        ;;
+    6)
+        echo '["remoteapp2/0"]'
+        ;;
+    *)
+        exit 2
+    ;;
+esac
+""")
 
         for relation in self.model.relations['db2']:
             self.assertIn(self.model.unit, relation.data)
@@ -69,12 +82,29 @@ class TestModel(unittest.TestCase):
     def test_get_relation(self):
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
-        fake_script(self, 'relation-ids',
-                    """([ "$1" = db1 ] && echo '["db1:4"]') || ([ "$1" = db2 ] && echo '["db2:5", "db2:6"]') || echo '[]'""")
-        fake_script(self, 'relation-list',
-                    f"""([ "$2" = 4 ] && echo '["remoteapp1/0"]') || (echo {err_msg} >&2 ; exit 2)""")
+        fake_script(self, 'relation-ids', '''
+            case "$1" in
+            db1)
+                echo '["db1:4"]'
+                ;;
+            db2)
+                echo '["db2:5", "db2:6"]'
+                ;;
+            *)
+                echo '[]'
+                ;;
+            esac
+        ''')
+        fake_script(self, 'relation-list', '''
+            if [ "$2" = 4 ]; then
+                echo '["remoteapp1/0"]'
+            else
+                echo {} >&2
+                exit 2
+            fi
+        '''.format(err_msg))
         fake_script(self, 'relation-get',
-                    f"""echo {err_msg} >&2 ; exit 2""")
+                    """echo {} >&2 ; exit 2""".format(err_msg))
 
         with self.assertRaises(ops.model.ModelError):
             self.model.get_relation('db1', 'db1:4')
@@ -82,7 +112,7 @@ class TestModel(unittest.TestCase):
         self.assertIsInstance(db1_4, ops.model.Relation)
         dead_rel = self.model.get_relation('db1', 7)
         self.assertIsInstance(dead_rel, ops.model.Relation)
-        self.assertEqual(list(dead_rel.data.keys()), [self.model.unit, self.model.unit.app])
+        self.assertEqual(set(dead_rel.data.keys()), {self.model.unit, self.model.unit.app})
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertIsNone(self.model.get_relation('db0'))
         self.assertIs(self.model.get_relation('db1'), db1_4)
@@ -102,14 +132,15 @@ class TestModel(unittest.TestCase):
 
     def test_peer_relation_app(self):
         meta = ops.charm.CharmMeta()
-        meta.relations = {'dbpeer': RelationMeta('peers', 'dbpeer', {'interface': 'dbpeer', 'scope': 'global'})}
+        meta.relations = {'dbpeer': RelationMeta('peers', 'dbpeer',
+                                                 {'interface': 'dbpeer', 'scope': 'global'})}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
         fake_script(self, 'relation-ids',
                     '''([ "$1" = dbpeer ] && echo '["dbpeer:0"]') || echo "[]"''')
         fake_script(self, 'relation-list',
-                    f'''([ "$2" = 0 ] && echo "[]") || (echo {err_msg} >&2 ; exit 2)''')
+                    '''([ "$2" = 0 ] && echo "[]") || (echo {} >&2 ; exit 2)'''.format(err_msg))
 
         db1_4 = self.model.get_relation('dbpeer')
         self.assertIs(db1_4.app, self.model.app)
@@ -136,13 +167,21 @@ class TestModel(unittest.TestCase):
     def test_unit_relation_data(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
-        fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]) && echo '{"host": "remoteapp1-0"}' || exit 2""")
+        fake_script(self, 'relation-get', """
+if [ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]; then
+    echo '{"host": "remoteapp1-0"}'
+else
+    exit 2
+fi
+""")
 
         random_unit = self.model._cache.get(ops.model.Unit, 'randomunit/0')
         with self.assertRaises(KeyError):
             self.model.get_relation('db1').data[random_unit]
-        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
-        self.assertEqual(self.model.get_relation('db1').data[remoteapp1_0], {'host': 'remoteapp1-0'})
+        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
+                                   self.model.get_relation('db1').units))
+        self.assertEqual(self.model.get_relation('db1').data[remoteapp1_0],
+                         {'host': 'remoteapp1-0'})
 
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
@@ -152,8 +191,20 @@ class TestModel(unittest.TestCase):
 
     def test_remote_app_relation_data(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
-        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
-        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = remoteapp1 ] && echo '{"secret": "cafedeadbeef"}' || exit 2""")
+        fake_script(self, 'relation-list', '''
+            if [ "$2" = 4 ]; then
+                echo '["remoteapp1/0", "remoteapp1/1"]'
+            else
+                exit 2
+            fi
+        ''')
+        fake_script(self, 'relation-get', '''
+            if [ "$2" = 4 ] && [ "$4" = remoteapp1 ]; then
+                echo '{"secret": "cafedeadbeef"}'
+            else
+                exit 2
+            fi
+        ''')
 
         # Try to get relation data for an invalid remote application.
         random_app = self.model._cache.get(ops.model.Application, 'randomapp')
@@ -161,7 +212,8 @@ class TestModel(unittest.TestCase):
             self.model.get_relation('db1').data[random_app]
 
         remoteapp1 = self.model.get_relation('db1').app
-        self.assertEqual(self.model.get_relation('db1').data[remoteapp1], {'secret': 'cafedeadbeef'})
+        self.assertEqual(self.model.get_relation('db1').data[remoteapp1],
+                         {'secret': 'cafedeadbeef'})
 
         self.assertEqual(fake_script_calls(self), [
             ['relation-ids', 'db1', '--format=json'],
@@ -172,10 +224,17 @@ class TestModel(unittest.TestCase):
     def test_relation_data_modify_remote(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
-        fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]) && echo '{"host": "remoteapp1-0"}' || exit 2""")
+        fake_script(self, 'relation-get', """
+if [ "$2" = 4 ] && [ "$4" = "remoteapp1/0" ]; then
+    echo '{"host": "remoteapp1-0"}'
+else
+    exit 2
+fi
+""")
 
         rel_db1 = self.model.get_relation('db1')
-        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
+        remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
+                                   self.model.get_relation('db1').units))
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[remoteapp1_0])
         with self.assertRaises(ops.model.RelationDataError):
@@ -192,7 +251,13 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
         fake_script(self, 'relation-set', '''[ "$2" = 4 ] && exit 0 || exit 2''')
-        fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "myapp/0" ]) && echo '{"host": "bar"}' || exit 2""")
+        fake_script(self, 'relation-get', '''
+            if [ "$2" = 4 ] && [ "$4" = "myapp/0" ]; then
+                echo '{"host": "bar"}'
+            else
+                exit 2
+            fi
+        ''')
 
         rel_db1 = self.model.get_relation('db1')
         # Force memory cache to be loaded.
@@ -209,8 +274,20 @@ class TestModel(unittest.TestCase):
 
     def test_app_relation_data_modify_local_as_leader(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
-        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
-        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
+        fake_script(self, 'relation-list', '''
+            if [ "$2" = 4 ]; then
+                echo '["remoteapp1/0", "remoteapp1/1"]'
+            else
+                exit 2
+            fi
+        ''')
+        fake_script(self, 'relation-get', '''
+            if [ "$2" = 4 ] && [ "$4" = myapp ]; then
+                echo '{"password": "deadbeefcafe"}'
+            else
+                exit 2
+            fi
+        ''')
         fake_script(self, 'relation-set', """[ "$2" = 4 ] && exit 0 || exit 2""")
         fake_script(self, 'is-leader', 'echo true')
 
@@ -233,8 +310,20 @@ class TestModel(unittest.TestCase):
 
     def test_app_relation_data_modify_local_as_minion(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
-        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
-        fake_script(self, 'relation-get', """[ "$2" = 4 ] && [ "$4" = myapp ] && echo '{"password": "deadbeefcafe"}' || exit 2""")
+        fake_script(self, 'relation-list', '''
+            if [ "$2" = 4 ]; then
+                echo '["remoteapp1/0", "remoteapp1/1"]'
+            else
+                exit 2
+            fi
+        ''')
+        fake_script(self, 'relation-get', '''
+            if [ "$2" = 4 ] && [ "$4" = myapp ]; then
+                echo '{"password": "deadbeefcafe"}'
+            else
+                exit 2
+            fi
+        ''')
         fake_script(self, 'is-leader', 'echo false')
 
         local_app = self.model.unit.app
@@ -256,13 +345,25 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
         fake_script(self, 'relation-set', '''[ "$2" = 4 ] && exit 0 || exit 2''')
-        fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "myapp/0" ]) && echo '{"host": "bar"}' || exit 2""")
+        fake_script(self, 'relation-get', '''
+            if [ "$2" = 4 ] && [ "$4" = "myapp/0" ]; then
+                echo '{"host": "bar"}'
+            else
+                exit 2
+            fi
+        ''')
 
         rel_db1 = self.model.get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         del rel_db1.data[self.model.unit]['host']
-        fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "myapp/0" ]) && echo '{}' || exit 2""")
+        fake_script(self, 'relation-get', '''
+            if [ "$2" = 4 ] && [ "$4" = "myapp/0" ]; then
+                echo '{}'
+            else
+                exit 2
+            fi
+        ''')
         self.assertNotIn('host', rel_db1.data[self.model.unit])
 
         self.assertEqual(fake_script_calls(self), [
@@ -276,7 +377,13 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids', """[ "$1" = db2 ] && echo '["db2:5"]' || echo '[]'""")
         fake_script(self, 'relation-list',
                     """[ "$2" = 5 ] && echo '["remoteapp1/0"]' || exit 2""")
-        fake_script(self, 'relation-get', """([ "$2" = 5 ] && [ "$4" = "myapp/0" ]) && echo '{"host": "myapp-0"}' || exit 2""")
+        fake_script(self, 'relation-get', '''
+            if [ "$2" = 5 ] && [ "$4" = "myapp/0" ]; then
+                echo '{"host": "myapp-0"}'
+            else
+                exit 2
+            fi
+        ''')
         fake_script(self, 'relation-set', 'exit 2')
 
         rel_db2 = self.model.relations['db2'][0]
@@ -319,7 +426,13 @@ class TestModel(unittest.TestCase):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
         fake_script(self, 'relation-list',
                     """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
-        fake_script(self, 'relation-get', """([ "$2" = 4 ] && [ "$4" = "myapp/0" ]) && echo '{"host": "myapp-0"}' || exit 2""")
+        fake_script(self, 'relation-get', '''
+            if [ "$2" = 4 ] && [ "$4" = "myapp/0" ]; then
+                echo '{"host": "myapp-0"}'
+            else
+                exit 2
+            fi
+        ''')
 
         rel_db1 = self.model.get_relation('db1')
         with self.assertRaises(ops.model.RelationDataError):
@@ -415,7 +528,8 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(ops.model.ModelError):
             model.resources.fetch('foo')
 
-        fake_script(self, 'resource-get', 'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
+        fake_script(self, 'resource-get',
+                    'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
         self.assertEqual(model.resources.fetch('foo').name, 'foo.tgz')
         self.assertEqual(model.resources.fetch('bar').name, 'bar.tgz')
 
@@ -433,8 +547,10 @@ class TestModel(unittest.TestCase):
             self.assertLessEqual(len(fake_calls), 2)
             pod_spec_call = next(filter(lambda c: c[0] == 'pod-spec-set', calls))
             self.assertEqual(pod_spec_call[:2], ['pod-spec-set', '--file'])
+
             # 8 bytes are used as of python 3.4.0, see Python bug #12015.
-            # Other characters are from POSIX 3.282 (Portable Filename Character Set) a subset of which Python's mkdtemp uses.
+            # Other characters are from POSIX 3.282 (Portable Filename
+            # Character Set) a subset of which Python's mkdtemp uses.
             self.assertRegex(pod_spec_call[2], '.*/tmp[A-Za-z0-9._-]{8}-pod-spec-set')
 
         self.model.pod.set_spec({'foo': 'bar'})
@@ -470,19 +586,24 @@ class TestModel(unittest.TestCase):
         test_cases = [(
             ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'active', 'Green']]),
+            lambda: self.assertEqual(fake_script_calls(self, True),
+                                     [['status-set', '--application=False', 'active', 'Green']]),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'maintenance', 'Yellow']]),
+            lambda: self.assertEqual(
+                fake_script_calls(self, True),
+                [['status-set', '--application=False', 'maintenance', 'Yellow']]),
         ), (
             ops.model.BlockedStatus('Red'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'blocked', 'Red']]),
+            lambda: self.assertEqual(fake_script_calls(self, True),
+                                     [['status-set', '--application=False', 'blocked', 'Red']]),
         ), (
             ops.model.WaitingStatus('White'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertEqual(fake_script_calls(self, True), [['status-set', '--application=False', 'waiting', 'White']]),
+            lambda: self.assertEqual(fake_script_calls(self, True),
+                                     [['status-set', '--application=False', 'waiting', 'White']]),
         )]
 
         for target_status, setup_tools, check_tool_calls in test_cases:
@@ -499,19 +620,23 @@ class TestModel(unittest.TestCase):
         test_cases = [(
             ops.model.ActiveStatus('Green'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertIn(['status-set', '--application=True', 'active', 'Green'], fake_script_calls(self, True)),
+            lambda: self.assertIn(['status-set', '--application=True', 'active', 'Green'],
+                                  fake_script_calls(self, True)),
         ), (
             ops.model.MaintenanceStatus('Yellow'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'], fake_script_calls(self, True)),
+            lambda: self.assertIn(['status-set', '--application=True', 'maintenance', 'Yellow'],
+                                  fake_script_calls(self, True)),
         ), (
             ops.model.BlockedStatus('Red'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertIn(['status-set', '--application=True', 'blocked', 'Red'], fake_script_calls(self, True)),
+            lambda: self.assertIn(['status-set', '--application=True', 'blocked', 'Red'],
+                                  fake_script_calls(self, True)),
         ), (
             ops.model.WaitingStatus('White'),
             lambda: fake_script(self, 'status-set', 'exit 0'),
-            lambda: self.assertIn(['status-set', '--application=True', 'waiting', 'White'], fake_script_calls(self, True)),
+            lambda: self.assertIn(['status-set', '--application=True', 'waiting', 'White'],
+                                  fake_script_calls(self, True)),
         )]
 
         for target_status, setup_tools, check_tool_calls in test_cases:
@@ -561,9 +686,16 @@ class TestModel(unittest.TestCase):
 
     def test_remote_unit_status(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
-        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+        fake_script(self, 'relation-list', '''
+            if [ "$2" = 4 ]; then
+                echo '["remoteapp1/0", "remoteapp1/1"]'
+            else
+                exit 2
+            fi
+        ''')
 
-        remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0', self.model.get_relation('db1').units))
+        remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0',
+                                  self.model.get_relation('db1').units))
 
         test_statuses = (
             ops.model.UnknownStatus(),
@@ -579,7 +711,13 @@ class TestModel(unittest.TestCase):
 
     def test_remote_app_status(self):
         fake_script(self, 'relation-ids', """[ "$1" = db1 ] && echo '["db1:4"]' || echo '[]'""")
-        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0", "remoteapp1/1"]' || exit 2""")
+        fake_script(self, 'relation-list', '''
+            if [ "$2" = 4 ]; then
+                echo '["remoteapp1/0", "remoteapp1/1"]'
+            else
+                exit 2
+            fi
+        ''')
 
         remoteapp1 = self.model.get_relation('db1').app
 
@@ -607,17 +745,22 @@ class TestModel(unittest.TestCase):
         meta.storages = {'disks': None, 'data': None}
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
-        fake_script(self, 'storage-list', """[ "$1" = disks ] && echo '["disks/0", "disks/1"]' || echo '[]'""")
-        fake_script(self, 'storage-get',
-                    """
-                    if [ "$2" = disks/0 ]; then
-                      echo '"/var/srv/disks/0"'
-                    elif [ "$2" = disks/1 ]; then
-                      echo '"/var/srv/disks/1"'
-                    else
-                      exit 2
-                    fi
-                    """)
+        fake_script(self, 'storage-list', '''
+            if [ "$1" = disks ]; then
+                echo '["disks/0", "disks/1"]'
+            else
+                echo '[]'
+            fi
+        ''')
+        fake_script(self, 'storage-get', '''
+            if [ "$2" = disks/0 ]; then
+                echo '"/var/srv/disks/0"'
+            elif [ "$2" = disks/1 ]; then
+                echo '"/var/srv/disks/1"'
+            else
+                exit 2
+            fi
+        ''')
         fake_script(self, 'storage-add', '')
 
         self.assertEqual(len(self.model.storages), 2)
@@ -718,12 +861,19 @@ class TestModel(unittest.TestCase):
             with self.assertRaises(ops.model.ModelError):
                 self.model.get_binding(name)
 
-        fake_script(self, 'network-get', f'''[ "$1" = db0 -a "$3" = 4 ] && echo '{network_get_out}' || exit 1'''),
+        fake_script(self, 'network-get', '''
+            if [ "$1" = db0 ] && [ "$3" = 4 ]; then
+                echo '{}'
+            else
+                exit 1
+            fi
+        '''.format(network_get_out)),
         # Bindings for dead relations are not supported.
         with self.assertRaises(ops.model.ModelError):
             binding = ops.model.Binding('db0', 42, self.model._backend)
             binding.network
-        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'db0', '-r', '42', '--format=json']])
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['network-get', 'db0', '-r', '42', '--format=json']])
 
         expected_calls = [
             ['relation-ids', 'db0', '--format=json'],
@@ -740,21 +890,16 @@ class TestModel(unittest.TestCase):
                                                           ipaddress.ip_network('192.0.3.0/24'),
                                                           ipaddress.ip_network('dead:beef::/64'),
                                                           ipaddress.ip_network('2001:db8::3/128')])
-        self.assertEqual(binding.network.interfaces[0].name, 'lo')
-        self.assertEqual(binding.network.interfaces[0].address, ipaddress.ip_address('192.0.2.2'))
-        self.assertEqual(binding.network.interfaces[0].subnet, ipaddress.ip_network('192.0.2.0/24'))
-        self.assertEqual(binding.network.interfaces[1].name, 'lo')
-        self.assertEqual(binding.network.interfaces[1].address, ipaddress.ip_address('dead:beef::1'))
-        self.assertEqual(binding.network.interfaces[1].subnet, ipaddress.ip_network('dead:beef::/64'))
-        self.assertEqual(binding.network.interfaces[2].name, 'tun')
-        self.assertEqual(binding.network.interfaces[2].address, ipaddress.ip_address('192.0.3.3'))
-        self.assertEqual(binding.network.interfaces[2].subnet, ipaddress.ip_network('192.0.3.3/32'))
-        self.assertEqual(binding.network.interfaces[3].name, 'tun')
-        self.assertEqual(binding.network.interfaces[3].address, ipaddress.ip_address('2001:db8::3'))
-        self.assertEqual(binding.network.interfaces[3].subnet, ipaddress.ip_network('2001:db8::3/128'))
-        self.assertEqual(binding.network.interfaces[4].name, 'tun')
-        self.assertEqual(binding.network.interfaces[4].address, ipaddress.ip_address('fe80::1:1'))
-        self.assertEqual(binding.network.interfaces[4].subnet, ipaddress.ip_network('fe80::/64'))
+
+        for (i, (name, address, subnet)) in enumerate([
+                ('lo', '192.0.2.2', '192.0.2.0/24'),
+                ('lo', 'dead:beef::1', 'dead:beef::/64'),
+                ('tun', '192.0.3.3', '192.0.3.3/32'),
+                ('tun', '2001:db8::3', '2001:db8::3/128'),
+                ('tun', 'fe80::1:1', 'fe80::/64')]):
+            self.assertEqual(binding.network.interfaces[i].name, name)
+            self.assertEqual(binding.network.interfaces[i].address, ipaddress.ip_address(address))
+            self.assertEqual(binding.network.interfaces[i].subnet, ipaddress.ip_network(subnet))
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
 
@@ -776,32 +921,32 @@ class TestModelBackend(unittest.TestCase):
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [(
-            lambda: fake_script(self, 'relation-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'relation-list', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_list(3),
             ops.model.ModelError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-list', f'echo {err_msg} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-list', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_list(3),
             ops.model.RelationNotFoundError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-set', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'relation-set', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.ModelError,
             [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
         ), (
-            lambda: fake_script(self, 'relation-set', f'echo {err_msg} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-set', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
         ), (
-            lambda: fake_script(self, 'relation-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'relation-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.ModelError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-get', f'echo {err_msg} >&2 ; exit 2'),
+            lambda: fake_script(self, 'relation-get', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
@@ -830,27 +975,27 @@ class TestModelBackend(unittest.TestCase):
 
     def test_storage_tool_errors(self):
         test_cases = [(
-            lambda: fake_script(self, 'storage-list', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-list', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_list('foobar'),
             ops.model.ModelError,
             [['storage-list', 'foobar', '--format=json']],
         ), (
-            lambda: fake_script(self, 'storage-get', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_get('foobar', 'someattr'),
             ops.model.ModelError,
             [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
         ), (
-            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=2),
             ops.model.ModelError,
             [['storage-add', 'foobar=2']],
         ), (
-            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=object),
             TypeError,
             [],
         ), (
-            lambda: fake_script(self, 'storage-add', f'echo fooerror >&2 ; exit 1'),
+            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.storage_add('foobar', count=True),
             TypeError,
             [],
@@ -883,26 +1028,30 @@ class TestModelBackend(unittest.TestCase):
     "192.0.2.2"
   ]
 }'''
-        fake_script(self, 'network-get', f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
+        fake_script(self, 'network-get',
+                    '''[ "$1" = deadbeef ] && echo '{}' || exit 1'''.format(network_get_out))
         network_info = self.backend.network_get('deadbeef')
         self.assertEqual(network_info, json.loads(network_get_out))
-        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'deadbeef', '--format=json']])
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['network-get', 'deadbeef', '--format=json']])
 
         network_info = self.backend.network_get('deadbeef', 1)
         self.assertEqual(network_info, json.loads(network_get_out))
-        self.assertEqual(fake_script_calls(self, clear=True), [['network-get', 'deadbeef', '-r', '1', '--format=json']])
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['network-get', 'deadbeef', '-r', '1', '--format=json']])
 
     def test_network_get_errors(self):
         err_no_endpoint = 'ERROR no network config found for binding "$2"'
         err_no_rel = 'ERROR invalid value "$3" for option -r: relation not found'
 
         test_cases = [(
-            lambda: fake_script(self, 'network-get', f'echo {err_no_endpoint} >&2 ; exit 1'),
+            lambda: fake_script(self, 'network-get',
+                                'echo {} >&2 ; exit 1'.format(err_no_endpoint)),
             lambda: self.backend.network_get("deadbeef"),
             ops.model.ModelError,
             [['network-get', 'deadbeef', '--format=json']],
         ), (
-            lambda: fake_script(self, 'network-get', f'echo {err_no_rel} >&2 ; exit 2'),
+            lambda: fake_script(self, 'network-get', 'echo {} >&2 ; exit 2'.format(err_no_rel)),
             lambda: self.backend.network_get("deadbeef", 3),
             ops.model.RelationNotFoundError,
             [['network-get', 'deadbeef', '-r', '3', '--format=json']],
@@ -915,7 +1064,7 @@ class TestModelBackend(unittest.TestCase):
 
     def test_action_get_error(self):
         fake_script(self, 'action-get', '')
-        fake_script(self, 'action-get', f'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-get', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_get()
         calls = [['action-get', '--format=json']]
@@ -923,15 +1072,15 @@ class TestModelBackend(unittest.TestCase):
 
     def test_action_set_error(self):
         fake_script(self, 'action-get', '')
-        fake_script(self, 'action-set', f'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-set', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
-            self.backend.action_set({'foo': 'bar', 'dead': 'beef cafe'})
+            self.backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
         calls = [["action-set", "foo=bar", "dead=beef cafe"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_action_log_error(self):
         fake_script(self, 'action-get', '')
-        fake_script(self, 'action-log', f'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-log', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_log('log-message')
         calls = [["action-log", "log-message"]]
@@ -947,7 +1096,7 @@ class TestModelBackend(unittest.TestCase):
     def test_action_set(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
-        self.backend.action_set({'x': 'dead beef', 'y': 1})
+        self.backend.action_set(OrderedDict([('x', 'dead beef'), ('y', 1)]))
         self.assertEqual(fake_script_calls(self), [['action-set', 'x=dead beef', 'y=1']])
 
     def test_action_fail(self):
@@ -965,7 +1114,8 @@ class TestModelBackend(unittest.TestCase):
     def test_juju_log(self):
         fake_script(self, 'juju-log', 'exit 0')
         self.backend.juju_log('WARNING', 'foo')
-        self.assertEqual(fake_script_calls(self, clear=True), [['juju-log', '--log-level', 'WARNING', 'foo']])
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['juju-log', '--log-level', 'WARNING', 'foo']])
 
         with self.assertRaises(TypeError):
             self.backend.juju_log('DEBUG')
@@ -974,17 +1124,19 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'juju-log', 'exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.juju_log('BAR', 'foo')
-        self.assertEqual(fake_script_calls(self, clear=True), [['juju-log', '--log-level', 'BAR', 'foo']])
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['juju-log', '--log-level', 'BAR', 'foo']])
 
     def test_valid_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
         test_cases = [(
-            {'foo': 42, 'b-ar': 4.5, 'ba_-z': 4.5, 'a': 1},
-            {'de': 'ad', 'be': 'ef_ -'},
-            [['add-metric', '--labels', 'de=ad,be=ef_ -', 'foo=42', 'b-ar=4.5', 'ba_-z=4.5', 'a=1']]
+            OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
+            OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
+            [['add-metric', '--labels', 'de=ad,be=ef_ -',
+              'foo=42', 'b-ar=4.5', 'ba_-z=4.5', 'a=1']]
         ), (
-            {'foo1': 0, 'b2r': 4.5},
-            {'d3': 'aд', 'b33f': '3_ -'},
+            OrderedDict([('foo1', 0), ('b2r', 4.5)]),
+            OrderedDict([('d3', 'aд'), ('b33f', '3_ -')]),
             [['add-metric', '--labels', 'd3=aд,b33f=3_ -', 'foo1=0', 'b2r=4.5']],
         )]
         for metrics, labels, expected_calls in test_cases:
