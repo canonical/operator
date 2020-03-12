@@ -36,7 +36,7 @@ def create_harness(charm_cls, charm_meta_yaml):
 
     :param charm_cls: The Charm class that should be tested. If you are just testing a component,
         you can pass in ops.charm.CharmBase.
-    :rtype charm_cls: CharmBase
+    :type charm_cls: CharmBase
     :param charm_meta_yaml: The YAML metadata for the charm, defining interfaces, name, etc.
         This can be either a string or a file.
     :return: (charm, harness)
