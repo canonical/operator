@@ -20,15 +20,32 @@ from ops.framework import Object, EventSource, EventBase, EventsBase
 
 
 class HookEvent(EventBase):
+    """A base class for events that trigger because of a Juju hook firing."""
     pass
 
 
 class ActionEvent(EventBase):
+    """A base class for events that trigger when a user asks for an Action to be run.
+
+    To read the parameters for the action, see the instance variable `params`.
+    To respond with the result of the action, call `set_results`. To add progress
+    messages that are visible as the action is progressing use `log`.
+
+    :ivar params: The parameters passed to the action (read by action-get)
+    """
 
     def defer(self):
+        """Action events are not deferable like other events.
+
+        This is because an action runs synchronously and the user is waiting for the result.
+        """
         raise RuntimeError('cannot defer action events')
 
     def restore(self, snapshot):
+        """Used by the operator framework to record the action.
+
+        Not meant to be called directly by Charm code.
+        """
         env_action_name = os.environ.get('JUJU_ACTION_NAME')
         event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
         if event_action_name != env_action_name:
@@ -39,62 +56,160 @@ class ActionEvent(EventBase):
         self.params = self.framework.model._backend.action_get()
 
     def set_results(self, results):
+        """Report the result of the action.
+
+        :param results: The result of the action as a Dict
+        :type results: collections.abc.Mapping
+        :rtype: None
+        """
         self.framework.model._backend.action_set(results)
 
     def log(self, message):
+        """Send a message that a user will see while the action is running.
+
+        :param message: The message for the user.
+        :type message: str
+        :rtype: None
+        """
         self.framework.model._backend.action_log(message)
 
     def fail(self, message=''):
+        """Report that this action has failed.
+
+        :param message: Optional message to record why it has failed.
+        :type message: str
+        :rtype: None
+        """
         self.framework.model._backend.action_fail(message)
 
 
 class InstallEvent(HookEvent):
+    """Represents the `install` hook from Juju,
+    triggered by `CharmBase.on.install`"""
     pass
 
 
 class StartEvent(HookEvent):
+    """Represents the `start` hook from Juju,
+    triggered by `CharmBase.on.start`"""
     pass
 
 
 class StopEvent(HookEvent):
+    """Represents the `stop` hook from Juju,
+    triggered by `CharmBase.on.stop`"""
     pass
 
 
 class ConfigChangedEvent(HookEvent):
+    """Represents the `config-changed` hook from Juju,
+    triggered by `CharmBase.on.config_changed`"""
     pass
 
 
 class UpdateStatusEvent(HookEvent):
+    """Represents the `update-status` hook from Juju,
+    triggered by `CharmBase.on.update_status`"""
     pass
 
 
 class UpgradeCharmEvent(HookEvent):
+    """Represents the `upgrade-charm` hook from Juju,
+    triggered by `CharmBase.on.upgrade_charm`.
+
+    This will be triggered when a user has run `juju upgrade-charm`. It is run after Juju
+    has unpacked the upgraded charm code, and so this event will be handled with new code.
+    """
     pass
 
 
 class PreSeriesUpgradeEvent(HookEvent):
+    """Represents the `pre-series-upgrade` hook from Juju, triggered by
+    `CharmBase.on.pre_series_upgrade`.
+
+    This happens when a user has run `juju upgrade-series MACHINE prepare` and
+    will fire for each unit that is running on the machine, telling them that
+    the user is preparing to upgrade the Machine's series (eg trusty->bionic).
+    The charm should take actions to prepare for the upgrade (a database charm
+    would want to write out a version-independent dump of the database, so that
+    when a new version of the database is available in a new series, it can be
+    used.)
+    Once all units on a machine have run `pre-series-upgrade`, the user will
+    initiate the steps to actually upgrade the machine (eg `do-release-upgrade`).
+    When the upgrade has been completed, the `PostSeriesUpgradeEvent`_ will fire.
+    """
     pass
 
 
 class PostSeriesUpgradeEvent(HookEvent):
+    """Represents the `post-series-upgrade` hook from Juju,
+    triggered by `CharmBase.on.post_series_upgrade`.
+
+    This is run after the user has done a distribution upgrade (or rolled back
+    and kept the same series). It is called in response to
+    `juju upgrade-series MACHINE complete`. Charms are expected to do whatever
+    steps are necessary to reconfigure their applications for the new series.
+    """
     pass
 
 
 class LeaderElectedEvent(HookEvent):
+    """Represents the `leader-elected` hook from Juju,
+    triggered by `CharmBase.on.leader_elected`.
+
+    This is triggered by Juju when a new lead unit is chosen for a given application.
+    This represents the leader of the charm information (not necessarily the primary
+    of a running application). The main utility is that charm authors can know
+    that only one unit will be a leader at any given time, so they can do
+    configuration, etc, that would otherwise require coordination between units.
+    (eg, selecting a password for a new relation)
+    """
     pass
 
 
 class LeaderSettingsChangedEvent(HookEvent):
+    """Represents the `leader-settings-changed` hook from Juju,
+    triggered by `CharmBase.on.leader_settings_changed`.
+
+    Deprecated. This represents when a lead unit would call `leader-set` to inform
+    the other units of an application that they have new information to handle.
+    This has been deprecated in favor of using a Peer relation, and having the
+    leader set a value in the Application data bag for that peer relation.
+    (see `RelationChangedEvent`_).
+    """
     pass
 
 
 class CollectMetricsEvent(HookEvent):
+    """Represents the `collect-metrics` hook from Juju,
+    triggered by `CharmBase.on.collect_metrics`.
+
+    Note that events firing during a CollectMetricsEvent are currently
+    sandboxed in how they can interact with Juju. To report metrics
+    use `add_metrics`_.
+    """
 
     def add_metrics(self, metrics, labels=None):
+        """Record metrics that have been gathered by the charm for this unit.
+
+        :param metrics: A collection of {key: float} pairs that contains the
+          metrics that have been gathered
+        :param labels: Optional {key:value} strings that can be applied to the
+            metrics that are being gathered
+        :rtype: None
+        """
         self.framework.model._backend.add_metrics(metrics, labels)
 
 
 class RelationEvent(HookEvent):
+    """A base class representing the various relation lifecycle events.
+
+    :ivar relation: The Relation involved in this event
+    :ivar app: The remote application that has triggered this event
+    :ivar unit: The remote unit that has triggered this event. This may be None
+        if the relation event was triggered as an Application level event
+    """
+
     def __init__(self, handle, relation, app=None, unit=None):
         super().__init__(handle)
 
@@ -107,6 +222,10 @@ class RelationEvent(HookEvent):
         self.unit = unit
 
     def snapshot(self):
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by Charm code.
+        """
         snapshot = {
             'relation_name': self.relation.name,
             'relation_id': self.relation.id,
@@ -118,6 +237,10 @@ class RelationEvent(HookEvent):
         return snapshot
 
     def restore(self, snapshot):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by Charm code.
+        """
         self.relation = self.framework.model.get_relation(
             snapshot['relation_name'], snapshot['relation_id'])
 
@@ -135,34 +258,75 @@ class RelationEvent(HookEvent):
 
 
 class RelationJoinedEvent(RelationEvent):
+    """Represents the `relation-joined` hook from Juju,
+    triggered by `CharmBase.on[RELATION].relation_joined`.
+
+    This is triggered whenever a new unit of a related application joins the relation.
+    (eg, a unit was added to an existing related app, or a new relation was established
+    with an application that already had units.)
+    """
     pass
 
 
 class RelationChangedEvent(RelationEvent):
+    """Represents the `relation-changed` hook from Juju,
+    triggered by `CharmBase.on[RELATION].relation_changed`.
+
+    This is triggered whenever there is a change to the data bucket for a related
+    application or unit. Look at `event.relation.data[event.unit/app]` to see the
+    new information.
+    """
     pass
 
 
 class RelationDepartedEvent(RelationEvent):
+    """Represents the `relation-departed` hook from Juju,
+    triggered by `CharmBase.on[RELATION].relation_departed`.
+
+    This is the inverse of the RelationJoinedEvent, representing when a unit
+    is leaving the relation (the unit is being removed, the app is being removed,
+    the relation is being removed). It is fired once for each unit that is
+    going away.
+    """
     pass
 
 
 class RelationBrokenEvent(RelationEvent):
+    """Represents the `relation-broken` hook from Juju,
+    triggered by `CharmBase.on[RELATION].relation_broken`.
+
+    If a relation is being removed (`juju remove-relation` or `juju remove-application`),
+    once all the units have been removed, RelationBrokenEvent will fire to signal
+    that the relationship has been fully terminated.
+    """
     pass
 
 
 class StorageEvent(HookEvent):
+    """Base class representing Storage related events."""
     pass
 
 
 class StorageAttachedEvent(StorageEvent):
+    """Represents the `storage-attached` hook from Juju,
+    triggered by `CharmBase.on[STORAGE].storage_attached`.
+
+    Called when new storage is available for the charm to use.
+    """
     pass
 
 
 class StorageDetachingEvent(StorageEvent):
+    """Represents the `storage-detaching` hook from Juju,
+    triggered by `CharmBase.on.storage_detaching`.
+
+    Called when storage a charm has been using is going away.
+    """
     pass
 
 
 class CharmEvents(EventsBase):
+    """The events that are generated by Juju in response to the lifecycle of an application."""
 
     install = EventSource(InstallEvent)
     start = EventSource(StartEvent)
@@ -178,6 +342,10 @@ class CharmEvents(EventsBase):
 
 
 class CharmBase(Object):
+    """Base class that represents the Charm overall.
+
+    :cvar on: Defines all events that the Charm will fire.
+    """
 
     on = CharmEvents()
 
@@ -202,18 +370,34 @@ class CharmBase(Object):
 
     @property
     def app(self):
+        """The Application that this unit is part of.
+
+        :rtype: ops.model.Application
+        """
         return self.framework.model.app
 
     @property
     def unit(self):
+        """The Unit that this execution is responsible for.
+
+        :rtype: ops.model.Unit
+        """
         return self.framework.model.unit
 
     @property
     def meta(self):
+        """The CharmMeta of this charm.
+
+        :rtype: ops.charm.CharmMeta
+        """
         return self.framework.meta
 
     @property
     def charm_dir(self):
+        """The root directory of the Charm as it is running.
+
+        :rtype: pathlib.Path
+        """
         return self.framework.charm_dir
 
 
@@ -265,6 +449,12 @@ class CharmMeta:
 
     @classmethod
     def from_yaml(cls, metadata, actions=None):
+        """"Instantiate a CharmMeta from a YAML description of metadata.yaml.
+
+        :param metadata: A YAML description of charm metadata (name, relations, etc.)
+            This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
+        :param actions: Optional YAML description of Actions for this charm (eg actions.yaml)
+        """
         meta = yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
@@ -322,6 +512,7 @@ class PayloadMeta:
 
 
 class ActionMeta:
+    """Object containing metadata about an action's definition."""
 
     def __init__(self, name, raw=None):
         raw = raw or {}
