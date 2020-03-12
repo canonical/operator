@@ -352,7 +352,7 @@ start:
             {},
         )]
 
-        logger.debug('Expected events {}'.format(events_under_test))
+        logger.debug('Expected events %s', events_under_test)
 
         # First run "install" to make sure all hooks are set up.
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))

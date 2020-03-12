@@ -82,8 +82,9 @@ def _create_event_link(charm, bound_event):
 
         # Ignore the non-symlink files or directories
         # assuming the charm author knows what they are doing.
-        logger.debug('Creating a new relative symlink at {} pointing to {}'.format(
-            event_path, target_path))
+        logger.debug(
+            'Creating a new relative symlink at %s pointing to %s',
+            event_path, target_path)
         event_path.symlink_to(target_path)
 
 
@@ -117,13 +118,13 @@ def _emit_charm_event(charm, event_name):
     try:
         event_to_emit = getattr(charm.on, event_name)
     except AttributeError:
-        logger.debug("event {} not defined for {}".format(event_name, charm))
+        logger.debug("event %s not defined for %s", event_name, charm)
 
     # If the event is not supported by the charm implementation, do
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        logger.debug('Emitting Juju event {}'.format(event_name))
+        logger.debug('Emitting Juju event %s', event_name)
         event_to_emit.emit(*args, **kwargs)
 
 
