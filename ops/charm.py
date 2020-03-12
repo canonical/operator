@@ -21,6 +21,7 @@ from ops.framework import Object, EventSource, EventBase, EventsBase
 
 class HookEvent(EventBase):
     """A base class for events that trigger because of a Juju hook firing."""
+
     pass
 
 
@@ -85,31 +86,41 @@ class ActionEvent(EventBase):
 
 class InstallEvent(HookEvent):
     """Represents the `install` hook from Juju,
-    triggered by `CharmBase.on.install`"""
+    triggered by `CharmBase.on.install`
+    """
+
     pass
 
 
 class StartEvent(HookEvent):
     """Represents the `start` hook from Juju,
-    triggered by `CharmBase.on.start`"""
+    triggered by `CharmBase.on.start`
+    """
+
     pass
 
 
 class StopEvent(HookEvent):
     """Represents the `stop` hook from Juju,
-    triggered by `CharmBase.on.stop`"""
+    triggered by `CharmBase.on.stop`
+    """
+
     pass
 
 
 class ConfigChangedEvent(HookEvent):
     """Represents the `config-changed` hook from Juju,
-    triggered by `CharmBase.on.config_changed`"""
+    triggered by `CharmBase.on.config_changed`
+    """
+
     pass
 
 
 class UpdateStatusEvent(HookEvent):
     """Represents the `update-status` hook from Juju,
-    triggered by `CharmBase.on.update_status`"""
+    triggered by `CharmBase.on.update_status`
+    """
+
     pass
 
 
@@ -120,6 +131,7 @@ class UpgradeCharmEvent(HookEvent):
     This will be triggered when a user has run `juju upgrade-charm`. It is run after Juju
     has unpacked the upgraded charm code, and so this event will be handled with new code.
     """
+
     pass
 
 
@@ -138,6 +150,7 @@ class PreSeriesUpgradeEvent(HookEvent):
     initiate the steps to actually upgrade the machine (eg `do-release-upgrade`).
     When the upgrade has been completed, the `PostSeriesUpgradeEvent`_ will fire.
     """
+
     pass
 
 
@@ -150,6 +163,7 @@ class PostSeriesUpgradeEvent(HookEvent):
     `juju upgrade-series MACHINE complete`. Charms are expected to do whatever
     steps are necessary to reconfigure their applications for the new series.
     """
+
     pass
 
 
@@ -164,6 +178,7 @@ class LeaderElectedEvent(HookEvent):
     configuration, etc, that would otherwise require coordination between units.
     (eg, selecting a password for a new relation)
     """
+
     pass
 
 
@@ -177,6 +192,7 @@ class LeaderSettingsChangedEvent(HookEvent):
     leader set a value in the Application data bag for that peer relation.
     (see `RelationChangedEvent`_).
     """
+
     pass
 
 
@@ -265,6 +281,7 @@ class RelationJoinedEvent(RelationEvent):
     (eg, a unit was added to an existing related app, or a new relation was established
     with an application that already had units.)
     """
+
     pass
 
 
@@ -276,6 +293,7 @@ class RelationChangedEvent(RelationEvent):
     application or unit. Look at `event.relation.data[event.unit/app]` to see the
     new information.
     """
+
     pass
 
 
@@ -288,6 +306,7 @@ class RelationDepartedEvent(RelationEvent):
     the relation is being removed). It is fired once for each unit that is
     going away.
     """
+
     pass
 
 
@@ -299,11 +318,13 @@ class RelationBrokenEvent(RelationEvent):
     once all the units have been removed, RelationBrokenEvent will fire to signal
     that the relationship has been fully terminated.
     """
+
     pass
 
 
 class StorageEvent(HookEvent):
     """Base class representing Storage related events."""
+
     pass
 
 
@@ -313,6 +334,7 @@ class StorageAttachedEvent(StorageEvent):
 
     Called when new storage is available for the charm to use.
     """
+
     pass
 
 
@@ -322,6 +344,7 @@ class StorageDetachingEvent(StorageEvent):
 
     Called when storage a charm has been using is going away.
     """
+
     pass
 
 
@@ -449,7 +472,7 @@ class CharmMeta:
 
     @classmethod
     def from_yaml(cls, metadata, actions=None):
-        """"Instantiate a CharmMeta from a YAML description of metadata.yaml.
+        """Instantiate a CharmMeta from a YAML description of metadata.yaml.
 
         :param metadata: A YAML description of charm metadata (name, relations, etc.)
             This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
