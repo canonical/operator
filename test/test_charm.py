@@ -89,6 +89,18 @@ class TestCharm(unittest.TestCase):
 
         self.assertEqual(charm.started, True)
 
+    def test_helper_properties(self):
+        framework = self.create_framework()
+
+        class MyCharm(CharmBase):
+            pass
+
+        charm = MyCharm(framework, None)
+        self.assertEqual(charm.app, framework.model.app)
+        self.assertEqual(charm.unit, framework.model.unit)
+        self.assertEqual(charm.meta, framework.meta)
+        self.assertEqual(charm.charm_dir, framework.charm_dir)
+
     def test_relation_events(self):
 
         class MyCharm(CharmBase):
