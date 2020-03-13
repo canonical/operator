@@ -901,8 +901,11 @@ class TestModelBindings(unittest.TestCase):
                 self.model.get_binding(name)
 
     def test_dead_relations(self):
-        fake_script(self, 'network-get', '''[ "$1" = db0 -a "$2" = --format=json ] && echo '{}' || '''.format(self.network_get_out) +
-                                         '''{ echo ERROR invalid value "$2" for option -r: relation not found >&2 ; exit 2; }'''),
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 -a "$2" = --format=json ]'''
+                    ''' && echo '{}' || '''.format(self.network_get_out) +
+                    '''{ echo ERROR invalid value "$2" for option -r: '''
+                    '''relation not found >&2 ; exit 2; }'''),
         # Validate the behavior for dead relations.
         binding = ops.model.Binding('db0', 42, self.model._backend)
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
@@ -912,7 +915,8 @@ class TestModelBindings(unittest.TestCase):
         ])
 
     def test_binding_by_relation_name(self):
-        fake_script(self, 'network-get', '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
         binding_name = 'db0'
         expected_calls = [['network-get', 'db0', '--format=json']]
 
@@ -921,7 +925,8 @@ class TestModelBindings(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
     def test_binding_by_relation(self):
-        fake_script(self, 'network-get', '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
         binding_name = 'db0'
         expected_calls = [
             ['relation-ids', 'db0', '--format=json'],

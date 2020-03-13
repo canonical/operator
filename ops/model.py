@@ -65,9 +65,10 @@ class Model:
 
         binding_key -- The relation name or instance to obtain bindings for.
 
-        If binding_key is a relation name, the method returns the default binding for that relation.
-        If a relation instance is provided, the method first looks up a more specific binding for that specific relation ID,
-        and if none is found falls back to the default binding for the relation name.
+        If binding_key is a relation name, the method returns the default binding for that
+        relation. If a relation instance is provided, the method first looks up a more specific
+        binding for that specific relation ID, and if none is found falls back to the default
+        binding for the relation name.
         """
         return self._bindings.get(binding_key)
 
@@ -283,7 +284,8 @@ class BindingMapping:
             binding_name = binding_key
             relation_id = None
         else:
-            raise ModelError('binding key must be str or relation instance, not {}'.format(type(binding_key).__name__))
+            raise ModelError('binding key must be str or relation instance, not {}'
+                             ''.format(type(binding_key).__name__))
         binding = self._data.get(binding_key)
         if binding is None:
             binding = Binding(binding_name, relation_id, self._backend)
@@ -308,7 +310,8 @@ class Binding:
             except RelationNotFoundError:
                 if self._relation_id is None:
                     raise
-                # If a relation is dead, we can still get network info associated with an endpoint itself
+                # If a relation is dead, we can still get network info associated with an
+                # endpoint itself
                 self._network = Network(self._backend.network_get(self.name))
         return self._network
 
