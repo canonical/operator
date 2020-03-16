@@ -21,4 +21,4 @@ install:
     - pip3 install pyyaml autopep8 flake8
 
 script:
-    - make test
+    - ./run_tests
