@@ -901,11 +901,17 @@ class TestModelBindings(unittest.TestCase):
                 self.model.get_binding(name)
 
     def test_dead_relations(self):
-        fake_script(self, 'network-get',
-                    '''[ "$1" = db0 -a "$2" = --format=json ]'''
-                    ''' && echo '{}' || '''.format(self.network_get_out) +
-                    '''{ echo ERROR invalid value "$2" for option -r: '''
-                    '''relation not found >&2 ; exit 2; }'''),
+        fake_script(
+            self,
+            'network-get',
+            '''
+                if [ "$1" = db0 ] && [ "$2" = --format=json ]; then
+                    echo '{}'
+                else
+                    echo ERROR invalid value "$2" for option -r: relation not found >&2
+                    exit 2
+                fi
+            '''.format(self.network_get_out))
         # Validate the behavior for dead relations.
         binding = ops.model.Binding('db0', 42, self.model._backend)
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
