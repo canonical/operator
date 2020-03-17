@@ -31,7 +31,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_add_relation(self):
         # language=YAML
-        harness = Harness(CharmBase, '''
+        harness = Harness('''
             name: test-app
             requires:
                 db:
@@ -45,7 +45,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_add_relation_and_unit(self):
         # language=YAML
-        harness = Harness(CharmBase, '''
+        harness = Harness('''
             name: test-app
             requires:
                 db:
@@ -63,7 +63,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_read_relation_data(self):
         # language=YAML
-        harness = Harness(CharmBase, '''
+        harness = Harness('''
             name: test-app
             requires:
                 db:
@@ -81,13 +81,13 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_create_harness(self):
         # language=YAML
-        harness = Harness(CharmBase, '''
+        harness = Harness('''
             name: my-charm
             requires:
               db:
                 interface: pgsql
             ''')
-        charm = harness.charm
+        charm = harness.initialize(CharmBase)
         helper = DBRelationChangedHelper(charm, "helper")
         rel_id = harness.add_relation('db', 'postgresql')
         relation = charm.model.get_relation('db', rel_id)
@@ -97,22 +97,26 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_create_harness_twice(self):
         # language=YAML
-        harness1 = Harness(CharmBase, '''
+        harness1 = Harness('''
             name: my-charm
             requires:
               db:
                 interface: pgsql
             ''')
         # language=YAML
-        harness2 = Harness(CharmBase, '''
+        harness2 = Harness('''
             name: my-charm
             requires:
               db:
                 interface: pgsql
             ''')
-        helper1 = DBRelationChangedHelper(harness1.charm, "helper1")
-        helper2 = DBRelationChangedHelper(harness2.charm, "helper2")
+        charm1 = harness1.initialize(CharmBase)
+        charm2 = harness2.initialize(CharmBase)
+        helper1 = DBRelationChangedHelper(charm1, "helper1")
+        helper2 = DBRelationChangedHelper(charm2, "helper2")
         rel_id = harness2.add_relation('db', 'postgresql')
+        harness1.enable_events(charm1)
+        harness2.enable_events(charm2)
         harness2.update_relation_data(rel_id, 'postgresql', {'key': 'value'})
         # Helper2 should see the event triggered by harness2, but helper1 should see no events.
         self.assertEqual(helper1.changes, [])
@@ -120,14 +124,15 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_update_relation_exposes_new_data(self):
         # language=YAML
-        harness = Harness(CharmBase, '''
+        harness = Harness('''
             name: my-charm
             requires:
               db:
                 interface: pgsql
             ''')
-
-        viewer = RelationChangedViewer(harness.charm, 'db')
+        charm = harness.initialize(CharmBase)
+        harness.enable_events(charm)
+        viewer = RelationChangedViewer(charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
@@ -137,13 +142,15 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_update_relation_remove_data(self):
         # language=YAML
-        harness = Harness(CharmBase, '''
+        harness = Harness('''
             name: my-charm
             requires:
               db:
                 interface: pgsql
             ''')
-        viewer = RelationChangedViewer(harness.charm, 'db')
+        charm = harness.initialize(CharmBase)
+        harness.enable_events(charm)
+        viewer = RelationChangedViewer(charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': ''})
@@ -151,10 +158,11 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_update_config(self):
         # language=YAML
-        harness = Harness(RecordingCharm, '''
+        harness = Harness('''
             name: my-charm
             ''')
-        charm = harness.charm
+        charm = harness.initialize(RecordingCharm)
+        harness.enable_events(charm)
         harness.update_config(key_values={'a': 'foo', 'b': 2})
         self.assertEqual(charm.changes, [{'name': 'config', 'data': {'a': 'foo', 'b': 2}}])
         harness.update_config(key_values={'b': 3})
@@ -169,12 +177,13 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_set_leader(self):
         # language=YAML
-        harness = Harness(RecordingCharm, '''
+        harness = Harness('''
             name: my-charm
             ''')
         # No event happens here
         harness.set_leader(False)
-        charm = harness.charm
+        charm = harness.initialize(RecordingCharm)
+        harness.enable_events(charm)
         self.assertFalse(charm.model.unit.is_leader())
         harness.set_leader(True)
         self.assertEqual(charm.changes, [{'name': 'leader-elected'}])
@@ -182,7 +191,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_relation_set_app_not_leader(self):
         # language=YAML
-        harness = Harness(RecordingCharm, '''
+        harness = Harness('''
             name: test-charm
             requires:
                 db:
@@ -191,7 +200,8 @@ class TestTestingHarness(unittest.TestCase):
         harness.set_leader(False)
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0')
-        charm = harness.charm
+        charm = harness.initialize(RecordingCharm)
+        harness.enable_events(charm)
         rel = charm.model.get_relation('db')
         with self.assertRaises(ModelError):
             rel.data[charm.model.app]['foo'] = 'bar'
