@@ -32,7 +32,7 @@ class Harness:
 
         Example::
 
-        harness = TestingHarness(MyCharm, '''
+        harness = Harness(MyCharm, '''
                 name: my-charm
                 requires:
                   db:
