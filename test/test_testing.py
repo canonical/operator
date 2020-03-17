@@ -24,14 +24,14 @@ from ops.framework import (
 from ops.model import (
     ModelError,
 )
-from ops.testing import create_harness
+from ops.testing import Harness
 
 
 class TestTestingHarness(unittest.TestCase):
 
     def test_add_relation(self):
         # language=YAML
-        harness = create_harness(CharmBase, '''
+        harness = Harness(CharmBase, '''
             name: test-app
             requires:
                 db:
@@ -39,13 +39,13 @@ class TestTestingHarness(unittest.TestCase):
             ''')
         rel_id = harness.add_relation('db', 'postgresql')
         self.assertIsInstance(rel_id, int)
-        backend = harness._get_backend()
+        backend = harness._backend
         self.assertEqual([rel_id], backend.relation_ids('db'))
         self.assertEqual([], backend.relation_list(rel_id))
 
     def test_add_relation_and_unit(self):
         # language=YAML
-        harness = create_harness(CharmBase, '''
+        harness = Harness(CharmBase, '''
             name: test-app
             requires:
                 db:
@@ -55,7 +55,7 @@ class TestTestingHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql', remote_app_data={'app': 'data'})
         self.assertIsInstance(rel_id, int)
         harness.add_relation_unit(rel_id, remote_unit, remote_unit_data={'foo': 'bar'})
-        backend = harness._get_backend()
+        backend = harness._backend
         self.assertEqual([rel_id], backend.relation_ids('db'))
         self.assertEqual([remote_unit], backend.relation_list(rel_id))
         self.assertEqual({'foo': 'bar'}, backend.relation_get(rel_id, remote_unit, is_app=False))
@@ -63,7 +63,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_read_relation_data(self):
         # language=YAML
-        harness = create_harness(CharmBase, '''
+        harness = Harness(CharmBase, '''
             name: test-app
             requires:
                 db:
@@ -81,7 +81,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_create_harness(self):
         # language=YAML
-        harness = create_harness(CharmBase, '''
+        harness = Harness(CharmBase, '''
             name: my-charm
             requires:
               db:
@@ -97,14 +97,14 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_create_harness_twice(self):
         # language=YAML
-        harness1 = create_harness(CharmBase, '''
+        harness1 = Harness(CharmBase, '''
             name: my-charm
             requires:
               db:
                 interface: pgsql
             ''')
         # language=YAML
-        harness2 = create_harness(CharmBase, '''
+        harness2 = Harness(CharmBase, '''
             name: my-charm
             requires:
               db:
@@ -120,7 +120,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_update_relation_exposes_new_data(self):
         # language=YAML
-        harness = create_harness(CharmBase, '''
+        harness = Harness(CharmBase, '''
             name: my-charm
             requires:
               db:
@@ -137,7 +137,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_update_relation_remove_data(self):
         # language=YAML
-        harness = create_harness(CharmBase, '''
+        harness = Harness(CharmBase, '''
             name: my-charm
             requires:
               db:
@@ -151,7 +151,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_update_config(self):
         # language=YAML
-        harness = create_harness(RecordingCharm, '''
+        harness = Harness(RecordingCharm, '''
             name: my-charm
             ''')
         charm = harness.charm
@@ -169,7 +169,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_set_leader(self):
         # language=YAML
-        harness = create_harness(RecordingCharm, '''
+        harness = Harness(RecordingCharm, '''
             name: my-charm
             ''')
         # No event happens here
@@ -182,7 +182,7 @@ class TestTestingHarness(unittest.TestCase):
 
     def test_relation_set_app_not_leader(self):
         # language=YAML
-        harness = create_harness(RecordingCharm, '''
+        harness = Harness(RecordingCharm, '''
             name: test-charm
             requires:
                 db:
@@ -240,10 +240,10 @@ class RecordingCharm(CharmBase):
         self.framework.observe(self.on.config_changed, self.on_config_changed)
         self.framework.observe(self.on.leader_elected, self.on_leader_elected)
 
-    def on_config_changed(self, event):
+    def on_config_changed(self, _):
         self.changes.append(dict(name='config', data=dict(self.framework.model.config)))
 
-    def on_leader_elected(self, event):
+    def on_leader_elected(self, _):
         self.changes.append(dict(name='leader-elected'))
 
 

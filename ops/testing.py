@@ -17,7 +17,8 @@ from textwrap import dedent
 from ops import charm, framework, model
 
 
-class TestingHarness:
+# noinspection PyProtectedMember
+class Harness:
     """This class represents a way to build up the model that will drive a test suite.
 
     The model that is created is from the viewpoint of the charm that you are testing.
@@ -42,8 +43,8 @@ class TestingHarness:
         # Check that charm has properly handled the relation_joined event for postgresql/0
         self.assertEqual(harness.charm.
 
-        :param charm_cls: The Charm class that should be tested. If you are just testing a component,
-            you can pass in ops.charm.CharmBase.
+        :param charm_cls: The Charm class that should be tested. If you are just testing a
+            component, you can pass in ops.charm.CharmBase.
         :type charm_cls: CharmBase
         :param charm_meta_yaml: The YAML metadata for the charm, defining interfaces, name, etc.
             This can be either a string or a file.
@@ -54,10 +55,11 @@ class TestingHarness:
             charm_meta_yaml = dedent(charm_meta_yaml)
         meta = charm.CharmMeta.from_yaml(charm_meta_yaml)
 
-        # The Framework adds attributes to class objects for events, etc. As such, we can't re-use a
-        # class for against mulitple Frameworks. So create a locally defined class and register it.
-        # TODO: jam 2020-03-16 We are looking to changes this to Instance attributes instead of Class
-        #  attributes which should clean up this ugliness. The API stays the same either way.
+        # The Framework adds attributes to class objects for events, etc. As such, we can't re-use
+        # the original class against multiple Frameworks. So create a locally defined class
+        # and register it.
+        # TODO: jam 2020-03-16 We are looking to changes this to Instance attributes instead of
+        #       Class attributes which should clean up this ugliness. The API can stay the same
         class TestEvents(charm_cls.on.__class__):
             pass
 
@@ -88,12 +90,13 @@ class TestingHarness:
         self._relation_id_counter += 1
         return rel_id
 
-    def add_relation(self, relation_name, remote_app, remote_app_data={}):
-        """Declare that there is a new relation between this app and `remote_app`
+    def add_relation(self, relation_name, remote_app, remote_app_data=None):
+        """Declare that there is a new relation between this app and `remote_app`.
 
         TODO: Once relation_created exists as a Juju hook, it should be triggered by this code.
 
         :param relation_name: The relation on Charm that is being related to
+        :param remote_app: The name of the application that is being related to
         :param remote_app_data: Optional data bag that the remote application is sending
           If remote_app_data is not empty, this should trigger
           ``charm.on[relation_name].relation_changed(app)``
@@ -104,6 +107,8 @@ class TestingHarness:
         self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
         self._backend._relation_names[rel_id] = relation_name
         self._backend._relation_list_map[rel_id] = []
+        if remote_app_data is None:
+            remote_app_data = {}
         self._backend._relation_data[rel_id] = {
             remote_app: remote_app_data,
             self._backend.unit_name: {},
@@ -112,10 +117,10 @@ class TestingHarness:
         # Reload the relation_ids list
         self.model.relations._invalidate(relation_name)
         # TODO: jam 2020-03-05 We should be triggering relation_changed(app) if
-        # remote_app_data isn't empty.
+        #       remote_app_data isn't empty.
         return rel_id
 
-    def add_relation_unit(self, relation_id, remote_unit_name, remote_unit_data={}):
+    def add_relation_unit(self, relation_id, remote_unit_name, remote_unit_data=None):
         """Add a new unit to a relation.
 
         Example::
@@ -126,7 +131,7 @@ class TestingHarness:
         This will trigger a `relation_joined` event and a `relation_changed` event.
 
         :param relation_id: The integer relation identifier (as returned by add_relation).
-        :type relation_id: str
+        :type relation_id: int
         :param remote_unit_name: A string representing the remote unit that is being added.
         :type remote_unit_name: str
         :param remote_unit_data: Optional data bag containing data that will be seeded in
@@ -135,6 +140,8 @@ class TestingHarness:
         :return: None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
+        if remote_unit_data is None:
+            remote_unit_data = {}
         self._backend._relation_data[relation_id][remote_unit_name] = remote_unit_data
         relation_name = self._backend._relation_names[relation_id]
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
@@ -217,19 +224,20 @@ class TestingHarness:
             args = (relation, app)
         self.charm.on[rel_name].relation_changed.emit(*args)
 
-    def update_config(self, key_values={}, unset=()):
+    def update_config(self, key_values=None, unset=()):
         """Update the config as seen by the charm, and trigger a config_changed event.
 
         This will trigger a `config_changed` event.
 
-        :param key_values: A dict of key:value pairs to update in config.
+        :param key_values: A Mapping of key:value pairs to update in config.
         :param unset: An iterable of keys to remove from Config. (Note that this does
           not currently reset the config values to the default defined in config.yaml.
         :return: None
         """
         config = self._backend._config
-        for key, value in key_values.items():
-            config[key] = value
+        if key_values is not None:
+            for key, value in key_values.items():
+                config[key] = value
         for key in unset:
             config.pop(key, None)
         # NOTE: jam 2020-03-01 Note that this sort of works "by accident". Config
