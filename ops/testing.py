@@ -39,11 +39,13 @@ class Harness:
                     interface: pgsql
                 ''')
         charm = harness.initialize(MyCharm)
-        harness.enable_events(charm)
+        # Do initial setup here
         relation_id = harness.add_relation('db', 'postgresql')
+        # Now enable the charm to see events as the model changes
+        harness.enable_events(charm)
         harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'value'})
         # Check that charm has properly handled the relation_joined event for postgresql/0
-        self.assertEqual(harness.charm.
+        self.assertEqual(harness.charm. ...)
 
         :param charm_meta_yaml: The YAML metadata for the charm, defining interfaces, name, etc.
             This can be either a string or a file.
@@ -169,11 +171,11 @@ class Harness:
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
         self.model.relations._invalidate(relation_name)
-        if self._charm is None:
-            return
         remote_unit = self.model.get_unit(remote_unit_name)
         relation = self.model.get_relation(relation_name, relation_id)
         relation.data[remote_unit]._invalidate()
+        if self._charm is None:
+            return
         self._charm.on[relation_name].relation_joined.emit(
             relation, remote_unit.app, remote_unit)
         # TODO: jam 2020-03-05 Do we only emit relation_changed if remote_unit_data isn't
