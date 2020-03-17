@@ -17,66 +17,6 @@ from textwrap import dedent
 from ops import charm, framework, model
 
 
-def create_harness(charm_cls, charm_meta_yaml):
-    """Used for testing your Charm or component implementations.
-
-    This ensures that you have an instance of `charm_cls` that can be driven by a TestingHarness.
-
-    Example::
-
-        harness = create_harness(MyCharm, '''
-            name: my-charm
-            requires:
-              db:
-                interface: pgsql
-            ''')
-        relation_id = harness.add_relation('db', 'postgresql')
-        harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'value'})
-        # Check that charm has properly handled the relation_joined event for postgresql/0
-        self.assertEqual(harness.charm.
-
-    :param charm_cls: The Charm class that should be tested. If you are just testing a component,
-        you can pass in ops.charm.CharmBase.
-    :type charm_cls: CharmBase
-    :param charm_meta_yaml: The YAML metadata for the charm, defining interfaces, name, etc.
-        This can be either a string or a file.
-    :return: harness
-    :rtype: TestingHarness
-    """
-    # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
-    #  it would define the default values of config that the charm would see.
-    if isinstance(charm_meta_yaml, str):
-        charm_meta_yaml = dedent(charm_meta_yaml)
-    meta = charm.CharmMeta.from_yaml(charm_meta_yaml)
-
-    # The Framework mutates class objects to build attributes for events, etc. That makes
-    # attribute access easy. However, it means you can't register the same class with
-    # multiple framework instances. So instead we dynamically create a new event class
-    # and charm class
-    # and register those with the framework.
-    class TestEvents(charm_cls.on.__class__):
-        pass
-
-    TestEvents.__name__ = charm_cls.on.__class__.__name__
-
-    class TestCharm(charm_cls):
-        on = TestEvents()
-
-    # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
-    # rather than TestCharm has no attribute foo.
-    TestCharm.__name__ = charm_cls.__name__
-
-    unit_name = meta.name + '/0'
-    harness = TestingHarness(unit_name)
-    the_model = model.Model(unit_name, meta, harness._get_backend())
-    the_framework = framework.Framework(":memory:", "no-disk-path", meta, the_model)
-    the_charm = TestCharm(the_framework, meta.name)
-    # noinspection PyProtectedMember
-    harness._register_charm(the_charm)
-    return harness
-
-
-# noinspection PyProtectedMember
 class TestingHarness:
     """This class represents a way to build up the model that will drive a test suite.
 
@@ -86,26 +26,62 @@ class TestingHarness:
     :type charm: CharmBase
     """
 
-    def __init__(self, unit_name):
-        """Create a testing harness that can drive a Model"""
+    def __init__(self, charm_cls, charm_meta_yaml):
+        """Used for testing your Charm or component implementations.
+
+        Example::
+
+        harness = TestingHarness(MyCharm, '''
+                name: my-charm
+                requires:
+                  db:
+                    interface: pgsql
+                ''')
+        relation_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'value'})
+        # Check that charm has properly handled the relation_joined event for postgresql/0
+        self.assertEqual(harness.charm.
+
+        :param charm_cls: The Charm class that should be tested. If you are just testing a component,
+            you can pass in ops.charm.CharmBase.
+        :type charm_cls: CharmBase
+        :param charm_meta_yaml: The YAML metadata for the charm, defining interfaces, name, etc.
+            This can be either a string or a file.
+        """
+        # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
+        #  it would define the default values of config that the charm would see.
+        if isinstance(charm_meta_yaml, str):
+            charm_meta_yaml = dedent(charm_meta_yaml)
+        meta = charm.CharmMeta.from_yaml(charm_meta_yaml)
+
+        # The Framework adds attributes to class objects for events, etc. As such, we can't re-use a
+        # class for against mulitple Frameworks. So create a locally defined class and register it.
+        # TODO: jam 2020-03-16 We are looking to changes this to Instance attributes instead of Class
+        #  attributes which should clean up this ugliness. The API stays the same either way.
+        class TestEvents(charm_cls.on.__class__):
+            pass
+
+        TestEvents.__name__ = charm_cls.on.__class__.__name__
+
+        class TestCharm(charm_cls):
+            on = TestEvents()
+
+        # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
+        # rather than TestCharm has no attribute foo.
+        TestCharm.__name__ = charm_cls.__name__
+
+        unit_name = meta.name + '/0'
         self.unit_name = unit_name
         self._backend = _TestingModelBackend(unit_name)
         self._relation_id_counter = 0
-        self.charm = None
 
-    def _get_backend(self):
-        return self._backend
+        the_model = model.Model(unit_name, meta, self._backend)
+        the_framework = framework.Framework(":memory:", "no-disk-path", meta, the_model)
+        self.charm = TestCharm(the_framework, meta.name)
 
     @property
     def model(self):
         return self.charm.model
-
-    def _register_charm(self, charm):
-        if self.charm is not None:
-            raise RuntimeError(
-                "registering charm {} while {} is already registered".format(
-                    charm, self.charm))
-        self.charm = charm
 
     def _next_relation_id(self):
         rel_id = self._relation_id_counter
