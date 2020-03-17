@@ -86,14 +86,14 @@ class Harness:
         class TestEvents(charm_cls.on.__class__):
             pass
 
-        ## TestEvents.__name__ = charm_cls.on.__class__.__name__
+        TestEvents.__name__ = charm_cls.on.__class__.__name__
 
         class TestCharm(charm_cls):
             on = TestEvents()
 
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
         # rather than TestCharm has no attribute foo.
-        ## TestCharm.__name__ = charm_cls.__name__
+        TestCharm.__name__ = charm_cls.__name__
         return TestCharm(self._framework, self._framework.meta.name)
 
     def enable_events(self, the_charm):
