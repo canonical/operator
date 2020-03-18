@@ -406,7 +406,7 @@ class CharmBase(Object):
             Generally is None when initialized by the framework.
         :type key: NoneType or str
         """
-        super().__init__(framework, application_name)
+        super().__init__(framework, key)
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
