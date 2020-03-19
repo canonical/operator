@@ -36,7 +36,22 @@ def get_python_filepaths():
 
 class InfrastructureTests(unittest.TestCase):
 
-    def test_autopep8(self):
+    def test_pep8(self):
+        # verify all files are nicely styled
+        python_filepaths = get_python_filepaths()
+        style_guide = get_style_guide()
+        fake_stdout = io.StringIO()
+        with patch('sys.stdout', fake_stdout):
+            report = style_guide.check_files(python_filepaths)
+
+        # if flake8 didnt' report anything, we're done
+        if report.total_errors == 0:
+            return
+
+        # grab on which files we have issues
+        flake8_issues = fake_stdout.getvalue().split('\n')
+        broken_filepaths = {item.split(':')[0] for item in flake8_issues if item}
+
         # give hints to the developer on how files' style could be improved
         options = autopep8.parse_args([''])
         options.aggressive = 1
@@ -44,23 +59,14 @@ class InfrastructureTests(unittest.TestCase):
         options.max_line_length = 99
 
         issues = []
-        for filepath in get_python_filepaths():
+        for filepath in broken_filepaths:
             diff = autopep8.fix_file(filepath, options=options)
             if diff:
                 issues.append(diff)
 
-        if issues:
-            self.fail("Please fix files as suggested:\n" + "\n".join(issues))
-
-    def test_flake8(self):
-        # verify all files are nicely styled
-        python_filepaths = get_python_filepaths()
-        style_guide = get_style_guide()
-        fake_stdout = io.StringIO()
-        with patch('sys.stdout', fake_stdout):
-            report = style_guide.check_files(python_filepaths)
-        self.assertEqual(
-            report.total_errors, 0, "There are flake8 issues!\n" + fake_stdout.getvalue())
+        report = ["Please fix files as suggested by autopep8:"] + issues
+        report += ["\n-- Original flake8 reports:"] + flake8_issues
+        self.fail("\n".join(report))
 
     def test_quote_backslashes(self):
         # ensure we're not using unneeded backslash to escape strings
