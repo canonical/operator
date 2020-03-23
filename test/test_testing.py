@@ -115,8 +115,6 @@ class TestTestingHarness(unittest.TestCase):
         helper1 = DBRelationChangedHelper(charm1, "helper1")
         helper2 = DBRelationChangedHelper(charm2, "helper2")
         rel_id = harness2.add_relation('db', 'postgresql')
-        harness1.enable_events(charm1)
-        harness2.enable_events(charm2)
         harness2.update_relation_data(rel_id, 'postgresql', {'key': 'value'})
         # Helper2 should see the event triggered by harness2, but helper1 should see no events.
         self.assertEqual(helper1.changes, [])
@@ -131,7 +129,6 @@ class TestTestingHarness(unittest.TestCase):
                 interface: pgsql
             ''')
         charm = harness.initialize(CharmBase)
-        harness.enable_events(charm)
         viewer = RelationChangedViewer(charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
@@ -149,7 +146,6 @@ class TestTestingHarness(unittest.TestCase):
                 interface: pgsql
             ''')
         charm = harness.initialize(CharmBase)
-        harness.enable_events(charm)
         viewer = RelationChangedViewer(charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
@@ -162,7 +158,6 @@ class TestTestingHarness(unittest.TestCase):
             name: my-charm
             ''')
         charm = harness.initialize(RecordingCharm)
-        harness.enable_events(charm)
         harness.update_config(key_values={'a': 'foo', 'b': 2})
         self.assertEqual(charm.changes, [{'name': 'config', 'data': {'a': 'foo', 'b': 2}}])
         harness.update_config(key_values={'b': 3})
@@ -183,7 +178,6 @@ class TestTestingHarness(unittest.TestCase):
         # No event happens here
         harness.set_leader(False)
         charm = harness.initialize(RecordingCharm)
-        harness.enable_events(charm)
         self.assertFalse(charm.model.unit.is_leader())
         harness.set_leader(True)
         self.assertEqual(charm.changes, [{'name': 'leader-elected'}])
@@ -201,7 +195,6 @@ class TestTestingHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0')
         charm = harness.initialize(RecordingCharm)
-        harness.enable_events(charm)
         rel = charm.model.get_relation('db')
         with self.assertRaises(ModelError):
             rel.data[charm.model.app]['foo'] = 'bar'
@@ -210,6 +203,26 @@ class TestTestingHarness(unittest.TestCase):
         harness.set_leader(True)
         rel.data[charm.model.app]['foo'] = 'bar'
         self.assertEqual(harness.read_relation_data(rel_id, 'test-charm'), {'foo': 'bar'})
+
+    def test_events_enabled_and_disabled(self):
+        harness = Harness('''
+            name: test-charm
+        ''')
+        # By default, after 'initialize' the charm is set up to receive events.
+        charm = harness.initialize(RecordingCharm)
+        harness.update_config({'value': 'first'})
+        self.assertEqual(
+            [{'name': 'config', 'data': {'value': 'first'}}],
+            charm.get_changes(reset=True), )
+        # Once disabled, we won't see config-changed when we make an update
+        harness.disable_events()
+        harness.update_config({'second': '2'})
+        self.assertEqual(charm.get_changes(reset=True), [])
+        harness.enable_events(charm)
+        harness.update_config({'value': 'third'})
+        self.assertEqual(
+            [{'name': 'config', 'data': {'value': 'third', 'second': '2'}}],
+            charm.get_changes(reset=True))
 
 
 class DBRelationChangedHelper(Object):
@@ -249,6 +262,12 @@ class RecordingCharm(CharmBase):
         self.changes = []
         self.framework.observe(self.on.config_changed, self.on_config_changed)
         self.framework.observe(self.on.leader_elected, self.on_leader_elected)
+
+    def get_changes(self, reset=True):
+        changes = self.changes
+        if reset:
+            self.changes = []
+        return changes
 
     def on_config_changed(self, _):
         self.changes.append(dict(name='config', data=dict(self.framework.model.config)))

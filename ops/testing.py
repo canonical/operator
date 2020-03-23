@@ -94,10 +94,12 @@ class Harness:
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = charm_cls.__name__
-        return TestCharm(self._framework, self._framework.meta.name)
+        the_charm = TestCharm(self._framework, self._framework.meta.name)
+        self.enable_events(the_charm)
+        return the_charm
 
     def enable_events(self, the_charm):
-        """Start triggering events for charm.on when the model is changed.
+        """Start emitting events for charm.on when the model is changed.
 
         Once enable_events is passed the charm, any changes to the model (such as
         `update_relation_data`) will trigger the associated events (`relation_changed`).
@@ -106,6 +108,14 @@ class Harness:
         :return: None
         """
         self._charm = the_charm
+
+    def disable_events(self):
+        """Stop emitting events when the model changes.
+
+        This can be used by developers to stop events from being emitted while they are doing
+        setup tasks.
+        """
+        self._charm = None
 
     def _next_relation_id(self):
         rel_id = self._relation_id_counter
@@ -230,9 +240,9 @@ class Harness:
             # If we have read and cached this data, make sure we invalidate it
             rel_data._invalidate()
         # TODO: we only need to trigger relation_changed if it is a remote app or unit
-        self._trigger_relation_changed(relation_id, app_or_unit)
+        self._emit_relation_changed(relation_id, app_or_unit)
 
-    def _trigger_relation_changed(self, relation_id, app_or_unit):
+    def _emit_relation_changed(self, relation_id, app_or_unit):
         if self._charm is None:
             return
         rel_name = self._backend._relation_names[relation_id]
@@ -354,7 +364,7 @@ class _TestingModelBackend:
 
     def status_set(self, status, message='', *, is_app=False):
         if is_app:
-            self._app_status = (status, message)
+            self._app_statugger_s = (status, message)
         else:
             self._unit_status = (status, message)
 
