@@ -27,7 +27,7 @@ from ops.model import (
 from ops.testing import Harness
 
 
-class TestTestingHarness(unittest.TestCase):
+class TestHarness(unittest.TestCase):
 
     def test_add_relation(self):
         # language=YAML
@@ -274,6 +274,27 @@ class RecordingCharm(CharmBase):
 
     def on_leader_elected(self, _):
         self.changes.append(dict(name='leader-elected'))
+
+
+class TestTestingModelBackend(unittest.TestCase):
+
+    def test_status_set_get_unit(self):
+        harness = Harness('''
+            name: app
+            ''')
+        backend = harness._backend
+        backend.status_set('blocked', 'message', is_app=False)
+        self.assertEqual(('blocked', 'message'), backend.status_get(is_app=False))
+        self.assertEqual(None, backend.status_get(is_app=True))
+
+    def test_status_set_get_app(self):
+        harness = Harness('''
+            name: app
+            ''')
+        backend = harness._backend
+        backend.status_set('blocked', 'message', is_app=True)
+        self.assertEqual(('blocked', 'message'), backend.status_get(is_app=True))
+        self.assertEqual(None, backend.status_get(is_app=False))
 
 
 if __name__ == "__main__":

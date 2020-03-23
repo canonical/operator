@@ -356,7 +356,6 @@ class _TestingModelBackend:
         self._pod_spec = (spec, k8s_resources)
 
     def status_get(self, *, is_app=False):
-        raise NotImplementedError(self.status_get)
         if is_app:
             return self._app_status
         else:
@@ -364,7 +363,7 @@ class _TestingModelBackend:
 
     def status_set(self, status, message='', *, is_app=False):
         if is_app:
-            self._app_statugger_s = (status, message)
+            self._app_status = (status, message)
         else:
             self._unit_status = (status, message)
 
