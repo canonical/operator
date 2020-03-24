@@ -19,14 +19,7 @@ Naming follows the convention of charm-<charm_name> for example `charm-percona-c
 
 The rationale behind this is quick and easy searching of the 1000s of github projects along with other reasons.
 
-
-## Charm Writing in detail
-
-## New to charms?
-
-> This covers aspects of charming which will be useful when creating them
-
-### Why charms?
+## Why charms?
 
 The objective of charms is the following: take the complication of managing 100s potentially 1000s of configuration files and abstract them as python modules. Thus by abstraction creating a true insfrastructure as code.
 
@@ -40,45 +33,24 @@ Here's an example from the Juju GUI:
 
 What you are looking at here is a Kubernetes, rendered, using Juju and charms. Each of the circles represents an application, each of the lines represents what we call a relation.
 
-### How do relations work?
-
-Relations between charms at a high level work through what are called interfaces, interfaces are the glue that sticks two or more charms together and allows them to communicate.
-
-#### Some history
-
-In the old framework (reactive) charms were found on github, and used the naming convention of `interface-<interface-name>`. This stays with the new framework.
-
-The major change is the removal of `requires.py` and `provides.py` these are now replaced by a simplied `interface_<interface_name>.py`.
-
-Here's the picture you might have in when you think of charm relations:
-
-![conception of charm relations](./diagrams/conception_of_charm_relations.jpg)
-
-The problem with this conception is what if want to create a new charm to use somecharm:relation, well then not only do I have to create a new charm, and program the relation into it, I __also__ have to adapt my original charm to work for my new charm. The two components are too closely coupled.
-
-So the charm framework deals with this by decoupling the relations, this is where we move onto the next section.
-
-#### What are Interfaces?
-
-To decouple the charms from each other and provide abstract, easy to use relations, we have what are called Interfaces.
-
-With the Operator Framework we introduce the new interfaces, but continuing with the previous theme, lets see how interfaces **used** to work in the old reactive framework.
-
-![Old interfaces](./diagrams/charm_interfaces_drawing.jpg)
-
-You can see here that the interfaces provide the decoupling needed for two or more different charms to communicate with each other.
-
-### How we do interfaces in the new framework
-
-In the new framework we have a single file which handles this inter-charm information sharing.
-
-These interfaces need a charm writing doc of their own (todo) the takeaway here is that there is a single import for both charms to be able to communicate with each other.
-
-![New charm interfaces](./diagrams/charm_interfaces_drawing_new.jpg)
-
-That's enough background for now, you can move onto Charm Writing in detail.
+More info and history on charms can be [found here](./charmhistory.md).
 
 ## Charm writing
+
+To start writing charms you will need to setup a development environment with git and a skeleton charm.
+
+```
+mkdir mynewcharm
+cd $_
+```
+
+Included in the docs directory of this repository is a set of tools, we're going to use the letscharm script to initialise a set of charms for our use.
+
+```
+./tools/letscharm.py
+```
+
+This tool will ask you whether you are creating a K8S charm or a IAAS charm. Pick the correct one as appropriate.
 
 ### Add the operator framework
 
