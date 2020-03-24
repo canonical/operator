@@ -31,7 +31,7 @@ class TestHarness(unittest.TestCase):
 
     def test_add_relation(self):
         # language=YAML
-        harness = Harness('''
+        harness = Harness(CharmBase, meta='''
             name: test-app
             requires:
                 db:
@@ -45,7 +45,7 @@ class TestHarness(unittest.TestCase):
 
     def test_add_relation_and_unit(self):
         # language=YAML
-        harness = Harness('''
+        harness = Harness(CharmBase, meta='''
             name: test-app
             requires:
                 db:
@@ -63,7 +63,7 @@ class TestHarness(unittest.TestCase):
 
     def test_read_relation_data(self):
         # language=YAML
-        harness = Harness('''
+        harness = Harness(CharmBase, meta='''
             name: test-app
             requires:
                 db:
@@ -71,6 +71,7 @@ class TestHarness(unittest.TestCase):
             ''')
         rel_id = harness.add_relation('db', 'postgresql',
                                       remote_app_data={'remote': 'data'})
+        harness.begin()
         self.assertEqual(harness.read_relation_data(rel_id, 'test-app'), {})
         self.assertEqual(harness.read_relation_data(rel_id, 'test-app/0'), {})
         self.assertEqual(harness.read_relation_data(rel_id, 'test-app/1'), None)
@@ -79,41 +80,20 @@ class TestHarness(unittest.TestCase):
             # unknown relation id
             harness.read_relation_data(99, 'postgresql')
 
-    def test_create_harness(self):
-        # language=YAML
-        harness = Harness('''
-            name: my-charm
-            requires:
-              db:
-                interface: pgsql
-            ''')
-        charm = harness.initialize(CharmBase)
-        helper = DBRelationChangedHelper(charm, "helper")
-        rel_id = harness.add_relation('db', 'postgresql')
-        relation = charm.model.get_relation('db', rel_id)
-        app = charm.model.get_app('postgresql')
-        charm.on.db_relation_changed.emit(relation, app)
-        self.assertEqual(helper.changes, [(rel_id, 'postgresql')])
-
     def test_create_harness_twice(self):
         # language=YAML
-        harness1 = Harness('''
+        metadata = '''
             name: my-charm
             requires:
               db:
                 interface: pgsql
-            ''')
-        # language=YAML
-        harness2 = Harness('''
-            name: my-charm
-            requires:
-              db:
-                interface: pgsql
-            ''')
-        charm1 = harness1.initialize(CharmBase)
-        charm2 = harness2.initialize(CharmBase)
-        helper1 = DBRelationChangedHelper(charm1, "helper1")
-        helper2 = DBRelationChangedHelper(charm2, "helper2")
+            '''
+        harness1 = Harness(CharmBase, meta=metadata)
+        harness2 = Harness(CharmBase, meta=metadata)
+        harness1.begin()
+        harness2.begin()
+        helper1 = DBRelationChangedHelper(harness1.charm, "helper1")
+        helper2 = DBRelationChangedHelper(harness2.charm, "helper2")
         rel_id = harness2.add_relation('db', 'postgresql')
         harness2.update_relation_data(rel_id, 'postgresql', {'key': 'value'})
         # Helper2 should see the event triggered by harness2, but helper1 should see no events.
@@ -122,14 +102,14 @@ class TestHarness(unittest.TestCase):
 
     def test_update_relation_exposes_new_data(self):
         # language=YAML
-        harness = Harness('''
+        harness = Harness(CharmBase, meta='''
             name: my-charm
             requires:
               db:
                 interface: pgsql
             ''')
-        charm = harness.initialize(CharmBase)
-        viewer = RelationChangedViewer(charm, 'db')
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
@@ -139,53 +119,53 @@ class TestHarness(unittest.TestCase):
 
     def test_update_relation_remove_data(self):
         # language=YAML
-        harness = Harness('''
+        harness = Harness(CharmBase, meta='''
             name: my-charm
             requires:
               db:
                 interface: pgsql
             ''')
-        charm = harness.initialize(CharmBase)
-        viewer = RelationChangedViewer(charm, 'db')
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': ''})
         self.assertEqual(viewer.changes, [{'initial': 'data'}, {}])
 
     def test_update_config(self):
-        # language=YAML
-        harness = Harness('''
-            name: my-charm
-            ''')
-        charm = harness.initialize(RecordingCharm)
+        harness = Harness(RecordingCharm)
+        harness.begin()
         harness.update_config(key_values={'a': 'foo', 'b': 2})
-        self.assertEqual(charm.changes, [{'name': 'config', 'data': {'a': 'foo', 'b': 2}}])
+        self.assertEqual(
+            [{'name': 'config', 'data': {'a': 'foo', 'b': 2}}],
+            harness.charm.changes)
         harness.update_config(key_values={'b': 3})
-        self.assertEqual(charm.changes, [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
-                                         {'name': 'config', 'data': {'a': 'foo', 'b': 3}}])
+        self.assertEqual(
+            [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
+             {'name': 'config', 'data': {'a': 'foo', 'b': 3}}],
+            harness.charm.changes)
         # you can set config values to the empty string, you can use unset to actually remove items
         harness.update_config(key_values={'a': ''}, unset=set('b'))
-        self.assertEqual(charm.changes, [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
-                                         {'name': 'config', 'data': {'a': 'foo', 'b': 3}},
-                                         {'name': 'config', 'data': {'a': ''}},
-                                         ])
+        self.assertEqual(
+            [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
+             {'name': 'config', 'data': {'a': 'foo', 'b': 3}},
+             {'name': 'config', 'data': {'a': ''}},
+             ],
+            harness.charm.changes)
 
     def test_set_leader(self):
-        # language=YAML
-        harness = Harness('''
-            name: my-charm
-            ''')
+        harness = Harness(RecordingCharm)
         # No event happens here
         harness.set_leader(False)
-        charm = harness.initialize(RecordingCharm)
-        self.assertFalse(charm.model.unit.is_leader())
+        harness.begin()
+        self.assertFalse(harness.charm.model.unit.is_leader())
         harness.set_leader(True)
-        self.assertEqual(charm.changes, [{'name': 'leader-elected'}])
-        self.assertTrue(charm.model.unit.is_leader())
+        self.assertEqual([{'name': 'leader-elected'}], harness.charm.changes)
+        self.assertTrue(harness.charm.model.unit.is_leader())
 
     def test_relation_set_app_not_leader(self):
         # language=YAML
-        harness = Harness('''
+        harness = Harness(RecordingCharm, meta='''
             name: test-charm
             requires:
                 db:
@@ -194,35 +174,38 @@ class TestHarness(unittest.TestCase):
         harness.set_leader(False)
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0')
-        charm = harness.initialize(RecordingCharm)
-        rel = charm.model.get_relation('db')
+        harness.begin()
+        rel = harness.charm.model.get_relation('db')
         with self.assertRaises(ModelError):
-            rel.data[charm.model.app]['foo'] = 'bar'
+            rel.data[harness.charm.app]['foo'] = 'bar'
         # The data has not actually been changed
         self.assertEqual(harness.read_relation_data(rel_id, 'test-charm'), {})
         harness.set_leader(True)
-        rel.data[charm.model.app]['foo'] = 'bar'
+        rel.data[harness.charm.app]['foo'] = 'bar'
         self.assertEqual(harness.read_relation_data(rel_id, 'test-charm'), {'foo': 'bar'})
 
     def test_events_enabled_and_disabled(self):
-        harness = Harness('''
+        # language=YAML
+        harness = Harness(RecordingCharm, meta='''
             name: test-charm
         ''')
-        # By default, after 'initialize' the charm is set up to receive events.
-        charm = harness.initialize(RecordingCharm)
+        # Before begin() there are no events.
         harness.update_config({'value': 'first'})
+        # By default, after begin the charm is set up to receive events.
+        harness.begin()
+        harness.update_config({'value': 'second'})
         self.assertEqual(
-            [{'name': 'config', 'data': {'value': 'first'}}],
-            charm.get_changes(reset=True), )
+            [{'name': 'config', 'data': {'value': 'second'}}],
+            harness.charm.get_changes(reset=True), )
         # Once disabled, we won't see config-changed when we make an update
         harness.disable_events()
-        harness.update_config({'second': '2'})
-        self.assertEqual(charm.get_changes(reset=True), [])
-        harness.enable_events(charm)
-        harness.update_config({'value': 'third'})
+        harness.update_config({'third': '3'})
+        self.assertEqual(harness.charm.get_changes(reset=True), [])
+        harness.enable_events()
+        harness.update_config({'value': 'fourth'})
         self.assertEqual(
-            [{'name': 'config', 'data': {'value': 'third', 'second': '2'}}],
-            charm.get_changes(reset=True))
+            [{'name': 'config', 'data': {'value': 'fourth', 'third': '3'}}],
+            harness.charm.get_changes(reset=True))
 
 
 class DBRelationChangedHelper(Object):
@@ -279,7 +262,7 @@ class RecordingCharm(CharmBase):
 class TestTestingModelBackend(unittest.TestCase):
 
     def test_status_set_get_unit(self):
-        harness = Harness('''
+        harness = Harness(CharmBase, meta='''
             name: app
             ''')
         backend = harness._backend
@@ -288,7 +271,7 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertEqual(None, backend.status_get(is_app=True))
 
     def test_status_set_get_app(self):
-        harness = Harness('''
+        harness = Harness(CharmBase, meta='''
             name: app
             ''')
         backend = harness._backend
