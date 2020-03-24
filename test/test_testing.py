@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib
+import pathlib
+import shutil
+import sys
+import tempfile
+import textwrap
 import unittest
 
 from ops.charm import (
@@ -184,7 +190,7 @@ class TestHarness(unittest.TestCase):
         rel.data[harness.charm.app]['foo'] = 'bar'
         self.assertEqual(harness.read_relation_data(rel_id, 'test-charm'), {'foo': 'bar'})
 
-    def test_events_enabled_and_disabled(self):
+    def test_hooks_enabled_and_disabled(self):
         # language=YAML
         harness = Harness(RecordingCharm, meta='''
             name: test-charm
@@ -198,14 +204,45 @@ class TestHarness(unittest.TestCase):
             [{'name': 'config', 'data': {'value': 'second'}}],
             harness.charm.get_changes(reset=True), )
         # Once disabled, we won't see config-changed when we make an update
-        harness.disable_events()
+        harness.disable_hooks()
         harness.update_config({'third': '3'})
         self.assertEqual(harness.charm.get_changes(reset=True), [])
-        harness.enable_events()
+        harness.enable_hooks()
         harness.update_config({'value': 'fourth'})
         self.assertEqual(
             [{'name': 'config', 'data': {'value': 'fourth', 'third': '3'}}],
             harness.charm.get_changes(reset=True))
+
+    def test_metadata_from_directory(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        with open(tmp / 'metadata.yaml', 'wt') as metadata:
+            metadata.write(textwrap.dedent('''
+            name: my-charm
+            requires:
+                db:
+                    interface: pgsql
+            '''))
+        srcdir = tmp / 'src'
+        srcdir.mkdir(0o755)
+        with open(srcdir / 'charm.py', 'wt') as charmpy:
+            # language=Python
+            charmpy.write('''
+from ops.charm import CharmBase
+class MyTestingCharm(CharmBase):
+    pass
+''')
+        orig = sys.path[:]
+        sys.path.append(str(srcdir))
+
+        def cleanup():
+            sys.path = orig
+            sys.modules.pop('charm')
+        self.addCleanup(cleanup)
+        charm_mod = importlib.import_module('charm')
+        harness = Harness(charm_mod.MyTestingCharm)
+        harness.begin()
+        self.assertEqual(['db'], list(harness.model.relations))
 
 
 class DBRelationChangedHelper(Object):

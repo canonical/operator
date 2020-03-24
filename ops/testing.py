@@ -39,7 +39,7 @@ class Harness:
             relation_id = harness.add_relation('db', 'postgresql')
             # Now instantiate the charm to see events as the model changes
             harness.begin()
-            harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'value'})
+            harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'val'})
             # Check that charm has properly handled the relation_joined event for postgresql/0
             self.assertEqual(harness.charm. ...)
 
@@ -57,9 +57,11 @@ class Harness:
         self._unit_name = self._meta.name + '/0'
         self._model = None
         self._framework = None
-        self._events_enabled = True
+        self._hooks_enabled = True
         self._relation_id_counter = 0
         self._backend = _TestingModelBackend(self._unit_name)
+        self._model = model.Model(self._unit_name, self._meta, self._backend)
+        self._framework = framework.Framework(":memory:", "no-disk-path", self._meta, self._model)
 
     @property
     def charm(self):
@@ -74,27 +76,10 @@ class Harness:
         return self._framework
 
     def begin(self):
-        self._model = model.Model(self._unit_name, self._meta, self._backend)
-        self._framework = framework.Framework(":memory:", "no-disk-path", self._meta, self._model)
-        self._initialize_charm()
+        """Instantiate the Charm and start handling events.
 
-    def _create_meta(self, charm_metadata):
-        """Create a CharmMeta object.
-
-        Handle the cases where a user doesn't supply an explicit metadata snippet.
+        Before calling begin(), changes to the model won't be
         """
-        if charm_metadata is None:
-            metadata_path = pathlib.Path(inspect.getfile(self._charm_cls)) / '../metadata.yaml'
-            if metadata_path.is_file():
-                charm_metadata = metadata_path.read_text()
-            else:
-                # The simplest of metadata that the framework can support
-                charm_metadata = 'name: test-charm'
-        elif isinstance(charm_metadata, str):
-            charm_metadata = dedent(charm_metadata)
-        return charm.CharmMeta.from_yaml(charm_metadata)
-
-    def _initialize_charm(self):
         # The Framework adds attributes to class objects for events, etc. As such, we can't re-use
         # the original class against multiple Frameworks. So create a locally defined class
         # and register it.
@@ -113,24 +98,38 @@ class Harness:
         TestCharm.__name__ = self._charm_cls.__name__
         self._charm = TestCharm(self._framework, self._framework.meta.name)
 
-    def enable_events(self):
-        """Start emitting events for charm.on when the model is changed.
+    def _create_meta(self, charm_metadata):
+        """Create a CharmMeta object.
 
-        Once enable_events is passed the charm, any changes to the model (such as
+        Handle the cases where a user doesn't supply an explicit metadata snippet.
+        """
+        if charm_metadata is None:
+            filename = inspect.getfile(self._charm_cls)
+            metadata_path = pathlib.Path(filename).parents[1] / 'metadata.yaml'
+            if metadata_path.is_file():
+                charm_metadata = metadata_path.read_text()
+            else:
+                # The simplest of metadata that the framework can support
+                charm_metadata = 'name: test-charm'
+        elif isinstance(charm_metadata, str):
+            charm_metadata = dedent(charm_metadata)
+        return charm.CharmMeta.from_yaml(charm_metadata)
+
+    def enable_hooks(self):
+        """Start emitting hook events from charm.on when the model is changed.
+
+        Once enable_hooks is passed the charm, any changes to the model (such as
         `update_relation_data`) will trigger the associated events (`relation_changed`).
-
-        :param the_charm: A CharmBase instance that we will use to trigger events.
-        :return: None
         """
-        self._events_enabled = True
+        self._hooks_enabled = True
 
-    def disable_events(self):
-        """Stop emitting events when the model changes.
+    def disable_hooks(self):
+        """Stop emitting hook events when the model changes.
 
-        This can be used by developers to stop events from being emitted while they are doing
-        setup tasks.
+        This can be used by developers to stop changes to the model from emitting events that
+        the charm will react to.
         """
-        self._events_enabled = False
+        self._hooks_enabled = False
 
     def _next_relation_id(self):
         rel_id = self._relation_id_counter
@@ -164,7 +163,7 @@ class Harness:
         # Reload the relation_ids list
         if self._model is not None:
             self._model.relations._invalidate(relation_name)
-        if self._charm is None or not self._events_enabled:
+        if self._charm is None or not self._hooks_enabled:
             return rel_id
         # TODO: jam 2020-03-05 We should be triggering relation_changed(app) if
         #       remote_app_data isn't empty.
@@ -201,7 +200,7 @@ class Harness:
             remote_unit = self._model.get_unit(remote_unit_name)
             relation = self._model.get_relation(relation_name, relation_id)
             relation.data[remote_unit]._invalidate()
-        if self._charm is None or not self._events_enabled:
+        if self._charm is None or not self._hooks_enabled:
             return
         self._charm.on[relation_name].relation_joined.emit(
             relation, remote_unit.app, remote_unit)
@@ -261,7 +260,7 @@ class Harness:
         self._emit_relation_changed(relation_id, app_or_unit)
 
     def _emit_relation_changed(self, relation_id, app_or_unit):
-        if self._charm is None or not self._events_enabled:
+        if self._charm is None or not self._hooks_enabled:
             return
         rel_name = self._backend._relation_names[relation_id]
         relation = self.model.get_relation(rel_name, relation_id)
@@ -297,7 +296,7 @@ class Harness:
         # is a LazyMapping, but its _load returns a dict and this method mutates
         # the dict that Config is caching. Arguably we should be doing some sort
         # of charm.framework.model.config._invalidate()
-        if self._charm is None or not self._events_enabled:
+        if self._charm is None or not self._hooks_enabled:
             return
         self._charm.on.config_changed.emit()
 
