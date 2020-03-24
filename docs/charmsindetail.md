@@ -13,7 +13,7 @@
 
 ## Best practices
 
-### Repoository Naming
+### Repository Naming
 
 Naming follows the convention of charm-<charm_name> for example `charm-percona-cluster`.
 
@@ -176,8 +176,8 @@ The charm __init__ method has the following signature:
 def __init__(self, framework, key)
              ^^^^  ^^^^^^^^^  ^^^
              ||||  |||||||||  ||||
-
- 1. Obvious!       |||||||||  ||||
+ 1. Reference to the class instance
+                   |||||||||  ||||
  2.      A reference to the framework
                               ||||
  3.                           key (described below)
