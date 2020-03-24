@@ -15,16 +15,16 @@ The following overall structure for your charm directory is recommended:
 
 ```
 .
-+-- config.yaml
-+-- metadata.yaml
-+-- mod/
-+-- lib/
-|   +-- ops -> ../mod/operator/ops
-+-- src/
-|   +-- charm.py
-+-- hooks/
-    +-- install -> ../src/charm.py
-    +-- start -> ../src/charm.py  # for k8s charms per below
+├── config.yaml
+├── metadata.yaml
+├── mod/
+├── lib/
+│   └── ops -> ../mod/operator/ops
+├── src/
+│   └── charm.py
+└── hooks/
+    ├── install -> ../src/charm.py
+    └── start -> ../src/charm.py  # for k8s charms per below
 ```
 
 The `mod/` directory should contain the operator framework dependency as a git
@@ -124,3 +124,14 @@ Alternatively, to deploy directly from local disk, run:
 ```
 juju deploy .
 ```
+
+# Operator Framework development
+
+If you want to work in the framework *itself* you will need the following depenencies installed in your system:
+
+- Python >= 3.5
+- PyYAML
+- autopep8
+- flake8
+
+Then you can try `./run_tests`, it should all go green.

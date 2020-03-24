@@ -60,9 +60,17 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, relation):
-        """Get a network space binding for a Relation object."""
-        return self._bindings.get(relation)
+    def get_binding(self, binding_key):
+        """Get a network space binding.
+
+        binding_key -- The relation name or instance to obtain bindings for.
+
+        If binding_key is a relation name, the method returns the default binding for that
+        relation. If a relation instance is provided, the method first looks up a more specific
+        binding for that specific relation ID, and if none is found falls back to the default
+        binding for the relation name.
+        """
+        return self._bindings.get(binding_key)
 
 
 class _ModelCache:
@@ -274,12 +282,20 @@ class BindingMapping:
         self._backend = backend
         self._data = {}
 
-    def get(self, relation):
-        if not isinstance(relation, Relation):
-            raise ModelError('expected Relation instance, got {}'.format(type(relation).__name__))
-        binding = self._data.get(relation)
+    def get(self, binding_key):
+        if isinstance(binding_key, Relation):
+            binding_name = binding_key.name
+            relation_id = binding_key.id
+        elif isinstance(binding_key, str):
+            binding_name = binding_key
+            relation_id = None
+        else:
+            raise ModelError('binding key must be str or relation instance, not {}'
+                             ''.format(type(binding_key).__name__))
+        binding = self._data.get(binding_key)
         if binding is None:
-            self._data[relation] = binding = Binding(relation.name, relation.id, self._backend)
+            binding = Binding(binding_name, relation_id, self._backend)
+            self._data[binding_key] = binding
         return binding
 
 
@@ -295,7 +311,14 @@ class Binding:
     @property
     def network(self):
         if self._network is None:
-            self._network = Network(self._backend.network_get(self.name, self._relation_id))
+            try:
+                self._network = Network(self._backend.network_get(self.name, self._relation_id))
+            except RelationNotFoundError:
+                if self._relation_id is None:
+                    raise
+                # If a relation is dead, we can still get network info associated with an
+                # endpoint itself
+                self._network = Network(self._backend.network_get(self.name))
         return self._network
 
 

@@ -798,11 +798,30 @@ fi
             with self.assertRaises(TypeError):
                 self.model.storages.request('data', count_v)
 
-    def test_relation_endpoint_bindings(self):
+
+class TestModelBindings(unittest.TestCase):
+
+    def setUp(self):
+        def restore_env(env):
+            os.environ.clear()
+            os.environ.update(env)
+        self.addCleanup(restore_env, os.environ.copy())
+
+        os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
+
+        meta = ops.charm.CharmMeta()
+        meta.relations = {
+            'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
+        }
+        self.backend = ops.model.ModelBackend()
+        self.model = ops.model.Model('myapp/0', meta, self.backend)
+
         fake_script(self, 'relation-ids',
                     """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
-        network_get_out = '''{
+        self.network_get_out = '''{
   "bind-addresses": [
     {
       "mac-address": "de:ad:be:ef:ca:fe",
@@ -856,33 +875,8 @@ fi
   ]
 }'''
 
-        # Basic validation for passing invalid keys (including relation names).
-        for name in (object, 0, 'db0'):
-            with self.assertRaises(ops.model.ModelError):
-                self.model.get_binding(name)
-
-        fake_script(self, 'network-get', '''
-            if [ "$1" = db0 ] && [ "$3" = 4 ]; then
-                echo '{}'
-            else
-                exit 1
-            fi
-        '''.format(network_get_out)),
-        # Bindings for dead relations are not supported.
-        with self.assertRaises(ops.model.ModelError):
-            binding = ops.model.Binding('db0', 42, self.model._backend)
-            binding.network
-        self.assertEqual(fake_script_calls(self, clear=True),
-                         [['network-get', 'db0', '-r', '42', '--format=json']])
-
-        expected_calls = [
-            ['relation-ids', 'db0', '--format=json'],
-            # The two invocations below are due to the get_relation call.
-            ['relation-list', '-r', '4', '--format=json'],
-            ['network-get', 'db0', '-r', '4', '--format=json'],
-        ]
-        binding = self.model.get_binding(self.model.get_relation('db0'))
-        self.assertEqual(binding.name, 'db0')
+    def _check_binding_data(self, binding_name, binding):
+        self.assertEqual(binding.name, binding_name)
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
         self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
         # /32 and /128 CIDRs are valid one-address networks for IPv{4,6}Network types respectively.
@@ -900,6 +894,55 @@ fi
             self.assertEqual(binding.network.interfaces[i].name, name)
             self.assertEqual(binding.network.interfaces[i].address, ipaddress.ip_address(address))
             self.assertEqual(binding.network.interfaces[i].subnet, ipaddress.ip_network(subnet))
+
+    def test_invalid_keys(self):
+        # Basic validation for passing invalid keys.
+        for name in (object, 0):
+            with self.assertRaises(ops.model.ModelError):
+                self.model.get_binding(name)
+
+    def test_dead_relations(self):
+        fake_script(
+            self,
+            'network-get',
+            '''
+                if [ "$1" = db0 ] && [ "$2" = --format=json ]; then
+                    echo '{}'
+                else
+                    echo ERROR invalid value "$2" for option -r: relation not found >&2
+                    exit 2
+                fi
+            '''.format(self.network_get_out))
+        # Validate the behavior for dead relations.
+        binding = ops.model.Binding('db0', 42, self.model._backend)
+        self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['network-get', 'db0', '-r', '42', '--format=json'],
+            ['network-get', 'db0', '--format=json'],
+        ])
+
+    def test_binding_by_relation_name(self):
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
+        binding_name = 'db0'
+        expected_calls = [['network-get', 'db0', '--format=json']]
+
+        binding = self.model.get_binding(binding_name)
+        self._check_binding_data(binding_name, binding)
+        self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
+
+    def test_binding_by_relation(self):
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
+        binding_name = 'db0'
+        expected_calls = [
+            ['relation-ids', 'db0', '--format=json'],
+            # The two invocations below are due to the get_relation call.
+            ['relation-list', '-r', '4', '--format=json'],
+            ['network-get', 'db0', '-r', '4', '--format=json'],
+        ]
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self._check_binding_data(binding_name, binding)
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
 
