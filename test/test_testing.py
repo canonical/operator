@@ -245,6 +245,8 @@ class TestHarness(unittest.TestCase):
         harness = Harness(charm_mod.MyTestingCharm)
         harness.begin()
         self.assertEqual(['db'], list(harness.model.relations))
+        # The charm_dir also gets set
+        self.assertEqual(harness.framework.charm_dir, tmp)
 
 
 class DBRelationChangedHelper(Object):

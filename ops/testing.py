@@ -53,6 +53,7 @@ class Harness:
         #       it would define the default values of config that the charm would see.
         self._charm_cls = charm_cls
         self._charm = None
+        self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta)
         self._unit_name = self._meta.name + '/0'
         self._model = None
@@ -61,7 +62,7 @@ class Harness:
         self._relation_id_counter = 0
         self._backend = _TestingModelBackend(self._unit_name)
         self._model = model.Model(self._unit_name, self._meta, self._backend)
-        self._framework = framework.Framework(":memory:", "no-disk-path", self._meta, self._model)
+        self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
 
     @property
     def charm(self):
@@ -78,7 +79,8 @@ class Harness:
     def begin(self):
         """Instantiate the Charm and start handling events.
 
-        Before calling begin(), changes to the model won't be
+        Before calling begin(), there is no Charm instance, so changes to the Model won't emit
+        events. You must call begin before self.charm is valid.
         """
         # The Framework adds attributes to class objects for events, etc. As such, we can't re-use
         # the original class against multiple Frameworks. So create a locally defined class
@@ -105,9 +107,11 @@ class Harness:
         """
         if charm_metadata is None:
             filename = inspect.getfile(self._charm_cls)
-            metadata_path = pathlib.Path(filename).parents[1] / 'metadata.yaml'
+            charm_dir = pathlib.Path(filename).parents[1]
+            metadata_path = charm_dir / 'metadata.yaml'
             if metadata_path.is_file():
                 charm_metadata = metadata_path.read_text()
+                self._charm_dir = charm_dir
             else:
                 # The simplest of metadata that the framework can support
                 charm_metadata = 'name: test-charm'
