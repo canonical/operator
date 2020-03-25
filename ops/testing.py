@@ -210,8 +210,8 @@ class Harness:
         self._charm.on[relation_name].relation_changed.emit(
             relation, remote_unit.app, remote_unit)
 
-    def read_relation_data(self, relation_id, app_or_unit):
-        """Read the relation data bucket for a single app or unit in a given relation.
+    def get_relation_data(self, relation_id, app_or_unit):
+        """Get the relation data bucket for a single app or unit in a given relation.
 
         This ignores all of the safety checks of who can and can't see data in relations (eg,
         non-leaders can't read their own application's relation data because there are no events

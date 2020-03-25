@@ -67,7 +67,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual({'foo': 'bar'}, backend.relation_get(rel_id, remote_unit, is_app=False))
         self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_unit, is_app=True))
 
-    def test_read_relation_data(self):
+    def test_get_relation_data(self):
         # language=YAML
         harness = Harness(CharmBase, meta='''
             name: test-app
@@ -78,13 +78,13 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql',
                                       remote_app_data={'remote': 'data'})
         harness.begin()
-        self.assertEqual(harness.read_relation_data(rel_id, 'test-app'), {})
-        self.assertEqual(harness.read_relation_data(rel_id, 'test-app/0'), {})
-        self.assertEqual(harness.read_relation_data(rel_id, 'test-app/1'), None)
-        self.assertEqual(harness.read_relation_data(rel_id, 'postgresql'), {'remote': 'data'})
+        self.assertEqual(harness.get_relation_data(rel_id, 'test-app'), {})
+        self.assertEqual(harness.get_relation_data(rel_id, 'test-app/0'), {})
+        self.assertEqual(harness.get_relation_data(rel_id, 'test-app/1'), None)
+        self.assertEqual(harness.get_relation_data(rel_id, 'postgresql'), {'remote': 'data'})
         with self.assertRaises(KeyError):
             # unknown relation id
-            harness.read_relation_data(99, 'postgresql')
+            harness.get_relation_data(99, 'postgresql')
 
     def test_create_harness_twice(self):
         # language=YAML
@@ -185,10 +185,10 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(ModelError):
             rel.data[harness.charm.app]['foo'] = 'bar'
         # The data has not actually been changed
-        self.assertEqual(harness.read_relation_data(rel_id, 'test-charm'), {})
+        self.assertEqual(harness.get_relation_data(rel_id, 'test-charm'), {})
         harness.set_leader(True)
         rel.data[harness.charm.app]['foo'] = 'bar'
-        self.assertEqual(harness.read_relation_data(rel_id, 'test-charm'), {'foo': 'bar'})
+        self.assertEqual(harness.get_relation_data(rel_id, 'test-charm'), {'foo': 'bar'})
 
     def test_hooks_enabled_and_disabled(self):
         # language=YAML
@@ -227,11 +227,11 @@ class TestHarness(unittest.TestCase):
         srcdir.mkdir(0o755)
         with open(srcdir / 'charm.py', 'wt') as charmpy:
             # language=Python
-            charmpy.write('''
-from ops.charm import CharmBase
-class MyTestingCharm(CharmBase):
-    pass
-''')
+            charmpy.write(textwrap.dedent('''
+                from ops.charm import CharmBase
+                class MyTestingCharm(CharmBase):
+                    pass
+                '''))
         orig = sys.path[:]
         sys.path.append(str(srcdir))
 
