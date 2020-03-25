@@ -547,6 +547,7 @@ fi
             self.assertLessEqual(len(fake_calls), 2)
             pod_spec_call = next(filter(lambda c: c[0] == 'pod-spec-set', calls))
             self.assertEqual(pod_spec_call[:2], ['pod-spec-set', '--file'])
+
             # 8 bytes are used as of python 3.4.0, see Python bug #12015.
             # Other characters are from POSIX 3.282 (Portable Filename
             # Character Set) a subset of which Python's mkdtemp uses.
@@ -1236,6 +1237,26 @@ class TestModelBackend(unittest.TestCase):
         for metrics, labels in invalid_inputs:
             with self.assertRaises(ops.model.ModelError):
                 self.backend.add_metrics(metrics, labels)
+
+
+class TestLazyMapping(unittest.TestCase):
+
+    def test_invalidate(self):
+        loaded = []
+
+        class MyLazyMap(ops.model.LazyMapping):
+            def _load(self):
+                loaded.append(1)
+                return {'foo': 'bar'}
+
+        map = MyLazyMap()
+        self.assertEqual(map['foo'], 'bar')
+        self.assertEqual(loaded, [1])
+        self.assertEqual(map['foo'], 'bar')
+        self.assertEqual(loaded, [1])
+        map._invalidate()
+        self.assertEqual(map['foo'], 'bar')
+        self.assertEqual(loaded, [1, 1])
 
 
 if __name__ == "__main__":

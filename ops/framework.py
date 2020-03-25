@@ -98,7 +98,7 @@ class Handle:
                     key = key[:-1]
                     good = True
             if not good:
-                raise RuntimeError("attempted to restore invalid handle path {path}")
+                raise RuntimeError("attempted to restore invalid handle path {}".format(path))
             handle = Handle(handle, kind, key)
         return handle
 
