@@ -166,8 +166,18 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         self.assertFalse(harness.charm.model.unit.is_leader())
         harness.set_leader(True)
-        self.assertEqual([{'name': 'leader-elected'}], harness.charm.changes)
+        self.assertEqual([{'name': 'leader-elected'}], harness.charm.get_changes(reset=True))
         self.assertTrue(harness.charm.model.unit.is_leader())
+        harness.set_leader(False)
+        self.assertFalse(harness.charm.model.unit.is_leader())
+        # No hook event when you lose leadership.
+        # TODO: verify if Juju always triggers `leader-settings-changed` if you
+        #   lose leadership.
+        self.assertEqual([], harness.charm.get_changes(reset=True))
+        harness.disable_hooks()
+        harness.set_leader(True)
+        # No hook event if you have disabled them
+        self.assertEqual([], harness.charm.get_changes(reset=True))
 
     def test_relation_set_app_not_leader(self):
         # language=YAML

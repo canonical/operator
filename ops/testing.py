@@ -119,21 +119,21 @@ class Harness:
             charm_metadata = dedent(charm_metadata)
         return charm.CharmMeta.from_yaml(charm_metadata)
 
-    def enable_hooks(self):
-        """Start emitting hook events from charm.on when the model is changed.
-
-        Once enable_hooks is passed the charm, any changes to the model (such as
-        `update_relation_data`) will trigger the associated events (`relation_changed`).
-        """
-        self._hooks_enabled = True
-
     def disable_hooks(self):
         """Stop emitting hook events when the model changes.
 
         This can be used by developers to stop changes to the model from emitting events that
-        the charm will react to.
+        the charm will react to. Call `enable_hooks`_ to re-enable them.
         """
         self._hooks_enabled = False
+
+    def enable_hooks(self):
+        """Re-enable hook events from charm.on when the model is changed.
+
+        By default hook events are enabled once you call begin(), but if you have used
+        disable_hooks, this can be used to enable them again.
+        """
+        self._hooks_enabled = True
 
     def _next_relation_id(self):
         rel_id = self._relation_id_counter
@@ -281,13 +281,13 @@ class Harness:
         self._charm.on[rel_name].relation_changed.emit(*args)
 
     def update_config(self, key_values=None, unset=()):
-        """Update the config as seen by the charm, and trigger a config_changed event.
+        """Update the config as seen by the charm.
 
         This will trigger a `config_changed` event.
 
         :param key_values: A Mapping of key:value pairs to update in config.
         :param unset: An iterable of keys to remove from Config. (Note that this does
-          not currently reset the config values to the default defined in config.yaml.
+          not currently reset the config values to the default defined in config.yaml.)
         :return: None
         """
         config = self._backend._config
@@ -316,7 +316,7 @@ class Harness:
         self._backend._is_leader = is_leader
         # Note: jam 2020-03-01 currently is_leader is cached at the ModelBackend level, not in
         # the Model objects, so this automatically gets noticed.
-        if is_leader and not was_leader and self._charm is not None:
+        if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
 
