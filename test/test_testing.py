@@ -215,8 +215,9 @@ class TestHarness(unittest.TestCase):
 
     def test_metadata_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, tmp)
-        with open(tmp / 'metadata.yaml', 'wt') as metadata:
+        self.addCleanup(shutil.rmtree, str(tmp))
+        metadata_filename = tmp / 'metadata.yaml'
+        with metadata_filename.open('wt') as metadata:
             metadata.write(textwrap.dedent('''
             name: my-charm
             requires:
@@ -225,7 +226,8 @@ class TestHarness(unittest.TestCase):
             '''))
         srcdir = tmp / 'src'
         srcdir.mkdir(0o755)
-        with open(srcdir / 'charm.py', 'wt') as charmpy:
+        charm_filename = srcdir / 'charm.py'
+        with charm_filename.open('wt') as charmpy:
             # language=Python
             charmpy.write(textwrap.dedent('''
                 from ops.charm import CharmBase
