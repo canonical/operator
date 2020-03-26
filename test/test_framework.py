@@ -1,5 +1,4 @@
-#!/usr/bin/python3
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,8 +21,20 @@ import datetime
 from pathlib import Path
 
 from ops.framework import (
-    Framework, Handle, EventSource, EventsBase, EventBase, Object, PreCommitEvent, CommitEvent,
-    NoSnapshotError, StoredState, StoredList, BoundStoredState, StoredStateData, SQLiteStorage
+    BoundStoredState,
+    CommitEvent,
+    EventBase,
+    EventSetBase,
+    EventSource,
+    Framework,
+    Handle,
+    NoSnapshotError,
+    Object,
+    PreCommitEvent,
+    SQLiteStorage,
+    StoredList,
+    StoredState,
+    StoredStateData,
 )
 
 
@@ -376,7 +387,7 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
-        class MyEvents(EventsBase):
+        class MyEvents(EventSetBase):
             foo = EventSource(MyEvent)
 
         class MyNotifier(Object):
@@ -473,7 +484,7 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
-        class MyEvents(EventsBase):
+        class MyEvents(EventSetBase):
             foo = EventSource(MyEvent)
             bar = EventSource(MyEvent)
 
@@ -511,11 +522,11 @@ class TestFramework(unittest.TestCase):
 
         event = EventSource(MyEvent)
 
-        class MyEvents(EventsBase):
+        class MyEvents(EventSetBase):
             foo = event
 
         with self.assertRaises(RuntimeError) as cm:
-            class OtherEvents(EventsBase):
+            class OtherEvents(EventSetBase):
                 foo = event
         self.assertEqual(
             str(cm.exception),
@@ -580,7 +591,7 @@ class TestFramework(unittest.TestCase):
         class MyBar(EventBase):
             pass
 
-        class MyEvents(EventsBase):
+        class MyEvents(EventSetBase):
             foo = EventSource(MyFoo)
 
         class MyNotifier(Object):
@@ -617,10 +628,10 @@ class TestFramework(unittest.TestCase):
     def test_dynamic_event_types(self):
         framework = self.create_framework()
 
-        class MyEventsA(EventsBase):
+        class MyEventsA(EventSetBase):
             handle_kind = 'on_a'
 
-        class MyEventsB(EventsBase):
+        class MyEventsB(EventSetBase):
             handle_kind = 'on_b'
 
         class MyNotifier(Object):
@@ -1208,7 +1219,3 @@ class TestStoredState(unittest.TestCase):
         self.assertEqual(parent.state.bar, 4)
         # TODO: jam 2020-01-30 is there a clean way to tell that
         #       parent.state._data.dirty is False?
-
-
-if __name__ == "__main__":
-    unittest.main()
