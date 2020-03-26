@@ -1,6 +1,7 @@
 # The Operator Framework
 
-The Operator Framework provides a simple, lightweight, and powerful way of encapsulating operational experience in code.
+The Operator Framework provides a simple, lightweight, and powerful way of
+writing juju charms, the best way to encapsulate operational experience in code.
 
 The framework will help you to:
 
@@ -11,79 +12,60 @@ The framework will help you to:
 
 ## Getting Started
 
-The following overall structure for your charm directory is recommended:
+Charms written using the operator framework are just Python code. The intention
+is for it to feel very natural for somebody used to coding in Python, and
+reasonably easy to pick up for somebody whose might be a domain expert but
+not necessarily a pythonista themselves.
+
+The dependencies of the operator framework are kept as minimal as possible;
+currently that's Python 3.5 or greater, and `PyYAML` (both are included by
+default in Ubuntu's cloud images from 16.04 on).
+
+If you're new to the world of juju and charms, you should probably dive into our
+[tutorial](/TBD).
+
+If you know about juju, and have written charms that didn't use the operator
+framework (be it with reactive or without), we have an [introduction to the
+operator framework](/TBD) just for you.
+
+If you've gone through the above already and just want a refresher, or are
+really impatient and just want to dive in, feel free to carry on down.
+
+## An Unrelenting Introduction
+
+Operator framework charms are just Python code. The entry point to your charm is
+a particular Python file. It could be anything that makes sense to your project,
+but let's assume this is `src/charm.py`. This file must be executable (and it
+must have the appropriate shebang line).
+
+This file must be symlinked from `hooks/install` (or `hooks/start` if it's a
+charm targeting k8s on juju < 3.8).
+
+You also need the usual `metadata.yaml` and `config.yaml` files, and any Python
+dependencies (maybe using some kind of virtualenv). In other words, your project
+might look like this:
 
 ```
 .
 ├── config.yaml
 ├── metadata.yaml
-├── mod/
-├── lib/
-│   └── ops -> ../mod/operator/ops
+├── env/
+│   └── # ... your Python dependencies, including the operator framework itself
 ├── src/
 │   └── charm.py
 └── hooks/
-    ├── install -> ../src/charm.py
-    └── start -> ../src/charm.py  # for k8s charms per below
+    └── install -> ../src/charm.py
 ```
 
-The `mod/` directory should contain the operator framework dependency as a git
-submodule:
-
-```
-git submodule add https://github.com/canonical/operator mod/operator
-```
-
-Then symlink from the git submodule for the operator framework into the `lib/`
-directory of your charm so it can be imported at run time:
-
-```
-ln -s ../mod/operator/ops lib/ops
-```
-
-Other dependencies included as git submodules can be added in the `mod/`
-directory and symlinked into `lib/` as well.
-
-You can sync subsequent changes from the framework and other submodule
-dependencies by running:
-
-```
-git submodule update
-```
-
-Those cloning and checking out the source for your charm for the first time
-will need to run:
-
-```
-git submodule update --init
-```
-
-Your `src/charm.py` is the entry point for your charm logic. It should be set
-to executable and use Python 3.6 or greater. At a minimum, it needs to define
-a subclass of `CharmBase` and pass that into the framework's `main` function:
+`src/charm.py` here is the entry point to your charm code. At a minimum, it
+needs to define a subclass of `CharmBase` and pass that into the framework's
+`main` function:
 
 ```python
-import sys
-sys.path.append('lib')  # noqa: E402
-
+#!../env/bin/python3
 from ops.charm import CharmBase
 from ops.main import main
 
-
-class MyCharm(CharmBase):
-    pass
-
-
-if __name__ == "__main__":
-    main(MyCharm)
-```
-
-This charm does nothing, because the `MyCharm` class passed to the operator
-framework's `main` function is empty. Functionality can be added to the charm
-by instructing it to observe particular Juju events when the `MyCharm` object
-is initialized. For example,
-
-```python
 class MyCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
@@ -91,43 +73,51 @@ class MyCharm(CharmBase):
 
     def on_start(self, event):
         # Handle the start event here.
+
+if __name__ == "__main__":
+    main(MyCharm)
 ```
 
-Every standard event in Juju may be observed that way, and you can also easily
-define your own events in your custom types.
-
-> The second argument to `observe` can be either the handler as a bound
-> method, or the observer itself if the handler is a method of the observer
-> that follows the conventional naming pattern. That is, in this case, we
-> could have called just `self.framework.observe(self.on.start, self)`.
-
-The `hooks/` directory must contain a symlink to your `src/charm.py` entry
-point so that Juju can call it. You only need to set up the `hooks/install` link
-(`hooks/start` for K8s charms, until [lp#1854635](https://bugs.launchpad.net/juju/+bug/1854635)
-is resolved), and the framework will create all others at runtime.
-
-Once your charm is ready, upload it to the charm store and deploy it as
-normal with:
+That should be enough for you to be able to run
 
 ```
-# Replace ${CHARM} with the name of the charm.
-charm push . cs:~${USER}/${CHARM}
-# Replace ${VERSION} with the version created by `charm push`.
-charm release cs:~${USER}/${CHARM}-${VERSION}
-charm grant cs:~${USER}/${CHARM}-${VERSION} everyone
-# And now deploy your charm.
-juju deploy cs:~${USER}/$CHARM
+$ juju deploy .
 ```
 
-Alternatively, to deploy directly from local disk, run:
+Happy charming!
 
+## Testing your charms
+
+The operator framework provides a testing harness, so that you can test that
+your charm does the right thing when presented with different scenarios, without
+having to have a full deployment to do so. `pydoc3 ops.testing` has the details
+for that, including this example:
+
+```python
+harness = Harness(MyCharm)
+# Do initial setup here
+relation_id = harness.add_relation('db', 'postgresql')
+# Now instantiate the charm to see events as the model changes
+harness.begin()
+harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'val'})
+# Check that charm has properly handled the relation_joined event for postgresql/0
+self.assertEqual(harness.charm. ...)
 ```
-juju deploy .
-```
+
+# Talk to us
+
+If you need help, have ideas, or would just like to chat with us, reach out on
+IRC: we're in [#smooth-operator](irc://chat.freenode.net/%23smooth-operator) on
+freenode (or try the [webchat](https://webchat.freenode.net/#smooth-operator)).
+
+We also pay attention to juju's [discourse](https://discourse.jujucharms.com/),
+but currently we don't actively post there; most discussion at this stage is on
+IRC.
 
 # Operator Framework development
 
-If you want to work in the framework *itself* you will need the following depenencies installed in your system:
+If you want to work in the framework *itself* you will need the following
+depenencies installed in your system:
 
 - Python >= 3.5
 - PyYAML
