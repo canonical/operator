@@ -117,7 +117,7 @@ IRC.
 # Operator Framework development
 
 If you want to work in the framework *itself* you will need the following
-depenencies installed in your system:
+dependencies installed in your system:
 
 - Python >= 3.5
 - PyYAML
