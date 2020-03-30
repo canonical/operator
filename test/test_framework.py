@@ -752,7 +752,7 @@ class TestFramework(unittest.TestCase):
 
     def test_snapshot_saving_restricted_to_simple_types(self):
         # this can not be saved, as it has not simple types!
-        to_be_saved = {"foo": 1, "bar": TestFramework}
+        to_be_saved = {"bar": TestFramework}
 
         class FooEvent(EventsBase):
             def snapshot(self):
@@ -767,7 +767,7 @@ class TestFramework(unittest.TestCase):
             framework.save_snapshot(event)
         expected = (
             "Can not save the data for FooEvent, must contain only simple types: "
-            "{'foo': 1, 'bar': <class 'test.test_framework.TestFramework'>}")
+            "{'bar': <class 'test.test_framework.TestFramework'>}")
         self.assertEqual(str(cm.exception), expected)
 
 
