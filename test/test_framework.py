@@ -766,8 +766,8 @@ class TestFramework(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             framework.save_snapshot(event)
         expected = (
-            "Can not save the data for FooEvent, must contain only simple types: {!r}".format(
-                to_be_saved))
+            "Can not save the data for FooEvent, must contain only simple types: "
+            "{'foo': 1, 'bar': <class 'test.test_framework.TestFramework'>}")
         self.assertEqual(str(cm.exception), expected)
 
 
