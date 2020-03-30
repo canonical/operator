@@ -559,7 +559,12 @@ class Framework(Object):
                 'cannot save {} values before registering that type'.format(type(value).__name__))
         data = value.snapshot()
         # Use marshal as a validator, enforcing the use of simple types.
-        marshal.dumps(data)
+        try:
+            marshal.dumps(data)
+        except ValueError:
+            msg = "Can not save the following data, must contain only simple types: {!r}"
+            raise ValueError(msg.format(data))
+
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(data)
         self._storage.save_snapshot(value.handle.path, raw_data)

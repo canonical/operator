@@ -750,6 +750,25 @@ class TestFramework(unittest.TestCase):
         self.assertIn('database is locked', str(cm.exception))
         f.close()
 
+    def test_snapshot_saving_restricted_to_simple_types(self):
+        # this can not be saved, as it has not simple types!
+        to_be_saved = {"foo": 1, "bar": TestFramework}
+
+        class FooEvent(EventsBase):
+            def snapshot(self):
+                return to_be_saved
+
+        handle = Handle(None, "a_foo", "some_key")
+        event = FooEvent()
+
+        framework = self.create_framework()
+        framework.register_type(FooEvent, None, handle.kind)
+        with self.assertRaises(ValueError) as cm:
+            framework.save_snapshot(event)
+        expected = "Can not save the following data, must contain only simple types: {!r}".format(
+            to_be_saved)
+        self.assertEqual(str(cm.exception), expected)
+
 
 class TestStoredState(unittest.TestCase):
 
