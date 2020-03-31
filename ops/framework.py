@@ -271,7 +271,7 @@ class Object(metaclass=_Metaclass):
         return self.framework.model
 
 
-class EventsBase(Object):
+class EventSetBase(Object):
     """Convenience type to allow defining .on attributes at class level."""
 
     handle_kind = "on"
@@ -358,7 +358,7 @@ class CommitEvent(EventBase):
     pass
 
 
-class FrameworkEvents(EventsBase):
+class FrameworkEventSet(EventSetBase):
     pre_commit = EventSource(PreCommitEvent)
     commit = EventSource(CommitEvent)
 
@@ -474,7 +474,7 @@ class SQLiteStorage:
 
 class Framework(Object):
 
-    on = FrameworkEvents()
+    on = FrameworkEventSet()
 
     # Override properties from Object so that we can set them in __init__.
     model = None
@@ -729,7 +729,7 @@ class StoredStateChanged(EventBase):
     pass
 
 
-class StoredStateEvents(EventsBase):
+class StoredStateEvents(EventSetBase):
     changed = EventSource(StoredStateChanged)
 
 
