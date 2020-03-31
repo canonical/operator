@@ -26,6 +26,9 @@ setup(
     license="Apache-2.0",
     url="https://github.com/canonical/operator",
     packages=["ops"],
+    install_requires=[
+        'PyYAML',
+    ],
     classifiers=[
         "Development Status :: 4 - Beta",
 
