@@ -60,7 +60,7 @@ class Harness:
         self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
-        self._backend = _TestingModelBackend(self._unit_name)
+        self._backend = _TestingModelBackend(self._unit_name, self._meta)
         self._model = model.Model(self._unit_name, self._meta, self._backend)
         self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
 
@@ -140,7 +140,7 @@ class Harness:
         self._relation_id_counter += 1
         return rel_id
 
-    def add_relation(self, relation_name, remote_app, remote_app_data=None):
+    def add_relation(self, relation_name, remote_app, *, remote_app_data=None):
         """Declare that there is a new relation between this app and `remote_app`.
 
         TODO: Once relation_created exists as a Juju hook, it should be triggered by this code.
@@ -173,7 +173,7 @@ class Harness:
         #       remote_app_data isn't empty.
         return rel_id
 
-    def add_relation_unit(self, relation_id, remote_unit_name, remote_unit_data=None):
+    def add_relation_unit(self, relation_id, remote_unit_name, *, remote_unit_data=None):
         """Add a new unit to a relation.
 
         Example::
@@ -319,16 +319,33 @@ class Harness:
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
+    def get_backend_calls(self, reset=False):
+        """Return the calls that we have made to the TestingModelBackend.
+
+        This is useful mostly for testing the framework itself, so that we can assert that we
+        do/don't trigger extra calls.
+
+        :param reset: If True, reset the calls list back to empty.
+        :type reset: bool
+        :return: [(call1, args...), (call2, args...)]
+        """
+        calls = self._backend._calls.copy()
+        if reset:
+            self._backend._calls.clear()
+        return calls
+
 
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
 
-    You should not use this class directly, it is used by `TestingHarness`_ to drive the model.
+    You should not use this class directly, it is used by `Harness`_ to drive the model.
     """
 
-    def __init__(self, unit_name):
+    def __init__(self, unit_name, meta):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
+        self._calls = []
+        self._meta = meta
         self._is_leader = None
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
         self._relation_names = {}  # reverse map from relation_id to relation_name
@@ -342,17 +359,31 @@ class _TestingModelBackend:
         self._unit_status = None
 
     def relation_ids(self, relation_name):
-        return self._relation_ids_map[relation_name]
+        self._calls.append(('relation_ids', relation_name))
+        try:
+            return self._relation_ids_map[relation_name]
+        except KeyError as e:
+            if relation_name not in self._meta.relations:
+                raise model.ModelError('{} is not a known relation'.format(relation_name)) from e
+            return []
 
     def relation_list(self, relation_id):
-        return self._relation_list_map[relation_id]
+        self._calls.append(('relation_list', relation_id))
+        try:
+            return self._relation_list_map[relation_id]
+        except KeyError as e:
+            raise model.RelationNotFoundError from e
 
     def relation_get(self, relation_id, member_name, is_app):
+        self._calls.append(('relation_get', relation_id, member_name, is_app))
         if is_app and '/' in member_name:
             member_name = member_name.split('/')[0]
+        if relation_id not in self._relation_data:
+            raise model.RelationNotFoundError()
         return self._relation_data[relation_id][member_name].copy()
 
     def relation_set(self, relation_id, key, value, is_app):
+        self._calls.append(('relation_set', relation_id, key, value, is_app))
         relation = self._relation_data[relation_id]
         if is_app:
             bucket_key = self.app_name
@@ -361,52 +392,69 @@ class _TestingModelBackend:
         if bucket_key not in relation:
             relation[bucket_key] = {}
         bucket = relation[bucket_key]
-        bucket[key] = value
+        if value == '':
+            bucket.pop(key, None)
+        else:
+            bucket[key] = value
 
     def config_get(self):
+        self._calls.append(('config-get',))
         return self._config
 
     def is_leader(self):
+        self._calls.append(('is_leader',))
         return self._is_leader
 
     def resource_get(self, resource_name):
+        self._calls.append(('resource_get', resource_name))
         return self._resources_map[resource_name]
 
     def pod_spec_set(self, spec, k8s_resources):
+        self._calls.append(('pod_spec_set', spec, k8s_resources))
         self._pod_spec = (spec, k8s_resources)
 
     def status_get(self, *, is_app=False):
+        self._calls.append(('status_get', {'is_app': is_app}))
         if is_app:
             return self._app_status
         else:
             return self._unit_status
 
     def status_set(self, status, message='', *, is_app=False):
+        self._calls.append(('status_set', status, message, {'is_app': is_app}))
         if is_app:
             self._app_status = (status, message)
         else:
             self._unit_status = (status, message)
 
     def storage_list(self, name):
+        self._calls.append(('storage_list', name))
         raise NotImplementedError(self.storage_list)
 
     def storage_get(self, storage_name_id, attribute):
+        self._calls.append(('storage_get', storage_name_id, attribute))
         raise NotImplementedError(self.storage_get)
 
     def storage_add(self, name, count=1):
+        self._calls.append(('storage_add', name, count))
         raise NotImplementedError(self.storage_add)
 
     def action_get(self):
+        self._calls.append(('action_get'))
         raise NotImplementedError(self.action_get)
 
     def action_set(self, results):
+        self._calls.append(('action_set', results))
         raise NotImplementedError(self.action_set)
 
     def action_log(self, message):
+        self._calls.append(('action_log', message))
         raise NotImplementedError(self.action_log)
 
     def action_fail(self, message=''):
+        self._calls.append(('action_fail', message))
         raise NotImplementedError(self.action_fail)
 
     def network_get(self, endpoint_name, relation_id=None):
+        self._calls.append(('network_get', endpoint_name, relation_id))
         raise NotImplementedError(self.network_get)
