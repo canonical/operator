@@ -812,39 +812,73 @@ class BoundStoredState:
 
 
 class StoredState:
+    """A class used to store data the charm needs persisted across invocations.
+
+    Example::
+
+        class MyClass(Object):
+            stored = StoredState()
+
+    Instances of `MyClass` can transparently save state between invocations by
+    setting attributes on `stored`. Initial state should be set with
+    `set_default` on the bound object, that is::
+
+        class MyClass(Object):
+            stored = StoredState()
+
+        def __init__(self, parent, key):
+            super().__init__(parent, key)
+            self.stored.set_default(seen=set())
+            self.framework.observe(self.on.seen, self._on_seen)
+
+        def _on_seen(self, event):
+            self.stored.seen.add(event.uuid)
+
+    """
 
     def __init__(self):
         self.parent_type = None
         self.attr_name = None
 
     def __get__(self, parent, parent_type=None):
-        if self.parent_type is None:
-            self.parent_type = parent_type
-        elif self.parent_type is not parent_type:
+        if self.parent_type is not None and self.parent_type not in parent_type.mro():
+            # the StoredState instance is being shared between two unrelated classes
+            # -> unclear what is exepcted of us -> bail out
             raise RuntimeError(
                 'StoredState shared by {} and {}'.format(
                     self.parent_type.__name__, parent_type.__name__))
 
         if parent is None:
+            # accessing via the class directly (e.g. MyClass.stored)
             return self
 
-        bound = parent.__dict__.get(self.attr_name)
-        if bound is None:
-            for attr_name, attr_value in parent_type.__dict__.items():
-                if attr_value is self:
-                    if self.attr_name and attr_name != self.attr_name:
-                        parent_tname = parent_type.__name__
-                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(
-                            parent_tname, self.attr_name, parent_tname, attr_name))
-                    self.attr_name = attr_name
-                    bound = BoundStoredState(parent, attr_name)
-                    parent.__dict__[attr_name] = bound
-                    break
-            else:
-                raise RuntimeError(
-                    'cannot find StoredVariable attribute in type {}'.format(parent_type.__name__))
+        if self.attr_name is not None and self.attr_name in parent.__dict__:
+            # we probably already have the thing
+            bound = parent.__dict__[self.attr_name]
 
-        return bound
+            if bound is not None:
+                return bound
+
+        # need to find ourselves amongst the parent's bases
+        for cls in parent_type.mro():
+            for attr_name, attr_value in cls.__dict__.items():
+                if attr_value is not self:
+                    continue
+                if self.attr_name is not None and attr_name != self.attr_name:
+                    # the StoredState instance is being stored in two different
+                    # attributes -> unclear what is expected of us -> bail out
+                    raise RuntimeError("StoredState shared by {0}.{1} and {0}.{2}".format(
+                        cls.__name__, self.attr_name, attr_name))
+                # we've found ourselves; save where, and bind the object (and cache it)
+                self.attr_name = attr_name
+                self.parent_type = cls
+                bound = BoundStoredState(parent, attr_name)
+                parent.__dict__[attr_name] = bound
+                return bound
+
+        raise AttributeError(
+            'cannot find StoredVariable attribute in type {}'.format(
+                parent_type.__name__))
 
 
 def _wrap_stored(parent_data, value):
