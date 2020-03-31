@@ -765,7 +765,7 @@ class TestFramework(unittest.TestCase):
         # this can not be saved, as it has not simple types!
         to_be_saved = {"bar": TestFramework}
 
-        class FooEvent(EventsBase):
+        class FooEvent(EventSetBase):
             def snapshot(self):
                 return to_be_saved
 
