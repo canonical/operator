@@ -288,6 +288,7 @@ class TestHarness(unittest.TestCase):
         # No calls to the backend yet
         self.assertEqual([], harness.get_backend_calls())
         rel_id = harness.add_relation('db', 'postgresql')
+        # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         self.assertEqual([
             ('relation_ids', 'db'),
