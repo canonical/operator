@@ -562,7 +562,7 @@ class Framework(Object):
         try:
             marshal.dumps(data)
         except ValueError:
-            msg = "Can not save the data for {}, must contain only simple types: {!r}"
+            msg = "unable to save the data for {}, it must contain only simple types: {!r}"
             raise ValueError(msg.format(value.__class__.__name__, data))
 
         # Use pickle for serialization, so the value remains portable.
