@@ -14,7 +14,7 @@
 
 import re
 
-from ...framework import EventBase, EventsBase, EventSource, StoredState
+from ...framework import Object, EventBase, EventSetBase, EventSource, StoredState
 from ...model import ModelError, BlockedStatus, WaitingStatus
 
 key_value_re = re.compile(r"""(?x)
@@ -83,11 +83,16 @@ class PostgreSQLMasterChanged(EventBase):
         self.master = snapshot['master']
 
 
-class PostgreSQLEvents(EventsBase):
+class PostgreSQLEvents(EventSetBase):
     master_changed = EventSource(PostgreSQLMasterChanged)
 
 
-class PostgreSQLClient(EventsBase):
+def comma_separated_list(s):
+    """Convert a string holding comma separated values into a python list."""
+    return [part.strip() for part in s.split(',') if part.strip()]
+
+
+class PostgreSQLClient(Object):
     """This provides a Client that understands how to communicate with the PostgreSQL Charm.
 
     The two primary methods are .master() which will give you the connection information for the
@@ -97,13 +102,14 @@ class PostgreSQLClient(EventsBase):
     on = PostgreSQLEvents()
     state = StoredState()
 
-    def __init__(self, parent, name):
-        if parent is None:
+    def __init__(self, charm, name):
+        if charm is None:
             raise RuntimeError('must pass a valid CharmBase')
-        super().__init__(parent, name)
+        super().__init__(charm, name)
         self.name = name
-        self.framework.observe(parent.on[self.name].relation_changed, self.on_relation_changed)
-        self.framework.observe(parent.on[self.name].relation_broken, self.on_relation_broken)
+        self.charm = charm
+        self.framework.observe(charm.on[self.name].relation_changed, self.on_relation_changed)
+        self.framework.observe(charm.on[self.name].relation_broken, self.on_relation_broken)
         self.state.set_default(master=None, database=None, roles=None, extensions=None)
 
     def master(self):
@@ -137,11 +143,20 @@ class PostgreSQLClient(EventsBase):
         """Indicate what extensions you want available from PostgreSQL."""
         pass
 
-    def _resolve_master(self, new_master):
+    def _is_relation_ready(self, event):
         # TODO: the pgsql charm likes to report that you can't actually connect as long as
-        # local[egress-subnets] is not a subset of remote[allowed-subnets] and
-        # the requested database, roles and extensions all match the values provided by remote
-        pass
+        #   local[egress-subnets] is not a subset of remote[allowed-subnets] and
+        #   the requested database, roles and extensions all match the values provided by remote
+        # TODO: old versions of the charm only used allowed_units and not allowed_subnets,
+        #  should we be compatible with older versions?
+        allowed_subnets = event.relation.data[event.unit].get('allowed-subnets')
+        if allowed_subnets is not None:
+            allowed_set = set(comma_separated_list(allowed_subnets))
+            egress_subnets = event.relation.data[self.charm.model.unit].get('egress-subnets', '')
+            egress_set = set(comma_separated_list(egress_subnets))
+            if not egress_set.issubset(allowed_set):
+                return False
+        return True
 
     def on_relation_changed(self, event):
         # Check to see if the master is now at a different location
@@ -150,8 +165,10 @@ class PostgreSQLClient(EventsBase):
         # TODO: do we check if any related units have a 'master' set?
         #  Also, we need to check if we actually have the database, roles, and access that we want
         master = data.get('master')
-        if master is not None:
-            should_emit = self.state.master != master
+        if not self._is_relation_ready(event):
+            # Not ready to set master
+            return
+        should_emit = self.state.master != master
         if should_emit:
             self.state.master = master
             self.on.master_changed.emit(master)

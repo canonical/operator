@@ -80,15 +80,21 @@ version: "10"
         self.client = client.PostgreSQLClient(self.harness.charm, "db")
 
     def test_real_relation_data(self):
-        self.relation_id = self.harness.add_relation('db', 'postgresql')
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.update_relation_data(
+            relation_id, 'test-charm/0', {'egress-subnets': '10.210.24.239/32'})
         self.harness.add_relation_unit(
-            self.relation_id, 'postgresql/0', remote_unit_data=self.realData)
+            relation_id, 'postgresql/0', remote_unit_data=self.realData)
         self.assertEqual('test-charm_test-charm', self.client.master().database)
 
     def test_master_changed(self):
-        self.relation_id = self.harness.add_relation('db', 'postgresql')
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.update_relation_data(
+            relation_id, 'test-charm/0', {'egress-subnets': '10.210.24.239/32'})
         self.harness.add_relation_unit(
-            self.relation_id, 'postgresql/0', remote_unit_data=self.realData)
+            relation_id, 'postgresql/0', remote_unit_data=self.realData)
+        master = self.realData['master']
+        self.assertEqual(master, self.client.master().master)
 
         # change the password
         class Receiver(framework.Object):
@@ -103,17 +109,17 @@ version: "10"
         new_master = ("dbname=test-charm_test-charm host=10.210.24.14"
                       " password=2 port=5432 user=juju_test-charm")
         self.harness.update_relation_data(
-            self.relation_id, 'postgresql/0', {'master': new_master, 'password': '2'})
+            relation_id, 'postgresql/0', {'master': new_master, 'password': '2'})
         self.assertEqual(r.changes, [new_master])
         # Changing a different field *doesn't* trigger master changed a second time
         self.harness.update_relation_data(
-            self.relation_id, 'postgresql/0', {'allowed-units': 'test-charm/1'})
+            relation_id, 'postgresql/0', {'allowed-units': 'test-charm/1'})
         self.assertEqual(r.changes, [new_master])
         # but changing master again, does
         new_master = ("dbname=test-charm_test-charm host=10.210.24.14"
                       " password=2 port=5555 user=juju_test-charm")
         self.harness.update_relation_data(
-            self.relation_id, 'postgresql/0', {'master': new_master, 'port': '5555'})
+            relation_id, 'postgresql/0', {'master': new_master, 'port': '5555'})
         self.assertEqual(new_master, self.client.master().master)
 
     def test_no_relation(self):
@@ -124,19 +130,64 @@ version: "10"
         self.assertIsInstance(cm.exception.status, model.BlockedStatus)
 
     def test_no_master(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
         # With a relation, but no established master, raise a Waiting status
         with self.assertRaises(client.PostgreSQLError) as cm:
             self.client.master()
         self.assertIsNotNone(cm.exception.status)
         self.assertIsInstance(cm.exception.status, model.WaitingStatus)
 
+    def test_multiple_relations(self):
+        rel_id1 = self.harness.add_relation('db', 'postgresql')
+        self.harness.add_relation_unit(rel_id1, 'postgresql/0')
+        rel_id2 = self.harness.add_relation('db', 'pgsql2')
+        self.harness.add_relation_unit(rel_id2, 'pgsql2/0')
+        with self.assertRaises(client.PostgreSQLError) as cm:
+            self.client.master()
+        self.assertIsNotNone(cm.exception.status)
+        self.assertIsInstance(cm.exception.status, model.BlockedStatus)
+
     def test_waits_for_allowed_subnets(self):
-        initialData = self.realData.copy()
+        initial_data = self.realData.copy()
         # unset allowed-subnets and allowed-units from the real data.
-        initialData['allowed-subnets'] = ''
-        initialData['allowed-units'] = ''
+        initial_data['allowed-subnets'] = ''
+        initial_data['allowed-units'] = ''
+        # set by Juju
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.update_relation_data(
+            relation_id, 'test-charm/0', {'egress-subnets': '10.20.30.40/24'})
+        # Initially this unit isn't configured to be allowed to connect to pgsql.
+        # There is a master that postgresql is advertising, but we aren't listed as being
+        # allowed to talk to it.
         self.harness.add_relation_unit(
-            self.relation_id, 'postgresql/0', remote_unit_data=initialData)
+            relation_id, 'postgresql/0', remote_unit_data=initial_data)
+        with self.assertRaises(client.PostgreSQLError) as cm:
+            self.client.master()
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
+        # Someone is allowed, but it isn't us
+        self.harness.update_relation_data(
+            relation_id, 'postgresql/0', {'allowed-subnets': '1.2.3.4/24'})
+        with self.assertRaises(client.PostgreSQLError) as cm:
+            self.client.master()
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
+        self.harness.update_relation_data(
+            relation_id, 'postgresql/0', {'allowed-subnets': '1.2.3.4/24,10.20.30.40/24'})
+        self.assertEqual(self.realData['master'], self.client.master().master)
+
+
+class TestCommaSeparatedList(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual([], client.comma_separated_list(''))
+
+    def test_single_entry(self):
+        self.assertEqual(['a'], client.comma_separated_list('a'))
+
+    def test_simple_entries(self):
+        self.assertEqual(['a', 'b'], client.comma_separated_list('a,b'))
+
+    def test_strips_whitespace(self):
+        self.assertEqual(['a', 'b'], client.comma_separated_list('a,b'))
 
 
 if __name__ == '__main__':
