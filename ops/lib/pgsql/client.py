@@ -146,7 +146,7 @@ class PostgreSQLClient(Object):
     application.
     """
     on = PostgreSQLEvents()
-    _state = StoredState()
+    _stored = StoredState()
 
     def __init__(self, charm, relation_name):
         if charm is None:
@@ -158,7 +158,7 @@ class PostgreSQLClient(Object):
             charm.on[self._relation_name].relation_changed, self._on_relation_changed)
         self.framework.observe(
             charm.on[self._relation_name].relation_broken, self._on_relation_broken)
-        self._state.set_default(master=None)
+        self._stored.set_default(master=None)
 
     def master(self):
         """Retrieve the libpq connection string for the Master postgresql database.
@@ -168,9 +168,9 @@ class PostgreSQLClient(Object):
         """
         relations = self.framework.model.relations[self._relation_name]
         if len(relations) == 1:
-            if self._state.master is None:
+            if self._stored.master is None:
                 raise PostgreSQLError(WaitingStatus, 'master not ready yet', self._relation_name)
-            return PostgreSQLDatabase(self._state.master)
+            return PostgreSQLDatabase(self._stored.master)
         if len(relations) == 0:
             raise PostgreSQLError(BlockedStatus, 'missing relation', self._relation_name)
         if len(relations) > 1:
@@ -237,9 +237,9 @@ class PostgreSQLClient(Object):
         if not self._is_relation_ready(relation.data[self._charm.model.unit], data):
             # Not ready to set master
             return
-        should_emit = self._state.master != master
+        should_emit = self._stored.master != master
         if should_emit:
-            self._state.master = master
+            self._stored.master = master
             self.on.master_changed.emit(master)
 
     def _on_relation_broken(self, event):
