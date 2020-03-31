@@ -110,7 +110,7 @@ class PostgreSQLClient(Object):
         self.charm = charm
         self.framework.observe(charm.on[self.name].relation_changed, self.on_relation_changed)
         self.framework.observe(charm.on[self.name].relation_broken, self.on_relation_broken)
-        self.state.set_default(master=None, database=None, roles=None, extensions=None)
+        self.state.set_default(master=None)
 
     def master(self):
         """Retrieve the libpq connection string for the Master postgresql database.
@@ -134,27 +134,44 @@ class PostgreSQLClient(Object):
 
     def set_database_name(self, value):
         """Indicate the database that this charm wants to use."""
+        # request the database name from postgresql
+        for relation in self.charm.model.relations[self.name]:
+            relation.data[self.charm.model.unit]['database'] = value
 
     def set_roles(self, value):
         """Indicate what roles you want available from PostgreSQL."""
-        pass
+        for relation in self.charm.model.relations[self.name]:
+            relation.data[self.charm.model.unit]['roles'] = value
 
     def set_extensions(self, value):
         """Indicate what extensions you want available from PostgreSQL."""
-        pass
+        for relation in self.charm.model.relations[self.name]:
+            relation.data[self.charm.model.unit]['extensions'] = value
 
-    def _is_relation_ready(self, event):
+    def _is_relation_ready(self, my_data, remote_data):
         # TODO: the pgsql charm likes to report that you can't actually connect as long as
         #   local[egress-subnets] is not a subset of remote[allowed-subnets] and
         #   the requested database, roles and extensions all match the values provided by remote
         # TODO: old versions of the charm only used allowed_units and not allowed_subnets,
         #  should we be compatible with older versions?
-        allowed_subnets = event.relation.data[event.unit].get('allowed-subnets')
+        allowed_subnets = remote_data.get('allowed-subnets')
         if allowed_subnets is not None:
             allowed_set = set(comma_separated_list(allowed_subnets))
-            egress_subnets = event.relation.data[self.charm.model.unit].get('egress-subnets', '')
+            egress_subnets = my_data.get('egress-subnets', '')
             egress_set = set(comma_separated_list(egress_subnets))
             if not egress_set.issubset(allowed_set):
+                return False
+        requested_database = my_data.get('database')
+        if requested_database is not None:
+            if remote_data.get('database', '') != requested_database:
+                return False
+        requested_roles = my_data.get('roles')
+        if requested_roles is not None:
+            if remote_data.get('roles', '') != requested_roles:
+                return False
+        requested_extensions = my_data.get('extensions')
+        if requested_extensions is not None:
+            if remote_data.get('extensions', '') != requested_extensions:
                 return False
         return True
 
@@ -165,7 +182,7 @@ class PostgreSQLClient(Object):
         # TODO: do we check if any related units have a 'master' set?
         #  Also, we need to check if we actually have the database, roles, and access that we want
         master = data.get('master')
-        if not self._is_relation_ready(event):
+        if not self._is_relation_ready(relation.data[self.charm.model.unit], data):
             # Not ready to set master
             return
         should_emit = self.state.master != master

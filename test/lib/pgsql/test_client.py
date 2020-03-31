@@ -130,7 +130,7 @@ version: "10"
         self.assertIsInstance(cm.exception.status, model.BlockedStatus)
 
     def test_no_master(self):
-        relation_id = self.harness.add_relation('db', 'postgresql')
+        _ = self.harness.add_relation('db', 'postgresql')
         # With a relation, but no established master, raise a Waiting status
         with self.assertRaises(client.PostgreSQLError) as cm:
             self.client.master()
@@ -172,6 +172,61 @@ version: "10"
         self.assertIsInstance(cm.exception.status, model.WaitingStatus)
         self.harness.update_relation_data(
             relation_id, 'postgresql/0', {'allowed-subnets': '1.2.3.4/24,10.20.30.40/24'})
+        self.assertEqual(self.realData['master'], self.client.master().master)
+
+    def test_waits_for_database_name_if_set(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.update_relation_data(
+            relation_id, 'test-charm/0', {'egress-subnets': '10.210.24.239/32'})
+        self.client.set_database_name('desired-db')
+        my_relation_data = self.harness.get_relation_data(relation_id, 'test-charm/0')
+        self.assertEqual('desired-db', my_relation_data['database'])
+
+        self.harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data=self.realData)
+        # Wait until postgresql acknowledges the desired db name
+        with self.assertRaises(client.PostgreSQLError) as cm:
+            self.client.master()
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
+        master = self.realData['master']
+        master = master.replace('dbname=test-charm_test-charm', 'dbname=desired-db')
+        self.harness.update_relation_data(
+            relation_id, 'postgresql/0', {'master': master, 'database': 'desired-db'})
+        self.assertEqual(master, self.client.master().master)
+
+    def test_waits_for_roles_if_set(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.update_relation_data(
+            relation_id, 'test-charm/0', {'egress-subnets': '10.210.24.239/32'})
+        self.client.set_roles('admin')
+        my_relation_data = self.harness.get_relation_data(relation_id, 'test-charm/0')
+        self.assertEqual('admin', my_relation_data['roles'])
+
+        self.harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data=self.realData)
+        # Wait until postgresql acknowledges the desired roles
+        with self.assertRaises(client.PostgreSQLError) as cm:
+            self.client.master()
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
+        self.harness.update_relation_data(relation_id, 'postgresql/0', {'roles': 'admin'})
+        self.assertEqual(self.realData['master'], self.client.master().master)
+
+    def test_waits_for_extensions_if_set(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.update_relation_data(
+            relation_id, 'test-charm/0', {'egress-subnets': '10.210.24.239/32'})
+        self.client.set_extensions('foo,bar')
+        my_relation_data = self.harness.get_relation_data(relation_id, 'test-charm/0')
+        self.assertEqual('foo,bar', my_relation_data['extensions'])
+
+        self.harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data=self.realData)
+        # Wait until postgresql acknowledges the desired roles
+        with self.assertRaises(client.PostgreSQLError) as cm:
+            self.client.master()
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
+        self.harness.update_relation_data(relation_id, 'postgresql/0', {'extensions': 'foo'})
+        with self.assertRaises(client.PostgreSQLError) as cm:
+            self.client.master()
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
+        self.harness.update_relation_data(relation_id, 'postgresql/0', {'extensions': 'foo,bar'})
         self.assertEqual(self.realData['master'], self.client.master().master)
 
 
