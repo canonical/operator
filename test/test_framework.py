@@ -813,6 +813,21 @@ class TestStoredState(unittest.TestCase):
         self._stored_state_tests(SubA)
         self._stored_state_tests(SubB)
 
+    def test_the_crazy_thing(self):
+        class NoState(Object):
+            pass
+
+        class StatedObject(NoState):
+            state = StoredState()
+
+        class Sibling(NoState):
+            pass
+
+        class FinalChild(StatedObject, Sibling):
+            pass
+
+        self._stored_state_tests(FinalChild)
+
     def _stored_state_tests(self, cls):
         framework = self.create_framework()
         obj = cls(framework, "1")
@@ -903,6 +918,10 @@ class TestStoredState(unittest.TestCase):
             self.fail("exception RuntimeError not raised")
         finally:
             framework.close()
+
+        # make sure we're not changing the object on failure
+        self.assertNotIn("stored", obj.__dict__)
+        self.assertNotIn("state", obj.__dict__)
 
     def test_same_name_two_classes(self):
         class Base(Object):

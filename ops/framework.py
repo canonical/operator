@@ -817,22 +817,22 @@ class StoredState:
     Example::
 
         class MyClass(Object):
-            stored = StoredState()
+            _stored = StoredState()
 
     Instances of `MyClass` can transparently save state between invocations by
     setting attributes on `stored`. Initial state should be set with
     `set_default` on the bound object, that is::
 
         class MyClass(Object):
-            stored = StoredState()
+            _stored = StoredState()
 
         def __init__(self, parent, key):
             super().__init__(parent, key)
-            self.stored.set_default(seen=set())
+            self._stored.set_default(seen=set())
             self.framework.observe(self.on.seen, self._on_seen)
 
         def _on_seen(self, event):
-            self.stored.seen.add(event.uuid)
+            self._stored.seen.add(event.uuid)
 
     """
 
@@ -852,10 +852,12 @@ class StoredState:
             # accessing via the class directly (e.g. MyClass.stored)
             return self
 
-        bound = parent.__dict__.get(self.attr_name)
-        if bound is not None:
-            # we already have the thing from a previous pass, huzzah
-            return bound
+        bound = None
+        if self.attr_name is not None:
+            bound = parent.__dict__.get(self.attr_name)
+            if bound is not None:
+                # we already have the thing from a previous pass, huzzah
+                return bound
 
         # need to find ourselves amongst the parent's bases
         for cls in parent_type.mro():
@@ -872,9 +874,9 @@ class StoredState:
                 self.attr_name = attr_name
                 self.parent_type = cls
                 bound = BoundStoredState(parent, attr_name)
-                parent.__dict__[attr_name] = bound
 
         if bound is not None:
+            parent.__dict__[self.attr_name] = bound
             return bound
 
         raise AttributeError(
