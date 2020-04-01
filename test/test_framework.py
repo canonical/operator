@@ -910,14 +910,10 @@ class TestStoredState(unittest.TestCase):
         framework = self.create_framework()
         obj = Mine(framework, None)
 
-        try:
+        with self.assertRaises(RuntimeError):
             obj.state.foo = 42
-        except RuntimeError:
-            pass
-        else:
-            self.fail("exception RuntimeError not raised")
-        finally:
-            framework.close()
+
+        framework.close()
 
         # make sure we're not changing the object on failure
         self.assertNotIn("stored", obj.__dict__)
@@ -937,17 +933,17 @@ class TestStoredState(unittest.TestCase):
         a = A(framework, None)
         b = B(framework, None)
 
-        try:
-            # NOTE it's the second one that actually triggers the
-            # exception, but that's an implementation detail
-            a.stored.foo = 42
+        # NOTE it's the second one that actually triggers the
+        # exception, but that's an implementation detail
+        a.stored.foo = 42
+
+        with self.assertRaises(RuntimeError):
             b.stored.foo = "xyzzy"
-        except RuntimeError:
-            pass
-        else:
-            self.fail("exception RuntimeError not raised")
-        finally:
-            framework.close()
+
+        framework.close()
+
+        # make sure we're not changing the object on failure
+        self.assertNotIn("stored", b.__dict__)
 
     def test_mutable_types_invalid(self):
         framework = self.create_framework()

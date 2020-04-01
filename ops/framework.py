@@ -870,12 +870,14 @@ class StoredState:
                     # attributes -> unclear what is expected of us -> bail out
                     raise RuntimeError("StoredState shared by {0}.{1} and {0}.{2}".format(
                         cls.__name__, self.attr_name, attr_name))
-                # we've found ourselves for the first time; save where, and bind & cache the object
+                # we've found ourselves for the first time; save where, and bind the object
                 self.attr_name = attr_name
                 self.parent_type = cls
                 bound = BoundStoredState(parent, attr_name)
 
         if bound is not None:
+            # cache the bound object to avoid the expensive lookup the next time
+            # (don't use setattr, to keep things symmetric with the fast-path lookup above)
             parent.__dict__[self.attr_name] = bound
             return bound
 
