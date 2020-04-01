@@ -258,6 +258,19 @@ class TestHarness(unittest.TestCase):
         # The charm_dir also gets set
         self.assertEqual(harness.framework.charm_dir, tmp)
 
+    def test_no_relation_ids(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+
+        self.assertIsNone(harness.charm.model.get_relation('db'))
+        self.assertEqual(harness.charm.model.relations['db'], [])
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):

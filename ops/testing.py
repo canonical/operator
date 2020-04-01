@@ -342,7 +342,7 @@ class _TestingModelBackend:
         self._unit_status = None
 
     def relation_ids(self, relation_name):
-        return self._relation_ids_map[relation_name]
+        return self._relation_ids_map.get(relation_name, [])
 
     def relation_list(self, relation_id):
         return self._relation_list_map[relation_id]
