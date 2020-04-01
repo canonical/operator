@@ -820,7 +820,7 @@ class StoredState:
             _stored = StoredState()
 
     Instances of `MyClass` can transparently save state between invocations by
-    setting attributes on `stored`. Initial state should be set with
+    setting attributes on `_stored`. Initial state should be set with
     `set_default` on the bound object, that is::
 
         class MyClass(Object):
