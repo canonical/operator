@@ -887,6 +887,49 @@ class TestStoredState(unittest.TestCase):
         self.assertEqual(b2.state.foo, "hello")
         self.assertEqual(z2.state.foo, {1})
 
+    def test_two_names_one_state(self):
+        class Mine(Object):
+            state = StoredState()
+            stored = state
+
+        framework = self.create_framework()
+        obj = Mine(framework, None)
+
+        try:
+            obj.state.foo = 42
+        except RuntimeError:
+            pass
+        else:
+            self.fail("exception RuntimeError not raised")
+        finally:
+            framework.close()
+
+    def test_same_name_two_classes(self):
+        class Base(Object):
+            pass
+
+        class A(Base):
+            stored = StoredState()
+
+        class B(Base):
+            stored = A.stored
+
+        framework = self.create_framework()
+        a = A(framework, None)
+        b = B(framework, None)
+
+        try:
+            # NOTE it's the second one that actually triggers the
+            # exception, but that's an implementation detail
+            a.stored.foo = 42
+            b.stored.foo = "xyzzy"
+        except RuntimeError:
+            pass
+        else:
+            self.fail("exception RuntimeError not raised")
+        finally:
+            framework.close()
+
     def test_mutable_types_invalid(self):
         framework = self.create_framework()
 

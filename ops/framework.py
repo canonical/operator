@@ -852,33 +852,34 @@ class StoredState:
             # accessing via the class directly (e.g. MyClass.stored)
             return self
 
-        if self.attr_name is not None and self.attr_name in parent.__dict__:
-            # we probably already have the thing
-            bound = parent.__dict__[self.attr_name]
-
-            if bound is not None:
-                return bound
+        bound = parent.__dict__.get(self.attr_name)
+        if bound is not None:
+            # we already have the thing from a previous pass, huzzah
+            return bound
 
         # need to find ourselves amongst the parent's bases
         for cls in parent_type.mro():
             for attr_name, attr_value in cls.__dict__.items():
                 if attr_value is not self:
                     continue
-                if self.attr_name is not None and attr_name != self.attr_name:
+                # we've found ourselves! is it the first time?
+                if bound is not None:
                     # the StoredState instance is being stored in two different
                     # attributes -> unclear what is expected of us -> bail out
                     raise RuntimeError("StoredState shared by {0}.{1} and {0}.{2}".format(
                         cls.__name__, self.attr_name, attr_name))
-                # we've found ourselves; save where, and bind the object (and cache it)
+                # we've found ourselves for the first time; save where, and bind & cache the object
                 self.attr_name = attr_name
                 self.parent_type = cls
                 bound = BoundStoredState(parent, attr_name)
                 parent.__dict__[attr_name] = bound
-                return bound
+
+        if bound is not None:
+            return bound
 
         raise AttributeError(
-            'cannot find StoredVariable attribute in type {}'.format(
-                parent_type.__name__))
+            'cannot find {} attribute in type {}'.format(
+                self.__class__.__name__, parent_type.__name__))
 
 
 def _wrap_stored(parent_data, value):
