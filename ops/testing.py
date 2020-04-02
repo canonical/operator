@@ -260,7 +260,19 @@ class Harness:
             if rel_data is not None:
                 # If we have read and cached this data, make sure we invalidate it
                 rel_data._invalidate()
-        # TODO: we only need to trigger relation_changed if it is a remote app or unit
+        is_peer = self._charm.meta.relations[relation_name].role == 'peers'
+        if self._model.unit == entity:
+            # Updates to our own unit do not trigger relation-changed events.
+            return
+        if not is_peer and self._model.app == entity:
+            # Updates to our own application on non-peer relations
+            # do not trigger relation-changed events.
+            return
+        elif isinstance(entity, model.Application):
+            # Updates to peer app relation data are not triggered for leaders.
+            if self._model.unit.is_leader():
+                return
+        # Remote app, unit or peer app relation data updates trigger an event.
         self._emit_relation_changed(relation_id, app_or_unit)
 
     def _emit_relation_changed(self, relation_id, app_or_unit):

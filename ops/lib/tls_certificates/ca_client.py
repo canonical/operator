@@ -57,43 +57,97 @@ tls-certificates interface.
             # ...
 """
 
+import json
+import logging
 
-from ops.framework import Object, EventBase, EventSetBase, EventSource, StoredState
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.x509 import load_pem_x509_certificate
 
-import json
-import logging
+from ops.framework import Object, EventBase, EventSetBase, EventSource, StoredState
+from ops.model import ModelError, BlockedStatus, WaitingStatus
 
 logger = logging.getLogger(__name__)
 
 
+class TlsCertificatesError(ModelError):
+    '''A base class for all errors raised by interface-tls-certificates.
+
+    The error provides the attribute self.status to indicate what status and message the Unit
+    should use based on the status of this relation. For example, if there is no relation to a
+    CA, it will raise a BlockedStatus('Missing relation <relation-name>')
+    '''
+
+    def __init__(self, kind, message, relation_name):
+        super().__init__()
+        self.status = kind('{}: {}'.format(message, relation_name))
+
+
+class CAClientError(TlsCertificatesError):
+    '''An error specific to the CAClient class'''
+
+
 class CAAvailable(EventBase):
+
+    '''Event emitted by CAClient.on.ca_available.
+
+    This event will be emitted by CAClient when a new unit of a CA charm
+    joins the relation. If there are multiple units joining one by one,
+    multiple events will be triggered.
+
+    The expected response from a handler of that event is to request a
+    certificate from the CA via the API provided by CAClient.
+    '''
     pass
 
 
 class TlsConfigReady(EventBase):
+
+    '''Event emitted by CAClient.on.tls_config_ready.
+
+    This event will be emitted by CAClient when a remote CA unit.
+
+    The expected response from a handler of that event is to request a
+    certificate from the CA via the API provided by CAClient.
+    '''
     pass
 
 
 class CAClientEvents(EventSetBase):
+
+    '''Events emitted by the CAClient class.'''
+
     ca_available = EventSource(CAAvailable)
     tls_config_ready = EventSource(TlsConfigReady)
 
 
 class CAClient(Object):
 
+    '''Provides a client type that handles the interaction with CA charms.
+
+    It mainly provides:
+
+    * an indication that a CA unit is available to accept requests for certificates;
+    * a method to provide details (CN, SANs) to the CA for generating certificates;
+    * an indication that a certificate and a key have been generated;
+    * a way to retrieve the generated certificate and key as well as a CA certificate.
+
+    '''
+
     on = CAClientEvents()
-    stored = StoredState()
+    _stored = StoredState()
 
     def __init__(self, charm, relation_name):
+        '''
+        :param charm: the charm object to be used as a parent object.
+        :type charm: :class: `ops.charm.CharmBase`
+        '''
         super().__init__(charm, relation_name)
         self._relation_name = relation_name
         self._common_name = None
         self._sans = None
 
-        self.stored.set_default(ca_certificate=None, key=None, certificate=None)
+        self._stored.set_default(ca_certificate=None, key=None, certificate=None)
 
         self.framework.observe(charm.on[relation_name].relation_joined, self._on_relation_joined)
         self.framework.observe(charm.on[relation_name].relation_changed, self._on_relation_changed)
@@ -104,22 +158,51 @@ class CAClient(Object):
 
     @property
     def is_ready(self):
-        return all(p is not None for p in (self.stored.certificate, self.stored.key,
-                                           self.stored.ca_certificate))
+        return all(p is not None for p in (self._stored.certificate, self._stored.key,
+                                           self._stored.ca_certificate))
+
+    @property
+    def _is_certificate_requested(self):
+        rel = self.framework.model.get_relation(self._relation_name)
+        if rel is None:
+            return False
+        common_name = rel.data[self.framework.model.unit].get('common_name')
+        sans = rel.data[self.framework.model.unit].get('sans')
+        if common_name is None or sans is None:
+            return False
+        return True
 
     @property
     def certificate(self):
-        return load_pem_x509_certificate(self.stored.certificate.encode('utf-8'),
+        if not self._is_certificate_requested:
+            raise CAClientError(BlockedStatus, 'a certificate request has not been sent',
+                                self._relation_name)
+        if self._stored.certificate is None:
+            raise CAClientError(WaitingStatus, 'a certificate has not been obtained yet.',
+                                self._relation_name)
+        return load_pem_x509_certificate(self._stored.certificate.encode('utf-8'),
                                          backend=default_backend())
 
     @property
     def key(self):
-        return load_pem_private_key(self.stored.key.encode('utf-8'), password=None,
+        if not self._is_certificate_requested:
+            raise CAClientError(BlockedStatus, 'a certificate request has not been sent',
+                                self._relation_name)
+        if self._stored.key is None:
+            raise CAClientError(WaitingStatus, 'a key has not been obtained yet.',
+                                self._relation_name)
+        return load_pem_private_key(self._stored.key.encode('utf-8'), password=None,
                                     backend=default_backend())
 
     @property
     def ca_certificate(self):
-        return load_pem_x509_certificate(self.stored.ca_certificate.encode('utf-8'),
+        if not self._is_certificate_requested:
+            raise CAClientError(BlockedStatus, 'a certificate request has not been sent',
+                                self._relation_name)
+        if self._stored.ca_certificate is None:
+            raise CAClientError(WaitingStatus, 'a CA certificate has not been obtained yet.',
+                                self._relation_name)
+        return load_pem_x509_certificate(self._stored.ca_certificate.encode('utf-8'),
                                          backend=default_backend())
 
     def _on_relation_joined(self, event):
@@ -136,6 +219,8 @@ class CAClient(Object):
         sans -- an updated list of Subject Alternative Names to use.
         """
         rel = self.framework.model.get_relation(self._relation_name)
+        if rel is None:
+            raise CAClientError(BlockedStatus, 'missing relation', self._relation_name)
         logger.info('Requesting a CA certificate. Common name: {}, SANS: {}'
                     ''.format(common_name, sans))
         rel_data = rel.data[self.model.unit]
@@ -151,11 +236,15 @@ class CAClient(Object):
         cert = remote_data.get('{}.server.cert'.format(self.model.unit.name.replace("/", "_")))
         key = remote_data.get('{}.server.key'.format(self.model.unit.name.replace("/", "_")))
         ca = remote_data.get('ca')
-        if cert is None or key is None or ca is None:
-            logger.info('A CA has not yet exposed a requested certificate,'
-                        ' key and CA certificate.')
+
+        if not self._is_certificate_requested:
             return
-        self.stored.certificate = cert
-        self.stored.key = key
-        self.stored.ca_certificate = ca
+
+        if cert is None or key is None or ca is None:
+            message = 'A CA has not yet exposed a requested certificate, key and CA certificate.'
+            logger.info(message)
+            raise CAClientError(WaitingStatus, message, self._relation_name)
+        self._stored.certificate = cert
+        self._stored.key = key
+        self._stored.ca_certificate = ca
         self.on.tls_config_ready.emit()

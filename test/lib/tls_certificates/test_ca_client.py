@@ -20,6 +20,7 @@ import cryptography
 from ops import framework
 from ops.charm import CharmBase
 from ops import testing
+from ops import model
 
 from ops.lib.tls_certificates import ca_client
 from pathlib import Path
@@ -63,12 +64,26 @@ class TestCAClient(unittest.TestCase):
 
     def test_request_server_certificate(self):
         relation_id = self.harness.add_relation('ca-client', 'easyrsa')
+
         self.harness.update_relation_data(
             relation_id, 'myserver/0', {'ingress-address': '192.0.2.1'})
 
         self.harness.add_relation_unit(relation_id, 'easyrsa/0',
                                        {'ingress-address': '192.0.2.2'})
         rel = self.harness.charm.model.get_relation('ca-client')
+
+        # Cannot obtain {certificate, key, ca_certificate} before a request is made.
+        with self.assertRaises(ca_client.CAClientError) as cm:
+            self.ca_client.certificate
+        self.assertIsInstance(cm.exception.status, model.BlockedStatus)
+
+        with self.assertRaises(ca_client.CAClientError) as cm:
+            self.ca_client.key
+        self.assertIsInstance(cm.exception.status, model.BlockedStatus)
+
+        with self.assertRaises(ca_client.CAClientError) as cm:
+            self.ca_client.ca_certificate
+        self.assertIsInstance(cm.exception.status, model.BlockedStatus)
 
         example_hostname = 'myserver.example'
         sans = [example_hostname, '192.0.2.1']
@@ -77,6 +92,19 @@ class TestCAClient(unittest.TestCase):
         server_data = rel.data[self.harness.charm.model.unit]
         self.assertEqual(server_data['common_name'], example_hostname)
         self.assertEqual(server_data['sans'], json.dumps(sans))
+
+        # Waiting for more relation data now - check for WaitingStatus in the exception.
+        with self.assertRaises(ca_client.CAClientError) as cm:
+            self.ca_client.certificate
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
+
+        with self.assertRaises(ca_client.CAClientError) as cm:
+            self.ca_client.key
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
+
+        with self.assertRaises(ca_client.CAClientError) as cm:
+            self.ca_client.ca_certificate
+        self.assertIsInstance(cm.exception.status, model.WaitingStatus)
 
         # Simulate a change and make sure it propagates to relation data correctly.
         new_example_hostname = 'myserver1.example'
@@ -100,12 +128,18 @@ class TestCAClient(unittest.TestCase):
         self.harness.framework.observe(self.ca_client.on.tls_config_ready, receiver)
 
         relation_id = self.harness.add_relation('ca-client', 'easyrsa')
+        self.harness.update_relation_data(relation_id, 'myserver/0',
+                                          {'ingress-address': '10.209.240.176'})
+
+        self.harness.add_relation_unit(relation_id, 'easyrsa/0', {'ingress-address': '192.0.2.2'})
+
         self.harness.update_relation_data(
-            relation_id, 'myserver/0', {'ingress-address': '10.209.240.176'})
-
-        self.harness.add_relation_unit(relation_id, 'easyrsa/0',
-                                       {'': '192.0.2.2'})
-
+            relation_id, 'myserver/0', {
+                'ingress-address': '10.209.240.176',
+                'common_name': '10.209.240.176',
+                'sans': '10.209.240.176',
+            }
+        )
         # Load the sample relation data from a file. The certificates and a key
         # were generated once for the purposes of creating an example.
         # They are not used anywhere in a production or test system.
