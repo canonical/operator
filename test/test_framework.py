@@ -794,12 +794,63 @@ class TestStoredState(unittest.TestCase):
         return framework
 
     def test_basic_state_storage(self):
-        framework = self.create_framework()
-
         class SomeObject(Object):
             state = StoredState()
 
-        obj = SomeObject(framework, "1")
+        self._stored_state_tests(SomeObject)
+
+    def test_straight_subclass(self):
+        class SomeObject(Object):
+            state = StoredState()
+
+        class Sub(SomeObject):
+            pass
+
+        self._stored_state_tests(Sub)
+
+    def test_straight_sub_subclass(self):
+        class SomeObject(Object):
+            state = StoredState()
+
+        class Sub(SomeObject):
+            pass
+
+        class SubSub(SomeObject):
+            pass
+
+        self._stored_state_tests(SubSub)
+
+    def test_two_subclasses(self):
+        class SomeObject(Object):
+            state = StoredState()
+
+        class SubA(SomeObject):
+            pass
+
+        class SubB(SomeObject):
+            pass
+
+        self._stored_state_tests(SubA)
+        self._stored_state_tests(SubB)
+
+    def test_the_crazy_thing(self):
+        class NoState(Object):
+            pass
+
+        class StatedObject(NoState):
+            state = StoredState()
+
+        class Sibling(NoState):
+            pass
+
+        class FinalChild(StatedObject, Sibling):
+            pass
+
+        self._stored_state_tests(FinalChild)
+
+    def _stored_state_tests(self, cls):
+        framework = self.create_framework()
+        obj = cls(framework, "1")
 
         try:
             obj.state.foo
@@ -832,11 +883,87 @@ class TestStoredState(unittest.TestCase):
 
         # Since this has the same absolute object handle, it will get its state back.
         framework_copy = self.create_framework()
-        obj_copy = SomeObject(framework_copy, "1")
+        obj_copy = cls(framework_copy, "1")
         self.assertEqual(obj_copy.state.foo, 42)
         self.assertEqual(obj_copy.state.bar, "s")
         self.assertEqual(obj_copy.state.baz, 4.2)
         self.assertEqual(obj_copy.state.bing, True)
+
+        framework_copy.close()
+
+    def test_two_subclasses_no_conflicts(self):
+        class Base(Object):
+            state = StoredState()
+
+        class SubA(Base):
+            pass
+
+        class SubB(Base):
+            pass
+
+        framework = self.create_framework()
+        a = SubA(framework, None)
+        b = SubB(framework, None)
+        z = Base(framework, None)
+
+        a.state.foo = 42
+        b.state.foo = "hello"
+        z.state.foo = {1}
+
+        framework.commit()
+        framework.close()
+
+        framework2 = self.create_framework()
+        a2 = SubA(framework2, None)
+        b2 = SubB(framework2, None)
+        z2 = Base(framework2, None)
+
+        self.assertEqual(a2.state.foo, 42)
+        self.assertEqual(b2.state.foo, "hello")
+        self.assertEqual(z2.state.foo, {1})
+
+    def test_two_names_one_state(self):
+        class Mine(Object):
+            state = StoredState()
+            stored = state
+
+        framework = self.create_framework()
+        obj = Mine(framework, None)
+
+        with self.assertRaises(RuntimeError):
+            obj.state.foo = 42
+
+        framework.close()
+
+        # make sure we're not changing the object on failure
+        self.assertNotIn("stored", obj.__dict__)
+        self.assertNotIn("state", obj.__dict__)
+
+    def test_same_name_two_classes(self):
+        class Base(Object):
+            pass
+
+        class A(Base):
+            stored = StoredState()
+
+        class B(Base):
+            stored = A.stored
+
+        framework = self.create_framework()
+        a = A(framework, None)
+        b = B(framework, None)
+
+        # NOTE it's the second one that actually triggers the
+        # exception, but that's an implementation detail
+        a.stored.foo = 42
+
+        with self.assertRaises(RuntimeError):
+            b.stored.foo = "xyzzy"
+
+        framework.close()
+
+        # make sure we're not changing the object on failure
+        self.assertNotIn("stored", b.__dict__)
 
     def test_mutable_types_invalid(self):
         framework = self.create_framework()
