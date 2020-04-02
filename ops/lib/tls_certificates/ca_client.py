@@ -136,7 +136,8 @@ class CAClient(Object):
         sans -- an updated list of Subject Alternative Names to use.
         """
         rel = self.framework.model.get_relation(self._relation_name)
-        logger.info(f'Requesting a CA certificate. Common name: {common_name}, SANS: {sans}')
+        logger.info('Requesting a CA certificate. Common name: {}, SANS: {}'
+                    ''.format(common_name, sans))
         rel_data = rel.data[self.model.unit]
         rel_data['common_name'] = common_name
         rel_data['sans'] = json.dumps(sans)
@@ -147,8 +148,8 @@ class CAClient(Object):
         # of writing) rely on app relation data.
         remote_data = event.relation.data[event.unit]
 
-        cert = remote_data.get(f'{self.model.unit.name.replace("/", "_")}.server.cert')
-        key = remote_data.get(f'{self.model.unit.name.replace("/", "_")}.server.key')
+        cert = remote_data.get('{}.server.cert'.format(self.model.unit.name.replace("/", "_")))
+        key = remote_data.get('{}.server.key'.format(self.model.unit.name.replace("/", "_")))
         ca = remote_data.get('ca')
         if cert is None or key is None or ca is None:
             logger.info('A CA has not yet exposed a requested certificate,'
