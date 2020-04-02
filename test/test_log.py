@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import unittest
 import importlib
 
@@ -36,13 +37,18 @@ class FakeModelBackend:
         self._calls.append((message, level))
 
 
+def reset_logging():
+    logging.shutdown()
+    importlib.reload(logging)
+
+
 class TestLogging(unittest.TestCase):
 
     def setUp(self):
         self.backend = FakeModelBackend()
 
-        logging.shutdown()
-        importlib.reload(logging)
+        reset_logging()
+        self.addCleanup(reset_logging)
 
     def test_default_logging(self):
         ops.log.setup_root_logging(self.backend)
@@ -79,6 +85,32 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(self.backend.calls(), [])
         logger.warning('bar')
         self.assertEqual(self.backend.calls(), [('WARNING', 'bar')])
+
+    def test_debug_logging(self):
+        buffer = io.StringIO()
+        ops.log.setup_root_logging(self.backend, debug=True, debug_stream=buffer)
+        logger = logging.getLogger()
+        logger.debug('debug message')
+        self.assertEqual(self.backend.calls(), [])
+        self.assertEqual(
+            buffer.getvalue(),
+            "   DEBUG debug message\n")
+        logger.info('info message')
+        logger.warning('warning message')
+        logger.critical('critical message')
+        self.assertEqual(
+            self.backend.calls(),
+            [('INFO', 'info message'),
+             ('WARNING', 'warning message'),
+             ('CRITICAL', 'critical message'),
+             ])
+        self.assertEqual(
+            buffer.getvalue(),
+            "   DEBUG debug message\n"
+            "    INFO info message\n"
+            " WARNING warning message\n"
+            "CRITICAL critical message\n"
+        )
 
 
 if __name__ == '__main__':
