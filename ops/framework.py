@@ -558,8 +558,18 @@ class Framework(Object):
             raise RuntimeError(
                 'cannot save {} values before registering that type'.format(type(value).__name__))
         data = value.snapshot()
-        # Use marshal as a validator, enforcing the use of simple types.
-        marshal.dumps(data)
+
+        # Use marshal as a validator, enforcing the use of simple types, as we later the
+        # information is really pickled, which is too error prone for future evolution of the
+        # stored data (e.g. if the developer stores a custom object and later changes its
+        # class name; when unpickling the original class will not be there and event
+        # data loading will fail).
+        try:
+            marshal.dumps(data)
+        except ValueError:
+            msg = "unable to save the data for {}, it must contain only simple types: {!r}"
+            raise ValueError(msg.format(value.__class__.__name__, data))
+
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(data)
         self._storage.save_snapshot(value.handle.path, raw_data)
