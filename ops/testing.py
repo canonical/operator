@@ -150,9 +150,15 @@ class Harness:
         :param remote_app_data: Optional data bag that the remote application is sending
           If remote_app_data is not empty, this should trigger
           ``charm.on[relation_name].relation_changed(app)``
+          For peer relations, use initial_app_data instead.
         :return: The relation_id created by this add_relation.
         :rtype: int
         """
+        is_peer = self._charm.meta.relations[relation_name].role == 'peers'
+        if is_peer and remote_app_data is not None:
+            raise RuntimeError('unable to update remote app data as there is no remote app on'
+                               ' a peer relation')
+
         rel_id = self._next_relation_id()
         self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
         self._backend._relation_names[rel_id] = relation_name
@@ -242,13 +248,6 @@ class Harness:
         :param key_values: Each key/value will be updated in the relation data.
         :return: None
         """
-        new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
-        for k, v in key_values.items():
-            if v == '':
-                new_values.pop(k, None)
-            else:
-                new_values[k] = v
-        self._backend._relation_data[relation_id][app_or_unit] = new_values
         relation_name = self._backend._relation_names[relation_id]
         if self._model is not None:
             relation = self._model.get_relation(relation_name, relation_id)
@@ -262,18 +261,29 @@ class Harness:
                 rel_data._invalidate()
 
         is_peer = self._charm.meta.relations[relation_name].role == 'peers'
+        our_unit = self._model.unit
+        is_our_app_updated = self._model.app == entity
         if self._model.unit == entity:
-            # Updates to our own unit do not trigger relation-changed events.
-            return
-        if not is_peer and self._model.app == entity:
-            # Updates to our own application on non-peer relations
-            # do not trigger relation-changed events.
-            return
-        elif isinstance(entity, model.Application):
-            # Updates to peer app relation data are not triggered for leaders.
-            if self._model.unit.is_leader():
-                return
+            raise RuntimeError('unable to update our unit relation data as if it was done by'
+                               ' a remote unit')
+        elif is_peer and is_our_app_updated and our_unit.is_leader():
+            raise RuntimeError('unable to update peer app relation data as if it was done by'
+                               ' a remote unit - our unit {} is a leader'.format(our_unit.name))
+        elif is_our_app_updated and our_unit.is_leader():
+            raise RuntimeError('unable to update app relation data for our app as if it was done'
+                               ' by a remote unit - our unit {} is a leader'.format(our_unit.name))
         # Remote app, unit or peer app relation data updates trigger an event.
+        new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
+        for k, v in key_values.items():
+            if v == '':
+                new_values.pop(k, None)
+            else:
+                new_values[k] = v
+        self._backend._relation_data[relation_id][app_or_unit] = new_values
+
+        # Updates to our app data are do not trigger change events for units of our app.
+        if not is_peer and is_our_app_updated:
+            return
         self._emit_relation_changed(relation_id, app_or_unit)
 
     def _emit_relation_changed(self, relation_id, app_or_unit):
