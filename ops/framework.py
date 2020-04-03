@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
-import pickle
-import marshal
-import types
-import sqlite3
 import collections
 import collections.abc
+import inspect
 import keyword
+import marshal
+import os
+import pdb
+import pickle
+import re
+import sqlite3
+import sys
+import types
 import weakref
 from datetime import timedelta
+
+
+# provided debugger magic strings
+JUJU_DEBUG_ENVVAR = 'JUJU_DEBUG_AT'
+JUJU_DEBUG_ALL = 'all'
+JUJU_DEBUG_HOOK = 'hook'
 
 
 class Handle:
@@ -506,6 +516,10 @@ class Framework(Object):
             self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
 
+        # Hook into builtin breakpoint, so if Python => 3.7, devs will be able to just do
+        # breakpoint(); if Python < 3.7, this doesn't affect anything
+        sys.breakpointhook = self.breakpoint
+
     def close(self):
         self._storage.close()
 
@@ -723,6 +737,22 @@ class Framework(Object):
 
         if not deferred:
             self._storage.drop_snapshot(last_event_path)
+
+    def breakpoint(self, name=None):
+        """Provide a debugger breakpoint if proper execution context."""
+        if name is not None:
+            # validate the given name
+            if not isinstance(name, str):
+                raise TypeError('breakpoint names must be strings')
+            if name in {JUJU_DEBUG_HOOK, JUJU_DEBUG_ALL}:
+                raise ValueError('breakpoint names "all" and "hook" are forbidden')
+            if not re.match(r'^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$', name):
+                raise ValueError('breakpoint names must look like "foo" or "foo-bar"')
+
+        indicated_breakpoints = set(os.environ.get(JUJU_DEBUG_ENVVAR, '').split(','))
+        if JUJU_DEBUG_ALL in indicated_breakpoints or name in indicated_breakpoints:
+            code_frame = inspect.currentframe().f_back
+            pdb.Pdb().set_trace(code_frame)
 
 
 class StoredStateChanged(EventBase):
