@@ -92,9 +92,9 @@ class TestLogging(unittest.TestCase):
         logger = logging.getLogger()
         logger.debug('debug message')
         self.assertEqual(self.backend.calls(), [])
-        self.assertEqual(
+        self.assertRegex(
             buffer.getvalue(),
-            "   DEBUG debug message\n")
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n")
         logger.info('info message')
         logger.warning('warning message')
         logger.critical('critical message')
@@ -104,12 +104,12 @@ class TestLogging(unittest.TestCase):
              ('WARNING', 'warning message'),
              ('CRITICAL', 'critical message'),
              ])
-        self.assertEqual(
+        self.assertRegex(
             buffer.getvalue(),
-            "   DEBUG debug message\n"
-            "    INFO info message\n"
-            " WARNING warning message\n"
-            "CRITICAL critical message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d INFO     info message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d WARNING  warning message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n"
         )
 
 

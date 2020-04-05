@@ -175,7 +175,7 @@ def main(charm_class):
 
     model_backend = ops.model.ModelBackend()
     debug_stream = None
-    if os.getenv("JUJU_DEBUG"):
+    if 'JUJU_DEBUG' in os.environ:
         debug_stream = sys.stderr
     setup_root_logging(model_backend, debug_stream=debug_stream)
 
