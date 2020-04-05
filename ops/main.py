@@ -174,10 +174,10 @@ def main(charm_class):
         juju_event_name = '{}_action'.format(juju_event_name)
 
     model_backend = ops.model.ModelBackend()
-    debug = False
+    debug_stream = None
     if os.getenv("JUJU_DEBUG"):
-        debug = True
-    setup_root_logging(model_backend, debug=debug)
+        debug_stream = sys.stderr
+    setup_root_logging(model_backend, debug_stream=debug_stream)
 
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)

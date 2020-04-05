@@ -88,7 +88,7 @@ class TestLogging(unittest.TestCase):
 
     def test_debug_logging(self):
         buffer = io.StringIO()
-        ops.log.setup_root_logging(self.backend, debug=True, debug_stream=buffer)
+        ops.log.setup_root_logging(self.backend, debug_stream=buffer)
         logger = logging.getLogger()
         logger.debug('debug message')
         self.assertEqual(self.backend.calls(), [])
