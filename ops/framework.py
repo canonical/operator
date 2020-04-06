@@ -32,6 +32,13 @@ from datetime import timedelta
 JUJU_DEBUG_ENVVAR = 'JUJU_DEBUG_AT'
 JUJU_DEBUG_ALL = 'all'
 JUJU_DEBUG_HOOK = 'hook'
+BREAKPOINT_WELCOME_MESSAGE = """
+Starting pdb to debug charm operator.
+Run `h` for help, `c` to continue, or `exit`/CTRL-d to abort.
+Future breakpoints may interrupt execution again.
+More details at https://discourse.jujucharms.com/t/debugging-charm-hooks
+
+"""
 
 
 class Handle:
@@ -761,6 +768,7 @@ class Framework(Object):
 
         indicated_breakpoints = set(os.environ.get(JUJU_DEBUG_ENVVAR, '').split(','))
         if JUJU_DEBUG_ALL in indicated_breakpoints or name in indicated_breakpoints:
+            print(BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
             code_frame = inspect.currentframe().f_back
             pdb.Pdb().set_trace(code_frame)
 
