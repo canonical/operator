@@ -28,6 +28,7 @@ from ops.framework import (
     Object,
 )
 from ops.model import (
+    ActiveStatus,
     ModelError,
     RelationNotFoundError,
 )
@@ -50,6 +51,25 @@ class TestHarness(unittest.TestCase):
         self.assertEqual([rel_id], backend.relation_ids('db'))
         self.assertEqual([], backend.relation_list(rel_id))
 
+    def test_add_relation_must_name_app_data(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        with self.assertRaises(TypeError):
+            harness.add_relation('db', 'postgresql', {'content': 'here'})
+        # No relation was created yet
+        self.assertIsNone(harness.model.get_relation('db'))
+        rel_id = harness.add_relation('db', 'postgresql', remote_app_data={'content': 'here'})
+        # see issue #175, we currently must have a unit
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        app = harness.model.get_app('postgresql')
+        rel = harness.model.get_relation('db', rel_id)
+        self.assertEqual(dict(rel.data[app]), {'content': 'here'})
+
     def test_add_relation_and_unit(self):
         # language=YAML
         harness = Harness(CharmBase, meta='''
@@ -67,6 +87,26 @@ class TestHarness(unittest.TestCase):
         self.assertEqual([remote_unit], backend.relation_list(rel_id))
         self.assertEqual({'foo': 'bar'}, backend.relation_get(rel_id, remote_unit, is_app=False))
         self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_unit, is_app=True))
+
+    def test_add_relation_unit_must_kwargs(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        remote_unit = 'postgresql/0'
+        rel_id = harness.add_relation('db', 'postgresql', remote_app_data={'app': 'data'})
+        with self.assertRaises(TypeError):
+            harness.add_relation_unit(rel_id, remote_unit, {'foo': 'bar'})
+        rel = harness.model.get_relation('db', rel_id)
+        self.assertEqual(set(), rel.units)
+        harness.add_relation_unit(rel_id, remote_unit, remote_unit_data={'foo': 'bar'})
+        rel = harness.model.get_relation('db', rel_id)
+        unit = harness.model.get_unit('postgresql/0')
+        self.assertEqual({'foo': 'bar'}, dict(rel.data[unit]))
+        self.assertEqual({unit}, rel.units)
 
     def test_get_relation_data(self):
         # language=YAML
@@ -300,7 +340,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual([
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
-        ], harness.get_backend_calls())
+        ], harness.get_backend_calls(reset=False))
         # If we check again, they are still there, but now we reset it
         self.assertEqual([
             ('relation_ids', 'db'),
@@ -308,6 +348,30 @@ class TestHarness(unittest.TestCase):
         ], harness.get_backend_calls(reset=True))
         # And the calls are gone
         self.assertEqual([], harness.get_backend_calls())
+
+    def test_get_backend_calls_with_kwargs(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+        unit = harness.charm.model.unit
+        # Reset the list, because we don't care what it took to get here
+        harness.get_backend_calls(reset=True)
+        unit.status = ActiveStatus()
+        self.assertEqual(
+            [('status_set', 'active', '', {'is_app': False})], harness.get_backend_calls())
+        harness.set_leader(True)
+        app = harness.charm.model.app
+        harness.get_backend_calls(reset=True)
+        app.status = ActiveStatus('message')
+        self.assertEqual(
+            [('is_leader',),
+             ('status_set', 'active', 'message', {'is_app': True})],
+            harness.get_backend_calls())
 
 
 class DBRelationChangedHelper(Object):
