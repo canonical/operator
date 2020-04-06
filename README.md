@@ -2,7 +2,6 @@
 
 The Operator Framework provides a simple, lightweight, and powerful way of encapsulating operational experience in code.
 
-<<<<<<< HEAD
 The framework will help you to:
 
 * model the integration of your services
@@ -11,7 +10,6 @@ The framework will help you to:
 * keep your code simple and readable
 
 
-<<<<<<< HEAD
 The following overall structure for your charm directory is recommended:
 
 ```
@@ -136,14 +134,6 @@ If you want to work in the framework *itself* you will need the following depene
 - flake8
 
 Then you can try `./run_tests`, it should all go green.
-=======
-# Getting Started
-
-Please find the [Beginner Docs](./docs/GettingStarted.md) here
->>>>>>> Charm Operator Framework Docs
-=======
-# Getting Started
-
 ## Table of contents
 
 [Introduction](##Introduction)
@@ -256,4 +246,3 @@ git submodule update
 ## More Links
 
 [Charms in detail](./docs/charmsindetail.md)
->>>>>>> Review changes 1/2
