@@ -53,8 +53,20 @@ class TestHarness(unittest.TestCase):
         self.assertEqual({}, backend.relation_get(rel_id, 'test-app/0', is_app=False))
 
     def test_add_relation_with_initial_data(self):
+
+        class InitialDataTester(CharmBase):
+            """Record the relation-changed events."""
+
+            def __init__(self, framework, charm_name):
+                super().__init__(framework, charm_name)
+                self.observed_events = []
+                self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
+
+            def _on_db_relation_changed(self, event):
+                self.observed_events.append(event)
+
         # language=YAML
-        harness = Harness(CharmBase, meta='''
+        harness = Harness(InitialDataTester, meta='''
             name: test-app
             requires:
                 db:
@@ -66,6 +78,9 @@ class TestHarness(unittest.TestCase):
         self.assertEqual({'k', 'v'}, backend.relation_get(rel_id, 'test-app', is_app=True))
         self.assertEqual({'ingress-address': '192.0.2.1'},
                          backend.relation_get(rel_id, 'test-app/0', is_app=False))
+        harness.begin()
+        # Make sure no relation-changed events are emitted for our own data bags.
+        self.assertEqual([], harness.charm.observed_events)
 
     def test_add_relation_and_unit(self):
         # language=YAML
