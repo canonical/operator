@@ -28,19 +28,6 @@ import weakref
 from datetime import timedelta
 
 
-# provided debugger magic strings
-JUJU_DEBUG_ENVVAR = 'JUJU_DEBUG_AT'
-JUJU_DEBUG_ALL = 'all'
-JUJU_DEBUG_HOOK = 'hook'
-BREAKPOINT_WELCOME_MESSAGE = """
-Starting pdb to debug charm operator.
-Run `h` for help, `c` to continue, or `exit`/CTRL-d to abort.
-Future breakpoints may interrupt execution again.
-More details at https://discourse.jujucharms.com/t/debugging-charm-hooks
-
-"""
-
-
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
 
@@ -489,6 +476,16 @@ class SQLiteStorage:
                 yield tuple(row)
 
 
+# the message to show to the user when a pdb breakpoint goes active
+_BREAKPOINT_WELCOME_MESSAGE = """
+Starting pdb to debug charm operator.
+Run `h` for help, `c` to continue, or `exit`/CTRL-d to abort.
+Future breakpoints may interrupt execution again.
+More details at https://discourse.jujucharms.com/t/debugging-charm-hooks
+
+"""
+
+
 class Framework(Object):
 
     on = FrameworkEventSet()
@@ -523,7 +520,7 @@ class Framework(Object):
             self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
 
-        # Hook into builtin breakpoint, so if Python => 3.7, devs will be able to just do
+        # Hook into builtin breakpoint, so if Python >= 3.7, devs will be able to just do
         # breakpoint(); if Python < 3.7, this doesn't affect anything
         sys.breakpointhook = self.breakpoint
 
@@ -756,19 +753,33 @@ class Framework(Object):
             self._storage.drop_snapshot(last_event_path)
 
     def breakpoint(self, name=None):
-        """Provide a debugger breakpoint if proper execution context."""
+        """Add breakpoint, optionally named, at the place where this method is called.
+
+        For the breakpoint to be activated the JUJU_DEBUG_AT environment variable
+        must be set to "all" or to the specific name parameter provided, if any. In every
+        other situation calling this method does nothing.
+
+        The framework also provides a standard breakpoint named "hook", that will
+        stop execution when a hook event is about to be handled.
+
+        For those reasons, the "all" and "hook" breakpoint names are reserved.
+        """
+        # If given, validate the name comply with all the rules
         if name is not None:
-            # validate the given name
             if not isinstance(name, str):
                 raise TypeError('breakpoint names must be strings')
-            if name in {JUJU_DEBUG_HOOK, JUJU_DEBUG_ALL}:
-                raise ValueError('breakpoint names "all" and "hook" are forbidden')
+            if name in ('hook', 'all'):
+                raise ValueError('breakpoint names "all" and "hook" are reserved')
             if not re.match(r'^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$', name):
                 raise ValueError('breakpoint names must look like "foo" or "foo-bar"')
 
-        indicated_breakpoints = set(os.environ.get(JUJU_DEBUG_ENVVAR, '').split(','))
-        if JUJU_DEBUG_ALL in indicated_breakpoints or name in indicated_breakpoints:
-            print(BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
+        debug_at = os.environ.get('JUJU_DEBUG_AT')
+        if not debug_at:
+            return
+
+        indicated_breakpoints = debug_at.split(',')
+        if 'all' in indicated_breakpoints or name in indicated_breakpoints:
+            print(_BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
             code_frame = inspect.currentframe().f_back
             pdb.Pdb().set_trace(code_frame)
 

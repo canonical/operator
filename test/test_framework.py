@@ -25,17 +25,14 @@ from unittest.mock import patch
 from pathlib import Path
 
 from ops.framework import (
+    _BREAKPOINT_WELCOME_MESSAGE,
     BoundStoredState,
-    BREAKPOINT_WELCOME_MESSAGE,
     CommitEvent,
     EventBase,
     EventSetBase,
     EventSource,
     Framework,
     Handle,
-    JUJU_DEBUG_ALL,
-    JUJU_DEBUG_HOOK,
-    JUJU_DEBUG_ENVVAR,
     NoSnapshotError,
     Object,
     PreCommitEvent,
@@ -1390,8 +1387,8 @@ class BreakpointTests(unittest.TestCase):
         self.addCleanup(self.framework.close)
 
     def test_ignored(self, fake_stderr):
-        # it doesn't do anything really unless proper environment is there
-        assert JUJU_DEBUG_ENVVAR not in os.environ
+        # It doesn't do anything really unless proper environment is there.
+        assert 'JUJU_DEBUG_AT' not in os.environ
 
         with patch('pdb.Pdb.set_trace') as mock:
             self.framework.breakpoint()
@@ -1399,9 +1396,9 @@ class BreakpointTests(unittest.TestCase):
         self.assertEqual(fake_stderr.getvalue(), "")
 
     def test_pdb_properly_called(self, fake_stderr):
-        # the debugger needs to leave the user in the frame where the breakpoint is executed,
-        # which for the test is the frame we're calling it here in the test :)
-        with patch.dict(os.environ, {JUJU_DEBUG_ENVVAR: JUJU_DEBUG_ALL}):
+        # The debugger needs to leave the user in the frame where the breakpoint is executed,
+        # which for the test is the frame we're calling it here in the test :).
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
             with patch('pdb.Pdb.set_trace') as mock:
                 this_frame = inspect.currentframe()
                 self.framework.breakpoint()
@@ -1409,23 +1406,25 @@ class BreakpointTests(unittest.TestCase):
         self.assertEqual(mock.call_args, ((this_frame,), {}))
 
     def test_welcome_message(self, fake_stderr):
-        # an initial message is shown to the user when code is interrupted
-        with patch.dict(os.environ, {JUJU_DEBUG_ENVVAR: JUJU_DEBUG_ALL}):
+        # Check that an initial message is shown to the user when code is interrupted.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
             with patch('pdb.Pdb.set_trace'):
                 self.framework.breakpoint()
-        self.assertEqual(fake_stderr.getvalue(), BREAKPOINT_WELCOME_MESSAGE)
+        self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
     def test_builtin_breakpoint_hooked(self, fake_stderr):
-        # proper hook is set
-        with patch.dict(os.environ, {JUJU_DEBUG_ENVVAR: JUJU_DEBUG_ALL}):
+        # Verify that the proper hook is set.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
             with patch('pdb.Pdb.set_trace') as mock:
-                # not calling breakpoint() so we can run the tests with Py < 3.7
+                # Calling through sys, not breakpoint() directly, so we can run the
+                # tests with Py < 3.7.
                 sys.breakpointhook()
         self.assertEqual(mock.call_count, 1)
 
     def test_breakpoint_names(self, fake_stderr):
-        # names must start and end with lowercase alphanumeric characters, and only contain
-        # lowercase alphanumeric characters, or the hyphen "-"
+        # Name rules:
+        # - must start and end with lowercase alphanumeric characters
+        # - only contain lowercase alphanumeric characters, or the hyphen "-"
         good_names = [
             'foobar',
             'foo-bar-baz',
@@ -1462,12 +1461,12 @@ class BreakpointTests(unittest.TestCase):
                     self.framework.breakpoint(name)
                 self.assertEqual(str(cm.exception), msg)
 
-        forbidden_names = [
+        reserved_names = [
             'all',
             'hook',
         ]
-        msg = 'breakpoint names "all" and "hook" are forbidden'
-        for name in forbidden_names:
+        msg = 'breakpoint names "all" and "hook" are reserved'
+        for name in reserved_names:
             with self.subTest(name=name):
                 with self.assertRaises(ValueError) as cm:
                     self.framework.breakpoint(name)
@@ -1486,35 +1485,35 @@ class BreakpointTests(unittest.TestCase):
 
     def check_trace_set(self, envvar_value, breakpoint_name, call_count):
         """Helper to check the diverse combinations of situations."""
-        with patch.dict(os.environ, {JUJU_DEBUG_ENVVAR: envvar_value}):
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': envvar_value}):
             with patch('pdb.Pdb.set_trace') as mock:
                 self.framework.breakpoint(breakpoint_name)
         self.assertEqual(mock.call_count, call_count)
 
     def test_unnamed_indicated_all(self, fake_stderr):
-        # if 'all' is indicated, unnamed breakpoints will activate
-        self.check_trace_set(JUJU_DEBUG_ALL, None, 1)
+        # If 'all' is indicated, unnamed breakpoints will always activate.
+        self.check_trace_set('all', None, 1)
 
     def test_unnamed_indicated_hook(self, fake_stderr):
-        # special value 'hook' was indicated, nothing to do with any call
-        self.check_trace_set(JUJU_DEBUG_HOOK, None, 0)
+        # Special value 'hook' was indicated, nothing to do with any call.
+        self.check_trace_set('hook', None, 0)
 
     def test_named_indicated_specifically(self, fake_stderr):
-        # some breakpoint was indicated, and the framework call was exactly that
+        # Some breakpoint was indicated, and the framework call used exactly that name.
         self.check_trace_set('mybreak', 'mybreak', 1)
 
     def test_named_indicated_somethingelse(self, fake_stderr):
-        # some breakpoint was indicated, but the framework call was not with that name
+        # Some breakpoint was indicated, but the framework call was not with that name.
         self.check_trace_set('some-breakpoint', None, 0)
 
     def test_named_indicated_ingroup(self, fake_stderr):
-        # some breakpoint was indicated, and the framework call was that among others
+        # A multiple breakpoint was indicated, and the framework call used a name among those.
         self.check_trace_set('some,mybreak,foobar', 'mybreak', 1)
 
     def test_named_indicated_all(self, fake_stderr):
-        # 'all' was indicated, which includes any named call
-        self.check_trace_set(JUJU_DEBUG_ALL, 'mybreak', 1)
+        # The framework indicated 'all', which includes any named breakpoint set.
+        self.check_trace_set('all', 'mybreak', 1)
 
     def test_named_indicated_hook(self, fake_stderr):
-        # special value 'hook' was indicated, nothing to do with any named call
-        self.check_trace_set(JUJU_DEBUG_HOOK, 'mybreak', 0)
+        # The framework indicated the special value 'hook', nothing to do with any named call.
+        self.check_trace_set('hook', 'mybreak', 0)
