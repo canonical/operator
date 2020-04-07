@@ -211,9 +211,10 @@ class CAClient(Object):
     def request_server_certificate(self, common_name, sans):
         """Request a new server certificate.
 
-        If arguments do not change from a previous request, then a new certificate will not
-        be requested. This method can be useful if a list of SANS has changed during the
-        lifetime of a charm.
+        If arguments have not changed from a previous request, then a different
+        certificate will not be generated. This method can be useful if a list of
+        SANS has changed during the lifetime of a charm and a new certificate needs
+        to be generated.
 
         common_name -- a new common name to use.
         sans -- an updated list of Subject Alternative Names to use.
@@ -233,8 +234,9 @@ class CAClient(Object):
         # of writing) rely on app relation data.
         remote_data = event.relation.data[event.unit]
 
-        cert = remote_data.get('{}.server.cert'.format(self.model.unit.name.replace("/", "_")))
-        key = remote_data.get('{}.server.key'.format(self.model.unit.name.replace("/", "_")))
+        munged_name = self.model.unit.name.replace("/", "_")
+        cert = remote_data.get('{}.server.cert'.format(munged_name))
+        key = remote_data.get('{}.server.key'.format(munged_name))
         ca = remote_data.get('ca')
 
         if not self._is_certificate_requested:

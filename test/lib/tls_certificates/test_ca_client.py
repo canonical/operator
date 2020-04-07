@@ -14,8 +14,6 @@
 
 import unittest
 import json
-import yaml
-import cryptography
 
 from ops import framework
 from ops.charm import CharmBase
@@ -23,7 +21,7 @@ from ops import testing
 from ops import model
 
 from ops.lib.tls_certificates import ca_client
-from pathlib import Path
+from test.lib.tls_certificates.ca_client_test_data import TEST_RELATION_DATA
 
 
 class TestCAClient(unittest.TestCase):
@@ -39,7 +37,7 @@ class TestCAClient(unittest.TestCase):
         self.harness.begin()
         self.ca_client = ca_client.CAClient(self.harness.charm, 'ca-client')
 
-    def test_is_join(self):
+    def test_ca_available(self):
 
         class TestReceiver(framework.Object):
 
@@ -140,24 +138,19 @@ class TestCAClient(unittest.TestCase):
                 'sans': '10.209.240.176',
             }
         )
-        # Load the sample relation data from a file. The certificates and a key
-        # were generated once for the purposes of creating an example.
-        # They are not used anywhere in a production or test system.
-        ca_client_data = yaml.safe_load(
-            (Path(__file__).parent / 'ca_client_test_data.yaml').read_text())
-
+        # The certificates and a key were generated once for the purposes of creating
+        # an example. They are not used anywhere in a production or test system.
+        ca_client_data = TEST_RELATION_DATA
         self.harness.update_relation_data(relation_id, 'easyrsa/0', ca_client_data)
 
         self.assertTrue(len(receiver.observed_events) == 1)
         self.assertIsInstance(receiver.observed_events[0], ca_client.TlsConfigReady)
 
-        self.assertIsInstance(self.ca_client.ca_certificate,
-                              cryptography.hazmat.backends.openssl.x509._Certificate)
-        self.assertIsInstance(self.ca_client.certificate,
-                              cryptography.hazmat.backends.openssl.x509._Certificate)
-        self.assertIsInstance(self.ca_client.key,
-                              cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey)
-
+        # Validate that the properties of certs and keys match the ones exposed.
+        self.assertEqual(self.ca_client.ca_certificate.serial_number,
+                         370671393612319950261394837222550598495379101011)
+        self.assertEqual(self.ca_client.certificate.serial_number, 2)
+        self.assertEqual(self.ca_client.key.public_key().public_numbers().e, 65537)
         self.assertTrue(self.ca_client.is_ready)
 
 
