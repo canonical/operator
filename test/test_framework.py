@@ -1412,6 +1412,16 @@ class BreakpointTests(unittest.TestCase):
                 self.framework.breakpoint()
         self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
+    def test_welcome_message_not_multiple(self, fake_stderr):
+        # Check that an initial message is NOT shown twice if the breakpoint is exercised
+        # twice in the same run.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            with patch('pdb.Pdb.set_trace'):
+                self.framework.breakpoint()
+                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+                self.framework.breakpoint()
+                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+
     def test_builtin_breakpoint_hooked(self, fake_stderr):
         # Verify that the proper hook is set.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):

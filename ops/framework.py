@@ -524,6 +524,9 @@ class Framework(Object):
         # breakpoint(); if Python < 3.7, this doesn't affect anything
         sys.breakpointhook = self.breakpoint
 
+        # Flag to indicate that we already presented the welcome message in a debugger breakpoint
+        self._breakpoint_welcomed = False
+
     def close(self):
         self._storage.close()
 
@@ -779,7 +782,13 @@ class Framework(Object):
 
         indicated_breakpoints = debug_at.split(',')
         if 'all' in indicated_breakpoints or name in indicated_breakpoints:
-            print(_BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
+            # Present the welcome message (only once!)
+            if not self._breakpoint_welcomed:
+                self._breakpoint_welcomed = True
+                print(_BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
+
+            # If we call set_trace() directly it will open the debugger *here*, so indicating
+            # it to use our caller's frame
             code_frame = inspect.currentframe().f_back
             pdb.Pdb().set_trace(code_frame)
 
