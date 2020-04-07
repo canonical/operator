@@ -56,7 +56,6 @@ class Harness:
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta)
         self._unit_name = self._meta.name + '/0'
-        self._model = None
         self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
@@ -154,7 +153,7 @@ class Harness:
         :return: The relation_id created by this add_relation.
         :rtype: int
         """
-        is_peer = self._charm.meta.relations[relation_name].role == 'peers'
+        is_peer = self._meta.relations[relation_name].role == 'peers'
         if is_peer and remote_app_data is not None:
             raise RuntimeError('unable to update remote app data as there is no remote app on'
                                ' a peer relation')
@@ -249,18 +248,17 @@ class Harness:
         :return: None
         """
         relation_name = self._backend._relation_names[relation_id]
-        if self._model is not None:
-            relation = self._model.get_relation(relation_name, relation_id)
-            if '/' in app_or_unit:
-                entity = self._model.get_unit(app_or_unit)
-            else:
-                entity = self._model.get_app(app_or_unit)
-            rel_data = relation.data.get(entity, None)
-            if rel_data is not None:
-                # If we have read and cached this data, make sure we invalidate it
-                rel_data._invalidate()
+        relation = self._model.get_relation(relation_name, relation_id)
+        if '/' in app_or_unit:
+            entity = self._model.get_unit(app_or_unit)
+        else:
+            entity = self._model.get_app(app_or_unit)
+        rel_data = relation.data.get(entity, None)
+        if rel_data is not None:
+            # If we have read and cached this data, make sure we invalidate it
+            rel_data._invalidate()
 
-        is_peer = self._charm.meta.relations[relation_name].role == 'peers'
+        is_peer = self._meta.relations[relation_name].role == 'peers'
         our_unit = self._model.unit
         is_our_app_updated = self._model.app == entity
         if self._model.unit == entity:
@@ -268,11 +266,11 @@ class Harness:
                                ' a remote unit')
         elif is_peer and is_our_app_updated and our_unit.is_leader():
             raise RuntimeError('unable to update peer app relation data as if it was done by'
-                               ' a remote unit - our unit {} is a leader'.format(our_unit.name))
+                               ' a remote unit - our unit {} is the leader'.format(our_unit.name))
         elif is_our_app_updated and our_unit.is_leader():
             raise RuntimeError('unable to update app relation data for our app as if it was done'
-                               ' by a remote unit - our unit {} is a leader'.format(our_unit.name))
-        # Remote app, unit or peer app relation data updates trigger an event.
+                               ' by a remote unit - our unit {} is the leader'
+                               ''.format(our_unit.name))
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
         for k, v in key_values.items():
             if v == '':
