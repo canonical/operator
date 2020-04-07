@@ -297,6 +297,20 @@ class RelationEvent(HookEvent):
             self.unit = None
 
 
+class RelationCreatedEvent(RelationEvent):
+    """Represents the `relation-created` hook from Juju.
+
+    It's triggered by `CharmBase.on[RELATION].relation_created`.
+
+    This is triggered whenever relations are created in the Juju model before relation-joined
+    events. For units that are coming up, relation-created events fire after the install event
+    but before any events, including leader-elected. This allows a leader unit to work with
+    peer application relation data early in its life cycle.
+    """
+
+    pass
+
+
 class RelationJoinedEvent(RelationEvent):
     """Represents the `relation-joined` hook from Juju.
 
@@ -420,6 +434,7 @@ class CharmBase(Object):
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
+            self.on.define_event(relation_name + '_relation_created', RelationCreatedEvent)
             self.on.define_event(relation_name + '_relation_joined', RelationJoinedEvent)
             self.on.define_event(relation_name + '_relation_changed', RelationChangedEvent)
             self.on.define_event(relation_name + '_relation_departed', RelationDepartedEvent)
