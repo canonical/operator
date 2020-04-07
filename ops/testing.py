@@ -139,7 +139,7 @@ class Harness:
         self._relation_id_counter += 1
         return rel_id
 
-    def add_relation(self, relation_name, remote_app, remote_app_data=None, *,
+    def add_relation(self, relation_name, remote_app, *, remote_app_data=None,
                      initial_unit_data=None, initial_app_data=None):
         """Declare that there is a new relation between this app and `remote_app`.
 
@@ -164,7 +164,7 @@ class Harness:
         is_peer = self._meta.relations[relation_name].role == 'peers'
         if is_peer and remote_app_data is not None:
             raise RuntimeError('unable to update remote app data as there is no remote app on'
-                               ' a peer relation')
+                               ' a peer relation - use initial app data instead')
 
         rel_id = self._next_relation_id()
         self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
