@@ -48,6 +48,24 @@ class TestHarness(unittest.TestCase):
         backend = harness._backend
         self.assertEqual([rel_id], backend.relation_ids('db'))
         self.assertEqual([], backend.relation_list(rel_id))
+        # Make sure the initial data bags for our app and unit are empty.
+        self.assertEqual({}, backend.relation_get(rel_id, 'test-app', is_app=True))
+        self.assertEqual({}, backend.relation_get(rel_id, 'test-app/0', is_app=False))
+
+    def test_add_relation_with_initial_data(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        rel_id = harness.add_relation('db', 'postgresql', initial_app_data={'k', 'v'},
+                                      initial_unit_data={'ingress-address': '192.0.2.1'})
+        backend = harness._backend
+        self.assertEqual({'k', 'v'}, backend.relation_get(rel_id, 'test-app', is_app=True))
+        self.assertEqual({'ingress-address': '192.0.2.1'},
+                         backend.relation_get(rel_id, 'test-app/0', is_app=False))
 
     def test_add_relation_and_unit(self):
         # language=YAML

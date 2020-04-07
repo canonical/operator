@@ -139,17 +139,25 @@ class Harness:
         self._relation_id_counter += 1
         return rel_id
 
-    def add_relation(self, relation_name, remote_app, remote_app_data=None):
+    def add_relation(self, relation_name, remote_app, remote_app_data=None, *,
+                     initial_unit_data=None, initial_app_data=None):
         """Declare that there is a new relation between this app and `remote_app`.
 
         TODO: Once relation_created exists as a Juju hook, it should be triggered by this code.
 
         :param relation_name: The relation on Charm that is being related to
+        :type relation_data: str
         :param remote_app: The name of the application that is being related to
+        :type remote_app: str
         :param remote_app_data: Optional data bag that the remote application is sending
           If remote_app_data is not empty, this should trigger
           ``charm.on[relation_name].relation_changed(app)``
           For peer relations, use initial_app_data instead.
+        :type remote_app_data: dict(str, str)
+        :param initial_unit_data: Optional data bag that holds our unit's initial data.
+        :type initial_unit_data: dict(str, str)
+        :param initial_app_data: Optional data bag that holds our app's initial data.
+        :type initial_app_data: dict(str, str)
         :return: The relation_id created by this add_relation.
         :rtype: int
         """
@@ -164,10 +172,14 @@ class Harness:
         self._backend._relation_list_map[rel_id] = []
         if remote_app_data is None:
             remote_app_data = {}
+        if initial_app_data is None:
+            initial_app_data = {}
+        if initial_unit_data is None:
+            initial_unit_data = {}
         self._backend._relation_data[rel_id] = {
             remote_app: remote_app_data,
-            self._backend.unit_name: {},
-            self._backend.app_name: {},
+            self._backend.unit_name: initial_unit_data,
+            self._backend.app_name: initial_app_data,
         }
         # Reload the relation_ids list
         if self._model is not None:
