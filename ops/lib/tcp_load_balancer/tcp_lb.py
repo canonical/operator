@@ -65,7 +65,6 @@ import datetime
 from collections.abc import Mapping
 
 from ops.framework import Object, StoredState, EventBase, EventSetBase, EventSource
-
 logger = logging.getLogger(__name__)
 
 
