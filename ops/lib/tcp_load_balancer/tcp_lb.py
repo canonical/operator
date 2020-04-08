@@ -31,7 +31,7 @@ class MyLBCharm(ops.charm.CharmBase):
            for member in pool.members:
                logger.debug(member.port)
                logger.debug(member.address)
-               # other fields...
+               # Access other fields...
 
 
 `TcpLoadBalancer`_ is the type that exposes the information about members that a TCP
@@ -56,7 +56,6 @@ load-balancer should provide load-balancing for.
             health_monitor = HTTPHealthMonitor(timeout=timedelta(seconds=10), http_method='GET',
                                                url_path='/health?ready=1')
             self.tcp_lb.expose_backend(listener, backend, health_monitor)
-            # ...
 """
 
 import logging
