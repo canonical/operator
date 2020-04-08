@@ -30,7 +30,8 @@ def setup_root_logging(model_backend, *, debug_stream=None):
     """Setup python logging to forward messages to juju-log.
 
     :param model_backend: a ModelBackend to use for juju_log.
-    :param debug_stream: (optional) If set, debug messages will also be sent to this stream.
+    :param debug_stream: A file stream where debug messages will be sent, in addition to juju-log.
+    :type debug_stream: File, optional
     """
     if debug_stream is not None:
         logLevel = logging.DEBUG
