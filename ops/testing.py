@@ -363,7 +363,7 @@ def _record_calls(cls):
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
 
-    You should not use this class directly, it is used by `Harness`_ to drive the model.
+    DO NOT use this class directly, it is used by `Harness`_ to drive the model.
     `Harness`_ is responsible for maintaining the internal consistency of the values here,
     as the only public methods of this type are for implementing ModelBackend.
     """
