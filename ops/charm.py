@@ -22,8 +22,6 @@ from ops.framework import Object, EventSource, EventBase, EventSetBase
 class HookEvent(EventBase):
     """A base class for events that trigger because of a Juju hook firing."""
 
-    pass
-
 
 class ActionEvent(EventBase):
     """A base class for events that trigger when a user asks for an Action to be run.
@@ -85,75 +83,39 @@ class ActionEvent(EventBase):
 
 
 class InstallEvent(HookEvent):
-    """Represents the `install` hook from Juju.
-
-    It's riggered by `CharmBase.on.install`.
-    """
-
-    pass
+    """Represents the `install` hook from Juju."""
 
 
 class StartEvent(HookEvent):
-    """Represents the `start` hook from Juju.
-
-    Its' triggered by `CharmBase.on.start`.
-    """
-
-    pass
+    """Represents the `start` hook from Juju."""
 
 
 class StopEvent(HookEvent):
-    """Represents the `stop` hook from Juju.
-
-    It's triggered by `CharmBase.on.stop`.
-    """
-
-    pass
+    """Represents the `stop` hook from Juju."""
 
 
 class RemoveEvent(HookEvent):
-    """Represents the `remove` hook from Juju.
-
-    It's triggered by `CharmBase.on.remove`.
-    """
-
-    pass
+    """Represents the `remove` hook from Juju. """
 
 
 class ConfigChangedEvent(HookEvent):
-    """Represents the `config-changed` hook from Juju.
-
-    It's triggered by `CharmBase.on.config_changed`.
-    """
-
-    pass
+    """Represents the `config-changed` hook from Juju."""
 
 
 class UpdateStatusEvent(HookEvent):
-    """Represents the `update-status` hook from Juju.
-
-    It's triggered by `CharmBase.on.update_status`
-    """
-
-    pass
+    """Represents the `update-status` hook from Juju."""
 
 
 class UpgradeCharmEvent(HookEvent):
     """Represents the `upgrade-charm` hook from Juju.
 
-    It's triggered by `CharmBase.on.upgrade_charm`.
-
     This will be triggered when a user has run `juju upgrade-charm`. It is run after Juju
     has unpacked the upgraded charm code, and so this event will be handled with new code.
     """
 
-    pass
-
 
 class PreSeriesUpgradeEvent(HookEvent):
     """Represents the `pre-series-upgrade` hook from Juju.
-
-     It's triggered by `CharmBase.on.pre_series_upgrade`.
 
     This happens when a user has run `juju upgrade-series MACHINE prepare` and
     will fire for each unit that is running on the machine, telling them that
@@ -167,13 +129,9 @@ class PreSeriesUpgradeEvent(HookEvent):
     When the upgrade has been completed, the `PostSeriesUpgradeEvent`_ will fire.
     """
 
-    pass
-
 
 class PostSeriesUpgradeEvent(HookEvent):
     """Represents the `post-series-upgrade` hook from Juju.
-
-    It's triggered by `CharmBase.on.post_series_upgrade`.
 
     This is run after the user has done a distribution upgrade (or rolled back
     and kept the same series). It is called in response to
@@ -181,13 +139,9 @@ class PostSeriesUpgradeEvent(HookEvent):
     steps are necessary to reconfigure their applications for the new series.
     """
 
-    pass
-
 
 class LeaderElectedEvent(HookEvent):
     """Represents the `leader-elected` hook from Juju.
-
-    It's triggered by `CharmBase.on.leader_elected`.
 
     Juju will trigger this when a new lead unit is chosen for a given application.
     This represents the leader of the charm information (not necessarily the primary
@@ -197,13 +151,9 @@ class LeaderElectedEvent(HookEvent):
     (eg, selecting a password for a new relation)
     """
 
-    pass
-
 
 class LeaderSettingsChangedEvent(HookEvent):
     """Represents the `leader-settings-changed` hook from Juju.
-
-    It's triggered by `CharmBase.on.leader_settings_changed`.
 
     Deprecated. This represents when a lead unit would call `leader-set` to inform
     the other units of an application that they have new information to handle.
@@ -211,8 +161,6 @@ class LeaderSettingsChangedEvent(HookEvent):
     leader set a value in the Application data bag for that peer relation.
     (see `RelationChangedEvent`_).
     """
-
-    pass
 
 
 class CollectMetricsEvent(HookEvent):
@@ -300,47 +248,33 @@ class RelationEvent(HookEvent):
 class RelationCreatedEvent(RelationEvent):
     """Represents the `relation-created` hook from Juju.
 
-    It's triggered by `CharmBase.on[RELATION].relation_created`.
-
-    This is triggered whenever relations are created in the Juju model before relation-joined
+    This is triggered whenever relations are created in the Juju model before relation-join
     events. For units that are coming up, relation-created events fire after the install event
     but before any events, including leader-elected. This allows a leader unit to work with
     peer application relation data early in its life cycle.
     """
 
-    pass
-
 
 class RelationJoinedEvent(RelationEvent):
     """Represents the `relation-joined` hook from Juju.
-
-    It's triggered by `CharmBase.on[RELATION].relation_joined`.
 
     This is triggered whenever a new unit of a related application joins the relation.
     (eg, a unit was added to an existing related app, or a new relation was established
     with an application that already had units.)
     """
 
-    pass
-
 
 class RelationChangedEvent(RelationEvent):
     """Represents the `relation-changed` hook from Juju.
-
-    It's triggered by `CharmBase.on[RELATION].relation_changed`.
 
     This is triggered whenever there is a change to the data bucket for a related
     application or unit. Look at `event.relation.data[event.unit/app]` to see the
     new information.
     """
 
-    pass
-
 
 class RelationDepartedEvent(RelationEvent):
     """Represents the `relation-departed` hook from Juju.
-
-    It's triggered by `CharmBase.on[RELATION].relation_departed`.
 
     This is the inverse of the RelationJoinedEvent, representing when a unit
     is leaving the relation (the unit is being removed, the app is being removed,
@@ -348,48 +282,32 @@ class RelationDepartedEvent(RelationEvent):
     going away.
     """
 
-    pass
-
 
 class RelationBrokenEvent(RelationEvent):
     """Represents the `relation-broken` hook from Juju.
-
-    It's triggered by `CharmBase.on[RELATION].relation_broken`.
 
     If a relation is being removed (`juju remove-relation` or `juju remove-application`),
     once all the units have been removed, RelationBrokenEvent will fire to signal
     that the relationship has been fully terminated.
     """
 
-    pass
-
 
 class StorageEvent(HookEvent):
     """Base class representing Storage related events."""
-
-    pass
 
 
 class StorageAttachedEvent(StorageEvent):
     """Represents the `storage-attached` hook from Juju.
 
-    It's triggered by `CharmBase.on[STORAGE].storage_attached`.
-
     Called when new storage is available for the charm to use.
     """
-
-    pass
 
 
 class StorageDetachingEvent(StorageEvent):
     """Represents the `storage-detaching` hook from Juju.
 
-    It's triggered by `CharmBase.on.storage_detaching`.
-
     Called when storage a charm has been using is going away.
     """
-
-    pass
 
 
 class CharmEvents(EventSetBase):
