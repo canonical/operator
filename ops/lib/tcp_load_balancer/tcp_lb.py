@@ -19,8 +19,8 @@ load-balancer should provide load-balancing for.
 
 class MyLBCharm(ops.charm.CharmBase):
 
-   def __init__(self, framework):
-      super().__init__(framework, None)
+   def __init__(self, *args):
+      super().__init__(*args)
       self.tcp_backend_manager = TcpBackendManagers(self, 'tcp-lb')
       self.framework.observe(self.tcp_backend_manager.on.pools_changed, self._on_tcp_pools_changed)
 
@@ -43,8 +43,8 @@ load-balancer should provide load-balancing for.
         SERVICE_PORT = 8080
         MONITOR_PORT = 8081
 
-        def __init__(self, framework):
-            super().__init__(framework, None)
+        def __init__(self, *args):
+            super().__init__(*args)
             self.tcp_lb = TcpLoadBalancer(self, 'tcp-lb', load_balancer_algorithm='round_robin')
             self.framework.observe(self.tcp_lb.on.load_balancer_available,
                                    self._on_load_balancer_available)
