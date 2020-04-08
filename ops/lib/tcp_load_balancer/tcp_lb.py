@@ -12,33 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pickle
+"""Implements types for provides and requires sides of the 'tcp-load-balancer' relation.
 
-from ops.framework import Object, StoredState, EventBase, EventSetBase, EventSource
-
-
-'''Implements types for provides and requires sides of the 'tcp-load-balancer' relation.
-
-`TcpMemberPools`_ is the type that exposes the information about members that a TCP
+`TcpBackendManager`_ is the type that exposes the information about members that a TCP
 load-balancer should provide load-balancing for.
 
+class MyLBCharm(ops.charm.CharmBase):
 
-     class MyLBCharm(ops.charm.CharmBase):
+   def __init__(self, framework):
+      super().__init__(framework, None)
+      self.tcp_backend_manager = TcpBackendManagers(self, 'tcp-lb')
+      self.framework.observe(self.tcp_backend_manager.on.pools_changed, self._on_tcp_pools_changed)
 
-        def __init__(self, framework):
-           super().__init__(framework, None)
-           self.tcp_member_pools = TcpMemberPools(self, 'tcp-lb')
-           self.framework.observe(self.member_pools.on.pools_changed, self._on_tcp_pools_changed)
-        ...
-        def _on_tcp_pools_changed(self, event):
-            pools = self.tcp_member_pools.pools
-            for pool in self.tcp_member_pools.pools:
-                logger.debug(pools.listener.port)
-                logger.debug(pools.listener.name)
-                for member in pool.members:
-                    logger.debug(member.port)
-                    logger.debug(member.address)
-                    # other fields...
+   def _on_tcp_pools_changed(self, event):
+       for pool in self.tcp_backend_manager.pools:
+           logger.debug(pool.listener.port)
+           logger.debug(pool.listener.name)
+           for member in pool.members:
+               logger.debug(member.port)
+               logger.debug(member.address)
+               # other fields...
 
 
 `TcpLoadBalancer`_ is the type that exposes the information about members that a TCP
@@ -52,48 +45,56 @@ load-balancer should provide load-balancing for.
 
         def __init__(self, framework):
             super().__init__(framework, None)
-            self.tcp_lb = TcpLoadBalancer(self, 'tcp-lb', lb_algorithm='round_robin')
-            self.framework.observe(self.tcp_lb.on.lb_available, self._on_lb_available)
+            self.tcp_lb = TcpLoadBalancer(self, 'tcp-lb', load_balancer_algorithm='round_robin')
+            self.framework.observe(self.tcp_lb.on.load_balancer_available,
+                                   self._on_load_balancer_available)
 
-        def _on_lb_available(self, event):
+        def _on_load_balancer_available(self, event):
             listener = Listener(name=self.app.name.replace('/', '_'), port=self.LISTENER_PORT)
             fqdn = socket.getfqdn()
-            member = Member(fqdn, self.MEMBER_PORT, monitor_port=self.MONITOR_PORT)
+            backend = Backend(fqdn, self.MEMBER_PORT, monitor_port=self.MONITOR_PORT)
             health_monitor = HTTPHealthMonitor(timeout=timedelta(seconds=10), http_method='GET',
                                                url_path='/health?ready=1')
-            self.tcp_lb.expose_member(listener, member, health_monitor)
+            self.tcp_lb.expose_backend(listener, backend, health_monitor)
             # ...
-'''
+"""
+
+import logging
+import yaml
+import datetime
+
+from collections.abc import Mapping
+
+from ops.framework import Object, StoredState, EventBase, EventSetBase, EventSource
+
+logger = logging.getLogger(__name__)
 
 
 class PoolsChanged(EventBase):
-
-    '''Event emitted by TcpMemberPools.on.pools_changed.
+    """Event emitted by TcpBackendManagers.on.pools_changed.
 
     This event will be emitted if any of the existing or new members exposes new data over a
     relation for the load-balancer to re-assess its current state.
-    '''
-    pass
+    """
 
 
-class TcpMemberPoolEvents(EventSetBase):
+class TcpBackendManagerEvents(EventSetBase):
+    """Events emitted by the TcpBackendManager class."""
 
-    '''Events emitted by the TcpMemberPoolEvents class.'''
     pools_changed = EventSource(PoolsChanged)
 
 
-class TcpMemberPools(Object):
+class TcpBackendManager(Object):
+    """Handles TCP backend events and exposes pools of TCP backends."""
 
-    '''Provides the information about pools of TCP load-balancer members.'''
-
-    on = TcpMemberPoolEvents()
+    on = TcpBackendManagerEvents()
 
     _stored = StoredState()
 
     def __init__(self, charm, relation_name):
         super().__init__(charm, relation_name)
         self._relation_name = relation_name
-        self._member_pools = None
+        self._backend_pools = None
         self.framework.observe(charm.on[relation_name].relation_changed, self._on_relation_changed)
 
     def _on_relation_changed(self, event):
@@ -101,8 +102,8 @@ class TcpMemberPools(Object):
 
     @property
     def pools(self):
-        if self._member_pools is None:
-            self._member_pools = []
+        if self._backend_pools is None:
+            self._backend_pools = []
             for relation in self.model.relations[self._relation_name]:
                 if not relation.units:
                     continue
@@ -110,26 +111,30 @@ class TcpMemberPools(Object):
 
                 listener_data = app_data.get('listener')
                 if listener_data is None:
+                    logger.debug('No listener data found for remote app %s', relation.app.name)
                     continue
-                listener = pickle.loads(listener_data.encode('utf-8'))
+                listener = Listener(**yaml.safe_load(listener_data))
                 health_monitor_data = app_data.get('health_monitor')
                 if health_monitor_data is None:
+                    logger.debug('No health monitor data found for remote app %s',
+                                 relation.app.name)
                     continue
-                health_monitor = pickle.loads(health_monitor_data.encode('utf-8'))
+                health_monitor = HealthMonitor(**yaml.safe_load(health_monitor_data))
 
                 members = []
                 for unit in relation.units:
-                    member_data = relation.data[unit].get('member')
-                    if member_data is None:
+                    backend_data = relation.data[unit].get('backend')
+                    if backend_data is None:
+                        logger.debug('No backend data found for remote unit %s', unit.name)
                         continue
-                    members.append(pickle.loads(member_data.encode('utf-8')))
-                self._member_pools.append(MemberPool(listener, members, health_monitor))
-        return self._member_pools
+                    backend = Backend(**yaml.safe_load(backend_data))
+                    members.append(backend)
+                self._backend_pools.append(BackendPool(listener, members, health_monitor))
+        return self._backend_pools
 
 
-class MemberPool:
-
-    '''A class that aggregates the information about a pool of load-balancer members'''
+class BackendPool:
+    """Represents a pool of TCP load-balancer backends."""
 
     def __init__(self, listener, members, health_monitor=None):
         self.members = members
@@ -137,75 +142,93 @@ class MemberPool:
         self.health_monitor = health_monitor
 
 
-class LBAvailable(EventBase):
-
-    '''Event emitted by TcpLoadBalancer.on.lb_available.
+class LoadBalancerAvailable(EventBase):
+    """Event emitted when a load-balancer is available.
 
     This event will be emitted when a new load-balancer instance appears on a relation for a member
     to expose its data. If a load-balancer is highly-available, there will be multiple of those
     events fired as instances of the load-balancer are observed by the member.
-    '''
-    pass
+    """
 
 
 class TcpLoadBalancerEvents(EventSetBase):
+    """Events emitted by the TcpLoadBalancer class."""
 
-    '''Events emitted by the TcpLoadBalancer class.'''
-    lb_available = EventSource(LBAvailable)
+    load_balancer_available = EventSource(LoadBalancerAvailable)
 
 
 class TcpLoadBalancer(Object):
+    """Represents a TCP load-balancer that distributes traffic across backends exposed to it.
+
+    Backends would use this type to expose themselves to a single TCP load-balancer.
+    """
 
     on = TcpLoadBalancerEvents()
     _stored = StoredState()
 
-    def __init__(self, charm, relation_name, lb_algorithm=None):
+    def __init__(self, charm, relation_name, load_balancer_algorithm=None):
         super().__init__(charm, relation_name)
         self._relation_name = relation_name
-        self._lb_algorithm = lb_algorithm
+        self._load_balancer_algorithm = load_balancer_algorithm
 
         self.framework.observe(charm.on[relation_name].relation_joined, self._on_relation_joined)
 
     def _on_relation_joined(self, event):
-        self.on.lb_available.emit()
+        self.on.load_balancer_available.emit()
 
-    @property
-    def _relation(self):
-        # TODO: there could be multiple independent reverse proxies in theory, address that later.
-        return self.model.get_relation(self._relation_name)
+    def expose_backend(self, backend, listener, health_monitor):
+        """Expose a backend to the load-balancer.
 
-    def expose_member(self, member, listener, health_monitor):
-        our_unit_data = self._relation.data[self.model.unit]
-        if member.address is None:
-            addr = self.model.get_binding(self._relation).network.ingress_address
-            member.set_address(addr)
+        backend -- a backend to expose to a TCP load-balancer.
+        listener -- a listener instance to provide frontend configuration parameters.
+        health_monitor -- a health monitor instance to configure health-checking for the backend.
+        """
+        rel = self.model.get_relation(self._relation_name)
+        our_unit_data = rel.data[self.model.unit]
+        if backend.address is None:
+            addr = self.model.get_binding(rel).network.ingress_address
+            backend.address = addr
 
-        our_unit_data['member'] = pickle.dumps(member, 0).decode('utf-8')
+        our_unit_data['backend'] = yaml.dump(backend, Dumper=InterfaceDataDumper)
         if self.model.unit.is_leader():
-            our_app_data = self._relation.data[self.model.app]
-            our_app_data['listener'] = pickle.dumps(listener, 0).decode('utf-8')
+            our_app_data = rel.data[self.model.app]
+            our_app_data['listener'] = yaml.dump(listener, Dumper=InterfaceDataDumper)
             # A monitor for a pool of members.
-            our_app_data['health_monitor'] = pickle.dumps(health_monitor, 0).decode('utf-8')
-            our_app_data['lb_algorithm'] = self._lb_algorithm
+            our_app_data['health_monitor'] = yaml.dump(health_monitor, Dumper=InterfaceDataDumper)
+            our_app_data['load_balancer_algorithm'] = self._load_balancer_algorithm
 
 
-class Listener:
+class InterfaceDataType(dict):
 
-    '''Listeners determine how load-balancer front-ends are configured.
-    '''
+    def __getattr__(self, name):
+        if name in self:
+            return self[name]
+        else:
+            raise AttributeError("No such attribute: {}".format(name))
 
-    def __init__(self, name, port):
+    def __setattr__(self, name, value):
+        self[name] = value
+
+    def __delattr__(self, name):
+        if name in self:
+            del self[name]
+        else:
+            raise AttributeError("No such attribute: {}".format(name))
+
+
+class Listener(InterfaceDataType):
+    """Listeners determine how load-balancer front-ends are configured."""
+
+    def __init__(self, name, port, **kwargs):
         self.name = name
         self.port = port
 
 
-class Member:
-
-    '''Members describe the details about a particular backend service instance.
-    '''
+class Backend(InterfaceDataType):
+    """Describes the details about a particular backend service instance."""
 
     def __init__(self, name, port, *, address=None, monitor_port=None, weight=None,
-                 data_timeout=None):
+                 data_timeout=None, **kwargs):
         self.name = name
         self.port = port
         self.address = address
@@ -213,29 +236,45 @@ class Member:
         self.weight = weight
         self.data_timeout = data_timeout
 
-    def set_address(self, address):
-        self.address = address
 
+class HealthMonitor(InterfaceDataType):
+    """Health-monitors provide parameters for regular health-checking operations."""
 
-class HealthMonitor:
-
-    '''Health-monitors provide parameters for regular health-checking operations.
-    '''
-
-    def __init__(self, *, delay=None, timeout=None, max_retries=None, max_retries_down=None):
-        self.delay = delay
-        self.timeout = timeout
+    def __init__(self, *, delay=None, timeout=None, max_retries=None, max_retries_down=None,
+                 **kwargs):
+        if isinstance(delay, float):
+            self.delay = datetime.timedelta(seconds=delay)
+        elif isinstance(delay, (datetime.timedelta, type(None))):
+            self.delay = delay
+        else:
+            raise RuntimeError('Invalid type provided for the delay attribute: {}'
+                               ''.format(type(delay).__name__))
+        if isinstance(timeout, float):
+            self.timeout = datetime.timedelta(seconds=timeout)
+        elif isinstance(timeout, (datetime.timedelta, type(None))):
+            self.timeout = timeout
+        else:
+            raise RuntimeError('Invalid type provided for the delay attribute: {}'
+                               ''.format(type(delay).__name__))
         self.max_retries = max_retries
         self.max_retries_down = max_retries_down
 
 
-class HTTPHealthMonitor(HealthMonitor):
+class HttpHealthMonitor(HealthMonitor):
+    """HTTP health monitors provide parameters to perform health-checks over HTTP."""
 
-    '''HTTP health monitors provide parameters to perform health-checks over HTTP.
-    '''
-
-    def __init__(self, http_method=None, url_path=None, expected_codes=None, *args):
-        super().__init__(*args)
+    def __init__(self, http_method=None, url_path=None, expected_codes=None, *kwargs):
+        super().__init__(**kwargs)
         self.http_method = http_method
         self.url_path = url_path
         self.expected_codes = expected_codes
+
+
+class InterfaceDataDumper(yaml.SafeDumper):
+
+    def represent_data(self, data):
+        if isinstance(data, Mapping):
+            return self.represent_dict(data.items())
+        if isinstance(data, datetime.timedelta):
+            return self.represent_float(data.total_seconds())
+        return super().represent_data(data)

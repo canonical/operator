@@ -15,22 +15,22 @@
 # limitations under the License.
 
 import unittest
-import pickle
 import datetime
+import yaml
 
 from ops.charm import CharmBase
 from ops.testing import Harness
 
 from ops.lib.tcp_load_balancer.tcp_lb import (
-    TcpMemberPools,
+    TcpBackendManager,
     Listener,
-    Member,
+    Backend,
     HealthMonitor,
     TcpLoadBalancer,
 )
 
 
-class TestTcpMemberPools(unittest.TestCase):
+class TestTcpBackendManager(unittest.TestCase):
 
     def setUp(self):
         self.harness = Harness(CharmBase, meta='''
@@ -41,7 +41,7 @@ class TestTcpMemberPools(unittest.TestCase):
         ''')
 
         self.harness.begin()
-        self.tcp_member_pools = TcpMemberPools(self.harness.charm, 'tcp-lb')
+        self.tcp_backend_manager = TcpBackendManager(self.harness.charm, 'tcp-lb')
 
     def test_pools(self):
         relation_id = self.harness.add_relation('tcp-lb', 'tcp-server')
@@ -51,22 +51,32 @@ class TestTcpMemberPools(unittest.TestCase):
         self.harness.add_relation_unit(
             relation_id, 'tcp-server/0', {
                 'ingress-address': '192.0.2.2',
-                'member': pickle.dumps(Member(name='tcp-server-0.example', port=80,
-                                              address='192.0.2.2'), 0).decode('utf-8')
+                'backend': yaml.safe_dump({
+                    'name': 'tcp-server-0.example',
+                    'port': 80,
+                    'address': '192.0.2.2',
+                })
             })
         self.harness.add_relation_unit(
             relation_id, 'tcp-server/1', {
                 'ingress-address': '192.0.2.3',
-                'member': pickle.dumps(Member(name='tcp-server-1.example', port=80,
-                                              address='192.0.2.3'), 0).decode('utf-8')
+                'backend': yaml.safe_dump({
+                    'name': 'tcp-server-1.example',
+                    'port': 80,
+                    'address': '192.0.2.3',
+                })
             })
         self.harness.update_relation_data(relation_id, 'tcp-server', {
-            'listener': pickle.dumps(Listener('tcp-server', 80), 0).decode('utf-8'),
-            'health_monitor': pickle.dumps(
-                HealthMonitor(timeout=datetime.timedelta(seconds=10)), 0).decode('utf-8')
+            'listener': yaml.safe_dump({
+                'name': 'tcp-server',
+                'port': 80,
+            }),
+            'health_monitor': yaml.safe_dump({
+                'timeout': 10.0
+            }),
         })
 
-        pools = self.tcp_member_pools.pools
+        pools = self.tcp_backend_manager.pools
         test_pool = pools[0]
         self.assertEqual(test_pool.listener.port, 80)
         self.assertEqual(test_pool.listener.name, 'tcp-server')
@@ -86,34 +96,57 @@ class TestLoadBalancer(unittest.TestCase):
         self.harness.begin()
         self.tcp_lb = TcpLoadBalancer(self.harness.charm, 'tcp-lb', 'round_robin')
 
-    def test_expose_member(self):
+    def test_expose_backend(self):
         relation_id = self.harness.add_relation('tcp-lb', 'tcp-server')
         self.harness.update_relation_data(
             relation_id, 'tcp-server/0', {'ingress-address': '192.0.2.1'})
 
         listener = Listener('tcp-server', 80)
-        member = Member(name='tcp-server-0.example', port=80, address='192.0.2.1')
+        backend = Backend(name='tcp-server-0.example', port=80, address='192.0.2.1')
         health_monitor = HealthMonitor(timeout=datetime.timedelta(seconds=10))
 
-        self.tcp_lb.expose_member(member, listener, health_monitor)
+        self.tcp_lb.expose_backend(backend, listener, health_monitor)
 
         rel = self.harness.charm.model.get_relation('tcp-lb')
-        self.assertEqual(rel.data[self.harness.charm.unit]['member'],
-                         pickle.dumps(member, 0).decode('utf-8'))
+        self.assertEqual(yaml.safe_load(rel.data[self.harness.charm.unit]['backend']),
+                         {
+                             'address': '192.0.2.1',
+                             'monitor_port': None,
+                             'name': 'tcp-server-0.example',
+                             'port': 80,
+                             'weight': None,
+                             'data_timeout': None,
+                         })
         with self.assertRaises(KeyError):
             rel.data[self.harness.charm.app]['listener']
         with self.assertRaises(KeyError):
             rel.data[self.harness.charm.app]['health_monitor'],
 
         self.harness.set_leader()
-        self.tcp_lb.expose_member(member, listener, health_monitor)
-        self.assertEqual(rel.data[self.harness.charm.unit]['member'],
-                         pickle.dumps(member, 0).decode('utf-8'))
-        self.assertEqual(rel.data[self.harness.charm.app]['listener'],
-                         pickle.dumps(listener, 0).decode('utf-8'))
-        self.assertEqual(rel.data[self.harness.charm.app]['health_monitor'],
-                         pickle.dumps(health_monitor, 0).decode('utf-8'))
-        self.assertEqual(rel.data[self.harness.charm.app]['lb_algorithm'], 'round_robin')
+        self.tcp_lb.expose_backend(backend, listener, health_monitor)
+        self.assertEqual(yaml.safe_load(rel.data[self.harness.charm.unit]['backend']),
+                         {
+                             'address': '192.0.2.1',
+                             'monitor_port': None,
+                             'name': 'tcp-server-0.example',
+                             'port': 80,
+                             'weight': None,
+                             'data_timeout': None,
+                         })
+        self.assertEqual(yaml.safe_load(rel.data[self.harness.charm.app]['listener']),
+                         {
+                             'name': 'tcp-server',
+                             'port': 80,
+                         })
+        self.assertEqual(yaml.safe_load(rel.data[self.harness.charm.app]['health_monitor']),
+                         {
+                             'delay': None,
+                             'max_retries': None,
+                             'max_retries_down': None,
+                             'timeout': 10.0
+                         })
+        self.assertEqual(rel.data[self.harness.charm.app]['load_balancer_algorithm'],
+                         'round_robin')
 
 
 if __name__ == "__main__":
