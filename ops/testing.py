@@ -319,7 +319,7 @@ class Harness:
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
-    def get_backend_calls(self, reset=True):
+    def _get_backend_calls(self, reset=True):
         """Return the calls that we have made to the TestingModelBackend.
 
         This is useful mostly for testing the framework itself, so that we can assert that we
@@ -336,7 +336,7 @@ class Harness:
         return calls
 
 
-def record_calls(cls):
+def _record_calls(cls):
     """Replace methods on cls with methods that record that they have been called.
 
     Iterate all attributes of cls, and for public methods, replace them with a wrapped method
@@ -359,7 +359,7 @@ def record_calls(cls):
     return cls
 
 
-@record_calls
+@_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
 
