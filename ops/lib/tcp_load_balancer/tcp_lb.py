@@ -188,9 +188,13 @@ class TCPLoadBalancer(Object):
     def expose_backend(self, backend, listener, health_monitor):
         """Expose a backend to the load-balancer.
 
-        backend -- a backend to expose to a TCP load-balancer.
-        listener -- a listener instance to provide frontend configuration parameters.
-        health_monitor -- a health monitor instance to configure health-checking for the backend.
+        :param backend: a backend to expose to a TCP load-balancer.
+        :type backend: :class: `.Backend`
+        :param listener: a listener instance to provide frontend configuration parameters.
+        :type listener: :class: `.Listener`
+        :param health_monitor: a health monitor instance to configure health-checking
+            for the backend.
+        :type health_monitor: :class: `.HealthMonitor`
         """
         rel = self.model.get_relation(self._relation_name)
         our_unit_data = rel.data[self.model.unit]
