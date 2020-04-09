@@ -1,3 +1,17 @@
+# Copyright 2020 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Implements types for provides and requires sides of the 'tcp-load-balancer' relation.
 
 `TcpBackendManager`_ is the type that exposes the information about members that a TCP
@@ -42,20 +56,6 @@ load-balancer should provide load-balancing for.
             health_monitor = HTTPHealthMonitor(timeout=timedelta(seconds=10), http_method='GET',
                                                url_path='/health?ready=1')
             self.tcp_lb.expose_backend(listener, backend, health_monitor)
-
-Copyright 2020 Canonical Ltd.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
 """
 
 import logging
