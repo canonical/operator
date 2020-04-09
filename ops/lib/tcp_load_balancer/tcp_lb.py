@@ -53,9 +53,12 @@ load-balancer should provide load-balancing for::
         def _on_load_balancer_available(self, event):
             listener = Listener(name=self.app.name.replace('/', '_'), port=self.LISTENER_PORT)
             fqdn = socket.getfqdn()
-            backend = Backend(fqdn, self.MEMBER_PORT, monitor_port=self.MONITOR_PORT)
-            health_monitor = HTTPHealthMonitor(timeout=timedelta(seconds=10), http_method='GET',
-                                               url_path='/health?ready=1')
+            backend = Backend(fqdn, self.SERVICE_PORT, monitor_port=self.MONITOR_PORT)
+            health_monitor = HTTPHealthMonitor(
+                timeout=timedelta(seconds=10),
+                http_method='GET',
+                url_path='/health?ready=1'
+            )
             self.tcp_lb.expose_backend(listener, backend, health_monitor)
 """
 

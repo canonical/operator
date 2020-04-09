@@ -40,7 +40,6 @@ class TestTCPBackendManager(unittest.TestCase):
               tcp-lb:
                 interface: tcp-load-balancer
         ''')
-
         self.harness.begin()
         self.tcp_backend_manager = TCPBackendManager(self.harness.charm, 'tcp-lb')
 
@@ -93,7 +92,6 @@ class TestLoadBalancer(unittest.TestCase):
               tcp-lb:
                 interface: tcp-load-balancer
         ''')
-
         self.harness.begin()
         self.tcp_lb = TCPLoadBalancer(self.harness.charm, 'tcp-lb', 'round_robin')
 
