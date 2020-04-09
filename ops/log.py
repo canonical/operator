@@ -26,22 +26,21 @@ class JujuLogHandler(logging.Handler):
         self.model_backend.juju_log(record.levelname, self.format(record))
 
 
-def setup_root_logging(model_backend, *, debug_stream=None):
+def setup_root_logging(model_backend, debug=False):
     """Setup python logging to forward messages to juju-log.
 
-    :param model_backend: a ModelBackend to use for juju_log.
-    :param debug_stream: A file stream where debug messages will be sent, in addition to juju-log.
-    :type debug_stream: File, optional
+    model_backend -- a ModelBackend to use for juju-log
+    debug -- if True, enable DEBUG level logging, and write logs to stderr as well as to juju-log.
     """
-    if debug_stream is not None:
-        logLevel = logging.DEBUG
+    if debug:
+        level = logging.DEBUG
     else:
-        logLevel = logging.INFO
+        level = logging.INFO
     logger = logging.getLogger()
-    logger.setLevel(logLevel)
+    logger.setLevel(level)
     logger.addHandler(JujuLogHandler(model_backend))
-    if debug_stream is not None:
-        streamHandler = logging.StreamHandler(debug_stream)
+    if debug:
+        handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
-        streamHandler.setFormatter(formatter)
-        logger.addHandler(streamHandler)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
