@@ -12,15 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-import tempfile
-import shutil
-import gc
 import datetime
-
+import gc
+import inspect
+import io
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from ops.framework import (
+    _BREAKPOINT_WELCOME_MESSAGE,
     BoundStoredState,
     CommitEvent,
     EventBase,
@@ -221,23 +226,23 @@ class TestFramework(unittest.TestCase):
 
         class PreCommitObserver(Object):
 
-            state = StoredState()
+            _stored = StoredState()
 
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
-                self.state.myinitdata = 40
+                self._stored.myinitdata = 40
 
             def on_pre_commit(self, event):
-                self.state.myinitdata = 41
-                self.state.mydata = 42
+                self._stored.myinitdata = 41
+                self._stored.mydata = 42
                 self.seen.append(type(event))
 
             def on_commit(self, event):
                 # Modifications made here will not be persisted.
-                self.state.myinitdata = 42
-                self.state.mydata = 43
-                self.state.myotherdata = 43
+                self._stored.myinitdata = 42
+                self._stored.mydata = 43
+                self._stored.myotherdata = 43
                 self.seen.append(type(event))
 
         obs = PreCommitObserver(framework, None)
@@ -246,8 +251,8 @@ class TestFramework(unittest.TestCase):
 
         framework.commit()
 
-        self.assertEqual(obs.state.myinitdata, 41)
-        self.assertEqual(obs.state.mydata, 42)
+        self.assertEqual(obs._stored.myinitdata, 41)
+        self.assertEqual(obs._stored.mydata, 42)
         self.assertTrue(obs.seen, [PreCommitEvent, CommitEvent])
         framework.close()
 
@@ -255,11 +260,11 @@ class TestFramework(unittest.TestCase):
 
         new_obs = PreCommitObserver(other_framework, None)
 
-        self.assertEqual(obs.state.myinitdata, 41)
-        self.assertEqual(new_obs.state.mydata, 42)
+        self.assertEqual(obs._stored.myinitdata, 41)
+        self.assertEqual(new_obs._stored.mydata, 42)
 
         with self.assertRaises(AttributeError):
-            new_obs.state.myotherdata
+            new_obs._stored.myotherdata
 
     def test_defer_and_reemit(self):
         framework = self.create_framework()
@@ -761,6 +766,26 @@ class TestFramework(unittest.TestCase):
         self.assertIn('database is locked', str(cm.exception))
         f.close()
 
+    def test_snapshot_saving_restricted_to_simple_types(self):
+        # this can not be saved, as it has not simple types!
+        to_be_saved = {"bar": TestFramework}
+
+        class FooEvent(EventSetBase):
+            def snapshot(self):
+                return to_be_saved
+
+        handle = Handle(None, "a_foo", "some_key")
+        event = FooEvent()
+
+        framework = self.create_framework()
+        framework.register_type(FooEvent, None, handle.kind)
+        with self.assertRaises(ValueError) as cm:
+            framework.save_snapshot(event)
+        expected = (
+            "unable to save the data for FooEvent, it must contain only simple types: "
+            "{'bar': <class 'test.test_framework.TestFramework'>}")
+        self.assertEqual(str(cm.exception), expected)
+
 
 class TestStoredState(unittest.TestCase):
 
@@ -775,13 +800,13 @@ class TestStoredState(unittest.TestCase):
 
     def test_basic_state_storage(self):
         class SomeObject(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         self._stored_state_tests(SomeObject)
 
     def test_straight_subclass(self):
         class SomeObject(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         class Sub(SomeObject):
             pass
@@ -790,7 +815,7 @@ class TestStoredState(unittest.TestCase):
 
     def test_straight_sub_subclass(self):
         class SomeObject(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         class Sub(SomeObject):
             pass
@@ -802,7 +827,7 @@ class TestStoredState(unittest.TestCase):
 
     def test_two_subclasses(self):
         class SomeObject(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         class SubA(SomeObject):
             pass
@@ -818,7 +843,7 @@ class TestStoredState(unittest.TestCase):
             pass
 
         class StatedObject(NoState):
-            state = StoredState()
+            _stored = StoredState()
 
         class Sibling(NoState):
             pass
@@ -833,47 +858,47 @@ class TestStoredState(unittest.TestCase):
         obj = cls(framework, "1")
 
         try:
-            obj.state.foo
+            obj._stored.foo
         except AttributeError as e:
             self.assertEqual(str(e), "attribute 'foo' is not stored")
         else:
             self.fail("AttributeError not raised")
 
         try:
-            obj.state.on = "nonono"
+            obj._stored.on = "nonono"
         except AttributeError as e:
             self.assertEqual(str(e), "attribute 'on' is reserved and cannot be set")
         else:
             self.fail("AttributeError not raised")
 
-        obj.state.foo = 41
-        obj.state.foo = 42
-        obj.state.bar = "s"
-        obj.state.baz = 4.2
-        obj.state.bing = True
+        obj._stored.foo = 41
+        obj._stored.foo = 42
+        obj._stored.bar = "s"
+        obj._stored.baz = 4.2
+        obj._stored.bing = True
 
-        self.assertEqual(obj.state.foo, 42)
+        self.assertEqual(obj._stored.foo, 42)
 
         framework.commit()
 
         # This won't be committed, and should not be seen.
-        obj.state.foo = 43
+        obj._stored.foo = 43
 
         framework.close()
 
         # Since this has the same absolute object handle, it will get its state back.
         framework_copy = self.create_framework()
         obj_copy = cls(framework_copy, "1")
-        self.assertEqual(obj_copy.state.foo, 42)
-        self.assertEqual(obj_copy.state.bar, "s")
-        self.assertEqual(obj_copy.state.baz, 4.2)
-        self.assertEqual(obj_copy.state.bing, True)
+        self.assertEqual(obj_copy._stored.foo, 42)
+        self.assertEqual(obj_copy._stored.bar, "s")
+        self.assertEqual(obj_copy._stored.baz, 4.2)
+        self.assertEqual(obj_copy._stored.bing, True)
 
         framework_copy.close()
 
     def test_two_subclasses_no_conflicts(self):
         class Base(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         class SubA(Base):
             pass
@@ -886,9 +911,9 @@ class TestStoredState(unittest.TestCase):
         b = SubB(framework, None)
         z = Base(framework, None)
 
-        a.state.foo = 42
-        b.state.foo = "hello"
-        z.state.foo = {1}
+        a._stored.foo = 42
+        b._stored.foo = "hello"
+        z._stored.foo = {1}
 
         framework.commit()
         framework.close()
@@ -898,36 +923,39 @@ class TestStoredState(unittest.TestCase):
         b2 = SubB(framework2, None)
         z2 = Base(framework2, None)
 
-        self.assertEqual(a2.state.foo, 42)
-        self.assertEqual(b2.state.foo, "hello")
-        self.assertEqual(z2.state.foo, {1})
+        self.assertEqual(a2._stored.foo, 42)
+        self.assertEqual(b2._stored.foo, "hello")
+        self.assertEqual(z2._stored.foo, {1})
 
     def test_two_names_one_state(self):
         class Mine(Object):
-            state = StoredState()
-            stored = state
+            _stored = StoredState()
+            _stored2 = _stored
 
         framework = self.create_framework()
         obj = Mine(framework, None)
 
         with self.assertRaises(RuntimeError):
-            obj.state.foo = 42
+            obj._stored.foo = 42
+
+        with self.assertRaises(RuntimeError):
+            obj._stored2.foo = 42
 
         framework.close()
 
         # make sure we're not changing the object on failure
-        self.assertNotIn("stored", obj.__dict__)
-        self.assertNotIn("state", obj.__dict__)
+        self.assertNotIn("_stored", obj.__dict__)
+        self.assertNotIn("_stored2", obj.__dict__)
 
     def test_same_name_two_classes(self):
         class Base(Object):
             pass
 
         class A(Base):
-            stored = StoredState()
+            _stored = StoredState()
 
         class B(Base):
-            stored = A.stored
+            _stored = A._stored
 
         framework = self.create_framework()
         a = A(framework, None)
@@ -935,27 +963,27 @@ class TestStoredState(unittest.TestCase):
 
         # NOTE it's the second one that actually triggers the
         # exception, but that's an implementation detail
-        a.stored.foo = 42
+        a._stored.foo = 42
 
         with self.assertRaises(RuntimeError):
-            b.stored.foo = "xyzzy"
+            b._stored.foo = "xyzzy"
 
         framework.close()
 
         # make sure we're not changing the object on failure
-        self.assertNotIn("stored", b.__dict__)
+        self.assertNotIn("_stored", b.__dict__)
 
     def test_mutable_types_invalid(self):
         framework = self.create_framework()
 
         class SomeObject(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         obj = SomeObject(framework, '1')
         try:
             class CustomObject:
                 pass
-            obj.state.foo = CustomObject()
+            obj._stored.foo = CustomObject()
         except AttributeError as e:
             self.assertEqual(
                 str(e),
@@ -1121,7 +1149,7 @@ class TestStoredState(unittest.TestCase):
         )]
 
         class SomeObject(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         class WrappedFramework(Framework):
             def __init__(self, data_path, charm_dir, meta, model):
@@ -1129,7 +1157,7 @@ class TestStoredState(unittest.TestCase):
                 self.snapshots = []
 
             def save_snapshot(self, value):
-                if value.handle.path == 'SomeObject[1]/StoredStateData[state]':
+                if value.handle.path == 'SomeObject[1]/StoredStateData[_stored]':
                     self.snapshots.append((type(value), value.snapshot()))
                 return super().save_snapshot(value)
 
@@ -1138,13 +1166,13 @@ class TestStoredState(unittest.TestCase):
             framework = self.create_framework(cls=WrappedFramework)
             obj = SomeObject(framework, '1')
 
-            obj.state.a = get_a()
-            self.assertTrue(isinstance(obj.state, BoundStoredState))
+            obj._stored.a = get_a()
+            self.assertTrue(isinstance(obj._stored, BoundStoredState))
 
-            op(obj.state.a, b)
-            validate_op(obj.state.a, expected_res)
+            op(obj._stored.a, b)
+            validate_op(obj._stored.a, expected_res)
 
-            obj.state.a = get_a()
+            obj._stored.a = get_a()
             framework.commit()
             # We should see an update for initializing a
             self.assertEqual(framework.snapshots, [
@@ -1153,10 +1181,10 @@ class TestStoredState(unittest.TestCase):
             del obj
             gc.collect()
             obj_copy1 = SomeObject(framework, '1')
-            self.assertEqual(obj_copy1.state.a, get_a())
+            self.assertEqual(obj_copy1._stored.a, get_a())
 
-            op(obj_copy1.state.a, b)
-            validate_op(obj_copy1.state.a, expected_res)
+            op(obj_copy1._stored.a, b)
+            validate_op(obj_copy1._stored.a, expected_res)
             framework.commit()
             framework.close()
 
@@ -1164,7 +1192,7 @@ class TestStoredState(unittest.TestCase):
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
-            validate_op(obj_copy2.state.a, expected_res)
+            validate_op(obj_copy2._stored.a, expected_res)
 
             # Commit saves the pre-commit and commit events, and the framework
             # event counter, but shouldn't update the stored state of my object
@@ -1256,22 +1284,22 @@ class TestStoredState(unittest.TestCase):
         )]
 
         class SomeObject(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         framework = self.create_framework()
 
         for i, (a, b, op, op_ab, op_ba) in enumerate(test_operations):
             obj = SomeObject(framework, str(i))
-            obj.state.a = a
-            self.assertEqual(op(obj.state.a, b), op_ab)
-            self.assertEqual(op(b, obj.state.a), op_ba)
+            obj._stored.a = a
+            self.assertEqual(op(obj._stored.a, b), op_ab)
+            self.assertEqual(op(b, obj._stored.a), op_ba)
 
     def test_set_operations(self):
         test_operations = [(
             {"1"},  # A set to test an operation against (other_set).
             lambda a, b: a | b,  # An operation to test.
-            {"1", "a", "b"},  # The expected result of operation(obj.state.set, other_set).
-            {"1", "a", "b"}  # The expected result of operation(other_set, obj.state.set).
+            {"1", "a", "b"},  # The expected result of operation(obj._stored.set, other_set).
+            {"1", "a", "b"}  # The expected result of operation(other_set, obj._stored.set).
         ), (
             {"a", "c"},
             lambda a, b: a - b,
@@ -1295,7 +1323,7 @@ class TestStoredState(unittest.TestCase):
         )]
 
         class SomeObject(Object):
-            state = StoredState()
+            _stored = StoredState()
 
         framework = self.create_framework()
 
@@ -1305,11 +1333,11 @@ class TestStoredState(unittest.TestCase):
         # original sets are not changed or used as a result.
         for i, (variable_operand, operation, ab_res, ba_res) in enumerate(test_operations):
             obj = SomeObject(framework, str(i))
-            obj.state.set = {"a", "b"}
+            obj._stored.set = {"a", "b"}
 
             for a, b, expected in [
-                    (obj.state.set, variable_operand, ab_res),
-                    (variable_operand, obj.state.set, ba_res)]:
+                    (obj._stored.set, variable_operand, ab_res),
+                    (variable_operand, obj._stored.set, ba_res)]:
                 old_a = set(a)
                 old_b = set(b)
 
@@ -1317,7 +1345,7 @@ class TestStoredState(unittest.TestCase):
                 self.assertEqual(result, expected)
 
                 # Common sanity checks
-                self.assertIsNot(obj.state.set._under, result)
+                self.assertIsNot(obj._stored.set._under, result)
                 self.assertIsNot(result, a)
                 self.assertIsNot(result, b)
                 self.assertEqual(a, old_a)
@@ -1327,22 +1355,175 @@ class TestStoredState(unittest.TestCase):
         framework = self.create_framework()
 
         class StatefulObject(Object):
-            state = StoredState()
+            _stored = StoredState()
         parent = StatefulObject(framework, 'key')
-        parent.state.set_default(foo=1)
-        self.assertEqual(parent.state.foo, 1)
-        parent.state.set_default(foo=2)
+        parent._stored.set_default(foo=1)
+        self.assertEqual(parent._stored.foo, 1)
+        parent._stored.set_default(foo=2)
         # foo was already set, so it doesn't get replaced
-        self.assertEqual(parent.state.foo, 1)
-        parent.state.set_default(foo=3, bar=4)
-        self.assertEqual(parent.state.foo, 1)
-        self.assertEqual(parent.state.bar, 4)
+        self.assertEqual(parent._stored.foo, 1)
+        parent._stored.set_default(foo=3, bar=4)
+        self.assertEqual(parent._stored.foo, 1)
+        self.assertEqual(parent._stored.bar, 4)
         # reloading the state still leaves things at the default values
         framework.commit()
         del parent
         parent = StatefulObject(framework, 'key')
-        parent.state.set_default(foo=5, bar=6)
-        self.assertEqual(parent.state.foo, 1)
-        self.assertEqual(parent.state.bar, 4)
+        parent._stored.set_default(foo=5, bar=6)
+        self.assertEqual(parent._stored.foo, 1)
+        self.assertEqual(parent._stored.bar, 4)
         # TODO: jam 2020-01-30 is there a clean way to tell that
-        #       parent.state._data.dirty is False?
+        #       parent._stored._data.dirty is False?
+
+
+@patch('sys.stderr', new_callable=io.StringIO)
+class BreakpointTests(unittest.TestCase):
+
+    def setUp(self):
+        tmpdir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, str(tmpdir))
+
+        self.framework = Framework(tmpdir / "framework.data", tmpdir, None, None)
+        self.addCleanup(self.framework.close)
+
+    def test_ignored(self, fake_stderr):
+        # It doesn't do anything really unless proper environment is there.
+        assert 'JUJU_DEBUG_AT' not in os.environ
+
+        with patch('pdb.Pdb.set_trace') as mock:
+            self.framework.breakpoint()
+        self.assertEqual(mock.call_count, 0)
+        self.assertEqual(fake_stderr.getvalue(), "")
+
+    def test_pdb_properly_called(self, fake_stderr):
+        # The debugger needs to leave the user in the frame where the breakpoint is executed,
+        # which for the test is the frame we're calling it here in the test :).
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            with patch('pdb.Pdb.set_trace') as mock:
+                this_frame = inspect.currentframe()
+                self.framework.breakpoint()
+        self.assertEqual(mock.call_count, 1)
+        self.assertEqual(mock.call_args, ((this_frame,), {}))
+
+    def test_welcome_message(self, fake_stderr):
+        # Check that an initial message is shown to the user when code is interrupted.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            with patch('pdb.Pdb.set_trace'):
+                self.framework.breakpoint()
+        self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+
+    def test_welcome_message_not_multiple(self, fake_stderr):
+        # Check that an initial message is NOT shown twice if the breakpoint is exercised
+        # twice in the same run.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            with patch('pdb.Pdb.set_trace'):
+                self.framework.breakpoint()
+                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+                self.framework.breakpoint()
+                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+
+    def test_builtin_breakpoint_hooked(self, fake_stderr):
+        # Verify that the proper hook is set.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            with patch('pdb.Pdb.set_trace') as mock:
+                # Calling through sys, not breakpoint() directly, so we can run the
+                # tests with Py < 3.7.
+                sys.breakpointhook()
+        self.assertEqual(mock.call_count, 1)
+
+    def test_breakpoint_names(self, fake_stderr):
+        # Name rules:
+        # - must start and end with lowercase alphanumeric characters
+        # - only contain lowercase alphanumeric characters, or the hyphen "-"
+        good_names = [
+            'foobar',
+            'foo-bar-baz',
+            'foo-------bar',
+            'foo123',
+            '778',
+            '77-xx',
+            'a-b',
+            'ab',
+            'x',
+        ]
+        for name in good_names:
+            with self.subTest(name=name):
+                self.framework.breakpoint(name)
+
+        bad_names = [
+            '',
+            '.',
+            '-',
+            '...foo',
+            'foo.bar',
+            'bar--'
+            'FOO',
+            'FooBar',
+            'foo bar',
+            'foo_bar',
+            '/foobar',
+            'break-here-☚',
+        ]
+        msg = 'breakpoint names must look like "foo" or "foo-bar"'
+        for name in bad_names:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError) as cm:
+                    self.framework.breakpoint(name)
+                self.assertEqual(str(cm.exception), msg)
+
+        reserved_names = [
+            'all',
+            'hook',
+        ]
+        msg = 'breakpoint names "all" and "hook" are reserved'
+        for name in reserved_names:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError) as cm:
+                    self.framework.breakpoint(name)
+                self.assertEqual(str(cm.exception), msg)
+
+        not_really_names = [
+            123,
+            1.1,
+            False,
+        ]
+        for name in not_really_names:
+            with self.subTest(name=name):
+                with self.assertRaises(TypeError) as cm:
+                    self.framework.breakpoint(name)
+                self.assertEqual(str(cm.exception), 'breakpoint names must be strings')
+
+    def check_trace_set(self, envvar_value, breakpoint_name, call_count):
+        """Helper to check the diverse combinations of situations."""
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': envvar_value}):
+            with patch('pdb.Pdb.set_trace') as mock:
+                self.framework.breakpoint(breakpoint_name)
+        self.assertEqual(mock.call_count, call_count)
+
+    def test_unnamed_indicated_all(self, fake_stderr):
+        # If 'all' is indicated, unnamed breakpoints will always activate.
+        self.check_trace_set('all', None, 1)
+
+    def test_unnamed_indicated_hook(self, fake_stderr):
+        # Special value 'hook' was indicated, nothing to do with any call.
+        self.check_trace_set('hook', None, 0)
+
+    def test_named_indicated_specifically(self, fake_stderr):
+        # Some breakpoint was indicated, and the framework call used exactly that name.
+        self.check_trace_set('mybreak', 'mybreak', 1)
+
+    def test_named_indicated_somethingelse(self, fake_stderr):
+        # Some breakpoint was indicated, but the framework call was not with that name.
+        self.check_trace_set('some-breakpoint', None, 0)
+
+    def test_named_indicated_ingroup(self, fake_stderr):
+        # A multiple breakpoint was indicated, and the framework call used a name among those.
+        self.check_trace_set('some,mybreak,foobar', 'mybreak', 1)
+
+    def test_named_indicated_all(self, fake_stderr):
+        # The framework indicated 'all', which includes any named breakpoint set.
+        self.check_trace_set('all', 'mybreak', 1)
+
+    def test_named_indicated_hook(self, fake_stderr):
+        # The framework indicated the special value 'hook', nothing to do with any named call.
+        self.check_trace_set('hook', 'mybreak', 0)
