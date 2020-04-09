@@ -277,8 +277,9 @@ class Harness:
                 new_values[k] = v
         self._backend._relation_data[relation_id][app_or_unit] = new_values
 
-        # Updates to our app data are do not trigger change events for units of our app.
         if not is_peer and is_our_app_updated:
+            # The leader is updating app data next to us, we only see that change if this
+            # is a peer relation.
             return
         self._emit_relation_changed(relation_id, app_or_unit)
 
