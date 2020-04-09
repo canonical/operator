@@ -282,4 +282,4 @@ class InterfaceDataEncoder(json.JSONEncoder):
         if isinstance(obj, datetime.timedelta):
             return obj.total_seconds()
         else:
-            return json.JSONEncoder.default(self, obj)
+            return super().default(self, obj)
