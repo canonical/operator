@@ -144,7 +144,7 @@ class TestCAClient(unittest.TestCase):
         self.harness.update_relation_data(relation_id, 'easyrsa/0', ca_client_data)
 
         self.assertTrue(len(receiver.observed_events) == 1)
-        self.assertIsInstance(receiver.observed_events[0], ca_client.TlsConfigReady)
+        self.assertIsInstance(receiver.observed_events[0], ca_client.TLSConfigReady)
 
         # Validate that the properties of certs and keys match the ones exposed.
         self.assertEqual(self.ca_client.ca_certificate.serial_number,

@@ -68,7 +68,7 @@ from ops.model import ModelError, BlockedStatus, WaitingStatus
 logger = logging.getLogger(__name__)
 
 
-class TlsCertificatesError(ModelError):
+class TLSCertificatesError(ModelError):
     """A base class for all errors raised by interface-tls-certificates.
 
     The error provides the attribute self.status to indicate what status and message the Unit
@@ -81,7 +81,7 @@ class TlsCertificatesError(ModelError):
         self.status = kind('{}: {}'.format(message, relation_name))
 
 
-class CAClientError(TlsCertificatesError):
+class CAClientError(TLSCertificatesError):
     """An error specific to the CAClient class"""
 
 
@@ -99,7 +99,7 @@ class CAAvailable(EventBase):
     pass
 
 
-class TlsConfigReady(EventBase):
+class TLSConfigReady(EventBase):
 
     """Event emitted by CAClient.on.tls_config_ready.
 
@@ -116,7 +116,7 @@ class CAClientEvents(EventSetBase):
     """Events emitted by the CAClient class."""
 
     ca_available = EventSource(CAAvailable)
-    tls_config_ready = EventSource(TlsConfigReady)
+    tls_config_ready = EventSource(TLSConfigReady)
 
 
 class CAClient(Object):
