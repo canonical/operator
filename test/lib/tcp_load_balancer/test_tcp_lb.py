@@ -19,7 +19,7 @@ limitations under the License.
 
 import unittest
 import datetime
-import yaml
+import json
 
 from ops.charm import CharmBase
 from ops.testing import Harness
@@ -30,6 +30,7 @@ from ops.lib.tcp_load_balancer.tcp_lb import (
     Backend,
     HealthMonitor,
     TcpLoadBalancer,
+    JSON_ENCODE_OPTIONS,
 )
 
 
@@ -54,29 +55,29 @@ class TestTcpBackendManager(unittest.TestCase):
         self.harness.add_relation_unit(
             relation_id, 'tcp-server/0', {
                 'ingress-address': '192.0.2.2',
-                'backend': yaml.safe_dump({
+                'backend': json.dumps({
                     'name': 'tcp-server-0.example',
                     'port': 80,
                     'address': '192.0.2.2',
-                })
+                }, **JSON_ENCODE_OPTIONS)
             })
         self.harness.add_relation_unit(
             relation_id, 'tcp-server/1', {
                 'ingress-address': '192.0.2.3',
-                'backend': yaml.safe_dump({
+                'backend': json.dumps({
                     'name': 'tcp-server-1.example',
                     'port': 80,
                     'address': '192.0.2.3',
-                })
+                }, **JSON_ENCODE_OPTIONS)
             })
         self.harness.update_relation_data(relation_id, 'tcp-server', {
-            'listener': yaml.safe_dump({
+            'listener': json.dumps({
                 'name': 'tcp-server',
                 'port': 80,
-            }),
-            'health_monitor': yaml.safe_dump({
+            }, **JSON_ENCODE_OPTIONS),
+            'health_monitor': json.dumps({
                 'timeout': 10.0
-            }),
+            }, **JSON_ENCODE_OPTIONS),
         })
 
         pools = self.tcp_backend_manager.pools
@@ -111,7 +112,7 @@ class TestLoadBalancer(unittest.TestCase):
         self.tcp_lb.expose_backend(backend, listener, health_monitor)
 
         rel = self.harness.charm.model.get_relation('tcp-lb')
-        self.assertEqual(yaml.safe_load(rel.data[self.harness.charm.unit]['backend']),
+        self.assertEqual(json.loads(rel.data[self.harness.charm.unit]['backend']),
                          {
                              'address': '192.0.2.1',
                              'monitor_port': None,
@@ -127,7 +128,7 @@ class TestLoadBalancer(unittest.TestCase):
 
         self.harness.set_leader()
         self.tcp_lb.expose_backend(backend, listener, health_monitor)
-        self.assertEqual(yaml.safe_load(rel.data[self.harness.charm.unit]['backend']),
+        self.assertEqual(json.loads(rel.data[self.harness.charm.unit]['backend']),
                          {
                              'address': '192.0.2.1',
                              'monitor_port': None,
@@ -136,12 +137,12 @@ class TestLoadBalancer(unittest.TestCase):
                              'weight': None,
                              'data_timeout': None,
                          })
-        self.assertEqual(yaml.safe_load(rel.data[self.harness.charm.app]['listener']),
+        self.assertEqual(json.loads(rel.data[self.harness.charm.app]['listener']),
                          {
                              'name': 'tcp-server',
                              'port': 80,
                          })
-        self.assertEqual(yaml.safe_load(rel.data[self.harness.charm.app]['health_monitor']),
+        self.assertEqual(json.loads(rel.data[self.harness.charm.app]['health_monitor']),
                          {
                              'delay': None,
                              'max_retries': None,

@@ -59,13 +59,19 @@ limitations under the License.
 """
 
 import logging
-import yaml
+import json
 import datetime
-
-from collections.abc import Mapping
 
 from ops.framework import Object, StoredState, EventBase, EventSetBase, EventSource
 logger = logging.getLogger(__name__)
+
+
+JSON_ENCODE_OPTIONS = dict(
+    sort_keys=True,
+    allow_nan=False,
+    indent=None,
+    separators=(',', ':'),
+)
 
 
 class PoolsChanged(EventBase):
@@ -111,13 +117,13 @@ class TcpBackendManager(Object):
                 if listener_data is None:
                     logger.debug('No listener data found for remote app %s', relation.app.name)
                     continue
-                listener = Listener(**yaml.safe_load(listener_data))
+                listener = Listener(**json.loads(listener_data))
                 health_monitor_data = app_data.get('health_monitor')
                 if health_monitor_data is None:
                     logger.debug('No health monitor data found for remote app %s',
                                  relation.app.name)
                     continue
-                health_monitor = HealthMonitor(**yaml.safe_load(health_monitor_data))
+                health_monitor = HealthMonitor(**json.loads(health_monitor_data))
 
                 members = []
                 for unit in relation.units:
@@ -125,7 +131,7 @@ class TcpBackendManager(Object):
                     if backend_data is None:
                         logger.debug('No backend data found for remote unit %s', unit.name)
                         continue
-                    backend = Backend(**yaml.safe_load(backend_data))
+                    backend = Backend(**json.loads(backend_data))
                     members.append(backend)
                 self._backend_pools.append(BackendPool(listener, members, health_monitor))
         return self._backend_pools
@@ -187,12 +193,15 @@ class TcpLoadBalancer(Object):
             addr = self.model.get_binding(rel).network.ingress_address
             backend.address = addr
 
-        our_unit_data['backend'] = yaml.dump(backend, Dumper=InterfaceDataDumper)
+        our_unit_data['backend'] = json.dumps(backend, cls=InterfaceDataEncoder,
+                                              **JSON_ENCODE_OPTIONS)
         if self.model.unit.is_leader():
             our_app_data = rel.data[self.model.app]
-            our_app_data['listener'] = yaml.dump(listener, Dumper=InterfaceDataDumper)
+            our_app_data['listener'] = json.dumps(listener, cls=InterfaceDataEncoder,
+                                                  **JSON_ENCODE_OPTIONS)
             # A monitor for a pool of members.
-            our_app_data['health_monitor'] = yaml.dump(health_monitor, Dumper=InterfaceDataDumper)
+            our_app_data['health_monitor'] = json.dumps(health_monitor, cls=InterfaceDataEncoder,
+                                                        **JSON_ENCODE_OPTIONS)
             our_app_data['load_balancer_algorithm'] = self._load_balancer_algorithm
 
 
@@ -268,11 +277,9 @@ class HttpHealthMonitor(HealthMonitor):
         self.expected_codes = expected_codes
 
 
-class InterfaceDataDumper(yaml.SafeDumper):
-
-    def represent_data(self, data):
-        if isinstance(data, Mapping):
-            return self.represent_dict(data.items())
-        if isinstance(data, datetime.timedelta):
-            return self.represent_float(data.total_seconds())
-        return super().represent_data(data)
+class InterfaceDataEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.timedelta):
+            return obj.total_seconds()
+        else:
+            return json.JSONEncoder.default(self, obj)
