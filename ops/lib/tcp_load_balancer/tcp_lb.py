@@ -63,6 +63,8 @@ import logging
 import json
 import datetime
 
+from types import SimpleNamespace
+
 from ops.framework import Object, StoredState, EventBase, EventSetBase, EventSource
 logger = logging.getLogger(__name__)
 
@@ -214,25 +216,7 @@ class TCPLoadBalancer(Object):
             our_app_data['load_balancer_algorithm'] = self._load_balancer_algorithm
 
 
-class InterfaceDataType(dict):
-
-    def __getattr__(self, name):
-        if name in self:
-            return self[name]
-        else:
-            raise AttributeError("No such attribute: {}".format(name))
-
-    def __setattr__(self, name, value):
-        self[name] = value
-
-    def __delattr__(self, name):
-        if name in self:
-            del self[name]
-        else:
-            raise AttributeError("No such attribute: {}".format(name))
-
-
-class Listener(InterfaceDataType):
+class Listener(SimpleNamespace):
     """Listeners determine how load-balancer front-ends are configured."""
 
     def __init__(self, name, port, **kwargs):
@@ -240,7 +224,7 @@ class Listener(InterfaceDataType):
         self.port = port
 
 
-class Backend(InterfaceDataType):
+class Backend(SimpleNamespace):
     """Describes the details about a particular backend service instance."""
 
     def __init__(self, name, port, *, address=None, monitor_port=None, weight=None,
@@ -253,7 +237,7 @@ class Backend(InterfaceDataType):
         self.data_timeout = data_timeout
 
 
-class HealthMonitor(InterfaceDataType):
+class HealthMonitor(SimpleNamespace):
     """Health-monitors provide parameters for regular health-checking operations."""
 
     def __init__(self, *, delay=None, timeout=None, max_retries=None, max_retries_down=None,
@@ -290,5 +274,7 @@ class InterfaceDataEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime.timedelta):
             return obj.total_seconds()
+        elif isinstance(obj, SimpleNamespace):
+            return obj.__dict__
         else:
-            return super().default(self, obj)
+            return super().default(obj)
