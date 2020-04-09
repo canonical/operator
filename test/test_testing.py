@@ -23,6 +23,7 @@ import unittest
 
 from ops.charm import (
     CharmBase,
+    RelationEvent,
 )
 from ops.framework import (
     Object,
@@ -52,7 +53,40 @@ class TestHarness(unittest.TestCase):
         self.assertEqual({}, backend.relation_get(rel_id, 'test-app', is_app=True))
         self.assertEqual({}, backend.relation_get(rel_id, 'test-app/0', is_app=False))
 
-    def test_add_relation_with_initial_data(self):
+    def test_add_relation_and_unit(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        remote_unit = 'postgresql/0'
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id, int)
+        harness.add_relation_unit(rel_id, remote_unit, remote_unit_data={'foo': 'bar'})
+        backend = harness._backend
+        self.assertEqual([rel_id], backend.relation_ids('db'))
+        self.assertEqual([remote_unit], backend.relation_list(rel_id))
+        self.assertEqual({'foo': 'bar'}, backend.relation_get(rel_id, remote_unit, is_app=False))
+
+    def test_add_relation_with_remote_app_data(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        remote_app = 'postgresql'
+        rel_id = harness.add_relation('db', remote_app)
+        harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
+        self.assertIsInstance(rel_id, int)
+        backend = harness._backend
+        self.assertEqual([rel_id], backend.relation_ids('db'))
+        self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_app, is_app=True))
+
+    def test_add_relation_with_our_initial_data(self):
 
         class InitialDataTester(CharmBase):
             """Record the relation-changed events."""
@@ -72,15 +106,33 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
-        rel_id = harness.add_relation('db', 'postgresql', initial_app_data={'k', 'v'},
-                                      initial_unit_data={'ingress-address': '192.0.2.1'})
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.update_relation_data(rel_id, 'test-app', {'k': 'v1'})
+        harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.1'})
         backend = harness._backend
-        self.assertEqual({'k', 'v'}, backend.relation_get(rel_id, 'test-app', is_app=True))
+        self.assertEqual({'k': 'v1'}, backend.relation_get(rel_id, 'test-app', is_app=True))
         self.assertEqual({'ingress-address': '192.0.2.1'},
                          backend.relation_get(rel_id, 'test-app/0', is_app=False))
+
         harness.begin()
+        self.assertEqual({'k': 'v1'}, backend.relation_get(rel_id, 'test-app', is_app=True))
+        self.assertEqual({'ingress-address': '192.0.2.1'},
+                         backend.relation_get(rel_id, 'test-app/0', is_app=False))
         # Make sure no relation-changed events are emitted for our own data bags.
         self.assertEqual([], harness.charm.observed_events)
+
+        # A remote unit can still update our app relation data bag since our unit is not a leader.
+        harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
+        # But indirectly updating our unit's data bag is not possible anymore.
+        with self.assertRaises(RuntimeError):
+            harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
+
+        # Updating our data app relation data bag and our unit data bag is not possible anymore.
+        harness.set_leader(True)
+        with self.assertRaises(RuntimeError):
+            harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
+        with self.assertRaises(RuntimeError):
+            harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
 
     def test_add_peer_relation_with_initial_data_leader(self):
 
@@ -103,35 +155,38 @@ class TestHarness(unittest.TestCase):
                 cluster:
                     interface: cluster
             ''')
-        # TODO: dmitriis 2020-04-07 test a minion unit and initial peer relation app data.
+        # TODO: dmitriis 2020-04-07 test a minion unit and initial peer relation app data
+        # events when the harness begins to emit events for initial data.
         harness.set_leader(is_leader=True)
-        rel_id = harness.add_relation('cluster', 'test-app', initial_app_data={'k', 'v'},
-                                      initial_unit_data={'ingress-address': '192.0.2.1'})
+        rel_id = harness.add_relation('cluster', 'test-app')
+        harness.update_relation_data(rel_id, 'test-app', {'k': 'v'})
+        harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.1'})
         backend = harness._backend
-        self.assertEqual({'k', 'v'}, backend.relation_get(rel_id, 'test-app', is_app=True))
+        self.assertEqual({'k': 'v'}, backend.relation_get(rel_id, 'test-app', is_app=True))
         self.assertEqual({'ingress-address': '192.0.2.1'},
                          backend.relation_get(rel_id, 'test-app/0', is_app=False))
+
         harness.begin()
+        self.assertEqual({'k': 'v'}, backend.relation_get(rel_id, 'test-app', is_app=True))
+        self.assertEqual({'ingress-address': '192.0.2.1'},
+                         backend.relation_get(rel_id, 'test-app/0', is_app=False))
         # Make sure no relation-changed events are emitted for our own data bags.
         self.assertEqual([], harness.charm.observed_events)
 
-    def test_add_relation_and_unit(self):
-        # language=YAML
-        harness = Harness(CharmBase, meta='''
-            name: test-app
-            requires:
-                db:
-                    interface: pgsql
-            ''')
-        remote_unit = 'postgresql/0'
-        rel_id = harness.add_relation('db', 'postgresql', remote_app_data={'app': 'data'})
-        self.assertIsInstance(rel_id, int)
-        harness.add_relation_unit(rel_id, remote_unit, remote_unit_data={'foo': 'bar'})
-        backend = harness._backend
-        self.assertEqual([rel_id], backend.relation_ids('db'))
-        self.assertEqual([remote_unit], backend.relation_list(rel_id))
-        self.assertEqual({'foo': 'bar'}, backend.relation_get(rel_id, remote_unit, is_app=False))
-        self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_unit, is_app=True))
+        # Updating our data app relation data bag and our unit data bag is not possible anymore.
+        with self.assertRaises(RuntimeError):
+            harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
+        with self.assertRaises(RuntimeError):
+            harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
+        self.assertEqual([], harness.charm.observed_events)
+
+        # If our unit becomes a minion, updating app relation data indirectly becomes possible
+        # and our charm gets notifications.
+        harness.set_leader(False)
+        harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
+        self.assertEqual({'k': 'v2'}, backend.relation_get(rel_id, 'test-app', is_app=True))
+        self.assertTrue(len(harness.charm.observed_events), 1)
+        self.assertIsInstance(harness.charm.observed_events[0], RelationEvent)
 
     def test_get_relation_data(self):
         # language=YAML
@@ -141,8 +196,8 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
-        rel_id = harness.add_relation('db', 'postgresql',
-                                      remote_app_data={'remote': 'data'})
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.update_relation_data(rel_id, 'postgresql', {'remote': 'data'})
         self.assertEqual(harness.get_relation_data(rel_id, 'test-app'), {})
         self.assertEqual(harness.get_relation_data(rel_id, 'test-app/0'), {})
         self.assertEqual(harness.get_relation_data(rel_id, 'test-app/1'), None)
@@ -170,6 +225,18 @@ class TestHarness(unittest.TestCase):
         # Helper2 should see the event triggered by harness2, but helper1 should see no events.
         self.assertEqual(helper1.changes, [])
         self.assertEqual(helper2.changes, [(rel_id, 'postgresql')])
+
+    def test_begin_twice(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+        with self.assertRaises(RuntimeError):
+            harness.begin()
 
     def test_update_relation_exposes_new_data(self):
         # language=YAML

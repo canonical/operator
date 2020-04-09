@@ -62,6 +62,7 @@ class Harness:
         self._backend = _TestingModelBackend(self._unit_name)
         self._model = model.Model(self._unit_name, self._meta, self._backend)
         self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
+        self._begun = False
 
     @property
     def charm(self):
@@ -81,6 +82,9 @@ class Harness:
         Before calling begin(), there is no Charm instance, so changes to the Model won't emit
         events. You must call begin before self.charm is valid.
         """
+        if self._begun:
+            raise RuntimeError('cannot call the begin method on the harness more than once')
+
         # The Framework adds attributes to class objects for events, etc. As such, we can't re-use
         # the original class against multiple Frameworks. So create a locally defined class
         # and register it.
@@ -98,6 +102,7 @@ class Harness:
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
         self._charm = TestCharm(self._framework, self._framework.meta.name)
+        self._begun = True
 
     def _create_meta(self, charm_metadata):
         """Create a CharmMeta object.
@@ -139,8 +144,7 @@ class Harness:
         self._relation_id_counter += 1
         return rel_id
 
-    def add_relation(self, relation_name, remote_app, *, remote_app_data=None,
-                     initial_unit_data=None, initial_app_data=None):
+    def add_relation(self, relation_name, remote_app):
         """Declare that there is a new relation between this app and `remote_app`.
 
         TODO: Once relation_created exists as a Juju hook, it should be triggered by this code.
@@ -149,37 +153,17 @@ class Harness:
         :type relation_data: str
         :param remote_app: The name of the application that is being related to
         :type remote_app: str
-        :param remote_app_data: Optional data bag that the remote application is sending
-          If remote_app_data is not empty, this should trigger
-          ``charm.on[relation_name].relation_changed(app)``
-          For peer relations, use initial_app_data instead.
-        :type remote_app_data: dict(str, str)
-        :param initial_unit_data: Optional data bag that holds our unit's initial data.
-        :type initial_unit_data: dict(str, str)
-        :param initial_app_data: Optional data bag that holds our app's initial data.
-        :type initial_app_data: dict(str, str)
         :return: The relation_id created by this add_relation.
         :rtype: int
         """
-        is_peer = self._meta.relations[relation_name].role == 'peers'
-        if is_peer and remote_app_data is not None:
-            raise RuntimeError('unable to update remote app data as there is no remote app on'
-                               ' a peer relation - use initial app data instead')
-
         rel_id = self._next_relation_id()
         self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
         self._backend._relation_names[rel_id] = relation_name
         self._backend._relation_list_map[rel_id] = []
-        if remote_app_data is None:
-            remote_app_data = {}
-        if initial_app_data is None:
-            initial_app_data = {}
-        if initial_unit_data is None:
-            initial_unit_data = {}
         self._backend._relation_data[rel_id] = {
-            remote_app: remote_app_data,
-            self._backend.unit_name: initial_unit_data,
-            self._backend.app_name: initial_app_data,
+            remote_app: {},
+            self._backend.unit_name: {},
+            self._backend.app_name: {},
         }
         # Reload the relation_ids list
         if self._model is not None:
@@ -273,16 +257,18 @@ class Harness:
         is_peer = self._meta.relations[relation_name].role == 'peers'
         our_unit = self._model.unit
         is_our_app_updated = self._model.app == entity
-        if self._model.unit == entity:
-            raise RuntimeError('unable to update our unit relation data as if it was done by'
-                               ' a remote unit')
-        elif is_peer and is_our_app_updated and our_unit.is_leader():
-            raise RuntimeError('unable to update peer app relation data as if it was done by'
-                               ' a remote unit - our unit {} is the leader'.format(our_unit.name))
-        elif is_our_app_updated and our_unit.is_leader():
-            raise RuntimeError('unable to update app relation data for our app as if it was done'
-                               ' by a remote unit - our unit {} is the leader'
-                               ''.format(our_unit.name))
+        if self._begun:
+            if self._model.unit == entity:
+                raise RuntimeError('unable to update our unit relation data as if it was done by'
+                                   ' a remote unit')
+            elif is_peer and is_our_app_updated and our_unit.is_leader():
+                raise RuntimeError('unable to update peer app relation data as if it was done by'
+                                   ' a remote unit - our unit {} is the leader'
+                                   ''.format(our_unit.name))
+            elif is_our_app_updated and our_unit.is_leader():
+                raise RuntimeError('unable to update app relation data for our app as if it was'
+                                   ' done by a remote unit - our unit {} is the leader'
+                                   ''.format(our_unit.name))
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
         for k, v in key_values.items():
             if v == '':
