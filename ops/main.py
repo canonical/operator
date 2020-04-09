@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -169,6 +170,23 @@ def main(charm_class):
     # TODO: For Windows, when symlinks are used, this is not a valid
     #       method of getting an event name (see LP: #1854505).
     juju_exec_path = Path(sys.argv[0])
+    has_dispatch = juju_exec_path.name == 'dispatch'
+    if has_dispatch:
+        # The executable was 'dispatch', which means the actual hook we want to
+        # run needs to be looked up in the JUJU_DISPATCH_PATH env var, where it
+        # should be a path relative to the charm directory (the directory that
+        # holds `dispatch`). If that path actually exists, we need to exec to
+        # it instead of continuing.
+        #
+        # We don't look at the existence of JUJU_DISPATCH_PATH because we don't
+        # unset it on exec'ing into the hook, and it could be a symlink back to
+        # ourselves.
+        dispatch_path = Path(os.environ['JUJU_DISPATCH_PATH'])
+        juju_exec_path = juju_exec_path.parent / dispatch_path
+        if juju_exec_path.exists():
+            argv = sys.argv[:]
+            argv[0] = str(juju_exec_path)
+            subprocess.run(argv, check=True)
     juju_event_name = juju_exec_path.name.replace('-', '_')
     if juju_exec_path.parent.name == 'actions':
         juju_event_name = '{}_action'.format(juju_event_name)
@@ -190,16 +208,17 @@ def main(charm_class):
     try:
         charm = charm_class(framework, None)
 
-        # When a charm is force-upgraded and a unit is in an error state Juju
-        # does not run upgrade-charm and instead runs the failed hook followed
-        # by config-changed. Given the nature of force-upgrading the hook setup
-        # code is not triggered on config-changed.
-        #
-        # 'start' event is included as Juju does not fire the install event for
-        # K8s charms (see LP: #1854635).
-        if (juju_event_name in ('install', 'start', 'upgrade_charm')
-                or juju_event_name.endswith('_storage_attached')):
-            _setup_event_links(charm_dir, charm)
+        if not has_dispatch:
+            # When a charm is force-upgraded and a unit is in an error state Juju
+            # does not run upgrade-charm and instead runs the failed hook followed
+            # by config-changed. Given the nature of force-upgrading the hook setup
+            # code is not triggered on config-changed.
+            #
+            # 'start' event is included as Juju does not fire the install event for
+            # K8s charms (see LP: #1854635).
+            if (juju_event_name in ('install', 'start', 'upgrade_charm')
+                    or juju_event_name.endswith('_storage_attached')):
+                _setup_event_links(charm_dir, charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant
         #       Juju changes are made.
