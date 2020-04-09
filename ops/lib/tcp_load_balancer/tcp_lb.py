@@ -14,28 +14,29 @@
 
 """Implements types for provides and requires sides of the 'tcp-load-balancer' relation.
 
-`TcpBackendManager`_ is the type that exposes the information about members that a TCP
-load-balancer should provide load-balancing for.
+`TCPBackendManager`_ is the type that exposes the information about members that a TCP
+load-balancer should provide load-balancing for::
 
-class MyLBCharm(ops.charm.CharmBase):
+    class MyLBCharm(ops.charm.CharmBase):
 
-   def __init__(self, *args):
-      super().__init__(*args)
-      self.tcp_backend_manager = TcpBackendManagers(self, 'tcp-lb')
-      self.framework.observe(self.tcp_backend_manager.on.pools_changed, self._on_tcp_pools_changed)
+       def __init__(self, *args):
+          super().__init__(*args)
+          self.tcp_backend_manager = TCPBackendManagers(self, 'tcp-lb')
+          self.framework.observe(self.tcp_backend_manager.on.pools_changed,
+                                 self._on_tcp_pools_changed)
 
-   def _on_tcp_pools_changed(self, event):
-       for pool in self.tcp_backend_manager.pools:
-           logger.debug(pool.listener.port)
-           logger.debug(pool.listener.name)
-           for member in pool.members:
-               logger.debug(member.port)
-               logger.debug(member.address)
-               # Access other fields...
+       def _on_tcp_pools_changed(self, event):
+           for pool in self.tcp_backend_manager.pools:
+               logger.debug(pool.listener.port)
+               logger.debug(pool.listener.name)
+               for member in pool.members:
+                   logger.debug(member.port)
+                   logger.debug(member.address)
+                   # Access other fields...
 
 
-`TcpLoadBalancer`_ is the type that exposes the information about members that a TCP
-load-balancer should provide load-balancing for.
+`TCPLoadBalancer`_ is the type that exposes the information about members that a TCP
+load-balancer should provide load-balancing for::
 
     class MyServiceCharm(ops.charm.CharmBase):
 
@@ -45,7 +46,7 @@ load-balancer should provide load-balancing for.
 
         def __init__(self, *args):
             super().__init__(*args)
-            self.tcp_lb = TcpLoadBalancer(self, 'tcp-lb', load_balancer_algorithm='round_robin')
+            self.tcp_lb = TCPLoadBalancer(self, 'tcp-lb', load_balancer_algorithm='round_robin')
             self.framework.observe(self.tcp_lb.on.load_balancer_available,
                                    self._on_load_balancer_available)
 
@@ -75,23 +76,23 @@ JSON_ENCODE_OPTIONS = dict(
 
 
 class PoolsChanged(EventBase):
-    """Event emitted by TcpBackendManagers.on.pools_changed.
+    """Event emitted by TCPBackendManagers.on.pools_changed.
 
     This event will be emitted if any of the existing or new members exposes new data over a
     relation for the load-balancer to re-assess its current state.
     """
 
 
-class TcpBackendManagerEvents(EventSetBase):
-    """Events emitted by the TcpBackendManager class."""
+class TCPBackendManagerEvents(EventSetBase):
+    """Events emitted by the TCPBackendManager class."""
 
     pools_changed = EventSource(PoolsChanged)
 
 
-class TcpBackendManager(Object):
+class TCPBackendManager(Object):
     """Handles TCP backend events and exposes pools of TCP backends."""
 
-    on = TcpBackendManagerEvents()
+    on = TCPBackendManagerEvents()
 
     _stored = StoredState()
 
@@ -155,19 +156,19 @@ class LoadBalancerAvailable(EventBase):
     """
 
 
-class TcpLoadBalancerEvents(EventSetBase):
-    """Events emitted by the TcpLoadBalancer class."""
+class TCPLoadBalancerEvents(EventSetBase):
+    """Events emitted by the TCPLoadBalancer class."""
 
     load_balancer_available = EventSource(LoadBalancerAvailable)
 
 
-class TcpLoadBalancer(Object):
+class TCPLoadBalancer(Object):
     """Represents a TCP load-balancer that distributes traffic across backends exposed to it.
 
     Backends would use this type to expose themselves to a single TCP load-balancer.
     """
 
-    on = TcpLoadBalancerEvents()
+    on = TCPLoadBalancerEvents()
     _stored = StoredState()
 
     def __init__(self, charm, relation_name, load_balancer_algorithm=None):
@@ -267,7 +268,7 @@ class HealthMonitor(InterfaceDataType):
         self.max_retries_down = max_retries_down
 
 
-class HttpHealthMonitor(HealthMonitor):
+class HTTPHealthMonitor(HealthMonitor):
     """HTTP health monitors provide parameters to perform health-checks over HTTP."""
 
     def __init__(self, http_method=None, url_path=None, expected_codes=None, *kwargs):

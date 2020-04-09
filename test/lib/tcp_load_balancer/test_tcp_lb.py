@@ -22,16 +22,16 @@ from ops.charm import CharmBase
 from ops.testing import Harness
 
 from ops.lib.tcp_load_balancer.tcp_lb import (
-    TcpBackendManager,
+    TCPBackendManager,
     Listener,
     Backend,
     HealthMonitor,
-    TcpLoadBalancer,
+    TCPLoadBalancer,
     JSON_ENCODE_OPTIONS,
 )
 
 
-class TestTcpBackendManager(unittest.TestCase):
+class TestTCPBackendManager(unittest.TestCase):
 
     def setUp(self):
         self.harness = Harness(CharmBase, meta='''
@@ -42,7 +42,7 @@ class TestTcpBackendManager(unittest.TestCase):
         ''')
 
         self.harness.begin()
-        self.tcp_backend_manager = TcpBackendManager(self.harness.charm, 'tcp-lb')
+        self.tcp_backend_manager = TCPBackendManager(self.harness.charm, 'tcp-lb')
 
     def test_pools(self):
         relation_id = self.harness.add_relation('tcp-lb', 'tcp-server')
@@ -95,7 +95,7 @@ class TestLoadBalancer(unittest.TestCase):
         ''')
 
         self.harness.begin()
-        self.tcp_lb = TcpLoadBalancer(self.harness.charm, 'tcp-lb', 'round_robin')
+        self.tcp_lb = TCPLoadBalancer(self.harness.charm, 'tcp-lb', 'round_robin')
 
     def test_expose_backend(self):
         relation_id = self.harness.add_relation('tcp-lb', 'tcp-server')
