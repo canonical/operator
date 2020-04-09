@@ -108,34 +108,38 @@ class TCPBackendManager(Object):
     @property
     def pools(self):
         if self._backend_pools is None:
-            self._backend_pools = []
-            for relation in self.model.relations[self._relation_name]:
-                if not relation.units:
-                    continue
-                app_data = relation.data[relation.app]
-
-                listener_data = app_data.get('listener')
-                if listener_data is None:
-                    logger.debug('No listener data found for remote app %s', relation.app.name)
-                    continue
-                listener = Listener(**json.loads(listener_data))
-                health_monitor_data = app_data.get('health_monitor')
-                if health_monitor_data is None:
-                    logger.debug('No health monitor data found for remote app %s',
-                                 relation.app.name)
-                    continue
-                health_monitor = HealthMonitor(**json.loads(health_monitor_data))
-
-                members = []
-                for unit in relation.units:
-                    backend_data = relation.data[unit].get('backend')
-                    if backend_data is None:
-                        logger.debug('No backend data found for remote unit %s', unit.name)
-                        continue
-                    backend = Backend(**json.loads(backend_data))
-                    members.append(backend)
-                self._backend_pools.append(BackendPool(listener, members, health_monitor))
+            self._backend_pools = self._compute_backend_pools()
         return self._backend_pools
+
+    def _compute_backend_pools(self):
+        pools = []
+        for relation in self.model.relations[self._relation_name]:
+            if not relation.units:
+                continue
+            app_data = relation.data[relation.app]
+
+            listener_data = app_data.get('listener')
+            if listener_data is None:
+                logger.debug('No listener data found for remote app %s', relation.app.name)
+                continue
+            listener = Listener(**json.loads(listener_data))
+            health_monitor_data = app_data.get('health_monitor')
+            if health_monitor_data is None:
+                logger.debug('No health monitor data found for remote app %s',
+                             relation.app.name)
+                continue
+            health_monitor = HealthMonitor(**json.loads(health_monitor_data))
+
+            members = []
+            for unit in relation.units:
+                backend_data = relation.data[unit].get('backend')
+                if backend_data is None:
+                    logger.debug('No backend data found for remote unit %s', unit.name)
+                    continue
+                backend = Backend(**json.loads(backend_data))
+                members.append(backend)
+            pools.append(BackendPool(listener, members, health_monitor))
+        return pools
 
 
 class BackendPool:
