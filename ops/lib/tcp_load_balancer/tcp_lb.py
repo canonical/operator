@@ -70,6 +70,7 @@ import logging
 import json
 import datetime
 
+from enum import Enum
 from types import SimpleNamespace
 
 from ops.framework import Object, StoredState, EventBase, EventSetBase, EventSource
@@ -82,6 +83,18 @@ JSON_ENCODE_OPTIONS = dict(
     indent=None,
     separators=(',', ':'),
 )
+
+
+class BalancingAlgorithm(Enum):
+    """Interface-specific load-balancing algorithms.
+
+    The algorithms listed here are independent of a particular load-balancer
+    implementation so a TCP load balancer implementing this interface needs to
+    validate that it can support it.
+    """
+    ROUND_ROBIN = 'round_robin'
+    LEAST_CONNECTIONS = 'least_connections'
+    SOURCE_IP = 'source_ip'
 
 
 class PoolsChanged(EventBase):
@@ -231,7 +244,7 @@ class Listener(SimpleNamespace):
     def __init__(self, name, port, balancing_algorithm, **kwargs):
         self.name = name
         self.port = port
-        self.balancing_algorithm = balancing_algorithm
+        self.balancing_algorithm = BalancingAlgorithm(balancing_algorithm)
 
 
 class Backend(SimpleNamespace):
@@ -286,5 +299,7 @@ class InterfaceDataEncoder(json.JSONEncoder):
             return obj.total_seconds()
         elif isinstance(obj, SimpleNamespace):
             return obj.__dict__
+        elif isinstance(obj, BalancingAlgorithm):
+            return obj.value
         else:
             return super().default(obj)

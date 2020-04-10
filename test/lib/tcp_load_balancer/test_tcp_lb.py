@@ -28,6 +28,7 @@ from ops.lib.tcp_load_balancer.tcp_lb import (
     HealthMonitor,
     TCPLoadBalancer,
     JSON_ENCODE_OPTIONS,
+    BalancingAlgorithm,
 )
 
 
@@ -80,7 +81,8 @@ class TestTCPBackendManager(unittest.TestCase):
         test_pool = pools[0]
         self.assertEqual(test_pool.listener.port, 80)
         self.assertEqual(test_pool.listener.name, 'tcp-server')
-        self.assertEqual(test_pool.listener.balancing_algorithm, 'least_connections')
+        self.assertEqual(test_pool.listener.balancing_algorithm,
+                         BalancingAlgorithm.LEAST_CONNECTIONS)
         self.assertEqual(test_pool.health_monitor.timeout, datetime.timedelta(seconds=10))
 
     def test_empty_pool(self):
@@ -140,7 +142,7 @@ class TestLoadBalancer(unittest.TestCase):
         self.harness.update_relation_data(
             relation_id, 'tcp-server/0', {'ingress-address': '192.0.2.1'})
 
-        listener = Listener('tcp-server', 80, 'round_robin')
+        listener = Listener('tcp-server', 80, BalancingAlgorithm.ROUND_ROBIN)
         backend = Backend(name='tcp-server-0.example', port=80, address='192.0.2.1')
         health_monitor = HealthMonitor(timeout=datetime.timedelta(seconds=10))
 
