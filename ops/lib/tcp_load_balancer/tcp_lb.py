@@ -226,7 +226,7 @@ class TCPLoadBalancer(Object):
 
 
 class Listener(SimpleNamespace):
-    """Listeners specifies load-balancer frontend and backend configuration."""
+    """Listeners specify load-balancer frontend and backend configuration."""
 
     def __init__(self, name, port, balancing_algorithm, **kwargs):
         self.name = name
