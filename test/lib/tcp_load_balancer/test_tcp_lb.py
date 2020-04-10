@@ -65,6 +65,7 @@ class TestTCPBackendManager(unittest.TestCase):
                     'name': 'tcp-server-1.example',
                     'port': 80,
                     'address': '192.0.2.3',
+                    'test_extra_arg': 'extra_value'
                 }, **JSON_ENCODE_OPTIONS)
             })
         self.harness.update_relation_data(relation_id, 'tcp-server', {
@@ -72,18 +73,34 @@ class TestTCPBackendManager(unittest.TestCase):
                 'name': 'tcp-server',
                 'port': 80,
                 'balancing_algorithm': 'least_connections',
+                'test_extra_arg': 'extra_value'
             }, **JSON_ENCODE_OPTIONS),
             'health_monitor': json.dumps({
-                'timeout': 10.0
+                'timeout': 10.0,
+                'test_extra_arg': 'extra_value',
             }, **JSON_ENCODE_OPTIONS),
         })
         pools = self.tcp_backend_manager.pools
         test_pool = pools[0]
+        self.assertEqual(len(test_pool.members), 2)
+
+        test_member = test_pool.members[0]
+        self.assertEqual(test_member.name, 'tcp-server-0.example')
+        self.assertEqual(test_member.address, '192.0.2.2')
+        self.assertEqual(test_member.port, 80)
+        with self.assertRaises(AttributeError):
+            test_member.test_extra_arg
+
         self.assertEqual(test_pool.listener.port, 80)
         self.assertEqual(test_pool.listener.name, 'tcp-server')
         self.assertEqual(test_pool.listener.balancing_algorithm,
                          BalancingAlgorithm.LEAST_CONNECTIONS)
+        with self.assertRaises(AttributeError):
+            test_pool.listener.test_extra_arg
+
         self.assertEqual(test_pool.health_monitor.timeout, datetime.timedelta(seconds=10))
+        with self.assertRaises(AttributeError):
+            test_pool.health_monitor.test_extra_arg
 
     def test_empty_pool(self):
         relation_id = self.harness.add_relation('tcp-lb', 'tcp-server')
