@@ -143,7 +143,12 @@ class TCPBackendManager(Object):
                     continue
                 backend = Backend(**json.loads(backend_data))
                 members.append(backend)
-            pools.append(BackendPool(listener, members, health_monitor))
+            # Add a pool only if there are members in it.
+            if members:
+                pools.append(BackendPool(listener, members, health_monitor))
+            else:
+                logger.debug('No backend data for listener {} exposed yet by any backend unit -'
+                             ' no pool will be added.'.format(listener.name))
         return pools
 
 

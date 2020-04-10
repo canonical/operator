@@ -82,6 +82,44 @@ class TestTCPBackendManager(unittest.TestCase):
         self.assertEqual(test_pool.listener.name, 'tcp-server')
         self.assertEqual(test_pool.health_monitor.timeout, datetime.timedelta(seconds=10))
 
+    def test_empty_pool(self):
+        relation_id = self.harness.add_relation('tcp-lb', 'tcp-server')
+        self.harness.update_relation_data(
+            relation_id, 'haproxy/0', {'ingress-address': '192.0.2.1'})
+
+        self.harness.update_relation_data(relation_id, 'tcp-server', {
+            'listener': json.dumps({
+                'name': 'tcp-server',
+                'port': 80,
+            }, **JSON_ENCODE_OPTIONS),
+            'health_monitor': json.dumps({
+                'timeout': 10.0
+            }, **JSON_ENCODE_OPTIONS),
+        })
+        self.assertEqual(len(self.tcp_backend_manager.pools), 0)
+
+    def test_empty_pool_no_backend_data(self):
+        relation_id = self.harness.add_relation('tcp-lb', 'tcp-server')
+        self.harness.update_relation_data(
+            relation_id, 'haproxy/0', {'ingress-address': '192.0.2.1'})
+
+        self.harness.update_relation_data(relation_id, 'tcp-server', {
+            'listener': json.dumps({
+                'name': 'tcp-server',
+                'port': 80,
+            }, **JSON_ENCODE_OPTIONS),
+            'health_monitor': json.dumps({
+                'timeout': 10.0
+            }, **JSON_ENCODE_OPTIONS),
+        })
+        # Add a unit without backend data - this should not result in a presence
+        # of a pool because there is no useful data for any units in it yet.
+        self.harness.add_relation_unit(
+            relation_id, 'tcp-server/0', {
+                'ingress-address': '192.0.2.2',
+            })
+        self.assertEqual(len(self.tcp_backend_manager.pools), 0)
+
 
 class TestLoadBalancer(unittest.TestCase):
 
