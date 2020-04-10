@@ -70,16 +70,17 @@ class TestTCPBackendManager(unittest.TestCase):
             'listener': json.dumps({
                 'name': 'tcp-server',
                 'port': 80,
+                'balancing_algorithm': 'least_connections',
             }, **JSON_ENCODE_OPTIONS),
             'health_monitor': json.dumps({
                 'timeout': 10.0
             }, **JSON_ENCODE_OPTIONS),
         })
-
         pools = self.tcp_backend_manager.pools
         test_pool = pools[0]
         self.assertEqual(test_pool.listener.port, 80)
         self.assertEqual(test_pool.listener.name, 'tcp-server')
+        self.assertEqual(test_pool.listener.balancing_algorithm, 'least_connections')
         self.assertEqual(test_pool.health_monitor.timeout, datetime.timedelta(seconds=10))
 
     def test_empty_pool(self):
@@ -107,6 +108,7 @@ class TestTCPBackendManager(unittest.TestCase):
             'listener': json.dumps({
                 'name': 'tcp-server',
                 'port': 80,
+                'balancing_algorithm': 'round_robin',
             }, **JSON_ENCODE_OPTIONS),
             'health_monitor': json.dumps({
                 'timeout': 10.0
@@ -131,14 +133,14 @@ class TestLoadBalancer(unittest.TestCase):
                 interface: tcp-load-balancer
         ''')
         self.harness.begin()
-        self.tcp_lb = TCPLoadBalancer(self.harness.charm, 'tcp-lb', 'round_robin')
+        self.tcp_lb = TCPLoadBalancer(self.harness.charm, 'tcp-lb')
 
     def test_expose_backend(self):
         relation_id = self.harness.add_relation('tcp-lb', 'tcp-server')
         self.harness.update_relation_data(
             relation_id, 'tcp-server/0', {'ingress-address': '192.0.2.1'})
 
-        listener = Listener('tcp-server', 80)
+        listener = Listener('tcp-server', 80, 'round_robin')
         backend = Backend(name='tcp-server-0.example', port=80, address='192.0.2.1')
         health_monitor = HealthMonitor(timeout=datetime.timedelta(seconds=10))
 
@@ -174,6 +176,7 @@ class TestLoadBalancer(unittest.TestCase):
                          {
                              'name': 'tcp-server',
                              'port': 80,
+                             'balancing_algorithm': 'round_robin'
                          })
         self.assertEqual(json.loads(rel.data[self.harness.charm.app]['health_monitor']),
                          {
@@ -182,8 +185,6 @@ class TestLoadBalancer(unittest.TestCase):
                              'max_retries_down': None,
                              'timeout': 10.0
                          })
-        self.assertEqual(rel.data[self.harness.charm.app]['load_balancer_algorithm'],
-                         'round_robin')
 
 
 if __name__ == "__main__":

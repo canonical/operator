@@ -46,12 +46,16 @@ load-balancer should provide load-balancing for::
 
         def __init__(self, *args):
             super().__init__(*args)
-            self.tcp_lb = TCPLoadBalancer(self, 'tcp-lb', load_balancer_algorithm='round_robin')
+            self.tcp_lb = TCPLoadBalancer(self, 'tcp-lb')
             self.framework.observe(self.tcp_lb.on.load_balancer_available,
                                    self._on_load_balancer_available)
 
         def _on_load_balancer_available(self, event):
-            listener = Listener(name=self.app.name.replace('/', '_'), port=self.LISTENER_PORT)
+            listener = Listener(
+                name=self.app.name.replace('/', '_'),
+                port=self.LISTENER_PORT,
+                balancing_algorithm='round_robin',
+            )
             fqdn = socket.getfqdn()
             backend = Backend(fqdn, self.SERVICE_PORT, monitor_port=self.MONITOR_PORT)
             health_monitor = HTTPHealthMonitor(
@@ -185,11 +189,9 @@ class TCPLoadBalancer(Object):
     on = TCPLoadBalancerEvents()
     _stored = StoredState()
 
-    def __init__(self, charm, relation_name, load_balancer_algorithm=None):
+    def __init__(self, charm, relation_name):
         super().__init__(charm, relation_name)
         self._relation_name = relation_name
-        self._load_balancer_algorithm = load_balancer_algorithm
-
         self.framework.observe(charm.on[relation_name].relation_joined, self._on_relation_joined)
 
     def _on_relation_joined(self, event):
@@ -200,7 +202,7 @@ class TCPLoadBalancer(Object):
 
         :param backend: a backend to expose to a TCP load-balancer.
         :type backend: :class: `.Backend`
-        :param listener: a listener instance to provide frontend configuration parameters.
+        :param listener: a listener to provide frontend and backend configuration parameters.
         :type listener: :class: `.Listener`
         :param health_monitor: a health monitor instance to configure health-checking
             for the backend.
@@ -221,15 +223,15 @@ class TCPLoadBalancer(Object):
             # A monitor for a pool of members.
             our_app_data['health_monitor'] = json.dumps(health_monitor, cls=InterfaceDataEncoder,
                                                         **JSON_ENCODE_OPTIONS)
-            our_app_data['load_balancer_algorithm'] = self._load_balancer_algorithm
 
 
 class Listener(SimpleNamespace):
-    """Listeners determine how load-balancer front-ends are configured."""
+    """Listeners specifies load-balancer frontend and backend configuration."""
 
-    def __init__(self, name, port, **kwargs):
+    def __init__(self, name, port, balancing_algorithm, **kwargs):
         self.name = name
         self.port = port
+        self.balancing_algorithm = balancing_algorithm
 
 
 class Backend(SimpleNamespace):
