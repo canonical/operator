@@ -16,23 +16,24 @@
 """Implements the requires side handling of the 'tls-certificates' interface.
 
 `CAClient`_ is the type providing integration with a certificate authority charm providing the
-tls-certificates interface.
+tls-certificates interface::
 
-     from pathlib import Path
-     from ops.lib.tls_certificates.ca_client import CAClient
+    from pathlib import Path
+    from ops.charm import CharmBase
+    from ops.lib.tls_certificates.ca_client import CAClient
 
-     class MyCharm(ops.charm.CharmBase):
+    class MyCharm(CharmBase):
 
         TLS_CONFIG_PATH = Path("/tls/config/path/for/your/app")
         TLS_KEY_PATH = TLS_CONFIG_PATH / 'key.pem'
         TLS_CERT_PATH = TLS_CONFIG_PATH / 'cert.pem'
         TLS_CA_CERT_PATH = TLS_CONFIG_PATH / 'ca.pem'
 
-        def __init__(self, framework, *args):
-           super().__init__(framework, *args)
-           self.ca_client = CAClient(self, 'ca-client')
-           self.framework.observe(self.ca_client.on.tls_config_ready, self._on_tls_config_ready)
-           self.framework.observe(self.ca_client.on.ca_available, self._on_ca_available)
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.ca_client = CAClient(self, 'ca-client')
+            self.framework.observe(self.ca_client.on.tls_config_ready, self._on_tls_config_ready)
+            self.framework.observe(self.ca_client.on.ca_available, self._on_ca_available)
 
         def _on_ca_available(self, event):
             # Obtain a common name and a list of subject alternative names to place into
