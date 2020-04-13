@@ -93,10 +93,6 @@ class TestLogging(unittest.TestCase):
             ops.log.setup_root_logging(self.backend, debug=True)
             logger = logging.getLogger()
             logger.debug('debug message')
-            self.assertEqual(self.backend.calls(), [])
-            self.assertRegex(
-                buffer.getvalue(),
-                r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n")
             logger.info('info message')
             logger.warning('warning message')
             logger.critical('critical message')
