@@ -65,7 +65,6 @@ from cryptography.x509 import load_pem_x509_certificate
 
 from ops.framework import Object, EventBase, EventSetBase, EventSource, StoredState
 from ops.model import ModelError, BlockedStatus, WaitingStatus
-
 logger = logging.getLogger(__name__)
 
 
@@ -87,7 +86,6 @@ class CAClientError(TLSCertificatesError):
 
 
 class CAAvailable(EventBase):
-
     """Event emitted by CAClient.on.ca_available.
 
     This event will be emitted by CAClient when a new unit of a CA charm
@@ -97,11 +95,9 @@ class CAAvailable(EventBase):
     The expected response from a handler of that event is to request a
     certificate from the CA via the API provided by CAClient.
     """
-    pass
 
 
 class TLSConfigReady(EventBase):
-
     """Event emitted by CAClient.on.tls_config_ready.
 
     This event will be emitted by CAClient when a remote CA unit.
@@ -109,11 +105,9 @@ class TLSConfigReady(EventBase):
     The expected response from a handler of that event is to request a
     certificate from the CA via the API provided by CAClient.
     """
-    pass
 
 
 class CAClientEvents(EventSetBase):
-
     """Events emitted by the CAClient class."""
 
     ca_available = EventSource(CAAvailable)
@@ -121,7 +115,6 @@ class CAClientEvents(EventSetBase):
 
 
 class CAClient(Object):
-
     """Provides a client type that handles the interaction with CA charms.
 
     It mainly provides:
@@ -130,7 +123,6 @@ class CAClient(Object):
     * a method to provide details (CN, SANs) to the CA for generating certificates;
     * an indication that a certificate and a key have been generated;
     * a way to retrieve the generated certificate and key as well as a CA certificate.
-
     """
 
     on = CAClientEvents()
