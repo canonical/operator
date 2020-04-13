@@ -207,8 +207,10 @@ class CAClient(Object):
         SANS has changed during the lifetime of a charm and a new certificate needs
         to be generated.
 
-        common_name -- a new common name to use.
-        sans -- an updated list of Subject Alternative Names to use.
+        :param common_name: a new common name to use in a certificate.
+        :type common_name: str
+        :param sans: a list of Subject Alternative Names to use in a certificate.
+        :type common_name: list(str)
         """
         rel = self.framework.model.get_relation(self._relation_name)
         if rel is None:
