@@ -39,6 +39,7 @@ from ops.framework import (
     SQLiteStorage,
     StoredList,
     StoredState,
+    StoredStateChanged,
     StoredStateData,
 )
 
@@ -1374,6 +1375,110 @@ class TestStoredState(unittest.TestCase):
         self.assertEqual(parent._stored.bar, 4)
         # TODO: jam 2020-01-30 is there a clean way to tell that
         #       parent._stored._data.dirty is False?
+
+
+class ObjectWithStored(Object):
+    stored = StoredState()
+
+
+class StateChangedListener(Object):
+    def __init__(self, parent, key):
+        super().__init__(parent, key)
+        self._changes = []
+        parent.framework.observe(parent.stored.on.changed, self._on_changed)
+
+    def _on_changed(self, event):
+        if not isinstance(event, StoredStateChanged):
+            raise RuntimeError("got an unknown event type: {}".format(type(event)))
+        self._changes.append(event.changed_attribute)
+
+    def get_changes(self, reset=True):
+        changes = self._changes[:]
+        if reset:
+            self._changes = []
+        return changes
+
+
+class TestStoredStateChanges(unittest.TestCase):
+
+    def setUp(self):
+        self.framework = Framework(":memory:", "not-a-real-path", None, None)
+        self.addCleanup(self.framework.close)
+        self.base = ObjectWithStored(self.framework, 'base')
+        self.listener = StateChangedListener(self.base, 'listener')
+
+    def test_set_default_no_changes(self):
+        # set_default doesn't trigger a changed
+        self.base.stored.set_default(foo='bar')
+        self.assertEqual([], self.listener.get_changes())
+        # Even if it isn't the first set_default call
+        self.base.stored.set_default(baz=1)
+        self.assertEqual([], self.listener.get_changes())
+        # And certainly not if it doesn't change the data
+        self.base.stored.set_default(foo='bing')
+        self.assertEqual([], self.listener.get_changes())
+        self.assertEqual('bar', self.base.stored.foo)
+
+    def test_attribute_set(self):
+        self.base.stored.foo = 1
+        self.assertEqual(['foo'], self.listener.get_changes())
+        self.base.stored.bar = 'foo'
+        self.assertEqual(['bar'], self.listener.get_changes())
+
+    def test_dict_updated(self):
+        self.base.stored.set_default(foo={})
+        self.assertEqual([], self.listener.get_changes())
+        self.base.stored.foo['a'] = 'b'
+        self.assertEqual(['foo'], self.listener.get_changes())
+
+    def test_dict_removed(self):
+        self.base.stored.set_default(foo={'a': 'b'})
+        del self.base.stored.foo['a']
+        self.assertEqual(['foo'], self.listener.get_changes())
+        self.assertEqual({}, dict(self.base.stored.foo))
+
+    def test_list_appended(self):
+        self.base.stored.set_default(lst=[])
+        self.base.stored.lst.append(1)
+        self.assertEqual(['lst'], self.listener.get_changes())
+        self.assertEqual([1], list(self.base.stored.lst))
+
+    def test_list_updated(self):
+        self.base.stored.set_default(lst=[1])
+        self.base.stored.lst[0] = 2
+        self.assertEqual(['lst'], self.listener.get_changes())
+        self.assertEqual([2], list(self.base.stored.lst))
+
+    def test_list_inserted(self):
+        self.base.stored.set_default(lst=[1])
+        self.base.stored.lst.insert(0, 2)
+        self.assertEqual(['lst'], self.listener.get_changes())
+        self.assertEqual([2, 1], list(self.base.stored.lst))
+
+    def test_list_removed(self):
+        self.base.stored.set_default(lst=[1])
+        del self.base.stored.lst[0]
+        self.assertEqual(['lst'], self.listener.get_changes())
+        self.assertEqual([], list(self.base.stored.lst))
+
+    def test_set_added(self):
+        self.base.stored.set_default(bar=set())
+        self.base.stored.bar.add(123)
+        self.assertEqual(['bar'], self.listener.get_changes())
+        self.assertEqual({123}, set(self.base.stored.bar))
+
+    def test_set_removed(self):
+        self.base.stored.set_default(bar={12})
+        self.base.stored.bar.discard(12)
+        self.assertEqual(['bar'], self.listener.get_changes())
+        self.assertEqual(set(), set(self.base.stored.bar))
+
+    def test_nested_updated(self):
+        # test a set nested in a list nested in a dict
+        orig = {'foo': [1, 2, set()]}
+        self.base.stored.set_default(attr=orig)
+        self.base.stored.attr['foo'][2].add(1234)
+        self.assertEqual(['attr'], self.listener.get_changes())
 
 
 @patch('sys.stderr', new_callable=io.StringIO)

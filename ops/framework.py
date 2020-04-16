@@ -794,7 +794,34 @@ class Framework(Object):
 
 
 class StoredStateChanged(EventBase):
-    pass
+    """Represents an update to an attribute of StoredState.
+
+    Emitted whenever a StoredState is updated, and indicates what attribute was changed by name.
+    Note that if an attribute is a complex type (like a dict), updating an item in the dict will
+    only tell you that the dict was changed, not what key in the dict.
+
+    Example::
+
+        class MyCharm(CharmBase):
+            _stored = StoredState()
+
+            def __init__(self, framework, key):
+                super().__init__(framework, key)
+                self.framework.observe(self._stored.on.changed, self._on_stored_changed)
+
+            def _on_stored_changed(self, event):
+                print(event.changed_attribute) # What attribute of self._stored has changed?
+    """
+
+    def __init__(self, handle, attribute=None):
+        super().__init__(handle)
+        self.changed_attribute = attribute
+
+    def snapshot(self):
+        return {'changed_attribute': self.changed_attribute}
+
+    def restore(self, snapshot):
+        self.changed_attribute = snapshot.get('changed_attribute')
 
 
 class StoredStateEvents(EventSetBase):
@@ -809,6 +836,10 @@ class StoredStateData(Object):
         super().__init__(parent, attr_name)
         self._cache = {}
         self.dirty = False
+
+    def changed(self, key):
+        self.dirty = True
+        self.on.changed.emit(key)
 
     def __getitem__(self, key):
         return self._cache.get(key)
@@ -856,7 +887,7 @@ class BoundStoredState:
             return self._data.on
         if key not in self._data:
             raise AttributeError("attribute '{}' is not stored".format(key))
-        return _wrap_stored(self._data, self._data[key])
+        return _wrap_stored(self._data, self._data[key], key)
 
     def __setattr__(self, key, value):
         if key == "on":
@@ -870,7 +901,7 @@ class BoundStoredState:
                     key, type(value).__name__))
 
         self._data[key] = _unwrap_stored(self._data, value)
-        self.on.changed.emit()
+        self._data.changed(key)
 
     def set_default(self, **kwargs):
         """"Set the value of any given key if it has not already been set"""
@@ -954,14 +985,14 @@ class StoredState:
                 self.__class__.__name__, parent_type.__name__))
 
 
-def _wrap_stored(parent_data, value):
+def _wrap_stored(parent_data, value, base_attr):
     t = type(value)
     if t is dict:
-        return StoredDict(parent_data, value)
+        return StoredDict(parent_data, value, base_attr)
     if t is list:
-        return StoredList(parent_data, value)
+        return StoredList(parent_data, value, base_attr)
     if t is set:
-        return StoredSet(parent_data, value)
+        return StoredSet(parent_data, value, base_attr)
     return value
 
 
@@ -974,20 +1005,21 @@ def _unwrap_stored(parent_data, value):
 
 class StoredDict(collections.abc.MutableMapping):
 
-    def __init__(self, stored_data, under):
+    def __init__(self, stored_data, under, base_attr):
         self._stored_data = stored_data
         self._under = under
+        self._base_attr = base_attr
 
     def __getitem__(self, key):
-        return _wrap_stored(self._stored_data, self._under[key])
+        return _wrap_stored(self._stored_data, self._under[key], self._base_attr)
 
     def __setitem__(self, key, value):
         self._under[key] = _unwrap_stored(self._stored_data, value)
-        self._stored_data.dirty = True
+        self._stored_data.changed(self._base_attr)
 
     def __delitem__(self, key):
         del self._under[key]
-        self._stored_data.dirty = True
+        self._stored_data.changed(self._base_attr)
 
     def __iter__(self):
         return self._under.__iter__()
@@ -1006,31 +1038,32 @@ class StoredDict(collections.abc.MutableMapping):
 
 class StoredList(collections.abc.MutableSequence):
 
-    def __init__(self, stored_data, under):
+    def __init__(self, stored_data, under, base_attr):
         self._stored_data = stored_data
         self._under = under
+        self._base_attr = base_attr
 
     def __getitem__(self, index):
-        return _wrap_stored(self._stored_data, self._under[index])
+        return _wrap_stored(self._stored_data, self._under[index], self._base_attr)
 
     def __setitem__(self, index, value):
         self._under[index] = _unwrap_stored(self._stored_data, value)
-        self._stored_data.dirty = True
+        self._stored_data.changed(self._base_attr)
 
     def __delitem__(self, index):
         del self._under[index]
-        self._stored_data.dirty = True
+        self._stored_data.changed(self._base_attr)
 
     def __len__(self):
         return len(self._under)
 
     def insert(self, index, value):
         self._under.insert(index, value)
-        self._stored_data.dirty = True
+        self._stored_data.changed(self._base_attr)
 
     def append(self, value):
         self._under.append(value)
-        self._stored_data.dirty = True
+        self._stored_data.changed(self._base_attr)
 
     def __eq__(self, other):
         if isinstance(other, StoredList):
@@ -1075,17 +1108,18 @@ class StoredList(collections.abc.MutableSequence):
 
 class StoredSet(collections.abc.MutableSet):
 
-    def __init__(self, stored_data, under):
+    def __init__(self, stored_data, under, base_attr):
         self._stored_data = stored_data
         self._under = under
+        self._base_attr = base_attr
 
     def add(self, key):
         self._under.add(key)
-        self._stored_data.dirty = True
+        self._stored_data.changed(self._base_attr)
 
     def discard(self, key):
         self._under.discard(key)
-        self._stored_data.dirty = True
+        self._stored_data.changed(self._base_attr)
 
     def __contains__(self, key):
         return key in self._under
