@@ -61,14 +61,16 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
-        remote_unit = 'postgresql/0'
         rel_id = harness.add_relation('db', 'postgresql')
         self.assertIsInstance(rel_id, int)
-        harness.add_relation_unit(rel_id, remote_unit, remote_unit_data={'foo': 'bar'})
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
         backend = harness._backend
         self.assertEqual([rel_id], backend.relation_ids('db'))
-        self.assertEqual([remote_unit], backend.relation_list(rel_id))
-        self.assertEqual({'foo': 'bar'}, backend.relation_get(rel_id, remote_unit, is_app=False))
+        self.assertEqual(['postgresql/0'], backend.relation_list(rel_id))
+        self.assertEqual(
+            {'foo': 'bar'},
+            backend.relation_get(rel_id, 'postgresql/0', is_app=False))
 
     def test_add_relation_with_remote_app_data(self):
         # language=YAML
@@ -123,16 +125,17 @@ class TestHarness(unittest.TestCase):
 
         # A remote unit can still update our app relation data bag since our unit is not a leader.
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
-        # But indirectly updating our unit's data bag is not possible anymore.
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
+        # And we get an event
+        self.assertEqual([], harness.charm.observed_events)
+        # We can also update our own relation data, even if it is a bit 'cheaty'
+        harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
+        # But no event happens
 
-        # Updating our data app relation data bag and our unit data bag is not possible anymore.
+        # Updating our data app relation data bag and our unit data bag does not generate events.
         harness.set_leader(True)
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
+        harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
+        harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
+        self.assertEqual([], harness.charm.observed_events)
 
     def test_add_peer_relation_with_initial_data_leader(self):
 
@@ -173,18 +176,16 @@ class TestHarness(unittest.TestCase):
         # Make sure no relation-changed events are emitted for our own data bags.
         self.assertEqual([], harness.charm.observed_events)
 
-        # Updating our data app relation data bag and our unit data bag is not possible anymore.
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
+        # Updating our app relation data bag and our unit data bag does not trigger events
+        harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
+        harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
         self.assertEqual([], harness.charm.observed_events)
 
         # If our unit becomes a minion, updating app relation data indirectly becomes possible
         # and our charm gets notifications.
         harness.set_leader(False)
-        harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
-        self.assertEqual({'k': 'v2'}, backend.relation_get(rel_id, 'test-app', is_app=True))
+        harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
+        self.assertEqual({'k': 'v3'}, backend.relation_get(rel_id, 'test-app', is_app=True))
         self.assertTrue(len(harness.charm.observed_events), 1)
         self.assertIsInstance(harness.charm.observed_events[0], RelationEvent)
 
@@ -249,7 +250,8 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         viewer = RelationChangedViewer(harness.charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
-        harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'value'})
         self.assertEqual(viewer.changes, [{'initial': 'data'},
@@ -268,10 +270,10 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         rel = harness.charm.model.get_relation('db')
         rel.data[harness.charm.model.unit]['key'] = 'value'
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'my-charm/0', {'new': 'other'})
+        # there should be no event for updating our own data
+        harness.update_relation_data(rel_id, 'my-charm/0', {'new': 'other'})
         # Make sure our unit data has not actually changed after an exception got raised.
-        self.assertEqual({'key': 'value'}, rel.data[harness.charm.model.unit])
+        self.assertEqual({'key': 'value', 'new': 'other'}, rel.data[harness.charm.model.unit])
 
         rel.data[harness.charm.model.unit]['new'] = 'value'
         # Our unit data bag got updated.
@@ -294,25 +296,25 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db')
         rel.data[harness.charm.model.unit]['key'] = 'value'
         rel = harness.charm.model.get_relation('db')
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'postgresql/0', {'k1': 'v1'})
-        # Make sure our unit data has not actually changed after an exception got raised.
-        self.assertEqual({'key': 'value'}, rel.data[harness.charm.model.unit])
+        harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v1'})
+        self.assertEqual({'key': 'v1'}, rel.data[harness.charm.model.unit])
+        # Make sure there was no event
+        self.assertEqual([], helper.changes)
 
-        rel.data[harness.charm.model.unit]['key'] = 'v1'
+        rel.data[harness.charm.model.unit]['key'] = 'v2'
         # Our unit data bag got updated.
-        self.assertEqual({'key': 'v1'}, dict(rel.data[harness.charm.model.unit]))
+        self.assertEqual({'key': 'v2'}, dict(rel.data[harness.charm.model.unit]))
         # But there were no changed events registered by our unit.
         self.assertEqual([], helper.changes)
 
         # Same for when our unit is a leader.
         harness.set_leader(is_leader=True)
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v2'})
-        self.assertEqual({'key': 'v1'}, dict(rel.data[harness.charm.model.unit]))
+        harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v3'})
+        self.assertEqual({'key': 'v3'}, dict(rel.data[harness.charm.model.unit]))
+        self.assertEqual([], helper.changes)
 
-        rel.data[harness.charm.model.unit]['key'] = 'v2'
-        self.assertEqual(rel.data[harness.charm.model.unit]['key'], 'v2')
+        rel.data[harness.charm.model.unit]['key'] = 'v4'
+        self.assertEqual(rel.data[harness.charm.model.unit]['key'], 'v4')
         self.assertEqual([], helper.changes)
 
     def test_update_peer_relation_app_data(self):
@@ -329,14 +331,13 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         rel = harness.charm.model.get_relation('db')
         rel.data[harness.charm.app]['key'] = 'value'
-        with self.assertRaises(RuntimeError):
-            harness.update_relation_data(rel_id, 'postgresql', {'k1': 'v1'})
-        # Also make sure that app data has not been actually updated if RuntimeError got raised.
-        self.assertEqual({'key': 'value'}, rel.data[harness.charm.app])
+        harness.update_relation_data(rel_id, 'postgresql', {'key': 'v1'})
+        self.assertEqual({'key': 'v1'}, rel.data[harness.charm.app])
+        self.assertEqual([], helper.changes)
 
-        rel.data[harness.charm.app]['k1'] = 'v1'
+        rel.data[harness.charm.app]['key'] = 'v2'
         # Our unit data bag got updated.
-        self.assertEqual(rel.data[harness.charm.model.app]['k1'], 'v1')
+        self.assertEqual(rel.data[harness.charm.model.app]['key'], 'v2')
         # But there were no changed events registered by our unit.
         self.assertEqual([], helper.changes)
 
@@ -360,6 +361,7 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         # TODO: remove this as soon as https://github.com/canonical/operator/issues/175 is fixed.
         harness.add_relation_unit(rel_id, 'postgresql/0')
+        self.assertEqual(helper.changes, [])
 
         harness.update_relation_data(rel_id, 'my-charm', {'new': 'value'})
         rel = harness.charm.model.get_relation('db')
@@ -368,7 +370,7 @@ class TestHarness(unittest.TestCase):
         # Our app data bag got updated.
         self.assertEqual(rel.data[harness.charm.model.app]['new'], 'value')
         # But there were no changed events registered by our unit.
-        self.assertEqual(helper.changes, [(0, 'postgresql/0')])
+        self.assertEqual(helper.changes, [])
 
     def test_update_relation_remove_data(self):
         # language=YAML
@@ -381,7 +383,8 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         viewer = RelationChangedViewer(harness.charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
-        harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'initial': 'data'})
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': ''})
         self.assertEqual(viewer.changes, [{'initial': 'data'}, {}])
 

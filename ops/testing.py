@@ -174,7 +174,7 @@ class Harness:
         #       remote_app_data isn't empty.
         return rel_id
 
-    def add_relation_unit(self, relation_id, remote_unit_name, remote_unit_data=None):
+    def add_relation_unit(self, relation_id, remote_unit_name):
         """Add a new unit to a relation.
 
         Example::
@@ -188,15 +188,10 @@ class Harness:
         :type relation_id: int
         :param remote_unit_name: A string representing the remote unit that is being added.
         :type remote_unit_name: str
-        :param remote_unit_data: Optional data bag containing data that will be seeded in
-            relation data before relation_changed is triggered.
-        :type remote_unit_data: dict
         :return: None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        if remote_unit_data is None:
-            remote_unit_data = {}
-        self._backend._relation_data[relation_id][remote_unit_name] = remote_unit_data
+        self._backend._relation_data[relation_id][remote_unit_name] = {}
         relation_name = self._backend._relation_names[relation_id]
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
@@ -208,11 +203,6 @@ class Harness:
         if self._charm is None or not self._hooks_enabled:
             return
         self._charm.on[relation_name].relation_joined.emit(
-            relation, remote_unit.app, remote_unit)
-        # TODO: jam 2020-03-05 Do we only emit relation_changed if remote_unit_data isn't
-        #       empty? juju itself always triggers relation_changed immediately after
-        #       relation_joined
-        self._charm.on[relation_name].relation_changed.emit(
             relation, remote_unit.app, remote_unit)
 
     def get_relation_data(self, relation_id, app_or_unit):
@@ -255,20 +245,6 @@ class Harness:
             rel_data._invalidate()
 
         is_peer = self._meta.relations[relation_name].role == 'peers'
-        our_unit = self._model.unit
-        is_our_app_updated = self._model.app == entity
-        if self._begun:
-            if self._model.unit == entity:
-                raise RuntimeError('unable to update our unit relation data as if it was done by'
-                                   ' a remote unit')
-            elif is_peer and is_our_app_updated and our_unit.is_leader():
-                raise RuntimeError('unable to update peer app relation data as if it was done by'
-                                   ' a remote unit - our unit {} is the leader'
-                                   ''.format(our_unit.name))
-            elif is_our_app_updated and our_unit.is_leader():
-                raise RuntimeError('unable to update app relation data for our app as if it was'
-                                   ' done by a remote unit - our unit {} is the leader'
-                                   ''.format(our_unit.name))
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
         for k, v in key_values.items():
             if v == '':
@@ -277,10 +253,16 @@ class Harness:
                 new_values[k] = v
         self._backend._relation_data[relation_id][app_or_unit] = new_values
 
-        if not is_peer and is_our_app_updated:
-            # The leader is updating app data next to us, we only see that change if this
-            # is a peer relation.
+        if entity == self._model.unit:
+            # No events for our own unit
             return
+        if entity == self._model.app:
+            # updating our own app only generates an event if it is a peer relation and we
+            # aren't the leader
+            if not is_peer:
+                return
+            if self._model.unit.is_leader():
+                return
         self._emit_relation_changed(relation_id, app_or_unit)
 
     def _emit_relation_changed(self, relation_id, app_or_unit):
