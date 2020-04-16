@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import unittest
+from unittest.mock import patch
 import importlib
 
 import logging
@@ -36,13 +38,18 @@ class FakeModelBackend:
         self._calls.append((message, level))
 
 
+def reset_logging():
+    logging.shutdown()
+    importlib.reload(logging)
+
+
 class TestLogging(unittest.TestCase):
 
     def setUp(self):
         self.backend = FakeModelBackend()
 
-        logging.shutdown()
-        importlib.reload(logging)
+        reset_logging()
+        self.addCleanup(reset_logging)
 
     def test_default_logging(self):
         ops.log.setup_root_logging(self.backend)
@@ -79,6 +86,29 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(self.backend.calls(), [])
         logger.warning('bar')
         self.assertEqual(self.backend.calls(), [('WARNING', 'bar')])
+
+    def test_debug_logging(self):
+        buffer = io.StringIO()
+        with patch('sys.stderr', buffer):
+            ops.log.setup_root_logging(self.backend, debug=True)
+            logger = logging.getLogger()
+            logger.debug('debug message')
+            logger.info('info message')
+            logger.warning('warning message')
+            logger.critical('critical message')
+        self.assertEqual(
+            self.backend.calls(),
+            [('INFO', 'info message'),
+             ('WARNING', 'warning message'),
+             ('CRITICAL', 'critical message'),
+             ])
+        self.assertRegex(
+            buffer.getvalue(),
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d INFO     info message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d WARNING  warning message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n"
+        )
 
 
 if __name__ == '__main__':
