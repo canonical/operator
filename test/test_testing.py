@@ -234,6 +234,34 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             '''))
+        harness = self._get_dummy_charm_harness(tmp)
+        harness.begin()
+        self.assertEqual(['db'], list(harness.model.relations))
+        # The charm_dir also gets set
+        self.assertEqual(harness.framework.charm_dir, tmp)
+
+    def test_actions_from_directory(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, str(tmp))
+        actions_filename = tmp / 'actions.yaml'
+        with actions_filename.open('wt') as actions:
+            actions.write(textwrap.dedent('''
+            test:
+                description: a dummy action
+            '''))
+        harness = self._get_dummy_charm_harness(tmp)
+        harness.begin()
+        self.assertEqual(['test'], list(harness.framework.meta.actions))
+        # The charm_dir also gets set
+        self.assertEqual(harness.framework.charm_dir, tmp)
+
+    def _get_dummy_charm_harness(self, tmp):
+        self._write_dummy_charm(tmp)
+        charm_mod = importlib.import_module('charm')
+        harness = Harness(charm_mod.MyTestingCharm)
+        return harness
+
+    def _write_dummy_charm(self, tmp):
         srcdir = tmp / 'src'
         srcdir.mkdir(0o755)
         charm_filename = srcdir / 'charm.py'
@@ -250,13 +278,8 @@ class TestHarness(unittest.TestCase):
         def cleanup():
             sys.path = orig
             sys.modules.pop('charm')
+
         self.addCleanup(cleanup)
-        charm_mod = importlib.import_module('charm')
-        harness = Harness(charm_mod.MyTestingCharm)
-        harness.begin()
-        self.assertEqual(['db'], list(harness.model.relations))
-        # The charm_dir also gets set
-        self.assertEqual(harness.framework.charm_dir, tmp)
 
 
 class DBRelationChangedHelper(Object):
