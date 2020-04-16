@@ -742,7 +742,17 @@ class Framework(Object):
             if observer:
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
-                    custom_handler(event)
+                    debug_at = os.environ.get('JUJU_DEBUG_AT')
+                    if debug_at and 'hook' in debug_at.split(','):
+                        # Present the welcome message (only once!) and run under PDB.
+                        if not self._breakpoint_welcomed:
+                            self._breakpoint_welcomed = True
+                            print(_BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
+
+                        pdb.runcall(custom_handler, event)
+                    else:
+                        # Regular call to the registered method.
+                        custom_handler(event)
 
             if event.deferred:
                 deferred = True
