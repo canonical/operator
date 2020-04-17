@@ -29,7 +29,7 @@ class Harness:
     :type charm: CharmBase
     """
 
-    def __init__(self, charm_cls, meta=None, actions=None):
+    def __init__(self, charm_cls, *, meta=None, actions=None):
         """Used for testing your Charm or component implementations.
 
         Example::
