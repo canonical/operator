@@ -24,6 +24,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
+from ops import charm
 from ops.framework import (
     _BREAKPOINT_WELCOME_MESSAGE,
     BoundStoredState,
@@ -1539,10 +1540,6 @@ class DebugHookTests(unittest.TestCase):
         self.framework = Framework(tmpdir / "framework.data", tmpdir, None, None)
         self.addCleanup(self.framework.close)
 
-        class MyNotifier(Object):
-            """Generic notifier for the tests."""
-            bar = EventSource(EventBase)
-
         class MyObserver(Object):
             """Generic observer for the tests."""
             def __init__(self, parent, key):
@@ -1552,14 +1549,14 @@ class DebugHookTests(unittest.TestCase):
             def callback_method(self, event):
                 self.called = True
 
-        self.pub = MyNotifier(self.framework, "1")
+        self.charm_pub = charm.CharmEvents(self.framework, "1")
         self.obs = MyObserver(self.framework, "1")
 
     def test_basic_interruption_enabled(self, fake_stderr):
-        self.framework.observe(self.pub.bar, self.obs.callback_method)
+        self.framework.observe(self.charm_pub.install, self.obs.callback_method)
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
             with patch('pdb.runcall') as mock:
-                self.pub.bar.emit()
+                self.charm_pub.install.emit()
 
         # Check that the pdb module was used correctly and that the callback method was NOT
         # called (as we intercepted the normal pdb behaviour! this is to check that the
@@ -1570,11 +1567,25 @@ class DebugHookTests(unittest.TestCase):
         self.assertIsInstance(expected_event, EventBase)
         self.assertFalse(self.obs.called)
 
+    def test_internal_events_not_interrupted(self, fake_stderr):
+        class MyNotifier(Object):
+            """Generic notifier for the tests."""
+            bar = EventSource(EventBase)
+
+        pub = MyNotifier(self.framework, "1")
+        self.framework.observe(pub.bar, self.obs.callback_method)
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
+            with patch('pdb.runcall') as mock:
+                pub.bar.emit()
+
+        self.assertEqual(mock.call_count, 0)
+        self.assertTrue(self.obs.called)
+
     def test_envvar_mixed(self, fake_stderr):
-        self.framework.observe(self.pub.bar, self.obs.callback_method)
+        self.framework.observe(self.charm_pub.install, self.obs.callback_method)
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'foo,hook,all,whatever'}):
             with patch('pdb.runcall') as mock:
-                self.pub.bar.emit()
+                self.charm_pub.install.emit()
 
         self.assertEqual(mock.call_count, 1)
         self.assertFalse(self.obs.called)
@@ -1582,25 +1593,25 @@ class DebugHookTests(unittest.TestCase):
     def test_no_registered_method(self, fake_stderr):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
             with patch('pdb.runcall') as mock:
-                self.pub.bar.emit()
+                self.charm_pub.install.emit()
 
         self.assertEqual(mock.call_count, 0)
         self.assertFalse(self.obs.called)
 
     def test_envvar_nohook(self, fake_stderr):
-        self.framework.observe(self.pub.bar, self.obs.callback_method)
+        self.framework.observe(self.charm_pub.install, self.obs.callback_method)
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'something-else'}):
             with patch('pdb.runcall') as mock:
-                self.pub.bar.emit()
+                self.charm_pub.install.emit()
 
         self.assertEqual(mock.call_count, 0)
         self.assertTrue(self.obs.called)
 
     def test_envvar_missing(self, fake_stderr):
-        self.framework.observe(self.pub.bar, self.obs.callback_method)
+        self.framework.observe(self.charm_pub.install, self.obs.callback_method)
         assert 'JUJU_DEBUG_AT' not in os.environ
         with patch('pdb.runcall') as mock:
-            self.pub.bar.emit()
+            self.charm_pub.install.emit()
 
         self.assertEqual(mock.call_count, 0)
         self.assertTrue(self.obs.called)

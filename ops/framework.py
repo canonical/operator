@@ -27,6 +27,8 @@ import types
 import weakref
 from datetime import timedelta
 
+from ops import charm
+
 
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
@@ -743,7 +745,8 @@ class Framework(Object):
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
                     debug_at = os.environ.get('JUJU_DEBUG_AT')
-                    if debug_at and 'hook' in debug_at.split(','):
+                    is_from_juju = isinstance(event, charm.HookEvent)
+                    if is_from_juju and debug_at and 'hook' in debug_at.split(','):
                         # Present the welcome message (only once!) and run under PDB.
                         if not self._breakpoint_welcomed:
                             self._breakpoint_welcomed = True
