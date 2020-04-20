@@ -111,6 +111,15 @@ class StopEvent(HookEvent):
     pass
 
 
+class RemoveEvent(HookEvent):
+    """Represents the `remove` hook from Juju.
+
+    It's triggered by `CharmBase.on.remove`.
+    """
+
+    pass
+
+
 class ConfigChangedEvent(HookEvent):
     """Represents the `config-changed` hook from Juju.
 
@@ -375,6 +384,7 @@ class CharmEvents(ObjectEvents):
     install = EventSource(InstallEvent)
     start = EventSource(StartEvent)
     stop = EventSource(StopEvent)
+    remove = EventSource(RemoveEvent)
     update_status = EventSource(UpdateStatusEvent)
     config_changed = EventSource(ConfigChangedEvent)
     upgrade_charm = EventSource(UpgradeCharmEvent)
