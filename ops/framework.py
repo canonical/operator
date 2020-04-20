@@ -793,17 +793,7 @@ class Framework(Object):
             pdb.Pdb().set_trace(code_frame)
 
 
-class StoredStateChanged(EventBase):
-    pass
-
-
-class StoredStateEvents(EventSetBase):
-    changed = EventSource(StoredStateChanged)
-
-
 class StoredStateData(Object):
-
-    on = StoredStateEvents()
 
     def __init__(self, parent, attr_name):
         super().__init__(parent, attr_name)
@@ -870,7 +860,6 @@ class BoundStoredState:
                     key, type(value).__name__))
 
         self._data[key] = _unwrap_stored(self._data, value)
-        self.on.changed.emit()
 
     def set_default(self, **kwargs):
         """"Set the value of any given key if it has not already been set"""
