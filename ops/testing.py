@@ -29,7 +29,7 @@ class Harness:
     :type charm: CharmBase
     """
 
-    def __init__(self, charm_cls, meta=None):
+    def __init__(self, charm_cls, *, meta=None, actions=None):
         """Used for testing your Charm or component implementations.
 
         Example::
@@ -48,13 +48,16 @@ class Harness:
             metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
             parent directory of the Charm, and if not found fall back to a trivial
             'name: test-charm' metadata.
+        :param actions: (optional) A string or file-like object containing the contents of
+            actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
+            parent directory of the Charm.
         """
         # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
         #       it would define the default values of config that the charm would see.
         self._charm_cls = charm_cls
         self._charm = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
-        self._meta = self._create_meta(meta)
+        self._meta = self._create_meta(meta, actions)
         self._unit_name = self._meta.name + '/0'
         self._model = None
         self._framework = None
@@ -100,14 +103,15 @@ class Harness:
         TestCharm.__name__ = self._charm_cls.__name__
         self._charm = TestCharm(self._framework, self._framework.meta.name)
 
-    def _create_meta(self, charm_metadata):
+    def _create_meta(self, charm_metadata, action_metadata):
         """Create a CharmMeta object.
 
-        Handle the cases where a user doesn't supply an explicit metadata snippet.
+        Handle the cases where a user doesn't supply explicit metadata snippets.
         """
+        filename = inspect.getfile(self._charm_cls)
+        charm_dir = pathlib.Path(filename).parents[1]
+
         if charm_metadata is None:
-            filename = inspect.getfile(self._charm_cls)
-            charm_dir = pathlib.Path(filename).parents[1]
             metadata_path = charm_dir / 'metadata.yaml'
             if metadata_path.is_file():
                 charm_metadata = metadata_path.read_text()
@@ -117,7 +121,16 @@ class Harness:
                 charm_metadata = 'name: test-charm'
         elif isinstance(charm_metadata, str):
             charm_metadata = dedent(charm_metadata)
-        return charm.CharmMeta.from_yaml(charm_metadata)
+
+        if action_metadata is None:
+            actions_path = charm_dir / 'actions.yaml'
+            if actions_path.is_file():
+                action_metadata = actions_path.read_text()
+                self._charm_dir = charm_dir
+        elif isinstance(action_metadata, str):
+            action_metadata = dedent(action_metadata)
+
+        return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
 
     def disable_hooks(self):
         """Stop emitting hook events when the model changes.
