@@ -240,6 +240,9 @@ class Harness:
         rel_data = relation.data.get(entity, None)
         if rel_data is not None:
             # If we have read and cached this data, make sure we invalidate it
+            # Note that we are grabbing the RelationDataContent object here, but we
+            # aren't looking at its content, so it should not load the cache just
+            # because we grabbed it to invalidate the cache.
             rel_data._invalidate()
 
         is_peer = self._meta.relations[relation_name].role == 'peers'
