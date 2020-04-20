@@ -282,12 +282,15 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(cleanup)
 
     def test_actions_passed_in(self):
-        harness = Harness(CharmBase, meta='''
-            name: test-app
-        ''', actions='''
-            test-action:
-              description: a dummy test action
-        ''')
+        harness = Harness(
+            CharmBase,
+            meta='''
+                name: test-app
+            ''',
+            actions='''
+                test-action:
+                    description: a dummy test action
+            ''')
         self.assertEqual(['test-action'], list(harness.framework.meta.actions))
 
 
