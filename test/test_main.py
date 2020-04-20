@@ -13,15 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
+import base64
 import logging
 import os
-import sys
-import subprocess
 import pickle
-import base64
-import tempfile
 import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
 
 import importlib.util
 
@@ -195,8 +195,10 @@ start:
         event_file = self.JUJU_CHARM_DIR / event_dir / event_filename
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        subprocess.check_call([sys.executable, str(event_file)],
-                              env=env, cwd=str(self.JUJU_CHARM_DIR))
+        cmd = [sys.executable, str(event_file)]
+        subprocess.run(
+            cmd, check=True, env=env, cwd=str(self.JUJU_CHARM_DIR),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
