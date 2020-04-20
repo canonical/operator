@@ -46,8 +46,8 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         self.assertIsInstance(rel_id, int)
         backend = harness._backend
-        self.assertEqual([rel_id], backend.relation_ids('db'))
-        self.assertEqual([], backend.relation_list(rel_id))
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), [])
 
     def test_add_relation_and_unit(self):
         # language=YAML
@@ -62,10 +62,11 @@ class TestHarness(unittest.TestCase):
         self.assertIsInstance(rel_id, int)
         harness.add_relation_unit(rel_id, remote_unit, remote_unit_data={'foo': 'bar'})
         backend = harness._backend
-        self.assertEqual([rel_id], backend.relation_ids('db'))
-        self.assertEqual([remote_unit], backend.relation_list(rel_id))
-        self.assertEqual({'foo': 'bar'}, backend.relation_get(rel_id, remote_unit, is_app=False))
-        self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_unit, is_app=True))
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), [remote_unit])
+        self.assertEqual(backend.relation_get(rel_id, remote_unit, is_app=False), {'foo': 'bar'})
+        self.assertEqual(backend.relation_get(rel_id, remote_unit, is_app=True),
+                         {'app': 'data'})
 
     def test_get_relation_data(self):
         # language=YAML
@@ -143,21 +144,21 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         harness.update_config(key_values={'a': 'foo', 'b': 2})
         self.assertEqual(
-            [{'name': 'config', 'data': {'a': 'foo', 'b': 2}}],
-            harness.charm.changes)
+            harness.charm.changes,
+            [{'name': 'config', 'data': {'a': 'foo', 'b': 2}}])
         harness.update_config(key_values={'b': 3})
         self.assertEqual(
+            harness.charm.changes,
             [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
-             {'name': 'config', 'data': {'a': 'foo', 'b': 3}}],
-            harness.charm.changes)
+             {'name': 'config', 'data': {'a': 'foo', 'b': 3}}])
         # you can set config values to the empty string, you can use unset to actually remove items
         harness.update_config(key_values={'a': ''}, unset=set('b'))
         self.assertEqual(
+            harness.charm.changes,
             [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
              {'name': 'config', 'data': {'a': 'foo', 'b': 3}},
              {'name': 'config', 'data': {'a': ''}},
-             ],
-            harness.charm.changes)
+             ])
 
     def test_set_leader(self):
         harness = Harness(RecordingCharm)
@@ -166,18 +167,18 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         self.assertFalse(harness.charm.model.unit.is_leader())
         harness.set_leader(True)
-        self.assertEqual([{'name': 'leader-elected'}], harness.charm.get_changes(reset=True))
+        self.assertEqual(harness.charm.get_changes(reset=True), [{'name': 'leader-elected'}])
         self.assertTrue(harness.charm.model.unit.is_leader())
         harness.set_leader(False)
         self.assertFalse(harness.charm.model.unit.is_leader())
         # No hook event when you lose leadership.
         # TODO: verify if Juju always triggers `leader-settings-changed` if you
         #   lose leadership.
-        self.assertEqual([], harness.charm.get_changes(reset=True))
+        self.assertEqual(harness.charm.get_changes(reset=True), [])
         harness.disable_hooks()
         harness.set_leader(True)
         # No hook event if you have disabled them
-        self.assertEqual([], harness.charm.get_changes(reset=True))
+        self.assertEqual(harness.charm.get_changes(reset=True), [])
 
     def test_relation_set_app_not_leader(self):
         # language=YAML
@@ -211,8 +212,8 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         harness.update_config({'value': 'second'})
         self.assertEqual(
-            [{'name': 'config', 'data': {'value': 'second'}}],
-            harness.charm.get_changes(reset=True), )
+            harness.charm.get_changes(reset=True),
+            [{'name': 'config', 'data': {'value': 'second'}}])
         # Once disabled, we won't see config-changed when we make an update
         harness.disable_hooks()
         harness.update_config({'third': '3'})
@@ -220,8 +221,8 @@ class TestHarness(unittest.TestCase):
         harness.enable_hooks()
         harness.update_config({'value': 'fourth'})
         self.assertEqual(
-            [{'name': 'config', 'data': {'value': 'fourth', 'third': '3'}}],
-            harness.charm.get_changes(reset=True))
+            harness.charm.get_changes(reset=True),
+            [{'name': 'config', 'data': {'value': 'fourth', 'third': '3'}}])
 
     def test_metadata_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
@@ -254,7 +255,7 @@ class TestHarness(unittest.TestCase):
         charm_mod = importlib.import_module('charm')
         harness = Harness(charm_mod.MyTestingCharm)
         harness.begin()
-        self.assertEqual(['db'], list(harness.model.relations))
+        self.assertEqual(list(harness.model.relations), ['db'])
         # The charm_dir also gets set
         self.assertEqual(harness.framework.charm_dir, tmp)
 
@@ -318,8 +319,8 @@ class TestTestingModelBackend(unittest.TestCase):
             ''')
         backend = harness._backend
         backend.status_set('blocked', 'message', is_app=False)
-        self.assertEqual(('blocked', 'message'), backend.status_get(is_app=False))
-        self.assertEqual(None, backend.status_get(is_app=True))
+        self.assertEqual(backend.status_get(is_app=False), ('blocked', 'message'))
+        self.assertEqual(backend.status_get(is_app=True), None)
 
     def test_status_set_get_app(self):
         harness = Harness(CharmBase, meta='''
@@ -327,8 +328,8 @@ class TestTestingModelBackend(unittest.TestCase):
             ''')
         backend = harness._backend
         backend.status_set('blocked', 'message', is_app=True)
-        self.assertEqual(('blocked', 'message'), backend.status_get(is_app=True))
-        self.assertEqual(None, backend.status_get(is_app=False))
+        self.assertEqual(backend.status_get(is_app=True), ('blocked', 'message'))
+        self.assertEqual(backend.status_get(is_app=False), None)
 
 
 if __name__ == "__main__":
