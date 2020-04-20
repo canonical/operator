@@ -62,7 +62,6 @@ class Harness:
         self._backend = _TestingModelBackend(self._unit_name)
         self._model = model.Model(self._unit_name, self._meta, self._backend)
         self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
-        self._begun = False
 
     @property
     def charm(self):
@@ -82,7 +81,7 @@ class Harness:
         Before calling begin(), there is no Charm instance, so changes to the Model won't emit
         events. You must call begin before self.charm is valid.
         """
-        if self._begun:
+        if self._charm is not None:
             raise RuntimeError('cannot call the begin method on the harness more than once')
 
         # The Framework adds attributes to class objects for events, etc. As such, we can't re-use
@@ -102,7 +101,6 @@ class Harness:
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
         self._charm = TestCharm(self._framework, self._framework.meta.name)
-        self._begun = True
 
     def _create_meta(self, charm_metadata):
         """Create a CharmMeta object.
@@ -253,10 +251,10 @@ class Harness:
                 new_values[k] = v
         self._backend._relation_data[relation_id][app_or_unit] = new_values
 
-        if entity == self._model.unit:
+        if app_or_unit == self._model.unit.name:
             # No events for our own unit
             return
-        if entity == self._model.app:
+        if app_or_unit == self._model.app.name:
             # updating our own app only generates an event if it is a peer relation and we
             # aren't the leader
             if not is_peer:
