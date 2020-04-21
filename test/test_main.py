@@ -447,11 +447,16 @@ start:
             'INDICATOR_FILE': indicator_file
         }))
         fake_script(self, 'add-metric', 'exit 0')
+        fake_script(self, 'juju-log', 'exit 0')
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        # Clear the calls during 'install'
+        fake_script_calls(self, clear=True)
         self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics',
                                        charm_config=charm_config))
-        self.assertEqual(fake_script_calls(self),
-                         [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
+        self.assertEqual(
+            fake_script_calls(self),
+            [['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event collect_metrics'],
+             ['add-metric', '--labels', 'bar=4.2', 'foo=42']])
 
     def test_logger(self):
         charm_config = base64.b64encode(pickle.dumps({
