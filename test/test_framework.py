@@ -29,7 +29,7 @@ from ops.framework import (
     BoundStoredState,
     CommitEvent,
     EventBase,
-    EventSetBase,
+    ObjectEvents,
     EventSource,
     Framework,
     Handle,
@@ -392,7 +392,7 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
-        class MyEvents(EventSetBase):
+        class MyEvents(ObjectEvents):
             foo = EventSource(MyEvent)
 
         class MyNotifier(Object):
@@ -489,7 +489,7 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
-        class MyEvents(EventSetBase):
+        class MyEvents(ObjectEvents):
             foo = EventSource(MyEvent)
             bar = EventSource(MyEvent)
 
@@ -527,11 +527,11 @@ class TestFramework(unittest.TestCase):
 
         event = EventSource(MyEvent)
 
-        class MyEvents(EventSetBase):
+        class MyEvents(ObjectEvents):
             foo = event
 
         with self.assertRaises(RuntimeError) as cm:
-            class OtherEvents(EventSetBase):
+            class OtherEvents(ObjectEvents):
                 foo = event
         self.assertEqual(
             str(cm.exception),
@@ -596,7 +596,7 @@ class TestFramework(unittest.TestCase):
         class MyBar(EventBase):
             pass
 
-        class MyEvents(EventSetBase):
+        class MyEvents(ObjectEvents):
             foo = EventSource(MyFoo)
 
         class MyNotifier(Object):
@@ -633,10 +633,10 @@ class TestFramework(unittest.TestCase):
     def test_dynamic_event_types(self):
         framework = self.create_framework()
 
-        class MyEventsA(EventSetBase):
+        class MyEventsA(ObjectEvents):
             handle_kind = 'on_a'
 
-        class MyEventsB(EventSetBase):
+        class MyEventsB(ObjectEvents):
             handle_kind = 'on_b'
 
         class MyNotifier(Object):
@@ -770,12 +770,12 @@ class TestFramework(unittest.TestCase):
         # this can not be saved, as it has not simple types!
         to_be_saved = {"bar": TestFramework}
 
-        class FooEvent(EventSetBase):
+        class FooEvent(EventBase):
             def snapshot(self):
                 return to_be_saved
 
         handle = Handle(None, "a_foo", "some_key")
-        event = FooEvent()
+        event = FooEvent(handle)
 
         framework = self.create_framework()
         framework.register_type(FooEvent, None, handle.kind)
