@@ -529,6 +529,10 @@ class Framework(Object):
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
         self._breakpoint_welcomed = False
 
+        # Parse once the env var, which may be used multiple times later
+        debug_at = os.environ.get('JUJU_DEBUG_AT')
+        self._juju_debug_at = debug_at.split(',') if debug_at else ()
+
     def close(self):
         self._storage.close()
 
@@ -744,9 +748,8 @@ class Framework(Object):
             if observer:
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
-                    debug_at = os.environ.get('JUJU_DEBUG_AT')
-                    is_from_juju = isinstance(event, charm.HookEvent)
-                    if is_from_juju and debug_at and 'hook' in debug_at.split(','):
+                    event_is_from_juju = isinstance(event, charm.HookEvent)
+                    if event_is_from_juju and 'hook' in self._juju_debug_at:
                         # Present the welcome message (only once!) and run under PDB.
                         if not self._breakpoint_welcomed:
                             self._breakpoint_welcomed = True

@@ -1377,6 +1377,29 @@ class TestStoredState(unittest.TestCase):
         #       parent._stored._data.dirty is False?
 
 
+def create_framework(testcase):
+    """Create a Framework object."""
+    # Need a temporary directory
+    tmpdir = Path(tempfile.mkdtemp())
+    testcase.addCleanup(shutil.rmtree, str(tmpdir))
+
+    data_path = tmpdir / "framework.data"
+    framework = Framework(data_path=data_path, charm_dir=tmpdir, meta=None, model=None)
+    testcase.addCleanup(framework.close)
+    return framework
+
+
+class GenericObserver(Object):
+    """Generic observer for the tests."""
+    def __init__(self, parent, key):
+        super().__init__(parent, key)
+        self.called = False
+
+    def callback_method(self, event):
+        """Set the instance .called to True."""
+        self.called = True
+
+
 @patch('sys.stderr', new_callable=io.StringIO)
 class BreakpointTests(unittest.TestCase):
 
@@ -1530,88 +1553,139 @@ class BreakpointTests(unittest.TestCase):
         self.check_trace_set('hook', 'mybreak', 0)
 
 
-@patch('sys.stderr', new_callable=io.StringIO)
 class DebugHookTests(unittest.TestCase):
 
-    def setUp(self):
-        tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, str(tmpdir))
+    def test_envvar_parsing_missing(self):
+        assert 'JUJU_DEBUG_AT' not in os.environ
+        framework = create_framework(self)
+        self.assertEqual(framework._juju_debug_at, ())
 
-        self.framework = Framework(tmpdir / "framework.data", tmpdir, None, None)
-        self.addCleanup(self.framework.close)
+    def test_envvar_parsing_empty(self):
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': ''}):
+            framework = create_framework(self)
+        self.assertEqual(framework._juju_debug_at, ())
 
-        class MyObserver(Object):
-            """Generic observer for the tests."""
-            def __init__(self, parent, key):
-                super().__init__(parent, key)
-                self.called = False
-
-            def callback_method(self, event):
-                self.called = True
-
-        self.charm_pub = charm.CharmEvents(self.framework, "1")
-        self.obs = MyObserver(self.framework, "1")
-
-    def test_basic_interruption_enabled(self, fake_stderr):
-        self.framework.observe(self.charm_pub.install, self.obs.callback_method)
+    def test_envvar_parsing_simple(self):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
+            framework = create_framework(self)
+        self.assertEqual(framework._juju_debug_at, ['hook'])
+
+    def test_envvar_parsing_multiple(self):
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'foo,bar,all'}):
+            framework = create_framework(self)
+        self.assertEqual(framework._juju_debug_at, ['foo', 'bar', 'all'])
+
+    def test_basic_interruption_enabled(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['hook']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
+        with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
             with patch('pdb.runcall') as mock:
-                self.charm_pub.install.emit()
+                publisher.install.emit()
 
         # Check that the pdb module was used correctly and that the callback method was NOT
         # called (as we intercepted the normal pdb behaviour! this is to check that the
         # framework didn't call the callback directly)
         self.assertEqual(mock.call_count, 1)
         expected_callback, expected_event = mock.call_args[0]
-        self.assertEqual(expected_callback, self.obs.callback_method)
+        self.assertEqual(expected_callback, observer.callback_method)
         self.assertIsInstance(expected_event, EventBase)
-        self.assertFalse(self.obs.called)
+        self.assertFalse(observer.called)
 
-    def test_internal_events_not_interrupted(self, fake_stderr):
+        # Verify proper message was given to the user.
+        self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+
+    def test_internal_events_not_interrupted(self):
         class MyNotifier(Object):
             """Generic notifier for the tests."""
             bar = EventSource(EventBase)
 
-        pub = MyNotifier(self.framework, "1")
-        self.framework.observe(pub.bar, self.obs.callback_method)
-        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
-            with patch('pdb.runcall') as mock:
-                pub.bar.emit()
+        framework = create_framework(self)
+        framework._juju_debug_at = ['hook']
+
+        publisher = MyNotifier(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.bar, observer.callback_method)
+
+        with patch('pdb.runcall') as mock:
+            publisher.bar.emit()
 
         self.assertEqual(mock.call_count, 0)
-        self.assertTrue(self.obs.called)
+        self.assertTrue(observer.called)
 
-    def test_envvar_mixed(self, fake_stderr):
-        self.framework.observe(self.charm_pub.install, self.obs.callback_method)
-        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'foo,hook,all,whatever'}):
+    def test_envvar_mixed(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['foo', 'hook', 'all', 'whatever']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
+        with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
-                self.charm_pub.install.emit()
+                publisher.install.emit()
 
         self.assertEqual(mock.call_count, 1)
-        self.assertFalse(self.obs.called)
+        self.assertFalse(observer.called)
 
-    def test_no_registered_method(self, fake_stderr):
-        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
-            with patch('pdb.runcall') as mock:
-                self.charm_pub.install.emit()
+    def test_no_registered_method(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['hook']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+
+        with patch('pdb.runcall') as mock:
+            publisher.install.emit()
 
         self.assertEqual(mock.call_count, 0)
-        self.assertFalse(self.obs.called)
+        self.assertFalse(observer.called)
 
-    def test_envvar_nohook(self, fake_stderr):
-        self.framework.observe(self.charm_pub.install, self.obs.callback_method)
+    def test_envvar_nohook(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['something-else']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'something-else'}):
             with patch('pdb.runcall') as mock:
-                self.charm_pub.install.emit()
+                publisher.install.emit()
 
         self.assertEqual(mock.call_count, 0)
-        self.assertTrue(self.obs.called)
+        self.assertTrue(observer.called)
 
-    def test_envvar_missing(self, fake_stderr):
-        self.framework.observe(self.charm_pub.install, self.obs.callback_method)
-        assert 'JUJU_DEBUG_AT' not in os.environ
+    def test_envvar_missing(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ()
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
         with patch('pdb.runcall') as mock:
-            self.charm_pub.install.emit()
+            publisher.install.emit()
 
         self.assertEqual(mock.call_count, 0)
-        self.assertTrue(self.obs.called)
+        self.assertTrue(observer.called)
+
+    def test_welcome_message_not_multiple(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['hook']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
+        with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
+            with patch('pdb.runcall') as mock:
+                publisher.install.emit()
+                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+                publisher.install.emit()
+                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+        self.assertEqual(mock.call_count, 2)
