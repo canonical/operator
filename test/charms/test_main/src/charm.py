@@ -43,7 +43,7 @@ class Charm(CharmBase):
         # (this implies refactoring most of test_main.py)
         self._state_file = self._charm_config.get('STATE_FILE')
         try:
-            with open(self._state_file, 'rb') as f:
+            with open(str(self._state_file), 'rb') as f:
                 self._state = pickle.load(f)
         except (FileNotFoundError, EOFError):
             self._state = {
