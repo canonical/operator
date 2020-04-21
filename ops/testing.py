@@ -243,7 +243,6 @@ class Harness:
             # Note, this won't cause the data to be loaded if it wasn't already.
             rel_data._invalidate()
 
-        is_peer = self._meta.relations[relation_name].role == 'peers'
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
         for k, v in key_values.items():
             if v == '':
@@ -258,6 +257,7 @@ class Harness:
         if app_or_unit == self._model.app.name:
             # updating our own app only generates an event if it is a peer relation and we
             # aren't the leader
+            is_peer = self._meta.relations[relation_name].role == 'peers'
             if not is_peer:
                 return
             if self._model.unit.is_leader():
