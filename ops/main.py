@@ -183,7 +183,7 @@ def main(charm_class):
         # before continuing.
         dispatch_path = juju_exec_path.parent / Path(os.environ['JUJU_DISPATCH_PATH'])
         if dispatch_path.exists() and dispatch_path.resolve() != juju_exec_path.resolve():
-            argv = sys.argv[:]
+            argv = sys.argv.copy()
             argv[0] = str(dispatch_path)
             try:
                 subprocess.run(argv, check=True)
