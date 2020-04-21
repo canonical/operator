@@ -272,7 +272,7 @@ class TestHarness(unittest.TestCase):
         rel.data[harness.charm.model.unit]['key'] = 'value'
         # there should be no event for updating our own data
         harness.update_relation_data(rel_id, 'my-charm/0', {'new': 'other'})
-        # Make sure our unit data has not actually changed after an exception got raised.
+        # but the data will be updated.
         self.assertEqual({'key': 'value', 'new': 'other'}, rel.data[harness.charm.model.unit])
 
         rel.data[harness.charm.model.unit]['new'] = 'value'

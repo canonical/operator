@@ -148,7 +148,7 @@ class Harness:
         TODO: Once relation_created exists as a Juju hook, it should be triggered by this code.
 
         :param relation_name: The relation on Charm that is being related to
-        :type relation_data: str
+        :type relation_name: str
         :param remote_app: The name of the application that is being related to
         :type remote_app: str
         :return: The relation_id created by this add_relation.
@@ -239,10 +239,8 @@ class Harness:
             entity = self._model.get_app(app_or_unit)
         rel_data = relation.data.get(entity, None)
         if rel_data is not None:
-            # If we have read and cached this data, make sure we invalidate it
-            # Note that we are grabbing the RelationDataContent object here, but we
-            # aren't looking at its content, so it should not load the cache just
-            # because we grabbed it to invalidate the cache.
+            # rel_data may have cached now-stale data, so _invalidate() it.
+            # Note, this won't cause the data to be loaded if it wasn't already.
             rel_data._invalidate()
 
         is_peer = self._meta.relations[relation_name].role == 'peers'
