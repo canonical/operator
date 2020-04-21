@@ -23,9 +23,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-
 import importlib.util
-
 from pathlib import Path
 
 from ops.charm import (
@@ -120,6 +118,10 @@ class TestMain(abc.ABC):
 
         fake_script(self, 'juju-log', "exit 0")
 
+        # set to something other than None for tests that care
+        self.stdout = None
+        self.stderr = None
+
     def _setup_charm_dir(self):
         self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
@@ -172,7 +174,7 @@ start:
         if self._state_file.stat().st_size:
             with open(str(self._state_file), 'r+b') as state_file:
                 state = pickle.load(state_file)
-                state_file.truncate()
+                state_file.truncate(0)
         return state
 
     def _simulate_event(self, event_spec):
@@ -535,13 +537,15 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
     def _setup_entry_point(self, directory, entry_point):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
-            path.symlink_to(self.JUJU_CHARM_DIR / 'src/charm.py')
+            path.symlink_to('src/charm.py')
 
     def _call_event(self, rel_path, env):
         env["JUJU_DISPATCH_PATH"] = str(rel_path)
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
         subprocess.run(
             [sys.executable, str(dispatch)],
+            stdout=self.stdout,
+            stderr=self.stderr,
             check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
 
     def test_setup_event_links(self):
@@ -583,6 +587,63 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
         # the script was called, *and*, the .on. was called
         self.assertEqual(fake_script_calls(self), [['install', '']])
         self.assertEqual(state['observed_event_types'], [InstallEvent])
+
+    def test_hook_and_dispatch_with_failing_hook(self):
+        self.stdout = self.stderr = tempfile.TemporaryFile()
+        self.addCleanup(self.stdout.close)
+
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+
+        old_path = self.fake_script_path
+        self.fake_script_path = self.hooks_dir
+        fake_script(self, 'install', 'exit 42')
+        event = EventSpec(InstallEvent, 'install', charm_config=charm_config)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self._simulate_event(event)
+        self.fake_script_path = old_path
+
+        self.stdout.seek(0)
+        self.assertEqual(self.stdout.read(), b'')
+        calls = fake_script_calls(self)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(calls[0]), 4)
+        self.assertEqual(
+            calls[0][:3],
+            ['juju-log', '--log-level', 'WARNING']
+        )
+        self.assertRegex(calls[0][3], r'hook /\S+/install exited with status 42')
+
+    def test_hook_and_dispatch_but_hook_is_dispatch(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        event = EventSpec(InstallEvent, 'install', charm_config=charm_config)
+        hook_path = self.hooks_dir / 'install'
+        for ((rel, ind), path) in {
+                # relative and indirect
+                (True, True):   Path('../dispatch'),
+                # relative and direct
+                (True, False):  Path(self.charm_exec_path),
+                # absolute and direct
+                (False, False): (self.hooks_dir / self.charm_exec_path).resolve(),
+                # absolute and indirect
+                (False, True):  self.JUJU_CHARM_DIR / 'dispatch',
+        }.items():
+            msg = "{} (relative:{} indirect:{})".format(path, rel, ind)
+            # sanity check
+            self.assertEqual(path.is_absolute(), not rel, msg)
+            self.assertEqual(path.name == 'dispatch', ind, msg)
+            hook_path.symlink_to(path)
+
+            state = self._simulate_event(event)
+
+            # the .on. was only called once
+            self.assertEqual(state['observed_event_types'], [InstallEvent], msg)
+            self.assertEqual(state['on_install'], [InstallEvent], msg)
+
+            hook_path.unlink()
 
 
 # TODO: this does not work

@@ -163,6 +163,10 @@ def main(charm_class):
     """
     charm_dir = _get_charm_dir()
 
+    model_backend = ops.model.ModelBackend()
+    debug = ('JUJU_DEBUG' in os.environ)
+    setup_root_logging(model_backend, debug=debug)
+
     # Process the Juju event relevant to the current hook execution
     # JUJU_HOOK_NAME, JUJU_FUNCTION_NAME, and JUJU_ACTION_NAME are not used
     # in order to support simulation of events from debugging sessions.
@@ -174,26 +178,22 @@ def main(charm_class):
     if has_dispatch:
         # The executable was 'dispatch', which means the actual hook we want to
         # run needs to be looked up in the JUJU_DISPATCH_PATH env var, where it
-        # should be a path relative to the charm directory (the directory that
-        # holds `dispatch`). If that path actually exists, we need to exec to
-        # it instead of continuing.
-        #
-        # We don't look at the existence of JUJU_DISPATCH_PATH because we don't
-        # unset it on exec'ing into the hook, and it could be a symlink back to
-        # ourselves.
-        dispatch_path = Path(os.environ['JUJU_DISPATCH_PATH'])
-        juju_exec_path = juju_exec_path.parent / dispatch_path
-        if juju_exec_path.exists():
+        # will be a path relative to the charm directory (the directory that
+        # holds `dispatch`). If that path actually exists, we want to run that
+        # before continuing.
+        dispatch_path = juju_exec_path.parent / Path(os.environ['JUJU_DISPATCH_PATH'])
+        if dispatch_path.exists() and dispatch_path.resolve() != juju_exec_path.resolve():
             argv = sys.argv[:]
-            argv[0] = str(juju_exec_path)
-            subprocess.run(argv, check=True)
+            argv[0] = str(dispatch_path)
+            try:
+                subprocess.run(argv, check=True)
+            except subprocess.CalledProcessError as e:
+                logger.warning("hook %s exited with status %d", dispatch_path, e.returncode)
+                sys.exit(e.returncode)
+        juju_exec_path = dispatch_path
     juju_event_name = juju_exec_path.name.replace('-', '_')
     if juju_exec_path.parent.name == 'actions':
         juju_event_name = '{}_action'.format(juju_event_name)
-
-    model_backend = ops.model.ModelBackend()
-    debug = ('JUJU_DEBUG' in os.environ)
-    setup_root_logging(model_backend, debug=debug)
 
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)
