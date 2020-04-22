@@ -1379,12 +1379,7 @@ class TestStoredState(unittest.TestCase):
 
 def create_framework(testcase):
     """Create a Framework object."""
-    # Need a temporary directory
-    tmpdir = Path(tempfile.mkdtemp())
-    testcase.addCleanup(shutil.rmtree, str(tmpdir))
-
-    data_path = tmpdir / "framework.data"
-    framework = Framework(data_path=data_path, charm_dir=tmpdir, meta=None, model=None)
+    framework = Framework(":memory:", charm_dir='non-existant', meta=None, model=None)
     testcase.addCleanup(framework.close)
     return framework
 
@@ -1556,8 +1551,9 @@ class BreakpointTests(unittest.TestCase):
 class DebugHookTests(unittest.TestCase):
 
     def test_envvar_parsing_missing(self):
-        assert 'JUJU_DEBUG_AT' not in os.environ
-        framework = create_framework(self)
+        with patch.dict(os.environ):
+            os.environ.pop('JUJU_DEBUG_AT', None)
+            framework = create_framework(self)
         self.assertEqual(framework._juju_debug_at, ())
 
     def test_envvar_parsing_empty(self):
