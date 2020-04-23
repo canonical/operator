@@ -233,6 +233,10 @@ class Harness:
         """
         return self._backend._relation_data[relation_id].get(app_or_unit, None)
 
+    def get_workload_version(self):
+        """Read the workload version that was set by the unit."""
+        return self._backend._workload_version
+
     def update_relation_data(self, relation_id, app_or_unit, key_values):
         """Update the relation data for a given unit or application in a given relation.
 
@@ -354,6 +358,7 @@ class _TestingModelBackend:
         self._pod_spec = None
         self._app_status = None
         self._unit_status = None
+        self._workload_version = None
 
     def relation_ids(self, relation_name):
         return self._relation_ids_map[relation_name]
@@ -382,6 +387,9 @@ class _TestingModelBackend:
 
     def is_leader(self):
         return self._is_leader
+
+    def application_version_set(self, version):
+        self._workload_version = version
 
     def resource_get(self, resource_name):
         return self._resources_map[resource_name]
