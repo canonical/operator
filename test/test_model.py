@@ -521,6 +521,13 @@ fi
         self.model.unit.set_workload_version('1.2.3')
         self.assertEqual(fake_script_calls(self), [['application-version-set', '1.2.3']])
 
+    def test_workload_version_invalid(self):
+        fake_script(self, 'application-version-set', 'exit 0')
+        with self.assertRaises(TypeError) as cm:
+            self.model.unit.set_workload_version(5)
+        self.assertEqual(str(cm.exception), "workload version must be a str, not int: 5")
+        self.assertEqual(fake_script_calls(self), [])
+
     def test_resources(self):
         meta = ops.charm.CharmMeta()
         meta.resources = {'foo': None, 'bar': None}

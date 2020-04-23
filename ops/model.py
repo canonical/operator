@@ -189,6 +189,9 @@ class Unit:
         This shouldn't be confused with the revision of the charm. This is informative only;
         shown in the output of 'juju status'.
         """
+        if not isinstance(version, str):
+            raise TypeError("workload version must be a str, not {}: {!r}".format(
+                type(version).__name__, version))
         self._backend.application_version_set(version)
 
 
