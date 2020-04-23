@@ -183,6 +183,14 @@ class Unit:
                 'cannot determine leadership status for remote applications: {}'.format(self)
             )
 
+    def set_workload_version(self, version):
+        """Record the version of the software running as the workload.
+
+        This shouldn't be confused with the revision of the charm. This is informative only,
+        show in the output of 'juju status'.
+        """
+        self._backend.application_version_set(version)
+
 
 class LazyMapping(Mapping, ABC):
 
@@ -816,6 +824,9 @@ class ModelBackend:
 
     def action_fail(self, message=''):
         self._run('action-fail', message)
+
+    def application_version_set(self, version):
+        self._run('application-version-set', version)
 
     def juju_log(self, level, message):
         self._run('juju-log', '--log-level', level, message)
