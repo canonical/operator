@@ -186,8 +186,8 @@ class Unit:
     def set_workload_version(self, version):
         """Record the version of the software running as the workload.
 
-        This shouldn't be confused with the revision of the charm. This is informative only,
-        show in the output of 'juju status'.
+        This shouldn't be confused with the revision of the charm. This is informative only;
+        shown in the output of 'juju status'.
         """
         self._backend.application_version_set(version)
 
