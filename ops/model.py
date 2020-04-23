@@ -829,7 +829,7 @@ class ModelBackend:
         self._run('action-fail', message)
 
     def application_version_set(self, version):
-        self._run('application-version-set', version)
+        self._run('application-version-set', '--', version)
 
     def juju_log(self, level, message):
         self._run('juju-log', '--log-level', level, message)

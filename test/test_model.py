@@ -519,7 +519,7 @@ fi
     def test_workload_version(self):
         fake_script(self, 'application-version-set', 'exit 0')
         self.model.unit.set_workload_version('1.2.3')
-        self.assertEqual(fake_script_calls(self), [['application-version-set', '1.2.3']])
+        self.assertEqual(fake_script_calls(self), [['application-version-set', '--', '1.2.3']])
 
     def test_workload_version_invalid(self):
         fake_script(self, 'application-version-set', 'exit 0')
@@ -1169,7 +1169,7 @@ class TestModelBackend(unittest.TestCase):
     def test_application_version_set(self):
         fake_script(self, 'application-version-set', 'exit 0')
         self.backend.application_version_set('1.2b3')
-        self.assertEqual(fake_script_calls(self), [['application-version-set', '1.2b3']])
+        self.assertEqual(fake_script_calls(self), [['application-version-set', '--', '1.2b3']])
 
     def test_application_version_set_invalid(self):
         fake_script(self, 'application-version-set', 'exit 0')
