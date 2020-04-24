@@ -36,6 +36,17 @@ from ops.testing import Harness
 
 class TestHarness(unittest.TestCase):
 
+    def test_relation_ids(self):
+        # language=YAML
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [])
+
     def test_add_relation(self):
         # language=YAML
         harness = Harness(CharmBase, meta='''
