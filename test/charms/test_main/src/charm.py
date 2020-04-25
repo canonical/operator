@@ -96,7 +96,7 @@ class Charm(CharmBase):
         Each invocation will override the previous state which is intentional.
         """
         if self._state_file is not None:
-            with open(str(self._state_file), 'wb') as f:
+            with self._state_file.open('wb') as f:
                 pickle.dump(self._state, f)
 
     def on_install(self, event):

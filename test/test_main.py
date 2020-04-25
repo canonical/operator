@@ -136,7 +136,7 @@ start:
         actions_dir_name = 'actions'
         actions_meta_file = 'actions.yaml'
 
-        with open(str(self.JUJU_CHARM_DIR / actions_meta_file), 'w+') as f:
+        with (self.JUJU_CHARM_DIR / actions_meta_file).open('w+') as f:
             f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
@@ -147,7 +147,7 @@ start:
     def _read_and_clear_state(self):
         state = None
         if self._state_file.stat().st_size:
-            with open(str(self._state_file), 'r+b') as state_file:
+            with self._state_file.open('r+b') as state_file:
                 state = pickle.load(state_file)
                 state_file.truncate()
         return state
