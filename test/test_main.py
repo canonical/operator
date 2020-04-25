@@ -136,7 +136,7 @@ start:
         actions_dir_name = 'actions'
         actions_meta_file = 'actions.yaml'
 
-        with (self.JUJU_CHARM_DIR / actions_meta_file).open('w+') as f:
+        with (self.JUJU_CHARM_DIR / actions_meta_file).open('w+t') as f:
             f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
