@@ -24,7 +24,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-from ops import charm
+from ops import charm, model
 from ops.framework import (
     _BREAKPOINT_WELCOME_MESSAGE,
     BoundStoredState,
@@ -42,6 +42,7 @@ from ops.framework import (
     StoredState,
     StoredStateData,
 )
+from test.test_helpers import fake_script
 
 
 class TestFramework(unittest.TestCase):
@@ -1377,9 +1378,22 @@ class TestStoredState(unittest.TestCase):
         #       parent._stored._data.dirty is False?
 
 
-def create_framework(testcase):
+def create_model(testcase):
+    """Create a Model object."""
+    unit_name = 'myapp/0'
+    patcher = patch.dict(os.environ, {'JUJU_UNIT_NAME': unit_name})
+    patcher.start()
+    testcase.addCleanup(patcher.stop)
+
+    backend = model.ModelBackend()
+    meta = charm.CharmMeta()
+    test_model = model.Model('myapp/0', meta, backend)
+    return test_model
+
+
+def create_framework(testcase, model=None):
     """Create a Framework object."""
-    framework = Framework(":memory:", charm_dir='non-existant', meta=None, model=None)
+    framework = Framework(":memory:", charm_dir='non-existant', meta=None, model=model)
     testcase.addCleanup(framework.close)
     return framework
 
@@ -1594,6 +1608,27 @@ class DebugHookTests(unittest.TestCase):
 
         # Verify proper message was given to the user.
         self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+
+    def test_actions_are_interrupted(self):
+        test_model = create_model(self)
+        framework = create_framework(self, model=test_model)
+        framework._juju_debug_at = ['hook']
+
+        class CustomEvents(EventSetBase):
+            foobar_action = EventSource(charm.ActionEvent)
+
+        publisher = CustomEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.foobar_action, observer.callback_method)
+        fake_script(self, 'action-get', "echo {}")
+
+        with patch('sys.stderr', new_callable=io.StringIO):
+            with patch('pdb.runcall') as mock:
+                with patch.dict(os.environ, {'JUJU_ACTION_NAME': 'foobar'}):
+                    publisher.foobar_action.emit()
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertFalse(observer.called)
 
     def test_internal_events_not_interrupted(self):
         class MyNotifier(Object):

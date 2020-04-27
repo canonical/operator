@@ -749,7 +749,8 @@ class Framework(Object):
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
-                    if event_is_from_juju and 'hook' in self._juju_debug_at:
+                    event_is_action = isinstance(event, charm.ActionEvent)
+                    if (event_is_from_juju or event_is_action) and 'hook' in self._juju_debug_at:
                         # Present the welcome message (only once!) and run under PDB.
                         if not self._breakpoint_welcomed:
                             self._breakpoint_welcomed = True
