@@ -55,28 +55,25 @@ class TestLogging(unittest.TestCase):
         ops.log.setup_root_logging(self.backend)
 
         logger = logging.getLogger()
-        self.assertEqual(logger.level, logging.INFO)
+        self.assertEqual(logger.level, logging.DEBUG)
         self.assertIsInstance(logger.handlers[0], ops.log.JujuLogHandler)
 
         test_cases = [(
-            lambda: logger.critical('critical'), ('CRITICAL', 'critical')
+            lambda: logger.critical('critical'), [('CRITICAL', 'critical')]
         ), (
-            lambda: logger.error('error'), ('ERROR', 'error')
+            lambda: logger.error('error'), [('ERROR', 'error')]
         ), (
-            lambda: logger.warning('warning'), ('WARNING', 'warning')
+            lambda: logger.warning('warning'), [('WARNING', 'warning')]
         ), (
-            lambda: logger.info('info'), ('INFO', 'info')
+            lambda: logger.info('info'), [('INFO', 'info')]
+        ), (
+            lambda: logger.debug('debug'), [('DEBUG', 'debug')]
         )]
 
         for do, res in test_cases:
             do()
             calls = self.backend.calls(clear=True)
-            self.assertEqual(len(calls), 1)
-            self.assertEqual(calls[0], res)
-        else:
-            logger.debug('debug')
-            calls = self.backend.calls(clear=True)
-            self.assertEqual(len(calls), 0)
+            self.assertEqual(calls, res)
 
     def test_handler_filtering(self):
         logger = logging.getLogger()
@@ -86,6 +83,24 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(self.backend.calls(), [])
         logger.warning('bar')
         self.assertEqual(self.backend.calls(), [('WARNING', 'bar')])
+
+    def test_no_stderr_without_debug(self):
+        buffer = io.StringIO()
+        with patch('sys.stderr', buffer):
+            ops.log.setup_root_logging(self.backend, debug=False)
+            logger = logging.getLogger()
+            logger.debug('debug message')
+            logger.info('info message')
+            logger.warning('warning message')
+            logger.critical('critical message')
+        self.assertEqual(
+            self.backend.calls(),
+            [('DEBUG', 'debug message'),
+             ('INFO', 'info message'),
+                ('WARNING', 'warning message'),
+                ('CRITICAL', 'critical message'),
+             ])
+        self.assertEqual(buffer.getvalue(), "")
 
     def test_debug_logging(self):
         buffer = io.StringIO()
@@ -98,7 +113,8 @@ class TestLogging(unittest.TestCase):
             logger.critical('critical message')
         self.assertEqual(
             self.backend.calls(),
-            [('INFO', 'info message'),
+            [('DEBUG', 'debug message'),
+             ('INFO', 'info message'),
              ('WARNING', 'warning message'),
              ('CRITICAL', 'critical message'),
              ])
@@ -109,6 +125,15 @@ class TestLogging(unittest.TestCase):
             r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d WARNING  warning message\n"
             r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n"
         )
+
+    def test_reduced_logging(self):
+        ops.log.setup_root_logging(self.backend)
+        logger = logging.getLogger()
+        logger.setLevel(logging.WARNING)
+        logger.debug('debug')
+        logger.info('info')
+        logger.warning('warning')
+        self.assertEqual(self.backend.calls(), [('WARNING', 'warning')])
 
 
 if __name__ == '__main__':
