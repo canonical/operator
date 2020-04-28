@@ -41,11 +41,14 @@ def fake_script(test_case, name, content):
 
 
 def fake_script_calls(test_case, clear=False):
-    with (test_case.fake_script_path / 'calls.txt').open('r+t') as f:
-        calls = [line.split(';') for line in f.read().splitlines()]
-        if clear:
-            f.truncate(0)
-        return calls
+    try:
+        with (test_case.fake_script_path / 'calls.txt').open('r+t') as f:
+            calls = [line.split(';') for line in f.read().splitlines()]
+            if clear:
+                f.truncate(0)
+            return calls
+    except FileNotFoundError:
+        return []
 
 
 class FakeScriptTest(unittest.TestCase):

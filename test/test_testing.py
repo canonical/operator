@@ -543,6 +543,15 @@ class TestHarness(unittest.TestCase):
             ''')
         self.assertEqual(list(harness.framework.meta.actions), ['test-action'])
 
+    def test_set_workload_version(self):
+        harness = Harness(CharmBase, meta='''
+            name: app
+            ''')
+        harness.begin()
+        self.assertIsNone(harness.get_workload_version())
+        harness.charm.model.unit.set_workload_version('1.2.3')
+        self.assertEqual(harness.get_workload_version(), '1.2.3')
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
