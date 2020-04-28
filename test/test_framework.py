@@ -1614,7 +1614,7 @@ class DebugHookTests(unittest.TestCase):
         framework = create_framework(self, model=test_model)
         framework._juju_debug_at = ['hook']
 
-        class CustomEvents(EventSetBase):
+        class CustomEvents(ObjectEvents):
             foobar_action = EventSource(charm.ActionEvent)
 
         publisher = CustomEvents(framework, "1")
