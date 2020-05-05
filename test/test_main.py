@@ -612,8 +612,8 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
         self.stdout.seek(0)
         self.assertEqual(self.stdout.read(), b'')
         calls = fake_script_calls(self)
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(len(calls[0]), 4)
+        self.assertEqual(len(calls), 1, 'unexpect call result: {}'.format(calls))
+        self.assertEqual(len(calls[0]), 4,  'unexpect call result: {}'.format(calls[0]))
         self.assertEqual(
             calls[0][:3],
             ['juju-log', '--log-level', 'WARNING']
@@ -636,19 +636,20 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
                 # absolute and indirect
                 (False, True):  self.JUJU_CHARM_DIR / 'dispatch',
         }.items():
-            msg = "{} (relative:{} indirect:{})".format(path, rel, ind)
-            # sanity check
-            self.assertEqual(path.is_absolute(), not rel, msg)
-            self.assertEqual(path.name == 'dispatch', ind, msg)
-            hook_path.symlink_to(path)
+            with self.subTest(path=path, rel=rel, ind=ind):
+                # sanity check
+                self.assertEqual(path.is_absolute(), not rel)
+                self.assertEqual(path.name == 'dispatch', ind)
+                try:
+                    hook_path.symlink_to(path)
 
-            state = self._simulate_event(event)
+                    state = self._simulate_event(event)
 
-            # the .on. was only called once
-            self.assertEqual(state['observed_event_types'], [InstallEvent], msg)
-            self.assertEqual(state['on_install'], [InstallEvent], msg)
-
-            hook_path.unlink()
+                    # the .on. was only called once
+                    self.assertEqual(state['observed_event_types'], [InstallEvent])
+                    self.assertEqual(state['on_install'], [InstallEvent])
+                finally:
+                    hook_path.unlink()
 
 
 # TODO: this does not work

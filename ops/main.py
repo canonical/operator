@@ -178,7 +178,7 @@ def main(charm_class):
     if has_dispatch:
         # The executable was 'dispatch', which means the actual hook we want to
         # run needs to be looked up in the JUJU_DISPATCH_PATH env var, where it
-        # will be a path relative to the charm directory (the directory that
+        # should be a path relative to the charm directory (the directory that
         # holds `dispatch`). If that path actually exists, we want to run that
         # before continuing.
         dispatch_path = juju_exec_path.parent / Path(os.environ['JUJU_DISPATCH_PATH'])
