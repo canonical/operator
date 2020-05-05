@@ -16,6 +16,9 @@ import io
 import itertools
 import os
 import re
+import subprocess
+import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -96,3 +99,32 @@ class InfrastructureTests(unittest.TestCase):
                     issues.append(filepath)
         if issues:
             self.fail("Please add copyright headers to the following files:\n" + "\n".join(issues))
+
+
+class ImportersTestCase(unittest.TestCase):
+
+    template = "from ops import {module_name}"
+
+    def test_imports(self):
+        mod_names = [
+            'charm',
+            'framework',
+            'main',
+            'model',
+            'testing',
+        ]
+
+        for name in mod_names:
+            with self.subTest(name=name):
+                self.check(name)
+
+    def check(self, name):
+        """Helper function to run the test."""
+        _, testfile = tempfile.mkstemp()
+        self.addCleanup(os.unlink, testfile)
+
+        with open(testfile, 'wt', encoding='utf8') as fh:
+            fh.write(self.template.format(module_name=name))
+
+        proc = subprocess.run([sys.executable, testfile], env={'PYTHONPATH': os.getcwd()})
+        self.assertEqual(proc.returncode, 0)
