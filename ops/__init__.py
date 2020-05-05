@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Expose internal modules importing them in a controlled way."""
+"""The Operator Framework."""
 
 from . import charm, framework, main, model, testing   # NOQA

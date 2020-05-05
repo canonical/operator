@@ -17,6 +17,7 @@ import itertools
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -125,5 +126,5 @@ class ImportersTestCase(unittest.TestCase):
         with open(testfile, 'wt', encoding='utf8') as fh:
             fh.write(self.template.format(module_name=name))
 
-        proc = subprocess.run(['python3', testfile])
+        proc = subprocess.run([sys.executable, testfile], env={'PYTHONPATH': os.getcwd()})
         self.assertEqual(proc.returncode, 0)
