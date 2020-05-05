@@ -331,47 +331,7 @@ class Harness:
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
-    def _get_backend_calls(self, reset=True):
-        """Return the calls that we have made to the TestingModelBackend.
 
-        This is useful mostly for testing the framework itself, so that we can assert that we
-        do/don't trigger extra calls.
-
-        :param reset: If True, reset the calls list back to empty, if false, the call list is
-            preserved.
-        :type reset: bool
-        :return: [(call1, args...), (call2, args...)]
-        """
-        calls = self._backend._calls.copy()
-        if reset:
-            self._backend._calls.clear()
-        return calls
-
-
-def _record_calls(cls):
-    """Replace methods on cls with methods that record that they have been called.
-
-    Iterate all attributes of cls, and for public methods, replace them with a wrapped method
-    that records the method called along with the arguments and keyword arguments.
-    """
-    for meth_name, orig_method in cls.__dict__.items():
-        if meth_name.startswith('_'):
-            continue
-
-        def decorator(orig_method):
-            def wrapped(self, *args, **kwargs):
-                full_args = (orig_method.__name__,) + args
-                if kwargs:
-                    full_args = full_args + (kwargs,)
-                self._calls.append(full_args)
-                return orig_method(self, *args, **kwargs)
-            return wrapped
-
-        setattr(cls, meth_name, decorator(orig_method))
-    return cls
-
-
-@_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
 
