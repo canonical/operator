@@ -516,6 +516,18 @@ fi
         self.backend._leader_check_time = None
         self.assertTrue(self.model.unit.is_leader())
 
+    def test_workload_version(self):
+        fake_script(self, 'application-version-set', 'exit 0')
+        self.model.unit.set_workload_version('1.2.3')
+        self.assertEqual(fake_script_calls(self), [['application-version-set', '--', '1.2.3']])
+
+    def test_workload_version_invalid(self):
+        fake_script(self, 'application-version-set', 'exit 0')
+        with self.assertRaises(TypeError) as cm:
+            self.model.unit.set_workload_version(5)
+        self.assertEqual(str(cm.exception), "workload version must be a str, not int: 5")
+        self.assertEqual(fake_script_calls(self), [])
+
     def test_resources(self):
         meta = ops.charm.CharmMeta()
         meta.resources = {'foo': None, 'bar': None}
@@ -1153,6 +1165,19 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-log', 'exit 0')
         self.backend.action_log('progress: 42%')
         self.assertEqual(fake_script_calls(self), [['action-log', 'progress: 42%']])
+
+    def test_application_version_set(self):
+        fake_script(self, 'application-version-set', 'exit 0')
+        self.backend.application_version_set('1.2b3')
+        self.assertEqual(fake_script_calls(self), [['application-version-set', '--', '1.2b3']])
+
+    def test_application_version_set_invalid(self):
+        fake_script(self, 'application-version-set', 'exit 0')
+        with self.assertRaises(TypeError):
+            self.backend.application_version_set(2)
+        with self.assertRaises(TypeError):
+            self.backend.application_version_set()
+        self.assertEqual(fake_script_calls(self), [])
 
     def test_juju_log(self):
         fake_script(self, 'juju-log', 'exit 0')

@@ -136,7 +136,7 @@ start:
         actions_dir_name = 'actions'
         actions_meta_file = 'actions.yaml'
 
-        with open(str(self.JUJU_CHARM_DIR / actions_meta_file), 'w+') as f:
+        with (self.JUJU_CHARM_DIR / actions_meta_file).open('w+t') as f:
             f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
@@ -147,7 +147,7 @@ start:
     def _read_and_clear_state(self):
         state = None
         if self._state_file.stat().st_size:
-            with open(str(self._state_file), 'r+b') as state_file:
+            with self._state_file.open('r+b') as state_file:
                 state = pickle.load(state_file)
                 state_file.truncate()
         return state
@@ -447,11 +447,16 @@ start:
             'INDICATOR_FILE': indicator_file
         }))
         fake_script(self, 'add-metric', 'exit 0')
+        fake_script(self, 'juju-log', 'exit 0')
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        # Clear the calls during 'install'
+        fake_script_calls(self, clear=True)
         self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics',
                                        charm_config=charm_config))
-        self.assertEqual(fake_script_calls(self),
-                         [['add-metric', '--labels', 'bar=4.2', 'foo=42']])
+        self.assertEqual(
+            fake_script_calls(self),
+            [['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event collect_metrics'],
+             ['add-metric', '--labels', 'bar=4.2', 'foo=42']])
 
     def test_logger(self):
         charm_config = base64.b64encode(pickle.dumps({
