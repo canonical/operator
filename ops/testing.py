@@ -20,6 +20,11 @@ import typing
 from ops import charm, framework, model
 
 
+# OptionalYAML is something like metadata.yaml or actions.yaml. You can
+# pass in a file-like object or the string directly.
+OptionalYAML = typing.Optional[typing.Union[str, typing.TextIO]]
+
+
 # noinspection PyProtectedMember
 class Harness:
     """This class represents a way to build up the model that will drive a test suite.
@@ -34,8 +39,8 @@ class Harness:
             self,
             charm_cls: typing.Type[charm.CharmBase],
             *,
-            meta: typing.Union[str, typing.TextIO] = None,
-            actions: typing.Union[str, typing.TextIO] = None):
+            meta: OptionalYAML = None,
+            actions: OptionalYAML = None):
         """Used for testing your Charm or component implementations.
 
         Example::
