@@ -39,31 +39,37 @@ class Charm(CharmBase):
         else:
             self._charm_config = {}
 
+        # TODO: refactor to use StoredState
+        # (this implies refactoring most of test_main.py)
         self._state_file = self._charm_config.get('STATE_FILE')
-        self._state = {}
+        try:
+            with open(str(self._state_file), 'rb') as f:
+                self._state = pickle.load(f)
+        except (FileNotFoundError, EOFError):
+            self._state = {
+                'on_install': [],
+                'on_start': [],
+                'on_config_changed': [],
+                'on_update_status': [],
+                'on_leader_settings_changed': [],
+                'on_db_relation_joined': [],
+                'on_mon_relation_changed': [],
+                'on_mon_relation_departed': [],
+                'on_ha_relation_broken': [],
+                'on_foo_bar_action': [],
+                'on_start_action': [],
+                'on_collect_metrics': [],
 
-        self._state['on_install'] = []
-        self._state['on_start'] = []
-        self._state['on_config_changed'] = []
-        self._state['on_update_status'] = []
-        self._state['on_leader_settings_changed'] = []
-        self._state['on_db_relation_joined'] = []
-        self._state['on_mon_relation_changed'] = []
-        self._state['on_mon_relation_departed'] = []
-        self._state['on_ha_relation_broken'] = []
-        self._state['on_foo_bar_action'] = []
-        self._state['on_start_action'] = []
-        self._state['on_collect_metrics'] = []
+                'on_log_critical_action': [],
+                'on_log_error_action': [],
+                'on_log_warning_action': [],
+                'on_log_info_action': [],
+                'on_log_debug_action': [],
 
-        self._state['on_log_critical_action'] = []
-        self._state['on_log_error_action'] = []
-        self._state['on_log_warning_action'] = []
-        self._state['on_log_info_action'] = []
-        self._state['on_log_debug_action'] = []
-
-        # Observed event types per invocation. A list is used to preserve the
-        # order in which charm handlers have observed the events.
-        self._state['observed_event_types'] = []
+                # Observed event types per invocation. A list is used to preserve the
+                # order in which charm handlers have observed the events.
+                'observed_event_types': [],
+            }
 
         self.framework.observe(self.on.install, self)
         self.framework.observe(self.on.start, self)
