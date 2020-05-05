@@ -14,4 +14,5 @@
 
 """The Operator Framework."""
 
-from . import charm, framework, main, model, testing   # NOQA
+# Import here the bare minimum to break the circular import between modules
+from . import charm  # NOQA
