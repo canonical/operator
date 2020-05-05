@@ -15,6 +15,7 @@
 import inspect
 import pathlib
 from textwrap import dedent
+import typing
 
 from ops import charm, framework, model
 
@@ -29,7 +30,13 @@ class Harness:
     :type charm: CharmBase
     """
 
-    def __init__(self, charm_cls, *, meta=None, actions=None):
+    def __init__(
+            self,
+            charm_cls: typing.Type[charm.CharmBase],
+            *,
+            meta: typing.Union[str, typing.TextIO] = None,
+            actions: typing.Union[str, typing.TextIO] = None,
+    ):
         """Used for testing your Charm or component implementations.
 
         Example::
@@ -43,14 +50,15 @@ class Harness:
             # Check that charm has properly handled the relation_joined event for postgresql/0
             self.assertEqual(harness.charm. ...)
 
-        :param charm_cls: The Charm class that you'll be testing.
-        :param meta: (optional) A string or file-like object containing the contents of
-            metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
-            parent directory of the Charm, and if not found fall back to a trivial
-            'name: test-charm' metadata.
-        :param actions: (optional) A string or file-like object containing the contents of
-            actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
-            parent directory of the Charm.
+        Args:
+            charm_cls: The Charm class that you'll be testing.
+            meta (optional): A string or file-like object containing the contents of
+                metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
+                parent directory of the Charm, and if not found fall back to a trivial
+                'name: test-charm' metadata.
+            actions (optional): A string or file-like object containing the contents of
+                actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
+                parent directory of the Charm.
         """
         # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
         #       it would define the default values of config that the charm would see.
@@ -67,18 +75,18 @@ class Harness:
         self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
 
     @property
-    def charm(self):
+    def charm(self) -> charm.CharmBase:
         return self._charm
 
     @property
-    def model(self):
+    def model(self) -> model.Model:
         return self._model
 
     @property
-    def framework(self):
+    def framework(self) -> framework.Framework:
         return self._framework
 
-    def begin(self):
+    def begin(self) -> None:
         """Instantiate the Charm and start handling events.
 
         Before calling begin(), there is no Charm instance, so changes to the Model won't emit
@@ -134,7 +142,7 @@ class Harness:
 
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
 
-    def disable_hooks(self):
+    def disable_hooks(self) -> None:
         """Stop emitting hook events when the model changes.
 
         This can be used by developers to stop changes to the model from emitting events that
@@ -142,7 +150,7 @@ class Harness:
         """
         self._hooks_enabled = False
 
-    def enable_hooks(self):
+    def enable_hooks(self) -> None:
         """Re-enable hook events from charm.on when the model is changed.
 
         By default hook events are enabled once you call begin(), but if you have used
@@ -155,17 +163,15 @@ class Harness:
         self._relation_id_counter += 1
         return rel_id
 
-    def add_relation(self, relation_name, remote_app):
+    def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
 
-        TODO: Once relation_created exists as a Juju hook, it should be triggered by this code.
+        Args:
+            relation_name: The relation on Charm that is being related to
+            remote_app: The name of the application that is being related to
 
-        :param relation_name: The relation on Charm that is being related to
-        :type relation_name: str
-        :param remote_app: The name of the application that is being related to
-        :type remote_app: str
-        :return: The relation_id created by this add_relation.
-        :rtype: int
+        Return:
+            The relation_id created by this add_relation.
         """
         rel_id = self._next_relation_id()
         self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
@@ -181,11 +187,10 @@ class Harness:
             self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return rel_id
-        # TODO: jam 2020-03-05 We should be triggering relation_changed(app) if
-        #       remote_app_data isn't empty.
+        # TODO: Once we land relation_created support, it should be triggered by this code.
         return rel_id
 
-    def add_relation_unit(self, relation_id, remote_unit_name):
+    def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Add a new unit to a relation.
 
         Example::
@@ -195,11 +200,11 @@ class Harness:
 
         This will trigger a `relation_joined` event and a `relation_changed` event.
 
-        :param relation_id: The integer relation identifier (as returned by add_relation).
-        :type relation_id: int
-        :param remote_unit_name: A string representing the remote unit that is being added.
-        :type remote_unit_name: str
-        :return: None
+        Args:
+            relation_id: The integer relation identifier (as returned by add_relation).
+            remote_unit_name: A string representing the remote unit that is being added.
+        Return:
+            None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
         self._backend._relation_data[relation_id][remote_unit_name] = {}
@@ -216,37 +221,42 @@ class Harness:
         self._charm.on[relation_name].relation_joined.emit(
             relation, remote_unit.app, remote_unit)
 
-    def get_relation_data(self, relation_id, app_or_unit):
+    def get_relation_data(self, relation_id: int, app_or_unit: str) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
 
         This ignores all of the safety checks of who can and can't see data in relations (eg,
         non-leaders can't read their own application's relation data because there are no events
         that keep that data up-to-date for the unit).
 
-        :param relation_id: The relation whose content we want to look at.
-        :type relation_id: int
-        :param app_or_unit: The name of the application or unit whose data we want to read
-        :type app_or_unit: str
-        :return: a dict containing the relation data for `app_or_unit` or None.
-        :rtype: dict
-        :raises: KeyError if relation_id doesn't exist
+        Args:
+            relation_id: The relation whose content we want to look at.
+            app_or_unit: The name of the application or unit whose data we want to read
+        Return:
+            a dict containing the relation data for `app_or_unit` or None.
+        Raises:
+            KeyError: if relation_id doesn't exist
         """
         return self._backend._relation_data[relation_id].get(app_or_unit, None)
 
-    def get_workload_version(self):
+    def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
 
-    def update_relation_data(self, relation_id, app_or_unit, key_values):
+    def update_relation_data(
+            self,
+            relation_id: int,
+            app_or_unit: str,
+            key_values: typing.Mapping,
+    ) -> None:
         """Update the relation data for a given unit or application in a given relation.
 
         This also triggers the `relation_changed` event for this relation_id.
 
-        :param relation_id: The integer relation_id representing this relation.
-        :param app_or_unit: The unit or application name that is being updated.
-          This can be the local or remote application.
-        :param key_values: Each key/value will be updated in the relation data.
-        :return: None
+        Args:
+            relation_id: The integer relation_id representing this relation.
+            app_or_unit: The unit or application name that is being updated.
+                This can be the local or remote application.
+            key_values: Each key/value will be updated in the relation data.
         """
         relation_name = self._backend._relation_names[relation_id]
         relation = self._model.get_relation(relation_name, relation_id)
@@ -298,15 +308,19 @@ class Harness:
             args = (relation, app)
         self._charm.on[rel_name].relation_changed.emit(*args)
 
-    def update_config(self, key_values=None, unset=()):
+    def update_config(
+            self,
+            key_values: typing.Mapping[str, str] = None,
+            unset: typing.Iterable[str] = (),
+    ) -> None:
         """Update the config as seen by the charm.
 
         This will trigger a `config_changed` event.
 
-        :param key_values: A Mapping of key:value pairs to update in config.
-        :param unset: An iterable of keys to remove from Config. (Note that this does
-          not currently reset the config values to the default defined in config.yaml.)
-        :return: None
+        Args:
+            key_values: A Mapping of key:value pairs to update in config.
+            unset: An iterable of keys to remove from Config. (Note that this does
+                not currently reset the config values to the default defined in config.yaml.)
         """
         config = self._backend._config
         if key_values is not None:
@@ -322,13 +336,13 @@ class Harness:
             return
         self._charm.on.config_changed.emit()
 
-    def set_leader(self, is_leader=True):
+    def set_leader(self, is_leader: bool = True) -> None:
         """Set whether this unit is the leader or not.
 
         If this charm becomes a leader then `leader_elected` will be triggered.
 
-        :param is_leader: True/False as to whether this unit is the leader.
-        :return: None
+        Args:
+            is_leader: True/False as to whether this unit is the leader.
         """
         was_leader = self._backend._is_leader
         self._backend._is_leader = is_leader
