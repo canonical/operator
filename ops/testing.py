@@ -35,8 +35,7 @@ class Harness:
             charm_cls: typing.Type[charm.CharmBase],
             *,
             meta: typing.Union[str, typing.TextIO] = None,
-            actions: typing.Union[str, typing.TextIO] = None,
-    ):
+            actions: typing.Union[str, typing.TextIO] = None):
         """Used for testing your Charm or component implementations.
 
         Example::
