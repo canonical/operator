@@ -52,11 +52,11 @@ class Harness:
 
         Args:
             charm_cls: The Charm class that you'll be testing.
-            meta (optional): A string or file-like object containing the contents of
+            meta: A string or file-like object containing the contents of
                 metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
                 parent directory of the Charm, and if not found fall back to a trivial
                 'name: test-charm' metadata.
-            actions (optional): A string or file-like object containing the contents of
+            actions: A string or file-like object containing the contents of
                 actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
                 parent directory of the Charm.
         """
