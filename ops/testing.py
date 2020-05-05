@@ -39,7 +39,8 @@ class Harness:
             relation_id = harness.add_relation('db', 'postgresql')
             # Now instantiate the charm to see events as the model changes
             harness.begin()
-            harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'val'})
+            harness.add_relation_unit(relation_id, 'postgresql/0')
+            harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
             # Check that charm has properly handled the relation_joined event for postgresql/0
             self.assertEqual(harness.charm. ...)
 
@@ -191,7 +192,7 @@ class Harness:
         Example::
 
           rel_id = harness.add_relation('db', 'postgresql')
-          harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'foo': 'bar'}
+          harness.add_relation_unit(rel_id, 'postgresql/0')
 
         This will trigger a `relation_joined` event and a `relation_changed` event.
 
