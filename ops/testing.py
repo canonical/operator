@@ -151,7 +151,7 @@ class Harness:
         """Stop emitting hook events when the model changes.
 
         This can be used by developers to stop changes to the model from emitting events that
-        the charm will react to. Call `enable_hooks`_ to re-enable them.
+        the charm will react to. Call `Harness.enable_hooks`_ to re-enable them.
         """
         self._hooks_enabled = False
 
@@ -159,7 +159,7 @@ class Harness:
         """Re-enable hook events from charm.on when the model is changed.
 
         By default hook events are enabled once you call begin(), but if you have used
-        disable_hooks, this can be used to enable them again.
+        `Harness.disable_hooks`_, this can be used to enable them again.
         """
         self._hooks_enabled = True
 
