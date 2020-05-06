@@ -84,7 +84,7 @@ class Harness:
         """Return the instance of the charm class that was passed to __init__.
 
         Note that the Charm is not instantiated until you have called
-        :py:meth:`~ops.testing.Harness.begin()`.
+        :py:meth:`.begin()`.
         """
         return self._charm
 
@@ -102,7 +102,7 @@ class Harness:
         """Instantiate the Charm and start handling events.
 
         Before calling begin(), there is no Charm instance, so changes to the Model won't emit
-        events. You must call begin before self.charm is valid.
+        events. You must call begin before :py:attr:`.charm` is valid.
         """
         if self._charm is not None:
             raise RuntimeError('cannot call the begin method on the harness more than once')
@@ -158,7 +158,7 @@ class Harness:
         """Stop emitting hook events when the model changes.
 
         This can be used by developers to stop changes to the model from emitting events that
-        the charm will react to. Call :py:meth:`~ops.testing.Harness.enable_hooks`
+        the charm will react to. Call :py:meth:`.enable_hooks`
         to re-enable them.
         See also :py:class:`ops.testing.Harness`
         """
@@ -167,8 +167,8 @@ class Harness:
     def enable_hooks(self) -> None:
         """Re-enable hook events from charm.on when the model is changed.
 
-        By default hook events are enabled once you call :py:meth:`~ops.testing.Harness.begin`,
-        but if you have used :py:meth:`~ops.testing.Harness.disable_hooks`, this can be used to
+        By default hook events are enabled once you call :py:meth:`.begin`,
+        but if you have used :py:meth:`.disable_hooks`, this can be used to
         enable them again.
         """
         self._hooks_enabled = True
