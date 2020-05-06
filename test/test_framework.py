@@ -1400,6 +1400,7 @@ def create_framework(testcase, model=None):
 
 class GenericObserver(Object):
     """Generic observer for the tests."""
+
     def __init__(self, parent, key):
         super().__init__(parent, key)
         self.called = False
