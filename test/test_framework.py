@@ -1413,19 +1413,14 @@ class GenericObserver(Object):
 @patch('sys.stderr', new_callable=io.StringIO)
 class BreakpointTests(unittest.TestCase):
 
-    def setUp(self):
-        tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, str(tmpdir))
-
-        self.framework = Framework(tmpdir / "framework.data", tmpdir, None, None)
-        self.addCleanup(self.framework.close)
-
     def test_ignored(self, fake_stderr):
         # It doesn't do anything really unless proper environment is there.
-        assert 'JUJU_DEBUG_AT' not in os.environ
+        with patch.dict(os.environ):
+            os.environ.pop('JUJU_DEBUG_AT', None)
+            framework = create_framework(self)
 
         with patch('pdb.Pdb.set_trace') as mock:
-            self.framework.breakpoint()
+            framework.breakpoint()
         self.assertEqual(mock.call_count, 0)
         self.assertEqual(fake_stderr.getvalue(), "")
 
@@ -1433,39 +1428,47 @@ class BreakpointTests(unittest.TestCase):
         # The debugger needs to leave the user in the frame where the breakpoint is executed,
         # which for the test is the frame we're calling it here in the test :).
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            with patch('pdb.Pdb.set_trace') as mock:
-                this_frame = inspect.currentframe()
-                self.framework.breakpoint()
+            framework = create_framework(self)
+
+        with patch('pdb.Pdb.set_trace') as mock:
+            this_frame = inspect.currentframe()
+            framework.breakpoint()
+
         self.assertEqual(mock.call_count, 1)
         self.assertEqual(mock.call_args, ((this_frame,), {}))
 
     def test_welcome_message(self, fake_stderr):
         # Check that an initial message is shown to the user when code is interrupted.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            with patch('pdb.Pdb.set_trace'):
-                self.framework.breakpoint()
+            framework = create_framework(self)
+        with patch('pdb.Pdb.set_trace'):
+            framework.breakpoint()
         self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
     def test_welcome_message_not_multiple(self, fake_stderr):
         # Check that an initial message is NOT shown twice if the breakpoint is exercised
         # twice in the same run.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            with patch('pdb.Pdb.set_trace'):
-                self.framework.breakpoint()
-                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
-                self.framework.breakpoint()
-                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+            framework = create_framework(self)
+        with patch('pdb.Pdb.set_trace'):
+            framework.breakpoint()
+            self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+            framework.breakpoint()
+            self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
     def test_builtin_breakpoint_hooked(self, fake_stderr):
         # Verify that the proper hook is set.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            with patch('pdb.Pdb.set_trace') as mock:
-                # Calling through sys, not breakpoint() directly, so we can run the
-                # tests with Py < 3.7.
-                sys.breakpointhook()
+            create_framework(self)  # creating the framework setups the hook
+        with patch('pdb.Pdb.set_trace') as mock:
+            # Calling through sys, not breakpoint() directly, so we can run the
+            # tests with Py < 3.7.
+            sys.breakpointhook()
         self.assertEqual(mock.call_count, 1)
 
     def test_breakpoint_names(self, fake_stderr):
+        framework = create_framework(self)
+
         # Name rules:
         # - must start and end with lowercase alphanumeric characters
         # - only contain lowercase alphanumeric characters, or the hyphen "-"
@@ -1482,7 +1485,7 @@ class BreakpointTests(unittest.TestCase):
         ]
         for name in good_names:
             with self.subTest(name=name):
-                self.framework.breakpoint(name)
+                framework.breakpoint(name)
 
         bad_names = [
             '',
@@ -1502,7 +1505,7 @@ class BreakpointTests(unittest.TestCase):
         for name in bad_names:
             with self.subTest(name=name):
                 with self.assertRaises(ValueError) as cm:
-                    self.framework.breakpoint(name)
+                    framework.breakpoint(name)
                 self.assertEqual(str(cm.exception), msg)
 
         reserved_names = [
@@ -1513,7 +1516,7 @@ class BreakpointTests(unittest.TestCase):
         for name in reserved_names:
             with self.subTest(name=name):
                 with self.assertRaises(ValueError) as cm:
-                    self.framework.breakpoint(name)
+                    framework.breakpoint(name)
                 self.assertEqual(str(cm.exception), msg)
 
         not_really_names = [
@@ -1524,14 +1527,15 @@ class BreakpointTests(unittest.TestCase):
         for name in not_really_names:
             with self.subTest(name=name):
                 with self.assertRaises(TypeError) as cm:
-                    self.framework.breakpoint(name)
+                    framework.breakpoint(name)
                 self.assertEqual(str(cm.exception), 'breakpoint names must be strings')
 
     def check_trace_set(self, envvar_value, breakpoint_name, call_count):
         """Helper to check the diverse combinations of situations."""
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': envvar_value}):
-            with patch('pdb.Pdb.set_trace') as mock:
-                self.framework.breakpoint(breakpoint_name)
+            framework = create_framework(self)
+        with patch('pdb.Pdb.set_trace') as mock:
+            framework.breakpoint(breakpoint_name)
         self.assertEqual(mock.call_count, call_count)
 
     def test_unnamed_indicated_all(self, fake_stderr):
