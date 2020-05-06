@@ -31,8 +31,27 @@ class Harness:
 
     The model that is created is from the viewpoint of the charm that you are testing.
 
-    :ivar charm: The instance of Charm that is backed by this testing harness.
-    :type charm: CharmBase
+    Example::
+
+        harness = Harness(MyCharm)
+        # Do initial setup here
+        relation_id = harness.add_relation('db', 'postgresql')
+        # Now instantiate the charm to see events as the model changes
+        harness.begin()
+        harness.add_relation_unit(relation_id, 'postgresql/0')
+        harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
+        # Check that charm has properly handled the relation_joined event for postgresql/0
+        self.assertEqual(harness.charm. ...)
+
+    Args:
+        charm_cls: The Charm class that you'll be testing.
+        meta: charm.CharmBase is a A string or file-like object containing the contents of
+            metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
+            parent directory of the Charm, and if not found fall back to a trivial
+            'name: test-charm' metadata.
+        actions: A string or file-like object containing the contents of
+            actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
+            parent directory of the Charm.
     """
 
     def __init__(
@@ -42,28 +61,6 @@ class Harness:
             meta: OptionalYAML = None,
             actions: OptionalYAML = None):
         """Used for testing your Charm or component implementations.
-
-        Example::
-
-            harness = Harness(MyCharm)
-            # Do initial setup here
-            relation_id = harness.add_relation('db', 'postgresql')
-            # Now instantiate the charm to see events as the model changes
-            harness.begin()
-            harness.add_relation_unit(relation_id, 'postgresql/0')
-            harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
-            # Check that charm has properly handled the relation_joined event for postgresql/0
-            self.assertEqual(harness.charm. ...)
-
-        Args:
-            charm_cls: The Charm class that you'll be testing.
-            meta: A string or file-like object containing the contents of
-                metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
-                parent directory of the Charm, and if not found fall back to a trivial
-                'name: test-charm' metadata.
-            actions: A string or file-like object containing the contents of
-                actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
-                parent directory of the Charm.
         """
         # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
         #       it would define the default values of config that the charm would see.
@@ -84,13 +81,13 @@ class Harness:
         """Return the instance of the charm class that was passed to __init__.
 
         Note that the Charm is not instantiated until you have called
-        :py:meth:`.begin()`.
+        :meth:`.begin()`.
         """
         return self._charm
 
     @property
     def model(self) -> model.Model:
-        """Return the Model that is being driven by this Harness."""
+        """Return the :class:`~ops.model.Model` that is being driven by this Harness."""
         return self._model
 
     @property
@@ -102,7 +99,7 @@ class Harness:
         """Instantiate the Charm and start handling events.
 
         Before calling begin(), there is no Charm instance, so changes to the Model won't emit
-        events. You must call begin before :py:attr:`.charm` is valid.
+        events. You must call begin before :attr:`.charm` is valid.
         """
         if self._charm is not None:
             raise RuntimeError('cannot call the begin method on the harness more than once')
@@ -158,17 +155,16 @@ class Harness:
         """Stop emitting hook events when the model changes.
 
         This can be used by developers to stop changes to the model from emitting events that
-        the charm will react to. Call :py:meth:`.enable_hooks`
+        the charm will react to. Call :meth:`.enable_hooks`
         to re-enable them.
-        See also :py:class:`ops.testing.Harness`
         """
         self._hooks_enabled = False
 
     def enable_hooks(self) -> None:
         """Re-enable hook events from charm.on when the model is changed.
 
-        By default hook events are enabled once you call :py:meth:`.begin`,
-        but if you have used :py:meth:`.disable_hooks`, this can be used to
+        By default hook events are enabled once you call :meth:`.begin`,
+        but if you have used :meth:`.disable_hooks`, this can be used to
         enable them again.
         """
         self._hooks_enabled = True
