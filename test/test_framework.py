@@ -12,19 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-import tempfile
-import shutil
-import gc
 import datetime
-
+import gc
+import inspect
+import io
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
 from pathlib import Path
 
+from ops import charm, model
 from ops.framework import (
+    _BREAKPOINT_WELCOME_MESSAGE,
     BoundStoredState,
     CommitEvent,
     EventBase,
-    EventSetBase,
+    ObjectEvents,
     EventSource,
     Framework,
     Handle,
@@ -36,6 +42,7 @@ from ops.framework import (
     StoredState,
     StoredStateData,
 )
+from test.test_helpers import fake_script
 
 
 class TestFramework(unittest.TestCase):
@@ -387,7 +394,7 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
-        class MyEvents(EventSetBase):
+        class MyEvents(ObjectEvents):
             foo = EventSource(MyEvent)
 
         class MyNotifier(Object):
@@ -484,7 +491,7 @@ class TestFramework(unittest.TestCase):
         class MyEvent(EventBase):
             pass
 
-        class MyEvents(EventSetBase):
+        class MyEvents(ObjectEvents):
             foo = EventSource(MyEvent)
             bar = EventSource(MyEvent)
 
@@ -522,11 +529,11 @@ class TestFramework(unittest.TestCase):
 
         event = EventSource(MyEvent)
 
-        class MyEvents(EventSetBase):
+        class MyEvents(ObjectEvents):
             foo = event
 
         with self.assertRaises(RuntimeError) as cm:
-            class OtherEvents(EventSetBase):
+            class OtherEvents(ObjectEvents):
                 foo = event
         self.assertEqual(
             str(cm.exception),
@@ -591,7 +598,7 @@ class TestFramework(unittest.TestCase):
         class MyBar(EventBase):
             pass
 
-        class MyEvents(EventSetBase):
+        class MyEvents(ObjectEvents):
             foo = EventSource(MyFoo)
 
         class MyNotifier(Object):
@@ -628,10 +635,10 @@ class TestFramework(unittest.TestCase):
     def test_dynamic_event_types(self):
         framework = self.create_framework()
 
-        class MyEventsA(EventSetBase):
+        class MyEventsA(ObjectEvents):
             handle_kind = 'on_a'
 
-        class MyEventsB(EventSetBase):
+        class MyEventsB(ObjectEvents):
             handle_kind = 'on_b'
 
         class MyNotifier(Object):
@@ -765,12 +772,12 @@ class TestFramework(unittest.TestCase):
         # this can not be saved, as it has not simple types!
         to_be_saved = {"bar": TestFramework}
 
-        class FooEvent(EventSetBase):
+        class FooEvent(EventBase):
             def snapshot(self):
                 return to_be_saved
 
         handle = Handle(None, "a_foo", "some_key")
-        event = FooEvent()
+        event = FooEvent(handle)
 
         framework = self.create_framework()
         framework.register_type(FooEvent, None, handle.kind)
@@ -1369,3 +1376,351 @@ class TestStoredState(unittest.TestCase):
         self.assertEqual(parent._stored.bar, 4)
         # TODO: jam 2020-01-30 is there a clean way to tell that
         #       parent._stored._data.dirty is False?
+
+
+def create_model(testcase):
+    """Create a Model object."""
+    unit_name = 'myapp/0'
+    patcher = patch.dict(os.environ, {'JUJU_UNIT_NAME': unit_name})
+    patcher.start()
+    testcase.addCleanup(patcher.stop)
+
+    backend = model.ModelBackend()
+    meta = charm.CharmMeta()
+    test_model = model.Model('myapp/0', meta, backend)
+    return test_model
+
+
+def create_framework(testcase, model=None):
+    """Create a Framework object."""
+    framework = Framework(":memory:", charm_dir='non-existant', meta=None, model=model)
+    testcase.addCleanup(framework.close)
+    return framework
+
+
+class GenericObserver(Object):
+    """Generic observer for the tests."""
+    def __init__(self, parent, key):
+        super().__init__(parent, key)
+        self.called = False
+
+    def callback_method(self, event):
+        """Set the instance .called to True."""
+        self.called = True
+
+
+@patch('sys.stderr', new_callable=io.StringIO)
+class BreakpointTests(unittest.TestCase):
+
+    def test_ignored(self, fake_stderr):
+        # It doesn't do anything really unless proper environment is there.
+        with patch.dict(os.environ):
+            os.environ.pop('JUJU_DEBUG_AT', None)
+            framework = create_framework(self)
+
+        with patch('pdb.Pdb.set_trace') as mock:
+            framework.breakpoint()
+        self.assertEqual(mock.call_count, 0)
+        self.assertEqual(fake_stderr.getvalue(), "")
+
+    def test_pdb_properly_called(self, fake_stderr):
+        # The debugger needs to leave the user in the frame where the breakpoint is executed,
+        # which for the test is the frame we're calling it here in the test :).
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            framework = create_framework(self)
+
+        with patch('pdb.Pdb.set_trace') as mock:
+            this_frame = inspect.currentframe()
+            framework.breakpoint()
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertEqual(mock.call_args, ((this_frame,), {}))
+
+    def test_welcome_message(self, fake_stderr):
+        # Check that an initial message is shown to the user when code is interrupted.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            framework = create_framework(self)
+        with patch('pdb.Pdb.set_trace'):
+            framework.breakpoint()
+        self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+
+    def test_welcome_message_not_multiple(self, fake_stderr):
+        # Check that an initial message is NOT shown twice if the breakpoint is exercised
+        # twice in the same run.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            framework = create_framework(self)
+        with patch('pdb.Pdb.set_trace'):
+            framework.breakpoint()
+            self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+            framework.breakpoint()
+            self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+
+    def test_builtin_breakpoint_hooked(self, fake_stderr):
+        # Verify that the proper hook is set.
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
+            create_framework(self)  # creating the framework setups the hook
+        with patch('pdb.Pdb.set_trace') as mock:
+            # Calling through sys, not breakpoint() directly, so we can run the
+            # tests with Py < 3.7.
+            sys.breakpointhook()
+        self.assertEqual(mock.call_count, 1)
+
+    def test_breakpoint_names(self, fake_stderr):
+        framework = create_framework(self)
+
+        # Name rules:
+        # - must start and end with lowercase alphanumeric characters
+        # - only contain lowercase alphanumeric characters, or the hyphen "-"
+        good_names = [
+            'foobar',
+            'foo-bar-baz',
+            'foo-------bar',
+            'foo123',
+            '778',
+            '77-xx',
+            'a-b',
+            'ab',
+            'x',
+        ]
+        for name in good_names:
+            with self.subTest(name=name):
+                framework.breakpoint(name)
+
+        bad_names = [
+            '',
+            '.',
+            '-',
+            '...foo',
+            'foo.bar',
+            'bar--'
+            'FOO',
+            'FooBar',
+            'foo bar',
+            'foo_bar',
+            '/foobar',
+            'break-here-☚',
+        ]
+        msg = 'breakpoint names must look like "foo" or "foo-bar"'
+        for name in bad_names:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError) as cm:
+                    framework.breakpoint(name)
+                self.assertEqual(str(cm.exception), msg)
+
+        reserved_names = [
+            'all',
+            'hook',
+        ]
+        msg = 'breakpoint names "all" and "hook" are reserved'
+        for name in reserved_names:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError) as cm:
+                    framework.breakpoint(name)
+                self.assertEqual(str(cm.exception), msg)
+
+        not_really_names = [
+            123,
+            1.1,
+            False,
+        ]
+        for name in not_really_names:
+            with self.subTest(name=name):
+                with self.assertRaises(TypeError) as cm:
+                    framework.breakpoint(name)
+                self.assertEqual(str(cm.exception), 'breakpoint names must be strings')
+
+    def check_trace_set(self, envvar_value, breakpoint_name, call_count):
+        """Helper to check the diverse combinations of situations."""
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': envvar_value}):
+            framework = create_framework(self)
+        with patch('pdb.Pdb.set_trace') as mock:
+            framework.breakpoint(breakpoint_name)
+        self.assertEqual(mock.call_count, call_count)
+
+    def test_unnamed_indicated_all(self, fake_stderr):
+        # If 'all' is indicated, unnamed breakpoints will always activate.
+        self.check_trace_set('all', None, 1)
+
+    def test_unnamed_indicated_hook(self, fake_stderr):
+        # Special value 'hook' was indicated, nothing to do with any call.
+        self.check_trace_set('hook', None, 0)
+
+    def test_named_indicated_specifically(self, fake_stderr):
+        # Some breakpoint was indicated, and the framework call used exactly that name.
+        self.check_trace_set('mybreak', 'mybreak', 1)
+
+    def test_named_indicated_somethingelse(self, fake_stderr):
+        # Some breakpoint was indicated, but the framework call was not with that name.
+        self.check_trace_set('some-breakpoint', None, 0)
+
+    def test_named_indicated_ingroup(self, fake_stderr):
+        # A multiple breakpoint was indicated, and the framework call used a name among those.
+        self.check_trace_set('some,mybreak,foobar', 'mybreak', 1)
+
+    def test_named_indicated_all(self, fake_stderr):
+        # The framework indicated 'all', which includes any named breakpoint set.
+        self.check_trace_set('all', 'mybreak', 1)
+
+    def test_named_indicated_hook(self, fake_stderr):
+        # The framework indicated the special value 'hook', nothing to do with any named call.
+        self.check_trace_set('hook', 'mybreak', 0)
+
+
+class DebugHookTests(unittest.TestCase):
+
+    def test_envvar_parsing_missing(self):
+        with patch.dict(os.environ):
+            os.environ.pop('JUJU_DEBUG_AT', None)
+            framework = create_framework(self)
+        self.assertEqual(framework._juju_debug_at, ())
+
+    def test_envvar_parsing_empty(self):
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': ''}):
+            framework = create_framework(self)
+        self.assertEqual(framework._juju_debug_at, ())
+
+    def test_envvar_parsing_simple(self):
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
+            framework = create_framework(self)
+        self.assertEqual(framework._juju_debug_at, ['hook'])
+
+    def test_envvar_parsing_multiple(self):
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'foo,bar,all'}):
+            framework = create_framework(self)
+        self.assertEqual(framework._juju_debug_at, ['foo', 'bar', 'all'])
+
+    def test_basic_interruption_enabled(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['hook']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
+        with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
+            with patch('pdb.runcall') as mock:
+                publisher.install.emit()
+
+        # Check that the pdb module was used correctly and that the callback method was NOT
+        # called (as we intercepted the normal pdb behaviour! this is to check that the
+        # framework didn't call the callback directly)
+        self.assertEqual(mock.call_count, 1)
+        expected_callback, expected_event = mock.call_args[0]
+        self.assertEqual(expected_callback, observer.callback_method)
+        self.assertIsInstance(expected_event, EventBase)
+        self.assertFalse(observer.called)
+
+        # Verify proper message was given to the user.
+        self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+
+    def test_actions_are_interrupted(self):
+        test_model = create_model(self)
+        framework = create_framework(self, model=test_model)
+        framework._juju_debug_at = ['hook']
+
+        class CustomEvents(ObjectEvents):
+            foobar_action = EventSource(charm.ActionEvent)
+
+        publisher = CustomEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.foobar_action, observer.callback_method)
+        fake_script(self, 'action-get', "echo {}")
+
+        with patch('sys.stderr', new_callable=io.StringIO):
+            with patch('pdb.runcall') as mock:
+                with patch.dict(os.environ, {'JUJU_ACTION_NAME': 'foobar'}):
+                    publisher.foobar_action.emit()
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertFalse(observer.called)
+
+    def test_internal_events_not_interrupted(self):
+        class MyNotifier(Object):
+            """Generic notifier for the tests."""
+            bar = EventSource(EventBase)
+
+        framework = create_framework(self)
+        framework._juju_debug_at = ['hook']
+
+        publisher = MyNotifier(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.bar, observer.callback_method)
+
+        with patch('pdb.runcall') as mock:
+            publisher.bar.emit()
+
+        self.assertEqual(mock.call_count, 0)
+        self.assertTrue(observer.called)
+
+    def test_envvar_mixed(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['foo', 'hook', 'all', 'whatever']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
+        with patch('sys.stderr', new_callable=io.StringIO):
+            with patch('pdb.runcall') as mock:
+                publisher.install.emit()
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertFalse(observer.called)
+
+    def test_no_registered_method(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['hook']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+
+        with patch('pdb.runcall') as mock:
+            publisher.install.emit()
+
+        self.assertEqual(mock.call_count, 0)
+        self.assertFalse(observer.called)
+
+    def test_envvar_nohook(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['something-else']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
+        with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'something-else'}):
+            with patch('pdb.runcall') as mock:
+                publisher.install.emit()
+
+        self.assertEqual(mock.call_count, 0)
+        self.assertTrue(observer.called)
+
+    def test_envvar_missing(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ()
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
+        with patch('pdb.runcall') as mock:
+            publisher.install.emit()
+
+        self.assertEqual(mock.call_count, 0)
+        self.assertTrue(observer.called)
+
+    def test_welcome_message_not_multiple(self):
+        framework = create_framework(self)
+        framework._juju_debug_at = ['hook']
+
+        publisher = charm.CharmEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.install, observer.callback_method)
+
+        with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
+            with patch('pdb.runcall') as mock:
+                publisher.install.emit()
+                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+                publisher.install.emit()
+                self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
+        self.assertEqual(mock.call_count, 2)

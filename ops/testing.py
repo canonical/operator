@@ -29,7 +29,7 @@ class Harness:
     :type charm: CharmBase
     """
 
-    def __init__(self, charm_cls, meta=None):
+    def __init__(self, charm_cls, *, meta=None, actions=None):
         """Used for testing your Charm or component implementations.
 
         Example::
@@ -39,7 +39,8 @@ class Harness:
             relation_id = harness.add_relation('db', 'postgresql')
             # Now instantiate the charm to see events as the model changes
             harness.begin()
-            harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'val'})
+            harness.add_relation_unit(relation_id, 'postgresql/0')
+            harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
             # Check that charm has properly handled the relation_joined event for postgresql/0
             self.assertEqual(harness.charm. ...)
 
@@ -48,19 +49,21 @@ class Harness:
             metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
             parent directory of the Charm, and if not found fall back to a trivial
             'name: test-charm' metadata.
+        :param actions: (optional) A string or file-like object containing the contents of
+            actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
+            parent directory of the Charm.
         """
         # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
         #       it would define the default values of config that the charm would see.
         self._charm_cls = charm_cls
         self._charm = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
-        self._meta = self._create_meta(meta)
+        self._meta = self._create_meta(meta, actions)
         self._unit_name = self._meta.name + '/0'
-        self._model = None
         self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
-        self._backend = _TestingModelBackend(self._unit_name)
+        self._backend = _TestingModelBackend(self._unit_name, self._meta)
         self._model = model.Model(self._unit_name, self._meta, self._backend)
         self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
 
@@ -82,6 +85,9 @@ class Harness:
         Before calling begin(), there is no Charm instance, so changes to the Model won't emit
         events. You must call begin before self.charm is valid.
         """
+        if self._charm is not None:
+            raise RuntimeError('cannot call the begin method on the harness more than once')
+
         # The Framework adds attributes to class objects for events, etc. As such, we can't re-use
         # the original class against multiple Frameworks. So create a locally defined class
         # and register it.
@@ -100,14 +106,15 @@ class Harness:
         TestCharm.__name__ = self._charm_cls.__name__
         self._charm = TestCharm(self._framework, self._framework.meta.name)
 
-    def _create_meta(self, charm_metadata):
+    def _create_meta(self, charm_metadata, action_metadata):
         """Create a CharmMeta object.
 
-        Handle the cases where a user doesn't supply an explicit metadata snippet.
+        Handle the cases where a user doesn't supply explicit metadata snippets.
         """
+        filename = inspect.getfile(self._charm_cls)
+        charm_dir = pathlib.Path(filename).parents[1]
+
         if charm_metadata is None:
-            filename = inspect.getfile(self._charm_cls)
-            charm_dir = pathlib.Path(filename).parents[1]
             metadata_path = charm_dir / 'metadata.yaml'
             if metadata_path.is_file():
                 charm_metadata = metadata_path.read_text()
@@ -117,7 +124,16 @@ class Harness:
                 charm_metadata = 'name: test-charm'
         elif isinstance(charm_metadata, str):
             charm_metadata = dedent(charm_metadata)
-        return charm.CharmMeta.from_yaml(charm_metadata)
+
+        if action_metadata is None:
+            actions_path = charm_dir / 'actions.yaml'
+            if actions_path.is_file():
+                action_metadata = actions_path.read_text()
+                self._charm_dir = charm_dir
+        elif isinstance(action_metadata, str):
+            action_metadata = dedent(action_metadata)
+
+        return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
 
     def disable_hooks(self):
         """Stop emitting hook events when the model changes.
@@ -140,16 +156,15 @@ class Harness:
         self._relation_id_counter += 1
         return rel_id
 
-    def add_relation(self, relation_name, remote_app, remote_app_data=None):
+    def add_relation(self, relation_name, remote_app):
         """Declare that there is a new relation between this app and `remote_app`.
 
         TODO: Once relation_created exists as a Juju hook, it should be triggered by this code.
 
         :param relation_name: The relation on Charm that is being related to
+        :type relation_name: str
         :param remote_app: The name of the application that is being related to
-        :param remote_app_data: Optional data bag that the remote application is sending
-          If remote_app_data is not empty, this should trigger
-          ``charm.on[relation_name].relation_changed(app)``
+        :type remote_app: str
         :return: The relation_id created by this add_relation.
         :rtype: int
         """
@@ -157,10 +172,8 @@ class Harness:
         self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
         self._backend._relation_names[rel_id] = relation_name
         self._backend._relation_list_map[rel_id] = []
-        if remote_app_data is None:
-            remote_app_data = {}
         self._backend._relation_data[rel_id] = {
-            remote_app: remote_app_data,
+            remote_app: {},
             self._backend.unit_name: {},
             self._backend.app_name: {},
         }
@@ -169,17 +182,15 @@ class Harness:
             self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return rel_id
-        # TODO: jam 2020-03-05 We should be triggering relation_changed(app) if
-        #       remote_app_data isn't empty.
         return rel_id
 
-    def add_relation_unit(self, relation_id, remote_unit_name, remote_unit_data=None):
+    def add_relation_unit(self, relation_id, remote_unit_name):
         """Add a new unit to a relation.
 
         Example::
 
           rel_id = harness.add_relation('db', 'postgresql')
-          harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'foo': 'bar'}
+          harness.add_relation_unit(rel_id, 'postgresql/0')
 
         This will trigger a `relation_joined` event and a `relation_changed` event.
 
@@ -187,15 +198,10 @@ class Harness:
         :type relation_id: int
         :param remote_unit_name: A string representing the remote unit that is being added.
         :type remote_unit_name: str
-        :param remote_unit_data: Optional data bag containing data that will be seeded in
-            relation data before relation_changed is triggered.
-        :type remote_unit_data: dict
         :return: None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        if remote_unit_data is None:
-            remote_unit_data = {}
-        self._backend._relation_data[relation_id][remote_unit_name] = remote_unit_data
+        self._backend._relation_data[relation_id][remote_unit_name] = {}
         relation_name = self._backend._relation_names[relation_id]
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
@@ -207,11 +213,6 @@ class Harness:
         if self._charm is None or not self._hooks_enabled:
             return
         self._charm.on[relation_name].relation_joined.emit(
-            relation, remote_unit.app, remote_unit)
-        # TODO: jam 2020-03-05 Do we only emit relation_changed if remote_unit_data isn't
-        #       empty? juju itself always triggers relation_changed immediately after
-        #       relation_joined
-        self._charm.on[relation_name].relation_changed.emit(
             relation, remote_unit.app, remote_unit)
 
     def get_relation_data(self, relation_id, app_or_unit):
@@ -231,6 +232,10 @@ class Harness:
         """
         return self._backend._relation_data[relation_id].get(app_or_unit, None)
 
+    def get_workload_version(self):
+        """Read the workload version that was set by the unit."""
+        return self._backend._workload_version
+
     def update_relation_data(self, relation_id, app_or_unit, key_values):
         """Update the relation data for a given unit or application in a given relation.
 
@@ -242,6 +247,18 @@ class Harness:
         :param key_values: Each key/value will be updated in the relation data.
         :return: None
         """
+        relation_name = self._backend._relation_names[relation_id]
+        relation = self._model.get_relation(relation_name, relation_id)
+        if '/' in app_or_unit:
+            entity = self._model.get_unit(app_or_unit)
+        else:
+            entity = self._model.get_app(app_or_unit)
+        rel_data = relation.data.get(entity, None)
+        if rel_data is not None:
+            # rel_data may have cached now-stale data, so _invalidate() it.
+            # Note, this won't cause the data to be loaded if it wasn't already.
+            rel_data._invalidate()
+
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
         for k, v in key_values.items():
             if v == '':
@@ -249,18 +266,18 @@ class Harness:
             else:
                 new_values[k] = v
         self._backend._relation_data[relation_id][app_or_unit] = new_values
-        relation_name = self._backend._relation_names[relation_id]
-        if self._model is not None:
-            relation = self._model.get_relation(relation_name, relation_id)
-            if '/' in app_or_unit:
-                entity = self._model.get_unit(app_or_unit)
-            else:
-                entity = self._model.get_app(app_or_unit)
-            rel_data = relation.data.get(entity, None)
-            if rel_data is not None:
-                # If we have read and cached this data, make sure we invalidate it
-                rel_data._invalidate()
-        # TODO: we only need to trigger relation_changed if it is a remote app or unit
+
+        if app_or_unit == self._model.unit.name:
+            # No events for our own unit
+            return
+        if app_or_unit == self._model.app.name:
+            # updating our own app only generates an event if it is a peer relation and we
+            # aren't the leader
+            is_peer = self._meta.relations[relation_name].role == 'peers'
+            if not is_peer:
+                return
+            if self._model.unit.is_leader():
+                return
         self._emit_relation_changed(relation_id, app_or_unit)
 
     def _emit_relation_changed(self, relation_id, app_or_unit):
@@ -323,12 +340,16 @@ class Harness:
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
 
-    You should not use this class directly, it is used by `TestingHarness`_ to drive the model.
+    DO NOT use this class directly, it is used by `Harness`_ to drive the model.
+    `Harness`_ is responsible for maintaining the internal consistency of the values here,
+    as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name):
+    def __init__(self, unit_name, meta):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
+        self._calls = []
+        self._meta = meta
         self._is_leader = None
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
         self._relation_names = {}  # reverse map from relation_id to relation_name
@@ -340,16 +361,27 @@ class _TestingModelBackend:
         self._pod_spec = None
         self._app_status = None
         self._unit_status = None
+        self._workload_version = None
 
     def relation_ids(self, relation_name):
-        return self._relation_ids_map[relation_name]
+        try:
+            return self._relation_ids_map[relation_name]
+        except KeyError as e:
+            if relation_name not in self._meta.relations:
+                raise model.ModelError('{} is not a known relation'.format(relation_name)) from e
+            return []
 
     def relation_list(self, relation_id):
-        return self._relation_list_map[relation_id]
+        try:
+            return self._relation_list_map[relation_id]
+        except KeyError as e:
+            raise model.RelationNotFoundError from e
 
     def relation_get(self, relation_id, member_name, is_app):
         if is_app and '/' in member_name:
             member_name = member_name.split('/')[0]
+        if relation_id not in self._relation_data:
+            raise model.RelationNotFoundError()
         return self._relation_data[relation_id][member_name].copy()
 
     def relation_set(self, relation_id, key, value, is_app):
@@ -361,13 +393,19 @@ class _TestingModelBackend:
         if bucket_key not in relation:
             relation[bucket_key] = {}
         bucket = relation[bucket_key]
-        bucket[key] = value
+        if value == '':
+            bucket.pop(key, None)
+        else:
+            bucket[key] = value
 
     def config_get(self):
         return self._config
 
     def is_leader(self):
         return self._is_leader
+
+    def application_version_set(self, version):
+        self._workload_version = version
 
     def resource_get(self, resource_name):
         return self._resources_map[resource_name]
