@@ -60,8 +60,6 @@ class Harness:
             *,
             meta: OptionalYAML = None,
             actions: OptionalYAML = None):
-        """Used for testing your Charm or component implementations.
-        """
         # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
         #       it would define the default values of config that the charm would see.
         self._charm_cls = charm_cls
