@@ -39,7 +39,8 @@ class Harness:
             relation_id = harness.add_relation('db', 'postgresql')
             # Now instantiate the charm to see events as the model changes
             harness.begin()
-            harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'val'})
+            harness.add_relation_unit(relation_id, 'postgresql/0')
+            harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
             # Check that charm has properly handled the relation_joined event for postgresql/0
             self.assertEqual(harness.charm. ...)
 
@@ -189,7 +190,7 @@ class Harness:
         Example::
 
           rel_id = harness.add_relation('db', 'postgresql')
-          harness.add_relation_unit(rel_id, 'postgresql/0', remote_unit_data={'foo': 'bar'}
+          harness.add_relation_unit(rel_id, 'postgresql/0')
 
         This will trigger a `relation_joined` event and a `relation_changed` event.
 
@@ -230,6 +231,10 @@ class Harness:
         :raises: KeyError if relation_id doesn't exist
         """
         return self._backend._relation_data[relation_id].get(app_or_unit, None)
+
+    def get_workload_version(self):
+        """Read the workload version that was set by the unit."""
+        return self._backend._workload_version
 
     def update_relation_data(self, relation_id, app_or_unit, key_values):
         """Update the relation data for a given unit or application in a given relation.
@@ -396,6 +401,7 @@ class _TestingModelBackend:
         self._pod_spec = None
         self._app_status = None
         self._unit_status = None
+        self._workload_version = None
 
     def relation_ids(self, relation_name):
         try:
@@ -437,6 +443,9 @@ class _TestingModelBackend:
 
     def is_leader(self):
         return self._is_leader
+
+    def application_version_set(self, version):
+        self._workload_version = version
 
     def resource_get(self, resource_name):
         return self._resources_map[resource_name]

@@ -553,6 +553,15 @@ class TestHarness(unittest.TestCase):
         del rel.data[harness.charm.model.unit]['foo']
         self.assertEqual({}, harness.get_relation_data(rel_id, 'test-charm/0'))
 
+    def test_set_workload_version(self):
+        harness = Harness(CharmBase, meta='''
+            name: app
+            ''')
+        harness.begin()
+        self.assertIsNone(harness.get_workload_version())
+        harness.charm.model.unit.set_workload_version('1.2.3')
+        self.assertEqual(harness.get_workload_version(), '1.2.3')
+
     def test_get_backend_calls(self):
         harness = Harness(CharmBase, meta='''
             name: test-charm
