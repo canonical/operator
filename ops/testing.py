@@ -63,7 +63,7 @@ class Harness:
         self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
-        self._backend = _TestingModelBackend(self._unit_name)
+        self._backend = _TestingModelBackend(self._unit_name, self._meta)
         self._model = model.Model(self._unit_name, self._meta, self._backend)
         self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
 
@@ -182,8 +182,6 @@ class Harness:
             self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return rel_id
-        # TODO: jam 2020-03-05 We should be triggering relation_changed(app) if
-        #       remote_app_data isn't empty.
         return rel_id
 
     def add_relation_unit(self, relation_id, remote_unit_name):
@@ -342,12 +340,16 @@ class Harness:
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
 
-    You should not use this class directly, it is used by `TestingHarness`_ to drive the model.
+    DO NOT use this class directly, it is used by `Harness`_ to drive the model.
+    `Harness`_ is responsible for maintaining the internal consistency of the values here,
+    as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name):
+    def __init__(self, unit_name, meta):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
+        self._calls = []
+        self._meta = meta
         self._is_leader = None
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
         self._relation_names = {}  # reverse map from relation_id to relation_name
@@ -362,14 +364,24 @@ class _TestingModelBackend:
         self._workload_version = None
 
     def relation_ids(self, relation_name):
-        return self._relation_ids_map[relation_name]
+        try:
+            return self._relation_ids_map[relation_name]
+        except KeyError as e:
+            if relation_name not in self._meta.relations:
+                raise model.ModelError('{} is not a known relation'.format(relation_name)) from e
+            return []
 
     def relation_list(self, relation_id):
-        return self._relation_list_map[relation_id]
+        try:
+            return self._relation_list_map[relation_id]
+        except KeyError as e:
+            raise model.RelationNotFoundError from e
 
     def relation_get(self, relation_id, member_name, is_app):
         if is_app and '/' in member_name:
             member_name = member_name.split('/')[0]
+        if relation_id not in self._relation_data:
+            raise model.RelationNotFoundError()
         return self._relation_data[relation_id][member_name].copy()
 
     def relation_set(self, relation_id, key, value, is_app):
@@ -381,7 +393,10 @@ class _TestingModelBackend:
         if bucket_key not in relation:
             relation[bucket_key] = {}
         bucket = relation[bucket_key]
-        bucket[key] = value
+        if value == '':
+            bucket.pop(key, None)
+        else:
+            bucket[key] = value
 
     def config_get(self):
         return self._config
