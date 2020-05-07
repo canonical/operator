@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # -- Project information -----------------------------------------------------
 
 project = 'The Operator Framework'
-copyright = '2020, Canonical Ltd'
+copyright = '2019, Canonical Ltd.'
 author = 'Canonical Ltd'
 
 
@@ -56,7 +56,8 @@ html_static_path = ['_static']
 
 #  If this is True, todo and todolist produce output, else they
 #  produce nothing. The default is False.
-todo_include_todos = True
+todo_include_todos = False
+
 
 # -- Options for sphinx.ext.autodoc ------------------------------------------
 
