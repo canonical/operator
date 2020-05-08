@@ -86,33 +86,6 @@ class TestModel(unittest.TestCase):
         relation_id_db0_b = self.harness.add_relation('db0', 'another')
         self.resetBackendCalls()
 
-        # TODO(jam): Move this to a direct ModelBackend test, for how we handle when Juju tells
-        #  us there is no such relation.
-        # ## err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
-        # ## fake_script(self, 'relation-ids', '''
-        # ##     case "$1" in
-        # ##     db1)
-        # ##         echo '["db1:4"]'
-        # ##         ;;
-        # ##     db2)
-        # ##         echo '["db2:5", "db2:6"]'
-        # ##         ;;
-        # ##     *)
-        # ##         echo '[]'
-        # ##         ;;
-        # ##     esac
-        # ## ''')
-        # ## fake_script(self, 'relation-list', '''
-        # ##     if [ "$2" = 4 ]; then
-        # ##         echo '["remoteapp1/0"]'
-        # ##     else
-        # ##         echo {} >&2
-        # ##         exit 2
-        # ##     fi
-        # ## '''.format(err_msg))
-        # ## fake_script(self, 'relation-get',
-        # ##             """echo {} >&2 ; exit 2""".format(err_msg))
-
         with self.assertRaises(ops.model.ModelError):
             # You have to specify it by just the integer ID
             self.model.get_relation('db1', 'db1:{}'.format(relation_id_db1))
