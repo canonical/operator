@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # -- Project information -----------------------------------------------------
 
 project = 'The Operator Framework'
-copyright = '2019, Canonical Ltd.'
+copyright = '2019-2020, Canonical Ltd.'
 author = 'Canonical Ltd'
 
 
