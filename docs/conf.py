@@ -79,7 +79,7 @@ autodoc_typehints = 'description'
 autoclass_content = 'both'
 
 autodoc_default_options = {
-    'members': True,
-    'undoc-members': True,
-    'show-inheritance': True,
+    'members': None,            # None here means "yes"
+    'undoc-members': None,
+    'show-inheritance': None,
 }
