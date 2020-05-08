@@ -571,28 +571,33 @@ class TestHarness(unittest.TestCase):
             ''')
         harness.begin()
         # No calls to the backend yet
-        self.assertEqual([], harness._get_backend_calls())
+        self.assertEqual(harness._get_backend_calls(), [])
         rel_id = harness.add_relation('db', 'postgresql')
         # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
-        self.assertEqual([
-            ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-        ], harness._get_backend_calls(reset=True))
-        # add_relation_unit resets the relation_list, and causes the Model to read
-        # it to fire `relation_changed`
+        self.assertEqual(
+            harness._get_backend_calls(reset=True), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
+        # add_relation_unit resets the relation_list, but doesn't trigger backend calls
         harness.add_relation_unit(rel_id, 'postgresql/0')
-        self.assertEqual([
-            ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-        ], harness._get_backend_calls(reset=False))
+        self.assertEqual([], harness._get_backend_calls(reset=False))
+        # however, update_relation_data does, because we are preparing relation-changed
+        harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
+        self.assertEqual(
+            harness._get_backend_calls(reset=False), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
         # If we check again, they are still there, but now we reset it
-        self.assertEqual([
-            ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-        ], harness._get_backend_calls(reset=True))
+        self.assertEqual(
+            harness._get_backend_calls(reset=True), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
         # And the calls are gone
-        self.assertEqual([], harness._get_backend_calls())
+        self.assertEqual(harness._get_backend_calls(), [])
 
     def test_get_backend_calls_with_kwargs(self):
         harness = Harness(CharmBase, meta='''
