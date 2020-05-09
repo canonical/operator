@@ -248,11 +248,9 @@ class RelationEvent(HookEvent):
 class RelationCreatedEvent(RelationEvent):
     """Represents the `relation-created` hook from Juju.
 
-    A relation-created event fires after a relation is created in Juju. A relation-joined
-    event will only fire after the respective relation-created event.
-    For units that are coming up, relation-created events fire after the install event
-    before any other events that fire after install, including leader-elected. This allows
-    a leader unit to work with peer application relation data early in its life cycle.
+    This is triggered when a new relation to another app is added in Juju. This
+    can occur before units for those applications have started. All existing
+    relations should be established before start.
     """
 
 
