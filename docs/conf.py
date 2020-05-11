@@ -81,9 +81,3 @@ autodoc_typehints = 'description'
 #              concatenated and inserted.
 #     'init' - Only the __init__ method’s docstring is inserted.
 autoclass_content = 'both'
-
-autodoc_default_options = {
-    'members': None,            # None here means "yes"
-    'undoc-members': None,
-    'show-inheritance': None,
-}
