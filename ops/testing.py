@@ -182,6 +182,10 @@ class Harness:
             self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return rel_id
+        relation = self._model.get_relation(relation_name, rel_id)
+        app = self._model.get_app(remote_app)
+        self._charm.on[relation_name].relation_created.emit(
+            relation, app)
         return rel_id
 
     def add_relation_unit(self, relation_id, remote_unit_name):
