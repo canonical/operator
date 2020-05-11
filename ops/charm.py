@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import os
+import pathlib
 import typing
 
 import yaml
 
-from ops.framework import Object, EventSource, EventBase, ObjectEvents
+from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
+from ops import model
 
 
 class HookEvent(EventBase):
@@ -341,7 +343,7 @@ class CharmBase(Object):
 
     on = CharmEvents()
 
-    def __init__(self, framework: 'ops.framework.Framework', key: typing.Optional[str]):
+    def __init__(self, framework: Framework, key: typing.Optional[str]):
         """Initialize the Charm with its framework and application name.
 
         """
@@ -365,23 +367,23 @@ class CharmBase(Object):
             self.on.define_event(action_name + '_action', ActionEvent)
 
     @property
-    def app(self) -> 'ops.model.Application':
+    def app(self) -> model.Application:
         """Application that this unit is part of."""
         return self.framework.model.app
 
     @property
-    def unit(self) -> 'ops.model.Unit':
+    def unit(self) -> model.Unit:
         """Unit that this execution is responsible for."""
         return self.framework.model.unit
 
     @property
-    def meta(self) -> 'ops.charm.CharmMeta':
+    def meta(self) -> 'CharmMeta':
         """CharmMeta of this charm.
         """
         return self.framework.meta
 
     @property
-    def charm_dir(self) -> 'pathlib.Path':
+    def charm_dir(self) -> pathlib.Path:
         """Root directory of the Charm as it is running.
         """
         return self.framework.charm_dir
@@ -471,8 +473,9 @@ class CharmMeta:
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw.items()}
 
     @classmethod
-    def from_yaml(cls, metadata: typing.Union[str, typing.TextIO],
-                  actions: typing.Optional[typing.Union[str, typing.TextIO]] = None):
+    def from_yaml(
+            cls, metadata: typing.Union[str, typing.TextIO],
+            actions: typing.Optional[typing.Union[str, typing.TextIO]] = None):
         """Instantiate a CharmMeta from a YAML description of metadata.yaml.
 
         Args:
