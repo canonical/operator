@@ -30,6 +30,10 @@ extensions = [
     'sphinx.ext.viewcode',
 ]
 
+# The document name of the “master” document, that is, the document
+# that contains the root toctree directive.
+master_doc = 'index'
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
