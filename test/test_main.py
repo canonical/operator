@@ -613,7 +613,7 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
         self.assertEqual(self.stdout.read(), b'')
         calls = fake_script_calls(self)
         self.assertEqual(len(calls), 1, 'unexpect call result: {}'.format(calls))
-        self.assertEqual(len(calls[0]), 4,  'unexpect call result: {}'.format(calls[0]))
+        self.assertEqual(len(calls[0]), 4, 'unexpect call result: {}'.format(calls[0]))
         self.assertEqual(
             calls[0][:3],
             ['juju-log', '--log-level', 'WARNING']
@@ -628,13 +628,13 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
         hook_path = self.hooks_dir / 'install'
         for ((rel, ind), path) in {
                 # relative and indirect
-                (True, True):   Path('../dispatch'),
+                (True, True): Path('../dispatch'),
                 # relative and direct
-                (True, False):  Path(self.charm_exec_path),
+                (True, False): Path(self.charm_exec_path),
                 # absolute and direct
                 (False, False): (self.hooks_dir / self.charm_exec_path).resolve(),
                 # absolute and indirect
-                (False, True):  self.JUJU_CHARM_DIR / 'dispatch',
+                (False, True): self.JUJU_CHARM_DIR / 'dispatch',
         }.items():
             with self.subTest(path=path, rel=rel, ind=ind):
                 # sanity check
