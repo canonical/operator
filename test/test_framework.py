@@ -24,7 +24,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-from ops import charm, model
+from ops import charm
 from ops.framework import (
     _BREAKPOINT_WELCOME_MESSAGE,
     BoundStoredState,
@@ -37,12 +37,12 @@ from ops.framework import (
     NoSnapshotError,
     Object,
     PreCommitEvent,
-    SQLiteStorage,
     StoredList,
     StoredState,
     StoredStateData,
 )
 from test.test_helpers import fake_script
+from test.factory import create_framework, create_model
 
 
 class TestFramework(unittest.TestCase):
@@ -50,17 +50,10 @@ class TestFramework(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
-        default_timeout = SQLiteStorage.DB_LOCK_TIMEOUT
 
-        def timeout_cleanup():
-            SQLiteStorage.DB_LOCK_TIMEOUT = default_timeout
-        SQLiteStorage.DB_LOCK_TIMEOUT = datetime.timedelta(0)
-        self.addCleanup(timeout_cleanup)
-
-    def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)
-        self.addCleanup(framework.close)
-        return framework
+        patcher = patch('ops.framework.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_handle_path(self):
         cases = [
@@ -85,7 +78,7 @@ class TestFramework(unittest.TestCase):
             handle.path = 'foo'
 
     def test_restore_unknown(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class Foo(Object):
             pass
@@ -117,13 +110,13 @@ class TestFramework(unittest.TestCase):
         handle = Handle(None, "a_foo", "some_key")
         event = Foo(handle, 1)
 
-        framework1 = self.create_framework()
+        framework1 = create_framework(self, tmpdir=self.tmpdir)
         framework1.register_type(Foo, None, handle.kind)
         framework1.save_snapshot(event)
         framework1.commit()
         framework1.close()
 
-        framework2 = self.create_framework()
+        framework2 = create_framework(self, tmpdir=self.tmpdir)
         framework2.register_type(Foo, None, handle.kind)
         event2 = framework2.load_snapshot(handle)
         self.assertEqual(event2.my_n, 2)
@@ -138,13 +131,13 @@ class TestFramework(unittest.TestCase):
         framework2.commit()
         framework2.close()
 
-        framework3 = self.create_framework()
+        framework3 = create_framework(self, tmpdir=self.tmpdir)
         framework3.register_type(Foo, None, handle.kind)
 
         self.assertRaises(NoSnapshotError, framework3.load_snapshot, handle)
 
     def test_simple_event_observer(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class MyEvent(EventBase):
             pass
@@ -211,7 +204,7 @@ class TestFramework(unittest.TestCase):
             def on_qux(self, event, extra=None):
                 assert False, 'should not be reached'
 
-        framework = self.create_framework()
+        framework = create_framework(self)
         pub = MyNotifier(framework, "pub")
         obs = MyObserver(framework, "obs")
 
@@ -224,7 +217,7 @@ class TestFramework(unittest.TestCase):
         framework.observe(pub.qux, obs)
 
     def test_on_pre_commit_emitted(self):
-        framework = self.create_framework()
+        framework = create_framework(self, tmpdir=self.tmpdir)
 
         class PreCommitObserver(Object):
 
@@ -258,7 +251,7 @@ class TestFramework(unittest.TestCase):
         self.assertTrue(obs.seen, [PreCommitEvent, CommitEvent])
         framework.close()
 
-        other_framework = self.create_framework()
+        other_framework = create_framework(self, tmpdir=self.tmpdir)
 
         new_obs = PreCommitObserver(other_framework, None)
 
@@ -269,7 +262,7 @@ class TestFramework(unittest.TestCase):
             new_obs._stored.myotherdata
 
     def test_defer_and_reemit(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class MyEvent(EventBase):
             pass
@@ -339,7 +332,7 @@ class TestFramework(unittest.TestCase):
         self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
 
     def test_custom_event_data(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class MyEvent(EventBase):
             def __init__(self, handle, n):
@@ -387,7 +380,7 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(obs.seen, ["on_foo:foo=2", "on_foo:foo=2"])
 
     def test_weak_observer(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         observed_events = []
 
@@ -418,7 +411,7 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(observed_events, ["foo"])
 
     def test_forget_and_multiple_objects(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class MyObject(Object):
             pass
@@ -438,12 +431,12 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(o1.handle.path, o3.handle.path)
         framework.close()
         # Or using a second framework
-        framework_copy = self.create_framework()
+        framework_copy = create_framework(self)
         o_copy = MyObject(framework_copy, "path")
         self.assertEqual(o1.handle.path, o_copy.handle.path)
 
     def test_forget_and_multiple_objects_with_load_snapshot(self):
-        framework = self.create_framework()
+        framework = create_framework(self, tmpdir=self.tmpdir)
 
         class MyObject(Object):
             def __init__(self, parent, name):
@@ -476,17 +469,17 @@ class TestFramework(unittest.TestCase):
             MyObject(framework, "path")
         framework.close()
         # But we can create an object, or load a snapshot in a copy of the framework
-        framework_copy1 = self.create_framework()
+        framework_copy1 = create_framework(self, tmpdir=self.tmpdir)
         o_copy1 = MyObject(framework_copy1, "path")
         self.assertEqual(o_copy1.value, "path")
         framework_copy1.close()
-        framework_copy2 = self.create_framework()
+        framework_copy2 = create_framework(self, tmpdir=self.tmpdir)
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
         self.assertEqual(o_copy2.value, "path")
 
     def test_events_base(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class MyEvent(EventBase):
             pass
@@ -551,7 +544,7 @@ class TestFramework(unittest.TestCase):
         # The event type may have been gone for good, and nobody cares,
         # so this shouldn't be an error scenario.
 
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class MyEvent(EventBase):
             pass
@@ -580,7 +573,7 @@ class TestFramework(unittest.TestCase):
         framework.commit()
         framework.close()
 
-        framework_copy = self.create_framework()
+        framework_copy = create_framework(self)
 
         # No errors on missing event types here.
         framework_copy.reemit()
@@ -590,7 +583,7 @@ class TestFramework(unittest.TestCase):
         self.assertRaises(NoSnapshotError, framework_copy.load_snapshot, event_handle)
 
     def test_auto_register_event_types(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class MyFoo(EventBase):
             pass
@@ -633,7 +626,7 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(obs.seen, ["on_foo:MyFoo:foo", "on_bar:MyBar:bar"])
 
     def test_dynamic_event_types(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class MyEventsA(ObjectEvents):
             handle_kind = 'on_a'
@@ -729,7 +722,7 @@ class TestFramework(unittest.TestCase):
                     event.defer()
                     MyObserver.has_deferred = True
 
-        framework1 = self.create_framework()
+        framework1 = create_framework(self, tmpdir=self.tmpdir)
         pub1 = MyNotifier(framework1, "pub")
         obs1 = MyObserver(framework1, "obs")
         framework1.observe(pub1.foo, obs1)
@@ -740,7 +733,7 @@ class TestFramework(unittest.TestCase):
         framework1.close()
         del framework1
 
-        framework2 = self.create_framework()
+        framework2 = create_framework(self, tmpdir=self.tmpdir)
         pub2 = MyNotifier(framework2, "pub")
         obs2 = MyObserver(framework2, "obs")
         framework2.observe(pub2.foo, obs2)
@@ -754,7 +747,7 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(obs2.seen, [('4', 'second'), ('1', 'first')])
 
     def test_helper_properties(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
         framework.model = 'test-model'
         framework.meta = 'test-meta'
 
@@ -762,9 +755,9 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(my_obj.model, framework.model)
 
     def test_ban_concurrent_frameworks(self):
-        f = self.create_framework()
+        f = create_framework(self, tmpdir=self.tmpdir)
         with self.assertRaises(Exception) as cm:
-            self.create_framework()
+            create_framework(self, tmpdir=self.tmpdir)
         self.assertIn('database is locked', str(cm.exception))
         f.close()
 
@@ -779,7 +772,7 @@ class TestFramework(unittest.TestCase):
         handle = Handle(None, "a_foo", "some_key")
         event = FooEvent(handle)
 
-        framework = self.create_framework()
+        framework = create_framework(self)
         framework.register_type(FooEvent, None, handle.kind)
         with self.assertRaises(ValueError) as cm:
             framework.save_snapshot(event)
@@ -794,11 +787,6 @@ class TestStoredState(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
-
-    def create_framework(self, cls=Framework):
-        framework = cls(self.tmpdir / "framework.data", self.tmpdir, None, None)
-        self.addCleanup(framework.close)
-        return framework
 
     def test_basic_state_storage(self):
         class SomeObject(Object):
@@ -856,7 +844,7 @@ class TestStoredState(unittest.TestCase):
         self._stored_state_tests(FinalChild)
 
     def _stored_state_tests(self, cls):
-        framework = self.create_framework()
+        framework = create_framework(self, tmpdir=self.tmpdir)
         obj = cls(framework, "1")
 
         try:
@@ -889,7 +877,7 @@ class TestStoredState(unittest.TestCase):
         framework.close()
 
         # Since this has the same absolute object handle, it will get its state back.
-        framework_copy = self.create_framework()
+        framework_copy = create_framework(self, tmpdir=self.tmpdir)
         obj_copy = cls(framework_copy, "1")
         self.assertEqual(obj_copy._stored.foo, 42)
         self.assertEqual(obj_copy._stored.bar, "s")
@@ -908,7 +896,7 @@ class TestStoredState(unittest.TestCase):
         class SubB(Base):
             pass
 
-        framework = self.create_framework()
+        framework = create_framework(self, tmpdir=self.tmpdir)
         a = SubA(framework, None)
         b = SubB(framework, None)
         z = Base(framework, None)
@@ -920,7 +908,7 @@ class TestStoredState(unittest.TestCase):
         framework.commit()
         framework.close()
 
-        framework2 = self.create_framework()
+        framework2 = create_framework(self, tmpdir=self.tmpdir)
         a2 = SubA(framework2, None)
         b2 = SubB(framework2, None)
         z2 = Base(framework2, None)
@@ -934,7 +922,7 @@ class TestStoredState(unittest.TestCase):
             _stored = StoredState()
             _stored2 = _stored
 
-        framework = self.create_framework()
+        framework = create_framework(self)
         obj = Mine(framework, None)
 
         with self.assertRaises(RuntimeError):
@@ -959,7 +947,7 @@ class TestStoredState(unittest.TestCase):
         class B(Base):
             _stored = A._stored
 
-        framework = self.create_framework()
+        framework = create_framework(self)
         a = A(framework, None)
         b = B(framework, None)
 
@@ -976,7 +964,7 @@ class TestStoredState(unittest.TestCase):
         self.assertNotIn("_stored", b.__dict__)
 
     def test_mutable_types_invalid(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class SomeObject(Object):
             _stored = StoredState()
@@ -1165,7 +1153,7 @@ class TestStoredState(unittest.TestCase):
 
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
-            framework = self.create_framework(cls=WrappedFramework)
+            framework = WrappedFramework(self.tmpdir / "framework.data", self.tmpdir, None, None)
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
@@ -1190,7 +1178,8 @@ class TestStoredState(unittest.TestCase):
             framework.commit()
             framework.close()
 
-            framework_copy = self.create_framework(cls=WrappedFramework)
+            framework_copy = WrappedFramework(
+                self.tmpdir / "framework.data", self.tmpdir, None, None)
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
@@ -1288,7 +1277,7 @@ class TestStoredState(unittest.TestCase):
         class SomeObject(Object):
             _stored = StoredState()
 
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         for i, (a, b, op, op_ab, op_ba) in enumerate(test_operations):
             obj = SomeObject(framework, str(i))
@@ -1327,7 +1316,7 @@ class TestStoredState(unittest.TestCase):
         class SomeObject(Object):
             _stored = StoredState()
 
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         # Validate that operations between StoredSet and built-in sets
         # only result in built-in sets being returned.
@@ -1354,7 +1343,7 @@ class TestStoredState(unittest.TestCase):
                 self.assertEqual(b, old_b)
 
     def test_set_default(self):
-        framework = self.create_framework()
+        framework = create_framework(self)
 
         class StatefulObject(Object):
             _stored = StoredState()
@@ -1376,26 +1365,6 @@ class TestStoredState(unittest.TestCase):
         self.assertEqual(parent._stored.bar, 4)
         # TODO: jam 2020-01-30 is there a clean way to tell that
         #       parent._stored._data.dirty is False?
-
-
-def create_model(testcase):
-    """Create a Model object."""
-    unit_name = 'myapp/0'
-    patcher = patch.dict(os.environ, {'JUJU_UNIT_NAME': unit_name})
-    patcher.start()
-    testcase.addCleanup(patcher.stop)
-
-    backend = model.ModelBackend()
-    meta = charm.CharmMeta()
-    test_model = model.Model('myapp/0', meta, backend)
-    return test_model
-
-
-def create_framework(testcase, model=None):
-    """Create a Framework object."""
-    framework = Framework(":memory:", charm_dir='non-existant', meta=None, model=model)
-    testcase.addCleanup(framework.close)
-    return framework
 
 
 class GenericObserver(Object):
