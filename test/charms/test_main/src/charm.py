@@ -17,12 +17,12 @@ import os
 import base64
 import pickle
 import sys
-sys.path.append('lib')  # noqa
+sys.path.append('lib')
 
-from ops.charm import CharmBase
-from ops.main import main
+from ops.charm import CharmBase  # NOQA: imported after fixing path above (not at the top)
+from ops.main import main  # NOQA: imported after fixing path above (not at the top)
 
-import logging
+import logging  # NOQA: imported after fixing path above (not at the top)
 
 logger = logging.getLogger()
 
