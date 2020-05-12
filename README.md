@@ -110,18 +110,25 @@ If you need help, have ideas, or would just like to chat with us, reach out on
 IRC: we're in [#smooth-operator](irc://chat.freenode.net/%23smooth-operator) on
 freenode (or try the [webchat](https://webchat.freenode.net/#smooth-operator)).
 
-We also pay attention to juju's [discourse](https://discourse.jujucharms.com/),
-but currently we don't actively post there; most discussion at this stage is on
-IRC.
+We also pay attention to juju's [discourse], but currently we don't actively
+post there outside of our little corner of the [docs]; most discussion at this
+stage is on IRC.
+
+[discourse]: https://discourse.juju.is/c/charming
+[docs]: https://discourse.juju.is/c/docs/operator-framework
 
 # Operator Framework development
 
-If you want to work in the framework *itself* you will need the following
+If you want to work in the framework *itself* you will need some extra
 dependencies installed in your system:
 
-- Python >= 3.5
-- PyYAML
-- autopep8
-- flake8
+    pip install -r requirements-dev.txt
 
 Then you can try `./run_tests`, it should all go green.
+
+If you want to build the documentation you can do
+
+    pip install -r docs/requirements.txt
+    ./build_docs
+
+
