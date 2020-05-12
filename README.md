@@ -14,8 +14,8 @@ The framework will help you to:
 
 Charms written using the operator framework are just Python code. The intention
 is for it to feel very natural for somebody used to coding in Python, and
-reasonably easy to pick up for somebody whose might be a domain expert but
-not necessarily a pythonista themselves.
+reasonably easy to pick up for somebody who might be a domain expert but not
+necessarily a pythonista themselves.
 
 The dependencies of the operator framework are kept as minimal as possible;
 currently that's Python 3.5 or greater, and `PyYAML` (both are included by
@@ -29,7 +29,7 @@ framework (be it with reactive or without), we have an [introduction to the
 operator framework](/TBD) just for you.
 
 If you've gone through the above already and just want a refresher, or are
-really impatient and just want to dive in, feel free to carry on down.
+really impatient and need to dive in, feel free to carry on down.
 
 ## An Unrelenting Introduction
 
@@ -38,8 +38,8 @@ a particular Python file. It could be anything that makes sense to your project,
 but let's assume this is `src/charm.py`. This file must be executable (and it
 must have the appropriate shebang line).
 
-This file must be symlinked from `hooks/install` (or `hooks/start` if it's a
-charm targeting k8s on juju < 3.8).
+This file must be symlinked from `dispatch` (as of juju 3.8; otherwise from
+`hooks/install`, and also from `hooks/start` if it's for k8s).
 
 You also need the usual `metadata.yaml` and `config.yaml` files, and any Python
 dependencies (maybe using some kind of virtualenv). In other words, your project
@@ -53,9 +53,10 @@ might look like this:
 │   └── # ... your Python dependencies, including the operator framework itself
 ├── src/
 │   └── charm.py
-└── hooks/
-    └── install -> ../src/charm.py
+└── dispatch -> src/charm.py
 ```
+
+> 🛈 once `charmcraft build` works the layout will get simpler!
 
 `src/charm.py` here is the entry point to your charm code. At a minimum, it
 needs to define a subclass of `CharmBase` and pass that into the framework's
@@ -104,31 +105,35 @@ harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 
 self.assertEqual(harness.charm. ...)
 ```
 
-# Talk to us
+## Talk to us
 
 If you need help, have ideas, or would just like to chat with us, reach out on
-IRC: we're in [#smooth-operator](irc://chat.freenode.net/%23smooth-operator) on
-freenode (or try the [webchat](https://webchat.freenode.net/#smooth-operator)).
+IRC: we're in [#smooth-operator] on freenode (or try the [webchat]).
 
 We also pay attention to juju's [discourse], but currently we don't actively
 post there outside of our little corner of the [docs]; most discussion at this
 stage is on IRC.
 
+[webchat]: https://webchat.freenode.net/#smooth-operator
+[#smooth-operator]: irc://chat.freenode.net/%23smooth-operator
 [discourse]: https://discourse.juju.is/c/charming
 [docs]: https://discourse.juju.is/c/docs/operator-framework
 
-# Operator Framework development
+## Operator Framework development
 
-If you want to work in the framework *itself* you will need some extra
-dependencies installed in your system:
+If you want to work in the framework *itself* you will need Python >= 3.5 and
+the dependencies declared in `requirements-dev.txt` installed in your system.
+Or you can use a virtualenv:
 
+    virtualenv --python=python3 env
+    source env/bin/activate
     pip install -r requirements-dev.txt
 
 Then you can try `./run_tests`, it should all go green.
 
-If you want to build the documentation you can do
+If you want to build the documentation you'll need the requirements from
+`docs/requirements.txt`, or in your virtualenv
 
     pip install -r docs/requirements.txt
-    ./build_docs
 
-
+and then you can run `./build_docs`.
