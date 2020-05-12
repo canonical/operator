@@ -163,7 +163,7 @@ def main(charm_class):
     """
     charm_dir = _get_charm_dir()
 
-    model_backend = ops.model.ModelBackend()
+    model_backend = ops.model._ModelBackend()
     debug = ('JUJU_DEBUG' in os.environ)
     setup_root_logging(model_backend, debug=debug)
 

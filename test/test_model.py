@@ -37,7 +37,7 @@ class TestModel(unittest.TestCase):
 
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
 
-        self.backend = ops.model.ModelBackend()
+        self.backend = ops.model._ModelBackend()
         meta = ops.charm.CharmMeta()
         meta.relations = {
             'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
@@ -405,7 +405,7 @@ fi
         ])
 
     def test_relation_get_set_is_app_arg(self):
-        self.backend = ops.model.ModelBackend()
+        self.backend = ops.model._ModelBackend()
 
         # No is_app provided.
         with self.assertRaises(TypeError):
@@ -479,7 +479,7 @@ fi
         check_remote_units()
 
         # Create a new model and backend to drop a cached is-leader output.
-        self.backend = ops.model.ModelBackend()
+        self.backend = ops.model._ModelBackend()
         meta = ops.charm.CharmMeta()
         meta.relations = {
             'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
@@ -580,7 +580,7 @@ fi
         check_calls(fake_calls)
 
         # Create a new model to drop is-leader caching result.
-        self.backend = ops.model.ModelBackend()
+        self.backend = ops.model._ModelBackend()
         meta = ops.charm.CharmMeta()
         self.model = ops.model.Model('myapp/0', meta, self.backend)
         fake_script(self, 'is-leader', 'echo false')
@@ -690,7 +690,7 @@ fi
         ])
 
     def test_status_set_is_app_not_bool_raises(self):
-        self.backend = ops.model.ModelBackend()
+        self.backend = ops.model._ModelBackend()
 
         for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
             with self.assertRaises(TypeError):
@@ -827,7 +827,7 @@ class TestModelBindings(unittest.TestCase):
             'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
             'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
         }
-        self.backend = ops.model.ModelBackend()
+        self.backend = ops.model._ModelBackend()
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'relation-ids',
@@ -969,7 +969,7 @@ class TestModelBackend(unittest.TestCase):
     @property
     def backend(self):
         if self._backend is None:
-            self._backend = ops.model.ModelBackend()
+            self._backend = ops.model._ModelBackend()
         return self._backend
 
     def test_relation_tool_errors(self):

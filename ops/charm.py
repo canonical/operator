@@ -337,8 +337,6 @@ class CharmBase(Object):
         key: Arbitrary key to distinguish this instance of CharmBase from another.
             Generally is None when initialized by the framework. For charms instantiated by
             main.main(), this is currenly None.
-    Attributes:
-        on: Defines all events that the Charm will fire.
     """
 
     on = CharmEvents()
