@@ -36,12 +36,12 @@ class Model:
     Attributes:
         unit: A :class:`Unit` that represents the unit that is running this code (eg yourself)
         app: A :class:`Application` that represents the application this unit is a part of.
-        relations: Mapping of {endpoint: [`:class:Relation`]} answering the question "what am I
-            currently related to". See also :meth:`.get_relation`
+        relations: Mapping of endpoint to list of :class:`Relation` answering the question
+            "what am I currently related to". See also :meth:`.get_relation`
         config: A dict of the config for the current application.
         resources: Access to resources for this charm. Use ``model.resources.fetch(resource_name)``
             to get the path on disk where the resource can be found.
-        storages: Mapping of {storage_name: :class:`Storage`} for the storage points defined in
+        storages: Mapping of storage_name to :class:`Storage` for the storage points defined in
             metadata.yaml
         pod: Used to get access to ``model.pod.set_spec`` to set the container specification
             for Kubernetes charms.
@@ -577,8 +577,8 @@ class RelationData(Mapping):
     """Represents the various data buckets of a given relation.
 
     Each unit and application involved in a relation has their own data bucket.
-    Eg: {entity: RelationDataContent}
-    Where entity can be either a :class:Unit or a :class:Application.
+    Eg: ``{entity: RelationDataContent}``
+    where entity can be either a :class:`Unit` or a :class:`Application`.
 
     Units can read and write their own data, and if they are the leader,
     they can read and write their application data. They are allowed to read
@@ -877,7 +877,7 @@ class TooManyRelatedAppsError(ModelError):
 
 
 class RelationDataError(ModelError):
-    """Raised by ``Relation.data[entity][value] = 'foo'`` if the data is invalid.
+    """Raised by ``Relation.data[entity][key] = 'foo'`` if the data is invalid.
 
     This is raised if you're either trying to set a value to something that isn't a string,
     or if you are trying to set a value in a bucket that you don't have access to. (eg,
