@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
-import pickle
-import marshal
-import types
-import sqlite3
 import collections
 import collections.abc
+import inspect
 import keyword
+import marshal
+import os
+import pdb
+import pickle
+import re
+import sqlite3
+import sys
+import types
 import weakref
 from datetime import timedelta
+
+from ops import charm
 
 
 class Handle:
@@ -271,7 +277,7 @@ class Object(metaclass=_Metaclass):
         return self.framework.model
 
 
-class EventsBase(Object):
+class ObjectEvents(Object):
     """Convenience type to allow defining .on attributes at class level."""
 
     handle_kind = "on"
@@ -358,7 +364,7 @@ class CommitEvent(EventBase):
     pass
 
 
-class FrameworkEvents(EventsBase):
+class FrameworkEvents(ObjectEvents):
     pre_commit = EventSource(PreCommitEvent)
     commit = EventSource(CommitEvent)
 
@@ -472,6 +478,16 @@ class SQLiteStorage:
                 yield tuple(row)
 
 
+# the message to show to the user when a pdb breakpoint goes active
+_BREAKPOINT_WELCOME_MESSAGE = """
+Starting pdb to debug charm operator.
+Run `h` for help, `c` to continue, or `exit`/CTRL-d to abort.
+Future breakpoints may interrupt execution again.
+More details at https://discourse.jujucharms.com/t/debugging-charm-hooks
+
+"""
+
+
 class Framework(Object):
 
     on = FrameworkEvents()
@@ -505,6 +521,17 @@ class Framework(Object):
         except NoSnapshotError:
             self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
+
+        # Hook into builtin breakpoint, so if Python >= 3.7, devs will be able to just do
+        # breakpoint(); if Python < 3.7, this doesn't affect anything
+        sys.breakpointhook = self.breakpoint
+
+        # Flag to indicate that we already presented the welcome message in a debugger breakpoint
+        self._breakpoint_welcomed = False
+
+        # Parse once the env var, which may be used multiple times later
+        debug_at = os.environ.get('JUJU_DEBUG_AT')
+        self._juju_debug_at = debug_at.split(',') if debug_at else ()
 
     def close(self):
         self._storage.close()
@@ -558,8 +585,18 @@ class Framework(Object):
             raise RuntimeError(
                 'cannot save {} values before registering that type'.format(type(value).__name__))
         data = value.snapshot()
-        # Use marshal as a validator, enforcing the use of simple types.
-        marshal.dumps(data)
+
+        # Use marshal as a validator, enforcing the use of simple types, as we later the
+        # information is really pickled, which is too error prone for future evolution of the
+        # stored data (e.g. if the developer stores a custom object and later changes its
+        # class name; when unpickling the original class will not be there and event
+        # data loading will fail).
+        try:
+            marshal.dumps(data)
+        except ValueError:
+            msg = "unable to save the data for {}, it must contain only simple types: {!r}"
+            raise ValueError(msg.format(value.__class__.__name__, data))
+
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(data)
         self._storage.save_snapshot(value.handle.path, raw_data)
@@ -711,7 +748,15 @@ class Framework(Object):
             if observer:
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
-                    custom_handler(event)
+                    event_is_from_juju = isinstance(event, charm.HookEvent)
+                    event_is_action = isinstance(event, charm.ActionEvent)
+                    if (event_is_from_juju or event_is_action) and 'hook' in self._juju_debug_at:
+                        # Present the welcome message and run under PDB.
+                        self._show_debug_code_message()
+                        pdb.runcall(custom_handler, event)
+                    else:
+                        # Regular call to the registered method.
+                        custom_handler(event)
 
             if event.deferred:
                 deferred = True
@@ -724,18 +769,44 @@ class Framework(Object):
         if not deferred:
             self._storage.drop_snapshot(last_event_path)
 
+    def _show_debug_code_message(self):
+        """Present the welcome message (only once!) when using debugger functionality."""
+        if not self._breakpoint_welcomed:
+            self._breakpoint_welcomed = True
+            print(_BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
 
-class StoredStateChanged(EventBase):
-    pass
+    def breakpoint(self, name=None):
+        """Add breakpoint, optionally named, at the place where this method is called.
 
+        For the breakpoint to be activated the JUJU_DEBUG_AT environment variable
+        must be set to "all" or to the specific name parameter provided, if any. In every
+        other situation calling this method does nothing.
 
-class StoredStateEvents(EventsBase):
-    changed = EventSource(StoredStateChanged)
+        The framework also provides a standard breakpoint named "hook", that will
+        stop execution when a hook event is about to be handled.
+
+        For those reasons, the "all" and "hook" breakpoint names are reserved.
+        """
+        # If given, validate the name comply with all the rules
+        if name is not None:
+            if not isinstance(name, str):
+                raise TypeError('breakpoint names must be strings')
+            if name in ('hook', 'all'):
+                raise ValueError('breakpoint names "all" and "hook" are reserved')
+            if not re.match(r'^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$', name):
+                raise ValueError('breakpoint names must look like "foo" or "foo-bar"')
+
+        indicated_breakpoints = self._juju_debug_at
+        if 'all' in indicated_breakpoints or name in indicated_breakpoints:
+            self._show_debug_code_message()
+
+            # If we call set_trace() directly it will open the debugger *here*, so indicating
+            # it to use our caller's frame
+            code_frame = inspect.currentframe().f_back
+            pdb.Pdb().set_trace(code_frame)
 
 
 class StoredStateData(Object):
-
-    on = StoredStateEvents()
 
     def __init__(self, parent, attr_name):
         super().__init__(parent, attr_name)
@@ -802,7 +873,6 @@ class BoundStoredState:
                     key, type(value).__name__))
 
         self._data[key] = _unwrap_stored(self._data, value)
-        self.on.changed.emit()
 
     def set_default(self, **kwargs):
         """"Set the value of any given key if it has not already been set"""
@@ -812,39 +882,78 @@ class BoundStoredState:
 
 
 class StoredState:
+    """A class used to store data the charm needs persisted across invocations.
+
+    Example::
+
+        class MyClass(Object):
+            _stored = StoredState()
+
+    Instances of `MyClass` can transparently save state between invocations by
+    setting attributes on `_stored`. Initial state should be set with
+    `set_default` on the bound object, that is::
+
+        class MyClass(Object):
+            _stored = StoredState()
+
+        def __init__(self, parent, key):
+            super().__init__(parent, key)
+            self._stored.set_default(seen=set())
+            self.framework.observe(self.on.seen, self._on_seen)
+
+        def _on_seen(self, event):
+            self._stored.seen.add(event.uuid)
+
+    """
 
     def __init__(self):
         self.parent_type = None
         self.attr_name = None
 
     def __get__(self, parent, parent_type=None):
-        if self.parent_type is None:
-            self.parent_type = parent_type
-        elif self.parent_type is not parent_type:
+        if self.parent_type is not None and self.parent_type not in parent_type.mro():
+            # the StoredState instance is being shared between two unrelated classes
+            # -> unclear what is exepcted of us -> bail out
             raise RuntimeError(
                 'StoredState shared by {} and {}'.format(
                     self.parent_type.__name__, parent_type.__name__))
 
         if parent is None:
+            # accessing via the class directly (e.g. MyClass.stored)
             return self
 
-        bound = parent.__dict__.get(self.attr_name)
-        if bound is None:
-            for attr_name, attr_value in parent_type.__dict__.items():
-                if attr_value is self:
-                    if self.attr_name and attr_name != self.attr_name:
-                        parent_tname = parent_type.__name__
-                        raise RuntimeError("StoredState shared by {}.{} and {}.{}".format(
-                            parent_tname, self.attr_name, parent_tname, attr_name))
-                    self.attr_name = attr_name
-                    bound = BoundStoredState(parent, attr_name)
-                    parent.__dict__[attr_name] = bound
-                    break
-            else:
-                raise RuntimeError(
-                    'cannot find StoredVariable attribute in type {}'.format(parent_type.__name__))
+        bound = None
+        if self.attr_name is not None:
+            bound = parent.__dict__.get(self.attr_name)
+            if bound is not None:
+                # we already have the thing from a previous pass, huzzah
+                return bound
 
-        return bound
+        # need to find ourselves amongst the parent's bases
+        for cls in parent_type.mro():
+            for attr_name, attr_value in cls.__dict__.items():
+                if attr_value is not self:
+                    continue
+                # we've found ourselves! is it the first time?
+                if bound is not None:
+                    # the StoredState instance is being stored in two different
+                    # attributes -> unclear what is expected of us -> bail out
+                    raise RuntimeError("StoredState shared by {0}.{1} and {0}.{2}".format(
+                        cls.__name__, self.attr_name, attr_name))
+                # we've found ourselves for the first time; save where, and bind the object
+                self.attr_name = attr_name
+                self.parent_type = cls
+                bound = BoundStoredState(parent, attr_name)
+
+        if bound is not None:
+            # cache the bound object to avoid the expensive lookup the next time
+            # (don't use setattr, to keep things symmetric with the fast-path lookup above)
+            parent.__dict__[self.attr_name] = bound
+            return bound
+
+        raise AttributeError(
+            'cannot find {} attribute in type {}'.format(
+                self.__class__.__name__, parent_type.__name__))
 
 
 def _wrap_stored(parent_data, value):

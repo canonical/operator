@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,16 +13,17 @@
 # limitations under the License.
 
 import os
+import pathlib
+import typing
 
 import yaml
 
-from ops.framework import Object, EventSource, EventBase, EventsBase
+from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
+from ops import model
 
 
 class HookEvent(EventBase):
     """A base class for events that trigger because of a Juju hook firing."""
-
-    pass
 
 
 class ActionEvent(EventBase):
@@ -42,7 +43,7 @@ class ActionEvent(EventBase):
         """
         raise RuntimeError('cannot defer action events')
 
-    def restore(self, snapshot):
+    def restore(self, snapshot: dict) -> None:
         """Used by the operator framework to record the action.
 
         Not meant to be called directly by Charm code.
@@ -56,95 +57,65 @@ class ActionEvent(EventBase):
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()
 
-    def set_results(self, results):
+    def set_results(self, results: typing.Mapping) -> None:
         """Report the result of the action.
 
-        :param results: The result of the action as a Dict
-        :type results: collections.abc.Mapping
-        :return: None
+        Args:
+            results: The result of the action as a Dict
         """
         self.framework.model._backend.action_set(results)
 
-    def log(self, message):
+    def log(self, message: str) -> None:
         """Send a message that a user will see while the action is running.
 
-        :param message: The message for the user.
-        :type message: str
-        :return: None
+        Args:
+            message: The message for the user.
         """
         self.framework.model._backend.action_log(message)
 
-    def fail(self, message=''):
+    def fail(self, message: str = '') -> None:
         """Report that this action has failed.
 
-        :param message: Optional message to record why it has failed.
-        :type message: str
-        :return: None
+        Args:
+            message: Optional message to record why it has failed.
         """
         self.framework.model._backend.action_fail(message)
 
 
 class InstallEvent(HookEvent):
-    """Represents the `install` hook from Juju.
-
-    It's riggered by `CharmBase.on.install`.
-    """
-
-    pass
+    """Represents the `install` hook from Juju."""
 
 
 class StartEvent(HookEvent):
-    """Represents the `start` hook from Juju.
-
-    Its' triggered by `CharmBase.on.start`.
-    """
-
-    pass
+    """Represents the `start` hook from Juju."""
 
 
 class StopEvent(HookEvent):
-    """Represents the `stop` hook from Juju.
+    """Represents the `stop` hook from Juju."""
 
-    It's triggered by `CharmBase.on.stop`.
-    """
 
-    pass
+class RemoveEvent(HookEvent):
+    """Represents the `remove` hook from Juju. """
 
 
 class ConfigChangedEvent(HookEvent):
-    """Represents the `config-changed` hook from Juju.
-
-    It's triggered by `CharmBase.on.config_changed`.
-    """
-
-    pass
+    """Represents the `config-changed` hook from Juju."""
 
 
 class UpdateStatusEvent(HookEvent):
-    """Represents the `update-status` hook from Juju.
-
-    It's triggered by `CharmBase.on.update_status`
-    """
-
-    pass
+    """Represents the `update-status` hook from Juju."""
 
 
 class UpgradeCharmEvent(HookEvent):
     """Represents the `upgrade-charm` hook from Juju.
 
-    It's triggered by `CharmBase.on.upgrade_charm`.
-
     This will be triggered when a user has run `juju upgrade-charm`. It is run after Juju
     has unpacked the upgraded charm code, and so this event will be handled with new code.
     """
 
-    pass
-
 
 class PreSeriesUpgradeEvent(HookEvent):
     """Represents the `pre-series-upgrade` hook from Juju.
-
-     It's triggered by `CharmBase.on.pre_series_upgrade`.
 
     This happens when a user has run `juju upgrade-series MACHINE prepare` and
     will fire for each unit that is running on the machine, telling them that
@@ -155,16 +126,12 @@ class PreSeriesUpgradeEvent(HookEvent):
     used.)
     Once all units on a machine have run `pre-series-upgrade`, the user will
     initiate the steps to actually upgrade the machine (eg `do-release-upgrade`).
-    When the upgrade has been completed, the `PostSeriesUpgradeEvent`_ will fire.
+    When the upgrade has been completed, the :class:`PostSeriesUpgradeEvent` will fire.
     """
-
-    pass
 
 
 class PostSeriesUpgradeEvent(HookEvent):
     """Represents the `post-series-upgrade` hook from Juju.
-
-    It's triggered by `CharmBase.on.post_series_upgrade`.
 
     This is run after the user has done a distribution upgrade (or rolled back
     and kept the same series). It is called in response to
@@ -172,13 +139,9 @@ class PostSeriesUpgradeEvent(HookEvent):
     steps are necessary to reconfigure their applications for the new series.
     """
 
-    pass
-
 
 class LeaderElectedEvent(HookEvent):
     """Represents the `leader-elected` hook from Juju.
-
-    It's triggered by `CharmBase.on.leader_elected`.
 
     Juju will trigger this when a new lead unit is chosen for a given application.
     This represents the leader of the charm information (not necessarily the primary
@@ -188,42 +151,34 @@ class LeaderElectedEvent(HookEvent):
     (eg, selecting a password for a new relation)
     """
 
-    pass
-
 
 class LeaderSettingsChangedEvent(HookEvent):
     """Represents the `leader-settings-changed` hook from Juju.
-
-    It's triggered by `CharmBase.on.leader_settings_changed`.
 
     Deprecated. This represents when a lead unit would call `leader-set` to inform
     the other units of an application that they have new information to handle.
     This has been deprecated in favor of using a Peer relation, and having the
     leader set a value in the Application data bag for that peer relation.
-    (see `RelationChangedEvent`_).
+    (see :class:`RelationChangedEvent`).
     """
-
-    pass
 
 
 class CollectMetricsEvent(HookEvent):
     """Represents the `collect-metrics` hook from Juju.
 
-    It's triggered by `CharmBase.on.collect_metrics`.
-
     Note that events firing during a CollectMetricsEvent are currently
     sandboxed in how they can interact with Juju. To report metrics
-    use `add_metrics`_.
+    use :meth:`.add_metrics`.
     """
 
-    def add_metrics(self, metrics, labels=None):
+    def add_metrics(self, metrics: typing.Mapping, labels: typing.Mapping = None) -> None:
         """Record metrics that have been gathered by the charm for this unit.
 
-        :param metrics: A collection of {key: float} pairs that contains the
-          metrics that have been gathered
-        :param labels: Optional {key:value} strings that can be applied to the
-            metrics that are being gathered
-        :return: None
+        Args:
+            metrics: A collection of {key: float} pairs that contains the
+              metrics that have been gathered
+            labels: {key:value} strings that can be applied to the
+                metrics that are being gathered
         """
         self.framework.model._backend.add_metrics(metrics, labels)
 
@@ -231,17 +186,18 @@ class CollectMetricsEvent(HookEvent):
 class RelationEvent(HookEvent):
     """A base class representing the various relation lifecycle events.
 
-    :ivar relation: The Relation involved in this event
-    :ivar app: The remote application that has triggered this event
-    :ivar unit: The remote unit that has triggered this event. This may be None
-        if the relation event was triggered as an Application level event
+    Charmers should not be creating RelationEvents directly. The events will be
+    generated by the framework from Juju related events. Users can observe them
+    from the various `CharmBase.on[relation_name].relation_*` events.
+
+    Attributes:
+        relation: The Relation involved in this event
+        app: The remote application that has triggered this event
+        unit: The remote unit that has triggered this event. This may be None
+              if the relation event was triggered as an Application level event
     """
 
     def __init__(self, handle, relation, app=None, unit=None):
-        """Charm authors should not directly instantiate RelationEvent.
-
-        Instead use `Charm.on[relation_name].relation_event.emit()`
-        """
         super().__init__(handle)
 
         if unit is not None and unit.app != app:
@@ -252,7 +208,7 @@ class RelationEvent(HookEvent):
         self.app = app
         self.unit = unit
 
-    def snapshot(self):
+    def snapshot(self) -> dict:
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by Charm code.
@@ -267,7 +223,7 @@ class RelationEvent(HookEvent):
             snapshot['unit_name'] = self.unit.name
         return snapshot
 
-    def restore(self, snapshot):
+    def restore(self, snapshot: dict) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by Charm code.
@@ -288,36 +244,35 @@ class RelationEvent(HookEvent):
             self.unit = None
 
 
+class RelationCreatedEvent(RelationEvent):
+    """Represents the `relation-created` hook from Juju.
+
+    This is triggered when a new relation to another app is added in Juju. This
+    can occur before units for those applications have started. All existing
+    relations should be established before start.
+    """
+
+
 class RelationJoinedEvent(RelationEvent):
     """Represents the `relation-joined` hook from Juju.
-
-    It's triggered by `CharmBase.on[RELATION].relation_joined`.
 
     This is triggered whenever a new unit of a related application joins the relation.
     (eg, a unit was added to an existing related app, or a new relation was established
     with an application that already had units.)
     """
 
-    pass
-
 
 class RelationChangedEvent(RelationEvent):
     """Represents the `relation-changed` hook from Juju.
-
-    It's triggered by `CharmBase.on[RELATION].relation_changed`.
 
     This is triggered whenever there is a change to the data bucket for a related
     application or unit. Look at `event.relation.data[event.unit/app]` to see the
     new information.
     """
 
-    pass
-
 
 class RelationDepartedEvent(RelationEvent):
     """Represents the `relation-departed` hook from Juju.
-
-    It's triggered by `CharmBase.on[RELATION].relation_departed`.
 
     This is the inverse of the RelationJoinedEvent, representing when a unit
     is leaving the relation (the unit is being removed, the app is being removed,
@@ -325,56 +280,41 @@ class RelationDepartedEvent(RelationEvent):
     going away.
     """
 
-    pass
-
 
 class RelationBrokenEvent(RelationEvent):
     """Represents the `relation-broken` hook from Juju.
-
-    It's triggered by `CharmBase.on[RELATION].relation_broken`.
 
     If a relation is being removed (`juju remove-relation` or `juju remove-application`),
     once all the units have been removed, RelationBrokenEvent will fire to signal
     that the relationship has been fully terminated.
     """
 
-    pass
-
 
 class StorageEvent(HookEvent):
     """Base class representing Storage related events."""
-
-    pass
 
 
 class StorageAttachedEvent(StorageEvent):
     """Represents the `storage-attached` hook from Juju.
 
-    It's triggered by `CharmBase.on[STORAGE].storage_attached`.
-
     Called when new storage is available for the charm to use.
     """
-
-    pass
 
 
 class StorageDetachingEvent(StorageEvent):
     """Represents the `storage-detaching` hook from Juju.
 
-    It's triggered by `CharmBase.on.storage_detaching`.
-
     Called when storage a charm has been using is going away.
     """
 
-    pass
 
-
-class CharmEvents(EventsBase):
+class CharmEvents(ObjectEvents):
     """The events that are generated by Juju in response to the lifecycle of an application."""
 
     install = EventSource(InstallEvent)
     start = EventSource(StartEvent)
     stop = EventSource(StopEvent)
+    remove = EventSource(RemoveEvent)
     update_status = EventSource(UpdateStatusEvent)
     config_changed = EventSource(ConfigChangedEvent)
     upgrade_charm = EventSource(UpgradeCharmEvent)
@@ -388,28 +328,30 @@ class CharmEvents(EventsBase):
 class CharmBase(Object):
     """Base class that represents the Charm overall.
 
-    :cvar on: Defines all events that the Charm will fire.
+    Usually this initialization is done by ops.main.main() rather than Charm authors
+    directly instantiating a Charm.
+
+    Args:
+        framework: The framework responsible for managing the Model and events for this
+            Charm.
+        key: Arbitrary key to distinguish this instance of CharmBase from another.
+            Generally is None when initialized by the framework. For charms instantiated by
+            main.main(), this is currenly None.
+    Attributes:
+        on: Defines all events that the Charm will fire.
     """
 
     on = CharmEvents()
 
-    def __init__(self, framework, key):
+    def __init__(self, framework: Framework, key: typing.Optional[str]):
         """Initialize the Charm with its framework and application name.
 
-        Usually this initialization is done by ops.main.main() rather than Charm authors
-        directly instantiating a Charm.
-
-        :param framework: The framework responsible for managing the Model and events for this
-            Charm.
-        :type framework: ops.Framework
-        :param key: Arbitrary key to distinguish this instance of CharmBase from another.
-            Generally is None when initialized by the framework.
-        :type key: NoneType or str
         """
         super().__init__(framework, key)
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
+            self.on.define_event(relation_name + '_relation_created', RelationCreatedEvent)
             self.on.define_event(relation_name + '_relation_joined', RelationJoinedEvent)
             self.on.define_event(relation_name + '_relation_changed', RelationChangedEvent)
             self.on.define_event(relation_name + '_relation_departed', RelationDepartedEvent)
@@ -425,40 +367,34 @@ class CharmBase(Object):
             self.on.define_event(action_name + '_action', ActionEvent)
 
     @property
-    def app(self):
-        """Application that this unit is part of.
-
-        :rtype: ops.model.Application
-        """
+    def app(self) -> model.Application:
+        """Application that this unit is part of."""
         return self.framework.model.app
 
     @property
-    def unit(self):
-        """Unit that this execution is responsible for.
-
-        :rtype: ops.model.Unit
-        """
+    def unit(self) -> model.Unit:
+        """Unit that this execution is responsible for."""
         return self.framework.model.unit
 
     @property
-    def meta(self):
+    def meta(self) -> 'CharmMeta':
         """CharmMeta of this charm.
-
-        :rtype: ops.charm.CharmMeta
         """
         return self.framework.meta
 
     @property
-    def charm_dir(self):
+    def charm_dir(self) -> pathlib.Path:
         """Root directory of the Charm as it is running.
-
-        :rtype: pathlib.Path
         """
         return self.framework.charm_dir
 
 
 class CharmMeta:
     """Object containing the metadata for the charm.
+
+    This is read from metadata.yaml and/or actions.yaml. Generally charms will
+    define this information, rather than reading it at runtime. This class is
+    mostly for the framework to understand what the charm has defined.
 
     The maintainers, tags, terms, series, and extra_bindings attributes are all
     lists of strings.  The requires, provides, peers, relations, storage,
@@ -468,9 +404,40 @@ class CharmMeta:
     The relations attribute is a convenience accessor which includes all of the
     requires, provides, and peers RelationMeta items.  If needed, the role of
     the relation definition can be obtained from its role attribute.
+
+    Attributes:
+        name: The name of this charm
+        summary: Short description of what this charm does
+        description: Long description for this charm
+        maintainers: A list of strings of the email addresses of the maintainers
+                     of this charm.
+        tags: Charm store tag metadata for categories associated with this charm.
+        terms: Charm store terms that should be agreed to before this charm can
+               be deployed. (Used for things like licensing issues.)
+        series: The list of supported OS series that this charm can support.
+                The first entry in the list is the default series that will be
+                used by deploy if no other series is requested by the user.
+        subordinate: True/False whether this charm is intended to be used as a
+                     subordinate charm.
+        min_juju_version: If supplied, indicates this charm needs features that
+                          are not available in older versions of Juju.
+        requires: A dict of {name: :class:`RelationMeta` } for each 'requires' relation.
+        provides: A dict of {name: :class:`RelationMeta` } for each 'provides' relation.
+        peers: A dict of {name: :class:`RelationMeta` } for each 'peer' relation.
+        relations: A dict containing all :class:`RelationMeta` attributes (merged from other
+                   sections)
+        storages: A dict of {name: :class:`StorageMeta`} for each defined storage.
+        resources: A dict of {name: :class:`ResourceMeta`} for each defined resource.
+        payloads: A dict of {name: :class:`PayloadMeta`} for each defined payload.
+        extra_bindings: A dict of additional named bindings that a charm can use
+                        for network configuration.
+        actions: A dict of {name: :class:`ActionMeta`} for actions that the charm has defined.
+    Args:
+        raw: a mapping containing the contents of metadata.yaml
+        actions_raw: a mapping containing the contents of actions.yaml
     """
 
-    def __init__(self, raw={}, actions_raw={}):
+    def __init__(self, raw: dict = {}, actions_raw: dict = {}):
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
@@ -488,6 +455,8 @@ class CharmMeta:
                          for name, rel in raw.get('requires', {}).items()}
         self.provides = {name: RelationMeta('provides', name, rel)
                          for name, rel in raw.get('provides', {}).items()}
+        # TODO: (jam 2020-05-11) The *role* should be 'peer' even though it comes from the
+        #  'peers' section.
         self.peers = {name: RelationMeta('peers', name, rel)
                       for name, rel in raw.get('peers', {}).items()}
         self.relations = {}
@@ -504,12 +473,15 @@ class CharmMeta:
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw.items()}
 
     @classmethod
-    def from_yaml(cls, metadata, actions=None):
+    def from_yaml(
+            cls, metadata: typing.Union[str, typing.TextIO],
+            actions: typing.Optional[typing.Union[str, typing.TextIO]] = None):
         """Instantiate a CharmMeta from a YAML description of metadata.yaml.
 
-        :param metadata: A YAML description of charm metadata (name, relations, etc.)
-            This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
-        :param actions: Optional YAML description of Actions for this charm (eg actions.yaml)
+        Args:
+            metadata: A YAML description of charm metadata (name, relations, etc.)
+                This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
+            actions: YAML description of Actions for this charm (eg actions.yaml)
         """
         meta = yaml.safe_load(metadata)
         raw_actions = {}
@@ -519,7 +491,18 @@ class CharmMeta:
 
 
 class RelationMeta:
-    """Object containing metadata about a relation definition."""
+    """Object containing metadata about a relation definition.
+
+    Should not be constructed directly by Charm code. Is gotten from one of
+    :attr:`CharmMeta.peers`, :attr:`CharmMeta.requires`, :attr:`CharmMeta.provides`,
+    :attr:`CharmMeta.relations`.
+
+    Attributes:
+        role: This is one of requires/provides/peers
+        relation_name: Name of this relation from metadata.yaml
+        interface_name: Optional definition of the interface protocol.
+        scope: "global" or "container" scope based on how the relation should be used.
+    """
 
     def __init__(self, role, relation_name, raw):
         self.role = role
