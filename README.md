@@ -127,7 +127,9 @@ juju deploy .
 
 # Operator Framework development
 
-If you want to work in the framework *itself* you will need Python >= 3.5 and the dependencies declared in requirements-dev.txt installed in your system. Or you can use a virtualenv:
+If you want to work in the framework *itself* you will need Python >= 3.5 and 
+the dependencies declared in requirements-dev.txt installed in your system. Or you 
+can use a virtualenv:
 
 ```
 virtualenv --python=python3 env
