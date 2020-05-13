@@ -584,7 +584,7 @@ class RelationData(Mapping):
     they can read and write their application data. They are allowed to read
     remote unit and application data.
 
-    This class should not be created directly. It should be accessed via:
+    This class should not be created directly. It should be accessed via
     :attr:`Relation.data`
     """
 
