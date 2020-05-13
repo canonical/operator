@@ -652,23 +652,22 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
                     hook_path.unlink()
 
 
-# TODO: this does not work
-# class TestMainWithDispatchAsScript(TestMainWithDispatch):
-#     """Here dispatch is a script that execs the charm.py instead of a symlink.
-#     """
-#     def _setup_entry_point(self, directory, entry_point):
-#         path = self.JUJU_CHARM_DIR / 'dispatch'
-#         if not path.exists():
-#             path.write_text('#!/bin/sh\nexec "{}" "{}"\n'.format(
-#                 sys.executable,
-#                 self.JUJU_CHARM_DIR / 'src/charm.py'))
-#             path.chmod(0o755)
+class TestMainWithDispatchAsScript(TestMainWithDispatch):
+    """Here dispatch is a script that execs the charm.py instead of a symlink.
+    """
+    def _setup_entry_point(self, directory, entry_point):
+        path = self.JUJU_CHARM_DIR / 'dispatch'
+        if not path.exists():
+            path.write_text('#!/bin/sh\nexec "{}" "{}"\n'.format(
+                sys.executable,
+                self.JUJU_CHARM_DIR / 'src/charm.py'))
+            path.chmod(0o755)
 
-#     def _call_event(self, rel_path, env):
-#         env["JUJU_DISPATCH_PATH"] = str(rel_path)
-#         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
-#         subprocess.check_call([str(dispatch)],
-#                               env=env, cwd=str(self.JUJU_CHARM_DIR))
+    def _call_event(self, rel_path, env):
+        env["JUJU_DISPATCH_PATH"] = str(rel_path)
+        dispatch = self.JUJU_CHARM_DIR / 'dispatch'
+        subprocess.check_call([str(dispatch)],
+                              env=env, cwd=str(self.JUJU_CHARM_DIR))
 
 
 if __name__ == "__main__":

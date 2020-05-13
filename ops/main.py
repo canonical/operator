@@ -174,14 +174,39 @@ def main(charm_class):
     # TODO: For Windows, when symlinks are used, this is not a valid
     #       method of getting an event name (see LP: #1854505).
     juju_exec_path = Path(sys.argv[0])
-    has_dispatch = juju_exec_path.name == 'dispatch'
-    if has_dispatch:
-        # The executable was 'dispatch', which means the actual hook we want to
-        # run needs to be looked up in the JUJU_DISPATCH_PATH env var, where it
-        # should be a path relative to the charm directory (the directory that
-        # holds `dispatch`). If that path actually exists, we want to run that
-        # before continuing.
-        dispatch_path = juju_exec_path.parent / Path(os.environ['JUJU_DISPATCH_PATH'])
+    if juju_exec_path.is_symlink():
+        has_dispatch = juju_exec_path.name == 'dispatch'
+        if has_dispatch:
+            # The executable was 'dispatch', which means the actual hook we want to
+            # run needs to be looked up in the JUJU_DISPATCH_PATH env var, where it
+            # should be a path relative to the charm directory (the directory that
+            # holds `dispatch`). If that path actually exists, we want to run that
+            # before continuing.
+            dispatch_path = juju_exec_path.parent / Path(os.environ['JUJU_DISPATCH_PATH'])
+            if dispatch_path.exists() and dispatch_path.resolve() != juju_exec_path.resolve():
+                argv = sys.argv.copy()
+                argv[0] = str(dispatch_path)
+                try:
+                    subprocess.run(argv, check=True)
+                except subprocess.CalledProcessError as e:
+                    logger.warning("hook %s exited with status %d", dispatch_path, e.returncode)
+                    sys.exit(e.returncode)
+            juju_exec_path = dispatch_path
+        juju_event_name = juju_exec_path.name.replace('-', '_')
+        if juju_exec_path.parent.name == 'actions':
+            juju_event_name = '{}_action'.format(juju_event_name)
+    else:
+        # we weren't called via a symlink, so we _need_ to use the environ to figure things out
+        if 'JUJU_DISPATCH_PATH' not in os.environ:
+            logger.critical("charm called via dispatch shim but no JUJU_DISPATCH_PATH set")
+            sys.exit(1)
+        if 'OPERATOR_DISPATCH' in os.environ:
+            # we called ourselves; bail
+            sys.exit(0)
+        has_dispatch = True
+        os.environ['OPERATOR_DISPATCH'] = '1'
+        juju_dispatch_path = Path(os.environ['JUJU_DISPATCH_PATH'])
+        dispatch_path = charm_dir / juju_dispatch_path
         if dispatch_path.exists() and dispatch_path.resolve() != juju_exec_path.resolve():
             argv = sys.argv.copy()
             argv[0] = str(dispatch_path)
@@ -190,10 +215,9 @@ def main(charm_class):
             except subprocess.CalledProcessError as e:
                 logger.warning("hook %s exited with status %d", dispatch_path, e.returncode)
                 sys.exit(e.returncode)
-        juju_exec_path = dispatch_path
-    juju_event_name = juju_exec_path.name.replace('-', '_')
-    if juju_exec_path.parent.name == 'actions':
-        juju_event_name = '{}_action'.format(juju_event_name)
+        juju_event_name = juju_dispatch_path.name.replace('-', '_')
+        if juju_dispatch_path.parent.name == 'actions':
+            juju_event_name = '{}_action'.format(juju_event_name)
 
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)
