@@ -270,7 +270,8 @@ class Unit:
             return self._backend.is_leader()
         else:
             raise RuntimeError(
-                'cannot determine leadership status for remote applications: {}'.format(self)
+                'leadership status of remote units ({}) is not visible to other'
+                ' applications'.format(self)
             )
 
     def set_workload_version(self, version: str) -> None:
