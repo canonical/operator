@@ -392,10 +392,6 @@ class Relation:
                 self.units.add(unit)
                 if self.app is None:
                     self.app = unit.app
-            if self.app is None:
-                app_name = os.environ.get('JUJU_REMOTE_APP')
-                if app_name is not None:
-                    self.app = cache.get(Application, app_name)
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
