@@ -189,6 +189,53 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(len(harness.charm.observed_events), 1)
         self.assertIsInstance(harness.charm.observed_events[0], RelationEvent)
 
+    def test_relation_events(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+        ''')
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        self.assertEqual(harness.charm.get_changes(), [])
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertEqual(
+            harness.charm.get_changes(),
+            [{'name': 'relation-created',
+              'data': {
+                  'app': 'postgresql',
+                  'unit': None,
+                  'relation_id': rel_id,
+              }}])
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        self.assertEqual(
+            harness.charm.get_changes(),
+            [{'name': 'relation-joined',
+              'data': {
+                  'app': 'postgresql',
+                  'unit': 'postgresql/0',
+                  'relation_id': rel_id,
+              }}])
+        harness.update_relation_data(rel_id, 'postgresql', {'foo': 'bar'})
+        self.assertEqual(
+            harness.charm.get_changes(),
+            [{'name': 'relation-changed',
+              'data': {
+                  'app': 'postgresql',
+                  'unit': None,
+                  'relation_id': rel_id,
+              }}])
+        harness.update_relation_data(rel_id, 'postgresql/0', {'baz': 'bing'})
+        self.assertEqual(
+            harness.charm.get_changes(),
+            [{'name': 'relation-changed',
+              'data': {
+                  'app': 'postgresql',
+                  'unit': 'postgresql/0',
+                  'relation_id': rel_id,
+              }}])
+
     def test_get_relation_data(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
@@ -672,6 +719,47 @@ class RecordingCharm(CharmBase):
 
     def on_leader_elected(self, _):
         self.changes.append(dict(name='leader-elected'))
+
+
+class RelationEventCharm(RecordingCharm):
+    """Record events related to relation lifecycles."""
+
+    def __init__(self, framework, charm_name):
+        super().__init__(framework, charm_name)
+
+    def observe_relation_events(self, relation_name):
+        self.framework.observe(self.on[relation_name].relation_created, self._on_relation_created)
+        self.framework.observe(self.on[relation_name].relation_joined, self._on_relation_joined)
+        self.framework.observe(self.on[relation_name].relation_changed, self._on_relation_changed)
+        self.framework.observe(self.on[relation_name].relation_departed,
+                               self._on_relation_departed)
+        self.framework.observe(self.on[relation_name].relation_broken, self._on_relation_broken)
+
+    def _on_relation_created(self, event):
+        self._observe_relation_event('relation-created', event)
+
+    def _on_relation_joined(self, event):
+        self._observe_relation_event('relation-joined', event)
+
+    def _on_relation_changed(self, event):
+        self._observe_relation_event('relation-changed', event)
+
+    def _on_relation_departed(self, event):
+        self._observe_relation_event('relation-departed', event)
+
+    def _on_relation_broken(self, event):
+        self._observe_relation_event('relation-broken', event)
+
+    def _observe_relation_event(self, event_name, event):
+        unit_name = None
+        if event.unit is not None:
+            unit_name = event.unit.name
+        app_name = None
+        if event.app is not None:
+            app_name = event.app.name
+        self.changes.append(
+            dict(name=event_name,
+                 data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id)))
 
 
 class TestTestingModelBackend(unittest.TestCase):

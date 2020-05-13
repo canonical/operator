@@ -1,0 +1,6 @@
+version: 2                      # required
+formats: []                     # i.e. no extra formats (for now)
+python:
+  version: "3.5"
+  install:
+    - requirements: docs/requirements.txt

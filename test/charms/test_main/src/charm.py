@@ -17,12 +17,12 @@ import os
 import base64
 import pickle
 import sys
-sys.path.append('lib')  # noqa
-
-from ops.charm import CharmBase
-from ops.main import main
-
 import logging
+
+sys.path.append('lib')
+
+from ops.charm import CharmBase  # noqa: E402 (module-level import after non-import code)
+from ops.main import main        # noqa: E402 (ditto)
 
 logger = logging.getLogger()
 
