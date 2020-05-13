@@ -31,7 +31,7 @@ operator framework](/TBD) just for you.
 If you've gone through the above already and just want a refresher, or are
 really impatient and need to dive in, feel free to carry on down.
 
-## An Unrelenting Introduction
+## An Quick Introduction
 
 Operator framework charms are just Python code. The entry point to your charm is
 a particular Python file. It could be anything that makes sense to your project,
