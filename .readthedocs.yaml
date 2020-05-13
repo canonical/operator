@@ -4,4 +4,3 @@ python:
   version: "3.5"
   install:
     - requirements: docs/requirements.txt
-    - requirements: requirements.txt
