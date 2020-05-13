@@ -119,13 +119,13 @@ def _emit_charm_event(charm, event_name):
     try:
         event_to_emit = getattr(charm.on, event_name)
     except AttributeError:
-        logger.debug("event %s not defined for %s", event_name, charm)
+        logger.debug("Event %s not defined for %s.", event_name, charm)
 
     # If the event is not supported by the charm implementation, do
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        logger.debug('Emitting Juju event %s', event_name)
+        logger.debug('Emitting Juju event %s.', event_name)
         event_to_emit.emit(*args, **kwargs)
 
 
@@ -168,6 +168,7 @@ class _JujuEvent:
         name: the name of the event to run
         is_dispatch: did juju call dispatch (as opposed to a hook symlink)
     """
+
     def __init__(self, charm_dir: Path):
         self._charm_dir = charm_dir
         self._exec_path = Path(sys.argv[0])
@@ -176,27 +177,54 @@ class _JujuEvent:
         else:
             self._init_dispatch()
 
+    def ensure_event_links(self, charm):
+        if self.is_dispatch:
+            # links aren't needed
+            return
+
+        # When a charm is force-upgraded and a unit is in an error state Juju
+        # does not run upgrade-charm and instead runs the failed hook followed
+        # by config-changed. Given the nature of force-upgrading the hook setup
+        # code is not triggered on config-changed.
+        #
+        # 'start' event is included as Juju does not fire the install event for
+        # K8s charms (see LP: #1854635).
+        if (self.name in ('install', 'start', 'upgrade_charm')
+                or self.name.endswith('_storage_attached')):
+            _setup_event_links(self._charm_dir, charm)
+
     def run_any_legacy_hook(self):
+        # return
         if not self.is_dispatch:
             # we *are* the legacy hook
             return
 
         dispatch_path = self._charm_dir / self._dispatch_path
         if not dispatch_path.exists():
-            # nothing to do
+            logger.debug("Legacy %s does not exist.", self._dispatch_path)
+            return
+
+        # super strange that there isn't an is_executable
+        if not os.access(str(dispatch_path), os.X_OK):
+            logger.warning("Legacy %s exists but is not executable.", self._dispatch_path)
             return
 
         if dispatch_path.resolve() == self._exec_path.resolve():
-            # we'd just be calling ourselves
+            logger.debug("Legacy %s is just a link to ourselves.", self._dispatch_path)
             return
 
         argv = sys.argv.copy()
         argv[0] = str(dispatch_path)
+        logger.info("Running legacy %s.", self._dispatch_path)
         try:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
-            logger.warning("hook %s exited with status %d", dispatch_path, e.returncode)
+            logger.warning(
+                "Legacy %s exited with status %d.",
+                self._dispatch_path, e.returncode)
             sys.exit(e.returncode)
+        else:
+            logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
 
     def _set_name_from_path(self, path: Path):
         name = path.name.replace('-', '_')
@@ -210,16 +238,16 @@ class _JujuEvent:
 
     def _init_dispatch(self):
         if 'JUJU_DISPATCH_PATH' not in os.environ:
-            logger.critical("charm called via dispatch but no JUJU_DISPATCH_PATH set")
+            logger.critical("Charm called via dispatch but no JUJU_DISPATCH_PATH set.")
             sys.exit(1)
-        if 'OPERATOR_DISPATCH' in os.environ:
-            # we called ourselves; bail
-            # this can't happen but it doesn't hurt to double-check
-            sys.exit(0)
-        os.environ['OPERATOR_DISPATCH'] = '1'
-        self.is_dispatch = True
         self._dispatch_path = Path(os.environ['JUJU_DISPATCH_PATH'])
 
+        if 'OPERATOR_DISPATCH' in os.environ:
+            logger.debug("Charm called itself via %s.", self._dispatch_path)
+            sys.exit(0)
+        os.environ['OPERATOR_DISPATCH'] = '1'
+
+        self.is_dispatch = True
         self._set_name_from_path(self._dispatch_path)
 
 
@@ -235,8 +263,7 @@ def main(charm_class):
     setup_root_logging(model_backend, debug=debug)
 
     juju_event = _JujuEvent(charm_dir)
-    if juju_event.is_dispatch:
-        juju_event.run_any_legacy_hook()
+    juju_event.run_any_legacy_hook()
 
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)
@@ -250,18 +277,7 @@ def main(charm_class):
     framework = ops.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
         charm = charm_class(framework, None)
-
-        if not juju_event.is_dispatch:
-            # When a charm is force-upgraded and a unit is in an error state Juju
-            # does not run upgrade-charm and instead runs the failed hook followed
-            # by config-changed. Given the nature of force-upgrading the hook setup
-            # code is not triggered on config-changed.
-            #
-            # 'start' event is included as Juju does not fire the install event for
-            # K8s charms (see LP: #1854635).
-            if (juju_event.name in ('install', 'start', 'upgrade_charm')
-                    or juju_event.name.endswith('_storage_attached')):
-                _setup_event_links(charm_dir, charm)
+        juju_event.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant
         #       Juju changes are made.

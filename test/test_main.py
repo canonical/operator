@@ -431,10 +431,19 @@ start:
         fake_script_calls(self, clear=True)
         self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics',
                                        charm_config=charm_config))
-        self.assertEqual(
-            fake_script_calls(self),
-            [['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event collect_metrics'],
-             ['add-metric', '--labels', 'bar=4.2', 'foo=42']])
+
+        expected = [
+            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event collect_metrics.'],
+            ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
+        ]
+        calls = fake_script_calls(self)
+
+        if self.has_dispatch:
+            expected.insert(0, [
+                'juju-log', '--log-level', 'DEBUG',
+                'Legacy hooks/collect-metrics does not exist.'])
+
+        self.assertEqual(calls, expected)
 
     def test_logger(self):
         charm_config = base64.b64encode(pickle.dumps({
@@ -483,6 +492,8 @@ log_debug: {}
 
 
 class TestMainWithNoDispatch(TestMain, unittest.TestCase):
+    has_dispatch = False
+
     def _setup_entry_point(self, directory, entry_point):
         path = directory / entry_point
         path.symlink_to(self.charm_exec_path)
@@ -539,6 +550,8 @@ class TestMainWithNoDispatch(TestMain, unittest.TestCase):
 
 
 class TestMainWithDispatch(TestMain, unittest.TestCase):
+    has_dispatch = True
+
     def _setup_entry_point(self, directory, entry_point):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
@@ -585,6 +598,7 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
             'STATE_FILE': self._state_file,
         }))
 
+        old_path = self.fake_script_path
         self.fake_script_path = self.hooks_dir
         fake_script(self, 'install', 'exit 0')
         state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
@@ -592,6 +606,29 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
         # the script was called, *and*, the .on. was called
         self.assertEqual(fake_script_calls(self), [['install', '']])
         self.assertEqual(state['observed_event_types'], [InstallEvent])
+
+        self.fake_script_path = old_path
+        self.assertEqual(fake_script_calls(self), [
+            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Legacy hooks/install exited with status 0.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+        ])
+
+    def test_non_executable_hook_and_dispatch(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+
+        (self.hooks_dir / "install").write_text("")
+        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+
+        self.assertEqual(state['observed_event_types'], [InstallEvent])
+
+        self.assertEqual(fake_script_calls(self), [
+            ['juju-log', '--log-level', 'WARNING',
+             'Legacy hooks/install exists but is not executable.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+        ])
 
     def test_hook_and_dispatch_with_failing_hook(self):
         self.stdout = self.stderr = tempfile.TemporaryFile()
@@ -612,13 +649,11 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
         self.stdout.seek(0)
         self.assertEqual(self.stdout.read(), b'')
         calls = fake_script_calls(self)
-        self.assertEqual(len(calls), 1, 'unexpect call result: {}'.format(calls))
-        self.assertEqual(len(calls[0]), 4, 'unexpect call result: {}'.format(calls[0]))
-        self.assertEqual(
-            calls[0][:3],
-            ['juju-log', '--log-level', 'WARNING']
-        )
-        self.assertRegex(calls[0][3], r'hook /\S+/install exited with status 42')
+        expected = [
+            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
+            ['juju-log', '--log-level', 'WARNING', 'Legacy hooks/install exited with status 42.'],
+        ]
+        self.assertEqual(calls, expected)
 
     def test_hook_and_dispatch_but_hook_is_dispatch(self):
         charm_config = base64.b64encode(pickle.dumps({
@@ -651,10 +686,35 @@ class TestMainWithDispatch(TestMain, unittest.TestCase):
                 finally:
                     hook_path.unlink()
 
+    def test_hook_and_dispatch_but_hook_is_dispatch_copy(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        hook_path = self.hooks_dir / 'install'
+        path = (self.hooks_dir / self.charm_exec_path).resolve()
+        shutil.copy(str(path), str(hook_path))
+        fake_script(self, 'juju-log', 'exit 0')
+
+        event = EventSpec(InstallEvent, 'install', charm_config=charm_config)
+        state = self._simulate_event(event)
+
+        # the .on. was only called once
+        self.assertEqual(state['observed_event_types'], [InstallEvent])
+        self.assertEqual(state['on_install'], [InstallEvent])
+        self.assertEqual(fake_script_calls(self), [
+            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Charm called itself via hooks/install.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Legacy hooks/install exited with status 0.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+        ])
+
 
 class TestMainWithDispatchAsScript(TestMainWithDispatch):
     """Here dispatch is a script that execs the charm.py instead of a symlink.
     """
+
+    has_dispatch = True
+
     def _setup_entry_point(self, directory, entry_point):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
