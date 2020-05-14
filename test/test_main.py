@@ -493,6 +493,7 @@ log_debug: {}
 
 class TestMainWithNoDispatch(TestMain, unittest.TestCase):
     has_dispatch = False
+    hooks_are_symlinks = True
 
     def _setup_entry_point(self, directory, entry_point):
         path = directory / entry_point
@@ -524,10 +525,10 @@ class TestMainWithNoDispatch(TestMain, unittest.TestCase):
         def _assess_event_links(event_spec):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
-                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists(),
-                                'Missing hook: ' + event_hook)
-                self.assertEqual(os.readlink(str(self.JUJU_CHARM_DIR / event_hook)),
-                                 self.charm_exec_path)
+                hook_path = self.JUJU_CHARM_DIR / event_hook
+                self.assertTrue(hook_path.exists(), 'Missing hook: ' + event_hook)
+                if self.hooks_are_symlinks:
+                    self.assertEqual(os.readlink(hook_path), self.charm_exec_path)
 
         for initial_event in initial_events:
             self._setup_charm_dir()
@@ -547,6 +548,15 @@ class TestMainWithNoDispatch(TestMain, unittest.TestCase):
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
         action_hook = self.JUJU_CHARM_DIR / 'actions' / 'test'
         self.assertTrue(action_hook.exists())
+
+
+class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
+    hooks_are_symlinks = False
+
+    def _setup_entry_point(self, directory, entry_point):
+        charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
+        path = directory / entry_point
+        shutil.copy(charm_path, str(path))
 
 
 class TestMainWithDispatch(TestMain, unittest.TestCase):

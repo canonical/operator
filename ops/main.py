@@ -172,10 +172,11 @@ class _JujuEvent:
     def __init__(self, charm_dir: Path):
         self._charm_dir = charm_dir
         self._exec_path = Path(sys.argv[0])
-        if self._exec_path.is_symlink() and self._exec_path.name != 'dispatch':
-            self._init_legacy()
-        else:
+
+        if 'JUJU_DISPATCH_PATH' in os.environ:
             self._init_dispatch()
+        else:
+            self._init_legacy()
 
     def ensure_event_links(self, charm):
         if self.is_dispatch:
@@ -237,9 +238,6 @@ class _JujuEvent:
         self._set_name_from_path(self._exec_path)
 
     def _init_dispatch(self):
-        if 'JUJU_DISPATCH_PATH' not in os.environ:
-            logger.critical("Charm called via dispatch but no JUJU_DISPATCH_PATH set.")
-            sys.exit(1)
         self._dispatch_path = Path(os.environ['JUJU_DISPATCH_PATH'])
 
         if 'OPERATOR_DISPATCH' in os.environ:
