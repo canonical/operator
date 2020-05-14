@@ -365,7 +365,7 @@ class Harness:
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
-    def _get_backend_calls(self, reset:bool=True) -> list:
+    def _get_backend_calls(self, reset: bool = True) -> list:
         """Return the calls that we have made to the TestingModelBackend.
 
         This is useful mostly for testing the framework itself, so that we can assert that we
