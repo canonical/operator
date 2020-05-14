@@ -429,9 +429,7 @@ class _TestingModelBackend:
         self._is_leader = False
         self._resources_map = {}
         self._pod_spec = None
-        # TODO: (jam 2020-05-08) Default _app_status and _unit_status to UnknownStatus
-        self._app_status = None
-        self._unit_status = None
+        self._app_status = self._unit_status = {'status': 'unknown', 'message': ''}
         self._workload_version = None
 
     def relation_ids(self, relation_name):
@@ -492,9 +490,9 @@ class _TestingModelBackend:
 
     def status_set(self, status, message='', *, is_app=False):
         if is_app:
-            self._app_status = (status, message)
+            self._app_status = {'status': status, 'message': message}
         else:
-            self._unit_status = (status, message)
+            self._unit_status = {'status': status, 'message': message}
 
     def storage_list(self, name):
         raise NotImplementedError(self.storage_list)

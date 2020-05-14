@@ -97,6 +97,9 @@ class Application:
         self._is_our_app = self.name == self._backend.app_name
         self._status = None
 
+    def _invalidate(self):
+        self._status = None
+
     @property
     def status(self):
         if not self._is_our_app:
@@ -143,6 +146,9 @@ class Unit:
         self._backend = backend
         self._cache = cache
         self._is_our_unit = self.name == self._backend.unit_name
+        self._status = None
+
+    def _invalidate(self):
         self._status = None
 
     @property
@@ -511,6 +517,14 @@ class StatusBase:
         cls._statuses[cls.name] = cls
         return super().__new__(cls)
 
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return self.message == other.message
+
+    def __repr__(self):
+        return "{.__class__.__name__}({!r})".format(self, self.message)
+
     @classmethod
     def from_name(cls, name, message):
         return cls._statuses[name](message)
@@ -558,6 +572,9 @@ class UnknownStatus(StatusBase):
     def __init__(self):
         # Unknown status cannot be set and does not have a message associated with it.
         super().__init__('')
+
+    def __repr__(self):
+        return "UnknownStatus()"
 
 
 class WaitingStatus(StatusBase):
