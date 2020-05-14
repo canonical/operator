@@ -37,7 +37,6 @@ class TestModel(unittest.TestCase):
         self.addCleanup(restore_env, os.environ.copy())
 
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
-        # language=YAML
         self.harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
             name: myapp
             provides:
