@@ -21,6 +21,7 @@ The dependencies of the operator framework are kept as minimal as possible;
 currently that's Python 3.5 or greater, and `PyYAML` (both are included by
 default in Ubuntu's cloud images from 16.04 on).
 
+<!--
 If you're new to the world of Juju and charms, you should probably dive into our
 [tutorial](/TBD).
 
@@ -30,7 +31,7 @@ operator framework](/TBD) just for you.
 
 If you've gone through the above already and just want a refresher, or are
 really impatient and need to dive in, feel free to carry on down.
-
+-->
 ## A Quick Introduction
 
 Operator framework charms are just Python code. The entry point to your charm is
