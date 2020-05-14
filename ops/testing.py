@@ -365,16 +365,17 @@ class Harness:
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
-    def _get_backend_calls(self, reset=True):
+    def _get_backend_calls(self, reset:bool=True) -> list:
         """Return the calls that we have made to the TestingModelBackend.
 
         This is useful mostly for testing the framework itself, so that we can assert that we
         do/don't trigger extra calls.
 
-        :param reset: If True, reset the calls list back to empty, if false, the call list is
-            preserved.
-        :type reset: bool
-        :return: [(call1, args...), (call2, args...)]
+        Args:
+            reset: If True, reset the calls list back to empty, if false, the call list is
+                preserved.
+        Return:
+            ``[(call1, args...), (call2, args...)]``
         """
         calls = self._backend._calls.copy()
         if reset:
