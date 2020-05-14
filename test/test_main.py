@@ -528,7 +528,7 @@ class TestMainWithNoDispatch(TestMain, unittest.TestCase):
                 hook_path = self.JUJU_CHARM_DIR / event_hook
                 self.assertTrue(hook_path.exists(), 'Missing hook: ' + event_hook)
                 if self.hooks_are_symlinks:
-                    self.assertEqual(os.readlink(hook_path), self.charm_exec_path)
+                    self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
 
         for initial_event in initial_events:
             self._setup_charm_dir()
