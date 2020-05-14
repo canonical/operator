@@ -1,7 +1,7 @@
 # The Operator Framework
 
 The Operator Framework provides a simple, lightweight, and powerful way of
-writing juju charms, the best way to encapsulate operational experience in code.
+writing Juju charms, the best way to encapsulate operational experience in code.
 
 The framework will help you to:
 
@@ -21,10 +21,10 @@ The dependencies of the operator framework are kept as minimal as possible;
 currently that's Python 3.5 or greater, and `PyYAML` (both are included by
 default in Ubuntu's cloud images from 16.04 on).
 
-If you're new to the world of juju and charms, you should probably dive into our
+If you're new to the world of Juju and charms, you should probably dive into our
 [tutorial](/TBD).
 
-If you know about juju, and have written charms that didn't use the operator
+If you know about Juju, and have written charms that didn't use the operator
 framework (be it with reactive or without), we have an [introduction to the
 operator framework](/TBD) just for you.
 
@@ -38,8 +38,9 @@ a particular Python file. It could be anything that makes sense to your project,
 but let's assume this is `src/charm.py`. This file must be executable (and it
 must have the appropriate shebang line).
 
-This file must be symlinked from `dispatch` (as of juju 3.8; otherwise from
-`hooks/install`, and also from `hooks/start` if it's for k8s).
+This file must be symlinked from `dispatch` (supported by Juju 2.8; otherwise
+from `hooks/install` and `hooks/upgrade-charm`, and `hooks/start` if it is a k8s
+charm).
 
 You also need the usual `metadata.yaml` and `config.yaml` files, and any Python
 dependencies (maybe using some kind of virtualenv). In other words, your project
@@ -63,7 +64,6 @@ needs to define a subclass of `CharmBase` and pass that into the framework's
 `main` function:
 
 ```python
-#!../env/bin/python3
 from ops.charm import CharmBase
 from ops.main import main
 
@@ -100,7 +100,8 @@ harness = Harness(MyCharm)
 relation_id = harness.add_relation('db', 'postgresql')
 # Now instantiate the charm to see events as the model changes
 harness.begin()
-harness.add_relation_unit(relation_id, 'postgresql/0', remote_unit_data={'key': 'val'})
+harness.add_relation_unit(relation_id, 'postgresql/0')
+harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
 # Check that charm has properly handled the relation_joined event for postgresql/0
 self.assertEqual(harness.charm. ...)
 ```
@@ -110,7 +111,7 @@ self.assertEqual(harness.charm. ...)
 If you need help, have ideas, or would just like to chat with us, reach out on
 IRC: we're in [#smooth-operator] on freenode (or try the [webchat]).
 
-We also pay attention to juju's [discourse], but currently we don't actively
+We also pay attention to Juju's [discourse], but currently we don't actively
 post there outside of our little corner of the [docs]; most discussion at this
 stage is on IRC.
 
