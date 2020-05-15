@@ -18,7 +18,7 @@ matrix:
           language: generic
 
 install:
-    - pip3 install pyyaml autopep8 flake8
+    - pip3 install -r requirements-dev.txt
 
 script:
     - ./run_tests
