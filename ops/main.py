@@ -156,17 +156,20 @@ def _get_event_args(charm, bound_event):
     return [], {}
 
 
-class _JujuEvent:
-    """Encapsulate how to figure out what event juju wants us to run
+class _Dispatcher:
+    """Encapsulate how to figure out what event Juju wants us to run.
 
-    Also knows how to run 'legacy' hooks when juju called us via dispatch.
+    Also knows how to run “legacy” hooks when Juju called us via a top-level
+    ``dispatch`` binary.
 
     Args:
         charm_dir: the toplevel directory of the charm
 
     Attributes:
-        name: the name of the event to run
-        is_dispatch: did juju call dispatch (as opposed to a hook symlink)
+        event_name: the name of the event to run
+        is_dispatch_aware: are we running under a Juju that knows about the
+            dispatch binary?
+
     """
 
     def __init__(self, charm_dir: Path):
@@ -179,7 +182,9 @@ class _JujuEvent:
             self._init_legacy()
 
     def ensure_event_links(self, charm):
-        if self.is_dispatch:
+        """Make sure necessary symlinks are present on disk"""
+
+        if self.is_dispatch_aware:
             # links aren't needed
             return
 
@@ -190,13 +195,18 @@ class _JujuEvent:
         #
         # 'start' event is included as Juju does not fire the install event for
         # K8s charms (see LP: #1854635).
-        if (self.name in ('install', 'start', 'upgrade_charm')
-                or self.name.endswith('_storage_attached')):
+        if (self.event_name in ('install', 'start', 'upgrade_charm')
+                or self.event_name.endswith('_storage_attached')):
             _setup_event_links(self._charm_dir, charm)
 
     def run_any_legacy_hook(self):
-        # return
-        if not self.is_dispatch:
+        """Run any extant legacy hook.
+
+        If there is both a dispatch file and a legacy hook for the
+        current event, run the wanted legacy hook.
+        """
+
+        if not self.is_dispatch_aware:
             # we *are* the legacy hook
             return
 
@@ -228,16 +238,30 @@ class _JujuEvent:
             logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
 
     def _set_name_from_path(self, path: Path):
+        """Sets the name attribute to that which can be inferred from the given path."""
         name = path.name.replace('-', '_')
         if path.parent.name == 'actions':
             name = '{}_action'.format(name)
-        self.name = name
+        self.event_name = name
 
     def _init_legacy(self):
-        self.is_dispatch = False
+        """Set up the 'legacy' dispatcher.
+
+        The current Juju doesn't know about 'dispatch' and calls hooks
+        explicitly.
+        """
+        self.is_dispatch_aware = False
         self._set_name_from_path(self._exec_path)
 
     def _init_dispatch(self):
+        """Set up the new 'dispatch' dispatcher.
+
+        The current Juju will run 'dispatch' if it exists, and otherwise fall
+        back to the old behaviour.
+
+        JUJU_DISPATCH_PATH will be set to the wanted hook, e.g. hooks/install,
+        in both cases.
+        """
         self._dispatch_path = Path(os.environ['JUJU_DISPATCH_PATH'])
 
         if 'OPERATOR_DISPATCH' in os.environ:
@@ -245,7 +269,7 @@ class _JujuEvent:
             sys.exit(0)
         os.environ['OPERATOR_DISPATCH'] = '1'
 
-        self.is_dispatch = True
+        self.is_dispatch_aware = True
         self._set_name_from_path(self._dispatch_path)
 
 
@@ -260,8 +284,8 @@ def main(charm_class):
     debug = ('JUJU_DEBUG' in os.environ)
     setup_root_logging(model_backend, debug=debug)
 
-    juju_event = _JujuEvent(charm_dir)
-    juju_event.run_any_legacy_hook()
+    dispatcher = _Dispatcher(charm_dir)
+    dispatcher.run_any_legacy_hook()
 
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)
@@ -275,17 +299,17 @@ def main(charm_class):
     framework = ops.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
         charm = charm_class(framework, None)
-        juju_event.ensure_event_links(charm)
+        dispatcher.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant
         #       Juju changes are made.
         #
         # Skip reemission of deferred events for collect-metrics events because
         # they do not have the full access to all hook tools.
-        if juju_event.name != 'collect_metrics':
+        if dispatcher.event_name != 'collect_metrics':
             framework.reemit()
 
-        _emit_charm_event(charm, juju_event.name)
+        _emit_charm_event(charm, dispatcher.event_name)
 
         framework.commit()
     finally:
