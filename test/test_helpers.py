@@ -91,8 +91,9 @@ class BaseTestCase(unittest.TestCase):
     def create_framework(self, *, model=None, tmpdir=None):
         """Create a Framework object.
 
-        By default operate in-memory; pass a temporary directory through 'tmpdir' parameter if
-        whish to instantiate several frameworks sharing the same dir (e.g. for storing state).
+        By default operate in-memory; pass a temporary directory via the 'tmpdir'
+        parameter if you whish to instantiate several frameworks sharing the
+        same dir (e.g. for storing state).
         """
         if tmpdir is None:
             data_fpath = ":memory:"
