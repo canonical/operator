@@ -474,6 +474,35 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(TypeError):
             ops.model.StatusBase('test')
 
+    def test_status_repr(self):
+        test_cases = {
+            "ActiveStatus('Seashell')": ops.model.ActiveStatus('Seashell'),
+            "MaintenanceStatus('Red')": ops.model.MaintenanceStatus('Red'),
+            "BlockedStatus('Magenta')": ops.model.BlockedStatus('Magenta'),
+            "WaitingStatus('Thistle')": ops.model.WaitingStatus('Thistle'),
+            'UnknownStatus()': ops.model.UnknownStatus(),
+        }
+        for expected, status in test_cases.items():
+            self.assertEqual(repr(status), expected)
+
+    def test_status_eq(self):
+        status_types = [
+            ops.model.ActiveStatus,
+            ops.model.MaintenanceStatus,
+            ops.model.BlockedStatus,
+            ops.model.WaitingStatus,
+        ]
+
+        self.assertEqual(ops.model.UnknownStatus(), ops.model.UnknownStatus())
+        for (i, t1) in enumerate(status_types):
+            self.assertNotEqual(t1(''), ops.model.UnknownStatus())
+            for (j, t2) in enumerate(status_types):
+                self.assertNotEqual(t1('one'), t2('two'))
+                if i == j:
+                    self.assertEqual(t1('one'), t2('one'))
+                else:
+                    self.assertNotEqual(t1('one'), t2('one'))
+
     def test_active_message_default(self):
         self.assertEqual(ops.model.ActiveStatus().message, '')
 
@@ -500,7 +529,9 @@ class TestModel(unittest.TestCase):
             with self.subTest(test_case):
                 self.model.unit.status = target_status
                 self.assertEqual(self.model.unit.status, target_status)
-                self.assertBackendCalls([backend_call])
+                self.model.unit._invalidate()
+                self.assertEqual(self.model.unit.status, target_status)
+                self.assertBackendCalls([backend_call, ('status_get', {'is_app': False})])
 
     def test_local_set_valid_app_status(self):
         self.harness.set_leader(True)
@@ -526,9 +557,15 @@ class TestModel(unittest.TestCase):
             with self.subTest(test_case):
                 self.model.app.status = target_status
                 self.assertEqual(self.model.app.status, target_status)
+                self.model.app._invalidate()
+                self.assertEqual(self.model.app.status, target_status)
                 # There is a backend call to check if we can set the value,
-                # and then a second check when we assert the status above
-                expected_calls = [('is_leader',), backend_call, ('is_leader',)]
+                # and then another check each time we assert the status above
+                expected_calls = [
+                    ('is_leader',), backend_call,
+                    ('is_leader',),
+                    ('is_leader',), ('status_get', {'is_app': True}),
+                ]
                 self.assertBackendCalls(expected_calls)
 
     def test_set_app_status_non_leader_raises(self):
@@ -539,6 +576,14 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.model.app.status = ops.model.ActiveStatus()
 
+    def test_set_unit_status_invalid(self):
+        with self.assertRaises(ops.model.InvalidStatusError):
+            self.model.unit.status = 'blocked'
+
+    def test_set_app_status_invalid(self):
+        with self.assertRaises(ops.model.InvalidStatusError):
+            self.model.app.status = 'blocked'
+
     def test_remote_unit_status(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
@@ -546,6 +591,9 @@ class TestModel(unittest.TestCase):
         remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0',
                                   self.model.get_relation('db1').units))
         self.resetBackendCalls()
+
+        # Remote unit status is always unknown.
+        self.assertEqual(remote_unit.status, ops.model.UnknownStatus())
 
         test_statuses = (
             ops.model.UnknownStatus(),

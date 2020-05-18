@@ -30,6 +30,8 @@ from ops.framework import (
 )
 from ops.model import (
     ActiveStatus,
+    MaintenanceStatus,
+    UnknownStatus,
     ModelError,
     RelationNotFoundError,
 )
@@ -669,6 +671,26 @@ class TestHarness(unittest.TestCase):
              ('status_set', 'active', 'message', {'is_app': True})],
             harness._get_backend_calls())
 
+    def test_unit_status(self):
+        harness = Harness(CharmBase, meta='name: test-app')
+        harness.set_leader(True)
+        harness.begin()
+        # default status
+        self.assertEqual(harness.model.unit.status, MaintenanceStatus(''))
+        status = ActiveStatus('message')
+        harness.model.unit.status = status
+        self.assertEqual(harness.model.unit.status, status)
+
+    def test_app_status(self):
+        harness = Harness(CharmBase, meta='name: test-app')
+        harness.set_leader(True)
+        harness.begin()
+        # default status
+        self.assertEqual(harness.model.app.status, UnknownStatus())
+        status = ActiveStatus('message')
+        harness.model.app.status = status
+        self.assertEqual(harness.model.app.status, status)
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -770,8 +792,12 @@ class TestTestingModelBackend(unittest.TestCase):
             ''')
         backend = harness._backend
         backend.status_set('blocked', 'message', is_app=False)
-        self.assertEqual(backend.status_get(is_app=False), ('blocked', 'message'))
-        self.assertEqual(backend.status_get(is_app=True), None)
+        self.assertEqual(
+            backend.status_get(is_app=False),
+            {'status': 'blocked', 'message': 'message'})
+        self.assertEqual(
+            backend.status_get(is_app=True),
+            {'status': 'unknown', 'message': ''})
 
     def test_status_set_get_app(self):
         harness = Harness(CharmBase, meta='''
@@ -779,8 +805,12 @@ class TestTestingModelBackend(unittest.TestCase):
             ''')
         backend = harness._backend
         backend.status_set('blocked', 'message', is_app=True)
-        self.assertEqual(backend.status_get(is_app=True), ('blocked', 'message'))
-        self.assertEqual(backend.status_get(is_app=False), None)
+        self.assertEqual(
+            backend.status_get(is_app=True),
+            {'status': 'blocked', 'message': 'message'})
+        self.assertEqual(
+            backend.status_get(is_app=False),
+            {'status': 'maintenance', 'message': ''})
 
     def test_relation_ids_unknown_relation(self):
         harness = Harness(CharmBase, meta='''

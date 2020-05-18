@@ -142,6 +142,9 @@ class Application:
         self._is_our_app = self.name == self._backend.app_name
         self._status = None
 
+    def _invalidate(self):
+        self._status = None
+
     @property
     def status(self) -> 'StatusBase':
         """Used to report or read the status of the overall application.
@@ -213,6 +216,9 @@ class Unit:
         self._backend = backend
         self._cache = cache
         self._is_our_unit = self.name == self._backend.unit_name
+        self._status = None
+
+    def _invalidate(self):
         self._status = None
 
     @property
@@ -704,9 +710,38 @@ class StatusBase:
         cls._statuses[cls.name] = cls
         return super().__new__(cls)
 
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return self.message == other.message
+
+    def __repr__(self):
+        return "{.__class__.__name__}({!r})".format(self, self.message)
+
     @classmethod
-    def from_name(cls, name, message):
-        return cls._statuses[name](message)
+    def from_name(cls, name: str, message: str):
+        if name == 'unknown':
+            # unknown is special
+            return UnknownStatus()
+        else:
+            return cls._statuses[name](message)
+
+
+class UnknownStatus(StatusBase):
+    """The unit status is unknown.
+
+    A unit-agent has finished calling install, config-changed and start, but the
+    charm has not called status-set yet.
+
+    """
+    name = 'unknown'
+
+    def __init__(self):
+        # Unknown status cannot be set and does not have a message associated with it.
+        super().__init__('')
+
+    def __repr__(self):
+        return "UnknownStatus()"
 
 
 class ActiveStatus(StatusBase):
@@ -716,8 +751,8 @@ class ActiveStatus(StatusBase):
     """
     name = 'active'
 
-    def __init__(self, message: typing.Optional[str] = None):
-        super().__init__(message or '')
+    def __init__(self, message: str = ''):
+        super().__init__(message)
 
 
 class BlockedStatus(StatusBase):
@@ -737,20 +772,6 @@ class MaintenanceStatus(StatusBase):
 
     """
     name = 'maintenance'
-
-
-class UnknownStatus(StatusBase):
-    """The unit status is unknown.
-
-    A unit-agent has finished calling install, config-changed and start, but the
-    charm has not called status-set yet.
-
-    """
-    name = 'unknown'
-
-    def __init__(self):
-        # Unknown status cannot be set and does not have a message associated with it.
-        super().__init__('')
 
 
 class WaitingStatus(StatusBase):
