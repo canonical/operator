@@ -20,11 +20,10 @@ import os
 import shutil
 import sys
 import tempfile
-import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-from ops import charm, model
+from ops import charm
 from ops.framework import (
     _BREAKPOINT_WELCOME_MESSAGE,
     BoundStoredState,
@@ -37,30 +36,22 @@ from ops.framework import (
     NoSnapshotError,
     Object,
     PreCommitEvent,
-    SQLiteStorage,
     StoredList,
     StoredState,
     StoredStateData,
 )
-from test.test_helpers import fake_script
+from test.test_helpers import fake_script, BaseTestCase
 
 
-class TestFramework(unittest.TestCase):
+class TestFramework(BaseTestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
-        default_timeout = SQLiteStorage.DB_LOCK_TIMEOUT
 
-        def timeout_cleanup():
-            SQLiteStorage.DB_LOCK_TIMEOUT = default_timeout
-        SQLiteStorage.DB_LOCK_TIMEOUT = datetime.timedelta(0)
-        self.addCleanup(timeout_cleanup)
-
-    def create_framework(self):
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, None, None)
-        self.addCleanup(framework.close)
-        return framework
+        patcher = patch('ops.framework.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_handle_path(self):
         cases = [
@@ -117,13 +108,13 @@ class TestFramework(unittest.TestCase):
         handle = Handle(None, "a_foo", "some_key")
         event = Foo(handle, 1)
 
-        framework1 = self.create_framework()
+        framework1 = self.create_framework(tmpdir=self.tmpdir)
         framework1.register_type(Foo, None, handle.kind)
         framework1.save_snapshot(event)
         framework1.commit()
         framework1.close()
 
-        framework2 = self.create_framework()
+        framework2 = self.create_framework(tmpdir=self.tmpdir)
         framework2.register_type(Foo, None, handle.kind)
         event2 = framework2.load_snapshot(handle)
         self.assertEqual(event2.my_n, 2)
@@ -138,7 +129,7 @@ class TestFramework(unittest.TestCase):
         framework2.commit()
         framework2.close()
 
-        framework3 = self.create_framework()
+        framework3 = self.create_framework(tmpdir=self.tmpdir)
         framework3.register_type(Foo, None, handle.kind)
 
         self.assertRaises(NoSnapshotError, framework3.load_snapshot, handle)
@@ -224,7 +215,7 @@ class TestFramework(unittest.TestCase):
         framework.observe(pub.qux, obs)
 
     def test_on_pre_commit_emitted(self):
-        framework = self.create_framework()
+        framework = self.create_framework(tmpdir=self.tmpdir)
 
         class PreCommitObserver(Object):
 
@@ -258,7 +249,7 @@ class TestFramework(unittest.TestCase):
         self.assertTrue(obs.seen, [PreCommitEvent, CommitEvent])
         framework.close()
 
-        other_framework = self.create_framework()
+        other_framework = self.create_framework(tmpdir=self.tmpdir)
 
         new_obs = PreCommitObserver(other_framework, None)
 
@@ -443,7 +434,7 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(o1.handle.path, o_copy.handle.path)
 
     def test_forget_and_multiple_objects_with_load_snapshot(self):
-        framework = self.create_framework()
+        framework = self.create_framework(tmpdir=self.tmpdir)
 
         class MyObject(Object):
             def __init__(self, parent, name):
@@ -476,11 +467,11 @@ class TestFramework(unittest.TestCase):
             MyObject(framework, "path")
         framework.close()
         # But we can create an object, or load a snapshot in a copy of the framework
-        framework_copy1 = self.create_framework()
+        framework_copy1 = self.create_framework(tmpdir=self.tmpdir)
         o_copy1 = MyObject(framework_copy1, "path")
         self.assertEqual(o_copy1.value, "path")
         framework_copy1.close()
-        framework_copy2 = self.create_framework()
+        framework_copy2 = self.create_framework(tmpdir=self.tmpdir)
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
         self.assertEqual(o_copy2.value, "path")
@@ -729,7 +720,7 @@ class TestFramework(unittest.TestCase):
                     event.defer()
                     MyObserver.has_deferred = True
 
-        framework1 = self.create_framework()
+        framework1 = self.create_framework(tmpdir=self.tmpdir)
         pub1 = MyNotifier(framework1, "pub")
         obs1 = MyObserver(framework1, "obs")
         framework1.observe(pub1.foo, obs1)
@@ -740,7 +731,7 @@ class TestFramework(unittest.TestCase):
         framework1.close()
         del framework1
 
-        framework2 = self.create_framework()
+        framework2 = self.create_framework(tmpdir=self.tmpdir)
         pub2 = MyNotifier(framework2, "pub")
         obs2 = MyObserver(framework2, "obs")
         framework2.observe(pub2.foo, obs2)
@@ -762,9 +753,9 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(my_obj.model, framework.model)
 
     def test_ban_concurrent_frameworks(self):
-        f = self.create_framework()
+        f = self.create_framework(tmpdir=self.tmpdir)
         with self.assertRaises(Exception) as cm:
-            self.create_framework()
+            self.create_framework(tmpdir=self.tmpdir)
         self.assertIn('database is locked', str(cm.exception))
         f.close()
 
@@ -789,16 +780,11 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(str(cm.exception), expected)
 
 
-class TestStoredState(unittest.TestCase):
+class TestStoredState(BaseTestCase):
 
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
-
-    def create_framework(self, cls=Framework):
-        framework = cls(self.tmpdir / "framework.data", self.tmpdir, None, None)
-        self.addCleanup(framework.close)
-        return framework
 
     def test_basic_state_storage(self):
         class SomeObject(Object):
@@ -856,7 +842,7 @@ class TestStoredState(unittest.TestCase):
         self._stored_state_tests(FinalChild)
 
     def _stored_state_tests(self, cls):
-        framework = self.create_framework()
+        framework = self.create_framework(tmpdir=self.tmpdir)
         obj = cls(framework, "1")
 
         try:
@@ -889,7 +875,7 @@ class TestStoredState(unittest.TestCase):
         framework.close()
 
         # Since this has the same absolute object handle, it will get its state back.
-        framework_copy = self.create_framework()
+        framework_copy = self.create_framework(tmpdir=self.tmpdir)
         obj_copy = cls(framework_copy, "1")
         self.assertEqual(obj_copy._stored.foo, 42)
         self.assertEqual(obj_copy._stored.bar, "s")
@@ -908,7 +894,7 @@ class TestStoredState(unittest.TestCase):
         class SubB(Base):
             pass
 
-        framework = self.create_framework()
+        framework = self.create_framework(tmpdir=self.tmpdir)
         a = SubA(framework, None)
         b = SubB(framework, None)
         z = Base(framework, None)
@@ -920,7 +906,7 @@ class TestStoredState(unittest.TestCase):
         framework.commit()
         framework.close()
 
-        framework2 = self.create_framework()
+        framework2 = self.create_framework(tmpdir=self.tmpdir)
         a2 = SubA(framework2, None)
         b2 = SubB(framework2, None)
         z2 = Base(framework2, None)
@@ -1165,7 +1151,7 @@ class TestStoredState(unittest.TestCase):
 
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
-            framework = self.create_framework(cls=WrappedFramework)
+            framework = WrappedFramework(self.tmpdir / "framework.data", self.tmpdir, None, None)
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
@@ -1190,7 +1176,8 @@ class TestStoredState(unittest.TestCase):
             framework.commit()
             framework.close()
 
-            framework_copy = self.create_framework(cls=WrappedFramework)
+            framework_copy = WrappedFramework(
+                self.tmpdir / "framework.data", self.tmpdir, None, None)
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
@@ -1378,26 +1365,6 @@ class TestStoredState(unittest.TestCase):
         #       parent._stored._data.dirty is False?
 
 
-def create_model(testcase):
-    """Create a Model object."""
-    unit_name = 'myapp/0'
-    patcher = patch.dict(os.environ, {'JUJU_UNIT_NAME': unit_name})
-    patcher.start()
-    testcase.addCleanup(patcher.stop)
-
-    backend = model._ModelBackend()
-    meta = charm.CharmMeta()
-    test_model = model.Model('myapp/0', meta, backend)
-    return test_model
-
-
-def create_framework(testcase, model=None):
-    """Create a Framework object."""
-    framework = Framework(":memory:", charm_dir='non-existant', meta=None, model=model)
-    testcase.addCleanup(framework.close)
-    return framework
-
-
 class GenericObserver(Object):
     """Generic observer for the tests."""
 
@@ -1411,13 +1378,13 @@ class GenericObserver(Object):
 
 
 @patch('sys.stderr', new_callable=io.StringIO)
-class BreakpointTests(unittest.TestCase):
+class BreakpointTests(BaseTestCase):
 
     def test_ignored(self, fake_stderr):
         # It doesn't do anything really unless proper environment is there.
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
-            framework = create_framework(self)
+            framework = self.create_framework()
 
         with patch('pdb.Pdb.set_trace') as mock:
             framework.breakpoint()
@@ -1428,7 +1395,7 @@ class BreakpointTests(unittest.TestCase):
         # The debugger needs to leave the user in the frame where the breakpoint is executed,
         # which for the test is the frame we're calling it here in the test :).
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            framework = create_framework(self)
+            framework = self.create_framework()
 
         with patch('pdb.Pdb.set_trace') as mock:
             this_frame = inspect.currentframe()
@@ -1440,7 +1407,7 @@ class BreakpointTests(unittest.TestCase):
     def test_welcome_message(self, fake_stderr):
         # Check that an initial message is shown to the user when code is interrupted.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            framework = create_framework(self)
+            framework = self.create_framework()
         with patch('pdb.Pdb.set_trace'):
             framework.breakpoint()
         self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
@@ -1449,7 +1416,7 @@ class BreakpointTests(unittest.TestCase):
         # Check that an initial message is NOT shown twice if the breakpoint is exercised
         # twice in the same run.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            framework = create_framework(self)
+            framework = self.create_framework()
         with patch('pdb.Pdb.set_trace'):
             framework.breakpoint()
             self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
@@ -1459,7 +1426,7 @@ class BreakpointTests(unittest.TestCase):
     def test_builtin_breakpoint_hooked(self, fake_stderr):
         # Verify that the proper hook is set.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            create_framework(self)  # creating the framework setups the hook
+            self.create_framework()  # creating the framework setups the hook
         with patch('pdb.Pdb.set_trace') as mock:
             # Calling through sys, not breakpoint() directly, so we can run the
             # tests with Py < 3.7.
@@ -1467,7 +1434,7 @@ class BreakpointTests(unittest.TestCase):
         self.assertEqual(mock.call_count, 1)
 
     def test_breakpoint_names(self, fake_stderr):
-        framework = create_framework(self)
+        framework = self.create_framework()
 
         # Name rules:
         # - must start and end with lowercase alphanumeric characters
@@ -1533,7 +1500,7 @@ class BreakpointTests(unittest.TestCase):
     def check_trace_set(self, envvar_value, breakpoint_name, call_count):
         """Helper to check the diverse combinations of situations."""
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': envvar_value}):
-            framework = create_framework(self)
+            framework = self.create_framework()
         with patch('pdb.Pdb.set_trace') as mock:
             framework.breakpoint(breakpoint_name)
         self.assertEqual(mock.call_count, call_count)
@@ -1567,31 +1534,31 @@ class BreakpointTests(unittest.TestCase):
         self.check_trace_set('hook', 'mybreak', 0)
 
 
-class DebugHookTests(unittest.TestCase):
+class DebugHookTests(BaseTestCase):
 
     def test_envvar_parsing_missing(self):
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
-            framework = create_framework(self)
+            framework = self.create_framework()
         self.assertEqual(framework._juju_debug_at, ())
 
     def test_envvar_parsing_empty(self):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': ''}):
-            framework = create_framework(self)
+            framework = self.create_framework()
         self.assertEqual(framework._juju_debug_at, ())
 
     def test_envvar_parsing_simple(self):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
-            framework = create_framework(self)
+            framework = self.create_framework()
         self.assertEqual(framework._juju_debug_at, ['hook'])
 
     def test_envvar_parsing_multiple(self):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'foo,bar,all'}):
-            framework = create_framework(self)
+            framework = self.create_framework()
         self.assertEqual(framework._juju_debug_at, ['foo', 'bar', 'all'])
 
     def test_basic_interruption_enabled(self):
-        framework = create_framework(self)
+        framework = self.create_framework()
         framework._juju_debug_at = ['hook']
 
         publisher = charm.CharmEvents(framework, "1")
@@ -1615,8 +1582,8 @@ class DebugHookTests(unittest.TestCase):
         self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
     def test_actions_are_interrupted(self):
-        test_model = create_model(self)
-        framework = create_framework(self, model=test_model)
+        test_model = self.create_model()
+        framework = self.create_framework(model=test_model)
         framework._juju_debug_at = ['hook']
 
         class CustomEvents(ObjectEvents):
@@ -1640,7 +1607,7 @@ class DebugHookTests(unittest.TestCase):
             """Generic notifier for the tests."""
             bar = EventSource(EventBase)
 
-        framework = create_framework(self)
+        framework = self.create_framework()
         framework._juju_debug_at = ['hook']
 
         publisher = MyNotifier(framework, "1")
@@ -1654,7 +1621,7 @@ class DebugHookTests(unittest.TestCase):
         self.assertTrue(observer.called)
 
     def test_envvar_mixed(self):
-        framework = create_framework(self)
+        framework = self.create_framework()
         framework._juju_debug_at = ['foo', 'hook', 'all', 'whatever']
 
         publisher = charm.CharmEvents(framework, "1")
@@ -1669,7 +1636,7 @@ class DebugHookTests(unittest.TestCase):
         self.assertFalse(observer.called)
 
     def test_no_registered_method(self):
-        framework = create_framework(self)
+        framework = self.create_framework()
         framework._juju_debug_at = ['hook']
 
         publisher = charm.CharmEvents(framework, "1")
@@ -1682,7 +1649,7 @@ class DebugHookTests(unittest.TestCase):
         self.assertFalse(observer.called)
 
     def test_envvar_nohook(self):
-        framework = create_framework(self)
+        framework = self.create_framework()
         framework._juju_debug_at = ['something-else']
 
         publisher = charm.CharmEvents(framework, "1")
@@ -1697,7 +1664,7 @@ class DebugHookTests(unittest.TestCase):
         self.assertTrue(observer.called)
 
     def test_envvar_missing(self):
-        framework = create_framework(self)
+        framework = self.create_framework()
         framework._juju_debug_at = ()
 
         publisher = charm.CharmEvents(framework, "1")
@@ -1711,7 +1678,7 @@ class DebugHookTests(unittest.TestCase):
         self.assertTrue(observer.called)
 
     def test_welcome_message_not_multiple(self):
-        framework = create_framework(self)
+        framework = self.create_framework()
         framework._juju_debug_at = ['hook']
 
         publisher = charm.CharmEvents(framework, "1")

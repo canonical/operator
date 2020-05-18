@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,11 @@ import subprocess
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
+
+from ops.framework import Framework
+from ops.model import Model, _ModelBackend
+from ops.charm import CharmMeta
 
 
 def fake_script(test_case, name, content):
@@ -79,3 +84,36 @@ class FakeScriptTest(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), [['bar', 'd e', 'f']])
 
         self.assertEqual(fake_script_calls(self, clear=True), [])
+
+
+class BaseTestCase(unittest.TestCase):
+
+    def create_framework(self, *, model=None, tmpdir=None):
+        """Create a Framework object.
+
+        By default operate in-memory; pass a temporary directory via the 'tmpdir'
+        parameter if you whish to instantiate several frameworks sharing the
+        same dir (e.g. for storing state).
+        """
+        if tmpdir is None:
+            data_fpath = ":memory:"
+            charm_dir = 'non-existant'
+        else:
+            data_fpath = tmpdir / "framework.data"
+            charm_dir = tmpdir
+
+        framework = Framework(data_fpath, charm_dir, meta=None, model=model)
+        self.addCleanup(framework.close)
+        return framework
+
+    def create_model(self):
+        """Create a Model object."""
+        unit_name = 'myapp/0'
+        patcher = patch.dict(os.environ, {'JUJU_UNIT_NAME': unit_name})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        backend = _ModelBackend()
+        meta = CharmMeta()
+        model = Model('myapp/0', meta, backend)
+        return model
