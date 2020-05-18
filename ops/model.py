@@ -84,7 +84,7 @@ class Model:
         relation is established only once or None if it is not established. If this
         same relation is established multiple times the error TooManyRelatedAppsError is raised.
 
-        Parameters:
+        Args:
             relation_name: The name of the endpoint for this charm
             relation_id: An identifier for a specific relation. Used to disambiguate when a
                 given application has more than one relation on a given endpoint.
@@ -97,8 +97,8 @@ class Model:
     def get_binding(self, binding_key: typing.Union[str, 'Relation']) -> 'Binding':
         """Get a network space binding.
 
-        Parameters:
-            binding_key -- The relation name or instance to obtain bindings for.
+        Args:
+            binding_key: The relation name or instance to obtain bindings for.
         Returns:
             If ``binding_key`` is a relation name, the method returns the default binding
             for that relation. If a relation instance is provided, the method first looks
@@ -392,7 +392,7 @@ class RelationMapping(Mapping):
 class BindingMapping:
     """Mapping of endpoints to network bindings.
 
-    Charm authors should instantiate this directly, but access it via
+    Charm authors should not instantiate this directly, but access it via
     :meth:`Model.get_binding`
     """
 
@@ -452,6 +452,9 @@ class Binding:
 class Network:
     """Network space details.
 
+    Charm authors should not instantiate this directly, but should get access to the Network
+    definition from :meth:`Model.get_binding` and its ``network`` attribute.
+
     Attributes:
         interfaces: A list of :class:`NetworkInterface` details. This includes the
             information about how your application should be configured (eg, what
@@ -465,6 +468,8 @@ class Network:
             other units will see you connecting from. Due to things like NAT it isn't always
             possible to narrow it down to a single address, but when it is clear, the CIDRs
             will be constrained to a single address. (eg, 10.0.0.1/32)
+    Args:
+        network_info: A dict of network information as returned by ``network-get``.
     """
 
     def __init__(self, network_info: dict):
@@ -1008,16 +1013,18 @@ class _ModelBackend:
     def status_get(self, *, is_app=False):
         """Get a status of a unit or an application.
 
-        app -- A boolean indicating whether the status should be retrieved for a unit
-               or an application.
+        Args:
+            is_app: A boolean indicating whether the status should be retrieved for a unit
+                or an application.
         """
         return self._run('status-get', '--include-data', '--application={}'.format(is_app))
 
     def status_set(self, status, message='', *, is_app=False):
         """Set a status of a unit or an application.
 
-        app -- A boolean indicating whether the status should be set for a unit or an
-               application.
+        Args:
+            app: A boolean indicating whether the status should be set for a unit or an
+                application.
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
@@ -1058,8 +1065,9 @@ class _ModelBackend:
     def network_get(self, binding_name, relation_id=None):
         """Return network info provided by network-get for a given binding.
 
-        binding_name -- A name of a binding (relation name or extra-binding name).
-        relation_id -- An optional relation id to get network info for.
+        Args:
+            binding_name: A name of a binding (relation name or extra-binding name).
+            relation_id: An optional relation id to get network info for.
         """
         cmd = ['network-get', binding_name]
         if relation_id is not None:
