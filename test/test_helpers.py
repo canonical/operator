@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import unittest
 from unittest.mock import patch
 
 from ops.framework import Framework
-from ops.model import Model, ModelBackend
+from ops.model import Model, _ModelBackend
 from ops.charm import CharmMeta
 
 
@@ -113,7 +113,7 @@ class BaseTestCase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        backend = ModelBackend()
+        backend = _ModelBackend()
         meta = CharmMeta()
         model = Model('myapp/0', meta, backend)
         return model
