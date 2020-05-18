@@ -429,7 +429,8 @@ class _TestingModelBackend:
         self._is_leader = False
         self._resources_map = {}
         self._pod_spec = None
-        self._app_status = self._unit_status = {'status': 'unknown', 'message': ''}
+        self._app_status = {'status': 'unknown', 'message': ''}
+        self._unit_status = {'status': 'maintenance', 'message': ''}
         self._workload_version = None
 
     def relation_ids(self, relation_name):
