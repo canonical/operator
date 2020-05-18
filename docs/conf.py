@@ -28,6 +28,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
 ]
 
 # The document name of the “master” document, that is, the document
@@ -87,3 +88,10 @@ autodoc_default_options = {
     'undoc-members': None,
     'show-inheritance': None,
 }
+
+
+# -- Options for sphinx.ext.intersphinx --------------------------------------
+
+# This config value contains the locations and names of other projects
+# that should be linked to in this documentation.
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
