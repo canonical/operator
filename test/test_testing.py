@@ -29,6 +29,7 @@ from ops.framework import (
     Object,
 )
 from ops.model import (
+    ActiveStatus,
     ModelError,
     RelationNotFoundError,
 )
@@ -607,6 +608,66 @@ class TestHarness(unittest.TestCase):
         self.assertIsNone(harness.get_workload_version())
         harness.charm.model.unit.set_workload_version('1.2.3')
         self.assertEqual(harness.get_workload_version(), '1.2.3')
+
+    def test_get_backend_calls(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+        # No calls to the backend yet
+        self.assertEqual(harness._get_backend_calls(), [])
+        rel_id = harness.add_relation('db', 'postgresql')
+        # update_relation_data ensures the cached data for the relation is wiped
+        harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
+        self.assertEqual(
+            harness._get_backend_calls(reset=True), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
+        # add_relation_unit resets the relation_list, but doesn't trigger backend calls
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        self.assertEqual([], harness._get_backend_calls(reset=False))
+        # however, update_relation_data does, because we are preparing relation-changed
+        harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
+        self.assertEqual(
+            harness._get_backend_calls(reset=False), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
+        # If we check again, they are still there, but now we reset it
+        self.assertEqual(
+            harness._get_backend_calls(reset=True), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
+        # And the calls are gone
+        self.assertEqual(harness._get_backend_calls(), [])
+
+    def test_get_backend_calls_with_kwargs(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+        unit = harness.charm.model.unit
+        # Reset the list, because we don't care what it took to get here
+        harness._get_backend_calls(reset=True)
+        unit.status = ActiveStatus()
+        self.assertEqual(
+            [('status_set', 'active', '', {'is_app': False})], harness._get_backend_calls())
+        harness.set_leader(True)
+        app = harness.charm.model.app
+        harness._get_backend_calls(reset=True)
+        app.status = ActiveStatus('message')
+        self.assertEqual(
+            [('is_leader',),
+             ('status_set', 'active', 'message', {'is_app': True})],
+            harness._get_backend_calls())
 
 
 class DBRelationChangedHelper(Object):

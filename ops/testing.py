@@ -224,10 +224,12 @@ class Harness:
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
         if self._model is not None:
-            self._model.relations._invalidate(relation_name)
             remote_unit = self._model.get_unit(remote_unit_name)
             relation = self._model.get_relation(relation_name, relation_id)
-            relation.data[remote_unit]._invalidate()
+            unit_cache = relation.data.get(remote_unit, None)
+            if unit_cache is not None:
+                unit_cache._invalidate()
+            self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return
         self._charm.on[relation_name].relation_joined.emit(
@@ -363,7 +365,48 @@ class Harness:
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
+    def _get_backend_calls(self, reset: bool = True) -> list:
+        """Return the calls that we have made to the TestingModelBackend.
 
+        This is useful mostly for testing the framework itself, so that we can assert that we
+        do/don't trigger extra calls.
+
+        Args:
+            reset: If True, reset the calls list back to empty, if false, the call list is
+                preserved.
+        Return:
+            ``[(call1, args...), (call2, args...)]``
+        """
+        calls = self._backend._calls.copy()
+        if reset:
+            self._backend._calls.clear()
+        return calls
+
+
+def _record_calls(cls):
+    """Replace methods on cls with methods that record that they have been called.
+
+    Iterate all attributes of cls, and for public methods, replace them with a wrapped method
+    that records the method called along with the arguments and keyword arguments.
+    """
+    for meth_name, orig_method in cls.__dict__.items():
+        if meth_name.startswith('_'):
+            continue
+
+        def decorator(orig_method):
+            def wrapped(self, *args, **kwargs):
+                full_args = (orig_method.__name__,) + args
+                if kwargs:
+                    full_args = full_args + (kwargs,)
+                self._calls.append(full_args)
+                return orig_method(self, *args, **kwargs)
+            return wrapped
+
+        setattr(cls, meth_name, decorator(orig_method))
+    return cls
+
+
+@_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
 
@@ -386,6 +429,7 @@ class _TestingModelBackend:
         self._is_leader = False
         self._resources_map = {}
         self._pod_spec = None
+        # TODO: (jam 2020-05-08) Default _app_status and _unit_status to UnknownStatus
         self._app_status = None
         self._unit_status = None
         self._workload_version = None
