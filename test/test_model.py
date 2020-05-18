@@ -409,7 +409,7 @@ class TestModel(unittest.TestCase):
         # TODO: (jam) 2020-05-07 Harness doesn't yet support resource-get issue #262
         meta = ops.charm.CharmMeta()
         meta.resources = {'foo': None, 'bar': None}
-        model = ops.model.Model('myapp/0', meta, ops.model.ModelBackend())
+        model = ops.model.Model('myapp/0', meta, ops.model._ModelBackend())
 
         with self.assertRaises(RuntimeError):
             model.resources.fetch('qux')
@@ -428,7 +428,7 @@ class TestModel(unittest.TestCase):
         meta = ops.charm.CharmMeta.from_yaml('''
             name: myapp
         ''')
-        model = ops.model.Model('myapp/0', meta, ops.model.ModelBackend())
+        model = ops.model.Model('myapp/0', meta, ops.model._ModelBackend())
         fake_script(self, 'pod-spec-set', """
                     cat $2 > $(dirname $0)/spec.json
                     [[ -n $4 ]] && cat $4 > $(dirname $0)/k8s_res.json || true
@@ -463,7 +463,7 @@ class TestModel(unittest.TestCase):
         check_calls(fake_calls)
 
         # Create a new model to drop is-leader caching result.
-        self.backend = ops.model.ModelBackend()
+        self.backend = ops.model._ModelBackend()
         meta = ops.charm.CharmMeta()
         model = ops.model.Model('myapp/0', meta, self.backend)
         fake_script(self, 'is-leader', 'echo false')
@@ -588,7 +588,7 @@ class TestModel(unittest.TestCase):
         # TODO: (jam) 2020-05-07 Harness doesn't yet expose storage-get issue #263
         meta = ops.charm.CharmMeta()
         meta.storages = {'disks': None, 'data': None}
-        model = ops.model.Model('myapp/0', meta, ops.model.ModelBackend())
+        model = ops.model.Model('myapp/0', meta, ops.model._ModelBackend())
 
         fake_script(self, 'storage-list', '''
             if [ "$1" = disks ]; then
@@ -666,7 +666,7 @@ class TestModelBindings(unittest.TestCase):
             'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
             'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
         }
-        self.backend = ops.model.ModelBackend()
+        self.backend = ops.model._ModelBackend()
         self.model = ops.model.Model('myapp/0', meta, self.backend)
 
         fake_script(self, 'relation-ids',
@@ -808,7 +808,7 @@ class TestModelBackend(unittest.TestCase):
     @property
     def backend(self):
         if self._backend is None:
-            self._backend = ops.model.ModelBackend()
+            self._backend = ops.model._ModelBackend()
         return self._backend
 
     def test_relation_get_set_is_app_arg(self):

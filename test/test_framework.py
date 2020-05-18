@@ -1385,7 +1385,7 @@ def create_model(testcase):
     patcher.start()
     testcase.addCleanup(patcher.stop)
 
-    backend = model.ModelBackend()
+    backend = model._ModelBackend()
     meta = charm.CharmMeta()
     test_model = model.Model('myapp/0', meta, backend)
     return test_model
