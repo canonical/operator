@@ -18,6 +18,7 @@ import os
 import shutil
 import tempfile
 import time
+import typing
 import datetime
 import re
 import ipaddress
@@ -30,6 +31,21 @@ from subprocess import run, PIPE, CalledProcessError
 
 
 class Model:
+    """Represents the Juju Model as seen from this unit.
+
+    Attributes:
+        unit: A :class:`Unit` that represents the unit that is running this code (eg yourself)
+        app: A :class:`Application` that represents the application this unit is a part of.
+        relations: Mapping of endpoint to list of :class:`Relation` answering the question
+            "what am I currently related to". See also :meth:`.get_relation`
+        config: A dict of the config for the current application.
+        resources: Access to resources for this charm. Use ``model.resources.fetch(resource_name)``
+            to get the path on disk where the resource can be found.
+        storages: Mapping of storage_name to :class:`Storage` for the storage points defined in
+            metadata.yaml
+        pod: Used to get access to ``model.pod.set_spec`` to set the container specification
+            for Kubernetes charms.
+    """
 
     def __init__(self, unit_name, meta, backend):
         self._cache = _ModelCache(backend)
@@ -43,32 +59,51 @@ class Model:
         self.storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
 
-    def get_unit(self, unit_name):
+    def get_unit(self, unit_name: str) -> 'Unit':
+        """Get an arbitrary unit by name.
+
+        Internally this uses a cache, so asking for the same unit two times will
+        return the same object.
+        """
         return self._cache.get(Unit, unit_name)
 
-    def get_app(self, app_name):
+    def get_app(self, app_name: str) -> 'Application':
+        """Get an application by name.
+
+        Internally this uses a cache, so asking for the same application two times will
+        return the same object.
+        """
         return self._cache.get(Application, app_name)
 
-    def get_relation(self, relation_name, relation_id=None):
+    def get_relation(
+            self, relation_name: str,
+            relation_id: typing.Optional[int] = None) -> 'Relation':
         """Get a specific Relation instance.
-
-        If relation_id is given, this will return that Relation instance.
 
         If relation_id is not given, this will return the Relation instance if the
         relation is established only once or None if it is not established. If this
         same relation is established multiple times the error TooManyRelatedAppsError is raised.
+
+        Args:
+            relation_name: The name of the endpoint for this charm
+            relation_id: An identifier for a specific relation. Used to disambiguate when a
+                given application has more than one relation on a given endpoint.
+        Raises:
+            TooManyRelatedAppsError: is raised if there is more than one relation to the
+                supplied relation_name and no relation_id was supplied
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_key):
+    def get_binding(self, binding_key: typing.Union[str, 'Relation']) -> 'Binding':
         """Get a network space binding.
 
-        binding_key -- The relation name or instance to obtain bindings for.
-
-        If binding_key is a relation name, the method returns the default binding for that
-        relation. If a relation instance is provided, the method first looks up a more specific
-        binding for that specific relation ID, and if none is found falls back to the default
-        binding for the relation name.
+        Args:
+            binding_key: The relation name or instance to obtain bindings for.
+        Returns:
+            If ``binding_key`` is a relation name, the method returns the default binding
+            for that relation. If a relation instance is provided, the method first looks
+            up a more specific binding for that specific relation ID, and if none is found
+            falls back to the default binding for the relation name.
         """
         return self._bindings.get(binding_key)
 
@@ -89,6 +124,16 @@ class _ModelCache:
 
 
 class Application:
+    """Represents a named application in the model.
+
+    This might be your application, or might be an application that you are related to.
+    Charmers should not instantiate Application objects directly, but should use
+    :meth:`Model.get_app` if they need a reference to a given application.
+
+    Attributes:
+        name: The name of this application (eg, 'mysql'). This name may differ from the name of
+            the charm, if the user has deployed it to a different name.
+    """
 
     def __init__(self, name, backend, cache):
         self.name = name
@@ -98,7 +143,23 @@ class Application:
         self._status = None
 
     @property
-    def status(self):
+    def status(self) -> 'StatusBase':
+        """Used to report or read the status of the overall application.
+
+        Can only be read and set by the lead unit of the application.
+
+        The status of remote units is always Unknown.
+
+        Raises:
+            RuntimeError: if you try to set the status of another application, or if you try to
+                set the status of this application as a unit that is not the leader.
+            InvalidStatusError: if you try to set the status to something that is not a
+                :class:`StatusBase`
+
+        Example::
+
+            self.model.app.status = BlockedStatus('I need a human to come help me')
+        """
         if not self._is_our_app:
             return UnknownStatus()
 
@@ -113,7 +174,7 @@ class Application:
         return self._status
 
     @status.setter
-    def status(self, value):
+    def status(self, value: 'StatusBase'):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(
                 'invalid value provided for application {} status: {}'.format(self, value)
@@ -133,6 +194,15 @@ class Application:
 
 
 class Unit:
+    """Represents a named unit in the model.
+
+    This might be your unit, another unit of your application, or a unit of another application
+    that you are related to.
+
+    Attributes:
+        name: The name of the unit (eg, 'mysql/0')
+        app: The Application the unit is a part of.
+    """
 
     def __init__(self, name, backend, cache):
         self.name = name
@@ -146,7 +216,19 @@ class Unit:
         self._status = None
 
     @property
-    def status(self):
+    def status(self) -> 'StatusBase':
+        """Used to report or read the status of a specific unit.
+
+        The status of any unit other than yourself is always Unknown.
+
+        Raises:
+            RuntimeError: if you try to set the status of a unit other than yourself.
+            InvalidStatusError: if you try to set the status to something other than
+                a :class:`StatusBase`
+        Example::
+
+            self.model.unit.status = MaintenanceStatus('reconfiguring the frobnicators')
+        """
         if not self._is_our_unit:
             return UnknownStatus()
 
@@ -158,7 +240,7 @@ class Unit:
         return self._status
 
     @status.setter
-    def status(self, value):
+    def status(self, value: 'StatusBase'):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(
                 'invalid value provided for unit {} status: {}'.format(self, value)
@@ -173,18 +255,43 @@ class Unit:
     def __repr__(self):
         return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
 
-    def is_leader(self):
+    def is_leader(self) -> bool:
+        """Return whether this unit is the leader of its application.
+
+        This can only be called for your own unit.
+        Returns:
+            True if you are the leader, False otherwise
+        Raises:
+            RuntimeError: if called for a unit that is not yourself
+        """
         if self._is_our_unit:
             # This value is not cached as it is not guaranteed to persist for the whole duration
             # of a hook execution.
             return self._backend.is_leader()
         else:
             raise RuntimeError(
-                'cannot determine leadership status for remote applications: {}'.format(self)
+                'leadership status of remote units ({}) is not visible to other'
+                ' applications'.format(self)
             )
+
+    def set_workload_version(self, version: str) -> None:
+        """Record the version of the software running as the workload.
+
+        This shouldn't be confused with the revision of the charm. This is informative only;
+        shown in the output of 'juju status'.
+        """
+        if not isinstance(version, str):
+            raise TypeError("workload version must be a str, not {}: {!r}".format(
+                type(version).__name__, version))
+        self._backend.application_version_set(version)
 
 
 class LazyMapping(Mapping, ABC):
+    """Represents a dict that isn't populated until it is accessed.
+
+    Charm authors should generally never need to use this directly, but it forms
+    the basis for many of the dicts that the framework tracks.
+    """
 
     _lazy_data = None
 
@@ -216,7 +323,7 @@ class LazyMapping(Mapping, ABC):
 
 
 class RelationMapping(Mapping):
-    """Map of relation names to lists of Relation instances."""
+    """Map of relation names to lists of :class:`Relation` instances."""
 
     def __init__(self, relations_meta, our_unit, backend, cache):
         self._peers = set()
@@ -249,6 +356,12 @@ class RelationMapping(Mapping):
         return relation_list
 
     def _invalidate(self, relation_name):
+        """Used to wipe the cache of a given relation_name.
+
+        Not meant to be used by Charm authors. The content of relation data is
+        static for the lifetime of a hook, so it is safe to cache in memory once
+        accessed.
+        """
         self._data[relation_name] = None
 
     def _get_unique(self, relation_name, relation_id=None):
@@ -277,12 +390,21 @@ class RelationMapping(Mapping):
 
 
 class BindingMapping:
+    """Mapping of endpoints to network bindings.
+
+    Charm authors should not instantiate this directly, but access it via
+    :meth:`Model.get_binding`
+    """
 
     def __init__(self, backend):
         self._backend = backend
         self._data = {}
 
-    def get(self, binding_key):
+    def get(self, binding_key: typing.Union[str, 'Relation']) -> 'Binding':
+        """Get a specific Binding for an endpoint/relation.
+
+        Not used directly by Charm authors. See :meth:`Model.get_binding`
+        """
         if isinstance(binding_key, Relation):
             binding_name = binding_key.name
             relation_id = binding_key.id
@@ -300,7 +422,11 @@ class BindingMapping:
 
 
 class Binding:
-    """Binding to a network space."""
+    """Binding to a network space.
+
+    Attributes:
+        name: The name of the endpoint this binding represents (eg, 'db')
+    """
 
     def __init__(self, name, relation_id, backend):
         self.name = name
@@ -309,7 +435,8 @@ class Binding:
         self._network = None
 
     @property
-    def network(self):
+    def network(self) -> 'Network':
+        """The network information for this binding."""
         if self._network is None:
             try:
                 self._network = Network(self._backend.network_get(self.name, self._relation_id))
@@ -323,9 +450,29 @@ class Binding:
 
 
 class Network:
-    """Network space details."""
+    """Network space details.
 
-    def __init__(self, network_info):
+    Charm authors should not instantiate this directly, but should get access to the Network
+    definition from :meth:`Model.get_binding` and its ``network`` attribute.
+
+    Attributes:
+        interfaces: A list of :class:`NetworkInterface` details. This includes the
+            information about how your application should be configured (eg, what
+            IP addresses should you bind to.)
+            Note that multiple addresses for a single interface are represented as multiple
+            interfaces. (eg, ``[NetworKInfo('ens1', '10.1.1.1/32'),
+            NetworkInfo('ens1', '10.1.2.1/32'])``)
+        ingress_addresses: A list of :class:`ipaddress.ip_address` objects representing the IP
+            addresses that other units should use to get in touch with you.
+        egress_subnets: A list of :class:`ipaddress.ip_network` representing the subnets that
+            other units will see you connecting from. Due to things like NAT it isn't always
+            possible to narrow it down to a single address, but when it is clear, the CIDRs
+            will be constrained to a single address. (eg, 10.0.0.1/32)
+    Args:
+        network_info: A dict of network information as returned by ``network-get``.
+    """
+
+    def __init__(self, network_info: dict):
         self.interfaces = []
         # Treat multiple addresses on an interface as multiple logical
         # interfaces with the same name.
@@ -342,16 +489,38 @@ class Network:
 
     @property
     def bind_address(self):
+        """A single address that your application should bind() to.
+
+        For the common case where there is a single answer. This represents a single
+        address from :attr:`.interfaces` that can be used to configure where your
+        application should bind() and listen().
+        """
         return self.interfaces[0].address
 
     @property
     def ingress_address(self):
+        """The address other applications should use to connect to your unit.
+
+        Due to things like public/private addresses, NAT and tunneling, the address you bind()
+        to is not always the address other people can use to connect() to you.
+        This is just the first address from :attr:`.ingress_addresses`.
+        """
         return self.ingress_addresses[0]
 
 
 class NetworkInterface:
+    """Represents a single network interface that the charm needs to know about.
 
-    def __init__(self, name, address_info):
+    Charmers should not instantiate this type directly. Instead use :meth:`Model.get_binding`
+    to get the network information for a given endpoint.
+
+    Attributes:
+        name: The name of the interface (eg. 'eth0', or 'ens1')
+        subnet: An :class:`ipaddress.ip_network` representation of the IP for the network
+            interface. This may be a single address (eg '10.0.1.2/32')
+    """
+
+    def __init__(self, name: str, address_info: dict):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
         self.address = ipaddress.ip_address(address_info['value'])
@@ -366,7 +535,24 @@ class NetworkInterface:
 
 
 class Relation:
-    def __init__(self, relation_name, relation_id, is_peer, our_unit, backend, cache):
+    """Represents an established relation between this application and another application.
+
+    This class should not be instantiated directly, instead use :meth:`Model.get_relation`
+    or :attr:`RelationEvent.relation`.
+
+    Attributes:
+        name: The name of the local endpoint of the relation (eg 'db')
+        id: The identifier for a particular relation (integer)
+        app: An :class:`Application` representing the remote application of this relation.
+            For peer relations this will be the local application.
+        units: A set of :class:`Unit` for units that have started and joined this relation.
+        data: A :class:`RelationData` holding the data buckets for each entity
+            of a relation. Accessed via eg Relation.data[unit]['foo']
+    """
+
+    def __init__(
+            self, relation_name: str, relation_id: int, is_peer: bool, our_unit: Unit,
+            backend: '_ModelBackend', cache: '_ModelCache'):
         self.name = relation_name
         self.id = relation_id
         self.app = None
@@ -394,7 +580,21 @@ class Relation:
 
 
 class RelationData(Mapping):
-    def __init__(self, relation, our_unit, backend):
+    """Represents the various data buckets of a given relation.
+
+    Each unit and application involved in a relation has their own data bucket.
+    Eg: ``{entity: RelationDataContent}``
+    where entity can be either a :class:`Unit` or a :class:`Application`.
+
+    Units can read and write their own data, and if they are the leader,
+    they can read and write their application data. They are allowed to read
+    remote unit and application data.
+
+    This class should not be created directly. It should be accessed via
+    :attr:`Relation.data`
+    """
+
+    def __init__(self, relation: Relation, our_unit: Unit, backend: '_ModelBackend'):
         self.relation = weakref.proxy(relation)
         self._data = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
@@ -487,11 +687,15 @@ class ConfigData(LazyMapping):
 
 
 class StatusBase:
-    """Status values specific to applications and units."""
+    """Status values specific to applications and units.
+
+    To access a status by name, see :meth:`StatusBase.from_name`, most use cases will just
+    directly use the child class to indicate their status.
+    """
 
     _statuses = {}
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         self.message = message
 
     def __new__(cls, *args, **kwargs):
@@ -512,7 +716,7 @@ class ActiveStatus(StatusBase):
     """
     name = 'active'
 
-    def __init__(self, message=None):
+    def __init__(self, message: typing.Optional[str] = None):
         super().__init__(message or '')
 
 
@@ -563,11 +767,11 @@ class Resources:
     """Object representing resources for the charm.
     """
 
-    def __init__(self, names, backend):
+    def __init__(self, names: typing.Iterable[str], backend: '_ModelBackend'):
         self._backend = backend
         self._paths = {name: None for name in names}
 
-    def fetch(self, name):
+    def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
 
         If successfully fetched, this returns a Path object to where the resource is stored
@@ -581,10 +785,24 @@ class Resources:
 
 
 class Pod:
-    def __init__(self, backend):
+    """Represents the definition of a pod spec in Kubernetes models.
+
+    Currently only supports simple access to setting the Juju pod spec via :attr:`.set_spec`.
+    """
+
+    def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def set_spec(self, spec, k8s_resources=None):
+    def set_spec(self, spec: typing.Mapping, k8s_resources: typing.Mapping = None):
+        """Set the specification for pods that Juju should start in kubernetes.
+
+        See `juju help-tool pod-spec-set` for details of what should be passed.
+        Args:
+            spec: The mapping defining the pod specification
+            k8s_resources: Additional kubernetes specific specification.
+
+        Returns:
+        """
         if not self._backend.is_leader():
             raise ModelError('cannot set a pod spec as this unit is not a leader')
         self._backend.pod_spec_set(spec, k8s_resources)
@@ -593,11 +811,11 @@ class Pod:
 class StorageMapping(Mapping):
     """Map of storage names to lists of Storage instances."""
 
-    def __init__(self, storage_names, backend):
+    def __init__(self, storage_names: typing.Iterable[str], backend: '_ModelBackend'):
         self._backend = backend
         self._storage_map = {storage_name: None for storage_name in storage_names}
 
-    def __contains__(self, key):
+    def __contains__(self, key: str):
         return key in self._storage_map
 
     def __len__(self):
@@ -606,7 +824,7 @@ class StorageMapping(Mapping):
     def __iter__(self):
         return iter(self._storage_map)
 
-    def __getitem__(self, storage_name):
+    def __getitem__(self, storage_name: str) -> typing.List['Storage']:
         storage_list = self._storage_map[storage_name]
         if storage_list is None:
             storage_list = self._storage_map[storage_name] = []
@@ -614,7 +832,7 @@ class StorageMapping(Mapping):
                 storage_list.append(Storage(storage_name, storage_id, self._backend))
         return storage_list
 
-    def request(self, storage_name, count=1):
+    def request(self, storage_name: str, count: int = 1):
         """Requests new storage instances of a given name.
 
         Uses storage-add tool to request additional storage. Juju will notify the unit
@@ -627,6 +845,12 @@ class StorageMapping(Mapping):
 
 
 class Storage:
+    """"Represents a storage as defined in metadata.yaml
+
+    Attributes:
+        name: Simple string name of the storage
+        id: The provider id for storage
+    """
 
     def __init__(self, storage_name, storage_id, backend):
         self.name = storage_name
@@ -643,10 +867,13 @@ class Storage:
 
 
 class ModelError(Exception):
+    """Base class for exceptions raised when interacting with the Model."""
     pass
 
 
 class TooManyRelatedAppsError(ModelError):
+    """Raised by :meth:`Model.get_relation` if there is more than one related application."""
+
     def __init__(self, relation_name, num_related, max_supported):
         super().__init__('Too many remote applications on {} ({} > {})'.format(
             relation_name, num_related, max_supported))
@@ -656,18 +883,28 @@ class TooManyRelatedAppsError(ModelError):
 
 
 class RelationDataError(ModelError):
-    pass
+    """Raised by ``Relation.data[entity][key] = 'foo'`` if the data is invalid.
+
+    This is raised if you're either trying to set a value to something that isn't a string,
+    or if you are trying to set a value in a bucket that you don't have access to. (eg,
+    another application/unit or setting your application data but you aren't the leader.)
+    """
 
 
 class RelationNotFoundError(ModelError):
-    pass
+    """Backend error when querying juju for a given relation and that relation doesn't exist."""
 
 
 class InvalidStatusError(ModelError):
-    pass
+    """Raised if trying to set an Application or Unit status to something invalid."""
 
 
-class ModelBackend:
+class _ModelBackend:
+    """Represents the connection between the Model representation and talking to Juju.
+
+    Charm authors should not directly interact with the ModelBackend, it is a private
+    implementation of Model.
+    """
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
 
@@ -776,16 +1013,18 @@ class ModelBackend:
     def status_get(self, *, is_app=False):
         """Get a status of a unit or an application.
 
-        app -- A boolean indicating whether the status should be retrieved for a unit
-               or an application.
+        Args:
+            is_app: A boolean indicating whether the status should be retrieved for a unit
+                or an application.
         """
         return self._run('status-get', '--include-data', '--application={}'.format(is_app))
 
     def status_set(self, status, message='', *, is_app=False):
         """Set a status of a unit or an application.
 
-        app -- A boolean indicating whether the status should be set for a unit or an
-               application.
+        Args:
+            app: A boolean indicating whether the status should be set for a unit or an
+                application.
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
@@ -817,14 +1056,18 @@ class ModelBackend:
     def action_fail(self, message=''):
         self._run('action-fail', message)
 
+    def application_version_set(self, version):
+        self._run('application-version-set', '--', version)
+
     def juju_log(self, level, message):
         self._run('juju-log', '--log-level', level, message)
 
     def network_get(self, binding_name, relation_id=None):
         """Return network info provided by network-get for a given binding.
 
-        binding_name -- A name of a binding (relation name or extra-binding name).
-        relation_id -- An optional relation id to get network info for.
+        Args:
+            binding_name: A name of a binding (relation name or extra-binding name).
+            relation_id: An optional relation id to get network info for.
         """
         cmd = ['network-get', binding_name]
         if relation_id is not None:

@@ -32,7 +32,7 @@ def fake_script(test_case, name, content):
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)
 
-    with open(str(test_case.fake_script_path / name), "w") as f:
+    with (test_case.fake_script_path / name).open('wt') as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
         f.write('''#!/bin/bash
 { echo -n $(basename $0); printf ";%s" "$@"; echo; } >> $(dirname $0)/calls.txt
@@ -41,11 +41,14 @@ def fake_script(test_case, name, content):
 
 
 def fake_script_calls(test_case, clear=False):
-    with open(str(test_case.fake_script_path / 'calls.txt'), 'r+') as f:
-        calls = [line.split(';') for line in f.read().splitlines()]
-        if clear:
-            f.truncate(0)
-        return calls
+    try:
+        with (test_case.fake_script_path / 'calls.txt').open('r+t') as f:
+            calls = [line.split(';') for line in f.read().splitlines()]
+            if clear:
+                f.truncate(0)
+            return calls
+    except FileNotFoundError:
+        return []
 
 
 class FakeScriptTest(unittest.TestCase):

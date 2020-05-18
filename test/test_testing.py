@@ -29,7 +29,9 @@ from ops.framework import (
     Object,
 )
 from ops.model import (
+    ActiveStatus,
     ModelError,
+    RelationNotFoundError,
 )
 from ops.testing import Harness
 
@@ -37,7 +39,6 @@ from ops.testing import Harness
 class TestHarness(unittest.TestCase):
 
     def test_add_relation(self):
-        # language=YAML
         harness = Harness(CharmBase, meta='''
             name: test-app
             requires:
@@ -54,7 +55,6 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_get(rel_id, 'test-app/0', is_app=False), {})
 
     def test_add_relation_and_unit(self):
-        # language=YAML
         harness = Harness(CharmBase, meta='''
             name: test-app
             requires:
@@ -189,8 +189,54 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(len(harness.charm.observed_events), 1)
         self.assertIsInstance(harness.charm.observed_events[0], RelationEvent)
 
+    def test_relation_events(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+        ''')
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        self.assertEqual(harness.charm.get_changes(), [])
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertEqual(
+            harness.charm.get_changes(),
+            [{'name': 'relation-created',
+              'data': {
+                  'app': 'postgresql',
+                  'unit': None,
+                  'relation_id': rel_id,
+              }}])
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        self.assertEqual(
+            harness.charm.get_changes(),
+            [{'name': 'relation-joined',
+              'data': {
+                  'app': 'postgresql',
+                  'unit': 'postgresql/0',
+                  'relation_id': rel_id,
+              }}])
+        harness.update_relation_data(rel_id, 'postgresql', {'foo': 'bar'})
+        self.assertEqual(
+            harness.charm.get_changes(),
+            [{'name': 'relation-changed',
+              'data': {
+                  'app': 'postgresql',
+                  'unit': None,
+                  'relation_id': rel_id,
+              }}])
+        harness.update_relation_data(rel_id, 'postgresql/0', {'baz': 'bing'})
+        self.assertEqual(
+            harness.charm.get_changes(),
+            [{'name': 'relation-changed',
+              'data': {
+                  'app': 'postgresql',
+                  'unit': 'postgresql/0',
+                  'relation_id': rel_id,
+              }}])
+
     def test_get_relation_data(self):
-        # language=YAML
         harness = Harness(CharmBase, meta='''
             name: test-app
             requires:
@@ -208,7 +254,6 @@ class TestHarness(unittest.TestCase):
             harness.get_relation_data(99, 'postgresql')
 
     def test_create_harness_twice(self):
-        # language=YAML
         metadata = '''
             name: my-charm
             requires:
@@ -240,7 +285,6 @@ class TestHarness(unittest.TestCase):
             harness.begin()
 
     def test_update_relation_exposes_new_data(self):
-        # language=YAML
         harness = Harness(CharmBase, meta='''
             name: my-charm
             requires:
@@ -373,7 +417,6 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(helper.changes, [])
 
     def test_update_relation_remove_data(self):
-        # language=YAML
         harness = Harness(CharmBase, meta='''
             name: my-charm
             requires:
@@ -430,7 +473,6 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.charm.get_changes(reset=True), [])
 
     def test_relation_set_app_not_leader(self):
-        # language=YAML
         harness = Harness(RecordingCharm, meta='''
             name: test-charm
             requires:
@@ -451,7 +493,6 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.get_relation_data(rel_id, 'test-charm'), {'foo': 'bar'})
 
     def test_hooks_enabled_and_disabled(self):
-        # language=YAML
         harness = Harness(RecordingCharm, meta='''
             name: test-charm
         ''')
@@ -543,6 +584,91 @@ class TestHarness(unittest.TestCase):
             ''')
         self.assertEqual(list(harness.framework.meta.actions), ['test-action'])
 
+    def test_relation_set_deletes(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+        harness.set_leader(False)
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        rel = harness.charm.model.get_relation('db', rel_id)
+        del rel.data[harness.charm.model.unit]['foo']
+        self.assertEqual({}, harness.get_relation_data(rel_id, 'test-charm/0'))
+
+    def test_set_workload_version(self):
+        harness = Harness(CharmBase, meta='''
+            name: app
+            ''')
+        harness.begin()
+        self.assertIsNone(harness.get_workload_version())
+        harness.charm.model.unit.set_workload_version('1.2.3')
+        self.assertEqual(harness.get_workload_version(), '1.2.3')
+
+    def test_get_backend_calls(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+        # No calls to the backend yet
+        self.assertEqual(harness._get_backend_calls(), [])
+        rel_id = harness.add_relation('db', 'postgresql')
+        # update_relation_data ensures the cached data for the relation is wiped
+        harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
+        self.assertEqual(
+            harness._get_backend_calls(reset=True), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
+        # add_relation_unit resets the relation_list, but doesn't trigger backend calls
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        self.assertEqual([], harness._get_backend_calls(reset=False))
+        # however, update_relation_data does, because we are preparing relation-changed
+        harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
+        self.assertEqual(
+            harness._get_backend_calls(reset=False), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
+        # If we check again, they are still there, but now we reset it
+        self.assertEqual(
+            harness._get_backend_calls(reset=True), [
+                ('relation_ids', 'db'),
+                ('relation_list', rel_id),
+            ])
+        # And the calls are gone
+        self.assertEqual(harness._get_backend_calls(), [])
+
+    def test_get_backend_calls_with_kwargs(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+        unit = harness.charm.model.unit
+        # Reset the list, because we don't care what it took to get here
+        harness._get_backend_calls(reset=True)
+        unit.status = ActiveStatus()
+        self.assertEqual(
+            [('status_set', 'active', '', {'is_app': False})], harness._get_backend_calls())
+        harness.set_leader(True)
+        app = harness.charm.model.app
+        harness._get_backend_calls(reset=True)
+        app.status = ActiveStatus('message')
+        self.assertEqual(
+            [('is_leader',),
+             ('status_set', 'active', 'message', {'is_app': True})],
+            harness._get_backend_calls())
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -595,6 +721,47 @@ class RecordingCharm(CharmBase):
         self.changes.append(dict(name='leader-elected'))
 
 
+class RelationEventCharm(RecordingCharm):
+    """Record events related to relation lifecycles."""
+
+    def __init__(self, framework, charm_name):
+        super().__init__(framework, charm_name)
+
+    def observe_relation_events(self, relation_name):
+        self.framework.observe(self.on[relation_name].relation_created, self._on_relation_created)
+        self.framework.observe(self.on[relation_name].relation_joined, self._on_relation_joined)
+        self.framework.observe(self.on[relation_name].relation_changed, self._on_relation_changed)
+        self.framework.observe(self.on[relation_name].relation_departed,
+                               self._on_relation_departed)
+        self.framework.observe(self.on[relation_name].relation_broken, self._on_relation_broken)
+
+    def _on_relation_created(self, event):
+        self._observe_relation_event('relation-created', event)
+
+    def _on_relation_joined(self, event):
+        self._observe_relation_event('relation-joined', event)
+
+    def _on_relation_changed(self, event):
+        self._observe_relation_event('relation-changed', event)
+
+    def _on_relation_departed(self, event):
+        self._observe_relation_event('relation-departed', event)
+
+    def _on_relation_broken(self, event):
+        self._observe_relation_event('relation-broken', event)
+
+    def _observe_relation_event(self, event_name, event):
+        unit_name = None
+        if event.unit is not None:
+            unit_name = event.unit.name
+        app_name = None
+        if event.app is not None:
+            app_name = event.app.name
+        self.changes.append(
+            dict(name=event_name,
+                 data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id)))
+
+
 class TestTestingModelBackend(unittest.TestCase):
 
     def test_status_set_get_unit(self):
@@ -614,6 +781,36 @@ class TestTestingModelBackend(unittest.TestCase):
         backend.status_set('blocked', 'message', is_app=True)
         self.assertEqual(backend.status_get(is_app=True), ('blocked', 'message'))
         self.assertEqual(backend.status_get(is_app=False), None)
+
+    def test_relation_ids_unknown_relation(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            provides:
+              db:
+                interface: mydb
+            ''')
+        backend = harness._backend
+        # With no relations added, we just get an empty list for the interface
+        self.assertEqual(backend.relation_ids('db'), [])
+        # But an unknown interface raises a ModelError
+        with self.assertRaises(ModelError):
+            backend.relation_ids('unknown')
+
+    def test_relation_get_unknown_relation_id(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            ''')
+        backend = harness._backend
+        with self.assertRaises(RelationNotFoundError):
+            backend.relation_get(1234, 'unit/0', False)
+
+    def test_relation_list_unknown_relation_id(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            ''')
+        backend = harness._backend
+        with self.assertRaises(RelationNotFoundError):
+            backend.relation_list(1234)
 
 
 if __name__ == "__main__":

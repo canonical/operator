@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import base64
 import logging
 import os
@@ -22,9 +23,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-
 import importlib.util
-
 from pathlib import Path
 
 from ops.charm import (
@@ -73,7 +72,31 @@ class EventSpec:
         self.charm_config = charm_config
 
 
-class TestMain(unittest.TestCase):
+class TestMain(abc.ABC):
+
+    @abc.abstractmethod
+    def _setup_entry_point(self, directory, entry_point):
+        """Set up the given entry point in the given directory.
+
+        If not using dispatch, that would be a symlink <dir>/<entry_point>
+        pointing at src/charm.py; if using dispatch that would be the dispatch
+        symlink. It could also not be a symlink...
+        """
+        return NotImplemented
+
+    @abc.abstractmethod
+    def _call_event(self, rel_path, env):
+        """Set up the environment and call (i.e. run) the given event."""
+        return NotImplemented
+
+    @abc.abstractmethod
+    def test_setup_event_links(self):
+        """Test auto-creation of symlinks caused by initial events.
+
+        Depending on the combination of dispatch and non-dispatch, this should
+        be checking for the creation or the _lack_ of creation, as appropriate.
+        """
+        return NotImplemented
 
     def setUp(self):
         self._setup_charm_dir()
@@ -95,6 +118,10 @@ class TestMain(unittest.TestCase):
 
         fake_script(self, 'juju-log', "exit 0")
 
+        # set to something other than None for tests that care
+        self.stdout = None
+        self.stderr = None
+
     def _setup_charm_dir(self):
         self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
@@ -113,8 +140,7 @@ class TestMain(unittest.TestCase):
         initial_hooks = ('install', 'start', 'upgrade-charm', 'disks-storage-attached')
         self.hooks_dir.mkdir()
         for hook in initial_hooks:
-            hook_path = self.hooks_dir / hook
-            hook_path.symlink_to(self.charm_exec_path)
+            self._setup_entry_point(self.hooks_dir, hook)
 
     def _prepare_actions(self):
         actions_meta = '''
@@ -136,20 +162,19 @@ start:
         actions_dir_name = 'actions'
         actions_meta_file = 'actions.yaml'
 
-        with open(str(self.JUJU_CHARM_DIR / actions_meta_file), 'w+') as f:
+        with (self.JUJU_CHARM_DIR / actions_meta_file).open('w+t') as f:
             f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
         for action_name in ('start', 'foo-bar'):
-            action_path = actions_dir / action_name
-            action_path.symlink_to(self.charm_exec_path)
+            self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(self):
         state = None
         if self._state_file.stat().st_size:
-            with open(str(self._state_file), 'r+b') as state_file:
+            with self._state_file.open('r+b') as state_file:
                 state = pickle.load(state_file)
-                state_file.truncate()
+                state_file.truncate(0)
         return state
 
     def _simulate_event(self, event_spec):
@@ -192,13 +217,8 @@ start:
         else:
             event_filename = event_spec.event_name.replace('_', '-')
             event_dir = 'hooks'
-        event_file = self.JUJU_CHARM_DIR / event_dir / event_filename
-        # Note that sys.executable is used to make sure we are using the same
-        # interpreter for the child process to support virtual environments.
-        cmd = [sys.executable, str(event_file)]
-        subprocess.run(
-            cmd, check=True, env=env, cwd=str(self.JUJU_CHARM_DIR),
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        self._call_event(Path(event_dir, event_filename), env)
         return self._read_and_clear_state()
 
     def test_event_reemitted(self):
@@ -398,48 +418,6 @@ start:
             self.fail('Event simulation for an unsupported event'
                       ' results in a non-zero exit code returned')
 
-    def test_setup_event_links(self):
-        """Test auto-creation of symlinks caused by initial events.
-        """
-        all_event_hooks = ['hooks/' + e.replace("_", "-")
-                           for e in self.charm_module.Charm.on.events().keys()]
-        charm_config = base64.b64encode(pickle.dumps({
-            'STATE_FILE': self._state_file,
-        }))
-        initial_events = {
-            EventSpec(InstallEvent, 'install', charm_config=charm_config),
-            EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
-            EventSpec(StartEvent, 'start', charm_config=charm_config),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
-        }
-
-        def _assess_event_links(event_spec):
-            self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
-            for event_hook in all_event_hooks:
-                self.assertTrue((self.JUJU_CHARM_DIR / event_hook).exists(),
-                                'Missing hook: ' + event_hook)
-                self.assertEqual(os.readlink(str(self.JUJU_CHARM_DIR / event_hook)),
-                                 self.charm_exec_path)
-
-        for initial_event in initial_events:
-            self._setup_charm_dir()
-
-            self._simulate_event(initial_event)
-            _assess_event_links(initial_event)
-            # Make sure it is idempotent.
-            self._simulate_event(initial_event)
-            _assess_event_links(initial_event)
-
-    def test_setup_action_links(self):
-        charm_config = base64.b64encode(pickle.dumps({
-            'STATE_FILE': self._state_file,
-        }))
-        actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
-        actions_yaml.write_text('test: {}')
-        self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-        action_hook = self.JUJU_CHARM_DIR / 'actions' / 'test'
-        self.assertTrue(action_hook.exists())
-
     def test_collect_metrics(self):
         indicator_file = self.JUJU_CHARM_DIR / 'indicator'
         charm_config = base64.b64encode(pickle.dumps({
@@ -453,10 +431,19 @@ start:
         fake_script_calls(self, clear=True)
         self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics',
                                        charm_config=charm_config))
-        self.assertEqual(
-            fake_script_calls(self),
-            [['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event collect_metrics'],
-             ['add-metric', '--labels', 'bar=4.2', 'foo=42']])
+
+        expected = [
+            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event collect_metrics.'],
+            ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
+        ]
+        calls = fake_script_calls(self)
+
+        if self.has_dispatch:
+            expected.insert(0, [
+                'juju-log', '--log-level', 'DEBUG',
+                'Legacy hooks/collect-metrics does not exist.'])
+
+        self.assertEqual(calls, expected)
 
     def test_logger(self):
         charm_config = base64.b64encode(pickle.dumps({
@@ -502,6 +489,255 @@ log_debug: {}
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
             self.assertIn(calls, fake_script_calls(self, clear=True))
+
+
+class TestMainWithNoDispatch(TestMain, unittest.TestCase):
+    has_dispatch = False
+    hooks_are_symlinks = True
+
+    def _setup_entry_point(self, directory, entry_point):
+        path = directory / entry_point
+        path.symlink_to(self.charm_exec_path)
+
+    def _call_event(self, rel_path, env):
+        event_file = self.JUJU_CHARM_DIR / rel_path
+        # Note that sys.executable is used to make sure we are using the same
+        # interpreter for the child process to support virtual environments.
+        subprocess.run(
+            [sys.executable, str(event_file)],
+            check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
+
+    def test_setup_event_links(self):
+        """Test auto-creation of symlinks caused by initial events.
+        """
+        all_event_hooks = ['hooks/' + e.replace("_", "-")
+                           for e in self.charm_module.Charm.on.events().keys()]
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        initial_events = {
+            EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+            EventSpec(StartEvent, 'start', charm_config=charm_config),
+            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+        }
+
+        def _assess_event_links(event_spec):
+            self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
+            for event_hook in all_event_hooks:
+                hook_path = self.JUJU_CHARM_DIR / event_hook
+                self.assertTrue(hook_path.exists(), 'Missing hook: ' + event_hook)
+                if self.hooks_are_symlinks:
+                    self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
+
+        for initial_event in initial_events:
+            self._setup_charm_dir()
+
+            self._simulate_event(initial_event)
+            _assess_event_links(initial_event)
+            # Make sure it is idempotent.
+            self._simulate_event(initial_event)
+            _assess_event_links(initial_event)
+
+    def test_setup_action_links(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
+        actions_yaml.write_text('test: {}')
+        self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        action_hook = self.JUJU_CHARM_DIR / 'actions' / 'test'
+        self.assertTrue(action_hook.exists())
+
+
+class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
+    hooks_are_symlinks = False
+
+    def _setup_entry_point(self, directory, entry_point):
+        charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
+        path = directory / entry_point
+        shutil.copy(charm_path, str(path))
+
+
+class TestMainWithDispatch(TestMain, unittest.TestCase):
+    has_dispatch = True
+
+    def _setup_entry_point(self, directory, entry_point):
+        path = self.JUJU_CHARM_DIR / 'dispatch'
+        if not path.exists():
+            path.symlink_to('src/charm.py')
+
+    def _call_event(self, rel_path, env):
+        env["JUJU_DISPATCH_PATH"] = str(rel_path)
+        dispatch = self.JUJU_CHARM_DIR / 'dispatch'
+        subprocess.run(
+            [sys.executable, str(dispatch)],
+            stdout=self.stdout,
+            stderr=self.stderr,
+            check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
+
+    def test_setup_event_links(self):
+        """Test auto-creation of symlinks caused by initial events does _not_ happen when using dispatch.
+        """
+        all_event_hooks = ['hooks/' + e.replace("_", "-")
+                           for e in self.charm_module.Charm.on.events().keys()]
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        initial_events = {
+            EventSpec(InstallEvent, 'install', charm_config=charm_config),
+            EventSpec(StorageAttachedEvent, 'disks-storage-attached', charm_config=charm_config),
+            EventSpec(StartEvent, 'start', charm_config=charm_config),
+            EventSpec(UpgradeCharmEvent, 'upgrade-charm', charm_config=charm_config),
+        }
+
+        def _assess_event_links(event_spec):
+            self.assertNotIn(self.hooks_dir / event_spec.event_name, self.hooks_dir.iterdir())
+            for event_hook in all_event_hooks:
+                self.assertFalse((self.JUJU_CHARM_DIR / event_hook).exists(),
+                                 'Spurious hook: ' + event_hook)
+
+        for initial_event in initial_events:
+            self._setup_charm_dir()
+
+            self._simulate_event(initial_event)
+            _assess_event_links(initial_event)
+
+    def test_hook_and_dispatch(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+
+        old_path = self.fake_script_path
+        self.fake_script_path = self.hooks_dir
+        fake_script(self, 'install', 'exit 0')
+        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+
+        # the script was called, *and*, the .on. was called
+        self.assertEqual(fake_script_calls(self), [['install', '']])
+        self.assertEqual(state['observed_event_types'], [InstallEvent])
+
+        self.fake_script_path = old_path
+        self.assertEqual(fake_script_calls(self), [
+            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Legacy hooks/install exited with status 0.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+        ])
+
+    def test_non_executable_hook_and_dispatch(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+
+        (self.hooks_dir / "install").write_text("")
+        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+
+        self.assertEqual(state['observed_event_types'], [InstallEvent])
+
+        self.assertEqual(fake_script_calls(self), [
+            ['juju-log', '--log-level', 'WARNING',
+             'Legacy hooks/install exists but is not executable.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+        ])
+
+    def test_hook_and_dispatch_with_failing_hook(self):
+        self.stdout = self.stderr = tempfile.TemporaryFile()
+        self.addCleanup(self.stdout.close)
+
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+
+        old_path = self.fake_script_path
+        self.fake_script_path = self.hooks_dir
+        fake_script(self, 'install', 'exit 42')
+        event = EventSpec(InstallEvent, 'install', charm_config=charm_config)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self._simulate_event(event)
+        self.fake_script_path = old_path
+
+        self.stdout.seek(0)
+        self.assertEqual(self.stdout.read(), b'')
+        calls = fake_script_calls(self)
+        expected = [
+            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
+            ['juju-log', '--log-level', 'WARNING', 'Legacy hooks/install exited with status 42.'],
+        ]
+        self.assertEqual(calls, expected)
+
+    def test_hook_and_dispatch_but_hook_is_dispatch(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        event = EventSpec(InstallEvent, 'install', charm_config=charm_config)
+        hook_path = self.hooks_dir / 'install'
+        for ((rel, ind), path) in {
+                # relative and indirect
+                (True, True): Path('../dispatch'),
+                # relative and direct
+                (True, False): Path(self.charm_exec_path),
+                # absolute and direct
+                (False, False): (self.hooks_dir / self.charm_exec_path).resolve(),
+                # absolute and indirect
+                (False, True): self.JUJU_CHARM_DIR / 'dispatch',
+        }.items():
+            with self.subTest(path=path, rel=rel, ind=ind):
+                # sanity check
+                self.assertEqual(path.is_absolute(), not rel)
+                self.assertEqual(path.name == 'dispatch', ind)
+                try:
+                    hook_path.symlink_to(path)
+
+                    state = self._simulate_event(event)
+
+                    # the .on. was only called once
+                    self.assertEqual(state['observed_event_types'], [InstallEvent])
+                    self.assertEqual(state['on_install'], [InstallEvent])
+                finally:
+                    hook_path.unlink()
+
+    def test_hook_and_dispatch_but_hook_is_dispatch_copy(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+        hook_path = self.hooks_dir / 'install'
+        path = (self.hooks_dir / self.charm_exec_path).resolve()
+        shutil.copy(str(path), str(hook_path))
+        fake_script(self, 'juju-log', 'exit 0')
+
+        event = EventSpec(InstallEvent, 'install', charm_config=charm_config)
+        state = self._simulate_event(event)
+
+        # the .on. was only called once
+        self.assertEqual(state['observed_event_types'], [InstallEvent])
+        self.assertEqual(state['on_install'], [InstallEvent])
+        self.assertEqual(fake_script_calls(self), [
+            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Charm called itself via hooks/install.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Legacy hooks/install exited with status 0.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+        ])
+
+
+class TestMainWithDispatchAsScript(TestMainWithDispatch):
+    """Here dispatch is a script that execs the charm.py instead of a symlink.
+    """
+
+    has_dispatch = True
+
+    def _setup_entry_point(self, directory, entry_point):
+        path = self.JUJU_CHARM_DIR / 'dispatch'
+        if not path.exists():
+            path.write_text('#!/bin/sh\nexec "{}" "{}"\n'.format(
+                sys.executable,
+                self.JUJU_CHARM_DIR / 'src/charm.py'))
+            path.chmod(0o755)
+
+    def _call_event(self, rel_path, env):
+        env["JUJU_DISPATCH_PATH"] = str(rel_path)
+        dispatch = self.JUJU_CHARM_DIR / 'dispatch'
+        subprocess.check_call([str(dispatch)],
+                              env=env, cwd=str(self.JUJU_CHARM_DIR))
 
 
 if __name__ == "__main__":

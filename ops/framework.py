@@ -27,6 +27,8 @@ import types
 import weakref
 from datetime import timedelta
 
+from ops import charm
+
 
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
@@ -527,6 +529,10 @@ class Framework(Object):
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
         self._breakpoint_welcomed = False
 
+        # Parse once the env var, which may be used multiple times later
+        debug_at = os.environ.get('JUJU_DEBUG_AT')
+        self._juju_debug_at = debug_at.split(',') if debug_at else ()
+
     def close(self):
         self._storage.close()
 
@@ -742,7 +748,15 @@ class Framework(Object):
             if observer:
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
-                    custom_handler(event)
+                    event_is_from_juju = isinstance(event, charm.HookEvent)
+                    event_is_action = isinstance(event, charm.ActionEvent)
+                    if (event_is_from_juju or event_is_action) and 'hook' in self._juju_debug_at:
+                        # Present the welcome message and run under PDB.
+                        self._show_debug_code_message()
+                        pdb.runcall(custom_handler, event)
+                    else:
+                        # Regular call to the registered method.
+                        custom_handler(event)
 
             if event.deferred:
                 deferred = True
@@ -754,6 +768,12 @@ class Framework(Object):
 
         if not deferred:
             self._storage.drop_snapshot(last_event_path)
+
+    def _show_debug_code_message(self):
+        """Present the welcome message (only once!) when using debugger functionality."""
+        if not self._breakpoint_welcomed:
+            self._breakpoint_welcomed = True
+            print(_BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
 
     def breakpoint(self, name=None):
         """Add breakpoint, optionally named, at the place where this method is called.
@@ -776,16 +796,9 @@ class Framework(Object):
             if not re.match(r'^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$', name):
                 raise ValueError('breakpoint names must look like "foo" or "foo-bar"')
 
-        debug_at = os.environ.get('JUJU_DEBUG_AT')
-        if not debug_at:
-            return
-
-        indicated_breakpoints = debug_at.split(',')
+        indicated_breakpoints = self._juju_debug_at
         if 'all' in indicated_breakpoints or name in indicated_breakpoints:
-            # Present the welcome message (only once!)
-            if not self._breakpoint_welcomed:
-                self._breakpoint_welcomed = True
-                print(_BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
+            self._show_debug_code_message()
 
             # If we call set_trace() directly it will open the debugger *here*, so indicating
             # it to use our caller's frame

@@ -26,7 +26,7 @@ from ops.charm import (
     CharmEvents,
 )
 from ops.framework import Framework, EventSource, EventBase
-from ops.model import Model, ModelBackend
+from ops.model import Model, _ModelBackend
 
 from .test_helpers import fake_script, fake_script_calls
 
@@ -61,7 +61,7 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(cleanup)
 
     def create_framework(self):
-        model = Model('local/0', self.meta, ModelBackend())
+        model = Model('local/0', self.meta, _ModelBackend())
         framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.meta, model)
         self.addCleanup(framework.close)
         return framework
