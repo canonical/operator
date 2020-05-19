@@ -54,6 +54,14 @@ class TestModel(unittest.TestCase):
 
     def test_model_attributes(self):
         self.assertIs(self.model.app, self.model.unit.app)
+        self.assertIsNone(self.model.name)
+
+    def test_model_name(self):
+        m = ops.model.Model('unit/0', ops.charm.CharmMeta(), self.harness._backend,
+                            model_name='default')
+        self.assertEqual(m.name, 'default')
+        with self.assertRaises(AttributeError):
+            m.name = "changes-disallowed"
 
     def test_relations_keys(self):
         rel_app1 = self.harness.add_relation('db1', 'remoteapp1')

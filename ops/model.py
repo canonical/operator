@@ -29,6 +29,8 @@ from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
+import ops
+
 
 class Model:
     """Represents the Juju Model as seen from this unit.
@@ -47,7 +49,9 @@ class Model:
             for Kubernetes charms.
     """
 
-    def __init__(self, unit_name, meta, backend):
+    def __init__(
+            self, unit_name: str, meta: 'ops.charm.CharmMeta',
+            backend: '_ModelBackend', model_name: str = None):
         self._cache = _ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(unit_name)
@@ -58,6 +62,15 @@ class Model:
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
+        self._model_name = model_name
+
+    @property
+    def name(self) -> str:
+        """Return the name of the Model that this unit is running in.
+
+        This is read from the environment variable ``JUJU_MODEL_NAME``.
+        """
+        return self._model_name
 
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
@@ -711,7 +724,7 @@ class StatusBase:
         return super().__new__(cls)
 
     def __eq__(self, other):
-        if type(self) is not type(other):
+        if not isinstance(self, type(other)):
             return False
         return self.message == other.message
 
