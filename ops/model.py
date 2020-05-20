@@ -50,8 +50,8 @@ class Model:
     """
 
     def __init__(
-            self, unit_name: str, meta: 'ops.charm.CharmMeta',
-            backend: '_ModelBackend', model_name: str = None):
+            self, unit_name: str, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend', *,
+            model_name: str = None):
         self._cache = _ModelCache(backend)
         self._backend = backend
         self.unit = self.get_unit(unit_name)
