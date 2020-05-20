@@ -62,7 +62,7 @@ class SymlinkTargetError(Exception):
 class EventSpec:
     def __init__(self, event_type, event_name, env_var=None,
                  relation_id=None, remote_app=None, remote_unit=None,
-                 charm_config=None):
+                 charm_config=None, model_name=None):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -70,6 +70,7 @@ class EventSpec:
         self.remote_app = remote_app
         self.remote_unit = remote_unit
         self.charm_config = charm_config
+        self.model_name = model_name
 
 
 class TestMain(abc.ABC):
@@ -158,7 +159,10 @@ foo-bar:
   required:
     - foo-name
 start:
-    description: Start the unit.'''
+    description: Start the unit.
+get-model-name:
+    description: Return the name of the unit
+'''
         actions_dir_name = 'actions'
         actions_meta_file = 'actions.yaml'
 
@@ -166,7 +170,7 @@ start:
             f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
-        for action_name in ('start', 'foo-bar'):
+        for action_name in ('start', 'foo-bar', 'get-model-name'):
             self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(self):
@@ -217,6 +221,8 @@ start:
         else:
             event_filename = event_spec.event_name.replace('_', '-')
             event_dir = 'hooks'
+        if event_spec.model_name is not None:
+            env['JUJU_MODEL_NAME'] = event_spec.model_name
 
         self._call_event(Path(event_dir, event_filename), env)
         return self._read_and_clear_state()
@@ -489,6 +495,23 @@ log_debug: {}
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
             self.assertIn(calls, fake_script_calls(self, clear=True))
+
+    def test_sets_model_name(self):
+        self._prepare_actions()
+
+        actions_charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+            'USE_ACTIONS': True,
+        }))
+
+        fake_script(self, 'action-get', "echo '{}'")
+        state = self._simulate_event(EventSpec(
+            ActionEvent, 'get_model_name_action',
+            env_var='JUJU_ACTION_NAME',
+            model_name='test-model-name',
+            charm_config=actions_charm_config))
+        self.assertIsNotNone(state)
+        self.assertEqual(state['_on_get_model_name_action'], ['test-model-name'])
 
 
 class TestMainWithNoDispatch(TestMain, unittest.TestCase):

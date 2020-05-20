@@ -58,6 +58,7 @@ class Charm(CharmBase):
                 'on_ha_relation_broken': [],
                 'on_foo_bar_action': [],
                 'on_start_action': [],
+                '_on_get_model_name_action': [],
                 'on_collect_metrics': [],
 
                 'on_log_critical_action': [],
@@ -86,6 +87,7 @@ class Charm(CharmBase):
         if self._charm_config.get('USE_ACTIONS'):
             self.framework.observe(self.on.start_action, self)
             self.framework.observe(self.on.foo_bar_action, self)
+            self.framework.observe(self.on.get_model_name_action, self._on_get_model_name_action)
 
         self.framework.observe(self.on.collect_metrics, self)
 
@@ -202,6 +204,10 @@ class Charm(CharmBase):
 
     def on_log_debug_action(self, event):
         logger.debug('insightful debug')
+
+    def _on_get_model_name_action(self, event):
+        self._state['_on_get_model_name_action'].append(self.model.name)
+        self._write_state()
 
 
 if __name__ == '__main__':

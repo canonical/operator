@@ -290,7 +290,8 @@ def main(charm_class):
     metadata, actions_metadata = _load_metadata(charm_dir)
     meta = ops.charm.CharmMeta(metadata, actions_metadata)
     unit_name = os.environ['JUJU_UNIT_NAME']
-    model = ops.model.Model(unit_name, meta, model_backend)
+    model_name = os.environ.get('JUJU_MODEL_NAME')
+    model = ops.model.Model(unit_name, meta, model_backend, model_name=model_name)
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
