@@ -24,7 +24,7 @@ from types import ModuleType
 from typing import Tuple, Dict, List, Iterator, Optional
 
 
-_libraries = {} # type: Dict[Tuple[str,str], List[_Lib]]
+_libraries = {}  # type: Dict[Tuple[str,str], List[_Lib]]
 
 _libline_re = re.compile(r'''^LIB([A-Z]+)\s+=\s+([0-9]+|['"][a-zA-Z0-9_.-@]+['"])\s*$''')
 _libname_re = re.compile(r'''^[a-z][a-z0-9]+$''')
@@ -109,6 +109,7 @@ def _find_all_specs(path: List[str]) -> Iterator[ModuleSpec]:
                     continue
                 yield spec
 
+
 def _parse_lib(spec: ModuleSpec) -> Optional['_Lib']:
     if spec.origin is None:
         return None
@@ -172,7 +173,7 @@ class _Lib:
         self.api = api
         self.patch = patch
 
-        self._module = None # type: Optional[ModuleType]
+        self._module = None  # type: Optional[ModuleType]
 
     def __repr__(self):
         return "_Lib({0.name} by {0.author}, API {0.api}, patch {0.patch})".format(self)

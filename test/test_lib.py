@@ -60,6 +60,7 @@ def _mklib(topdir: str, pkgname: str, libname: str) -> Path:
 def _flatten(specgen):
     return [os.path.dirname(spec.origin) for spec in specgen]
 
+
 class TestLibFinder(TestCase):
     def _mkdtemp(self) -> str:
         tmpdir = mkdtemp()
@@ -235,6 +236,7 @@ class TestLibParser(TestCase):
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
 
+
 class TestLib(TestCase):
 
     def test_lib_comparison(self):
@@ -278,9 +280,9 @@ class TestLib(TestCase):
 
         for i in range(20):
             with self.subTest(i):
-                l = [a, b, c, d, e]
-                shuffle(l)
-                self.assertEqual(sorted(l), [a, b, c, d, e])
+                libs = [a, b, c, d, e]
+                shuffle(libs)
+                self.assertEqual(sorted(libs), [a, b, c, d, e])
 
     def test_use_bad_args_types(self):
         with self.assertRaises(TypeError):
@@ -380,7 +382,6 @@ class TestLibFunctional(TestCase):
                 LIBPATCH = {}
                 LIBAUTHOR = "alice@example.com"
                 """).format(t.patchB))
-
 
                 # autoimport would be done in main
                 ops.lib.autoimport()
