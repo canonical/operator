@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import inspect
 import pathlib
 from textwrap import dedent
+import tempfile
 import typing
+import yaml
 
 from ops import charm, framework, model
 
@@ -65,6 +68,7 @@ class Harness:
         self._charm_cls = charm_cls
         self._charm = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
+        self._resource_dir = self._create_resources_dir()
         self._meta = self._create_meta(meta, actions)
         self._unit_name = self._meta.name + '/0'
         self._framework = None
@@ -148,6 +152,38 @@ class Harness:
             action_metadata = dedent(action_metadata)
 
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
+
+    def _create_resources_dir(self) -> None:
+        """Create a temporary resource folder."""
+        self.__resource_dir = tempfile.TemporaryDirectory()
+        atexit.register(self.__resource_dir.cleanup)
+        return pathlib.Path(self.__resource_dir.name)
+
+    def add_oci_resource(self, resource_name: str = None, contents: typing.Mapping = None) -> None:
+        """Add oci resources to the backend.
+
+        This will register oci resources and create a temporary file for processing metadata
+        about the resource. A default set of values will be used for all oci resources unless
+        a specifc resource name and contents dict is proivded.
+
+        Args:
+            resource_name: Optioal name of the resource to add custom contents to.
+            contents: Optional custom dict to write for the named resource.
+        """
+        if resource_name and contents:
+            if self._meta.resources[resource_name].type == "oci-image":
+                resource_file = self._resource_dir / f"{resource_name}"
+                with resource_file.open('w') as resource_yaml:
+                    yaml.dump(contents, resource_yaml)
+                self._backend._resources_map[resource_name] = resource_file
+        else:
+            for name, data in self._meta.resources.items():
+                if data.type == "oci-image":
+                    contents = {'registrypath': 'registrypath',
+                                'username': 'username',
+                                'password': 'password',
+                                }
+                    self.add_oci_resource(name, contents)
 
     def disable_hooks(self) -> None:
         """Stop emitting hook events when the model changes.
