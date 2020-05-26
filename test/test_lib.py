@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -138,6 +137,15 @@ class TestLibFinder(TestCase):
             _flatten(ops.lib._find_all_specs([tmpdir])),
             [tmpdir + '/foo/opslib/bar'])
 
+    def test_namespace(self):
+        tmpdir = self._mkdtemp()
+
+        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+
+        _mklib(tmpdir, "foo", "bar")  # no __init__.py  =>  a namespace package
+
+        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+
 
 class TestLibParser(TestCase):
     def _mkmod(self, name: str, content: str = None) -> ModuleSpec:
@@ -161,7 +169,7 @@ class TestLibParser(TestCase):
         lib = ops.lib._parse_lib(m)
         self.assertEqual(lib, ops.lib._Lib(None, "foo", "alice@example.com", 2, 42))
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '_Lib(foo by alice@example.com, API 2, patch 42)')
+        self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
 
     def test_incomplete(self):
         """Check that if anything is missing, nothing is returned"""
@@ -234,6 +242,19 @@ class TestLibParser(TestCase):
         LIBPATCH = 42
         LIBAUTHOR = 43
         ''')
+        self.assertIsNone(ops.lib._parse_lib(m))
+
+    def test_other_encoding(self):
+        """Check that we don't crash when a library is not UTF-8"""
+        m = self._mkmod('foo')
+        with open(m.origin, 'wt', encoding='latin-1') as f:
+            f.write(dedent('''
+            LIBNAME = "foo"
+            LIBAPI = 2
+            LIBPATCH = 42
+            LIBAUTHOR = "alice@example.com"
+            LIBANANA = "Ñoño"
+            '''))
         self.assertIsNone(ops.lib._parse_lib(m))
 
 

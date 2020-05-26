@@ -103,9 +103,11 @@ def _find_all_specs(path: List[str]) -> Iterator[ModuleSpec]:
             if finder is None or not hasattr(finder, 'find_spec'):
                 continue
             for lib_dir in lib_dirs:
-                # XXX: find_spec can raise ValueError (how?)
                 spec = finder.find_spec(lib_dir)
                 if spec is None:
+                    continue
+                if spec.loader is None:
+                    # a namespace package; not supported
                     continue
                 yield spec
 
@@ -113,55 +115,31 @@ def _find_all_specs(path: List[str]) -> Iterator[ModuleSpec]:
 def _parse_lib(spec: ModuleSpec) -> Optional['_Lib']:
     if spec.origin is None:
         return None
+
+    _expected = {'NAME': str, 'AUTHOR': str, 'API': int, 'PATCH': int}
+
     try:
-        with open(spec.origin) as f:
-            name = author = api = patch = None
+        with open(spec.origin, 'rt', encoding='utf-8') as f:
+            libinfo = {}
             for line in f:
-                if name and author and api and patch:
+                if len(libinfo) == len(_expected):
                     break
                 m = _libline_re.match(line)
-                if not m:
+                if m is None:
                     continue
-                g = m.groups()
-                key, value = g[0], g[1]
-                if key == "NAME":
-                    name = value
-                    continue
-                if key == "AUTHOR":
-                    author = value
-                    continue
-                if key == "API":
-                    api = value
-                    continue
-                if key == "PATCH":
-                    patch = value
-                    continue
-    except OSError:
-        return None
-
-    if not (name and author and api and patch):
-        return None
-
-    try:
-        # We could easily parse it but it'd still be more work than this,
-        # and given the strict regexp above, this should hopefully be okay.
-        name = literal_eval(name)
-        author = literal_eval(author)
-        api = literal_eval(api)
-        patch = literal_eval(patch)
+                key, value = m.groups()
+                if key in _expected:
+                    value = literal_eval(value)
+                    if not isinstance(value, _expected[key]):
+                        return None
+                    libinfo[key] = value
     except Exception:
         return None
 
-    if not isinstance(name, str):
-        return None
-    if not isinstance(author, str):
-        return None
-    if not isinstance(api, int):
-        return None
-    if not isinstance(patch, int):
+    if len(libinfo) != len(_expected):
         return None
 
-    return _Lib(spec, name, author, api, patch)
+    return _Lib(spec, libinfo['NAME'], libinfo['AUTHOR'], libinfo['API'], libinfo['PATCH'])
 
 
 class _Lib:
@@ -176,7 +154,7 @@ class _Lib:
         self._module = None  # type: Optional[ModuleType]
 
     def __repr__(self):
-        return "_Lib({0.name} by {0.author}, API {0.api}, patch {0.patch})".format(self)
+        return "<_Lib {0.name} by {0.author}, API {0.api}, patch {0.patch}>".format(self)
 
     def import_module(self) -> ModuleType:
         if self._module is None:
