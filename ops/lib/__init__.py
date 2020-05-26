@@ -133,10 +133,10 @@ def _parse_lib(spec: ModuleSpec) -> Optional['_Lib']:
                     if not isinstance(value, _expected[key]):
                         return None
                     libinfo[key] = value
+            else:
+                if len(libinfo) != len(_expected):
+                    return None
     except Exception:
-        return None
-
-    if len(libinfo) != len(_expected):
         return None
 
     return _Lib(spec, libinfo['NAME'], libinfo['AUTHOR'], libinfo['API'], libinfo['PATCH'])
