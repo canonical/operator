@@ -159,7 +159,6 @@ class _Lib:
     def import_module(self) -> ModuleType:
         if self._module is None:
             module = module_from_spec(self.spec)
-            # XXX: loader can be None
             self.spec.loader.exec_module(module)
             self._module = module
         return self._module
