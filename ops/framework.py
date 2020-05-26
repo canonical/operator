@@ -16,6 +16,7 @@ import collections
 import collections.abc
 import inspect
 import keyword
+import logging
 import marshal
 import os
 import pdb
@@ -28,6 +29,8 @@ import weakref
 from datetime import timedelta
 
 from ops import charm
+
+logger = logging.getLogger(__name__)
 
 
 class Handle:
@@ -797,6 +800,9 @@ class Framework(Object):
                 raise ValueError('breakpoint names must look like "foo" or "foo-bar"')
 
         indicated_breakpoints = self._juju_debug_at
+        if not indicated_breakpoints:
+            return
+
         if 'all' in indicated_breakpoints or name in indicated_breakpoints:
             self._show_debug_code_message()
 
@@ -804,6 +810,10 @@ class Framework(Object):
             # it to use our caller's frame
             code_frame = inspect.currentframe().f_back
             pdb.Pdb().set_trace(code_frame)
+        else:
+            logger.warning(
+                "Breakpoint %r skipped (not found in the indicated ones: %s)",
+                name, indicated_breakpoints)
 
 
 class StoredStateData(Object):
