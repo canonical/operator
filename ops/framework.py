@@ -622,7 +622,7 @@ class Framework(Object):
     def drop_snapshot(self, handle):
         self._storage.drop_snapshot(handle.path)
 
-    def observe(self, bound_event, observer):
+    def observe(self, bound_event: BoundEvent, observer: types.MethodType):
         """Register observer to be called when bound_event is emitted.
 
         The bound_event is generally provided as an attribute of the object that emits
@@ -633,18 +633,18 @@ class Framework(Object):
 
         That event may be observed as:
 
-            framework.observe(someobj.something_happened, self.on_something_happened)
+            framework.observe(someobj.something_happened, self._on_something_happened)
 
-        If the method to be called follows the name convention "on_<event name>", it
-        may be omitted from the observe call. That means the above is equivalent to:
-
-            framework.observe(someobj.something_happened, self)
-
+        Raises:
+            RuntimeError: if bound_event or observer are the wrong type.
         """
         if not isinstance(bound_event, BoundEvent):
             raise RuntimeError(
                 'Framework.observe requires a BoundEvent as second parameter, got {}'.format(
                     bound_event))
+        if not isinstance(observer, types.MethodType):
+            raise RuntimeError(
+                'Framework.observe requires a method as third parameter, got {}'.format(observer))
 
         event_type = bound_event.event_type
         event_kind = bound_event.event_kind
@@ -662,13 +662,6 @@ class Framework(Object):
         if isinstance(observer, types.MethodType):
             method_name = observer.__name__
             observer = observer.__self__
-        else:
-            method_name = "on_" + event_kind
-            if not hasattr(observer, method_name):
-                raise RuntimeError(
-                    'Observer method not provided explicitly'
-                    ' and {} type has no "{}" method'.format(type(observer).__name__,
-                                                             method_name))
 
         # Validate that the method has an acceptable call signature.
         sig = inspect.signature(getattr(observer, method_name))
@@ -851,7 +844,7 @@ class BoundStoredState:
         self.__dict__["_data"] = data
         self.__dict__["_attr_name"] = attr_name
 
-        parent.framework.observe(parent.framework.on.commit, self._data)
+        parent.framework.observe(parent.framework.on.commit, self._data.on_commit)
 
     def __getattr__(self, key):
         # "on" is the only reserved key that can't be used in the data map.

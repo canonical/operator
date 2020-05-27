@@ -161,22 +161,14 @@ class TestFramework(BaseTestCase):
 
         framework.observe(pub.foo, obs.on_any)
         framework.observe(pub.bar, obs.on_any)
-        framework.observe(pub.foo, obs)  # Method name defaults to on_<event kind>.
 
-        try:
+        with self.assertRaises(RuntimeError):
             framework.observe(pub.baz, obs)
-        except RuntimeError as e:
-            self.assertEqual(
-                str(e),
-                'Observer method not provided explicitly'
-                ' and MyObserver type has no "on_baz" method')
-        else:
-            self.fail("RuntimeError not raised")
 
         pub.foo.emit()
         pub.bar.emit()
 
-        self.assertEqual(obs.seen, ["on_any:foo", "on_foo:foo", "on_any:bar"])
+        self.assertEqual(obs.seen, ["on_any:foo", "on_any:bar"])
 
     def test_bad_sig_observer(self):
 
@@ -190,16 +182,16 @@ class TestFramework(BaseTestCase):
             qux = EventSource(MyEvent)
 
         class MyObserver(Object):
-            def on_foo(self):
+            def _on_foo(self):
                 assert False, 'should not be reached'
 
-            def on_bar(self, event, extra):
+            def _on_bar(self, event, extra):
                 assert False, 'should not be reached'
 
-            def on_baz(self, event, extra=None, *, k):
+            def _on_baz(self, event, extra=None, *, k):
                 assert False, 'should not be reached'
 
-            def on_qux(self, event, extra=None):
+            def _on_qux(self, event, extra=None):
                 assert False, 'should not be reached'
 
         framework = self.create_framework()
@@ -207,12 +199,12 @@ class TestFramework(BaseTestCase):
         obs = MyObserver(framework, "obs")
 
         with self.assertRaises(TypeError):
-            framework.observe(pub.foo, obs)
+            framework.observe(pub.foo, obs._on_foo)
         with self.assertRaises(TypeError):
-            framework.observe(pub.bar, obs)
+            framework.observe(pub.bar, obs._on_bar)
         with self.assertRaises(TypeError):
-            framework.observe(pub.baz, obs)
-        framework.observe(pub.qux, obs)
+            framework.observe(pub.baz, obs._on_baz)
+        framework.observe(pub.qux, obs._on_qux)
 
     def test_on_pre_commit_emitted(self):
         framework = self.create_framework(tmpdir=self.tmpdir)
@@ -352,14 +344,14 @@ class TestFramework(BaseTestCase):
                 super().__init__(parent, key)
                 self.seen = []
 
-            def on_foo(self, event):
+            def _on_foo(self, event):
                 self.seen.append("on_foo:{}={}".format(event.handle.kind, event.my_n))
                 event.defer()
 
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
 
-        framework.observe(pub.foo, obs)
+        framework.observe(pub.foo, obs._on_foo)
 
         pub.foo.emit(1)
 
@@ -392,13 +384,13 @@ class TestFramework(BaseTestCase):
             on = MyEvents()
 
         class MyObserver(Object):
-            def on_foo(self, event):
+            def _on_foo(self, event):
                 observed_events.append("foo")
 
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "2")
 
-        framework.observe(pub.on.foo, obs)
+        framework.observe(pub.on.foo, obs._on_foo)
         pub.on.foo.emit()
         self.assertEqual(observed_events, ["foo"])
         # Now delete the observer, and note that when we emit the event, it
@@ -494,11 +486,11 @@ class TestFramework(BaseTestCase):
                 super().__init__(parent, key)
                 self.seen = []
 
-            def on_foo(self, event):
+            def _on_foo(self, event):
                 self.seen.append("on_foo:{}".format(event.handle.kind))
                 event.defer()
 
-            def on_bar(self, event):
+            def _on_bar(self, event):
                 self.seen.append("on_bar:{}".format(event.handle.kind))
 
         pub = MyNotifier(framework, "1")
@@ -506,8 +498,8 @@ class TestFramework(BaseTestCase):
 
         # Confirm that temporary persistence of BoundEvents doesn't cause errors,
         # and that events can be observed.
-        for bound_event in [pub.on.foo, pub.on.bar]:
-            framework.observe(bound_event, obs)
+        for bound_event, handler in [(pub.on.foo, obs._on_foo), (pub.on.bar, obs._on_bar)]:
+            framework.observe(bound_event, handler)
 
         # Confirm that events can be emitted and seen.
         pub.on.foo.emit()
@@ -555,14 +547,14 @@ class TestFramework(BaseTestCase):
                 super().__init__(parent, key)
                 self.seen = []
 
-            def on_foo(self, event):
+            def _on_foo(self, event):
                 self.seen.append(event.handle)
                 event.defer()
 
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
 
-        framework.observe(pub.foo, obs)
+        framework.observe(pub.foo, obs._on_foo)
         pub.foo.emit()
 
         event_handle = obs.seen[0]
@@ -601,11 +593,11 @@ class TestFramework(BaseTestCase):
                 super().__init__(parent, key)
                 self.seen = []
 
-            def on_foo(self, event):
+            def _on_foo(self, event):
                 self.seen.append("on_foo:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
-            def on_bar(self, event):
+            def _on_bar(self, event):
                 self.seen.append("on_bar:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
@@ -615,8 +607,8 @@ class TestFramework(BaseTestCase):
         pub.on.foo.emit()
         pub.bar.emit()
 
-        framework.observe(pub.on.foo, obs)
-        framework.observe(pub.bar, obs)
+        framework.observe(pub.on.foo, obs._on_foo)
+        framework.observe(pub.bar, obs._on_bar)
 
         pub.on.foo.emit()
         pub.bar.emit()
@@ -641,11 +633,11 @@ class TestFramework(BaseTestCase):
                 super().__init__(parent, key)
                 self.seen = []
 
-            def on_foo(self, event):
+            def _on_foo(self, event):
                 self.seen.append("on_foo:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
-            def on_bar(self, event):
+            def _on_bar(self, event):
                 self.seen.append("on_bar:{}:{}".format(type(event).__name__, event.handle.kind))
                 event.defer()
 
@@ -667,8 +659,8 @@ class TestFramework(BaseTestCase):
         pub.on_a.define_event("foo", MyFoo)
         pub.on_b.define_event("bar", MyBar)
 
-        framework.observe(pub.on_a.foo, obs)
-        framework.observe(pub.on_b.bar, obs)
+        framework.observe(pub.on_a.foo, obs._on_foo)
+        framework.observe(pub.on_b.bar, obs._on_bar)
 
         pub.on_a.foo.emit()
         pub.on_b.bar.emit()
@@ -713,7 +705,7 @@ class TestFramework(BaseTestCase):
                 super().__init__(parent, key)
                 self.seen = []
 
-            def on_foo(self, event):
+            def _on_foo(self, event):
                 self.seen.append((event.handle.key, event.value))
                 # Only defer the first event and once.
                 if not MyObserver.has_deferred:
@@ -723,7 +715,7 @@ class TestFramework(BaseTestCase):
         framework1 = self.create_framework(tmpdir=self.tmpdir)
         pub1 = MyNotifier(framework1, "pub")
         obs1 = MyObserver(framework1, "obs")
-        framework1.observe(pub1.foo, obs1)
+        framework1.observe(pub1.foo, obs1._on_foo)
         pub1.foo.emit('first')
         self.assertEqual(obs1.seen, [('1', 'first')])
 
@@ -734,7 +726,7 @@ class TestFramework(BaseTestCase):
         framework2 = self.create_framework(tmpdir=self.tmpdir)
         pub2 = MyNotifier(framework2, "pub")
         obs2 = MyObserver(framework2, "obs")
-        framework2.observe(pub2.foo, obs2)
+        framework2.observe(pub2.foo, obs2._on_foo)
         pub2.foo.emit('second')
         framework2.reemit()
 

@@ -74,9 +74,9 @@ class TestCharm(unittest.TestCase):
                 super().__init__(*args)
 
                 self.started = False
-                framework.observe(self.on.start, self)
+                framework.observe(self.on.start, self._on_start)
 
-            def on_start(self, event):
+            def _on_start(self, event):
                 self.started = True
 
         events = list(MyCharm.on.events())
@@ -167,21 +167,21 @@ peers:
             def __init__(self, *args):
                 super().__init__(*args)
                 self.seen = []
-                self.framework.observe(self.on['stor1'].storage_attached, self)
-                self.framework.observe(self.on['stor2'].storage_detaching, self)
-                self.framework.observe(self.on['stor3'].storage_attached, self)
-                self.framework.observe(self.on['stor-4'].storage_attached, self)
+                self.framework.observe(self.on['stor1'].storage_attached, self._on_stor1_attach)
+                self.framework.observe(self.on['stor2'].storage_detaching, self._on_stor2_detach)
+                self.framework.observe(self.on['stor3'].storage_attached, self._on_stor3_attach)
+                self.framework.observe(self.on['stor-4'].storage_attached, self._on_stor4_attach)
 
-            def on_stor1_storage_attached(self, event):
+            def _on_stor1_attach(self, event):
                 self.seen.append(type(event).__name__)
 
-            def on_stor2_storage_detaching(self, event):
+            def _on_stor2_detach(self, event):
                 self.seen.append(type(event).__name__)
 
-            def on_stor3_storage_attached(self, event):
+            def _on_stor3_attach(self, event):
                 self.seen.append(type(event).__name__)
 
-            def on_stor_4_storage_attached(self, event):
+            def _on_stor4_attach(self, event):
                 self.seen.append(type(event).__name__)
 
         # language=YAML
@@ -251,16 +251,16 @@ start:
 
             def __init__(self, *args):
                 super().__init__(*args)
-                framework.observe(self.on.foo_bar_action, self)
-                framework.observe(self.on.start_action, self)
+                framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
+                framework.observe(self.on.start_action, self._on_start_action)
 
-            def on_foo_bar_action(self, event):
+            def _on_foo_bar_action(self, event):
                 self.seen_action_params = event.params
                 event.log('test-log')
                 event.set_results({'res': 'val with spaces'})
                 event.fail('test-fail')
 
-            def on_start_action(self, event):
+            def _on_start_action(self, event):
                 pass
 
         fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
@@ -300,9 +300,9 @@ start:
 
             def __init__(self, *args):
                 super().__init__(*args)
-                framework.observe(self.on.start_action, self)
+                framework.observe(self.on.start_action, self._on_start_action)
 
-            def on_start_action(self, event):
+            def _on_start_action(self, event):
                 event.defer()
 
         fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
