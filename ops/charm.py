@@ -453,9 +453,7 @@ class CharmMeta:
                          for name, rel in raw.get('requires', {}).items()}
         self.provides = {name: RelationMeta('provides', name, rel)
                          for name, rel in raw.get('provides', {}).items()}
-        # TODO: (jam 2020-05-11) The *role* should be 'peer' even though it comes from the
-        #  'peers' section.
-        self.peers = {name: RelationMeta('peers', name, rel)
+        self.peers = {name: RelationMeta('peer', name, rel)
                       for name, rel in raw.get('peers', {}).items()}
         self.relations = {}
         self.relations.update(self.requires)

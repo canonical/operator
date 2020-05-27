@@ -720,7 +720,7 @@ class TestModelBindings(unittest.TestCase):
         meta.relations = {
             'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
             'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
-            'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
+            'db2': RelationMeta('peer', 'db2', {'interface': 'db2', 'scope': 'global'}),
         }
         self.backend = ops.model._ModelBackend()
         self.model = ops.model.Model('myapp/0', meta, self.backend)
