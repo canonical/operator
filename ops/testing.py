@@ -153,7 +153,7 @@ class Harness:
 
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
 
-    def _create_resources_dir(self) -> None:
+    def _create_resources_dir(self) -> pathlib.Path:
         """Create a temporary resource folder."""
         self.__resource_dir = tempfile.TemporaryDirectory()
         atexit.register(self.__resource_dir.cleanup)
@@ -172,7 +172,7 @@ class Harness:
         """
         if resource_name and contents:
             if self._meta.resources[resource_name].type == "oci-image":
-                resource_file = self._resource_dir / f"{resource_name}"
+                resource_file = self._resource_dir / "{}".format(resource_name)
                 with resource_file.open('w') as resource_yaml:
                     yaml.dump(contents, resource_yaml)
                 self._backend._resources_map[resource_name] = resource_file
