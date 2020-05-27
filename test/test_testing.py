@@ -843,7 +843,7 @@ class TestTestingModelBackend(unittest.TestCase):
         with self.assertRaises(RelationNotFoundError):
             backend.relation_list(1234)
 
-    def test_add_oci_resource_default(self):
+    def test_populate_oci_resources(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             resources:
@@ -854,8 +854,8 @@ class TestTestingModelBackend(unittest.TestCase):
                 type: oci-image
                 description: "Another image."
             ''')
-        harness.add_oci_resource()
-        resource = harness._resource_dir / "image"
+        harness.populate_oci_resources()
+        resource = harness._resource_dir / "image" / "contents.yaml"
         with resource.open('r') as resource_file:
             contents = yaml.safe_load(resource_file.read())
         self.assertEqual(contents['registrypath'], 'registrypath')
@@ -877,7 +877,7 @@ class TestTestingModelBackend(unittest.TestCase):
             "password": "custom_password",
             }
         harness.add_oci_resource('image', custom)
-        resource = harness._resource_dir / "image"
+        resource = harness._resource_dir / "image" / "contents.yaml"
         with resource.open('r') as resource_file:
             contents = yaml.safe_load(resource_file.read())
         self.assertEqual(contents['registrypath'], 'custompath')
@@ -893,7 +893,10 @@ class TestTestingModelBackend(unittest.TestCase):
                 type: file
                 description: "Image to deploy."
             ''')
-        harness.add_oci_resource()
+        with self.assertRaises(RuntimeError):
+            harness.add_oci_resource("image")
+        with self.assertRaises(RuntimeError):
+            harness.add_oci_resource("missing-resource")
         self.assertEqual(len(harness._backend._resources_map), 0)
 
 
