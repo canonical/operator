@@ -165,9 +165,9 @@ class Harness:
     def add_oci_resource(self, resource_name: str, contents: typing.Mapping = None) -> None:
         """Add oci resources to the backend.
 
-        This will register oci resources and create a temporary file for processing metadata
-        about the resource. A default set of values will be used for all oci resources unless
-        a specific resource name and contents dict is provided.
+        This will register an oci resource and create a temporary file for processing metadata
+        about the resource. A default set of values will be used for all the file contents
+        unless a specific contents dict is provided.
 
         Args:
             resource_name: Name of the resource to add custom contents to.
@@ -193,11 +193,7 @@ class Harness:
         """Populate all OCI resources."""
         for name, data in self._meta.resources.items():
             if data.type == "oci-image":
-                contents = {'registrypath': 'registrypath',
-                            'username': 'username',
-                            'password': 'password',
-                            }
-                self.add_oci_resource(name, contents)
+                self.add_oci_resource(name)
 
     def disable_hooks(self) -> None:
         """Stop emitting hook events when the model changes.
