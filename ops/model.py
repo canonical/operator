@@ -347,7 +347,7 @@ class RelationMapping(Mapping):
     def __init__(self, relations_meta, our_unit, backend, cache):
         self._peers = set()
         for name, relation_meta in relations_meta.items():
-            if relation_meta.role == 'peers':
+            if relation_meta.is_peer():
                 self._peers.add(name)
         self._our_unit = our_unit
         self._backend = backend

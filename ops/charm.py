@@ -449,13 +449,11 @@ class CharmMeta:
         self.series = raw.get('series', [])
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
-        self.requires = {name: RelationMeta('requires', name, rel)
+        self.requires = {name: RelationMeta._new_requires(name, rel)
                          for name, rel in raw.get('requires', {}).items()}
-        self.provides = {name: RelationMeta('provides', name, rel)
+        self.provides = {name: RelationMeta._new_provides(name, rel)
                          for name, rel in raw.get('provides', {}).items()}
-        # TODO: (jam 2020-05-11) The *role* should be 'peer' even though it comes from the
-        #  'peers' section.
-        self.peers = {name: RelationMeta('peers', name, rel)
+        self.peers = {name: RelationMeta._new_peer(name, rel)
                       for name, rel in raw.get('peers', {}).items()}
         self.relations = {}
         self.relations.update(self.requires)
@@ -507,6 +505,23 @@ class RelationMeta:
         self.relation_name = relation_name
         self.interface_name = raw['interface']
         self.scope = raw.get('scope')
+
+    @classmethod
+    def _new_requires(self, name, raw):
+        return RelationMeta('requires', name, raw)
+
+    @classmethod
+    def _new_provides(self, name, raw):
+        return RelationMeta('provides', name, raw)
+
+    @classmethod
+    def _new_peer(self, name, raw):
+        return RelationMeta('peer', name, raw)
+
+    def is_peer(self) -> bool:
+        """Return whether this is a peer relation.
+        """
+        return self.role == 'peer'
 
 
 class StorageMeta:
