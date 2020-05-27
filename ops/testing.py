@@ -298,7 +298,7 @@ class Harness:
         if app_or_unit == self._model.app.name:
             # updating our own app only generates an event if it is a peer relation and we
             # aren't the leader
-            is_peer = self._meta.relations[relation_name].role == 'peers'
+            is_peer = self._meta.relations[relation_name].role.is_peer()
             if not is_peer:
                 return
             if self._model.unit.is_leader():

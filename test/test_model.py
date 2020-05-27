@@ -23,7 +23,7 @@ from collections import OrderedDict
 import ops.model
 import ops.charm
 import ops.testing
-from ops.charm import RelationMeta
+from ops.charm import RelationMeta, RelationRole
 
 from test.test_helpers import fake_script, fake_script_calls
 
@@ -718,9 +718,12 @@ class TestModelBindings(unittest.TestCase):
 
         meta = ops.charm.CharmMeta()
         meta.relations = {
-            'db0': RelationMeta('provides', 'db0', {'interface': 'db0', 'scope': 'global'}),
-            'db1': RelationMeta('requires', 'db1', {'interface': 'db1', 'scope': 'global'}),
-            'db2': RelationMeta('peers', 'db2', {'interface': 'db2', 'scope': 'global'}),
+            'db0': RelationMeta(
+                RelationRole.provides, 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': RelationMeta(
+                RelationRole.requires, 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': RelationMeta(
+                RelationRole.peer, 'db2', {'interface': 'db2', 'scope': 'global'}),
         }
         self.backend = ops.model._ModelBackend()
         self.model = ops.model.Model('myapp/0', meta, self.backend)
