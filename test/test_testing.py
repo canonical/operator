@@ -863,6 +863,21 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertEqual(contents['password'], 'password')
         self.assertEqual(len(harness._backend._resources_map), 2)
 
+    def test_resource_folder_cleanup(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+            ''')
+        harness.populate_oci_resources()
+        resource = harness._resource_dir / "image" / "contents.yaml"
+        del harness
+        with self.assertRaises(FileNotFoundError):
+            with resource.open('r') as resource_file:
+                print("This shouldn't be here: {}".format(resource_file))
+
     def test_add_oci_resource_custom(self):
         harness = Harness(CharmBase, meta='''
             name: test-app

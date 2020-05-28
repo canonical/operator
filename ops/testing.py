@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import atexit
 import inspect
 import pathlib
 from textwrap import dedent
 import tempfile
 import typing
 import yaml
+import weakref
 
 from ops import charm, framework, model
 
@@ -101,9 +101,10 @@ class Harness:
     def _resource_dir(self) -> pathlib.Path:
         if self._lazy_resource_dir is not None:
             return self._lazy_resource_dir
+
         self.__resource_dir = tempfile.TemporaryDirectory()
         self._lazy_resource_dir = pathlib.Path(self.__resource_dir.name)
-        atexit.register(self.__resource_dir.cleanup)
+        self._finalizer = weakref.finalize(self, self.__resource_dir.cleanup)
         return self._lazy_resource_dir
 
     def begin(self) -> None:
