@@ -162,7 +162,7 @@ class TestFramework(BaseTestCase):
         framework.observe(pub.foo, obs.on_any)
         framework.observe(pub.bar, obs.on_any)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaisesRegex(RuntimeError, "^Framework.observe requires a method"):
             framework.observe(pub.baz, obs)
 
         pub.foo.emit()
@@ -198,11 +198,11 @@ class TestFramework(BaseTestCase):
         pub = MyNotifier(framework, "pub")
         obs = MyObserver(framework, "obs")
 
-        with self.assertRaises(TypeError):
+        with self.assertRaisesRegex(TypeError, "must accept event parameter"):
             framework.observe(pub.foo, obs._on_foo)
-        with self.assertRaises(TypeError):
+        with self.assertRaisesRegex(TypeError, "has extra required parameter"):
             framework.observe(pub.bar, obs._on_bar)
-        with self.assertRaises(TypeError):
+        with self.assertRaisesRegex(TypeError, "has extra required parameter"):
             framework.observe(pub.baz, obs._on_baz)
         framework.observe(pub.qux, obs._on_qux)
 

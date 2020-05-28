@@ -89,7 +89,7 @@ class TestCharm(unittest.TestCase):
 
         self.assertEqual(charm.started, True)
 
-        with self.assertRaises(TypeError):
+        with self.assertRaisesRegex(TypeError, "observer methods must now be explicitly provided"):
             framework.observe(charm.on.start, charm)
 
     def test_helper_properties(self):
