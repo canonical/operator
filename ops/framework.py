@@ -646,8 +646,10 @@ class Framework(Object):
             # help users of older versions of the framework
             if isinstance(observer, charm.CharmBase):
                 raise TypeError(
-                    'observer methods must now be explicitly provided,'
-                    ' please replace observe(…, self) with observe(…, self._on_…)')
+                    'observer methods must now be explicitly provided;'
+                    ' please replace observe(self.on.{0}, self)'
+                    ' with e.g. observe(self.on.{0}, self._on_{0})'.format(
+                        bound_event.event_kind))
             raise RuntimeError(
                 'Framework.observe requires a method as third parameter, got {}'.format(observer))
 
@@ -663,15 +665,13 @@ class Framework(Object):
             raise RuntimeError(
                 'event emitter {} must have a "handle" attribute'.format(type(emitter).__name__))
 
-        method_name = None
-        if isinstance(observer, types.MethodType):
-            method_name = observer.__name__
-            observer = observer.__self__
-
         # Validate that the method has an acceptable call signature.
-        sig = inspect.signature(getattr(observer, method_name))
+        sig = inspect.signature(observer)
         # Self isn't included in the params list, so the first arg will be the event.
         extra_params = list(sig.parameters.values())[1:]
+
+        method_name = observer.__name__
+        observer = observer.__self__
         if not sig.parameters:
             raise TypeError(
                 '{}.{} must accept event parameter'.format(type(observer).__name__, method_name))
