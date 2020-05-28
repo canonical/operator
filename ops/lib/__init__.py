@@ -66,9 +66,10 @@ def use(name: str, api: int, author: str) -> ModuleType:
 
     others = ', '.join(str(lib.api) for lib in versions)
     if others:
-        msg = 'cannot find "{}" from {} with API {} (have {})'.format(name, author, api, others)
+        msg = 'cannot find "{}" from "{}" with API version {} (have {})'.format(
+            name, author, api, others)
     else:
-        msg = 'cannot find library "{}" from {}'.format(name, author)
+        msg = 'cannot find library "{}" from "{}"'.format(name, author)
 
     raise ImportError(msg, name=name)
 
@@ -112,6 +113,10 @@ def _find_all_specs(path: List[str]) -> Iterator[ModuleSpec]:
                 yield spec
 
 
+# only the first this many lines of a file are looked at for the LIB* constants
+_MAX_LIB_LINES = 99
+
+
 def _parse_lib(spec: ModuleSpec) -> Optional['_Lib']:
     if spec.origin is None:
         return None
@@ -121,9 +126,11 @@ def _parse_lib(spec: ModuleSpec) -> Optional['_Lib']:
     try:
         with open(spec.origin, 'rt', encoding='utf-8') as f:
             libinfo = {}
-            for line in f:
+            for n, line in enumerate(f):
                 if len(libinfo) == len(_expected):
                     break
+                if n > _MAX_LIB_LINES:
+                    return None
                 m = _libline_re.match(line)
                 if m is None:
                     continue

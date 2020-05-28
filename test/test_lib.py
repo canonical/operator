@@ -15,7 +15,6 @@
 import os
 import sys
 
-from collections import namedtuple
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from tempfile import mkdtemp, mkstemp
@@ -57,7 +56,7 @@ def _mklib(topdir: str, pkgname: str, libname: str) -> Path:
 
 
 def _flatten(specgen):
-    return [os.path.dirname(spec.origin) for spec in specgen]
+    return sorted([os.path.dirname(spec.origin) for spec in specgen])
 
 
 class TestLibFinder(TestCase):
@@ -81,23 +80,35 @@ class TestLibFinder(TestCase):
         tmpdirA = self._mkdtemp()
         tmpdirB = self._mkdtemp()
 
+        if tmpdirA > tmpdirB:
+            # keep sorting happy
+            tmpdirA, tmpdirB = tmpdirB, tmpdirA
+
         dirs = [tmpdirA, tmpdirB]
 
-        expected = []
         for top in [tmpdirA, tmpdirB]:
             for pkg in ["bar", "baz"]:
-                for lib in ["quux", "meep"]:
+                for lib in ["meep", "quux"]:
                     _mklib(top, pkg, lib).write_text("")
-                    expected.append(os.path.join(top, pkg, "opslib", lib))
 
-        self.assertEqual(
-            sorted(_flatten(ops.lib._find_all_specs(dirs))),
-            sorted(expected))
+        expected = [
+            os.path.join(tmpdirA, "bar", "opslib", "meep"),
+            os.path.join(tmpdirA, "bar", "opslib", "quux"),
+            os.path.join(tmpdirA, "baz", "opslib", "meep"),
+            os.path.join(tmpdirA, "baz", "opslib", "quux"),
+            os.path.join(tmpdirB, "bar", "opslib", "meep"),
+            os.path.join(tmpdirB, "bar", "opslib", "quux"),
+            os.path.join(tmpdirB, "baz", "opslib", "meep"),
+            os.path.join(tmpdirB, "baz", "opslib", "quux"),
+        ]
+
+        self.assertEqual(_flatten(ops.lib._find_all_specs(dirs)), expected)
 
     def test_cwd(self):
         tmpcwd = self._mkdtemp()
+        cwd = os.getcwd()
         os.chdir(tmpcwd)
-        self.addCleanup(os.chdir, tmpcwd)
+        self.addCleanup(os.chdir, cwd)
 
         dirs = [""]
 
@@ -110,6 +121,7 @@ class TestLibFinder(TestCase):
             ['./foo/opslib/bar'])
 
     def test_bogus_topdir(self):
+        """Check that having one bogus dir in sys.path doesn't cause the finder to abort."""
         tmpdir = self._mkdtemp()
 
         dirs = [tmpdir, "/bogus"]
@@ -123,6 +135,8 @@ class TestLibFinder(TestCase):
             [tmpdir + '/foo/opslib/bar'])
 
     def test_bogus_opsdir(self):
+        """Check that having one bogus opslib doesn't cause the finder to abort."""
+
         tmpdir = self._mkdtemp()
 
         self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
@@ -138,6 +152,7 @@ class TestLibFinder(TestCase):
             [tmpdir + '/foo/opslib/bar'])
 
     def test_namespace(self):
+        """Check that namespace packages are ignored."""
         tmpdir = self._mkdtemp()
 
         self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
@@ -161,6 +176,7 @@ class TestLibParser(TestCase):
         """Check that we can load a reasonably straightforward lib"""
         m = self._mkmod('foo', '''
         LIBNAME = "foo"
+        LIBEACH = float('-inf')
         LIBAPI = 2
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
@@ -180,6 +196,16 @@ class TestLibParser(TestCase):
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
 
+    def test_too_long(self):
+        """Check that if the file is too long, nothing is returned"""
+        m = self._mkmod('foo', '\n'*ops.lib._MAX_LIB_LINES + '''
+        LIBNAME = "foo"
+        LIBAPI = 2
+        LIBPATCH = 42
+        LIBAUTHOR = "alice@example.com"
+        ''')
+        self.assertIsNone(ops.lib._parse_lib(m))
+
     def test_no_origin(self):
         """Check that _parse_lib doesn't choke when given a spec with no origin"""
         # 'just don't crash'
@@ -194,13 +220,12 @@ class TestLibParser(TestCase):
 
     def test_bogus_lib(self):
         """Check our behaviour when the lib is messed up"""
-        # note the syntax error
+        # note the syntax error (that is carefully chosen to pass the initial regexp)
         m = self._mkmod('foo', '''
         LIBNAME = "1'
         LIBAPI = 2
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
-        LIBANANA = True
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
 
@@ -353,66 +378,86 @@ class TestLibFunctional(TestCase):
         self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
 
     def test_use_finds_best_same_toplevel(self):
-        """Test that ops.lib.use("baz") works when there are two baz."""
+        """Test that ops.lib.use("baz") works when there are two baz in the same toplevel."""
 
-        T = namedtuple("T", "desc sameTop pkgA libA patchA pkgB libB patchB")
+        pkg_b = "foo"
+        lib_b = "bar"
+        patch_b = 40
+        for pkg_a in ["foo", "fooA"]:
+            for lib_a in ["bar", "barA"]:
+                if (pkg_a, lib_a) == (pkg_b, lib_b):
+                    # everything-is-the-same :-)
+                    continue
+                for patch_a in [38, 42]:
+                    desc = "A: {}/{}/{}; B: {}/{}/{}".format(
+                        pkg_a, lib_a, patch_a, pkg_b, lib_b, patch_b)
+                    with self.subTest(desc):
+                        tmpdir = self._mkdtemp()
+                        sys.path = [tmpdir]
 
-        for t in [
-            T("same toplevel, different package, same lib, AB",
-              True, "fooA", "bar", 40, "fooB", "bar", 42),
-            T("same toplevel, different package, same lib, BA",
-              True, "fooA", "bar", 42, "fooB", "bar", 40),
-            T("same toplevel, same package, different lib, AB",
-              True, "foo", "barA", 40, "foo", "barB", 42),
-            T("same toplevel, same package, different lib, BA",
-              True, "foo", "barA", 42, "foo", "barB", 40),
+                        _mklib(tmpdir, pkg_a, lib_a).write_text(dedent("""
+                        LIBNAME = "baz"
+                        LIBAPI = 2
+                        LIBPATCH = {}
+                        LIBAUTHOR = "alice@example.com"
+                        """).format(patch_a))
 
-            T("different toplevel, same package, same lib, AB",
-              False, "foo", "bar", 40, "foo", "bar", 42),
-            T("different toplevel, same package, same lib, BA",
-              False, "foo", "bar", 42, "foo", "bar", 40),
+                        _mklib(tmpdir, pkg_b, lib_b).write_text(dedent("""
+                        LIBNAME = "baz"
+                        LIBAPI = 2
+                        LIBPATCH = {}
+                        LIBAUTHOR = "alice@example.com"
+                        """).format(patch_b))
 
-            T("different toplevel, different package, same lib, AB",
-              False, "fooA", "bar", 40, "fooB", "bar", 42),
-            T("different toplevel, different package, same lib, BA",
-              False, "fooA", "bar", 42, "fooB", "bar", 40),
-            T("different toplevel, same package, different lib, AB",
-              False, "foo", "barA", 40, "foo", "barB", 42),
-            T("different toplevel, same package, different lib, BA",
-              False, "foo", "barA", 42, "foo", "barB", 40),
-        ]:
-            with self.subTest(t.desc):
-                tmpdirA = self._mkdtemp()
-                sys.path = [tmpdirA]
-                if t.sameTop:
-                    tmpdirB = tmpdirA
-                else:
-                    tmpdirB = self._mkdtemp()
-                    sys.path.append(tmpdirB)
+                        # autoimport would be done in main
+                        ops.lib.autoimport()
 
-                _mklib(tmpdirA, t.pkgA, t.libA).write_text(dedent("""
-                LIBNAME = "baz"
-                LIBAPI = 2
-                LIBPATCH = {}
-                LIBAUTHOR = "alice@example.com"
-                """).format(t.patchA))
+                        # ops.lib.use done by charm author
+                        baz = ops.lib.use('baz', 2, 'alice@example.com')
+                        self.assertEqual(baz.LIBNAME, 'baz')
+                        self.assertEqual(baz.LIBAPI, 2)
+                        self.assertEqual(baz.LIBPATCH, max(patch_a, patch_b))
+                        self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
 
-                _mklib(tmpdirB, t.pkgB, t.libB).write_text(dedent("""
-                LIBNAME = "baz"
-                LIBAPI = 2
-                LIBPATCH = {}
-                LIBAUTHOR = "alice@example.com"
-                """).format(t.patchB))
+    def test_use_finds_best_diff_toplevel(self):
+        """Test that ops.lib.use("baz") works when there are two baz in the different toplevels."""
 
-                # autoimport would be done in main
-                ops.lib.autoimport()
+        pkg_b = "foo"
+        lib_b = "bar"
+        patch_b = 40
+        for pkg_a in ["foo", "fooA"]:
+            for lib_a in ["bar", "barA"]:
+                for patch_a in [38, 42]:
+                    desc = "A: {}/{}/{}; B: {}/{}/{}".format(
+                        pkg_a, lib_a, patch_a, pkg_b, lib_b, patch_b)
+                    with self.subTest(desc):
+                        tmpdirA = self._mkdtemp()
+                        tmpdirB = self._mkdtemp()
+                        sys.path = [tmpdirA, tmpdirB]
 
-                # ops.lib.use done by charm author
-                baz = ops.lib.use('baz', 2, 'alice@example.com')
-                self.assertEqual(baz.LIBNAME, 'baz')
-                self.assertEqual(baz.LIBAPI, 2)
-                self.assertEqual(baz.LIBPATCH, 42)
-                self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
+                        _mklib(tmpdirA, pkg_a, lib_a).write_text(dedent("""
+                        LIBNAME = "baz"
+                        LIBAPI = 2
+                        LIBPATCH = {}
+                        LIBAUTHOR = "alice@example.com"
+                        """).format(patch_a))
+
+                        _mklib(tmpdirB, pkg_b, lib_b).write_text(dedent("""
+                        LIBNAME = "baz"
+                        LIBAPI = 2
+                        LIBPATCH = {}
+                        LIBAUTHOR = "alice@example.com"
+                        """).format(patch_b))
+
+                        # autoimport would be done in main
+                        ops.lib.autoimport()
+
+                        # ops.lib.use done by charm author
+                        baz = ops.lib.use('baz', 2, 'alice@example.com')
+                        self.assertEqual(baz.LIBNAME, 'baz')
+                        self.assertEqual(baz.LIBAPI, 2)
+                        self.assertEqual(baz.LIBPATCH, max(patch_a, patch_b))
+                        self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
 
     def test_none_found(self):
         with self.assertRaises(ImportError):
