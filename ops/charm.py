@@ -505,7 +505,7 @@ class RelationMeta:
 
     Should not be constructed directly by Charm code. Is gotten from one of
     :attr:`CharmMeta.peers`, :attr:`CharmMeta.requires`, :attr:`CharmMeta.provides`,
-    :attr:`CharmMeta.relations`.
+    or :attr:`CharmMeta.relations`.
 
     Attributes:
         role: This is one of peer/requires/provides
