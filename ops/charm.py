@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import enum
 import os
 import pathlib
 import typing
@@ -449,13 +450,11 @@ class CharmMeta:
         self.series = raw.get('series', [])
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
-        self.requires = {name: RelationMeta('requires', name, rel)
+        self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw.get('requires', {}).items()}
-        self.provides = {name: RelationMeta('provides', name, rel)
+        self.provides = {name: RelationMeta(RelationRole.provides, name, rel)
                          for name, rel in raw.get('provides', {}).items()}
-        # TODO: (jam 2020-05-11) The *role* should be 'peer' even though it comes from the
-        #  'peers' section.
-        self.peers = {name: RelationMeta('peers', name, rel)
+        self.peers = {name: RelationMeta(RelationRole.peer, name, rel)
                       for name, rel in raw.get('peers', {}).items()}
         self.relations = {}
         self.relations.update(self.requires)
@@ -488,21 +487,36 @@ class CharmMeta:
         return cls(meta, raw_actions)
 
 
+class RelationRole(enum.Enum):
+    peer = 'peer'
+    requires = 'requires'
+    provides = 'provides'
+
+    def is_peer(self) -> bool:
+        """Return whether the current role is peer.
+
+        A convenience to avoid having to import charm.
+        """
+        return self is RelationRole.peer
+
+
 class RelationMeta:
     """Object containing metadata about a relation definition.
 
     Should not be constructed directly by Charm code. Is gotten from one of
     :attr:`CharmMeta.peers`, :attr:`CharmMeta.requires`, :attr:`CharmMeta.provides`,
-    :attr:`CharmMeta.relations`.
+    or :attr:`CharmMeta.relations`.
 
     Attributes:
-        role: This is one of requires/provides/peers
+        role: This is one of peer/requires/provides
         relation_name: Name of this relation from metadata.yaml
         interface_name: Optional definition of the interface protocol.
         scope: "global" or "container" scope based on how the relation should be used.
     """
 
-    def __init__(self, role, relation_name, raw):
+    def __init__(self, role: RelationRole, relation_name: str, raw: dict):
+        if not isinstance(role, RelationRole):
+            raise TypeError("role should be a Role, not {!r}".format(role))
         self.role = role
         self.relation_name = relation_name
         self.interface_name = raw['interface']

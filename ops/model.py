@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
+import decimal
+import ipaddress
 import json
-import weakref
 import os
+import re
 import shutil
 import tempfile
 import time
 import typing
-import datetime
-import re
-import ipaddress
-import decimal
+import weakref
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
@@ -347,7 +347,7 @@ class RelationMapping(Mapping):
     def __init__(self, relations_meta, our_unit, backend, cache):
         self._peers = set()
         for name, relation_meta in relations_meta.items():
-            if relation_meta.role == 'peers':
+            if relation_meta.role.is_peer():
                 self._peers.add(name)
         self._our_unit = our_unit
         self._backend = backend
