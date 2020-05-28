@@ -89,6 +89,9 @@ class TestCharm(unittest.TestCase):
 
         self.assertEqual(charm.started, True)
 
+        with self.assertRaises(TypeError):
+            framework.observe(charm.on.start, charm)
+
     def test_helper_properties(self):
         framework = self.create_framework()
 

@@ -643,6 +643,11 @@ class Framework(Object):
                 'Framework.observe requires a BoundEvent as second parameter, got {}'.format(
                     bound_event))
         if not isinstance(observer, types.MethodType):
+            # help users of older versions of the framework
+            if isinstance(observer, charm.CharmBase):
+                raise TypeError(
+                    'observer methods must now be explicitly provided,'
+                    ' please replace observe(…, self) with observe(…, self._on_…)')
             raise RuntimeError(
                 'Framework.observe requires a method as third parameter, got {}'.format(observer))
 
