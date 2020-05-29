@@ -39,7 +39,7 @@ a particular Python file. It could be anything that makes sense to your project,
 but let's assume this is `src/charm.py`. This file must be executable (and it
 must have the appropriate shebang line).
 
-You need the usual `metadata.yaml` and `config.yaml` files, and a
+You need the usual `metadata.yaml` and (probably) `config.yaml` files, and a
 `requirements.txt` for any Python dependencies.  In other words, your project
 might look like this:
 
