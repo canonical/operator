@@ -12,41 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from setuptools import setup, find_namespace_packages
-
-with open("README.md", "rt", encoding="utf8") as fh:
-    long_description = fh.read()
-
-# ops.__init__ needs to pull in ops.charm to work around a circular
-# import so we can't import it here as that pulls in yaml which isn't
-# necessarily there yet.
 import ast
-version = 'unknown'
-with open("ops/__init__.py", "rt", encoding="utf8") as fh:
-    source = fh.read()
-code = ast.parse(source)
-for node in code.body:
-    if isinstance(node, ast.Assign):
-        targets = [i.id for i in node.targets]
-        if '__version__' in targets:
-            if isinstance(node.value, ast.Str):
-                # Python < 3.8
-                version = node.value.s
-            else:
-                version = node.value.value
-            break
+from setuptools import setup, find_packages
+
+
+def _read_me() -> str:
+    with open("README.md", "rt", encoding="utf8") as fh:
+        readme = fh.read()
+    return readme
+
+
+def _get_version() -> str:
+    # ops.__init__ needs to pull in ops.charm to work around a circular
+    # import so we can't import it here as that pulls in yaml which isn't
+    # necessarily there yet.
+    version = 'unknown'
+    with open("ops/__init__.py", "rt", encoding="utf8") as fh:
+        source = fh.read()
+    code = ast.parse(source)
+    for node in code.body:
+        if isinstance(node, ast.Assign):
+            targets = [i.id for i in node.targets]
+            if '__version__' in targets:
+                if isinstance(node.value, ast.Str):
+                    # Python < 3.8
+                    version = node.value.s
+                else:
+                    version = node.value.value
+                break
+    return version
+
 
 setup(
     name="ops",
-    version=version,
+    version=_get_version(),
     description="The Python library behind great charms",
-    long_description=long_description,
+    long_description=_read_me(),
     long_description_content_type="text/markdown",
     license="Apache-2.0",
     url="https://github.com/canonical/operator",
     author="The Charmcraft team at Canonical Ltd.",
     author_email="charmcraft@lists.launchpad.net",
-    packages=find_namespace_packages(include=('ops', 'ops.*')),
+    packages=find_packages(include=('ops', 'ops.*')),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
@@ -60,5 +67,5 @@ setup(
         # "Operating System :: Microsoft :: Windows",
     ],
     python_requires='>=3.5',
-    install_requires=['PyYAML'],
+    install_requires=["PyYAML"],
 )

@@ -20,7 +20,6 @@ from pathlib import Path
 
 import yaml
 
-import ops
 import ops.charm
 import ops.framework
 import ops.model
@@ -284,7 +283,6 @@ def main(charm_class):
     model_backend = ops.model._ModelBackend()
     debug = ('JUJU_DEBUG' in os.environ)
     setup_root_logging(model_backend, debug=debug)
-    logger.info("ops %s up and running", ops.__version__)
 
     dispatcher = _Dispatcher(charm_dir)
     dispatcher.run_any_legacy_hook()

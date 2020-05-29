@@ -1,1 +1,1 @@
-. #  i.e. get them from setup.py
+-e . #  i.e. get them from setup.py
