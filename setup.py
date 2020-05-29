@@ -12,28 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from setuptools import setup
+from setuptools import setup, find_namespace_packages
 
-with open("README.md", "r") as fh:
+with open("README.md", "rt", encoding="utf8") as fh:
     long_description = fh.read()
+
+# ops.__init__ needs to pull in ops.charm to work around a circular
+# import so we can't import it here as that pulls in yaml which isn't
+# necessarily there yet.
+import ast
+version = 'unknown'
+with open("ops/__init__.py", "rt", encoding="utf8") as fh:
+    source = fh.read()
+code = ast.parse(source)
+for node in code.body:
+    if isinstance(node, ast.Assign):
+        targets = [i.id for i in node.targets]
+        if '__version__' in targets:
+            if isinstance(node.value, ast.Str):
+                # Python < 3.8
+                version = node.value.s
+            else:
+                version = node.value.value
+            break
 
 setup(
     name="ops",
-    version="0.0.1",
+    version=version,
     description="The Python library behind great charms",
     long_description=long_description,
     long_description_content_type="text/markdown",
     license="Apache-2.0",
     url="https://github.com/canonical/operator",
-    packages=["ops"],
+    author="The Charmcraft team at Canonical Ltd.",
+    author_email="charmcraft@lists.launchpad.net",
+    packages=find_namespace_packages(include=('ops', 'ops.*')),
     classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: Apache Software License",
         "Development Status :: 4 - Beta",
 
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-
-        "License :: OSI Approved :: Apache Software License",
+        "Intended Audience :: Developers",
+        "Intended Audience :: System Administrators",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: POSIX :: Linux",
+        # include Windows once we're running tests there also
+        # "Operating System :: Microsoft :: Windows",
     ],
+    python_requires='>=3.5',
+    install_requires=['PyYAML'],
 )
