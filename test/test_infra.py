@@ -25,6 +25,8 @@ from unittest.mock import patch
 import autopep8
 from flake8.api.legacy import get_style_guide
 
+import ops
+
 
 def get_python_filepaths():
     """Helper to retrieve paths of Python files."""
@@ -99,6 +101,29 @@ class InfrastructureTests(unittest.TestCase):
                     issues.append(filepath)
         if issues:
             self.fail("Please add copyright headers to the following files:\n" + "\n".join(issues))
+
+    def _run_setup(self, *args):
+        proc = subprocess.run(
+            (sys.executable, 'setup.py') + args,
+            stdout=subprocess.PIPE,
+            check=True)
+        return proc.stdout.strip().decode("utf8")
+
+    def test_setup_version(self):
+        setup_version = self._run_setup('--version')
+
+        self.assertEqual(setup_version, ops.__version__)
+
+    def test_setup_description(self):
+        with open("README.md", "rt", encoding="utf8") as fh:
+            disk_readme = fh.read().strip()
+
+        setup_readme = self._run_setup('--long-description')
+
+        self.assertEqual(setup_readme, disk_readme)
+
+    def test_check(self):
+        self._run_setup('check', '--strict')
 
 
 class ImportersTestCase(unittest.TestCase):

@@ -39,26 +39,18 @@ a particular Python file. It could be anything that makes sense to your project,
 but let's assume this is `src/charm.py`. This file must be executable (and it
 must have the appropriate shebang line).
 
-This file must be symlinked from `dispatch` (supported by Juju 2.8; otherwise
-from `hooks/install` and `hooks/upgrade-charm`, and `hooks/start` if it is a k8s
-charm).
-
-You also need the usual `metadata.yaml` and `config.yaml` files, and any Python
-dependencies (maybe using some kind of virtualenv). In other words, your project
+You need the usual `metadata.yaml` and (probably) `config.yaml` files, and a
+`requirements.txt` for any Python dependencies.  In other words, your project
 might look like this:
 
 ```
-.
+my-charm
 ├── config.yaml
 ├── metadata.yaml
-├── env/
-│   └── # ... your Python dependencies, including the operator framework itself
-├── src/
-│   └── charm.py
-└── dispatch -> src/charm.py
+├── requirements.txt
+└── src/
+    └── charm.py
 ```
-
-> 🛈 once `charmcraft build` works the layout will get simpler!
 
 `src/charm.py` here is the entry point to your charm code. At a minimum, it
 needs to define a subclass of `CharmBase` and pass that into the framework's
@@ -83,8 +75,13 @@ if __name__ == "__main__":
 That should be enough for you to be able to run
 
 ```
-$ juju deploy .
+$ charmcraft build
+Done, charm left in 'my-charm.charm'
+$ juju deploy my-charm.charm
 ```
+
+> 🛈 More information on [`charmcraft`](https://pypi.org/project/charmcraft/) can
+> also be found on its [github page](https://github.com/canonical/charmcraft).
 
 Happy charming!
 

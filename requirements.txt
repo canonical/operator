@@ -1,1 +1,1 @@
-PyYAML
+-e . #  i.e. get them from setup.py

@@ -14,5 +14,7 @@
 
 """The Operator Framework."""
 
+__version__ = '0.6.0'
+
 # Import here the bare minimum to break the circular import between modules
 from . import charm  # NOQA
