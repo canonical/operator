@@ -573,6 +573,12 @@ class TestMainWithNoDispatch(TestMain, unittest.TestCase):
         self.assertTrue(action_hook.exists())
 
 
+class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
+    def _call_event(self, rel_path, env):
+        env["JUJU_DISPATCH_PATH"] = str(rel_path)
+        super()._call_event(rel_path, env)
+
+
 class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
     hooks_are_symlinks = False
 
