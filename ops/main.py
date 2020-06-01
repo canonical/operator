@@ -176,7 +176,7 @@ class _Dispatcher:
         self._charm_dir = charm_dir
         self._exec_path = Path(sys.argv[0])
 
-        if 'JUJU_DISPATCH_PATH' in os.environ:
+        if 'JUJU_DISPATCH_PATH' in os.environ and (charm_dir / 'dispatch').exists():
             self._init_dispatch()
         else:
             self._init_legacy()
