@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import pathlib
-import unittest
+from collections import OrderedDict
 import json
 import ipaddress
-from collections import OrderedDict
+import os
+import pathlib
+from textwrap import dedent
+import unittest
 
 import ops.model
 import ops.charm
@@ -481,6 +482,12 @@ class TestModel(unittest.TestCase):
     def test_base_status_instance_raises(self):
         with self.assertRaises(TypeError):
             ops.model.StatusBase('test')
+
+        class NoNameStatus(ops.model.StatusBase):
+            pass
+
+        with self.assertRaises(AttributeError):
+            ops.model.StatusBase.register_status(NoNameStatus)
 
     def test_status_repr(self):
         test_cases = {
@@ -947,6 +954,39 @@ class TestModelBackend(unittest.TestCase):
             with self.assertRaises(exception):
                 run()
             self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_status_get(self):
+        # taken from actual Juju output
+        content = '{"message": "", "status": "unknown", "status-data": {}}'
+        fake_script(self, 'status-get', "echo '{}'".format(content))
+        s = self.backend.status_get(is_app=False)
+        self.assertEqual(s['status'], "unknown")
+        self.assertEqual(s['message'], "")
+        # taken from actual Juju output
+        content = dedent("""
+            {
+                "application-status": {
+                    "message": "installing",
+                    "status": "maintenance",
+                    "status-data": {},
+                    "units": {
+                        "uo/0": {
+                            "message": "",
+                            "status": "active",
+                            "status-data": {}
+                        }
+                    }
+                }
+            }
+            """)
+        fake_script(self, 'status-get', "echo '{}'".format(content))
+        s = self.backend.status_get(is_app=True)
+        self.assertEqual(s['status'], "maintenance")
+        self.assertEqual(s['message'], "installing")
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['status-get', '--include-data', '--application=False', '--format=json'],
+            ['status-get', '--include-data', '--application=True', '--format=json'],
+        ])
 
     def test_status_is_app_forced_kwargs(self):
         fake_script(self, 'status-get', 'exit 1')

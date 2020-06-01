@@ -161,7 +161,9 @@ foo-bar:
 start:
     description: Start the unit.
 get-model-name:
-    description: Return the name of the unit
+    description: Return the name of the model
+get-status:
+    description: Return the Status of the unit
 '''
         actions_dir_name = 'actions'
         actions_meta_file = 'actions.yaml'
@@ -170,7 +172,7 @@ get-model-name:
             f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
-        for action_name in ('start', 'foo-bar', 'get-model-name'):
+        for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
             self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(self):
@@ -512,6 +514,33 @@ log_debug: {}
             charm_config=actions_charm_config))
         self.assertIsNotNone(state)
         self.assertEqual(state['_on_get_model_name_action'], ['test-model-name'])
+
+    def test_has_valid_status(self):
+        self._prepare_actions()
+
+        actions_charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+            'USE_ACTIONS': True,
+        }))
+
+        fake_script(self, 'action-get', "echo '{}'")
+        fake_script(self, 'status-get', """echo '{"status": "unknown", "message": ""}'""")
+        state = self._simulate_event(EventSpec(
+            ActionEvent, 'get_status_action',
+            env_var='JUJU_ACTION_NAME',
+            charm_config=actions_charm_config))
+        self.assertIsNotNone(state)
+        self.assertEqual(state['status_name'], 'unknown')
+        self.assertEqual(state['status_message'], '')
+        fake_script(
+            self, 'status-get', """echo '{"status": "blocked", "message": "help meeee"}'""")
+        state = self._simulate_event(EventSpec(
+            ActionEvent, 'get_status_action',
+            env_var='JUJU_ACTION_NAME',
+            charm_config=actions_charm_config))
+        self.assertIsNotNone(state)
+        self.assertEqual(state['status_name'], 'blocked')
+        self.assertEqual(state['status_message'], 'help meeee')
 
 
 class TestMainWithNoDispatch(TestMain, unittest.TestCase):

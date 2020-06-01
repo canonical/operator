@@ -198,7 +198,7 @@ class TestLibParser(TestCase):
 
     def test_too_long(self):
         """Check that if the file is too long, nothing is returned"""
-        m = self._mkmod('foo', '\n'*ops.lib._MAX_LIB_LINES + '''
+        m = self._mkmod('foo', '\n' * ops.lib._MAX_LIB_LINES + '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42

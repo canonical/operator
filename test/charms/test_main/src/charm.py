@@ -88,6 +88,7 @@ class Charm(CharmBase):
             self.framework.observe(self.on.start_action, self._on_start_action)
             self.framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
             self.framework.observe(self.on.get_model_name_action, self._on_get_model_name_action)
+            self.framework.observe(self.on.get_status_action, self._on_get_status_action)
 
         self.framework.observe(self.on.collect_metrics, self._on_collect_metrics)
 
@@ -182,6 +183,11 @@ class Charm(CharmBase):
             'event action name cannot be different from the one being handled')
         self._state['on_foo_bar_action'].append(type(event))
         self._state['observed_event_types'].append(type(event))
+        self._write_state()
+
+    def _on_get_status_action(self, event):
+        self._state['status_name'] = self.unit.status.name
+        self._state['status_message'] = self.unit.status.message
         self._write_state()
 
     def _on_collect_metrics(self, event):
