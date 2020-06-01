@@ -740,12 +740,14 @@ class StatusBase:
             return cls._statuses[name](message)
 
     @classmethod
-    def register_status(cls, child):
+    def register(cls, child):
         if child.name is None:
             raise AttributeError('cannot register a Status which has no name')
         cls._statuses[child.name] = child
+        return child
 
 
+@StatusBase.register
 class UnknownStatus(StatusBase):
     """The unit status is unknown.
 
@@ -763,6 +765,7 @@ class UnknownStatus(StatusBase):
         return "UnknownStatus()"
 
 
+@StatusBase.register
 class ActiveStatus(StatusBase):
     """The unit is ready.
 
@@ -774,9 +777,7 @@ class ActiveStatus(StatusBase):
         super().__init__(message)
 
 
-StatusBase.register_status(ActiveStatus)
-
-
+@StatusBase.register
 class BlockedStatus(StatusBase):
     """The unit requires manual intervention.
 
@@ -785,9 +786,7 @@ class BlockedStatus(StatusBase):
     name = 'blocked'
 
 
-StatusBase.register_status(BlockedStatus)
-
-
+@StatusBase.register
 class MaintenanceStatus(StatusBase):
     """The unit is performing maintenance tasks.
 
@@ -799,9 +798,7 @@ class MaintenanceStatus(StatusBase):
     name = 'maintenance'
 
 
-StatusBase.register_status(MaintenanceStatus)
-
-
+@StatusBase.register
 class WaitingStatus(StatusBase):
     """A unit is unable to progress.
 
@@ -810,9 +807,6 @@ class WaitingStatus(StatusBase):
 
     """
     name = 'waiting'
-
-
-StatusBase.register_status(WaitingStatus)
 
 
 class Resources:
