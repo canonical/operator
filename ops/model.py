@@ -713,6 +713,7 @@ class StatusBase:
     """
 
     _statuses = {}
+    name = None
 
     def __init__(self, message: str):
         self.message = message
@@ -720,7 +721,6 @@ class StatusBase:
     def __new__(cls, *args, **kwargs):
         if cls is StatusBase:
             raise TypeError("cannot instantiate a base class")
-        cls._statuses[cls.name] = cls
         return super().__new__(cls)
 
     def __eq__(self, other):
@@ -739,7 +739,15 @@ class StatusBase:
         else:
             return cls._statuses[name](message)
 
+    @classmethod
+    def register(cls, child):
+        if child.name is None:
+            raise AttributeError('cannot register a Status which has no name')
+        cls._statuses[child.name] = child
+        return child
 
+
+@StatusBase.register
 class UnknownStatus(StatusBase):
     """The unit status is unknown.
 
@@ -757,6 +765,7 @@ class UnknownStatus(StatusBase):
         return "UnknownStatus()"
 
 
+@StatusBase.register
 class ActiveStatus(StatusBase):
     """The unit is ready.
 
@@ -768,6 +777,7 @@ class ActiveStatus(StatusBase):
         super().__init__(message)
 
 
+@StatusBase.register
 class BlockedStatus(StatusBase):
     """The unit requires manual intervention.
 
@@ -776,6 +786,7 @@ class BlockedStatus(StatusBase):
     name = 'blocked'
 
 
+@StatusBase.register
 class MaintenanceStatus(StatusBase):
     """The unit is performing maintenance tasks.
 
@@ -787,6 +798,7 @@ class MaintenanceStatus(StatusBase):
     name = 'maintenance'
 
 
+@StatusBase.register
 class WaitingStatus(StatusBase):
     """A unit is unable to progress.
 
@@ -1051,7 +1063,30 @@ class _ModelBackend:
             is_app: A boolean indicating whether the status should be retrieved for a unit
                 or an application.
         """
-        return self._run('status-get', '--include-data', '--application={}'.format(is_app))
+        content = self._run(
+            'status-get', '--include-data', '--application={}'.format(is_app),
+            use_json=True,
+            return_output=True)
+        # Unit status looks like (in YAML):
+        # message: 'load: 0.28 0.26 0.26'
+        # status: active
+        # status-data: {}
+        # Application status looks like (in YAML):
+        # application-status:
+        #   message: 'load: 0.28 0.26 0.26'
+        #   status: active
+        #   status-data: {}
+        #   units:
+        #     uo/0:
+        #       message: 'load: 0.28 0.26 0.26'
+        #       status: active
+        #       status-data: {}
+
+        if is_app:
+            return {'status': content['application-status']['status'],
+                    'message': content['application-status']['message']}
+        else:
+            return content
 
     def status_set(self, status, message='', *, is_app=False):
         """Set a status of a unit or an application.
