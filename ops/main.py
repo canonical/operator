@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -299,7 +298,7 @@ def main(charm_class):
     charm_state_path = charm_dir / CHARM_STATE_FILE
     framework = ops.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
-        charm = charm_class(framework, None)
+        charm = charm_class(framework)
         dispatcher.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant
