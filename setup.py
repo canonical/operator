@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ast
+import importlib
+from pathlib import Path
 from setuptools import setup, find_packages
 
 
@@ -22,30 +23,16 @@ def _read_me() -> str:
     return readme
 
 
-def _get_version() -> str:
-    # ops.__init__ needs to pull in ops.charm to work around a circular
-    # import so we can't import it here as that pulls in yaml which isn't
-    # necessarily there yet.
-    version = 'unknown'
-    with open("ops/__init__.py", "rt", encoding="utf8") as fh:
-        source = fh.read()
-    code = ast.parse(source)
-    for node in code.body:
-        if isinstance(node, ast.Assign):
-            targets = [i.id for i in node.targets]
-            if '__version__' in targets:
-                if isinstance(node.value, ast.Str):
-                    # Python < 3.8
-                    version = node.value.s
-                else:
-                    version = node.value.value
-                break
-    return version
-
+version = importlib.import_module('ops.version').version
+version_path = Path("ops/version.py")
+version_backup = Path("ops/version.py~")
+version_path.rename(version_backup)
+with version_path.open("wt", encoding="utf8") as fh:
+    print("# this is a generated file\n\nversion = {!r}".format(version), file=fh)
 
 setup(
     name="ops",
-    version=_get_version(),
+    version=version,
     description="The Python library behind great charms",
     long_description=_read_me(),
     long_description_content_type="text/markdown",
@@ -69,3 +56,5 @@ setup(
     python_requires='>=3.5',
     install_requires=["PyYAML"],
 )
+
+version_backup.rename(version_path)
