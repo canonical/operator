@@ -387,6 +387,74 @@ class NoTypeError(Exception):
         return "cannot restore {} since no class was registered for it".format(self.handle_path)
 
 
+# An example (and possibly quite inefficient) storage implementation that uses
+# hook tools to persist the charm state on the Juju controller
+class JujuStorage:
+
+    def __init__(self):
+        subprocess.call("juju-log 'using server-side storage provider'", shell=True)
+
+    def close(self):
+        return
+
+    def commit(self):
+        return
+
+    def save_snapshot(self, handle_path, snapshot_data):
+        self.store_key(handle_path, snapshot_data)
+
+    def load_snapshot(self, handle_path):
+        return self.load_key(handle_path)
+
+    def drop_snapshot(self, handle_path):
+        self.delete_key(handle_path)
+
+    def save_notice(self, event_path, observer_path, method_name):
+        notice_list = self.load_notice_list()
+        notice_list.append([event_path, observer_path, method_name])
+        self.store_notice_list(notice_list)
+
+    def drop_notice(self, event_path, observer_path, method_name):
+        notice_list = self.load_notice_list()
+        notice_list.remove([event_path, observer_path, method_name])
+        self.store_notice_list(notice_list)
+
+    def notices(self, event_path):
+        notice_list = self.load_notice_list()
+        if event_path:
+            notice_list = list(filter(lambda row: row[0] == event_path, notice_list))
+        for row in notice_list:
+            yield tuple(row)
+
+    def load_notice_list(self):
+        serialized_notices = self.load_key("#notices#")
+        if serialized_notices is None:
+            return []
+        return pickle.loads(serialized_notices)
+
+    def store_notice_list(self, notice_list):
+        serialized_notices = pickle.dumps(notice_list)
+        self.store_key("#notices#", serialized_notices)
+
+    def load_key(self, key):
+        # We could use yaml here but would need an external package
+        encoded_val = json.loads(subprocess.check_output(["state-get", "--format", "json", key]))
+        if not encoded_val:
+            return None
+        return base64.b64decode(encoded_val)
+
+    def store_key(self, key, value):
+        value = base64.b64encode(value)
+        p = subprocess.Popen(["state-set", "--file", "-"],
+                             stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT)
+        p.communicate(input="{}: {}".format(key, value.decode('latin1')).encode())
+
+    def delete_key(self, key):
+        subprocess.check_output(["state-delete", key])
+
+
 class SQLiteStorage:
 
     DB_LOCK_TIMEOUT = timedelta(hours=1)
