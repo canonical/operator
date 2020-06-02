@@ -1529,14 +1529,14 @@ class BreakpointTests(BaseTestCase):
         self.check_trace_set('some-breakpoint', None, 0)
         self.assertLoggedWarning(
             "Breakpoint None skipped",
-            "not found in the indicated ones: ['some-breakpoint']")
+            "not found in the requested breakpoints: ['some-breakpoint']")
 
     def test_named_indicated_somethingelse(self, fake_stderr):
         # Some breakpoint was indicated, but the framework call was with a different name
         self.check_trace_set('some-breakpoint', 'other-name', 0)
         self.assertLoggedWarning(
             "Breakpoint 'other-name' skipped",
-            "not found in the indicated ones: ['some-breakpoint']")
+            "not found in the requested breakpoints: ['some-breakpoint']")
 
     def test_named_indicated_ingroup(self, fake_stderr):
         # A multiple breakpoint was indicated, and the framework call used a name among those.

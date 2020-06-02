@@ -812,7 +812,7 @@ class Framework(Object):
             pdb.Pdb().set_trace(code_frame)
         else:
             logger.warning(
-                "Breakpoint %r skipped (not found in the indicated ones: %s)",
+                "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
                 name, indicated_breakpoints)
 
 
