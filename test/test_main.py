@@ -183,9 +183,12 @@ get-model-name:
 
     def _simulate_event(self, event_spec):
         ppath = Path(__file__).parent
+        pypath = str(ppath.parent)
+        if 'PYTHONPATH' in os.environ:
+            pypath += ':' + os.environ['PYTHONPATH']
         env = {
             'PATH': "{}:{}".format(ppath / 'bin', os.environ['PATH']),
-            'PYTHONPATH': str(ppath.parent),
+            'PYTHONPATH': pypath,
             'JUJU_CHARM_DIR': str(self.JUJU_CHARM_DIR),
             'JUJU_UNIT_NAME': 'test_main/0',
             'CHARM_CONFIG': event_spec.charm_config,
