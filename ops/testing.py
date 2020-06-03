@@ -163,7 +163,8 @@ class Harness:
 
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
 
-    def add_oci_resource(self, resource_name: str, contents: typing.Mapping = None) -> None:
+    def add_oci_resource(self, resource_name: str,
+                         contents: typing.Mapping[str, str] = None) -> None:
         """Add oci resources to the backend.
 
         This will register an oci resource and create a temporary file for processing metadata
