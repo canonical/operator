@@ -183,7 +183,7 @@ class Harness:
             raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
         if self._meta.resources[resource_name].type != "oci-image":
             raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
-        resource_dir = self._resource_dir / "{}".format(resource_name)
+        resource_dir = self._resource_dir / resource_name
         resource_dir.mkdir(exist_ok=True)
         resource_file = resource_dir / "contents.yaml"
         with resource_file.open('w') as resource_yaml:
