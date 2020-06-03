@@ -20,6 +20,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import yaml
 
 from ops.charm import (
     CharmBase,
@@ -841,6 +842,77 @@ class TestTestingModelBackend(unittest.TestCase):
         backend = harness._backend
         with self.assertRaises(RelationNotFoundError):
             backend.relation_list(1234)
+
+    def test_populate_oci_resources(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+              image2:
+                type: oci-image
+                description: "Another image."
+            ''')
+        harness.populate_oci_resources()
+        resource = harness._resource_dir / "image" / "contents.yaml"
+        with resource.open('r') as resource_file:
+            contents = yaml.safe_load(resource_file.read())
+        self.assertEqual(contents['registrypath'], 'registrypath')
+        self.assertEqual(contents['username'], 'username')
+        self.assertEqual(contents['password'], 'password')
+        self.assertEqual(len(harness._backend._resources_map), 2)
+
+    def test_resource_folder_cleanup(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+            ''')
+        harness.populate_oci_resources()
+        resource = harness._resource_dir / "image" / "contents.yaml"
+        del harness
+        with self.assertRaises(FileNotFoundError):
+            with resource.open('r') as resource_file:
+                print("This shouldn't be here: {}".format(resource_file))
+
+    def test_add_oci_resource_custom(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+            ''')
+        custom = {
+            "registrypath": "custompath",
+            "username": "custom_username",
+            "password": "custom_password",
+            }
+        harness.add_oci_resource('image', custom)
+        resource = harness._resource_dir / "image" / "contents.yaml"
+        with resource.open('r') as resource_file:
+            contents = yaml.safe_load(resource_file.read())
+        self.assertEqual(contents['registrypath'], 'custompath')
+        self.assertEqual(contents['username'], 'custom_username')
+        self.assertEqual(contents['password'], 'custom_password')
+        self.assertEqual(len(harness._backend._resources_map), 1)
+
+    def test_add_oci_resource_no_image(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: file
+                description: "Image to deploy."
+            ''')
+        with self.assertRaises(RuntimeError):
+            harness.add_oci_resource("image")
+        with self.assertRaises(RuntimeError):
+            harness.add_oci_resource("missing-resource")
+        self.assertEqual(len(harness._backend._resources_map), 0)
 
 
 if __name__ == "__main__":

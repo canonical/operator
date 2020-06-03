@@ -15,7 +15,10 @@
 import inspect
 import pathlib
 from textwrap import dedent
+import tempfile
 import typing
+import yaml
+import weakref
 
 from ops import charm, framework, model
 
@@ -65,6 +68,7 @@ class Harness:
         self._charm_cls = charm_cls
         self._charm = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
+        self._lazy_resource_dir = None
         self._meta = self._create_meta(meta, actions)
         self._unit_name = self._meta.name + '/0'
         self._framework = None
@@ -92,6 +96,16 @@ class Harness:
     def framework(self) -> framework.Framework:
         """Return the Framework that is being driven by this Harness."""
         return self._framework
+
+    @property
+    def _resource_dir(self) -> pathlib.Path:
+        if self._lazy_resource_dir is not None:
+            return self._lazy_resource_dir
+
+        self.__resource_dir = tempfile.TemporaryDirectory()
+        self._lazy_resource_dir = pathlib.Path(self.__resource_dir.name)
+        self._finalizer = weakref.finalize(self, self.__resource_dir.cleanup)
+        return self._lazy_resource_dir
 
     def begin(self) -> None:
         """Instantiate the Charm and start handling events.
@@ -148,6 +162,40 @@ class Harness:
             action_metadata = dedent(action_metadata)
 
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
+
+    def add_oci_resource(self, resource_name: str,
+                         contents: typing.Mapping[str, str] = None) -> None:
+        """Add oci resources to the backend.
+
+        This will register an oci resource and create a temporary file for processing metadata
+        about the resource. A default set of values will be used for all the file contents
+        unless a specific contents dict is provided.
+
+        Args:
+            resource_name: Name of the resource to add custom contents to.
+            contents: Optional custom dict to write for the named resource.
+        """
+        if not contents:
+            contents = {'registrypath': 'registrypath',
+                        'username': 'username',
+                        'password': 'password',
+                        }
+        if resource_name not in self._meta.resources.keys():
+            raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
+        if self._meta.resources[resource_name].type != "oci-image":
+            raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
+        resource_dir = self._resource_dir / resource_name
+        resource_dir.mkdir(exist_ok=True)
+        resource_file = resource_dir / "contents.yaml"
+        with resource_file.open('wt', encoding='utf8') as resource_yaml:
+            yaml.dump(contents, resource_yaml)
+        self._backend._resources_map[resource_name] = resource_file
+
+    def populate_oci_resources(self) -> None:
+        """Populate all OCI resources."""
+        for name, data in self._meta.resources.items():
+            if data.type == "oci-image":
+                self.add_oci_resource(name)
 
     def disable_hooks(self) -> None:
         """Stop emitting hook events when the model changes.
