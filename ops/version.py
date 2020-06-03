@@ -19,7 +19,7 @@ __all__ = ('version',)
 
 
 def _get_version():
-    version = "UNKNOWN"
+    version = "0.7.dev+UNKNOWN"
 
     p = os.path.dirname(__file__)
     if os.path.exists(os.path.join(p, "../.git")):
