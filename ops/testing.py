@@ -186,7 +186,7 @@ class Harness:
         resource_dir = self._resource_dir / resource_name
         resource_dir.mkdir(exist_ok=True)
         resource_file = resource_dir / "contents.yaml"
-        with resource_file.open('w') as resource_yaml:
+        with resource_file.open('wt', encoding='utf8') as resource_yaml:
             yaml.dump(contents, resource_yaml)
         self._backend._resources_map[resource_name] = resource_file
 
