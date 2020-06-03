@@ -19,7 +19,6 @@ import keyword
 import marshal
 import os
 import pdb
-import pickle
 import re
 import sys
 import types

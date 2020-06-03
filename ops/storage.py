@@ -20,6 +20,7 @@ import pickle
 import shutil
 import subprocess
 import sqlite3
+import typing
 
 import yaml
 
@@ -76,12 +77,12 @@ class SQLiteStorage:
     # take the needed actions to undo their logic until the last snapshot.
     # This is doable but will increase significantly the chances for mistakes.
 
-    def save_snapshot(self, handle_path, snapshot_data):
+    def save_snapshot(self, handle_path: str, snapshot_data: typing.Any) -> None:
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(snapshot_data)
         self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, raw_data))
 
-    def load_snapshot(self, handle_path):
+    def load_snapshot(self, handle_path: str) -> typing.Any:
         c = self._db.cursor()
         c.execute("SELECT data FROM snapshot WHERE handle=?", (handle_path,))
         row = c.fetchone()
