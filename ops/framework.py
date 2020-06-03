@@ -24,6 +24,7 @@ import re
 import sqlite3
 import sys
 import types
+import typing
 import weakref
 from datetime import timedelta
 
@@ -430,16 +431,18 @@ class SQLiteStorage:
     # take the needed actions to undo their logic until the last snapshot.
     # This is doable but will increase significantly the chances for mistakes.
 
-    def save_snapshot(self, handle_path, snapshot_data):
-        self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, snapshot_data))
+    def save_snapshot(self, handle_path: str, snapshot_data: typing.Any) -> None:
+        # Use pickle for serialization, so the value remains portable.
+        raw_data = pickle.dumps(snapshot_data)
+        self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, raw_data))
 
-    def load_snapshot(self, handle_path):
+    def load_snapshot(self, handle_path: str) -> typing.Any:
         c = self._db.cursor()
         c.execute("SELECT data FROM snapshot WHERE handle=?", (handle_path,))
         row = c.fetchone()
         if row:
-            return row[0]
-        return None
+            return pickle.loads(row[0])
+        raise NoSnapshotError(handle_path)
 
     def drop_snapshot(self, handle_path):
         self._db.execute("DELETE FROM snapshot WHERE handle=?", (handle_path,))
@@ -597,9 +600,7 @@ class Framework(Object):
             msg = "unable to save the data for {}, it must contain only simple types: {!r}"
             raise ValueError(msg.format(value.__class__.__name__, data))
 
-        # Use pickle for serialization, so the value remains portable.
-        raw_data = pickle.dumps(data)
-        self._storage.save_snapshot(value.handle.path, raw_data)
+        self._storage.save_snapshot(value.handle.path, data)
 
     def load_snapshot(self, handle):
         parent_path = None
@@ -608,10 +609,7 @@ class Framework(Object):
         cls = self._type_registry.get((parent_path, handle.kind))
         if not cls:
             raise NoTypeError(handle.path)
-        raw_data = self._storage.load_snapshot(handle.path)
-        if not raw_data:
-            raise NoSnapshotError(handle.path)
-        data = pickle.loads(raw_data)
+        data = self._storage.load_snapshot(handle.path)
         obj = cls.__new__(cls)
         obj.framework = self
         obj.handle = handle
