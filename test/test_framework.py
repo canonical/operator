@@ -49,7 +49,7 @@ class TestFramework(BaseTestCase):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
 
-        patcher = patch('ops.framework.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
+        patcher = patch('ops.storage.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
         patcher.start()
         self.addCleanup(patcher.stop)
 

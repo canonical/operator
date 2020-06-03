@@ -13,11 +13,24 @@
 # limitations under the License.
 
 import base64
+import binascii
+from datetime import timedelta
 import json
 import pickle
+import shutil
 import subprocess
 import sqlite3
-from datetime import timedelta
+
+import yaml
+
+
+class NoSnapshotError(Exception):
+
+    def __init__(self, handle_path):
+        self.handle_path = handle_path
+
+    def __str__(self):
+        return 'no snapshot data found for {} object'.format(self.handle_path)
 
 
 class SQLiteStorage:
@@ -64,15 +77,18 @@ class SQLiteStorage:
     # This is doable but will increase significantly the chances for mistakes.
 
     def save_snapshot(self, handle_path, snapshot_data):
-        self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, snapshot_data))
+        # Use pickle for serialization, so the value remains portable.
+        raw_data = pickle.dumps(snapshot_data)
+        self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, raw_data))
 
     def load_snapshot(self, handle_path):
         c = self._db.cursor()
         c.execute("SELECT data FROM snapshot WHERE handle=?", (handle_path,))
         row = c.fetchone()
         if row:
-            return row[0]
-        return None
+            pickled_data = row[0]
+            return pickle.loads(pickled_data)
+        raise NoSnapshotError(handle_path)
 
     def drop_snapshot(self, handle_path):
         self._db.execute("DELETE FROM snapshot WHERE handle=?", (handle_path,))
@@ -112,9 +128,14 @@ class SQLiteStorage:
 
 
 class JujuStorage:
+    """"Storing the content tracked by the Framework in Juju.
 
-    def __init__(self):
-        subprocess.call("juju-log 'using server-side storage provider'", shell=True)
+    This uses :class:`_JujuStorageBackend` to interact with state-get/state-set
+    as the way to store state for the framework and for components.
+    """
+
+    def __init__(self, backend: '_JujuStorageBackend'):
+        self._backend = backend
 
     def close(self):
         return
@@ -122,8 +143,8 @@ class JujuStorage:
     def commit(self):
         return
 
-    def save_snapshot(self, handle_path, snapshot_data):
-        self.store_key(handle_path, snapshot_data)
+    def save_snapshot(self, handle_path: str, snapshot_data: bytes) -> None:
+        self._backend.set(handle_path, snapshot_data)
 
     def load_snapshot(self, handle_path):
         return self.load_key(handle_path)
@@ -175,3 +196,70 @@ class JujuStorage:
 
     def delete_key(self, key):
         subprocess.check_output(["state-delete", key])
+
+
+class _JujuStorageBackend:
+    """Implements the interface from the Operator framework to Juju's state-get/set/etc."""
+
+    @staticmethod
+    def is_available() -> bool:
+        """Check if Juju state storage is available.
+
+        This checks if there is a 'state-get' executable in PATH.
+        """
+        p = shutil.which('state-get')
+        return p is not None
+
+    @staticmethod
+    def set(key: str, value: bytes) -> None:
+        """Set a key to a given bytes value.
+
+        Args:
+            key: The string key that will be used to find the value later
+            value: Arbitrary bytes that will be returned by get().
+        Raises:
+            CalledProcessError: if 'state-set' returns an error code.
+        """
+        # encoded = base64.b64encode(value).decode('ascii')
+        # content = yaml.dump({key: encoded}, encoding='utf-8')
+        content = yaml.dump({key: value}, encoding='utf-8')
+        # Note: 'capture_output' would be good here, but was added in Python 3.7
+        p = subprocess.run(["state-set", "--file", "-"], input=content)
+        p.check_returncode()
+
+    @staticmethod
+    def get(key: str) -> bytes:
+        """Get the bytes value associated with a given key.
+
+        Args:
+            key: The string key that will be used to find the value
+        Raises:
+            CalledProcessError: if 'state-get' returns an error code.
+        """
+        # Note: 'capture_output' would be good here, but was added in Python 3.7
+        p = subprocess.run(
+            ["state-get", key],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        p.check_returncode()
+        try:
+            content = base64.b64decode(p.stdout)
+        except binascii.Error as e:
+            # TODO: translate non b64 content into a better error
+            import pdb
+            pdb.set_trace()
+            raise
+        return content
+
+    @staticmethod
+    def delete(key: str) -> None:
+        """Remove a key from being tracked.
+
+        Args:
+            key: The key to stop storing
+        Raises:
+            CalledProcessError: if 'state-delete' returns an error code.
+        """
+        p = subprocess.run(["state-delete", key])
+        p.check_returncode()

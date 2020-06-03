@@ -26,7 +26,10 @@ import types
 import weakref
 
 from ops import charm
-from ops.storage import SQLiteStorage
+from ops.storage import (
+    NoSnapshotError,
+    SQLiteStorage,
+)
 
 
 class Handle:
@@ -368,15 +371,6 @@ class FrameworkEvents(ObjectEvents):
     commit = EventSource(CommitEvent)
 
 
-class NoSnapshotError(Exception):
-
-    def __init__(self, handle_path):
-        self.handle_path = handle_path
-
-    def __str__(self):
-        return 'no snapshot data found for {} object'.format(self.handle_path)
-
-
 class NoTypeError(Exception):
 
     def __init__(self, handle_path):
@@ -505,9 +499,7 @@ class Framework(Object):
             msg = "unable to save the data for {}, it must contain only simple types: {!r}"
             raise ValueError(msg.format(value.__class__.__name__, data))
 
-        # Use pickle for serialization, so the value remains portable.
-        raw_data = pickle.dumps(data)
-        self._storage.save_snapshot(value.handle.path, raw_data)
+        self._storage.save_snapshot(value.handle.path, data)
 
     def load_snapshot(self, handle):
         parent_path = None
@@ -516,10 +508,7 @@ class Framework(Object):
         cls = self._type_registry.get((parent_path, handle.kind))
         if not cls:
             raise NoTypeError(handle.path)
-        raw_data = self._storage.load_snapshot(handle.path)
-        if not raw_data:
-            raise NoSnapshotError(handle.path)
-        data = pickle.loads(raw_data)
+        data = self._storage.load_snapshot(handle.path)
         obj = cls.__new__(cls)
         obj.framework = self
         obj.handle = handle
