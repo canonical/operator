@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
-import binascii
 from datetime import timedelta
-import json
 import pickle
 import shutil
 import subprocess
@@ -171,14 +168,13 @@ class JujuStorage:
             yield tuple(row)
 
     def load_notice_list(self):
-        serialized_notices = self.load_key("#notices#")
+        serialized_notices = self._backend.get("#notices#")
         if serialized_notices is None:
             return []
-        return pickle.loads(serialized_notices)
+        return serialized_notices
 
     def store_notice_list(self, notice_list):
-        serialized_notices = pickle.dumps(notice_list)
-        self.store_key("#notices#", serialized_notices)
+        self.self._backend.set("#notices#", notice_list)
 
 
 class _SimpleLoader(yaml.SafeLoader):

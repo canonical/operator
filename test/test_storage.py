@@ -14,7 +14,6 @@
 
 import abc
 import gc
-import sys
 import tempfile
 from textwrap import dedent
 
