@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import abc
-import base64
-import pickle
+import gc
+import sys
 import tempfile
 from textwrap import dedent
 
@@ -53,10 +53,14 @@ class StoragePermutations(abc.ABC):
                 self.__dict__.update(snapshot)
 
         f.register_type(Sample, None, Sample.handle_kind)
-        s = Sample(f, 'test', {'test': 1})
+        content = {'test': 1}
+        s = Sample(f, 'test', content)
+        handle = s.handle
         f.save_snapshot(s)
-        res = f.load_snapshot(s.handle)
-        self.assertEqual(s.content, res.content)
+        del s
+        gc.collect()
+        res = f.load_snapshot(handle)
+        self.assertEqual(content, res.content)
 
 
 class TestSQLiteStorage(StoragePermutations, BaseTestCase):
@@ -75,7 +79,7 @@ class _MemoryStorageBackend:
         self._calls.append(('set', key, value))
         self._values[key] = value
 
-    def get(self, key, value):
+    def get(self, key):
         self._calls.append(('get', key))
         return self._values[key]
 
@@ -93,7 +97,57 @@ class TestJujuStorage(StoragePermutations, BaseTestCase):
         return f
 
 
+python_state_set = '''#!{executable}
+import sys
+import yaml
+
+assert sys.argv[1:] == ['--file', '-']
+
+with open({filename!r}, 'r+b') as saved:
+    content = yaml.load(saved)
+    if content is None:
+        content = {{}}
+    more = yaml.load(sys.stdin.buffer.read())
+    content.update(more)
+    out.seek(0)
+    out.truncate()
+    out.write(yaml.dump(existing)
+'''
+
+python_state_get = '''#!{executable}
+import sys
+import yaml
+
+with open({filename!r}, 'rb') as saved:
+    content = yaml.load(saved)
+    if len(sys.argv) == 1:
+        yaml.dump(content, sys.stdout)
+    else:
+        sys.stdout.write('{{}}'.format(content[sys.argv[1]]))
+'''
+
+python_state_delete = '''#!{executable}
+import sys
+import yaml
+
+assert len(sys.argv) == 2
+with open({filename!r}, 'r+b') as saved:
+    content = yaml.load(saved)
+    if len(sys.argv) == 1:
+        yaml.dump(content, sys.stdout)
+    else:
+        sys.stdout.write('{{}}'.format(content[sys.argv[1]]))
+'''
+
+
 class TestJujuStateBackend(BaseTestCase):
+
+    def setUpPythonStateScripts(self):
+        t = tempfile.NamedTemporaryFile()
+        template_args = {'executable': sys.executable, 'filename': t.name}
+        fake_script(self, 'state-get', python_state_get.format(**template_args))
+        fake_script(self, 'state-set', python_state_set.format(**template_args))
+        fake_script(self, 'state-delete', python_state_delete.format(**template_args))
 
     def test_is_not_available(self):
         self.assertFalse(storage._JujuStorageBackend.is_available())
@@ -110,41 +164,34 @@ class TestJujuStateBackend(BaseTestCase):
             cat >> {}
             """).format(t.name))
         backend = storage._JujuStorageBackend()
-        backend.set('key', b'value')
+        backend.set('key', {'foo': 2})
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['state-set', '--file', '-'],
         ])
         t.seek(0)
         content = t.read()
-        self.assertEqual(content, b"key: dmFsdWU=")
-        self.assertEqual(base64.b64decode(content[5:]), b"value")
+        self.assertEqual(content.decode('utf-8'), dedent("""\
+            {key: '{foo: 2}
+
+                '}
+            """))
 
     def test_get(self):
         fake_script(self, 'state-get', dedent("""
             #!/bin/sh
-            echo 'dmFsdWU='
+            echo 'foo: "bar"'
             """))
         backend = storage._JujuStorageBackend()
         value = backend.get('key')
-        self.assertEqual(value, b'value')
+        self.assertEqual(value, {'foo': 'bar'})
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['state-get', 'key'],
         ])
 
-    def test_round_trip_pickle(self):
-        value = {'foo': [1, 2, 3], 5: set('a')}
-        pickled = pickle.dumps(value)
-        t = tempfile.NamedTemporaryFile()
-        fake_script(self, 'state-set', dedent("""
-            #!/bin/sh
-            cat >> {}
-            """).format(t.name))
-        fake_script(self, 'state-get', dedent("""
-            #!/bin/sh
-            cat {}
-        """).format(t.name))
+    def test_fake_backend(self):
+        self.setUpPythonStateScripts()
         backend = storage._JujuStorageBackend()
-        backend.set('key', pickled)
-        result = backend.get('key')
-        unpickled = pickle.loads(result)
-        self.assertEqual(unpickled, value)
+        values = {'k': 'v', 2: 10, ('a', 'b'): {1, 2, 3}}
+        backend.set('foo', values)
+        res = backend.get('foo')
+        self.assertEqual(res, values)

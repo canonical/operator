@@ -144,14 +144,14 @@ class JujuStorage:
     def commit(self):
         return
 
-    def save_snapshot(self, handle_path: str, snapshot_data: bytes) -> None:
+    def save_snapshot(self, handle_path: str, snapshot_data: typing.Any) -> None:
         self._backend.set(handle_path, snapshot_data)
 
     def load_snapshot(self, handle_path):
-        return self.load_key(handle_path)
+        return self._backend.get(handle_path)
 
     def drop_snapshot(self, handle_path):
-        self.delete_key(handle_path)
+        self._backend.delete(handle_path)
 
     def save_notice(self, event_path, observer_path, method_name):
         notice_list = self.load_notice_list()
@@ -180,24 +180,6 @@ class JujuStorage:
         serialized_notices = pickle.dumps(notice_list)
         self.store_key("#notices#", serialized_notices)
 
-    def load_key(self, key):
-        # We could use yaml here but would need an external package
-        encoded_val = json.loads(subprocess.check_output(["state-get", "--format", "json", key]))
-        if not encoded_val:
-            return None
-        return base64.b64decode(encoded_val)
-
-    def store_key(self, key, value):
-        value = base64.b64encode(value)
-        p = subprocess.Popen(["state-set", "--file", "-"],
-                             stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT)
-        p.communicate(input="{}: {}".format(key, value.decode('latin1')).encode())
-
-    def delete_key(self, key):
-        subprocess.check_output(["state-delete", key])
-
 
 class _JujuStorageBackend:
     """Implements the interface from the Operator framework to Juju's state-get/set/etc."""
@@ -211,8 +193,7 @@ class _JujuStorageBackend:
         p = shutil.which('state-get')
         return p is not None
 
-    @staticmethod
-    def set(key: str, value: bytes) -> None:
+    def set(self, key: str, value: typing.Any) -> None:
         """Set a key to a given bytes value.
 
         Args:
@@ -221,15 +202,13 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-set' returns an error code.
         """
-        # encoded = base64.b64encode(value).decode('ascii')
-        # content = yaml.dump({key: encoded}, encoding='utf-8')
-        content = yaml.dump({key: value}, encoding='utf-8')
+        encoded_value = yaml.dump(value)
+        content = yaml.dump({key: encoded_value}, encoding='utf-8')
         # Note: 'capture_output' would be good here, but was added in Python 3.7
         p = subprocess.run(["state-set", "--file", "-"], input=content)
         p.check_returncode()
 
-    @staticmethod
-    def get(key: str) -> bytes:
+    def get(self, key: str) -> typing.Any:
         """Get the bytes value associated with a given key.
 
         Args:
@@ -244,17 +223,10 @@ class _JujuStorageBackend:
             stderr=subprocess.STDOUT,
         )
         p.check_returncode()
-        try:
-            content = base64.b64decode(p.stdout)
-        except binascii.Error as e:
-            # TODO: translate non b64 content into a better error
-            import pdb
-            pdb.set_trace()
-            raise
+        content = yaml.safe_load(p.stdout)
         return content
 
-    @staticmethod
-    def delete(key: str) -> None:
+    def delete(self, key: str) -> None:
         """Remove a key from being tracked.
 
         Args:
