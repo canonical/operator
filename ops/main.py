@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import os
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 
 import yaml
@@ -298,7 +300,17 @@ def main(charm_class):
     charm_state_path = charm_dir / CHARM_STATE_FILE
     framework = ops.framework.Framework(charm_state_path, charm_dir, meta, model)
     try:
-        charm = charm_class(framework)
+        sig = inspect.signature(charm_class)
+        try:
+            sig.bind(framework)
+        except TypeError:
+            msg = (
+                "the second argument, 'key', has been deprecated and will be "
+                "removed after the 0.7 release")
+            warnings.warn(msg, DeprecationWarning)
+            charm = charm_class(framework, None)
+        else:
+            charm = charm_class(framework)
         dispatcher.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant

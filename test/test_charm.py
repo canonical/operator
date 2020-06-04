@@ -1,5 +1,4 @@
-#!/usr/bin/python3
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -320,7 +319,3 @@ start:
 
     def test_action_event_defer_fails(self):
         self._test_action_event_defer_fails('action')
-
-
-if __name__ == "__main__":
-    unittest.main()

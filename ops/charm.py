@@ -335,14 +335,12 @@ class CharmBase(Object):
     Args:
         framework: The framework responsible for managing the Model and events for this
             Charm.
+        key: Ignored; will remove after deprecation period of the signature change.
     """
 
     on = CharmEvents()
 
-    def __init__(self, framework: Framework):
-        """Initialize the Charm with its framework and application name.
-
-        """
+    def __init__(self, framework: Framework, key: typing.Optional = None):
         super().__init__(framework, None)
 
         for relation_name in self.framework.meta.relations:
