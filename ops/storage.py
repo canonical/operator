@@ -181,6 +181,35 @@ class JujuStorage:
         self.store_key("#notices#", serialized_notices)
 
 
+class _SimpleLoader(yaml.SafeLoader):
+    """Handle a couple basic python types.
+
+    yaml.SafeLoader can handle all the basic int/float/dict/set/etc that we want. The only one
+    that it *doesn't* handle is tuples. We don't want to support arbitrary types, so we just
+    subclass SafeLoader and add tuples back in.
+    """
+    # Taken from the example at:
+    # https://stackoverflow.com/questions/9169025/how-can-i-add-a-python-tuple-to-a-yaml-file-using-pyyaml
+
+
+_SimpleLoader.construct_python_tuple = yaml.Loader.construct_python_tuple
+_SimpleLoader.add_constructor(
+    u'tag:yaml.org,2002:python/tuple',
+    _SimpleLoader.construct_python_tuple)
+
+
+class _SimpleDumper(yaml.SafeDumper):
+    """Add types supported by 'marshal'
+
+    YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So
+    we want to only support dumping out types that are safe to load.
+    """
+
+
+_SimpleDumper.represent_tuple = yaml.Dumper.represent_tuple
+_SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)
+
+
 class _JujuStorageBackend:
     """Implements the interface from the Operator framework to Juju's state-get/set/etc."""
 
@@ -202,8 +231,9 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-set' returns an error code.
         """
-        encoded_value = yaml.dump(value).strip()
-        content = yaml.dump({key: encoded_value}, encoding='utf-8', default_flow_style=False)
+        encoded_value = yaml.dump(value, Dumper=_SimpleDumper)
+        content = yaml.safe_dump({key: encoded_value}, encoding='utf-8',
+                                 default_style='|', default_flow_style=False)
         # Note: 'capture_output' would be good here, but was added in Python 3.7
         p = subprocess.run(["state-set", "--file", "-"], input=content)
         p.check_returncode()
@@ -223,8 +253,7 @@ class _JujuStorageBackend:
             stderr=subprocess.STDOUT,
         )
         p.check_returncode()
-        content = yaml.safe_load(p.stdout)
-        return content
+        return yaml.load(p.stdout, Loader=_SimpleLoader)
 
     def delete(self, key: str) -> None:
         """Remove a key from being tracked.

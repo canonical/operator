@@ -53,7 +53,15 @@ class StoragePermutations(abc.ABC):
                 self.__dict__.update(snapshot)
 
         f.register_type(Sample, None, Sample.handle_kind)
-        content = {'test': 1}
+        content = {
+            'str': 'string',
+            'bytes': b'bytes',
+            'int': 1,
+            'float': 3.0,
+            'dict': {'a': 'b'},
+            'set': {'a', 'b'},
+            'list': [1, 2],
+        }
         s = Sample(f, 'test', content)
         handle = s.handle
         f.save_snapshot(s)
@@ -110,7 +118,6 @@ class TestJujuStateBackend(BaseTestCase):
     def test_set_encodes_args(self):
         t = tempfile.NamedTemporaryFile()
         fake_script(self, 'state-set', dedent("""
-            #!/bin/sh
             cat >> {}
             """).format(t.name))
         backend = storage._JujuStorageBackend()
@@ -121,12 +128,12 @@ class TestJujuStateBackend(BaseTestCase):
         t.seek(0)
         content = t.read()
         self.assertEqual(content.decode('utf-8'), dedent("""\
-            key: '{foo: 2}'
+            "key": |
+              {foo: 2}
             """))
 
     def test_get(self):
         fake_script(self, 'state-get', dedent("""
-            #!/bin/sh
             echo 'foo: "bar"'
             """))
         backend = storage._JujuStorageBackend()
@@ -139,7 +146,6 @@ class TestJujuStateBackend(BaseTestCase):
     def test_set_and_get_complex_value(self):
         t = tempfile.NamedTemporaryFile()
         fake_script(self, 'state-set', dedent("""
-            #!/bin/sh
             cat >> {}
             """).format(t.name))
         backend = storage._JujuStorageBackend()
@@ -149,6 +155,7 @@ class TestJujuStateBackend(BaseTestCase):
             'four': {2, 3},
             'five': {'a': 2, 'b': 3.0},
             'six': ('a', 'b'),
+            'seven': b'1234',
         }
         backend.set('Class[foo]/_stored', complex_val)
         self.assertEqual(fake_script_calls(self, clear=True), [
@@ -157,13 +164,26 @@ class TestJujuStateBackend(BaseTestCase):
         t.seek(0)
         content = t.read()
         self.assertEqual(content.decode('utf-8'), dedent("""\
-            Class[foo]/_stored: 'foo: 2
-
-              3: [1, 2, ''3'']
-
+            "Class[foo]/_stored": |
+              foo: 2
+              3: [1, 2, '3']
               four: !!set {2: null, 3: null}
-
               five: {a: 2, b: 3.0}
-
-              six: !!python/tuple [a, b]'
+              six: !!python/tuple [a, b]
+              seven: !!binary |
+                MTIzNA==
             """))
+        # Note that the content is yaml in a string, embedded inside YAML to declare the Key:
+        # Value of where to store the entry.
+        fake_script(self, 'state-get', dedent("""
+            echo "foo: 2
+            3: [1, 2, '3']
+            four: !!set {2: null, 3: null}
+            five: {a: 2, b: 3.0}
+            six: !!python/tuple [a, b]
+            seven: !!binary |
+              MTIzNA==
+            "
+        """))
+        out = backend.get('Class[foo]/_stored')
+        self.assertEqual(out, complex_val)
