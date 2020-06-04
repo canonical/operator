@@ -97,57 +97,7 @@ class TestJujuStorage(StoragePermutations, BaseTestCase):
         return f
 
 
-python_state_set = '''#!{executable}
-import sys
-import yaml
-
-assert sys.argv[1:] == ['--file', '-']
-
-with open({filename!r}, 'r+b') as saved:
-    content = yaml.load(saved)
-    if content is None:
-        content = {{}}
-    more = yaml.load(sys.stdin.buffer.read())
-    content.update(more)
-    out.seek(0)
-    out.truncate()
-    out.write(yaml.dump(existing)
-'''
-
-python_state_get = '''#!{executable}
-import sys
-import yaml
-
-with open({filename!r}, 'rb') as saved:
-    content = yaml.load(saved)
-    if len(sys.argv) == 1:
-        yaml.dump(content, sys.stdout)
-    else:
-        sys.stdout.write('{{}}'.format(content[sys.argv[1]]))
-'''
-
-python_state_delete = '''#!{executable}
-import sys
-import yaml
-
-assert len(sys.argv) == 2
-with open({filename!r}, 'r+b') as saved:
-    content = yaml.load(saved)
-    if len(sys.argv) == 1:
-        yaml.dump(content, sys.stdout)
-    else:
-        sys.stdout.write('{{}}'.format(content[sys.argv[1]]))
-'''
-
-
 class TestJujuStateBackend(BaseTestCase):
-
-    def setUpPythonStateScripts(self):
-        t = tempfile.NamedTemporaryFile()
-        template_args = {'executable': sys.executable, 'filename': t.name}
-        fake_script(self, 'state-get', python_state_get.format(**template_args))
-        fake_script(self, 'state-set', python_state_set.format(**template_args))
-        fake_script(self, 'state-delete', python_state_delete.format(**template_args))
 
     def test_is_not_available(self):
         self.assertFalse(storage._JujuStorageBackend.is_available())
@@ -171,9 +121,7 @@ class TestJujuStateBackend(BaseTestCase):
         t.seek(0)
         content = t.read()
         self.assertEqual(content.decode('utf-8'), dedent("""\
-            {key: '{foo: 2}
-
-                '}
+            key: '{foo: 2}'
             """))
 
     def test_get(self):
@@ -188,10 +136,34 @@ class TestJujuStateBackend(BaseTestCase):
             ['state-get', 'key'],
         ])
 
-    def test_fake_backend(self):
-        self.setUpPythonStateScripts()
+    def test_set_and_get_complex_value(self):
+        t = tempfile.NamedTemporaryFile()
+        fake_script(self, 'state-set', dedent("""
+            #!/bin/sh
+            cat >> {}
+            """).format(t.name))
         backend = storage._JujuStorageBackend()
-        values = {'k': 'v', 2: 10, ('a', 'b'): {1, 2, 3}}
-        backend.set('foo', values)
-        res = backend.get('foo')
-        self.assertEqual(res, values)
+        complex_val = {
+            'foo': 2,
+            3: [1, 2, '3'],
+            'four': {2, 3},
+            'five': {'a': 2, 'b': 3.0},
+            'six': ('a', 'b'),
+        }
+        backend.set('Class[foo]/_stored', complex_val)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['state-set', '--file', '-'],
+        ])
+        t.seek(0)
+        content = t.read()
+        self.assertEqual(content.decode('utf-8'), dedent("""\
+            Class[foo]/_stored: 'foo: 2
+
+              3: [1, 2, ''3'']
+
+              four: !!set {2: null, 3: null}
+
+              five: {a: 2, b: 3.0}
+
+              six: !!python/tuple [a, b]'
+            """))

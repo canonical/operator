@@ -202,8 +202,8 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-set' returns an error code.
         """
-        encoded_value = yaml.dump(value)
-        content = yaml.dump({key: encoded_value}, encoding='utf-8')
+        encoded_value = yaml.dump(value).strip()
+        content = yaml.dump({key: encoded_value}, encoding='utf-8', default_flow_style=False)
         # Note: 'capture_output' would be good here, but was added in Python 3.7
         p = subprocess.run(["state-set", "--file", "-"], input=content)
         p.check_returncode()
