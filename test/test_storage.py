@@ -187,3 +187,8 @@ class TestJujuStateBackend(BaseTestCase):
         """))
         out = backend.get('Class[foo]/_stored')
         self.assertEqual(out, complex_val)
+
+    # TODO: Add tests for things we don't want to support. eg, YAML that has custom types should
+    #  be properly forbidden.
+    # TODO: Tests for state-set/get/delete and how they handle if you ask to delete something
+    #  that doesn't exist, or get something that doesn't exist, etc.
