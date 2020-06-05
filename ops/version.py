@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os.path
 import subprocess
+from pathlib import Path
 
 __all__ = ('version',)
 
@@ -21,8 +21,8 @@ __all__ = ('version',)
 def _get_version():
     version = "0.7.dev+UNKNOWN"
 
-    p = os.path.dirname(__file__)
-    if os.path.exists(os.path.join(p, "../.git")):
+    p = Path(__file__).parent
+    if (p.parent / '.git').exists():
         try:
             proc = subprocess.run(
                 ['git', 'describe', '--tags', '--long', '--dirty'],
@@ -36,10 +36,10 @@ def _get_version():
             version = proc.stdout.strip().decode('utf8')
             if '-' in version:
                 # version will look like <tag>-<#commits>-g<hex>[-dirty]
-                # everything after the first - is a 'local version' in PEP440 terms
-                # so mangle it to fit that spec
-                s = version.split('-', 1)
-                version = s[0] + '+' + s[1].replace('-', '.')
+                # in terms of PEP 440, the tag we'll make sure is a 'public version identifier';
+                # everything after the first - needs to be a 'local version'
+                public, local = version.split('-', 1)
+                version = public + '+' + local.replace('-', '.')
                 # version now <tag>+<#commits>.g<hex>[.dirty]
                 # which is PEP440-compliant (as long as <tag> is :-)
     return version
