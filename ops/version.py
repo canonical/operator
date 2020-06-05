@@ -17,9 +17,11 @@ from pathlib import Path
 
 __all__ = ('version',)
 
+_FALLBACK = '0.7'  # this gets bumped after release
+
 
 def _get_version():
-    version = "0.7.dev+UNKNOWN"
+    version = _FALLBACK + ".dev+UNKNOWN"
 
     p = Path(__file__).parent
     if (p.parent / '.git').exists():
