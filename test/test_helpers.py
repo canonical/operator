@@ -39,12 +39,9 @@ def fake_script(test_case, name, content):
 
     with (test_case.fake_script_path / name).open('wt') as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
-        # \x1e (\U001E) is "record separator" which seems like a reasonable one to use for this
-        # note we need something a little bit fancy to support multilines
-        # without having to worry about escaping things in the common case
-        # (if you want to look at the 'escaping' route, look at printf %q)
+        # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
         f.write('''#!/bin/bash
-{ echo -n $(basename $0); printf "\x1e%s" "$@"; echo; echo %%; echo; } >> $(dirname $0)/calls.txt
+{ echo -n $(basename $0); printf "\\x1e%s" "$@"; printf "\\x1c"; } >> $(dirname $0)/calls.txt
 ''' + content)
     os.chmod(str(test_case.fake_script_path / name), 0o755)
 
@@ -52,7 +49,7 @@ def fake_script(test_case, name, content):
 def fake_script_calls(test_case, clear=False):
     try:
         with (test_case.fake_script_path / 'calls.txt').open('r+t') as f:
-            calls = [line.split('\x1e') for line in f.read().split('\n%%\n\n')[:-1]]
+            calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]
             if clear:
                 f.truncate(0)
             return calls
