@@ -132,7 +132,7 @@ class Harness:
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
-        self._charm = TestCharm(self._framework, self._framework.meta.name)
+        self._charm = TestCharm(self._framework)
 
     def _create_meta(self, charm_metadata, action_metadata):
         """Create a CharmMeta object.

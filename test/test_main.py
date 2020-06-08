@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +23,9 @@ import sys
 import tempfile
 import unittest
 import importlib.util
+import warnings
 from pathlib import Path
+from unittest.mock import patch
 
 from ops.charm import (
     CharmBase,
@@ -45,6 +46,7 @@ from ops.charm import (
     ActionEvent,
     CollectMetricsEvent,
 )
+from ops.main import main
 
 from .test_helpers import fake_script, fake_script_calls
 
@@ -71,6 +73,62 @@ class EventSpec:
         self.remote_unit = remote_unit
         self.charm_config = charm_config
         self.model_name = model_name
+
+
+class CharmInitTestCase(unittest.TestCase):
+
+    def _check(self, charm_class):
+        """Helper for below tests."""
+        fake_environ = {
+            'JUJU_UNIT_NAME': 'test_main/0',
+            'JUJU_MODEL_NAME': 'mymodel',
+        }
+        with patch.dict(os.environ, fake_environ):
+            with patch('ops.main._emit_charm_event'):
+                with patch('ops.main._get_charm_dir') as mock_charmdir:
+                    with tempfile.TemporaryDirectory() as tmpdirname:
+                        tmpdirname = Path(tmpdirname)
+                        fake_metadata = tmpdirname / 'metadata.yaml'
+                        with fake_metadata.open('wb') as fh:
+                            fh.write(b'name: test')
+                        mock_charmdir.return_value = tmpdirname
+
+                        with warnings.catch_warnings(record=True) as warnings_cm:
+                            main(charm_class)
+
+        return warnings_cm
+
+    def test_init_signature_passthrough(self):
+        class MyCharm(CharmBase):
+
+            def __init__(self, *args):
+                super().__init__(*args)
+
+        warn_cm = self._check(MyCharm)
+        self.assertFalse(warn_cm)
+
+    def test_init_signature_both_arguments(self):
+        class MyCharm(CharmBase):
+
+            def __init__(self, framework, somekey):
+                super().__init__(framework, somekey)
+
+        warn_cm = self._check(MyCharm)
+        self.assertEqual(len(warn_cm), 1)
+        (warn,) = warn_cm
+        self.assertTrue(issubclass(warn.category, DeprecationWarning))
+        self.assertEqual(str(warn.message), (
+            "the second argument, 'key', has been deprecated and will be removed "
+            "after the 0.7 release"))
+
+    def test_init_signature_only_framework(self):
+        class MyCharm(CharmBase):
+
+            def __init__(self, framework):
+                super().__init__(framework)
+
+        warn_cm = self._check(MyCharm)
+        self.assertFalse(warn_cm)
 
 
 class TestMain(abc.ABC):
@@ -547,6 +605,16 @@ log_debug: {}
         self.assertEqual(state['status_name'], 'blocked')
         self.assertEqual(state['status_message'], 'help meeee')
 
+    def test_foo(self):
+        # base64 encoding is used to avoid null bytes.
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+        }))
+
+        # First run "install" to make sure all hooks are set up.
+        state = self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
+        self.assertEqual(state['observed_event_types'], [InstallEvent])
+
 
 class TestMainWithNoDispatch(TestMain, unittest.TestCase):
     has_dispatch = False
@@ -801,7 +869,3 @@ class TestMainWithDispatchAsScript(TestMainWithDispatch):
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
         subprocess.check_call([str(dispatch)],
                               env=env, cwd=str(self.JUJU_CHARM_DIR))
-
-
-if __name__ == "__main__":
-    unittest.main()

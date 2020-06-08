@@ -335,18 +335,13 @@ class CharmBase(Object):
     Args:
         framework: The framework responsible for managing the Model and events for this
             Charm.
-        key: Arbitrary key to distinguish this instance of CharmBase from another.
-            Generally is None when initialized by the framework. For charms instantiated by
-            main.main(), this is currenly None.
+        key: Ignored; will remove after deprecation period of the signature change.
     """
 
     on = CharmEvents()
 
-    def __init__(self, framework: Framework, key: typing.Optional[str]):
-        """Initialize the Charm with its framework and application name.
-
-        """
-        super().__init__(framework, key)
+    def __init__(self, framework: Framework, key: typing.Optional = None):
+        super().__init__(framework, None)
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')

@@ -1,5 +1,4 @@
-#!/usr/bin/python3
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,7 +83,7 @@ class TestCharm(unittest.TestCase):
         self.assertIn('custom', events)
 
         framework = self.create_framework()
-        charm = MyCharm(framework, None)
+        charm = MyCharm(framework)
         charm.on.start.emit()
 
         self.assertEqual(charm.started, True)
@@ -98,7 +97,7 @@ class TestCharm(unittest.TestCase):
         class MyCharm(CharmBase):
             pass
 
-        charm = MyCharm(framework, None)
+        charm = MyCharm(framework)
         self.assertEqual(charm.app, framework.model.app)
         self.assertEqual(charm.unit, framework.model.unit)
         self.assertEqual(charm.meta, framework.meta)
@@ -142,7 +141,7 @@ peers:
    interface: peer2
 ''')
 
-        charm = MyCharm(self.create_framework(), None)
+        charm = MyCharm(self.create_framework())
 
         rel = charm.framework.model.get_relation('req1', 1)
         unit = charm.framework.model.get_unit('remote/0')
@@ -212,7 +211,7 @@ storage:
         self.assertEqual(self.meta.storages['stor3'].multiple_range, (2, None))
         self.assertEqual(self.meta.storages['stor-4'].multiple_range, (2, 4))
 
-        charm = MyCharm(self.create_framework(), None)
+        charm = MyCharm(self.create_framework())
 
         charm.on['stor1'].storage_attached.emit()
         charm.on['stor2'].storage_detaching.emit()
@@ -274,7 +273,7 @@ start:
 
         os.environ['JUJU_{}_NAME'.format(cmd_type.upper())] = 'foo-bar'
         framework = self.create_framework()
-        charm = MyCharm(framework, None)
+        charm = MyCharm(framework)
 
         events = list(MyCharm.on.events())
         self.assertIn('foo_bar_action', events)
@@ -313,14 +312,10 @@ start:
 
         os.environ['JUJU_{}_NAME'.format(cmd_type.upper())] = 'start'
         framework = self.create_framework()
-        charm = MyCharm(framework, None)
+        charm = MyCharm(framework)
 
         with self.assertRaises(RuntimeError):
             charm.on.start_action.emit()
 
     def test_action_event_defer_fails(self):
         self._test_action_event_defer_fails('action')
-
-
-if __name__ == "__main__":
-    unittest.main()
