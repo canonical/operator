@@ -99,6 +99,9 @@ class Charm(CharmBase):
             self.framework.observe(self.on.log_info_action, self._on_log_info_action)
             self.framework.observe(self.on.log_debug_action, self._on_log_debug_action)
 
+        if self._charm_config.get('TRY_EXCEPTHOOK'):
+            raise RuntimeError("failing as requested")
+
     def _write_state(self):
         """Write state variables so that the parent process can read them.
 

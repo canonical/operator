@@ -561,6 +561,33 @@ log_debug: {}
             self._simulate_event(event_spec)
             self.assertIn(calls, fake_script_calls(self, clear=True))
 
+    def test_excepthook(self):
+        charm_config = base64.b64encode(pickle.dumps({
+            'STATE_FILE': self._state_file,
+            'TRY_EXCEPTHOOK': True,
+        }))
+        with self.assertRaises(subprocess.CalledProcessError):
+            self._simulate_event(EventSpec(InstallEvent, 'install',
+                                           charm_config=charm_config))
+
+        calls = [' '.join(i) for i in fake_script_calls(self)]
+
+        if self.has_dispatch:
+            self.assertEqual(
+                calls.pop(0),
+                'juju-log --log-level DEBUG Legacy hooks/install does not exist.')
+
+        self.maxDiff = None
+        self.assertRegex(
+            calls[0],
+            '(?ms)juju-log --log-level ERROR Uncaught exception while in charm code:\n'
+            'Traceback .most recent call last.:\n'
+            '  .*'
+            '    raise RuntimeError."failing as requested".\n'
+            'RuntimeError: failing as requested'
+        )
+        self.assertEqual(len(calls), 1, "expected 1 call, but got extra: {}".format(calls[1:]))
+
     def test_sets_model_name(self):
         self._prepare_actions()
 

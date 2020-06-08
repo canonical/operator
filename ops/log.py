@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import logging
 
 
@@ -45,3 +46,6 @@ def setup_root_logging(model_backend, debug=False):
         formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+
+    sys.excepthook = lambda etype, value, tb: logger.error(
+        "Uncaught exception while in charm code:", exc_info=(etype, value, tb))
