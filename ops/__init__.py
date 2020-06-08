@@ -14,7 +14,7 @@
 
 """The Operator Framework."""
 
-__version__ = '0.6.1'
+from .version import version as __version__  # noqa: F401 (imported but unused)
 
 # Import here the bare minimum to break the circular import between modules
-from . import charm  # NOQA
+from . import charm  # noqa: F401 (imported but unused)
