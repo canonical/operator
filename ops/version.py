@@ -21,7 +21,7 @@ _FALLBACK = '0.7'  # this gets bumped after release
 
 
 def _get_version():
-    version = _FALLBACK + ".dev+UNKNOWN"
+    version = _FALLBACK + ".dev0+unknown"
 
     p = Path(__file__).parent
     if (p.parent / '.git').exists():
