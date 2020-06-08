@@ -432,11 +432,25 @@ class SQLiteStorage:
     # This is doable but will increase significantly the chances for mistakes.
 
     def save_snapshot(self, handle_path: str, snapshot_data: typing.Any) -> None:
+        """Part of the Storage API, persist a snapshot data under the given handle.
+
+        Args:
+            handle_path: The string identifying the snapshot.
+            snapshot_data: The data to be persisted. (as returned by Object.snapshot()). This
+            might be a dict/tuple/int, but must only contain 'simple' python types.
+        """
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(snapshot_data)
         self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, raw_data))
 
     def load_snapshot(self, handle_path: str) -> typing.Any:
+        """Part of the Storage API, retrieve a snapshot that was previously saved.
+
+        Args:
+            handle_path: The string identifying the snapshot.
+        Raises:
+            NoSnapshotError: if there is no snapshot for the given handle_path.
+        """
         c = self._db.cursor()
         c.execute("SELECT data FROM snapshot WHERE handle=?", (handle_path,))
         row = c.fetchone()
