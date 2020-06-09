@@ -30,6 +30,7 @@ from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
 import ops
+from ops.jujuversion import JujuVersion
 
 
 class Model:
@@ -996,10 +997,15 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
+        if is_app and not JujuVersion.from_environ().has_app_data():
+            return {}
+
+        args = ['relation-get', '-r', str(relation_id), '-', member_name]
+        if is_app:
+            args.append('--app')
+
         try:
-            return self._run('relation-get', '-r', str(relation_id),
-                             '-', member_name, '--app={}'.format(is_app),
-                             return_output=True, use_json=True)
+            return self._run(*args, return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
@@ -1008,6 +1014,9 @@ class _ModelBackend:
     def relation_set(self, relation_id, key, value, is_app):
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
+
+        if is_app and not JujuVersion.from_environ().has_app_data():
+            raise RuntimeError('trying to relation-set app data on a Juju too old for it')
 
         try:
             return self._run('relation-set', '-r', str(relation_id),

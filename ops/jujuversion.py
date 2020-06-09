@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import re
 from functools import total_ordering
 
@@ -83,3 +84,15 @@ class JujuVersion:
         elif self.build != other.build:
             return self.build < other.build
         return False
+
+    @classmethod
+    def from_environ(cls) -> 'JujuVersion':
+        """Build a JujuVersion from JUJU_VERSION."""
+        v = os.environ.get('JUJU_VERSION')
+        if not v:
+            raise RuntimeError('environ has no JUJU_VERSION')
+        return cls(v)
+
+    def has_app_data(self) -> bool:
+        """Determine whether this juju version knows about app data."""
+        return (self.major, self.minor, self.patch) >= (2, 7, 1)

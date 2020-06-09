@@ -941,12 +941,12 @@ class TestModelBackend(unittest.TestCase):
             lambda: fake_script(self, 'relation-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.ModelError,
-            [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
+            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
         ), (
             lambda: fake_script(self, 'relation-get', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.RelationNotFoundError,
-            [['relation-get', '-r', '3', '-', 'remote/0', '--app=False', '--format=json']],
+            [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
         )]
 
         for do_fake, run, exception, calls in test_cases:
