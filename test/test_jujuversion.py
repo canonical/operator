@@ -57,7 +57,8 @@ class TestJujuVersion(unittest.TestCase):
 
     def test_has_app_data(self):
         self.assertTrue(JujuVersion('2.8.0').has_app_data())
-        self.assertFalse(JujuVersion('2.7.0').has_app_data())
+        self.assertTrue(JujuVersion('2.7.0').has_app_data())
+        self.assertFalse(JujuVersion('2.6.9').has_app_data())
 
     def test_parsing_errors(self):
         invalid_versions = [

@@ -998,7 +998,7 @@ class _ModelBackend:
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if is_app and not JujuVersion.from_environ().has_app_data():
-            return {}
+            raise RuntimeError('trying to relation-get app data on a Juju too old for it')
 
         args = ['relation-get', '-r', str(relation_id), '-', member_name]
         if is_app:

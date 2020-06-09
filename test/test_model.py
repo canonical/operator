@@ -866,10 +866,8 @@ class TestModelBindings(unittest.TestCase):
 class TestModelBackend(unittest.TestCase):
 
     def setUp(self):
-        os.environ['JUJU_VERSION'] = '2.8.0'
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
         self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
-        self.addCleanup(os.environ.pop, 'JUJU_VERSION')
 
         self._backend = None
 
@@ -917,6 +915,8 @@ class TestModelBackend(unittest.TestCase):
         self.assertTrue(model.unit.is_leader())
 
     def test_relation_tool_errors(self):
+        self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
+        os.environ['JUJU_VERSION'] = '2.8.0'
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [(
@@ -969,28 +969,40 @@ class TestModelBackend(unittest.TestCase):
                 self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_relation_get_juju_version_quirks(self):
+        self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
+
         fake_script(self, 'relation-get', '''echo '{"foo": "bar"}' ''')
 
-        # post-1.7.1, things proceed as expected
-        self.assertEqual(self.backend.relation_get(1, 'foo/0', is_app=True), {"foo": "bar"})
-        calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
-        self.assertEqual(calls, ['relation-get -r 1 - foo/0 --app --format=json'])
+        # on 2.7.0+, things proceed as expected
+        for v in ['2.8.0', '2.7.0']:
+            with self.subTest(v):
+                os.environ['JUJU_VERSION'] = v
+                rel_data = self.backend.relation_get(1, 'foo/0', is_app=True)
+                self.assertEqual(rel_data, {"foo": "bar"})
+                calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
+                self.assertEqual(calls, ['relation-get -r 1 - foo/0 --app --format=json'])
 
-        # before 1.7.1, it just returns an empty dict always (no --app support)
-        os.environ['JUJU_VERSION'] = '1.7.0'
-        self.assertEqual(self.backend.relation_get(1, 'foo/0', is_app=True), {})
+        # before 2.7.0, it just fails (no --app support)
+        os.environ['JUJU_VERSION'] = '2.6.9'
+        with self.assertRaisesRegex(RuntimeError, 'Juju too old'):
+            self.backend.relation_get(1, 'foo/0', is_app=True)
         self.assertEqual(fake_script_calls(self), [])
 
     def test_relation_set_juju_version_quirks(self):
+        self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
+
         fake_script(self, 'relation-set', 'exit 0')
 
-        # post-1.7.1, things work
-        self.backend.relation_set(1, 'foo', 'bar', is_app=True)
-        calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
-        self.assertEqual(calls, ['relation-set -r 1 foo=bar --app'])
+        # on 2.7.0+, things proceed as expected
+        for v in ['2.8.0', '2.7.0']:
+            with self.subTest(v):
+                os.environ['JUJU_VERSION'] = v
+                self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+                calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
+                self.assertEqual(calls, ['relation-set -r 1 foo=bar --app'])
 
-        # before 1.7.1, it just fails always (no --app support)
-        os.environ['JUJU_VERSION'] = '1.7.0'
+        # before 2.7.0, it just fails always (no --app support)
+        os.environ['JUJU_VERSION'] = '2.6.9'
         with self.assertRaisesRegex(RuntimeError, 'Juju too old'):
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
         self.assertEqual(fake_script_calls(self), [])

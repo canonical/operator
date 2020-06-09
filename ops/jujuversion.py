@@ -95,4 +95,4 @@ class JujuVersion:
 
     def has_app_data(self) -> bool:
         """Determine whether this juju version knows about app data."""
-        return (self.major, self.minor, self.patch) >= (2, 7, 1)
+        return (self.major, self.minor, self.patch) >= (2, 7, 0)
