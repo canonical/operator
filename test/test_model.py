@@ -866,8 +866,10 @@ class TestModelBindings(unittest.TestCase):
 class TestModelBackend(unittest.TestCase):
 
     def setUp(self):
+        os.environ['JUJU_VERSION'] = '2.8.0'
         os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
         self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
+        self.addCleanup(os.environ.pop, 'JUJU_VERSION')
 
         self._backend = None
 
@@ -931,12 +933,17 @@ class TestModelBackend(unittest.TestCase):
             lambda: fake_script(self, 'relation-set', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.ModelError,
-            [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
+            [['relation-set', '-r', '3', 'foo=bar']],
         ), (
             lambda: fake_script(self, 'relation-set', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar', '--app=False']],
+            [['relation-set', '-r', '3', 'foo=bar']],
+        ), (
+            lambda: None,
+            lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=True),
+            ops.model.RelationNotFoundError,
+            [['relation-set', '-r', '3', 'foo=bar', '--app']],
         ), (
             lambda: fake_script(self, 'relation-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
@@ -947,13 +954,46 @@ class TestModelBackend(unittest.TestCase):
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+        ), (
+            lambda: None,
+            lambda: self.backend.relation_get(3, 'remote/0', is_app=True),
+            ops.model.RelationNotFoundError,
+            [['relation-get', '-r', '3', '-', 'remote/0', '--app', '--format=json']],
         )]
 
-        for do_fake, run, exception, calls in test_cases:
-            do_fake()
-            with self.assertRaises(exception):
-                run()
-            self.assertEqual(fake_script_calls(self, clear=True), calls)
+        for i, (do_fake, run, exception, calls) in enumerate(test_cases):
+            with self.subTest(i):
+                do_fake()
+                with self.assertRaises(exception):
+                    run()
+                self.assertEqual(fake_script_calls(self, clear=True), calls)
+
+    def test_relation_get_juju_version_quirks(self):
+        fake_script(self, 'relation-get', '''echo '{"foo": "bar"}' ''')
+
+        # post-1.7.1, things proceed as expected
+        self.assertEqual(self.backend.relation_get(1, 'foo/0', is_app=True), {"foo": "bar"})
+        calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
+        self.assertEqual(calls, ['relation-get -r 1 - foo/0 --app --format=json'])
+
+        # before 1.7.1, it just returns an empty dict always (no --app support)
+        os.environ['JUJU_VERSION'] = '1.7.0'
+        self.assertEqual(self.backend.relation_get(1, 'foo/0', is_app=True), {})
+        self.assertEqual(fake_script_calls(self), [])
+
+    def test_relation_set_juju_version_quirks(self):
+        fake_script(self, 'relation-set', 'exit 0')
+
+        # post-1.7.1, things work
+        self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+        calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
+        self.assertEqual(calls, ['relation-set -r 1 foo=bar --app'])
+
+        # before 1.7.1, it just fails always (no --app support)
+        os.environ['JUJU_VERSION'] = '1.7.0'
+        with self.assertRaisesRegex(RuntimeError, 'Juju too old'):
+            self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+        self.assertEqual(fake_script_calls(self), [])
 
     def test_status_get(self):
         # taken from actual Juju output

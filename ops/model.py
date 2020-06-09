@@ -1018,9 +1018,12 @@ class _ModelBackend:
         if is_app and not JujuVersion.from_environ().has_app_data():
             raise RuntimeError('trying to relation-set app data on a Juju too old for it')
 
+        args = ['relation-set', '-r', str(relation_id), '{}={}'.format(key, value)]
+        if is_app:
+            args.append('--app')
+
         try:
-            return self._run('relation-set', '-r', str(relation_id),
-                             '{}={}'.format(key, value), '--app={}'.format(is_app))
+            return self._run(*args)
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
