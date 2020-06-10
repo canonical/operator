@@ -997,8 +997,11 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
-        if is_app and not JujuVersion.from_environ().has_app_data():
-            raise RuntimeError('trying to relation-get app data on a Juju too old for it')
+        if is_app:
+            version = JujuVersion.from_environ()
+            if not version.has_app_data():
+                raise RuntimeError(
+                    'getting application data is not supported on Juju version {}'.format(version))
 
         args = ['relation-get', '-r', str(relation_id), '-', member_name]
         if is_app:
@@ -1015,8 +1018,11 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
-        if is_app and not JujuVersion.from_environ().has_app_data():
-            raise RuntimeError('trying to relation-set app data on a Juju too old for it')
+        if is_app:
+            version = JujuVersion.from_environ()
+            if not version.has_app_data():
+                raise RuntimeError(
+                    'setting application data is not supported on Juju version {}'.format(version))
 
         args = ['relation-set', '-r', str(relation_id), '{}={}'.format(key, value)]
         if is_app:

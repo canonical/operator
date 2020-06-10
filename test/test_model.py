@@ -984,7 +984,7 @@ class TestModelBackend(unittest.TestCase):
 
         # before 2.7.0, it just fails (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'
-        with self.assertRaisesRegex(RuntimeError, 'Juju too old'):
+        with self.assertRaisesRegex(RuntimeError, 'not supported on Juju version 2.6.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         self.assertEqual(fake_script_calls(self), [])
 
@@ -1003,7 +1003,7 @@ class TestModelBackend(unittest.TestCase):
 
         # before 2.7.0, it just fails always (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'
-        with self.assertRaisesRegex(RuntimeError, 'Juju too old'):
+        with self.assertRaisesRegex(RuntimeError, 'not supported on Juju version 2.6.9'):
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
         self.assertEqual(fake_script_calls(self), [])
 
