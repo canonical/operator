@@ -19,8 +19,6 @@ import sys
 import warnings
 from pathlib import Path
 
-import yaml
-
 import ops.charm
 import ops.framework
 import ops.model
@@ -42,17 +40,6 @@ def _get_charm_dir():
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
-
-
-def _load_metadata(charm_dir):
-    metadata = yaml.safe_load((charm_dir / 'metadata.yaml').read_text())
-
-    actions_meta = charm_dir / 'actions.yaml'
-    if actions_meta.exists():
-        actions_metadata = yaml.safe_load(actions_meta.read_text())
-    else:
-        actions_metadata = {}
-    return metadata, actions_metadata
 
 
 def _create_event_link(charm, bound_event):
@@ -288,8 +275,14 @@ def main(charm_class):
     dispatcher = _Dispatcher(charm_dir)
     dispatcher.run_any_legacy_hook()
 
-    metadata, actions_metadata = _load_metadata(charm_dir)
-    meta = ops.charm.CharmMeta(metadata, actions_metadata)
+    metadata = (charm_dir / 'metadata.yaml').read_text()
+    actions_meta = charm_dir / 'actions.yaml'
+    if actions_meta.exists():
+        actions_metadata = actions_meta.read_text()
+    else:
+        actions_metadata = None
+
+    meta = ops.charm.CharmMeta.from_yaml(metadata, actions_metadata)
     unit_name = os.environ['JUJU_UNIT_NAME']
     model_name = os.environ.get('JUJU_MODEL_NAME')
     model = ops.model.Model(unit_name, meta, model_backend, model_name=model_name)
