@@ -177,7 +177,7 @@ class JujuStorage:
         self.self._backend.set("#notices#", notice_list)
 
 
-class _SimpleLoader(yaml.SafeLoader):
+class _SimpleLoader(getattr(yaml, 'CSafeLoader', yaml.SafeLoader)):
     """Handle a couple basic python types.
 
     yaml.SafeLoader can handle all the basic int/float/dict/set/etc that we want. The only one
@@ -194,7 +194,7 @@ _SimpleLoader.add_constructor(
     _SimpleLoader.construct_python_tuple)
 
 
-class _SimpleDumper(yaml.SafeDumper):
+class _SimpleDumper(getattr(yaml, 'CSafeDumper', yaml.SafeDumper)):
     """Add types supported by 'marshal'
 
     YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So

@@ -14,8 +14,11 @@
 
 import abc
 import gc
+import io
 import tempfile
 from textwrap import dedent
+
+import yaml
 
 from ops import (
     framework,
@@ -102,6 +105,19 @@ class TestJujuStorage(StoragePermutations, BaseTestCase):
         f = framework.Framework(':memory:', None, None, None)
         f._storage = storage.JujuStorage(mem_backend)
         return f
+
+
+class TestSimpleLoader(BaseTestCase):
+
+    def test_is_c_loader(self):
+        # we could make this 'test that we are using the C loader if it is available',
+        # but really, anywhere we run our code, we really do want it to be available
+        loader = storage._SimpleLoader(io.StringIO(''))
+        self.assertIsInstance(loader, yaml.CSafeLoader)
+
+    def test_is_c_dumper(self):
+        loader = storage._SimpleDumper(None)
+        self.assertIsInstance(loader, yaml.CSafeDumper)
 
 
 class TestJujuStateBackend(BaseTestCase):
