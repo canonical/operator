@@ -1,5 +1,4 @@
-#!/usr/bin/python3
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +19,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import yaml
 
 from ops.charm import (
     CharmBase,
@@ -95,8 +95,8 @@ class TestHarness(unittest.TestCase):
         class InitialDataTester(CharmBase):
             """Record the relation-changed events."""
 
-            def __init__(self, framework, charm_name):
-                super().__init__(framework, charm_name)
+            def __init__(self, framework):
+                super().__init__(framework)
                 self.observed_events = []
                 self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
 
@@ -144,8 +144,8 @@ class TestHarness(unittest.TestCase):
         class InitialDataTester(CharmBase):
             """Record the relation-changed events."""
 
-            def __init__(self, framework, charm_name):
-                super().__init__(framework, charm_name)
+            def __init__(self, framework):
+                super().__init__(framework)
                 self.observed_events = []
                 self.framework.observe(self.on.cluster_relation_changed,
                                        self._on_cluster_relation_changed)
@@ -724,8 +724,8 @@ class RelationChangedViewer(Object):
 class RecordingCharm(CharmBase):
     """Record the events that we see, and any associated data."""
 
-    def __init__(self, framework, charm_name):
-        super().__init__(framework, charm_name)
+    def __init__(self, framework):
+        super().__init__(framework)
         self.changes = []
         self.framework.observe(self.on.config_changed, self.on_config_changed)
         self.framework.observe(self.on.leader_elected, self.on_leader_elected)
@@ -746,8 +746,8 @@ class RecordingCharm(CharmBase):
 class RelationEventCharm(RecordingCharm):
     """Record events related to relation lifecycles."""
 
-    def __init__(self, framework, charm_name):
-        super().__init__(framework, charm_name)
+    def __init__(self, framework):
+        super().__init__(framework)
 
     def observe_relation_events(self, relation_name):
         self.framework.observe(self.on[relation_name].relation_created, self._on_relation_created)
@@ -842,6 +842,73 @@ class TestTestingModelBackend(unittest.TestCase):
         with self.assertRaises(RelationNotFoundError):
             backend.relation_list(1234)
 
+    def test_populate_oci_resources(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+              image2:
+                type: oci-image
+                description: "Another image."
+            ''')
+        harness.populate_oci_resources()
+        resource = harness._resource_dir / "image" / "contents.yaml"
+        with resource.open('r') as resource_file:
+            contents = yaml.safe_load(resource_file.read())
+        self.assertEqual(contents['registrypath'], 'registrypath')
+        self.assertEqual(contents['username'], 'username')
+        self.assertEqual(contents['password'], 'password')
+        self.assertEqual(len(harness._backend._resources_map), 2)
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_resource_folder_cleanup(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+            ''')
+        harness.populate_oci_resources()
+        resource = harness._resource_dir / "image" / "contents.yaml"
+        del harness
+        with self.assertRaises(FileNotFoundError):
+            with resource.open('r') as resource_file:
+                print("This shouldn't be here: {}".format(resource_file))
+
+    def test_add_oci_resource_custom(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+            ''')
+        custom = {
+            "registrypath": "custompath",
+            "username": "custom_username",
+            "password": "custom_password",
+        }
+        harness.add_oci_resource('image', custom)
+        resource = harness._resource_dir / "image" / "contents.yaml"
+        with resource.open('r') as resource_file:
+            contents = yaml.safe_load(resource_file.read())
+        self.assertEqual(contents['registrypath'], 'custompath')
+        self.assertEqual(contents['username'], 'custom_username')
+        self.assertEqual(contents['password'], 'custom_password')
+        self.assertEqual(len(harness._backend._resources_map), 1)
+
+    def test_add_oci_resource_no_image(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: file
+                description: "Image to deploy."
+            ''')
+        with self.assertRaises(RuntimeError):
+            harness.add_oci_resource("image")
+        with self.assertRaises(RuntimeError):
+            harness.add_oci_resource("missing-resource")
+        self.assertEqual(len(harness._backend._resources_map), 0)

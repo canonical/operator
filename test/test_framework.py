@@ -23,6 +23,8 @@ import tempfile
 from unittest.mock import patch
 from pathlib import Path
 
+import logassert
+
 from ops import charm
 from ops.framework import (
     _BREAKPOINT_WELCOME_MESSAGE,
@@ -1372,6 +1374,10 @@ class GenericObserver(Object):
 @patch('sys.stderr', new_callable=io.StringIO)
 class BreakpointTests(BaseTestCase):
 
+    def setUp(self):
+        super().setUp()
+        logassert.setup(self, 'ops')
+
     def test_ignored(self, fake_stderr):
         # It doesn't do anything really unless proper environment is there.
         with patch.dict(os.environ):
@@ -1382,6 +1388,7 @@ class BreakpointTests(BaseTestCase):
             framework.breakpoint()
         self.assertEqual(mock.call_count, 0)
         self.assertEqual(fake_stderr.getvalue(), "")
+        self.assertNotLoggedWarning("Breakpoint", "skipped")
 
     def test_pdb_properly_called(self, fake_stderr):
         # The debugger needs to leave the user in the frame where the breakpoint is executed,
@@ -1509,9 +1516,19 @@ class BreakpointTests(BaseTestCase):
         # Some breakpoint was indicated, and the framework call used exactly that name.
         self.check_trace_set('mybreak', 'mybreak', 1)
 
-    def test_named_indicated_somethingelse(self, fake_stderr):
-        # Some breakpoint was indicated, but the framework call was not with that name.
+    def test_named_indicated_unnamed(self, fake_stderr):
+        # Some breakpoint was indicated, but the framework call was unnamed
         self.check_trace_set('some-breakpoint', None, 0)
+        self.assertLoggedWarning(
+            "Breakpoint None skipped",
+            "not found in the requested breakpoints: ['some-breakpoint']")
+
+    def test_named_indicated_somethingelse(self, fake_stderr):
+        # Some breakpoint was indicated, but the framework call was with a different name
+        self.check_trace_set('some-breakpoint', 'other-name', 0)
+        self.assertLoggedWarning(
+            "Breakpoint 'other-name' skipped",
+            "not found in the requested breakpoints: ['some-breakpoint']")
 
     def test_named_indicated_ingroup(self, fake_stderr):
         # A multiple breakpoint was indicated, and the framework call used a name among those.

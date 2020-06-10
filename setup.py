@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ast
+from importlib.util import spec_from_file_location, module_from_spec
+from pathlib import Path
 from setuptools import setup, find_packages
 
 
@@ -23,49 +24,52 @@ def _read_me() -> str:
 
 
 def _get_version() -> str:
-    # ops.__init__ needs to pull in ops.charm to work around a circular
-    # import so we can't import it here as that pulls in yaml which isn't
-    # necessarily there yet.
-    version = 'unknown'
-    with open("ops/__init__.py", "rt", encoding="utf8") as fh:
-        source = fh.read()
-    code = ast.parse(source)
-    for node in code.body:
-        if isinstance(node, ast.Assign):
-            targets = [i.id for i in node.targets]
-            if '__version__' in targets:
-                if isinstance(node.value, ast.Str):
-                    # Python < 3.8
-                    version = node.value.s
-                else:
-                    version = node.value.value
-                break
-    return version
+    """Get the version via ops/version.py, without loading ops/__init__.py"""
+    spec = spec_from_file_location('ops.version', 'ops/version.py')
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return module.version
 
 
-setup(
-    name="ops",
-    version=_get_version(),
-    description="The Python library behind great charms",
-    long_description=_read_me(),
-    long_description_content_type="text/markdown",
-    license="Apache-2.0",
-    url="https://github.com/canonical/operator",
-    author="The Charmcraft team at Canonical Ltd.",
-    author_email="charmcraft@lists.launchpad.net",
-    packages=find_packages(include=('ops', 'ops.*')),
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: Apache Software License",
-        "Development Status :: 4 - Beta",
+version = _get_version()
+version_path = Path("ops/version.py")
+version_backup = Path("ops/version.py~")
+version_path.rename(version_backup)
+try:
+    with version_path.open("wt", encoding="utf8") as fh:
+        fh.write('''\
+# this is a generated file
 
-        "Intended Audience :: Developers",
-        "Intended Audience :: System Administrators",
-        "Operating System :: MacOS :: MacOS X",
-        "Operating System :: POSIX :: Linux",
-        # include Windows once we're running tests there also
-        # "Operating System :: Microsoft :: Windows",
-    ],
-    python_requires='>=3.5',
-    install_requires=["PyYAML"],
-)
+version = {!r}
+'''.format(version))
+
+    setup(
+        name="ops",
+        version=version,
+        description="The Python library behind great charms",
+        long_description=_read_me(),
+        long_description_content_type="text/markdown",
+        license="Apache-2.0",
+        url="https://github.com/canonical/operator",
+        author="The Charmcraft team at Canonical Ltd.",
+        author_email="charmcraft@lists.launchpad.net",
+        packages=find_packages(include=('ops', 'ops.*')),
+        classifiers=[
+            "Programming Language :: Python :: 3",
+            "License :: OSI Approved :: Apache Software License",
+            "Development Status :: 4 - Beta",
+
+            "Intended Audience :: Developers",
+            "Intended Audience :: System Administrators",
+            "Operating System :: MacOS :: MacOS X",
+            "Operating System :: POSIX :: Linux",
+            # include Windows once we're running tests there also
+            # "Operating System :: Microsoft :: Windows",
+        ],
+        python_requires='>=3.5',
+        install_requires=["PyYAML"],
+    )
+
+finally:
+    version_backup.rename(version_path)
