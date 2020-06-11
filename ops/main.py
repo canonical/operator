@@ -13,16 +13,18 @@
 # limitations under the License.
 
 import inspect
+import logging
 import os
 import subprocess
 import sys
 import warnings
 from pathlib import Path
 
+import yaml
+
 import ops.charm
 import ops.framework
 import ops.model
-import logging
 
 from ops.log import setup_root_logging
 
@@ -282,6 +284,8 @@ def main(charm_class):
     else:
         actions_metadata = None
 
+    if not yaml.__with_libyaml__:
+        logger.debug('yaml does not have libyaml extensions, using slower pure Python yaml loader')
     meta = ops.charm.CharmMeta.from_yaml(metadata, actions_metadata)
     unit_name = os.environ['JUJU_UNIT_NAME']
     model_name = os.environ.get('JUJU_MODEL_NAME')
