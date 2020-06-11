@@ -232,18 +232,23 @@ class _JujuStorageBackend:
         return p is not None
 
     def set(self, key: str, value: typing.Any) -> None:
-        """Set a key to a given bytes value.
+        """Set a key to a given value.
 
         Args:
             key: The string key that will be used to find the value later
-            value: Arbitrary bytes that will be returned by get().
+            value: Arbitrary content that will be returned by get().
         Raises:
             CalledProcessError: if 'state-set' returns an error code.
         """
-        encoded_value = yaml.dump(value, Dumper=_SimpleDumper)
-        content = yaml.safe_dump({key: encoded_value}, encoding='utf-8',
-                                 default_style='|', default_flow_style=False)
-        # Note: 'capture_output' would be good here, but was added in Python 3.7
+        # default_flow_style=None means that it can use Block for
+        # complex types (types that have nested types) but use flow
+        # for simple types (like an array). Not all versions of PyYAML
+        # have the same default style.
+        encoded_value = yaml.dump(value, Dumper=_SimpleDumper, default_flow_style=None)
+        content = yaml.dump(
+            {key: encoded_value}, encoding='utf-8', default_style='|',
+            default_flow_style=False,
+            Dumper=_SimpleDumper)
         p = subprocess.run(["state-set", "--file", "-"], input=content)
         p.check_returncode()
 
@@ -255,7 +260,6 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-get' returns an error code.
         """
-        # Note: 'capture_output' would be good here, but was added in Python 3.7
         p = subprocess.run(
             ["state-get", key],
             stdout=subprocess.PIPE,

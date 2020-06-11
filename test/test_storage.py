@@ -110,14 +110,18 @@ class TestJujuStorage(StoragePermutations, BaseTestCase):
 class TestSimpleLoader(BaseTestCase):
 
     def test_is_c_loader(self):
-        # we could make this 'test that we are using the C loader if it is available',
-        # but really, anywhere we run our code, we really do want it to be available
         loader = storage._SimpleLoader(io.StringIO(''))
-        self.assertIsInstance(loader, yaml.CSafeLoader)
+        if getattr(yaml, 'CSafeLoader', None) is not None:
+            self.assertIsInstance(loader, yaml.CSafeLoader)
+        else:
+            self.assertIsInstance(loader, yaml.SafeLoader)
 
     def test_is_c_dumper(self):
-        loader = storage._SimpleDumper(None)
-        self.assertIsInstance(loader, yaml.CSafeDumper)
+        dumper = storage._SimpleDumper(io.StringIO(''))
+        if getattr(yaml, 'CSafeDumper', None) is not None:
+            self.assertIsInstance(dumper, yaml.CSafeDumper)
+        else:
+            self.assertIsInstance(dumper, yaml.SafeDumper)
 
 
 class TestJujuStateBackend(BaseTestCase):
