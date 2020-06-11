@@ -75,7 +75,7 @@ class Harness:
         self._hooks_enabled = True
         self._relation_id_counter = 0
         self._backend = _TestingModelBackend(self._unit_name, self._meta)
-        self._model = model.Model(self._unit_name, self._meta, self._backend)
+        self._model = model.Model(self._meta, self._backend)
         self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
 
     @property
@@ -304,6 +304,16 @@ class Harness:
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
 
+    def set_model_name(self, name: str) -> None:
+        """Set the name of the Model that this is representing.
+
+        This cannot be called once begin() has been called. But it lets you set the value that
+        will be returned by Model.name.
+        """
+        if self._charm is not None:
+            raise RuntimeError('cannot set the Model name after begin()')
+        self._backend.model_name = name
+
     def update_relation_data(
             self,
             relation_id: int,
@@ -466,6 +476,7 @@ class _TestingModelBackend:
     def __init__(self, unit_name, meta):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
+        self.model_name = None
         self._calls = []
         self._meta = meta
         self._is_leader = None

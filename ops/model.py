@@ -35,6 +35,9 @@ import ops
 class Model:
     """Represents the Juju Model as seen from this unit.
 
+    This should not be instantiated directly by Charmers, but can be accessed as `self.model`
+    from any class that derives from Object.
+
     Attributes:
         unit: A :class:`Unit` that represents the unit that is running this code (eg yourself)
         app: A :class:`Application` that represents the application this unit is a part of.
@@ -49,12 +52,10 @@ class Model:
             for Kubernetes charms.
     """
 
-    def __init__(
-            self, unit_name: str, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend', *,
-            model_name: str = None):
+    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(backend)
         self._backend = backend
-        self.unit = self.get_unit(unit_name)
+        self.unit = self.get_unit(self._backend.unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
         self.config = ConfigData(self._backend)
@@ -62,7 +63,6 @@ class Model:
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
-        self._model_name = model_name
 
     @property
     def name(self) -> str:
@@ -70,7 +70,7 @@ class Model:
 
         This is read from the environment variable ``JUJU_MODEL_NAME``.
         """
-        return self._model_name
+        return self._backend.model_name
 
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
@@ -954,8 +954,14 @@ class _ModelBackend:
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
 
-    def __init__(self):
-        self.unit_name = os.environ['JUJU_UNIT_NAME']
+    def __init__(self, unit_name=None, model_name=None):
+        if unit_name is None:
+            self.unit_name = os.environ['JUJU_UNIT_NAME']
+        else:
+            self.unit_name = unit_name
+        if model_name is None:
+            model_name = os.environ.get('JUJU_MODEL_NAME')
+        self.model_name = model_name
         self.app_name = self.unit_name.split('/')[0]
 
         self._is_leader = None
