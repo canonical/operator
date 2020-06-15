@@ -131,7 +131,7 @@ class CharmInitTestCase(unittest.TestCase):
         self.assertFalse(warn_cm)
 
 
-class TestMain(abc.ABC):
+class _TestMain(abc.ABC):
 
     @abc.abstractmethod
     def _setup_entry_point(self, directory, entry_point):
@@ -643,7 +643,7 @@ log_debug: {}
         self.assertEqual(state['observed_event_types'], [InstallEvent])
 
 
-class TestMainWithNoDispatch(TestMain, unittest.TestCase):
+class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
     has_dispatch = False
     hooks_are_symlinks = True
 
@@ -717,7 +717,7 @@ class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
         shutil.copy(charm_path, str(path))
 
 
-class TestMainWithDispatch(TestMain, unittest.TestCase):
+class TestMainWithDispatch(_TestMain, unittest.TestCase):
     has_dispatch = True
 
     def _setup_entry_point(self, directory, entry_point):
