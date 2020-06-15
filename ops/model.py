@@ -30,6 +30,7 @@ from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
 import ops
+from ops.jujuversion import JujuVersion
 
 
 class Model:
@@ -996,10 +997,18 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
+        if is_app:
+            version = JujuVersion.from_environ()
+            if not version.has_app_data():
+                raise RuntimeError(
+                    'getting application data is not supported on Juju version {}'.format(version))
+
+        args = ['relation-get', '-r', str(relation_id), '-', member_name]
+        if is_app:
+            args.append('--app')
+
         try:
-            return self._run('relation-get', '-r', str(relation_id),
-                             '-', member_name, '--app={}'.format(is_app),
-                             return_output=True, use_json=True)
+            return self._run(*args, return_output=True, use_json=True)
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
@@ -1009,9 +1018,18 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
+        if is_app:
+            version = JujuVersion.from_environ()
+            if not version.has_app_data():
+                raise RuntimeError(
+                    'setting application data is not supported on Juju version {}'.format(version))
+
+        args = ['relation-set', '-r', str(relation_id), '{}={}'.format(key, value)]
+        if is_app:
+            args.append('--app')
+
         try:
-            return self._run('relation-set', '-r', str(relation_id),
-                             '{}={}'.format(key, value), '--app={}'.format(is_app))
+            return self._run(*args)
         except ModelError as e:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
