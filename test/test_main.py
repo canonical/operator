@@ -202,32 +202,9 @@ class _TestMain(abc.ABC):
             self._setup_entry_point(self.hooks_dir, hook)
 
     def _prepare_actions(self):
-        actions_meta = '''
-foo-bar:
-  description: Foos the bar.
-  title: foo-bar
-  params:
-    foo-name:
-      type: string
-      description: A foo name to bar.
-    silent:
-      type: boolean
-      description:
-      default: false
-  required:
-    - foo-name
-start:
-    description: Start the unit.
-get-model-name:
-    description: Return the name of the model
-get-status:
-    description: Return the Status of the unit
-'''
+        # TODO: jam 2020-06-16 this same work could be done just triggering the 'install' event
+        #  of the charm, it might be cleaner to not set up entry points directly here.
         actions_dir_name = 'actions'
-        actions_meta_file = 'actions.yaml'
-
-        with (self.JUJU_CHARM_DIR / actions_meta_file).open('w+t') as f:
-            f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
         for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
@@ -522,15 +499,6 @@ get-status:
             'USE_LOG_ACTIONS': True,
         }))
         fake_script(self, 'action-get', "echo '{}'")
-        actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
-        actions_yaml.write_text(
-            '''
-log_critical: {}
-log_error: {}
-log_warning: {}
-log_info: {}
-log_debug: {}
-            ''')
 
         test_cases = [(
             EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME',
@@ -695,10 +663,9 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
-        actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
-        actions_yaml.write_text('test: {}')
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-        action_hook = self.JUJU_CHARM_DIR / 'actions' / 'test'
+        # foo-bar is one of the actions defined in actions.yaml
+        action_hook = self.JUJU_CHARM_DIR / 'actions' / 'foo-bar'
         self.assertTrue(action_hook.exists())
 
 
