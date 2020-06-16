@@ -160,9 +160,8 @@ class _TestMain(abc.ABC):
     def setUp(self):
         self._setup_charm_dir()
 
-        _, tmp_file = tempfile.mkstemp()
+        _, tmp_file = tempfile.mkstemp(dir=self._tmpdir)
         self._state_file = Path(tmp_file)
-        self.addCleanup(self._state_file.unlink)
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
@@ -171,7 +170,6 @@ class _TestMain(abc.ABC):
         CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            shutil.rmtree(str(self.JUJU_CHARM_DIR))
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
@@ -182,7 +180,9 @@ class _TestMain(abc.ABC):
         self.stderr = None
 
     def _setup_charm_dir(self):
-        self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
+        self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-'))
+        self.addCleanup(shutil.rmtree, str(self._tmpdir))
+        self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
         charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
         self.charm_exec_path = os.path.relpath(charm_path,

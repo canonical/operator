@@ -889,7 +889,7 @@ class TestTestingModelBackend(unittest.TestCase):
             "registrypath": "custompath",
             "username": "custom_username",
             "password": "custom_password",
-            }
+        }
         harness.add_oci_resource('image', custom)
         resource = harness._resource_dir / "image" / "contents.yaml"
         with resource.open('r') as resource_file:
