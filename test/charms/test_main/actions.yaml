@@ -7,7 +7,7 @@ foo-bar:
       description: A foo name to bar.
     silent:
       type: boolean
-      description:
+      description: ""
       default: false
   required:
     - foo-name
@@ -17,13 +17,13 @@ get-model-name:
   description: Return the name of the model
 get-status:
   description: Return the Status of the unit
-log_critical:
+log-critical:
   description: log a message at Critical level
-log_error:
+log-error:
   description: log a message at Error level
-log_warning:
+log-warning:
   description: log a message at Warning level
-log_info:
+log-info:
   description: log a message at Info level
-log_debug:
+log-debug:
   description: log a message at Debug level
