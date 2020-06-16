@@ -160,7 +160,7 @@ class _TestMain(abc.ABC):
     def setUp(self):
         self._setup_charm_dir()
 
-        _, tmp_file = tempfile.mkstemp(dir=self._tmpdir)
+        _, tmp_file = tempfile.mkstemp(dir=str(self._tmpdir))
         self._state_file = Path(tmp_file)
 
         # Relations events are defined dynamically and modify the class attributes.
