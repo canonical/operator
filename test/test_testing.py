@@ -533,6 +533,23 @@ class TestHarness(unittest.TestCase):
         # The charm_dir also gets set
         self.assertEqual(harness.framework.charm_dir, tmp)
 
+    def test_set_model_name(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+        ''')
+        harness.set_model_name('foo')
+        self.assertEqual('foo', harness.model.name)
+
+    def test_set_model_name_after_begin(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+        ''')
+        harness.set_model_name('bar')
+        harness.begin()
+        with self.assertRaises(RuntimeError):
+            harness.set_model_name('foo')
+        self.assertEqual(harness.model.name, 'bar')
+
     def test_actions_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(tmp))

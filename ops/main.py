@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import inspect
+import logging
 import os
 import subprocess
 import sys
@@ -24,7 +25,6 @@ import yaml
 import ops.charm
 import ops.framework
 import ops.model
-import logging
 
 from ops.log import setup_root_logging
 
@@ -42,17 +42,6 @@ def _get_charm_dir():
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
-
-
-def _load_metadata(charm_dir):
-    metadata = yaml.safe_load((charm_dir / 'metadata.yaml').read_text())
-
-    actions_meta = charm_dir / 'actions.yaml'
-    if actions_meta.exists():
-        actions_metadata = yaml.safe_load(actions_meta.read_text())
-    else:
-        actions_metadata = {}
-    return metadata, actions_metadata
 
 
 def _create_event_link(charm, bound_event):
@@ -288,11 +277,17 @@ def main(charm_class):
     dispatcher = _Dispatcher(charm_dir)
     dispatcher.run_any_legacy_hook()
 
-    metadata, actions_metadata = _load_metadata(charm_dir)
-    meta = ops.charm.CharmMeta(metadata, actions_metadata)
-    unit_name = os.environ['JUJU_UNIT_NAME']
-    model_name = os.environ.get('JUJU_MODEL_NAME')
-    model = ops.model.Model(unit_name, meta, model_backend, model_name=model_name)
+    metadata = (charm_dir / 'metadata.yaml').read_text()
+    actions_meta = charm_dir / 'actions.yaml'
+    if actions_meta.exists():
+        actions_metadata = actions_meta.read_text()
+    else:
+        actions_metadata = None
+
+    if not yaml.__with_libyaml__:
+        logger.debug('yaml does not have libyaml extensions, using slower pure Python yaml loader')
+    meta = ops.charm.CharmMeta.from_yaml(metadata, actions_metadata)
+    model = ops.model.Model(meta, model_backend)
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
