@@ -16,7 +16,6 @@
 from collections import OrderedDict
 import json
 import ipaddress
-import os
 import pathlib
 from textwrap import dedent
 import unittest
@@ -32,12 +31,6 @@ from test.test_helpers import fake_script, fake_script_calls
 class TestModel(unittest.TestCase):
 
     def setUp(self):
-        def restore_env(env):
-            os.environ.clear()
-            os.environ.update(env)
-        self.addCleanup(restore_env, os.environ.copy())
-
-        os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
         self.harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
             name: myapp
             provides:
@@ -57,9 +50,9 @@ class TestModel(unittest.TestCase):
         self.assertIs(self.model.app, self.model.unit.app)
         self.assertIsNone(self.model.name)
 
-    def test_model_name(self):
-        m = ops.model.Model('unit/0', ops.charm.CharmMeta(), self.harness._backend,
-                            model_name='default')
+    def test_model_name_from_backend(self):
+        self.harness.set_model_name('default')
+        m = ops.model.Model(ops.charm.CharmMeta(), self.harness._backend)
         self.assertEqual(m.name, 'default')
         with self.assertRaises(AttributeError):
             m.name = "changes-disallowed"
@@ -418,7 +411,7 @@ class TestModel(unittest.TestCase):
         # TODO: (jam) 2020-05-07 Harness doesn't yet support resource-get issue #262
         meta = ops.charm.CharmMeta()
         meta.resources = {'foo': None, 'bar': None}
-        model = ops.model.Model('myapp/0', meta, ops.model._ModelBackend())
+        model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
 
         with self.assertRaises(RuntimeError):
             model.resources.fetch('qux')
@@ -437,7 +430,7 @@ class TestModel(unittest.TestCase):
         meta = ops.charm.CharmMeta.from_yaml('''
             name: myapp
         ''')
-        model = ops.model.Model('myapp/0', meta, ops.model._ModelBackend())
+        model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
         fake_script(self, 'pod-spec-set', """
                     cat $2 > $(dirname $0)/spec.json
                     [[ -n $4 ]] && cat $4 > $(dirname $0)/k8s_res.json || true
@@ -472,9 +465,9 @@ class TestModel(unittest.TestCase):
         check_calls(fake_calls)
 
         # Create a new model to drop is-leader caching result.
-        self.backend = ops.model._ModelBackend()
+        self.backend = ops.model._ModelBackend('myapp/0')
         meta = ops.charm.CharmMeta()
-        model = ops.model.Model('myapp/0', meta, self.backend)
+        model = ops.model.Model(meta, self.backend)
         fake_script(self, 'is-leader', 'echo false')
         with self.assertRaises(ops.model.ModelError):
             model.pod.set_spec({'foo': 'bar'})
@@ -651,7 +644,7 @@ class TestModel(unittest.TestCase):
         # TODO: (jam) 2020-05-07 Harness doesn't yet expose storage-get issue #263
         meta = ops.charm.CharmMeta()
         meta.storages = {'disks': None, 'data': None}
-        model = ops.model.Model('myapp/0', meta, ops.model._ModelBackend())
+        model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
 
         fake_script(self, 'storage-list', '''
             if [ "$1" = disks ]; then
@@ -716,13 +709,6 @@ class TestModel(unittest.TestCase):
 class TestModelBindings(unittest.TestCase):
 
     def setUp(self):
-        def restore_env(env):
-            os.environ.clear()
-            os.environ.update(env)
-        self.addCleanup(restore_env, os.environ.copy())
-
-        os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
-
         meta = ops.charm.CharmMeta()
         meta.relations = {
             'db0': RelationMeta(
@@ -732,8 +718,8 @@ class TestModelBindings(unittest.TestCase):
             'db2': RelationMeta(
                 RelationRole.peer, 'db2', {'interface': 'db2', 'scope': 'global'}),
         }
-        self.backend = ops.model._ModelBackend()
-        self.model = ops.model.Model('myapp/0', meta, self.backend)
+        self.backend = ops.model._ModelBackend('myapp/0')
+        self.model = ops.model.Model(meta, self.backend)
 
         fake_script(self, 'relation-ids',
                     """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
@@ -866,15 +852,12 @@ class TestModelBindings(unittest.TestCase):
 class TestModelBackend(unittest.TestCase):
 
     def setUp(self):
-        os.environ['JUJU_UNIT_NAME'] = 'myapp/0'
-        self.addCleanup(os.environ.pop, 'JUJU_UNIT_NAME')
-
         self._backend = None
 
     @property
     def backend(self):
         if self._backend is None:
-            self._backend = ops.model._ModelBackend()
+            self._backend = ops.model._ModelBackend('myapp/0')
         return self._backend
 
     def test_relation_get_set_is_app_arg(self):
@@ -897,7 +880,7 @@ class TestModelBackend(unittest.TestCase):
         meta = ops.charm.CharmMeta.from_yaml('''
             name: myapp
         ''')
-        model = ops.model.Model('myapp/0', meta, self.backend)
+        model = ops.model.Model(meta, self.backend)
         fake_script(self, 'is-leader', 'echo false')
         self.assertFalse(model.unit.is_leader())
 
@@ -1060,7 +1043,7 @@ class TestModelBackend(unittest.TestCase):
         meta = ops.charm.CharmMeta.from_yaml('''
             name: myapp
         ''')
-        model = ops.model.Model('myapp/0', meta, self.backend)
+        model = ops.model.Model(meta, self.backend)
         fake_script(self, 'status-set', 'exit 1')
         fake_script(self, 'is-leader', 'echo true')
 

@@ -60,7 +60,7 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(cleanup)
 
     def create_framework(self):
-        model = Model('local/0', self.meta, _ModelBackend())
+        model = Model(self.meta, _ModelBackend('local/0'))
         framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.meta, model)
         self.addCleanup(framework.close)
         return framework
