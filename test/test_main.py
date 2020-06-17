@@ -131,7 +131,7 @@ class CharmInitTestCase(unittest.TestCase):
         self.assertFalse(warn_cm)
 
 
-class TestMain(abc.ABC):
+class _TestMain(abc.ABC):
 
     @abc.abstractmethod
     def _setup_entry_point(self, directory, entry_point):
@@ -160,9 +160,8 @@ class TestMain(abc.ABC):
     def setUp(self):
         self._setup_charm_dir()
 
-        _, tmp_file = tempfile.mkstemp()
+        _, tmp_file = tempfile.mkstemp(dir=str(self._tmpdir))
         self._state_file = Path(tmp_file)
-        self.addCleanup(self._state_file.unlink)
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
@@ -171,7 +170,6 @@ class TestMain(abc.ABC):
         CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            shutil.rmtree(str(self.JUJU_CHARM_DIR))
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
@@ -182,7 +180,9 @@ class TestMain(abc.ABC):
         self.stderr = None
 
     def _setup_charm_dir(self):
-        self.JUJU_CHARM_DIR = Path(tempfile.mkdtemp()) / 'test_main'
+        self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-'))
+        self.addCleanup(shutil.rmtree, str(self._tmpdir))
+        self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
         charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
         self.charm_exec_path = os.path.relpath(charm_path,
@@ -202,32 +202,9 @@ class TestMain(abc.ABC):
             self._setup_entry_point(self.hooks_dir, hook)
 
     def _prepare_actions(self):
-        actions_meta = '''
-foo-bar:
-  description: Foos the bar.
-  title: foo-bar
-  params:
-    foo-name:
-      type: string
-      description: A foo name to bar.
-    silent:
-      type: boolean
-      description:
-      default: false
-  required:
-    - foo-name
-start:
-    description: Start the unit.
-get-model-name:
-    description: Return the name of the model
-get-status:
-    description: Return the Status of the unit
-'''
+        # TODO: jam 2020-06-16 this same work could be done just triggering the 'install' event
+        #  of the charm, it might be cleaner to not set up entry points directly here.
         actions_dir_name = 'actions'
-        actions_meta_file = 'actions.yaml'
-
-        with (self.JUJU_CHARM_DIR / actions_meta_file).open('w+t') as f:
-            f.write(actions_meta)
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
         for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
@@ -522,15 +499,6 @@ get-status:
             'USE_LOG_ACTIONS': True,
         }))
         fake_script(self, 'action-get', "echo '{}'")
-        actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
-        actions_yaml.write_text(
-            '''
-log_critical: {}
-log_error: {}
-log_warning: {}
-log_info: {}
-log_debug: {}
-            ''')
 
         test_cases = [(
             EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME',
@@ -643,7 +611,7 @@ log_debug: {}
         self.assertEqual(state['observed_event_types'], [InstallEvent])
 
 
-class TestMainWithNoDispatch(TestMain, unittest.TestCase):
+class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
     has_dispatch = False
     hooks_are_symlinks = True
 
@@ -695,10 +663,9 @@ class TestMainWithNoDispatch(TestMain, unittest.TestCase):
         charm_config = base64.b64encode(pickle.dumps({
             'STATE_FILE': self._state_file,
         }))
-        actions_yaml = self.JUJU_CHARM_DIR / 'actions.yaml'
-        actions_yaml.write_text('test: {}')
         self._simulate_event(EventSpec(InstallEvent, 'install', charm_config=charm_config))
-        action_hook = self.JUJU_CHARM_DIR / 'actions' / 'test'
+        # foo-bar is one of the actions defined in actions.yaml
+        action_hook = self.JUJU_CHARM_DIR / 'actions' / 'foo-bar'
         self.assertTrue(action_hook.exists())
 
 
@@ -717,7 +684,7 @@ class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
         shutil.copy(charm_path, str(path))
 
 
-class TestMainWithDispatch(TestMain, unittest.TestCase):
+class TestMainWithDispatch(_TestMain, unittest.TestCase):
     has_dispatch = True
 
     def _setup_entry_point(self, directory, entry_point):

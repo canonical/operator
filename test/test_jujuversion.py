@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2019 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import unittest
+import unittest.mock  # in this file, importing just 'patch' would be confusing
 
 from ops.jujuversion import JujuVersion
 
@@ -40,6 +41,24 @@ class TestJujuVersion(unittest.TestCase):
             self.assertEqual(v.tag, tag)
             self.assertEqual(v.patch, patch)
             self.assertEqual(v.build, build)
+
+    @unittest.mock.patch('os.environ', new={})
+    def test_from_environ(self):
+        with self.assertRaisesRegex(RuntimeError, 'environ has no JUJU_VERSION'):
+            JujuVersion.from_environ()
+
+        os.environ['JUJU_VERSION'] = 'no'
+        with self.assertRaisesRegex(RuntimeError, 'not a valid Juju version'):
+            JujuVersion.from_environ()
+
+        os.environ['JUJU_VERSION'] = '2.8.0'
+        v = JujuVersion.from_environ()
+        self.assertEqual(v, JujuVersion('2.8.0'))
+
+    def test_has_app_data(self):
+        self.assertTrue(JujuVersion('2.8.0').has_app_data())
+        self.assertTrue(JujuVersion('2.7.0').has_app_data())
+        self.assertFalse(JujuVersion('2.6.9').has_app_data())
 
     def test_parsing_errors(self):
         invalid_versions = [
@@ -124,7 +143,3 @@ class TestJujuVersion(unittest.TestCase):
             self.assertEqual(JujuVersion(a) <= b, expected_weak)
             self.assertEqual(b > JujuVersion(a), expected_strict)
             self.assertEqual(b >= JujuVersion(a), expected_weak)
-
-
-if __name__ == "__main__":
-    unittest.main()

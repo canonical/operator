@@ -1,0 +1,29 @@
+foo-bar:
+  description: Foos the bar.
+  title: foo-bar
+  params:
+    foo-name:
+      type: string
+      description: A foo name to bar.
+    silent:
+      type: boolean
+      description: ""
+      default: false
+  required:
+    - foo-name
+start:
+  description: Start the unit.
+get-model-name:
+  description: Return the name of the model
+get-status:
+  description: Return the Status of the unit
+log-critical:
+  description: log a message at Critical level
+log-error:
+  description: log a message at Error level
+log-warning:
+  description: log a message at Warning level
+log-info:
+  description: log a message at Info level
+log-debug:
+  description: log a message at Debug level

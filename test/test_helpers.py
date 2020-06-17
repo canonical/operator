@@ -18,7 +18,6 @@ import subprocess
 import shutil
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from ops.framework import Framework
 from ops.model import Model, _ModelBackend
@@ -109,12 +108,7 @@ class BaseTestCase(unittest.TestCase):
 
     def create_model(self):
         """Create a Model object."""
-        unit_name = 'myapp/0'
-        patcher = patch.dict(os.environ, {'JUJU_UNIT_NAME': unit_name})
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-        backend = _ModelBackend()
+        backend = _ModelBackend(unit_name='myapp/0')
         meta = CharmMeta()
-        model = Model('myapp/0', meta, backend)
+        model = Model(meta, backend)
         return model

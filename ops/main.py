@@ -287,9 +287,7 @@ def main(charm_class):
     if not yaml.__with_libyaml__:
         logger.debug('yaml does not have libyaml extensions, using slower pure Python yaml loader')
     meta = ops.charm.CharmMeta.from_yaml(metadata, actions_metadata)
-    unit_name = os.environ['JUJU_UNIT_NAME']
-    model_name = os.environ.get('JUJU_MODEL_NAME')
-    model = ops.model.Model(unit_name, meta, model_backend, model_name=model_name)
+    model = ops.model.Model(meta, model_backend)
 
     # TODO: If Juju unit agent crashes after exit(0) from the charm code
     # the framework will commit the snapshot but Juju will not commit its
