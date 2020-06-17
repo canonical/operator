@@ -176,7 +176,7 @@ class JujuStorage:
     def notices(self, event_path):
         notice_list = self.load_notice_list()
         if event_path:
-            notice_list = list(filter(lambda row: row[0] == event_path, notice_list))
+            notice_list = list(filter(lambda r: r[0] == event_path, notice_list))
         for row in notice_list:
             yield tuple(row)
 
@@ -187,7 +187,7 @@ class JujuStorage:
         return serialized_notices
 
     def store_notice_list(self, notice_list):
-        self.self._backend.set("#notices#", notice_list)
+        self._backend.set("#notices#", notice_list)
 
 
 class _SimpleLoader(getattr(yaml, 'CSafeLoader', yaml.SafeLoader)):
@@ -263,7 +263,7 @@ class _JujuStorageBackend:
         p = subprocess.run(
             ["state-get", key],
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            # stderr=subprocess.STDOUT,
         )
         p.check_returncode()
         return yaml.load(p.stdout, Loader=_SimpleLoader)

@@ -15,6 +15,8 @@
 import abc
 import gc
 import io
+import pathlib
+import sys
 import tempfile
 from textwrap import dedent
 
@@ -79,31 +81,70 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
         return framework.Framework(':memory:', None, None, None)
 
 
-class _MemoryStorageBackend:
+def setup_juju_backend(test_case, state_file):
+    """Create fake scripts for pretending to be state-set and state-get"""
+    template_args = {
+        'executable': sys.executable,
+        'state_file': str(state_file),
+    }
+    fake_script(test_case, 'state-set', dedent('''\
+        {executable} -c '
+        import sys, yaml, pathlib, pickle
+        assert sys.argv[1:] == ["--file", "-"]
+        request = yaml.safe_load(sys.stdin)
+        state_file = pathlib.Path("{state_file}")
+        if state_file.exists() and state_file.stat().st_size > 0:
+            with state_file.open("rb") as f:
+                state = pickle.load(f)
+        else:
+            state = {{}}
+        for k, v in request.items():
+            state[k] = v
+        with state_file.open("wb") as f:
+            pickle.dump(state, f)
+        ' "$@"
+        ''').format(**template_args))
 
-    def __init__(self):
-        self._values = {}
-        self._calls = []
+    fake_script(test_case, 'state-get', dedent('''\
+        {executable} -c '
+        import sys, pathlib, pickle
+        assert len(sys.argv) == 2
+        state_file = pathlib.Path("{state_file}")
+        if state_file.exists() and state_file.stat().st_size > 0:
+            with state_file.open("rb") as f:
+                state = pickle.load(f)
+        else:
+            state = {{}}
+        result = state.get(sys.argv[1], "\\n")
+        sys.stdout.write(result)
+        ' "$@"
+        ''').format(**template_args))
 
-    def set(self, key, value):
-        self._calls.append(('set', key, value))
-        self._values[key] = value
-
-    def get(self, key):
-        self._calls.append(('get', key))
-        return self._values[key]
-
-    def delete(self, key):
-        self._calls.append(('delete', key))
-        self._calls.pop(key, None)
+    fake_script(test_case, 'state-delete', dedent('''\
+        {executable} -c '
+        import sys, pathlib, pickle
+        assert len(sys.argv) == 2
+        state_file = pathlib.Path("{state_file}")
+        if state_file.exists() and state_file.stat().st_size > 0:
+            with state_file.open("rb") as f:
+                state = pickle.load(f)
+        else:
+            state = {{}}
+        state.pop(sys.argv[1], None)
+        with state_file.open("wb") as f:
+            pickle.dump(state, f)
+        ' "$@"
+        ''').format(**template_args))
 
 
 class TestJujuStorage(StoragePermutations, BaseTestCase):
 
     def create_framework(self):
-        mem_backend = _MemoryStorageBackend()
+        state_file = pathlib.Path(tempfile.mkstemp(prefix='tmp-ops-test-state-')[1])
+        self.addCleanup(state_file.unlink)
+        setup_juju_backend(self, state_file)
         f = framework.Framework(':memory:', None, None, None)
-        f._storage = storage.JujuStorage(mem_backend)
+        f._storage = storage.JujuStorage(storage._JujuStorageBackend())
         return f
 
 
