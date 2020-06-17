@@ -23,6 +23,12 @@ from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvent
 from ops import model
 
 
+def _loadYaml(source):
+    if yaml.__with_libyaml__:
+        return yaml.load(source, Loader=yaml.CSafeLoader)
+    return yaml.load(source, Loader=yaml.SafeLoader)
+
+
 class HookEvent(EventBase):
     """A base class for events that trigger because of a Juju hook firing."""
 
@@ -475,10 +481,10 @@ class CharmMeta:
                 This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
             actions: YAML description of Actions for this charm (eg actions.yaml)
         """
-        meta = yaml.safe_load(metadata)
+        meta = _loadYaml(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = yaml.safe_load(actions)
+            raw_actions = _loadYaml(actions)
         return cls(meta, raw_actions)
 
 
