@@ -158,7 +158,11 @@ class JujuStorage:
         self._backend.set(handle_path, snapshot_data)
 
     def load_snapshot(self, handle_path):
-        return self._backend.get(handle_path)
+        try:
+            content = self._backend.get(handle_path)
+        except KeyError:
+            raise NoSnapshotError(handle_path)
+        return content
 
     def drop_snapshot(self, handle_path):
         self._backend.delete(handle_path)
@@ -263,9 +267,11 @@ class _JujuStorageBackend:
         p = subprocess.run(
             ["state-get", key],
             stdout=subprocess.PIPE,
-            # stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
         )
         p.check_returncode()
+        if p.stdout == b'' or p.stdout == b'\n':
+            raise KeyError(key)
         return yaml.load(p.stdout, Loader=_SimpleLoader)
 
     def delete(self, key: str) -> None:

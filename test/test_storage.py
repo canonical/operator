@@ -41,6 +41,11 @@ class StoragePermutations(abc.ABC):
         """
         return NotImplemented
 
+    @abc.abstractmethod
+    def create_storage(self) -> storage.SQLiteStorage:
+        """Create a Storage backend that we can interact with"""
+        return NotImplemented
+
     def test_save_and_load_snapshot(self):
         f = self.create_framework()
 
@@ -57,7 +62,7 @@ class StoragePermutations(abc.ABC):
                 self.__dict__.update(snapshot)
 
         f.register_type(Sample, None, Sample.handle_kind)
-        content = {
+        data = {
             'str': 'string',
             'bytes': b'bytes',
             'int': 1,
@@ -66,19 +71,67 @@ class StoragePermutations(abc.ABC):
             'set': {'a', 'b'},
             'list': [1, 2],
         }
-        s = Sample(f, 'test', content)
+        s = Sample(f, 'test', data)
         handle = s.handle
         f.save_snapshot(s)
         del s
         gc.collect()
         res = f.load_snapshot(handle)
-        self.assertEqual(content, res.content)
+        self.assertEqual(data, res.content)
+
+    def test_save_and_overwrite_snapshot(self):
+        store = self.create_storage()
+        store.save_snapshot('foo', {1: 2})
+        self.assertEqual({1: 2}, store.load_snapshot('foo'))
+        store.save_snapshot('foo', {'three': 4})
+        self.assertEqual({'three': 4}, store.load_snapshot('foo'))
+
+    def test_drop_snapshot(self):
+        store = self.create_storage()
+        store.save_snapshot('foo', {1: 2})
+        self.assertEqual({1: 2}, store.load_snapshot('foo'))
+        store.drop_snapshot('foo')
+        with self.assertRaises(storage.NoSnapshotError):
+            store.load_snapshot('foo')
+
+    def test_save_snapshot_empty_string(self):
+        store = self.create_storage()
+        with self.assertRaises(storage.NoSnapshotError):
+            store.load_snapshot('foo')
+        store.save_snapshot('foo', '')
+        self.assertEqual('', store.load_snapshot('foo'))
+        store.drop_snapshot('foo')
+        with self.assertRaises(storage.NoSnapshotError):
+            store.load_snapshot('foo')
+
+    def test_save_snapshot_none(self):
+        store = self.create_storage()
+        with self.assertRaises(storage.NoSnapshotError):
+            store.load_snapshot('bar')
+        store.save_snapshot('bar', None)
+        self.assertEqual(None, store.load_snapshot('bar'))
+        store.drop_snapshot('bar')
+        with self.assertRaises(storage.NoSnapshotError):
+            store.load_snapshot('bar')
+
+    def test_save_snapshot_zero(self):
+        store = self.create_storage()
+        with self.assertRaises(storage.NoSnapshotError):
+            store.load_snapshot('zero')
+        store.save_snapshot('zero', 0)
+        self.assertEqual(0, store.load_snapshot('zero'))
+        store.drop_snapshot('zero')
+        with self.assertRaises(storage.NoSnapshotError):
+            store.load_snapshot('zero')
 
 
 class TestSQLiteStorage(StoragePermutations, BaseTestCase):
 
     def create_framework(self):
         return framework.Framework(':memory:', None, None, None)
+
+    def create_storage(self):
+        return storage.SQLiteStorage(':memory:')
 
 
 def setup_juju_backend(test_case, state_file):
@@ -140,12 +193,17 @@ def setup_juju_backend(test_case, state_file):
 class TestJujuStorage(StoragePermutations, BaseTestCase):
 
     def create_framework(self):
+        storage = self.create_storage()
+        # TODO: jam 2020-06-17 Framework should take a Storage not a path
+        f = framework.Framework(':memory:', None, None, None)
+        f._storage = storage
+        return f
+
+    def create_storage(self):
         state_file = pathlib.Path(tempfile.mkstemp(prefix='tmp-ops-test-state-')[1])
         self.addCleanup(state_file.unlink)
         setup_juju_backend(self, state_file)
-        f = framework.Framework(':memory:', None, None, None)
-        f._storage = storage.JujuStorage(storage._JujuStorageBackend())
-        return f
+        return storage.JujuStorage(storage._JujuStorageBackend())
 
 
 class TestSimpleLoader(BaseTestCase):
