@@ -147,8 +147,10 @@ class JujuStorage:
 
     NOTICE_KEY = "#notices#"
 
-    def __init__(self, backend: '_JujuStorageBackend'):
+    def __init__(self, backend: '_JujuStorageBackend' = None):
         self._backend = backend
+        if backend is None:
+            self._backend = _JujuStorageBackend()
 
     def close(self):
         return

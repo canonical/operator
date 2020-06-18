@@ -256,7 +256,7 @@ class TestJujuStorage(StoragePermutations, BaseTestCase):
         state_file = pathlib.Path(tempfile.mkstemp(prefix='tmp-ops-test-state-')[1])
         self.addCleanup(state_file.unlink)
         setup_juju_backend(self, state_file)
-        return storage.JujuStorage(storage._JujuStorageBackend())
+        return storage.JujuStorage()
 
 
 class TestSimpleLoader(BaseTestCase):
@@ -274,6 +274,23 @@ class TestSimpleLoader(BaseTestCase):
             self.assertIsInstance(dumper, yaml.CSafeDumper)
         else:
             self.assertIsInstance(dumper, yaml.SafeDumper)
+
+    def test_handles_tuples(self):
+        raw = yaml.dump((1, 'tuple'), Dumper=storage._SimpleDumper)
+        parsed = yaml.load(raw, Loader=storage._SimpleLoader)
+        self.assertEqual(parsed, (1, 'tuple'))
+
+    def test_forbids_objects(self):
+        class Foo:
+            pass
+        f = Foo()
+        # We shouldn't allow them to be written
+        with self.assertRaises(yaml.representer.RepresenterError):
+            yaml.dump(f, Dumper=storage._SimpleDumper)
+        # If they did somehow end up written, we shouldn't be able to load them
+        raw = yaml.dump(f, Dumper=yaml.Dumper)
+        with self.assertRaises(yaml.constructor.ConstructorError):
+            yaml.load(raw, Loader=storage._SimpleLoader)
 
 
 class TestJujuStateBackend(BaseTestCase):

@@ -264,7 +264,7 @@ class _Dispatcher:
         self._set_name_from_path(self._dispatch_path)
 
 
-def main(charm_class):
+def main(charm_class, use_juju_for_storage=False):
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
@@ -294,7 +294,10 @@ def main(charm_class):
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
-    store = ops.storage.SQLiteStorage(charm_state_path)
+    if use_juju_for_storage:
+        store = ops.storage.JujuStorage()
+    else:
+        store = ops.storage.SQLiteStorage(charm_state_path)
     framework = ops.framework.Framework(store, charm_dir, meta, model)
     try:
         sig = inspect.signature(charm_class)
