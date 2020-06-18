@@ -740,27 +740,26 @@ class Framework(Object):
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""
 
-        # Save the event for all known observers before the first notification
-        # takes place, so that either everyone interested sees it, or nobody does.
-        self.save_snapshot(event)
+        saved = False
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent_path = event.handle.parent.path
         # TODO Track observers by (parent_path, event_kind) rather than as a list of
         # all observers. Avoiding linear search through all observers for every event
-        has_observers = False
         for observer_path, method_name, _parent_path, _event_kind in self._observers:
             if _parent_path != parent_path:
                 continue
             if _event_kind and _event_kind != event_kind:
                 continue
-            has_observers = True
+            if not saved:
+                # Save the event for all known observers before the first notification
+                # takes place, so that either everyone interested sees it, or nobody does.
+                self.save_snapshot(event)
+                saved = True
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
-        if has_observers:
+        if saved:
             self._reemit(event_path)
-        else:
-            self._storage.drop_snapshot(event.handle.path)
 
     def reemit(self):
         """Reemit previously deferred events to the observers that deferred them.
