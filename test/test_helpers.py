@@ -47,7 +47,7 @@ def fake_script(test_case, name, content):
         # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
         f.write('''#!/bin/sh
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
-{content}'''.format(**template_args))
+{content}'''.format_map(template_args))
     os.chmod(str(test_case.fake_script_path / name), 0o755)
 
 
