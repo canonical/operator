@@ -39,9 +39,9 @@ def fake_script(test_case, name, content):
     with (test_case.fake_script_path / name).open('wt') as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
         # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
-        f.write('''#!/bin/bash
-{ echo -n $(basename $0); printf "\\x1e%s" "$@"; printf "\\x1c"; } >> $(dirname $0)/calls.txt
-''' + content)
+        f.write('''#!/bin/sh
+{{ printf {}; printf "\\036%s" "$@"; printf "\\034"; }} >> {}/calls.txt
+{}'''.format(name, test_case.fake_script_path, content))
     os.chmod(str(test_case.fake_script_path / name), 0o755)
 
 
