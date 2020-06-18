@@ -20,7 +20,12 @@ import typing
 import yaml
 import weakref
 
-from ops import charm, framework, model
+from ops import (
+    charm,
+    framework,
+    model,
+    storage,
+)
 
 
 # OptionalYAML is something like metadata.yaml or actions.yaml. You can
@@ -76,7 +81,9 @@ class Harness:
         self._relation_id_counter = 0
         self._backend = _TestingModelBackend(self._unit_name, self._meta)
         self._model = model.Model(self._meta, self._backend)
-        self._framework = framework.Framework(":memory:", self._charm_dir, self._meta, self._model)
+        self._storage = storage.SQLiteStorage(':memory:')
+        self._framework = framework.Framework(
+            self._storage, self._charm_dir, self._meta, self._model)
 
     @property
     def charm(self) -> charm.CharmBase:

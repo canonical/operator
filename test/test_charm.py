@@ -26,6 +26,7 @@ from ops.charm import (
 )
 from ops.framework import Framework, EventSource, EventBase
 from ops.model import Model, _ModelBackend
+from ops.storage import SQLiteStorage
 
 from .test_helpers import fake_script, fake_script_calls
 
@@ -61,7 +62,7 @@ class TestCharm(unittest.TestCase):
 
     def create_framework(self):
         model = Model(self.meta, _ModelBackend('local/0'))
-        framework = Framework(self.tmpdir / "framework.data", self.tmpdir, self.meta, model)
+        framework = Framework(SQLiteStorage(':memory:'), self.tmpdir, self.meta, model)
         self.addCleanup(framework.close)
         return framework
 

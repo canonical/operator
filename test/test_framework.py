@@ -42,6 +42,7 @@ from ops.framework import (
     StoredState,
     StoredStateData,
 )
+from ops.storage import SQLiteStorage
 from test.test_helpers import fake_script, BaseTestCase
 
 
@@ -54,6 +55,14 @@ class TestFramework(BaseTestCase):
         patcher = patch('ops.storage.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
         patcher.start()
         self.addCleanup(patcher.stop)
+        logassert.setup(self, 'ops')
+
+    def test_deprecated_init(self):
+        # For 0.7, this still works, but it is deprecated.
+        framework = Framework(':memory:', None, None, None)
+        self.assertLoggedWarning(
+            "deprecated: Framework now takes a Storage not a path")
+        self.assertIsInstance(framework._storage, SQLiteStorage)
 
     def test_handle_path(self):
         cases = [
@@ -1134,8 +1143,8 @@ class TestStoredState(BaseTestCase):
             _stored = StoredState()
 
         class WrappedFramework(Framework):
-            def __init__(self, data_path, charm_dir, meta, model):
-                super().__init__(data_path, charm_dir, meta, model)
+            def __init__(self, store, charm_dir, meta, model):
+                super().__init__(store, charm_dir, meta, model)
                 self.snapshots = []
 
             def save_snapshot(self, value):
@@ -1145,7 +1154,8 @@ class TestStoredState(BaseTestCase):
 
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
-            framework = WrappedFramework(self.tmpdir / "framework.data", self.tmpdir, None, None)
+            storage = SQLiteStorage(self.tmpdir / "framework.data")
+            framework = WrappedFramework(storage, self.tmpdir, None, None)
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
@@ -1170,8 +1180,8 @@ class TestStoredState(BaseTestCase):
             framework.commit()
             framework.close()
 
-            framework_copy = WrappedFramework(
-                self.tmpdir / "framework.data", self.tmpdir, None, None)
+            storage_copy = SQLiteStorage(self.tmpdir / "framework.data")
+            framework_copy = WrappedFramework(storage_copy, self.tmpdir, None, None)
 
             obj_copy2 = SomeObject(framework_copy, '1')
 

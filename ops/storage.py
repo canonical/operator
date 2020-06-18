@@ -169,17 +169,17 @@ class JujuStorage:
     def drop_snapshot(self, handle_path):
         self._backend.delete(handle_path)
 
-    def save_notice(self, event_path, observer_path, method_name):
+    def save_notice(self, event_path: str, observer_path: str, method_name: str):
         notice_list = self._load_notice_list()
         notice_list.append([event_path, observer_path, method_name])
         self._save_notice_list(notice_list)
 
-    def drop_notice(self, event_path, observer_path, method_name):
+    def drop_notice(self, event_path: str, observer_path: str, method_name: str):
         notice_list = self._load_notice_list()
         notice_list.remove([event_path, observer_path, method_name])
         self._save_notice_list(notice_list)
 
-    def notices(self, event_path):
+    def notices(self, event_path: str):
         notice_list = self._load_notice_list()
         if event_path:
             notice_list = list(filter(lambda r: r[0] == event_path, notice_list))

@@ -35,11 +35,10 @@ from test.test_helpers import (
 
 class StoragePermutations(abc.ABC):
 
-    @abc.abstractmethod
     def create_framework(self) -> framework.Framework:
         """Create a Framework that we can use to test the backend storage.
         """
-        return NotImplemented
+        return framework.Framework(self.create_storage(), None, None, None)
 
     @abc.abstractmethod
     def create_storage(self) -> storage.SQLiteStorage:
@@ -191,9 +190,6 @@ class StoragePermutations(abc.ABC):
 
 class TestSQLiteStorage(StoragePermutations, BaseTestCase):
 
-    def create_framework(self):
-        return framework.Framework(':memory:', None, None, None)
-
     def create_storage(self):
         return storage.SQLiteStorage(':memory:')
 
@@ -255,13 +251,6 @@ def setup_juju_backend(test_case, state_file):
 
 
 class TestJujuStorage(StoragePermutations, BaseTestCase):
-
-    def create_framework(self):
-        storage = self.create_storage()
-        # TODO: jam 2020-06-17 Framework should take a Storage not a path
-        f = framework.Framework(':memory:', None, None, None)
-        f._storage = storage
-        return f
 
     def create_storage(self):
         state_file = pathlib.Path(tempfile.mkstemp(prefix='tmp-ops-test-state-')[1])

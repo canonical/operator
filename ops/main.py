@@ -25,6 +25,7 @@ import yaml
 import ops.charm
 import ops.framework
 import ops.model
+import ops.storage
 
 from ops.log import setup_root_logging
 
@@ -293,7 +294,8 @@ def main(charm_class):
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
-    framework = ops.framework.Framework(charm_state_path, charm_dir, meta, model)
+    store = ops.storage.SQLiteStorage(charm_state_path)
+    framework = ops.framework.Framework(store, charm_dir, meta, model)
     try:
         sig = inspect.signature(charm_class)
         try:
