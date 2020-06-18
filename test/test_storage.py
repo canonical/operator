@@ -79,6 +79,44 @@ class StoragePermutations(abc.ABC):
         res = f.load_snapshot(handle)
         self.assertEqual(data, res.content)
 
+    def test_emit_event(self):
+        f = self.create_framework()
+
+        class Evt(framework.EventBase):
+            def __init__(self, handle, content):
+                super().__init__(handle)
+                self.content = content
+
+            def snapshot(self):
+                return self.content
+
+            def restore(self, content):
+                self.content = content
+
+        class Events(framework.ObjectEvents):
+            event = framework.EventSource(Evt)
+
+        class Sample(framework.Object):
+
+            on = Events()
+
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self.observed_content = None
+                self.framework.observe(self.on.event, self._on_event)
+
+            def _on_event(self, event: Evt):
+                self.observed_content = event.content
+
+        s = Sample(f, 'key')
+        f.register_type(Sample, None, Sample.handle_kind)
+        s.on.event.emit('foo')
+        self.assertEqual('foo', s.observed_content)
+        s.on.event.emit(1)
+        self.assertEqual(1, s.observed_content)
+        s.on.event.emit(None)
+        self.assertEqual(None, s.observed_content)
+
     def test_save_and_overwrite_snapshot(self):
         store = self.create_storage()
         store.save_snapshot('foo', {1: 2})
@@ -124,6 +162,32 @@ class StoragePermutations(abc.ABC):
         with self.assertRaises(storage.NoSnapshotError):
             store.load_snapshot('zero')
 
+    def test_save_notice(self):
+        store = self.create_storage()
+        store.save_notice('event', 'observer', 'method')
+        self.assertEqual(
+            list(store.notices('event')),
+            [('event', 'observer', 'method')])
+
+    def test_load_notices(self):
+        store = self.create_storage()
+        self.assertEqual(list(store.notices('path')), [])
+
+    def test_save_one_load_another_notice(self):
+        store = self.create_storage()
+        store.save_notice('event', 'observer', 'method')
+        self.assertEqual(list(store.notices('other')), [])
+
+    def test_save_load_drop_load_notices(self):
+        store = self.create_storage()
+        store.save_notice('event', 'observer', 'method')
+        store.save_notice('event', 'observer', 'method2')
+        self.assertEqual(
+            list(store.notices('event')),
+            [('event', 'observer', 'method'),
+             ('event', 'observer', 'method2'),
+             ])
+
 
 class TestSQLiteStorage(StoragePermutations, BaseTestCase):
 
@@ -144,7 +208,7 @@ def setup_juju_backend(test_case, state_file):
         {executable} -c '
         import sys, yaml, pathlib, pickle
         assert sys.argv[1:] == ["--file", "-"]
-        request = yaml.safe_load(sys.stdin)
+        request = yaml.load(sys.stdin, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader))
         state_file = pathlib.Path("{state_file}")
         if state_file.exists() and state_file.stat().st_size > 0:
             with state_file.open("rb") as f:
@@ -159,7 +223,7 @@ def setup_juju_backend(test_case, state_file):
         ''').format(**template_args))
 
     fake_script(test_case, 'state-get', dedent('''\
-        {executable} -c '
+        {executable} -Sc '
         import sys, pathlib, pickle
         assert len(sys.argv) == 2
         state_file = pathlib.Path("{state_file}")
@@ -174,7 +238,7 @@ def setup_juju_backend(test_case, state_file):
         ''').format(**template_args))
 
     fake_script(test_case, 'state-delete', dedent('''\
-        {executable} -c '
+        {executable} -Sc '
         import sys, pathlib, pickle
         assert len(sys.argv) == 2
         state_file = pathlib.Path("{state_file}")

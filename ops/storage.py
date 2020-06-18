@@ -145,6 +145,8 @@ class JujuStorage:
     as the way to store state for the framework and for components.
     """
 
+    NOTICE_KEY = "#notices#"
+
     def __init__(self, backend: '_JujuStorageBackend'):
         self._backend = backend
 
@@ -168,30 +170,33 @@ class JujuStorage:
         self._backend.delete(handle_path)
 
     def save_notice(self, event_path, observer_path, method_name):
-        notice_list = self.load_notice_list()
+        notice_list = self._load_notice_list()
         notice_list.append([event_path, observer_path, method_name])
-        self.store_notice_list(notice_list)
+        self._save_notice_list(notice_list)
 
     def drop_notice(self, event_path, observer_path, method_name):
-        notice_list = self.load_notice_list()
+        notice_list = self._load_notice_list()
         notice_list.remove([event_path, observer_path, method_name])
-        self.store_notice_list(notice_list)
+        self._save_notice_list(notice_list)
 
     def notices(self, event_path):
-        notice_list = self.load_notice_list()
+        notice_list = self._load_notice_list()
         if event_path:
             notice_list = list(filter(lambda r: r[0] == event_path, notice_list))
         for row in notice_list:
             yield tuple(row)
 
-    def load_notice_list(self):
-        serialized_notices = self._backend.get("#notices#")
-        if serialized_notices is None:
+    def _load_notice_list(self) -> typing.List[typing.Tuple[str]]:
+        try:
+            notice_list = self._backend.get(self.NOTICE_KEY)
+        except KeyError:
             return []
-        return serialized_notices
+        if notice_list is None:
+            return []
+        return notice_list
 
-    def store_notice_list(self, notice_list):
-        self._backend.set("#notices#", notice_list)
+    def _save_notice_list(self, notices: typing.List[typing.Tuple[str]]) -> None:
+        self._backend.set(self.NOTICE_KEY, notices)
 
 
 class _SimpleLoader(getattr(yaml, 'CSafeLoader', yaml.SafeLoader)):
