@@ -434,7 +434,7 @@ class TestModel(unittest.TestCase):
         model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
         fake_script(self, 'pod-spec-set', """
                     cat $2 > $(dirname $0)/spec.json
-                    [[ -n $4 ]] && cat $4 > $(dirname $0)/k8s_res.json || true
+                    [ -n "$4" ] && cat "$4" > $(dirname $0)/k8s_res.json || true
                     """)
         fake_script(self, 'is-leader', 'echo true')
         spec_path = self.fake_script_path / 'spec.json'
