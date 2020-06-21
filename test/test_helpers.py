@@ -37,12 +37,18 @@ def fake_script(test_case, name, content):
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)
 
+    template_args = {
+        'name': name,
+        'path': test_case.fake_script_path,
+        'content': content,
+    }
+
     with (test_case.fake_script_path / name).open('wt') as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
         # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
-        f.write('''#!/bin/bash
-{ echo -n $(basename $0); printf "\\x1e%s" "$@"; printf "\\x1c"; } >> $(dirname $0)/calls.txt
-''' + content)
+        f.write('''#!/bin/sh
+{{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
+{content}'''.format_map(template_args))
     os.chmod(str(test_case.fake_script_path / name), 0o755)
 
 
