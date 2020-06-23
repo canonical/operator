@@ -17,6 +17,7 @@ import gc
 import inspect
 import io
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -31,6 +32,7 @@ from ops.framework import (
     BoundStoredState,
     CommitEvent,
     EventBase,
+    _event_regex,
     ObjectEvents,
     EventSource,
     Framework,
@@ -772,6 +774,90 @@ class TestFramework(BaseTestCase):
             "unable to save the data for FooEvent, it must contain only simple types: "
             "{'bar': <class 'test.test_framework.TestFramework'>}")
         self.assertEqual(str(cm.exception), expected)
+
+    def test_unobserved_events_dont_leave_cruft(self):
+        class FooEvent(EventBase):
+            def snapshot(self):
+                return {'content': 1}
+
+        class Events(ObjectEvents):
+            foo = EventSource(FooEvent)
+
+        class Emitter(Object):
+            on = Events()
+
+        framework = self.create_framework()
+        e = Emitter(framework, 'key')
+        e.on.foo.emit()
+        ev_1_handle = Handle(e.on, "foo", "1")
+        with self.assertRaises(NoSnapshotError):
+            framework.load_snapshot(ev_1_handle)
+        # Committing will save the framework's state, but no other snapshots should be saved
+        framework.commit()
+        events = framework._storage.list_snapshots()
+        self.assertEqual(list(events), [framework._stored.handle.path])
+
+    def test_event_regex(self):
+        examples = [
+            'Ubuntu/on/config_changed[7]',
+            'on/commit[9]',
+            'on/pre_commit[8]',
+        ]
+        non_examples = [
+            'StoredStateData[_stored]',
+            'ObjectWithSTorage[obj]StoredStateData[_stored]',
+        ]
+        regex = re.compile(_event_regex)
+        for e in examples:
+            self.assertIsNotNone(regex.match(e))
+        for e in non_examples:
+            self.assertIsNone(regex.match(e))
+
+    def test_remove_unreferenced_events(self):
+        framework = self.create_framework()
+
+        class Evt(EventBase):
+            pass
+
+        class Events(ObjectEvents):
+            event = EventSource(Evt)
+
+        class ObjectWithStorage(Object):
+            _stored = StoredState()
+            on = Events()
+
+            def __init__(self, framework, key):
+                super().__init__(framework, key)
+                self._stored.set_default(foo=2)
+                self.framework.observe(self.on.event, self._on_event)
+
+            def _on_event(self, event):
+                event.defer()
+
+        # This is an event that 'happened in the past' that doesn't have an associated notice.
+        o = ObjectWithStorage(framework, 'obj')
+        handle = Handle(o.on, 'event', '100')
+        event = Evt(handle)
+        framework.save_snapshot(event)
+        self.assertEqual(list(framework._storage.list_snapshots()), [handle.path])
+        o.on.event.emit()
+        self.assertEqual(
+            list(framework._storage.notices('')),
+            [('ObjectWithStorage[obj]/on/event[1]', 'ObjectWithStorage[obj]', '_on_event')])
+        framework.commit()
+        self.assertEqual(
+            sorted(framework._storage.list_snapshots()),
+            sorted(['ObjectWithStorage[obj]/on/event[100]',
+                    'StoredStateData[_stored]',
+                    'ObjectWithStorage[obj]/StoredStateData[_stored]',
+                    'ObjectWithStorage[obj]/on/event[1]']))
+        framework.remove_unreferenced_events()
+        self.assertEqual(
+            sorted(framework._storage.list_snapshots()),
+            sorted([
+                'StoredStateData[_stored]',
+                'ObjectWithStorage[obj]/StoredStateData[_stored]',
+                'ObjectWithStorage[obj]/on/event[1]']))
 
 
 class TestStoredState(BaseTestCase):

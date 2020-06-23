@@ -461,14 +461,31 @@ class SQLiteStorage:
             return pickle.loads(row[0])
         raise NoSnapshotError(handle_path)
 
-    def drop_snapshot(self, handle_path):
+    def drop_snapshot(self, handle_path: str):
+        """Part of the Storage API, remove a snapshot that was previously saved.
+
+        Dropping a snapshot that doesn't exist is treated as a no-op.
+        """
         self._db.execute("DELETE FROM snapshot WHERE handle=?", (handle_path,))
 
-    def save_notice(self, event_path, observer_path, method_name):
+    def list_snapshots(self) -> typing.Generator[str, None, None]:
+        """Return the name of all snapshots that are currently saved."""
+        c = self._db.cursor()
+        c.execute("SELECT handle FROM snapshot")
+        while True:
+            rows = c.fetchmany()
+            if not rows:
+                break
+            for row in rows:
+                yield row[0]
+
+    def save_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
+        """Part of the Storage API, record an notice (event and observer)"""
         self._db.execute('INSERT INTO notice VALUES (NULL, ?, ?, ?)',
                          (event_path, observer_path, method_name))
 
-    def drop_notice(self, event_path, observer_path, method_name):
+    def drop_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
+        """Part of the Storage API, remove a notice that was previously recorded."""
         self._db.execute('''
             DELETE FROM notice
              WHERE event_path=?
@@ -476,7 +493,16 @@ class SQLiteStorage:
                AND method_name=?
             ''', (event_path, observer_path, method_name))
 
-    def notices(self, event_path):
+    def notices(self, event_path: typing.Optional[str]) ->\
+            typing.Generator[typing.Tuple[str, str, str], None, None]:
+        """Part of the Storage API, return all notices that begin with event_path.
+
+        Args:
+            event_path: If supplied, will only yield events that match event_path. If not
+                supplied (or None/'') will return all events.
+        Returns:
+            Iterable of (event_path, observer_path, method_name) tuples
+        """
         if event_path:
             c = self._db.execute('''
                 SELECT event_path, observer_path, method_name
@@ -506,6 +532,9 @@ Future breakpoints may interrupt execution again.
 More details at https://discourse.jujucharms.com/t/debugging-charm-hooks
 
 """
+
+
+_event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 
 
 class Framework(Object):
@@ -711,9 +740,7 @@ class Framework(Object):
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""
 
-        # Save the event for all known observers before the first notification
-        # takes place, so that either everyone interested sees it, or nobody does.
-        self.save_snapshot(event)
+        saved = False
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent_path = event.handle.parent.path
@@ -724,9 +751,15 @@ class Framework(Object):
                 continue
             if _event_kind and _event_kind != event_kind:
                 continue
+            if not saved:
+                # Save the event for all known observers before the first notification
+                # takes place, so that either everyone interested sees it, or nobody does.
+                self.save_snapshot(event)
+                saved = True
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
-        self._reemit(event_path)
+        if saved:
+            self._reemit(event_path)
 
     def reemit(self):
         """Reemit previously deferred events to the observers that deferred them.
@@ -745,7 +778,7 @@ class Framework(Object):
             event_handle = Handle.from_path(event_path)
 
             if last_event_path != event_path:
-                if not deferred:
+                if not deferred and last_event_path is not None:
                     self._storage.drop_snapshot(last_event_path)
                 last_event_path = event_path
                 deferred = False
@@ -779,7 +812,7 @@ class Framework(Object):
             # scratch in the next path.
             self.framework._forget(event)
 
-        if not deferred:
+        if not deferred and last_event_path is not None:
             self._storage.drop_snapshot(last_event_path)
 
     def _show_debug_code_message(self):
@@ -824,6 +857,24 @@ class Framework(Object):
             logger.warning(
                 "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
                 name, indicated_breakpoints)
+
+    def remove_unreferenced_events(self):
+        """Remove events from storage that are not referenced.
+
+        In older versions of the framework, events that had no observers would get recorded but
+        never deleted. This makes a best effort to find these events and remove them from the
+        database.
+        """
+        event_regex = re.compile(_event_regex)
+        to_remove = []
+        for handle_path in self._storage.list_snapshots():
+            if event_regex.match(handle_path):
+                notices = self._storage.notices(handle_path)
+                if next(notices, None) is None:
+                    # There are no notices for this handle_path, it is valid to remove it
+                    to_remove.append(handle_path)
+        for handle_path in to_remove:
+            self._storage.drop_snapshot(handle_path)
 
 
 class StoredStateData(Object):
