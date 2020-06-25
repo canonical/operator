@@ -1,4 +1,4 @@
-# Copyright 2020 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,17 +18,9 @@ import shutil
 import subprocess
 import sqlite3
 import typing
+from datetime import timedelta
 
 import yaml
-
-
-class NoSnapshotError(Exception):
-
-    def __init__(self, handle_path):
-        self.handle_path = handle_path
-
-    def __str__(self):
-        return 'no snapshot data found for {} object'.format(self.handle_path)
 
 
 class SQLiteStorage:
@@ -101,14 +93,31 @@ class SQLiteStorage:
             return pickle.loads(row[0])
         raise NoSnapshotError(handle_path)
 
-    def drop_snapshot(self, handle_path):
+    def drop_snapshot(self, handle_path: str):
+        """Part of the Storage API, remove a snapshot that was previously saved.
+
+        Dropping a snapshot that doesn't exist is treated as a no-op.
+        """
         self._db.execute("DELETE FROM snapshot WHERE handle=?", (handle_path,))
 
-    def save_notice(self, event_path, observer_path, method_name):
+    def list_snapshots(self) -> typing.Generator[str, None, None]:
+        """Return the name of all snapshots that are currently saved."""
+        c = self._db.cursor()
+        c.execute("SELECT handle FROM snapshot")
+        while True:
+            rows = c.fetchmany()
+            if not rows:
+                break
+            for row in rows:
+                yield row[0]
+
+    def save_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
+        """Part of the Storage API, record an notice (event and observer)"""
         self._db.execute('INSERT INTO notice VALUES (NULL, ?, ?, ?)',
                          (event_path, observer_path, method_name))
 
-    def drop_notice(self, event_path, observer_path, method_name):
+    def drop_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
+        """Part of the Storage API, remove a notice that was previously recorded."""
         self._db.execute('''
             DELETE FROM notice
              WHERE event_path=?
@@ -116,7 +125,16 @@ class SQLiteStorage:
                AND method_name=?
             ''', (event_path, observer_path, method_name))
 
-    def notices(self, event_path):
+    def notices(self, event_path: typing.Optional[str]) ->\
+            typing.Generator[typing.Tuple[str, str, str], None, None]:
+        """Part of the Storage API, return all notices that begin with event_path.
+
+        Args:
+            event_path: If supplied, will only yield events that match event_path. If not
+                supplied (or None/'') will return all events.
+        Returns:
+            Iterable of (event_path, observer_path, method_name) tuples
+        """
         if event_path:
             c = self._db.execute('''
                 SELECT event_path, observer_path, method_name
@@ -291,3 +309,12 @@ class _JujuStorageBackend:
         """
         p = subprocess.run(["state-delete", key])
         p.check_returncode()
+
+
+class NoSnapshotError(Exception):
+
+    def __init__(self, handle_path):
+        self.handle_path = handle_path
+
+    def __str__(self):
+        return 'no snapshot data found for {} object'.format(self.handle_path)

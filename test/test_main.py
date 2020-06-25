@@ -47,6 +47,7 @@ from ops.charm import (
     CollectMetricsEvent,
 )
 from ops.main import main
+from ops.version import version
 
 from .test_helpers import fake_script, fake_script_calls
 
@@ -54,6 +55,10 @@ from .test_helpers import fake_script, fake_script_calls
 # source of the charm under test.
 TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
 
+VERSION_LOGLINE = [
+    'juju-log', '--log-level', 'DEBUG',
+    'Operator Framework {} up and running.'.format(version),
+]
 logger = logging.getLogger(__name__)
 
 
@@ -481,13 +486,14 @@ class _TestMain(abc.ABC):
                                        charm_config=charm_config))
 
         expected = [
+            VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
         ]
         calls = fake_script_calls(self)
 
         if self.has_dispatch:
-            expected.insert(0, [
+            expected.insert(1, [
                 'juju-log', '--log-level', 'DEBUG',
                 'Legacy hooks/collect-metrics does not exist.'])
 
@@ -539,6 +545,8 @@ class _TestMain(abc.ABC):
                                            charm_config=charm_config))
 
         calls = [' '.join(i) for i in fake_script_calls(self)]
+
+        self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
 
         if self.has_dispatch:
             self.assertEqual(
@@ -744,6 +752,7 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
 
         self.fake_script_path = old_path
         self.assertEqual(fake_script_calls(self), [
+            VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
             ['juju-log', '--log-level', 'DEBUG', 'Legacy hooks/install exited with status 0.'],
             ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
@@ -760,6 +769,7 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
         self.assertEqual(state['observed_event_types'], [InstallEvent])
 
         self.assertEqual(fake_script_calls(self), [
+            VERSION_LOGLINE,
             ['juju-log', '--log-level', 'WARNING',
              'Legacy hooks/install exists but is not executable.'],
             ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
@@ -785,6 +795,7 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
         self.assertEqual(self.stdout.read(), b'')
         calls = fake_script_calls(self)
         expected = [
+            VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
             ['juju-log', '--log-level', 'WARNING', 'Legacy hooks/install exited with status 42.'],
         ]
@@ -837,7 +848,9 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
         self.assertEqual(state['observed_event_types'], [InstallEvent])
         self.assertEqual(state['on_install'], [InstallEvent])
         self.assertEqual(fake_script_calls(self), [
+            VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
+            VERSION_LOGLINE,    # because it called itself
             ['juju-log', '--log-level', 'DEBUG', 'Charm called itself via hooks/install.'],
             ['juju-log', '--log-level', 'DEBUG', 'Legacy hooks/install exited with status 0.'],
             ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],

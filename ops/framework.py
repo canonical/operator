@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -393,6 +393,9 @@ More details at https://discourse.jujucharms.com/t/debugging-charm-hooks
 """
 
 
+_event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
+
+
 class Framework(Object):
 
     on = FrameworkEvents()
@@ -599,9 +602,7 @@ class Framework(Object):
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""
 
-        # Save the event for all known observers before the first notification
-        # takes place, so that either everyone interested sees it, or nobody does.
-        self.save_snapshot(event)
+        saved = False
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent_path = event.handle.parent.path
@@ -612,9 +613,15 @@ class Framework(Object):
                 continue
             if _event_kind and _event_kind != event_kind:
                 continue
+            if not saved:
+                # Save the event for all known observers before the first notification
+                # takes place, so that either everyone interested sees it, or nobody does.
+                self.save_snapshot(event)
+                saved = True
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
-        self._reemit(event_path)
+        if saved:
+            self._reemit(event_path)
 
     def reemit(self):
         """Reemit previously deferred events to the observers that deferred them.
@@ -633,7 +640,7 @@ class Framework(Object):
             event_handle = Handle.from_path(event_path)
 
             if last_event_path != event_path:
-                if not deferred:
+                if not deferred and last_event_path is not None:
                     self._storage.drop_snapshot(last_event_path)
                 last_event_path = event_path
                 deferred = False
@@ -667,7 +674,7 @@ class Framework(Object):
             # scratch in the next path.
             self.framework._forget(event)
 
-        if not deferred:
+        if not deferred and last_event_path is not None:
             self._storage.drop_snapshot(last_event_path)
 
     def _show_debug_code_message(self):
@@ -712,6 +719,24 @@ class Framework(Object):
             logger.warning(
                 "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
                 name, indicated_breakpoints)
+
+    def remove_unreferenced_events(self):
+        """Remove events from storage that are not referenced.
+
+        In older versions of the framework, events that had no observers would get recorded but
+        never deleted. This makes a best effort to find these events and remove them from the
+        database.
+        """
+        event_regex = re.compile(_event_regex)
+        to_remove = []
+        for handle_path in self._storage.list_snapshots():
+            if event_regex.match(handle_path):
+                notices = self._storage.notices(handle_path)
+                if next(notices, None) is None:
+                    # There are no notices for this handle_path, it is valid to remove it
+                    to_remove.append(handle_path)
+        for handle_path in to_remove:
+            self._storage.drop_snapshot(handle_path)
 
 
 class StoredStateData(Object):
