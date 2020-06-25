@@ -37,13 +37,13 @@ from ops.framework import (
     EventSource,
     Framework,
     Handle,
-    NoSnapshotError,
     Object,
     PreCommitEvent,
     StoredList,
     StoredState,
     StoredStateData,
 )
+from ops.storage import NoSnapshotError
 from test.test_helpers import fake_script, BaseTestCase
 
 
@@ -53,7 +53,7 @@ class TestFramework(BaseTestCase):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
 
-        patcher = patch('ops.framework.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
+        patcher = patch('ops.storage.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
         patcher.start()
         self.addCleanup(patcher.stop)
 
