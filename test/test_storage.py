@@ -280,17 +280,26 @@ class TestSimpleLoader(BaseTestCase):
         parsed = yaml.load(raw, Loader=storage._SimpleLoader)
         self.assertEqual(parsed, (1, 'tuple'))
 
-    def test_forbids_objects(self):
+    def assertRefused(self, obj):
+        # We shouldn't allow them to be written
+        with self.assertRaises(yaml.representer.RepresenterError):
+            yaml.dump(obj, Dumper=storage._SimpleDumper)
+        # If they did somehow end up written, we shouldn't be able to load them
+        raw = yaml.dump(obj, Dumper=yaml.Dumper)
+        with self.assertRaises(yaml.constructor.ConstructorError):
+            yaml.load(raw, Loader=storage._SimpleLoader)
+
+    def test_forbids_some_types(self):
+        self.assertRefused(1 + 2j)
+        self.assertRefused({'foo': 1 + 2j})
+        self.assertRefused(frozenset(['foo', 'bar']))
+        self.assertRefused(bytearray(b'foo'))
+        self.assertRefused(object())
+
         class Foo:
             pass
         f = Foo()
-        # We shouldn't allow them to be written
-        with self.assertRaises(yaml.representer.RepresenterError):
-            yaml.dump(f, Dumper=storage._SimpleDumper)
-        # If they did somehow end up written, we shouldn't be able to load them
-        raw = yaml.dump(f, Dumper=yaml.Dumper)
-        with self.assertRaises(yaml.constructor.ConstructorError):
-            yaml.load(raw, Loader=storage._SimpleLoader)
+        self.assertRefused(f)
 
 
 class TestJujuStateBackend(BaseTestCase):

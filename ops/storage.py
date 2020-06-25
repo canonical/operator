@@ -18,7 +18,6 @@ import shutil
 import subprocess
 import sqlite3
 import typing
-from datetime import timedelta
 
 import yaml
 
@@ -201,9 +200,9 @@ class JujuStorage:
 
     def notices(self, event_path: str):
         notice_list = self._load_notice_list()
-        if event_path:
-            notice_list = list(filter(lambda r: r[0] == event_path, notice_list))
         for row in notice_list:
+            if row[0] != event_path:
+                continue
             yield tuple(row)
 
     def _load_notice_list(self) -> typing.List[typing.Tuple[str]]:
@@ -229,8 +228,9 @@ class _SimpleLoader(getattr(yaml, 'CSafeLoader', yaml.SafeLoader)):
     # Taken from the example at:
     # https://stackoverflow.com/questions/9169025/how-can-i-add-a-python-tuple-to-a-yaml-file-using-pyyaml
 
+    construct_python_tuple = yaml.Loader.construct_python_tuple
 
-_SimpleLoader.construct_python_tuple = yaml.Loader.construct_python_tuple
+
 _SimpleLoader.add_constructor(
     u'tag:yaml.org,2002:python/tuple',
     _SimpleLoader.construct_python_tuple)
@@ -278,8 +278,7 @@ class _JujuStorageBackend:
             {key: encoded_value}, encoding='utf-8', default_style='|',
             default_flow_style=False,
             Dumper=_SimpleDumper)
-        p = subprocess.run(["state-set", "--file", "-"], input=content)
-        p.check_returncode()
+        subprocess.run(["state-set", "--file", "-"], input=content, check=True)
 
     def get(self, key: str) -> typing.Any:
         """Get the bytes value associated with a given key.
@@ -292,9 +291,8 @@ class _JujuStorageBackend:
         p = subprocess.run(
             ["state-get", key],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            check=True,
         )
-        p.check_returncode()
         if p.stdout == b'' or p.stdout == b'\n':
             raise KeyError(key)
         return yaml.load(p.stdout, Loader=_SimpleLoader)
@@ -307,8 +305,7 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-delete' returns an error code.
         """
-        p = subprocess.run(["state-delete", key])
-        p.check_returncode()
+        subprocess.run(["state-delete", key], check=True)
 
 
 class NoSnapshotError(Exception):
