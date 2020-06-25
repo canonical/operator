@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from test.test_helpers import fake_script, BaseTestCase
-from ops.storage import NoSnapshotError
-from ops.storage import SQLiteStorage
 import datetime
 import gc
 import inspect
@@ -46,6 +43,8 @@ from ops.framework import (
     StoredState,
     StoredStateData,
 )
+from ops.storage import NoSnapshotError, SQLiteStorage
+from test.test_helpers import fake_script, BaseTestCase
 
 
 class TestFramework(BaseTestCase):
