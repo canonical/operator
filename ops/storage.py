@@ -288,6 +288,7 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-get' returns an error code.
         """
+        # We don't capture stderr here so it can end up in debug logs.
         p = subprocess.run(
             ["state-get", key],
             stdout=subprocess.PIPE,
