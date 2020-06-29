@@ -22,6 +22,7 @@ import unittest
 from ops.framework import Framework
 from ops.model import Model, _ModelBackend
 from ops.charm import CharmMeta
+from ops.storage import SQLiteStorage
 
 
 def fake_script(test_case, name, content):
@@ -108,7 +109,7 @@ class BaseTestCase(unittest.TestCase):
             data_fpath = tmpdir / "framework.data"
             charm_dir = tmpdir
 
-        framework = Framework(data_fpath, charm_dir, meta=None, model=model)
+        framework = Framework(SQLiteStorage(data_fpath), charm_dir, meta=None, model=model)
         self.addCleanup(framework.close)
         return framework
 

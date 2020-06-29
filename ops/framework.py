@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import keyword
 import logging
 import marshal
 import os
+import pathlib
 import pdb
 import re
 import sys
@@ -26,7 +27,10 @@ import types
 import weakref
 
 from ops import charm
-from ops.storage import SQLiteStorage, NoSnapshotError
+from ops.storage import (
+    NoSnapshotError,
+    SQLiteStorage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -401,11 +405,10 @@ class Framework(Object):
     meta = None
     charm_dir = None
 
-    def __init__(self, data_path, charm_dir, meta, model):
+    def __init__(self, storage, charm_dir, meta, model):
 
         super().__init__(self, None)
 
-        self._data_path = data_path
         self.charm_dir = charm_dir
         self.meta = meta
         self.model = model
@@ -415,7 +418,11 @@ class Framework(Object):
         self._type_registry = {}  # {(parent_path, kind): cls}
         self._type_known = set()  # {cls}
 
-        self._storage = SQLiteStorage(data_path)
+        if isinstance(storage, (str, pathlib.Path)):
+            logger.warning(
+                "deprecated: Framework now takes a Storage not a path")
+            storage = SQLiteStorage(storage)
+        self._storage = storage
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)

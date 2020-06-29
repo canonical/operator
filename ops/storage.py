@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import timedelta
 import pickle
+import shutil
+import subprocess
 import sqlite3
 import typing
-from datetime import timedelta
+
+import yaml
 
 
 class SQLiteStorage:
@@ -149,6 +153,160 @@ class SQLiteStorage:
                 break
             for row in rows:
                 yield tuple(row)
+
+
+class JujuStorage:
+    """"Storing the content tracked by the Framework in Juju.
+
+    This uses :class:`_JujuStorageBackend` to interact with state-get/state-set
+    as the way to store state for the framework and for components.
+    """
+
+    NOTICE_KEY = "#notices#"
+
+    def __init__(self, backend: '_JujuStorageBackend' = None):
+        self._backend = backend
+        if backend is None:
+            self._backend = _JujuStorageBackend()
+
+    def close(self):
+        return
+
+    def commit(self):
+        return
+
+    def save_snapshot(self, handle_path: str, snapshot_data: typing.Any) -> None:
+        self._backend.set(handle_path, snapshot_data)
+
+    def load_snapshot(self, handle_path):
+        try:
+            content = self._backend.get(handle_path)
+        except KeyError:
+            raise NoSnapshotError(handle_path)
+        return content
+
+    def drop_snapshot(self, handle_path):
+        self._backend.delete(handle_path)
+
+    def save_notice(self, event_path: str, observer_path: str, method_name: str):
+        notice_list = self._load_notice_list()
+        notice_list.append([event_path, observer_path, method_name])
+        self._save_notice_list(notice_list)
+
+    def drop_notice(self, event_path: str, observer_path: str, method_name: str):
+        notice_list = self._load_notice_list()
+        notice_list.remove([event_path, observer_path, method_name])
+        self._save_notice_list(notice_list)
+
+    def notices(self, event_path: str):
+        notice_list = self._load_notice_list()
+        for row in notice_list:
+            if row[0] != event_path:
+                continue
+            yield tuple(row)
+
+    def _load_notice_list(self) -> typing.List[typing.Tuple[str]]:
+        try:
+            notice_list = self._backend.get(self.NOTICE_KEY)
+        except KeyError:
+            return []
+        if notice_list is None:
+            return []
+        return notice_list
+
+    def _save_notice_list(self, notices: typing.List[typing.Tuple[str]]) -> None:
+        self._backend.set(self.NOTICE_KEY, notices)
+
+
+class _SimpleLoader(getattr(yaml, 'CSafeLoader', yaml.SafeLoader)):
+    """Handle a couple basic python types.
+
+    yaml.SafeLoader can handle all the basic int/float/dict/set/etc that we want. The only one
+    that it *doesn't* handle is tuples. We don't want to support arbitrary types, so we just
+    subclass SafeLoader and add tuples back in.
+    """
+    # Taken from the example at:
+    # https://stackoverflow.com/questions/9169025/how-can-i-add-a-python-tuple-to-a-yaml-file-using-pyyaml
+
+    construct_python_tuple = yaml.Loader.construct_python_tuple
+
+
+_SimpleLoader.add_constructor(
+    u'tag:yaml.org,2002:python/tuple',
+    _SimpleLoader.construct_python_tuple)
+
+
+class _SimpleDumper(getattr(yaml, 'CSafeDumper', yaml.SafeDumper)):
+    """Add types supported by 'marshal'
+
+    YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So
+    we want to only support dumping out types that are safe to load.
+    """
+
+
+_SimpleDumper.represent_tuple = yaml.Dumper.represent_tuple
+_SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)
+
+
+class _JujuStorageBackend:
+    """Implements the interface from the Operator framework to Juju's state-get/set/etc."""
+
+    @staticmethod
+    def is_available() -> bool:
+        """Check if Juju state storage is available.
+
+        This checks if there is a 'state-get' executable in PATH.
+        """
+        p = shutil.which('state-get')
+        return p is not None
+
+    def set(self, key: str, value: typing.Any) -> None:
+        """Set a key to a given value.
+
+        Args:
+            key: The string key that will be used to find the value later
+            value: Arbitrary content that will be returned by get().
+        Raises:
+            CalledProcessError: if 'state-set' returns an error code.
+        """
+        # default_flow_style=None means that it can use Block for
+        # complex types (types that have nested types) but use flow
+        # for simple types (like an array). Not all versions of PyYAML
+        # have the same default style.
+        encoded_value = yaml.dump(value, Dumper=_SimpleDumper, default_flow_style=None)
+        content = yaml.dump(
+            {key: encoded_value}, encoding='utf-8', default_style='|',
+            default_flow_style=False,
+            Dumper=_SimpleDumper)
+        subprocess.run(["state-set", "--file", "-"], input=content, check=True)
+
+    def get(self, key: str) -> typing.Any:
+        """Get the bytes value associated with a given key.
+
+        Args:
+            key: The string key that will be used to find the value
+        Raises:
+            CalledProcessError: if 'state-get' returns an error code.
+        """
+        # We don't capture stderr here so it can end up in debug logs.
+        p = subprocess.run(
+            ["state-get", key],
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+        if p.stdout == b'' or p.stdout == b'\n':
+            raise KeyError(key)
+        return yaml.load(p.stdout, Loader=_SimpleLoader)
+
+    def delete(self, key: str) -> None:
+        """Remove a key from being tracked.
+
+        Args:
+            key: The key to stop storing
+        Raises:
+            CalledProcessError: if 'state-delete' returns an error code.
+        """
+        subprocess.run(["state-delete", key], check=True)
 
 
 class NoSnapshotError(Exception):

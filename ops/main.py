@@ -25,6 +25,7 @@ import yaml
 import ops.charm
 import ops.framework
 import ops.model
+import ops.storage
 
 from ops.log import setup_root_logging
 
@@ -263,7 +264,7 @@ class _Dispatcher:
         self._set_name_from_path(self._dispatch_path)
 
 
-def main(charm_class):
+def main(charm_class, use_juju_for_storage=False):
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
@@ -294,7 +295,11 @@ def main(charm_class):
     # the framework will commit the snapshot but Juju will not commit its
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
-    framework = ops.framework.Framework(charm_state_path, charm_dir, meta, model)
+    if use_juju_for_storage:
+        store = ops.storage.JujuStorage()
+    else:
+        store = ops.storage.SQLiteStorage(charm_state_path)
+    framework = ops.framework.Framework(store, charm_dir, meta, model)
     try:
         sig = inspect.signature(charm_class)
         try:
