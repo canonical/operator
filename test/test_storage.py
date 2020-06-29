@@ -15,6 +15,7 @@
 import abc
 import gc
 import io
+import os
 import pathlib
 import sys
 import tempfile
@@ -198,10 +199,15 @@ def setup_juju_backend(test_case, state_file):
     """Create fake scripts for pretending to be state-set and state-get"""
     template_args = {
         'executable': sys.executable,
+        'pthpth': os.path.dirname(pathlib.__file__),
         'state_file': str(state_file),
     }
+
     fake_script(test_case, 'state-set', dedent('''\
         {executable} -c '
+        import sys
+        if "{pthpth}" not in sys.path:
+            sys.path.append("{pthpth}")
         import sys, yaml, pathlib, pickle
         assert sys.argv[1:] == ["--file", "-"]
         request = yaml.load(sys.stdin, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader))
@@ -220,6 +226,9 @@ def setup_juju_backend(test_case, state_file):
 
     fake_script(test_case, 'state-get', dedent('''\
         {executable} -Sc '
+        import sys
+        if "{pthpth}" not in sys.path:
+            sys.path.append("{pthpth}")
         import sys, pathlib, pickle
         assert len(sys.argv) == 2
         state_file = pathlib.Path("{state_file}")
@@ -235,6 +244,9 @@ def setup_juju_backend(test_case, state_file):
 
     fake_script(test_case, 'state-delete', dedent('''\
         {executable} -Sc '
+        import sys
+        if "{pthpth}" not in sys.path:
+            sys.path.append("{pthpth}")
         import sys, pathlib, pickle
         assert len(sys.argv) == 2
         state_file = pathlib.Path("{state_file}")
