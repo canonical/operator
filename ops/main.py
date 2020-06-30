@@ -264,7 +264,7 @@ class _Dispatcher:
         self._set_name_from_path(self._dispatch_path)
 
     def is_restricted_context(self):
-        return self.event_name in ('collect-metrics',)
+        return self.event_name in ('collect_metrics',)
 
 
 def main(charm_class, use_juju_for_storage=False):
