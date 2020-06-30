@@ -481,6 +481,37 @@ class TestLibFunctional(TestCase):
         baz = ops.lib.use('baz', 2, 'alice@example.com')
         self.assertEqual(baz.LIBAPI, 2)
 
+    def _test_submodule(self, *, relative=False):
+        tmpdir = self._mkdtemp()
+        sys.path = [tmpdir]
+
+        path = _mklib(tmpdir, "foo", "bar")
+        path.write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = 42
+        LIBAUTHOR = "alice@example.com"
+
+        from {} import quux
+        """).format("." if relative else "foo.opslib.bar"))
+        (path.parent / 'quux.py').write_text(dedent("""
+        this = 42
+        """))
+
+        # reset
+        ops.lib.autoimport()
+
+        # sanity check that ops.lib.use works
+        baz = ops.lib.use('baz', 2, 'alice@example.com')
+        self.assertEqual(baz.LIBAPI, 2)
+        self.assertEqual(baz.quux.this, 42)
+
+    def test_submodule_absolute(self):
+        self._test_submodule(relative=False)
+
+    def test_submodule_relative(self):
+        self._test_submodule(relative=True)
+
     def test_others_found(self):
         tmpdir = self._mkdtemp()
         sys.path = [tmpdir]

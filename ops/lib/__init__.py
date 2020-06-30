@@ -113,7 +113,7 @@ def _find_all_specs(path):
             if finder is None or not hasattr(finder, 'find_spec'):
                 continue
             for lib_dir in lib_dirs:
-                spec = finder.find_spec(lib_dir)
+                spec = finder.find_spec("{}.opslib.{}".format(top_dir, lib_dir))
                 if spec is None:
                     continue
                 if spec.loader is None:
