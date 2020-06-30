@@ -406,7 +406,7 @@ class TestLibFunctional(TestCase):
         LIBAUTHOR = "alice@example.com"
         """))
 
-        # autoimport would be done in main
+        # autoimport to reset things
         ops.lib.autoimport()
 
         # ops.lib.use done by charm author
@@ -448,7 +448,7 @@ class TestLibFunctional(TestCase):
                         LIBAUTHOR = "alice@example.com"
                         """).format(patch_b))
 
-                        # autoimport would be done in main
+                        # autoimport to reset things
                         ops.lib.autoimport()
 
                         # ops.lib.use done by charm author
@@ -488,7 +488,7 @@ class TestLibFunctional(TestCase):
                         LIBAUTHOR = "alice@example.com"
                         """).format(patch_b))
 
-                        # autoimport would be done in main
+                        # autoimport to reset things
                         ops.lib.autoimport()
 
                         # ops.lib.use done by charm author
@@ -502,6 +502,24 @@ class TestLibFunctional(TestCase):
         with self.assertRaises(ImportError):
             ops.lib.use('foo', 1, 'alice@example.com')
 
+    def test_from_scratch(self):
+        tmpdir = self._mkdtemp()
+        sys.path = [tmpdir]
+
+        _mklib(tmpdir, "foo", "bar").write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = 42
+        LIBAUTHOR = "alice@example.com"
+        """))
+
+        # hard reset
+        ops.lib._libraries = None
+
+        # sanity check that ops.lib.use works
+        baz = ops.lib.use('baz', 2, 'alice@example.com')
+        self.assertEqual(baz.LIBAPI, 2)
+
     def test_others_found(self):
         tmpdir = self._mkdtemp()
         sys.path = [tmpdir]
@@ -513,6 +531,7 @@ class TestLibFunctional(TestCase):
         LIBAUTHOR = "alice@example.com"
         """))
 
+        # reload
         ops.lib.autoimport()
 
         # sanity check that ops.lib.use works

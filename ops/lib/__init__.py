@@ -21,10 +21,9 @@ from importlib.util import module_from_spec
 from importlib.machinery import ModuleSpec
 from pkgutil import get_importer
 from types import ModuleType
-from typing import Tuple, Dict, List, Iterator, Optional
 
 
-_libraries = {}  # type: Dict[Tuple[str,str], List[_Lib]]
+_libraries = None
 
 _libline_re = re.compile(r'''^LIB([A-Z]+)\s*=\s*([0-9]+|['"][a-zA-Z0-9_.\-@]+['"])''')
 _libname_re = re.compile(r'''^[a-z][a-z0-9]+$''')
@@ -59,6 +58,9 @@ def use(name: str, api: int, author: str) -> ModuleType:
     if not _libauthor_re.match(author):
         raise ValueError("invalid library author email: {!r}".format(author))
 
+    if _libraries is None:
+        autoimport()
+
     versions = _libraries.get((name, author), ())
     for lib in versions:
         if lib.api == api:
@@ -75,7 +77,14 @@ def use(name: str, api: int, author: str) -> ModuleType:
 
 
 def autoimport():
-    _libraries.clear()
+    """Find all libs in the path and enable use of them.
+
+    You only need to call this if you've installed a package or
+    otherwise changed sys.path in the current run, and need to see the
+    changes. Otherwise libraries are found on first call of `use`.
+    """
+    global _libraries
+    _libraries = {}
     for spec in _find_all_specs(sys.path):
         lib = _parse_lib(spec)
         if lib is None:
@@ -86,7 +95,7 @@ def autoimport():
         versions.sort(reverse=True)
 
 
-def _find_all_specs(path: List[str]) -> Iterator[ModuleSpec]:
+def _find_all_specs(path):
     for sys_dir in path:
         if sys_dir == "":
             sys_dir = "."
@@ -117,7 +126,7 @@ def _find_all_specs(path: List[str]) -> Iterator[ModuleSpec]:
 _MAX_LIB_LINES = 99
 
 
-def _parse_lib(spec: ModuleSpec) -> Optional['_Lib']:
+def _parse_lib(spec):
     if spec.origin is None:
         return None
 
@@ -158,7 +167,7 @@ class _Lib:
         self.api = api
         self.patch = patch
 
-        self._module = None  # type: Optional[ModuleType]
+        self._module = None
 
     def __repr__(self):
         return "<_Lib {0.name} by {0.author}, API {0.api}, patch {0.patch}>".format(self)
