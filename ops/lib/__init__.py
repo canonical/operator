@@ -26,7 +26,7 @@ from typing import Tuple, Dict, List, Iterator, Optional
 
 _libraries = {}  # type: Dict[Tuple[str,str], List[_Lib]]
 
-_libline_re = re.compile(r'''^LIB([A-Z]+)\s+=\s+([0-9]+|['"][a-zA-Z0-9_.-@]+['"])\s*$''')
+_libline_re = re.compile(r'''^LIB([A-Z]+)\s+=\s+([0-9]+|['"][a-zA-Z0-9_.\-@]+['"])\s*$''')
 _libname_re = re.compile(r'''^[a-z][a-z0-9]+$''')
 
 # Not perfect, but should do for now.
