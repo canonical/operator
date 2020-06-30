@@ -58,9 +58,8 @@ def use(name: str, api: int, author: str) -> ModuleType:
     if not _libauthor_re.match(author):
         raise ValueError("invalid library author email: {!r}".format(author))
 
-    global _libraries
     if _libraries is None:
-        _libraries = _load_specs()
+        autoimport()
 
     versions = _libraries.get((name, author), ())
     for lib in versions:
@@ -84,23 +83,16 @@ def autoimport():
     otherwise changed sys.path in the current run, and need to see the
     changes. Otherwise libraries are found on first call of `use`.
     """
-    if _libraries is not None:
-        _libraries.clear()
-    _libraries.update(_load_specs())
-
-
-def _load_specs():
-    libs = {}
+    global _libraries
+    _libraries = {}
     for spec in _find_all_specs(sys.path):
         lib = _parse_lib(spec)
         if lib is None:
             continue
 
-        versions = libs.setdefault((lib.name, lib.author), [])
+        versions = _libraries.setdefault((lib.name, lib.author), [])
         versions.append(lib)
         versions.sort(reverse=True)
-
-    return libs
 
 
 def _find_all_specs(path):
