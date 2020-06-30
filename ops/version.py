@@ -27,7 +27,7 @@ def _get_version():
     if (p.parent / '.git').exists():
         try:
             proc = subprocess.run(
-                ['git', 'describe', '--tags', '--long', '--dirty'],
+                ['git', 'describe', '--tags', '--dirty'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 cwd=p,
