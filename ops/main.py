@@ -264,6 +264,12 @@ class _Dispatcher:
         self._set_name_from_path(self._dispatch_path)
 
     def is_restricted_context(self):
+        """"Return True if we are running in a restricted Juju context.
+
+        When in a restricted context, most commands (relation-get, config-get,
+        state-get) are not available. As such, we change how we interact with
+        Juju.
+        """
         return self.event_name in ('collect_metrics',)
 
 
