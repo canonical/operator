@@ -263,6 +263,9 @@ class _Dispatcher:
         self.is_dispatch_aware = True
         self._set_name_from_path(self._dispatch_path)
 
+    def is_restricted_context(self):
+        return self.event_name in ('collect-metrics',)
+
 
 def main(charm_class, use_juju_for_storage=False):
     """Setup the charm and dispatch the observed event.
@@ -319,10 +322,19 @@ def main(charm_class, use_juju_for_storage=False):
         #
         # Skip reemission of deferred events for collect-metrics events because
         # they do not have the full access to all hook tools.
-        if dispatcher.event_name != 'collect_metrics':
+        if not dispatcher.is_restricted_context():
             framework.reemit()
 
-        _emit_charm_event(charm, dispatcher.event_name)
+        if dispatcher.is_restricted_context() and use_juju_for_storage:
+            # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
+            #  Though we eventually expect that juju will run collect-metrics in a
+            #  non-restricted context. Once we can determine that we are running collect-metrics
+            #  in a non-restricted context, we should fire the event as normal.
+            logger.debug('"%s" is not supported when using Juju for storage\n'
+                         'see: https://github.com/canonical/operator/issues/348',
+                         dispatcher.event_name)
+        else:
+            _emit_charm_event(charm, dispatcher.event_name)
 
         framework.commit()
     finally:
