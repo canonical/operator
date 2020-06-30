@@ -299,6 +299,16 @@ def main(charm_class, use_juju_for_storage=False):
     # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
     if use_juju_for_storage:
+        if dispatcher.is_restricted_context():
+            # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
+            #  Though we eventually expect that juju will run collect-metrics in a
+            #  non-restricted context. Once we can determine that we are running collect-metrics
+            #  in a non-restricted context, we should fire the event as normal.
+            logger.debug('"%s" is not supported when using Juju for storage\n'
+                         'see: https://github.com/canonical/operator/issues/348',
+                         dispatcher.event_name)
+            # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
+            return
         store = ops.storage.JujuStorage()
     else:
         store = ops.storage.SQLiteStorage(charm_state_path)
@@ -325,16 +335,7 @@ def main(charm_class, use_juju_for_storage=False):
         if not dispatcher.is_restricted_context():
             framework.reemit()
 
-        if dispatcher.is_restricted_context() and use_juju_for_storage:
-            # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
-            #  Though we eventually expect that juju will run collect-metrics in a
-            #  non-restricted context. Once we can determine that we are running collect-metrics
-            #  in a non-restricted context, we should fire the event as normal.
-            logger.debug('"%s" is not supported when using Juju for storage\n'
-                         'see: https://github.com/canonical/operator/issues/348',
-                         dispatcher.event_name)
-        else:
-            _emit_charm_event(charm, dispatcher.event_name)
+        _emit_charm_event(charm, dispatcher.event_name)
 
         framework.commit()
     finally:
