@@ -25,7 +25,7 @@ from types import ModuleType
 
 _libraries = None
 
-_libline_re = re.compile(r'''^LIB([A-Z]+)\s+=\s+([0-9]+|['"][a-zA-Z0-9_.-@]+['"])\s*$''')
+_libline_re = re.compile(r'''^LIB([A-Z]+)\s*=\s*([0-9]+|['"][a-zA-Z0-9_.\-@]+['"])''')
 _libname_re = re.compile(r'''^[a-z][a-z0-9]+$''')
 
 # Not perfect, but should do for now.
