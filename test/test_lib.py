@@ -213,6 +213,19 @@ class TestLibParser(TestCase):
         # also check the repr while we're at it
         self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
 
+    def test_lib_definitions_trailing_comments(self):
+        m = self._mkmod('foo', '''
+        LIBNAME = "foo" # comment style 1
+        LIBAPI = 2 = comment style 2
+        LIBPATCH = 42
+        LIBAUTHOR = "alice@example.com"anything after the quote is a comment
+        LIBANANA = True
+        ''')
+        lib = ops.lib._parse_lib(m)
+        self.assertEqual(lib, ops.lib._Lib(None, "foo", "alice@example.com", 2, 42))
+        # also check the repr while we're at it
+        self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
+
     def test_incomplete(self):
         """Check that if anything is missing, nothing is returned"""
         m = self._mkmod('foo', '''
