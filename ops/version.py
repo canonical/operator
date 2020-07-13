@@ -17,7 +17,7 @@ from pathlib import Path
 
 __all__ = ('version',)
 
-_FALLBACK = '0.7'  # this gets bumped after release
+_FALLBACK = '0.8'  # this gets bumped after release
 
 
 def _get_version():
@@ -27,7 +27,7 @@ def _get_version():
     if (p.parent / '.git').exists():
         try:
             proc = subprocess.run(
-                ['git', 'describe', '--tags', '--long', '--dirty'],
+                ['git', 'describe', '--tags', '--dirty'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 cwd=p,
