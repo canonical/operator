@@ -47,6 +47,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         rel_id = harness.add_relation('db', 'postgresql')
         self.assertIsInstance(rel_id, int)
         backend = harness._backend
@@ -63,6 +64,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         rel_id = harness.add_relation('db', 'postgresql')
         self.assertIsInstance(rel_id, int)
         harness.add_relation_unit(rel_id, 'postgresql/0')
@@ -82,6 +84,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         remote_app = 'postgresql'
         rel_id = harness.add_relation('db', remote_app)
         harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
@@ -110,6 +113,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         rel_id = harness.add_relation('db', 'postgresql')
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v1'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.1'})
@@ -160,6 +164,7 @@ class TestHarness(unittest.TestCase):
                 cluster:
                     interface: cluster
             ''')
+        self.addCleanup(harness.cleanup)
         # TODO: dmitriis 2020-04-07 test a minion unit and initial peer relation app data
         # events when the harness begins to emit events for initial data.
         harness.set_leader(is_leader=True)
@@ -198,6 +203,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
         ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         harness.charm.observe_relation_events('db')
         self.assertEqual(harness.charm.get_changes(), [])
@@ -245,6 +251,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         rel_id = harness.add_relation('db', 'postgresql')
         harness.update_relation_data(rel_id, 'postgresql', {'remote': 'data'})
         self.assertEqual(harness.get_relation_data(rel_id, 'test-app'), {})
@@ -263,7 +270,9 @@ class TestHarness(unittest.TestCase):
                 interface: pgsql
             '''
         harness1 = Harness(CharmBase, meta=metadata)
+        self.addCleanup(harness1.cleanup)
         harness2 = Harness(CharmBase, meta=metadata)
+        self.addCleanup(harness2.cleanup)
         harness1.begin()
         harness2.begin()
         helper1 = DBRelationChangedHelper(harness1.charm, "helper1")
@@ -282,6 +291,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         with self.assertRaises(RuntimeError):
             harness.begin()
@@ -293,6 +303,7 @@ class TestHarness(unittest.TestCase):
               db:
                 interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         viewer = RelationChangedViewer(harness.charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
@@ -311,6 +322,7 @@ class TestHarness(unittest.TestCase):
               db:
                 interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         helper = DBRelationChangedHelper(harness.charm, "helper")
         rel_id = harness.add_relation('db', 'postgresql')
@@ -335,6 +347,7 @@ class TestHarness(unittest.TestCase):
               db:
                 interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         helper = DBRelationChangedHelper(harness.charm, "helper")
         rel_id = harness.add_relation('db', 'postgresql')
@@ -371,6 +384,7 @@ class TestHarness(unittest.TestCase):
               db:
                 interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         harness.set_leader(is_leader=True)
         helper = DBRelationChangedHelper(harness.charm, "helper")
@@ -401,6 +415,7 @@ class TestHarness(unittest.TestCase):
               db:
                 interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         harness.set_leader(False)
         helper = DBRelationChangedHelper(harness.charm, "helper")
@@ -425,6 +440,7 @@ class TestHarness(unittest.TestCase):
               db:
                 interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         viewer = RelationChangedViewer(harness.charm, 'db')
         rel_id = harness.add_relation('db', 'postgresql')
@@ -435,6 +451,7 @@ class TestHarness(unittest.TestCase):
 
     def test_update_config(self):
         harness = Harness(RecordingCharm)
+        self.addCleanup(harness.cleanup)
         harness.begin()
         harness.update_config(key_values={'a': 'foo', 'b': 2})
         self.assertEqual(
@@ -456,6 +473,7 @@ class TestHarness(unittest.TestCase):
 
     def test_set_leader(self):
         harness = Harness(RecordingCharm)
+        self.addCleanup(harness.cleanup)
         # No event happens here
         harness.set_leader(False)
         harness.begin()
@@ -481,6 +499,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         harness.set_leader(False)
         rel_id = harness.add_relation('db', 'postgresql')
@@ -498,6 +517,7 @@ class TestHarness(unittest.TestCase):
         harness = Harness(RecordingCharm, meta='''
             name: test-charm
         ''')
+        self.addCleanup(harness.cleanup)
         # Before begin() there are no events.
         harness.update_config({'value': 'first'})
         # By default, after begin the charm is set up to receive events.
@@ -537,6 +557,7 @@ class TestHarness(unittest.TestCase):
         harness = Harness(CharmBase, meta='''
             name: test-charm
         ''')
+        self.addCleanup(harness.cleanup)
         harness.set_model_name('foo')
         self.assertEqual('foo', harness.model.name)
 
@@ -544,6 +565,7 @@ class TestHarness(unittest.TestCase):
         harness = Harness(CharmBase, meta='''
             name: test-charm
         ''')
+        self.addCleanup(harness.cleanup)
         harness.set_model_name('bar')
         harness.begin()
         with self.assertRaises(RuntimeError):
@@ -569,6 +591,7 @@ class TestHarness(unittest.TestCase):
         self._write_dummy_charm(tmp)
         charm_mod = importlib.import_module('charm')
         harness = Harness(charm_mod.MyTestingCharm)
+        self.addCleanup(harness.cleanup)
         return harness
 
     def _write_dummy_charm(self, tmp):
@@ -601,6 +624,7 @@ class TestHarness(unittest.TestCase):
                 test-action:
                     description: a dummy test action
             ''')
+        self.addCleanup(harness.cleanup)
         self.assertEqual(list(harness.framework.meta.actions), ['test-action'])
 
     def test_relation_set_deletes(self):
@@ -610,6 +634,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         harness.set_leader(False)
         rel_id = harness.add_relation('db', 'postgresql')
@@ -623,6 +648,7 @@ class TestHarness(unittest.TestCase):
         harness = Harness(CharmBase, meta='''
             name: app
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         self.assertIsNone(harness.get_workload_version())
         harness.charm.model.unit.set_workload_version('1.2.3')
@@ -635,6 +661,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         # No calls to the backend yet
         self.assertEqual(harness._get_backend_calls(), [])
@@ -672,6 +699,7 @@ class TestHarness(unittest.TestCase):
                 db:
                     interface: pgsql
             ''')
+        self.addCleanup(harness.cleanup)
         harness.begin()
         unit = harness.charm.model.unit
         # Reset the list, because we don't care what it took to get here
@@ -690,6 +718,7 @@ class TestHarness(unittest.TestCase):
 
     def test_unit_status(self):
         harness = Harness(CharmBase, meta='name: test-app')
+        self.addCleanup(harness.cleanup)
         harness.set_leader(True)
         harness.begin()
         # default status
@@ -700,6 +729,7 @@ class TestHarness(unittest.TestCase):
 
     def test_app_status(self):
         harness = Harness(CharmBase, meta='name: test-app')
+        self.addCleanup(harness.cleanup)
         harness.set_leader(True)
         harness.begin()
         # default status
@@ -707,6 +737,159 @@ class TestHarness(unittest.TestCase):
         status = ActiveStatus('message')
         harness.model.app.status = status
         self.assertEqual(harness.model.app.status, status)
+
+    def test_populate_oci_resources(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+              image2:
+                type: oci-image
+                description: "Another image."
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.populate_oci_resources()
+        path = harness.model.resources.fetch('image')
+        self.assertTrue(str(path).endswith('/image/contents.yaml'))
+        with path.open('r') as resource_file:
+            contents = yaml.safe_load(resource_file.read())
+        self.assertEqual(contents['registrypath'], 'registrypath')
+        self.assertEqual(contents['username'], 'username')
+        self.assertEqual(contents['password'], 'password')
+        path = harness.model.resources.fetch('image2')
+        self.assertTrue(str(path).endswith('/image2/contents.yaml'))
+
+    def test_resource_folder_cleanup(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.populate_oci_resources()
+        path = harness.model.resources.fetch('image')
+        self.assertTrue(path.exists())
+        harness.cleanup()
+        self.assertFalse(path.exists())
+        self.assertFalse(path.parent.exists())
+        self.assertFalse(path.parent.parent.exists())
+
+    def test_add_oci_resource_custom(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+            ''')
+        self.addCleanup(harness.cleanup)
+        custom = {
+            "registrypath": "custompath",
+            "username": "custom_username",
+            "password": "custom_password",
+        }
+        harness.add_oci_resource('image', custom)
+        resource = harness.model.resources.fetch('image')
+        with resource.open('r') as resource_file:
+            contents = yaml.safe_load(resource_file.read())
+        self.assertEqual(contents['registrypath'], 'custompath')
+        self.assertEqual(contents['username'], 'custom_username')
+        self.assertEqual(contents['password'], 'custom_password')
+
+    def test_add_oci_resource_no_image(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: file
+                description: "Image to deploy."
+            ''')
+        self.addCleanup(harness.cleanup)
+        with self.assertRaises(RuntimeError):
+            harness.add_oci_resource("image")
+        with self.assertRaises(RuntimeError):
+            harness.add_oci_resource("missing-resource")
+        self.assertEqual(len(harness._backend._resources_map), 0)
+
+    def test_add_resource_unknown(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: file
+                description: "Image to deploy."
+            ''')
+        self.addCleanup(harness.cleanup)
+        with self.assertRaises(RuntimeError):
+            harness.add_resource('unknown', 'content')
+
+    def test_add_resource_but_oci(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: oci-image
+                description: "Image to deploy."
+            ''')
+        self.addCleanup(harness.cleanup)
+        with self.assertRaises(RuntimeError):
+            harness.add_resource('image', 'content')
+
+    def test_add_resource_string(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: file
+                filename: foo.txt
+                description: "Image to deploy."
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.add_resource('image', 'foo contents\n')
+        path = harness.model.resources.fetch('image')
+        self.assertTrue(
+            str(path).endswith('/image/foo.txt'),
+            msg='expected {} to end with /image/foo.zip')
+        with path.open('rt') as f:
+            self.assertEqual('foo contents\n', f.read())
+
+    def test_add_resource_bytes(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: file
+                filename: foo.zip
+                description: "Image to deploy."
+            ''')
+        self.addCleanup(harness.cleanup)
+        raw_contents = b'\xff\xff\x00blah\n'
+        harness.add_resource('image', raw_contents)
+        path = harness.model.resources.fetch('image')
+        self.assertTrue(
+            str(path).endswith('/image/foo.zip'),
+            msg='expected {} to end with /image/foo.zip')
+        with path.open('rb') as f:
+            self.assertEqual(raw_contents, f.read())
+
+    def test_add_resource_unknown_filename(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            resources:
+              image:
+                type: file
+                description: "Image to deploy."
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.add_resource('image', 'foo contents\n')
+        path = harness.model.resources.fetch('image')
+        self.assertTrue(
+            str(path).endswith('/image/image'),
+            msg='expected {} to end with /image/image')
 
 
 class DBRelationChangedHelper(Object):
@@ -807,6 +990,7 @@ class TestTestingModelBackend(unittest.TestCase):
         harness = Harness(CharmBase, meta='''
             name: app
             ''')
+        self.addCleanup(harness.cleanup)
         backend = harness._backend
         backend.status_set('blocked', 'message', is_app=False)
         self.assertEqual(
@@ -820,6 +1004,7 @@ class TestTestingModelBackend(unittest.TestCase):
         harness = Harness(CharmBase, meta='''
             name: app
             ''')
+        self.addCleanup(harness.cleanup)
         backend = harness._backend
         backend.status_set('blocked', 'message', is_app=True)
         self.assertEqual(
@@ -836,6 +1021,7 @@ class TestTestingModelBackend(unittest.TestCase):
               db:
                 interface: mydb
             ''')
+        self.addCleanup(harness.cleanup)
         backend = harness._backend
         # With no relations added, we just get an empty list for the interface
         self.assertEqual(backend.relation_ids('db'), [])
@@ -847,6 +1033,7 @@ class TestTestingModelBackend(unittest.TestCase):
         harness = Harness(CharmBase, meta='''
             name: test-charm
             ''')
+        self.addCleanup(harness.cleanup)
         backend = harness._backend
         with self.assertRaises(RelationNotFoundError):
             backend.relation_get(1234, 'unit/0', False)
@@ -855,68 +1042,30 @@ class TestTestingModelBackend(unittest.TestCase):
         harness = Harness(CharmBase, meta='''
             name: test-charm
             ''')
+        self.addCleanup(harness.cleanup)
         backend = harness._backend
         with self.assertRaises(RelationNotFoundError):
             backend.relation_list(1234)
 
-    def test_populate_oci_resources(self):
+    def test_lazy_resource_directory(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             resources:
               image:
                 type: oci-image
                 description: "Image to deploy."
-              image2:
-                type: oci-image
-                description: "Another image."
             ''')
+        self.addCleanup(harness.cleanup)
         harness.populate_oci_resources()
-        resource = harness._resource_dir / "image" / "contents.yaml"
-        with resource.open('r') as resource_file:
-            contents = yaml.safe_load(resource_file.read())
-        self.assertEqual(contents['registrypath'], 'registrypath')
-        self.assertEqual(contents['username'], 'username')
-        self.assertEqual(contents['password'], 'password')
-        self.assertEqual(len(harness._backend._resources_map), 2)
+        backend = harness._backend
+        self.assertIsNone(backend._resource_dir)
+        path = backend.resource_get('image')
+        self.assertIsNotNone(backend._resource_dir)
+        self.assertTrue(
+            str(path).startswith(str(backend._resource_dir.name)),
+            msg='expected {} to be a subdirectory of {}'.format(path, backend._resource_dir.name))
 
-    def test_resource_folder_cleanup(self):
-        harness = Harness(CharmBase, meta='''
-            name: test-app
-            resources:
-              image:
-                type: oci-image
-                description: "Image to deploy."
-            ''')
-        harness.populate_oci_resources()
-        resource = harness._resource_dir / "image" / "contents.yaml"
-        del harness
-        with self.assertRaises(FileNotFoundError):
-            with resource.open('r') as resource_file:
-                print("This shouldn't be here: {}".format(resource_file))
-
-    def test_add_oci_resource_custom(self):
-        harness = Harness(CharmBase, meta='''
-            name: test-app
-            resources:
-              image:
-                type: oci-image
-                description: "Image to deploy."
-            ''')
-        custom = {
-            "registrypath": "custompath",
-            "username": "custom_username",
-            "password": "custom_password",
-        }
-        harness.add_oci_resource('image', custom)
-        resource = harness._resource_dir / "image" / "contents.yaml"
-        with resource.open('r') as resource_file:
-            contents = yaml.safe_load(resource_file.read())
-        self.assertEqual(contents['registrypath'], 'custompath')
-        self.assertEqual(contents['username'], 'custom_username')
-        self.assertEqual(contents['password'], 'custom_password')
-        self.assertEqual(len(harness._backend._resources_map), 1)
-
-    def test_add_oci_resource_no_image(self):
+    def test_resource_get_no_resource(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             resources:
@@ -924,8 +1073,10 @@ class TestTestingModelBackend(unittest.TestCase):
                 type: file
                 description: "Image to deploy."
             ''')
-        with self.assertRaises(RuntimeError):
-            harness.add_oci_resource("image")
-        with self.assertRaises(RuntimeError):
-            harness.add_oci_resource("missing-resource")
-        self.assertEqual(len(harness._backend._resources_map), 0)
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        with self.assertRaises(ModelError) as cm:
+            backend.resource_get('foo')
+        self.assertIn(
+            "units/unit-test-app-0/resources/foo: resource#test-app/foo not found",
+            str(cm.exception))
