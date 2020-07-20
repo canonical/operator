@@ -18,7 +18,6 @@ from textwrap import dedent
 import tempfile
 import typing
 import yaml
-import weakref
 
 from ops import (
     charm,
@@ -73,7 +72,6 @@ class Harness:
         self._charm_cls = charm_cls
         self._charm = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
-        self._lazy_resource_dir = None
         self._meta = self._create_meta(meta, actions)
         self._unit_name = self._meta.name + '/0'
         self._framework = None
@@ -82,6 +80,7 @@ class Harness:
         self._backend = _TestingModelBackend(self._unit_name, self._meta)
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
+        self._oci_resources = {}
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
 
@@ -103,16 +102,6 @@ class Harness:
     def framework(self) -> framework.Framework:
         """Return the Framework that is being driven by this Harness."""
         return self._framework
-
-    @property
-    def _resource_dir(self) -> pathlib.Path:
-        if self._lazy_resource_dir is not None:
-            return self._lazy_resource_dir
-
-        self.__resource_dir = tempfile.TemporaryDirectory()
-        self._lazy_resource_dir = pathlib.Path(self.__resource_dir.name)
-        self._finalizer = weakref.finalize(self, self.__resource_dir.cleanup)
-        return self._lazy_resource_dir
 
     def begin(self) -> None:
         """Instantiate the Charm and start handling events.
@@ -140,6 +129,14 @@ class Harness:
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
         self._charm = TestCharm(self._framework)
+
+    def cleanup(self):
+        """Called by your test infrastructure to cleanup any temporary directories/files/etc.
+
+        Currently this only needs to be called if you test with resources. But it is reasonable
+        to always include a `testcase.addCleanup(harness.cleanup)` just in case.
+        """
+        self._backend._cleanup()
 
     def _create_meta(self, charm_metadata, action_metadata):
         """Create a CharmMeta object.
@@ -191,12 +188,32 @@ class Harness:
             raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
         if self._meta.resources[resource_name].type != "oci-image":
             raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
-        resource_dir = self._resource_dir / resource_name
-        resource_dir.mkdir(exist_ok=True)
-        resource_file = resource_dir / "contents.yaml"
-        with resource_file.open('wt', encoding='utf8') as resource_yaml:
-            yaml.dump(contents, resource_yaml)
-        self._backend._resources_map[resource_name] = resource_file
+
+        as_yaml = yaml.dump(contents, Dumper=yaml.SafeDumper)
+        self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
+
+    def add_resource(self, resource_name: str, content: typing.AnyStr) -> None:
+        """Add content for a resource to the backend.
+
+        This will register the content, so that a call to `Model.resources.fetch(resource_name)`
+        will return a path to a file containing that content.
+
+        Args:
+            resource_name: The name of the resource being added
+            contents: Either string or bytes content, which will be the content of the filename
+                returned by resource-get. If contents is a string, it will be encoded in utf-8
+        """
+        if resource_name not in self._meta.resources.keys():
+            raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
+        record = self._meta.resources[resource_name]
+        if record.type != "file":
+            raise RuntimeError(
+                'Resource {} is not a file, but actually {}'.format(resource_name, record.type))
+        filename = record.filename
+        if filename is None:
+            filename = resource_name
+
+        self._backend._resources_map[resource_name] = (filename, content)
 
     def populate_oci_resources(self) -> None:
         """Populate all OCI resources."""
@@ -471,6 +488,13 @@ def _record_calls(cls):
     return cls
 
 
+class _ResourceEntry:
+    """Tracks the contents of a Resource."""
+
+    def __init__(self, resource_name):
+        self.name = resource_name
+
+
 @_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
@@ -493,11 +517,25 @@ class _TestingModelBackend:
         self._relation_data = {}  # {relation_id: {name: data}}
         self._config = {}
         self._is_leader = False
-        self._resources_map = {}
+        self._resources_map = {}  # {resource_name: resource_content}
         self._pod_spec = None
         self._app_status = {'status': 'unknown', 'message': ''}
         self._unit_status = {'status': 'maintenance', 'message': ''}
         self._workload_version = None
+        self._resource_dir = None
+
+    def _cleanup(self):
+        if self._resource_dir is not None:
+            self._resource_dir.cleanup()
+            self._resource_dir = None
+
+    def _get_resource_dir(self) -> pathlib.Path:
+        if self._resource_dir is None:
+            # In actual Juju, the resource path for a charm's resource is
+            # $AGENT_DIR/resources/$RESOURCE_NAME/$RESOURCE_FILENAME
+            # However, charms shouldn't depend on this.
+            self._resource_dir = tempfile.TemporaryDirectory(prefix='tmp-ops-test-resource-')
+        return pathlib.Path(self._resource_dir.name)
 
     def relation_ids(self, relation_name):
         try:
@@ -544,7 +582,24 @@ class _TestingModelBackend:
         self._workload_version = version
 
     def resource_get(self, resource_name):
-        return self._resources_map[resource_name]
+        if resource_name not in self._resources_map:
+            raise model.ModelError(
+                "ERROR could not download resource: HTTP request failed: "
+                "Get https://.../units/unit-{}/resources/{}: resource#{}/{} not found".format(
+                    self.unit_name.replace('/', '-'), resource_name, self.app_name, resource_name
+                ))
+        filename, contents = self._resources_map[resource_name]
+        resource_dir = self._get_resource_dir()
+        resource_filename = resource_dir / resource_name / filename
+        if not resource_filename.exists():
+            if isinstance(contents, bytes):
+                mode = 'wb'
+            else:
+                mode = 'wt'
+            resource_filename.parent.mkdir(exist_ok=True)
+            with resource_filename.open(mode=mode) as resource_file:
+                resource_file.write(contents)
+        return resource_filename
 
     def pod_spec_set(self, spec, k8s_resources):
         self._pod_spec = (spec, k8s_resources)
