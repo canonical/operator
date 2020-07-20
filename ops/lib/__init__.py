@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import logging
 import os
 import re
+import sys
 
 from ast import literal_eval
 from importlib.util import module_from_spec
@@ -22,6 +23,9 @@ from importlib.machinery import ModuleSpec
 from pkgutil import get_importer
 from types import ModuleType
 
+__all__ = ('use', 'autoimport')
+
+logger = logging.getLogger(__name__)
 
 _libraries = None
 
@@ -97,6 +101,7 @@ def autoimport():
 
 def _find_all_specs(path):
     for sys_dir in path:
+        logger.debug("Looking under %r.", sys_dir)
         if sys_dir == "":
             sys_dir = "."
         try:
@@ -108,17 +113,29 @@ def _find_all_specs(path):
             try:
                 lib_dirs = os.listdir(opslib)
             except OSError:
+                # logger.trace(...) # *lots* of things checked here
                 continue
+            else:
+                logger.debug("Trying %r.", opslib)
             finder = get_importer(opslib)
-            if finder is None or not hasattr(finder, 'find_spec'):
+            if finder is None:
+                logger.debug("Finder for %r is None.", opslib)
+                continue
+            if not hasattr(finder, 'find_spec'):
+                logger.debug("Finder for %r has no find_psec.", opslib)
                 continue
             for lib_dir in lib_dirs:
-                spec = finder.find_spec("{}.opslib.{}".format(top_dir, lib_dir))
+                spec_name = "{}.opslib.{}".format(top_dir, lib_dir)
+                spec = finder.find_spec(spec_name)
                 if spec is None:
+                    logger.debug("No spec for %r.", spec_name)
                     continue
                 if spec.loader is None:
                     # a namespace package; not supported
+                    logger.debug("No loader for %r (probably a namespace package)", spec_name)
                     continue
+
+                logger.debug("Found %r.", spec_name)
                 yield spec
 
 
@@ -126,34 +143,61 @@ def _find_all_specs(path):
 _MAX_LIB_LINES = 99
 
 
+_EXPECTED = {'NAME': str, 'AUTHOR': str, 'API': int, 'PATCH': int}
+
+
+# XXX Names Are Hard™
+class _NAH:
+    """A silly little helper to only work out the difference between
+    what was found and what was expected when logging"""
+
+    def __init__(self, found):
+        self._found = found
+
+    def __str__(self):
+        return ", ".join(set(_EXPECTED) - set(self._found))
+
+
 def _parse_lib(spec):
     if spec.origin is None:
+        # "can't happen"
+        logger.debug("No origin for %r (no idea why; please report)", spec.name)
         return None
 
-    _expected = {'NAME': str, 'AUTHOR': str, 'API': int, 'PATCH': int}
+    logger.debug("Parsing %r:", spec.name)
 
     try:
         with open(spec.origin, 'rt', encoding='utf-8') as f:
             libinfo = {}
             for n, line in enumerate(f):
-                if len(libinfo) == len(_expected):
+                if len(libinfo) == len(_EXPECTED):
                     break
                 if n > _MAX_LIB_LINES:
+                    logger.debug(
+                        "  Reached line %d without finding %s.",
+                        _MAX_LIB_LINES, _NAH(libinfo))
                     return None
                 m = _libline_re.match(line)
                 if m is None:
                     continue
                 key, value = m.groups()
-                if key in _expected:
+                if key in _EXPECTED:
                     value = literal_eval(value)
-                    if not isinstance(value, _expected[key]):
+                    if not isinstance(value, _EXPECTED[key]):
+                        logger.debug(
+                            "  Bad type for %s: expected %s, got %s.",
+                            key, _EXPECTED[key].__name__, type(value).__name__)
                         return None
                     libinfo[key] = value
             else:
-                if len(libinfo) != len(_expected):
+                if len(libinfo) != len(_EXPECTED):
+                    logger.debug("  Reached end without finding %s.", _NAH(libinfo))
                     return None
-    except Exception:
+    except Exception as e:
+        logger.debug("  Failed: %s.", e)
         return None
+
+    logger.debug("  Success.")
 
     return _Lib(spec, libinfo['NAME'], libinfo['AUTHOR'], libinfo['API'], libinfo['PATCH'])
 

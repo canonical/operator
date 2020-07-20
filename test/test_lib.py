@@ -24,6 +24,8 @@ from random import shuffle
 from shutil import rmtree
 from textwrap import dedent
 
+import logassert
+
 import ops.lib
 
 
@@ -60,6 +62,9 @@ def _flatten(specgen):
 
 
 class TestLibFinder(TestCase):
+    def setUp(self):
+        logassert.setup(self, 'ops.lib')
+
     def _mkdtemp(self) -> str:
         tmpdir = mkdtemp()
         self.addCleanup(rmtree, tmpdir)
@@ -69,12 +74,14 @@ class TestLibFinder(TestCase):
         tmpdir = self._mkdtemp()
 
         self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+        self.assertLoggedDebug('Looking under', tmpdir)
 
         _mklib(tmpdir, "foo", "bar").write_text("")
 
         self.assertEqual(
             _flatten(ops.lib._find_all_specs([tmpdir])),
             [tmpdir + '/foo/opslib/bar'])
+        self.assertLoggedDebug("Found", "foo.opslib.bar")
 
     def test_multi(self):
         tmpdirA = self._mkdtemp()
@@ -172,6 +179,9 @@ class TestLibParser(TestCase):
         os.close(fd)
         return ModuleSpec(name=name, loader=None, origin=fname)
 
+    def setUp(self):
+        logassert.setup(self, 'ops.lib')
+
     def test_simple(self):
         """Check that we can load a reasonably straightforward lib"""
         m = self._mkmod('foo', '''
@@ -186,6 +196,8 @@ class TestLibParser(TestCase):
         self.assertEqual(lib, ops.lib._Lib(None, "foo", "alice@example.com", 2, 42))
         # also check the repr while we're at it
         self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Success")
 
     def test_libauthor_has_dashes(self):
         m = self._mkmod('foo', '''
@@ -234,6 +246,9 @@ class TestLibParser(TestCase):
         LIBPATCH = 42
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Reached end without finding AUTHOR.")
+        self.assertNotLogged("Success")
 
     def test_too_long(self):
         """Check that if the file is too long, nothing is returned"""
@@ -244,6 +259,9 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Reached line 99 without finding")
+        self.assertNotLogged("Success")
 
     def test_no_origin(self):
         """Check that _parse_lib doesn't choke when given a spec with no origin"""
@@ -267,6 +285,9 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Failed")
+        self.assertNotLogged("Success")
 
     def test_name_is_number(self):
         """Check our behaviour when the name in the lib is a number"""
@@ -277,6 +298,9 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Bad type for NAME: expected str, got int.")
+        self.assertNotLogged("Success")
 
     def test_api_is_string(self):
         """Check our behaviour when the api in the lib is a string"""
@@ -287,6 +311,9 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Bad type for API: expected int, got str.")
+        self.assertNotLogged("Success")
 
     def test_patch_is_string(self):
         """Check our behaviour when the patch in the lib is a string"""
@@ -297,6 +324,9 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Bad type for PATCH: expected int, got str.")
+        self.assertNotLogged("Success")
 
     def test_author_is_number(self):
         """Check our behaviour when the author in the lib is a number"""
@@ -307,6 +337,9 @@ class TestLibParser(TestCase):
         LIBAUTHOR = 43
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Bad type for AUTHOR: expected str, got int.")
+        self.assertNotLogged("Success")
 
     def test_other_encoding(self):
         """Check that we don't crash when a library is not UTF-8"""
@@ -320,6 +353,9 @@ class TestLibParser(TestCase):
             LIBANANA = "Ñoño"
             '''))
         self.assertIsNone(ops.lib._parse_lib(m))
+        self.assertLoggedDebug("Parsing", "foo")
+        self.assertLoggedDebug("Failed", "can't decode")
+        self.assertNotLogged("Success")
 
 
 class TestLib(TestCase):
