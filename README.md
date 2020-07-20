@@ -109,14 +109,15 @@ self.assertEqual(harness.charm. ...)
 If you need help, have ideas, or would just like to chat with us, reach out on
 IRC: we're in [#smooth-operator] on freenode (or try the [webchat]).
 
-We also pay attention to Juju's [discourse], but currently we don't actively
-post there outside of our little corner of the [docs]; most discussion at this
-stage is on IRC.
+We also pay attention to Juju's [discourse]; most discussion at this
+stage is on IRC, however.
+
+You can also deep dive into the [API docs] if that's your thing.
 
 [webchat]: https://webchat.freenode.net/#smooth-operator
 [#smooth-operator]: irc://chat.freenode.net/%23smooth-operator
 [discourse]: https://discourse.juju.is/c/charming
-[docs]: https://discourse.juju.is/c/docs/operator-framework
+[API docs]: https://ops.rtfd.io/
 
 ## Operator Framework development
 
