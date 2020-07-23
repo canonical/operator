@@ -106,15 +106,20 @@ def _find_all_specs(path):
             sys_dir = "."
         try:
             top_dirs = os.listdir(sys_dir)
-        except OSError:
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        except OSError as e:
+            logger.debug("Tried to look for ops.lib packages under %r: %s", sys_dir, e)
             continue
         logger.debug("Looking for ops.lib packages under %r", sys_dir)
         for top_dir in top_dirs:
             opslib = os.path.join(sys_dir, top_dir, 'opslib')
             try:
                 lib_dirs = os.listdir(opslib)
-            except OSError:
-                # logger.trace("Tried %r but got %s", opslib, e)  # *lots* of things checked here
+            except (FileNotFoundError, NotADirectoryError):
+                continue
+            except OSError as e:
+                logger.debug("  Tried %r: %s", opslib, e)  # *lots* of things checked here
                 continue
             else:
                 logger.debug("  Trying %r", opslib)
