@@ -22,6 +22,7 @@ from importlib.util import module_from_spec
 from importlib.machinery import ModuleSpec
 from pkgutil import get_importer
 from types import ModuleType
+from typing import List
 
 __all__ = ('use', 'autoimport')
 
@@ -101,105 +102,120 @@ def autoimport():
 
 def _find_all_specs(path):
     for sys_dir in path:
-        logger.debug("Looking under %r.", sys_dir)
         if sys_dir == "":
             sys_dir = "."
         try:
             top_dirs = os.listdir(sys_dir)
         except OSError:
             continue
+        logger.debug("Looking for ops.lib packages under %r", sys_dir)
         for top_dir in top_dirs:
             opslib = os.path.join(sys_dir, top_dir, 'opslib')
             try:
                 lib_dirs = os.listdir(opslib)
             except OSError:
-                # logger.trace(...) # *lots* of things checked here
+                # logger.trace("Tried %r but got %s", opslib, e)  # *lots* of things checked here
                 continue
             else:
-                logger.debug("Trying %r.", opslib)
+                logger.debug("  Trying %r", opslib)
             finder = get_importer(opslib)
             if finder is None:
-                logger.debug("Finder for %r is None.", opslib)
+                logger.debug("  Finder for %r is None", opslib)
                 continue
             if not hasattr(finder, 'find_spec'):
-                logger.debug("Finder for %r has no find_psec.", opslib)
+                logger.debug("  Finder for %r has no find_spec", opslib)
                 continue
             for lib_dir in lib_dirs:
                 spec_name = "{}.opslib.{}".format(top_dir, lib_dir)
                 spec = finder.find_spec(spec_name)
                 if spec is None:
-                    logger.debug("No spec for %r.", spec_name)
+                    logger.debug("    No spec for %r", spec_name)
                     continue
                 if spec.loader is None:
                     # a namespace package; not supported
-                    logger.debug("No loader for %r (probably a namespace package)", spec_name)
+                    logger.debug("    No loader for %r (probably a namespace package)", spec_name)
                     continue
 
-                logger.debug("Found %r.", spec_name)
+                logger.debug("    Found %r", spec_name)
                 yield spec
 
 
 # only the first this many lines of a file are looked at for the LIB* constants
 _MAX_LIB_LINES = 99
+# these keys, with these types, are needed for find an opslib
+_NEEDED_KEYS = {'NAME': str, 'AUTHOR': str, 'API': int, 'PATCH': int}
 
 
-_EXPECTED = {'NAME': str, 'AUTHOR': str, 'API': int, 'PATCH': int}
+def _join_and(keys: List[str]) -> str:
+    if len(keys) == 0:
+        return ""
+    if len(keys) == 1:
+        return keys[0]
+    return ", ".join(keys[:-1]) + ", and " + keys[-1]
 
 
-# XXX Names Are Hard™
-class _NAH:
+class _Missing:
     """A silly little helper to only work out the difference between
-    what was found and what was expected when logging"""
+    what was found and what was needed when logging"""
 
     def __init__(self, found):
         self._found = found
 
     def __str__(self):
-        return ", ".join(set(_EXPECTED) - set(self._found))
+        exp = set(_NEEDED_KEYS)
+        got = set(self._found)
+        if len(got) == 0:
+            return "missing {}".format(_join_and(sorted(exp)))
+        return "got {}, but missing {}".format(
+            _join_and(sorted(got)),
+            _join_and(sorted(exp - got)))
 
 
 def _parse_lib(spec):
     if spec.origin is None:
         # "can't happen"
-        logger.debug("No origin for %r (no idea why; please report)", spec.name)
+        logger.warning("No origin for %r (no idea why; please report)", spec.name)
         return None
 
-    logger.debug("Parsing %r:", spec.name)
+    logger.debug("    Parsing %r", spec.name)
 
     try:
         with open(spec.origin, 'rt', encoding='utf-8') as f:
             libinfo = {}
             for n, line in enumerate(f):
-                if len(libinfo) == len(_EXPECTED):
+                if len(libinfo) == len(_NEEDED_KEYS):
                     break
                 if n > _MAX_LIB_LINES:
                     logger.debug(
-                        "  Reached line %d without finding %s.",
-                        _MAX_LIB_LINES, _NAH(libinfo))
+                        "      Missing opslib metadata after reading to line %d: %s",
+                        _MAX_LIB_LINES, _Missing(libinfo))
                     return None
                 m = _libline_re.match(line)
                 if m is None:
                     continue
                 key, value = m.groups()
-                if key in _EXPECTED:
+                if key in _NEEDED_KEYS:
                     value = literal_eval(value)
-                    if not isinstance(value, _EXPECTED[key]):
+                    if not isinstance(value, _NEEDED_KEYS[key]):
                         logger.debug(
-                            "  Bad type for %s: expected %s, got %s.",
-                            key, _EXPECTED[key].__name__, type(value).__name__)
+                            "      Bad type for %s: expected %s, got %s",
+                            key, _NEEDED_KEYS[key].__name__, type(value).__name__)
                         return None
                     libinfo[key] = value
             else:
-                if len(libinfo) != len(_EXPECTED):
-                    logger.debug("  Reached end without finding %s.", _NAH(libinfo))
+                if len(libinfo) != len(_NEEDED_KEYS):
+                    logger.debug(
+                        "      Missing opslib metadata after reading to end of file: %s",
+                        _Missing(libinfo))
                     return None
     except Exception as e:
-        logger.debug("  Failed: %s.", e)
+        logger.debug("      Failed: %s", e)
         return None
 
-    logger.debug("  Success.")
+    lib = _Lib(spec, libinfo['NAME'], libinfo['AUTHOR'], libinfo['API'], libinfo['PATCH'])
+    logger.debug("    Success: found library %s", lib)
 
-    return _Lib(spec, libinfo['NAME'], libinfo['AUTHOR'], libinfo['API'], libinfo['PATCH'])
+    return lib
 
 
 class _Lib:
@@ -214,7 +230,10 @@ class _Lib:
         self._module = None
 
     def __repr__(self):
-        return "<_Lib {0.name} by {0.author}, API {0.api}, patch {0.patch}>".format(self)
+        return "<_Lib {}>".format(self)
+
+    def __str__(self):
+        return "{0.name} by {0.author}, API {0.api}, patch {0.patch}".format(self)
 
     def import_module(self) -> ModuleType:
         if self._module is None:

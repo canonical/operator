@@ -74,7 +74,7 @@ class TestLibFinder(TestCase):
         tmpdir = self._mkdtemp()
 
         self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
-        self.assertLoggedDebug('Looking under', tmpdir)
+        self.assertLoggedDebug('Looking for ops.lib packages under', tmpdir)
 
         _mklib(tmpdir, "foo", "bar").write_text("")
 
@@ -247,7 +247,9 @@ class TestLibParser(TestCase):
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
         self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Reached end without finding AUTHOR.")
+        self.assertLoggedDebug(
+            "Missing opslib metadata after reading to end of file:"
+            " got API, NAME, and PATCH, but missing AUTHOR")
         self.assertNotLogged("Success")
 
     def test_too_long(self):
@@ -260,7 +262,9 @@ class TestLibParser(TestCase):
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
         self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Reached line 99 without finding")
+        self.assertLoggedDebug(
+            "Missing opslib metadata after reading to line 99:"
+            " missing API, AUTHOR, NAME, and PATCH")
         self.assertNotLogged("Success")
 
     def test_no_origin(self):
@@ -299,7 +303,7 @@ class TestLibParser(TestCase):
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
         self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Bad type for NAME: expected str, got int.")
+        self.assertLoggedDebug("Bad type for NAME: expected str, got int")
         self.assertNotLogged("Success")
 
     def test_api_is_string(self):
@@ -312,7 +316,7 @@ class TestLibParser(TestCase):
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
         self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Bad type for API: expected int, got str.")
+        self.assertLoggedDebug("Bad type for API: expected int, got str")
         self.assertNotLogged("Success")
 
     def test_patch_is_string(self):
@@ -325,7 +329,7 @@ class TestLibParser(TestCase):
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
         self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Bad type for PATCH: expected int, got str.")
+        self.assertLoggedDebug("Bad type for PATCH: expected int, got str")
         self.assertNotLogged("Success")
 
     def test_author_is_number(self):
@@ -338,7 +342,7 @@ class TestLibParser(TestCase):
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
         self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Bad type for AUTHOR: expected str, got int.")
+        self.assertLoggedDebug("Bad type for AUTHOR: expected str, got int")
         self.assertNotLogged("Success")
 
     def test_other_encoding(self):
