@@ -891,6 +891,17 @@ class TestHarness(unittest.TestCase):
             str(path).endswith('/image/image'),
             msg='expected {} to end with /image/image')
 
+    def test_get_pod_spec(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_leader(True)
+        container_spec = {'container': 'spec'}
+        k8s_resources = {'k8s': 'spec'}
+        harness.model.pod.set_spec(container_spec, k8s_resources)
+        self.assertEqual(harness.get_pod_spec(), (container_spec, k8s_resources))
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):

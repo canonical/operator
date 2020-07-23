@@ -849,6 +849,7 @@ class Pod:
             k8s_resources: Additional kubernetes specific specification.
 
         Returns:
+            None
         """
         if not self._backend.is_leader():
             raise ModelError('cannot set a pod spec as this unit is not a leader')

@@ -324,6 +324,14 @@ class Harness:
         """
         return self._backend._relation_data[relation_id].get(app_or_unit, None)
 
+    def get_pod_spec(self) -> (typing.Mapping, typing.Mapping):
+        """Return the content of the pod spec as last set by the charm.
+
+        This returns both the pod spec and any k8s_resources that were supplied.
+        See the signature of Model.pod.set_spec
+        """
+        return self._backend._pod_spec
+
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
