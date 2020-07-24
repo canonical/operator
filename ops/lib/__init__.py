@@ -147,7 +147,7 @@ def _find_all_specs(path):
 
 # only the first this many lines of a file are looked at for the LIB* constants
 _MAX_LIB_LINES = 99
-# these keys, with these types, are needed for find an opslib
+# these keys, with these types, are needed to have an opslib
 _NEEDED_KEYS = {'NAME': str, 'AUTHOR': str, 'API': int, 'PATCH': int}
 
 
