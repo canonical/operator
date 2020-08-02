@@ -13,10 +13,8 @@
 # limitations under the License.
 
 import abc
-import base64
 import logging
 import os
-import pickle
 import shutil
 import subprocess
 import sys
@@ -47,9 +45,9 @@ from ops.charm import (
     ActionEvent,
     CollectMetricsEvent,
 )
-from ops.framework import Framework, StoredStateData, Handle
+from ops.framework import Framework, StoredStateData
 from ops.main import main, CHARM_STATE_FILE
-from ops.storage import NoSnapshotError, SQLiteStorage
+from ops.storage import SQLiteStorage
 from ops.version import version
 
 from .test_helpers import fake_script, fake_script_calls
@@ -91,6 +89,7 @@ class CharmInitTestCase(unittest.TestCase):
             'JUJU_UNIT_NAME': 'test_main/0',
             'JUJU_MODEL_NAME': 'mymodel',
         }
+        fake_script(self, 'juju-log', "exit 0")
         with patch.dict(os.environ, fake_environ):
             with patch('ops.main._emit_charm_event'):
                 with patch('ops.main._get_charm_dir') as mock_charmdir:
@@ -451,7 +450,6 @@ class _TestMain(abc.ABC):
                       ' results in a non-zero exit code returned')
 
     def test_collect_metrics(self):
-        indicator_file = self.JUJU_CHARM_DIR / 'indicator'
         fake_script(self, 'add-metric', 'exit 0')
         fake_script(self, 'juju-log', 'exit 0')
         self._simulate_event(EventSpec(InstallEvent, 'install'))
