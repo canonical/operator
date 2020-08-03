@@ -456,19 +456,19 @@ class TestHarness(unittest.TestCase):
         harness.update_config(key_values={'a': 'foo', 'b': 2})
         self.assertEqual(
             harness.charm.changes,
-            [{'name': 'config', 'data': {'a': 'foo', 'b': 2}}])
+            [{'name': 'config-changed', 'data': {'a': 'foo', 'b': 2}}])
         harness.update_config(key_values={'b': 3})
         self.assertEqual(
             harness.charm.changes,
-            [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
-             {'name': 'config', 'data': {'a': 'foo', 'b': 3}}])
+            [{'name': 'config-changed', 'data': {'a': 'foo', 'b': 2}},
+             {'name': 'config-changed', 'data': {'a': 'foo', 'b': 3}}])
         # you can set config values to the empty string, you can use unset to actually remove items
         harness.update_config(key_values={'a': ''}, unset=set('b'))
         self.assertEqual(
             harness.charm.changes,
-            [{'name': 'config', 'data': {'a': 'foo', 'b': 2}},
-             {'name': 'config', 'data': {'a': 'foo', 'b': 3}},
-             {'name': 'config', 'data': {'a': ''}},
+            [{'name': 'config-changed', 'data': {'a': 'foo', 'b': 2}},
+             {'name': 'config-changed', 'data': {'a': 'foo', 'b': 3}},
+             {'name': 'config-changed', 'data': {'a': ''}},
              ])
 
     def test_set_leader(self):
@@ -525,7 +525,7 @@ class TestHarness(unittest.TestCase):
         harness.update_config({'value': 'second'})
         self.assertEqual(
             harness.charm.get_changes(reset=True),
-            [{'name': 'config', 'data': {'value': 'second'}}])
+            [{'name': 'config-changed', 'data': {'value': 'second'}}])
         # Once disabled, we won't see config-changed when we make an update
         harness.disable_hooks()
         harness.update_config({'third': '3'})
@@ -534,7 +534,7 @@ class TestHarness(unittest.TestCase):
         harness.update_config({'value': 'fourth'})
         self.assertEqual(
             harness.charm.get_changes(reset=True),
-            [{'name': 'config', 'data': {'value': 'fourth', 'third': '3'}}])
+            [{'name': 'config-changed', 'data': {'value': 'fourth', 'third': '3'}}])
 
     def test_metadata_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
@@ -902,6 +902,26 @@ class TestHarness(unittest.TestCase):
         harness.model.pod.set_spec(container_spec, k8s_resources)
         self.assertEqual(harness.get_pod_spec(), (container_spec, k8s_resources))
 
+    def test_begin_with_initial_hooks_no_relations(self):
+        harness = Harness(RecordingCharm, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.update_config({'foo': 'bar'})
+        harness.set_leader(True)
+        self.assertIsNone(harness.charm)
+        harness.begin_with_initial_hooks()
+        self.assertIsNotNone(harness.charm)
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'leader-elected'},
+                {'name': 'config-changed', 'data': {'foo': 'bar'}},
+                {'name': 'start'},
+            ]
+        )
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -938,8 +958,15 @@ class RecordingCharm(CharmBase):
     def __init__(self, framework):
         super().__init__(framework)
         self.changes = []
-        self.framework.observe(self.on.config_changed, self.on_config_changed)
-        self.framework.observe(self.on.leader_elected, self.on_leader_elected)
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.leader_elected, self._on_leader_elected)
+        self.framework.observe(self.on.leader_settings_changed, self._on_leader_settings_changed)
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on.stop, self._on_stop)
+        self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
+        self.framework.observe(self.on.update_status, self._on_update_status)
 
     def get_changes(self, reset=True):
         changes = self.changes
@@ -947,11 +974,32 @@ class RecordingCharm(CharmBase):
             self.changes = []
         return changes
 
-    def on_config_changed(self, _):
-        self.changes.append(dict(name='config', data=dict(self.framework.model.config)))
+    def _on_install(self, _):
+        self.changes.append(dict(name='install'))
 
-    def on_leader_elected(self, _):
+    def _on_start(self, _):
+        self.changes.append(dict(name='start'))
+
+    def _on_stop(self, _):
+        self.changes.append(dict(name='stop'))
+
+    def _on_remove(self, _):
+        self.changes.append(dict(name='remove'))
+
+    def _on_config_changed(self, _):
+        self.changes.append(dict(name='config-changed', data=dict(self.framework.model.config)))
+
+    def _on_leader_elected(self, _):
         self.changes.append(dict(name='leader-elected'))
+
+    def _on_leader_settings_changed(self, _):
+        self.changes.append(dict(name='leader-settings-changed'))
+
+    def _on_upgrade_charm(self, _):
+        self.changes.append(dict(name='upgrade-charm'))
+
+    def _on_update_status(self, _):
+        self.changes.append(dict(name='update-status'))
 
 
 class RelationEventCharm(RecordingCharm):

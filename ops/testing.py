@@ -106,8 +106,8 @@ class Harness:
     def begin(self) -> None:
         """Instantiate the Charm and start handling events.
 
-        Before calling begin(), there is no Charm instance, so changes to the Model won't emit
-        events. You must call begin before :attr:`.charm` is valid.
+        Before calling :meth:`.begin`(), there is no Charm instance, so changes to the Model won't
+        emit events. You must call :meth:`.begin` before :attr:`.charm` is valid.
         """
         if self._charm is not None:
             raise RuntimeError('cannot call the begin method on the harness more than once')
@@ -130,7 +130,51 @@ class Harness:
         TestCharm.__name__ = self._charm_cls.__name__
         self._charm = TestCharm(self._framework)
 
-    def cleanup(self):
+    def begin_with_initial_hooks(self) -> None:
+        """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
+
+        This triggers install, relation-created, config-changed, start, and any relation-joined
+        hooks. Based on what relations have been defined before you called begin().
+        Note that all of these are fired before returning control to the test suite, so if you
+        want to introspect what happens at each step, you need to fire them directly
+        (eg Charm.on.install.emit()).
+
+        To use this with all the normal hooks, you should instantiate the harness, setup any
+        relations that you want active when the charm starts, and then call this method.
+
+        Example::
+
+            harness = Harness(MyCharm)
+            # Do initial setup here
+            relation_id = harness.add_relation('db', 'postgresql')
+            harness.add_relation_unit(relation_id, 'postgresql/0')
+            harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
+            harness.set_leader(True)
+            harness.update_config({'initial': 'config'})
+            harness.begin_with_initial_hooks()
+            # This will cause
+            # install, db-relation-created('postgresql'), leader-elected, config-changed, start
+            # db-relation-joined('postrgesql/0'), db-relation-changed('postgresql/0')
+            # To be fired.
+        """
+        # TODO: jam 2020-08-03 This should also handle storage-attached hooks once we have support
+        #  for dealing with storage.
+        self.begin()
+        self._charm.on.install.emit()
+        # TODO: jam 2020-08-03 relation-created hooks fire here
+        if self._backend._is_leader:
+            self._charm.on.leader_elected.emit()
+        else:
+            # TODO: jam 2020-08-03 confirm if Juju triggers leader_settings_changed for non leader
+            #   units before or after config-changed et al.
+            pass
+        self._charm.on.config_changed.emit()
+        self._charm.on.start.emit()
+        # TODO: jam 2020-08-03 relation-joined and relation-changed hooks fire here
+        # TODO: jam 2020-08-03 what about update-status and collect-metrics? Those are fired
+        #  based on timing
+
+    def cleanup(self) -> None:
         """Called by your test infrastructure to cleanup any temporary directories/files/etc.
 
         Currently this only needs to be called if you test with resources. But it is reasonable
