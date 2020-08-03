@@ -165,9 +165,7 @@ class Harness:
         if self._backend._is_leader:
             self._charm.on.leader_elected.emit()
         else:
-            # TODO: jam 2020-08-03 confirm if Juju triggers leader_settings_changed for non leader
-            #   units before or after config-changed et al.
-            pass
+            self._charm.on.leader_settings_changed.emit()
         self._charm.on.config_changed.emit()
         self._charm.on.start.emit()
         # TODO: jam 2020-08-03 relation-joined and relation-changed hooks fire here

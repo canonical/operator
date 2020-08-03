@@ -922,6 +922,25 @@ class TestHarness(unittest.TestCase):
             ]
         )
 
+    def test_begin_with_initial_hooks_no_relations_not_leader(self):
+        harness = Harness(RecordingCharm, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.update_config({'foo': 'bar'})
+        self.assertIsNone(harness.charm)
+        harness.begin_with_initial_hooks()
+        self.assertIsNotNone(harness.charm)
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'leader-settings-changed'},
+                {'name': 'config-changed', 'data': {'foo': 'bar'}},
+                {'name': 'start'},
+            ]
+        )
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
