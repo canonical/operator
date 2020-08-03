@@ -1113,6 +1113,69 @@ class TestHarness(unittest.TestCase):
                  }},
             ])
 
+    def test_begin_with_initial_hooks_with_multiple_units(self):
+        class CharmWithDB(RelationEventCharm):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.observe_relation_events('db')
+        harness = Harness(CharmWithDB, meta='''
+            name: test-app
+            requires:
+              db:
+                interface: sql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_leader()
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/1')
+        harness.update_relation_data(rel_id, 'postgresql/1', {'new': 'data'})
+        # We intentionally add 0 after 1 to assert that the code triggers them in order
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.begin_with_initial_hooks()
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'relation-created',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': None,
+                     'app': 'postgresql',
+                 }},
+                {'name': 'leader-elected'},
+                {'name': 'config-changed', 'data': {}},
+                {'name': 'start'},
+                {'name': 'relation-joined',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': 'postgresql/0',
+                     'app': 'postgresql',
+                 }},
+                {'name': 'relation-changed',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': 'postgresql/0',
+                     'app': 'postgresql',
+                 }},
+                {'name': 'relation-joined',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': 'postgresql/1',
+                     'app': 'postgresql',
+                 }},
+                {'name': 'relation-changed',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': 'postgresql/1',
+                     'app': 'postgresql',
+                 }},
+            ])
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
