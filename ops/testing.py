@@ -14,6 +14,7 @@
 
 import inspect
 import pathlib
+import random
 from textwrap import dedent
 import tempfile
 import typing
@@ -157,17 +158,60 @@ class Harness:
             # db-relation-joined('postrgesql/0'), db-relation-changed('postgresql/0')
             # To be fired.
         """
+        self.begin()
         # TODO: jam 2020-08-03 This should also handle storage-attached hooks once we have support
         #  for dealing with storage.
-        self.begin()
         self._charm.on.install.emit()
-        # TODO: jam 2020-08-03 relation-created hooks fire here
+        # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
+        # guarantee a stable ordering between relation events. It *does* give a stable ordering
+        # of joined units for a given relation.
+        items = list(self._meta.relations.items())
+        random.shuffle(items)
+        this_app_name = self._meta.name
+        for relname, meta in items:
+            if meta.role == charm.RelationRole.peer:
+                # If the user has directly added a relation, leave it be, but otherwise ensure
+                # that peer relations are always established at before leader-elected.
+                rel_ids = self._backend._relation_ids_map.get(relname)
+                if rel_ids is None:
+                    self.add_relation(relname, self._meta.name)
+                else:
+                    for rel_id in rel_ids:
+                        # TODO: jam 2020-08-03 We should fire relation-created for these
+                        self._emit_relation_created(relname, rel_id, this_app_name)
+            else:
+                rel_ids = self._backend._relation_ids_map.get(relname)
+                for rel_id in rel_ids:
+                    app_name = self._backend._relation_app_and_units[rel_id]["app"]
+                    self._emit_relation_created(relname, rel_id, app_name)
         if self._backend._is_leader:
             self._charm.on.leader_elected.emit()
         else:
             self._charm.on.leader_settings_changed.emit()
         self._charm.on.config_changed.emit()
         self._charm.on.start.emit()
+        all_ids = self._backend._relation_names.items()
+        random.shuffle(all_ids)
+        for rel_id, rel_name in all_ids:
+            rel_app_and_units = self._backend._relation_app_and_units[rel_id]
+            app_name = rel_app_and_units["app"]
+            # TODO: Handle app data if it has been set
+            # Note: Juju *does* fire relation events for a given relation in the sorted order of
+            # the unit names. It also always fires relation-changed immediately after
+            # relation-joined for the same unit.
+            # Juju only fires relation-changed (app) if there is data for the related application
+            relation = self._model.get_relation(rel_name, rel_id)
+            if self._backend._relation_data[rel_id].get(app_name):
+                app = self._model.get_app(app_name)
+                self._charm.on[rel_name].relation_changed.emit(
+                    relation, app, None)
+            for unit_name in sorted(rel_app_and_units["units"]):
+                remote_unit = self._model.get_unit(unit_name)
+                self._charm.on[rel_name].relation_joined.emit(
+                    relation, remote_unit.app, remote_unit)
+                self._charm.on[rel_name].relation_changed.emit(
+                    relation, remote_unit.app, remote_unit)
+
         # TODO: jam 2020-08-03 relation-joined and relation-changed hooks fire here
         # TODO: jam 2020-08-03 what about update-status and collect-metrics? Those are fired
         #  based on timing
@@ -305,16 +349,27 @@ class Harness:
             self._backend.unit_name: {},
             self._backend.app_name: {},
         }
+        self._backend._relation_app_and_units[rel_id] = {
+            "app": remote_app,
+            "units": [],
+        }
         # Reload the relation_ids list
         if self._model is not None:
             self._model.relations._invalidate(relation_name)
+        self._emit_relation_created(relation_name, rel_id, remote_app)
+        return rel_id
+
+    def _emit_relation_created(self, relation_name: str, relation_id: int,
+                               remote_app: str) -> None:
+        """Trigger relation-created for a given relation with a given remote application."""
         if self._charm is None or not self._hooks_enabled:
-            return rel_id
-        relation = self._model.get_relation(relation_name, rel_id)
+            return
+        if self._charm is None or not self._hooks_enabled:
+            return
+        relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
         self._charm.on[relation_name].relation_created.emit(
             relation, app)
-        return rel_id
 
     def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Add a new unit to a relation.
@@ -334,6 +389,9 @@ class Harness:
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
         self._backend._relation_data[relation_id][remote_unit_name] = {}
+        # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
+        #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
+        self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
         relation_name = self._backend._relation_names[relation_id]
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
@@ -565,6 +623,8 @@ class _TestingModelBackend:
         self._relation_names = {}  # reverse map from relation_id to relation_name
         self._relation_list_map = {}  # relation_id: [unit_name,...]
         self._relation_data = {}  # {relation_id: {name: data}}
+        # {relation_id: {"app": app_name, "units": ["app/0",...]}
+        self._relation_app_and_units = {}
         self._config = {}
         self._is_leader = False
         self._resources_map = {}  # {resource_name: resource_content}

@@ -211,6 +211,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.get_changes(),
             [{'name': 'relation-created',
+              'relation': 'db',
               'data': {
                   'app': 'postgresql',
                   'unit': None,
@@ -220,6 +221,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.get_changes(),
             [{'name': 'relation-joined',
+              'relation': 'db',
               'data': {
                   'app': 'postgresql',
                   'unit': 'postgresql/0',
@@ -229,6 +231,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.get_changes(),
             [{'name': 'relation-changed',
+              'relation': 'db',
               'data': {
                   'app': 'postgresql',
                   'unit': None,
@@ -238,6 +241,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.get_changes(),
             [{'name': 'relation-changed',
+              'relation': 'db',
               'data': {
                   'app': 'postgresql',
                   'unit': 'postgresql/0',
@@ -941,6 +945,174 @@ class TestHarness(unittest.TestCase):
             ]
         )
 
+    def test_begin_with_initial_hooks_with_peer_relation(self):
+        class PeerCharm(RelationEventCharm):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.observe_relation_events('peer')
+        harness = Harness(PeerCharm, meta='''
+            name: test-app
+            peers:
+              peer:
+                interface: app-peer
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.update_config({'foo': 'bar'})
+        self.assertIsNone(harness.charm)
+        harness.begin_with_initial_hooks()
+        self.assertIsNotNone(harness.charm)
+        rel_id = harness.model.get_relation('peer').id
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'relation-created',
+                 'relation': 'peer',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': None,
+                     'app': 'test-app',
+                 }},
+                {'name': 'leader-settings-changed'},
+                {'name': 'config-changed', 'data': {'foo': 'bar'}},
+                {'name': 'start'},
+            ])
+        # With a single unit, no peer-relation-joined is fired
+
+    def test_begin_with_initial_hooks_peer_relation_pre_defined(self):
+        class PeerCharm(RelationEventCharm):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.observe_relation_events('peer')
+        harness = Harness(PeerCharm, meta='''
+            name: test-app
+            peers:
+              peer:
+                interface: app-peer
+            ''')
+        self.addCleanup(harness.cleanup)
+        peer_rel_id = harness.add_relation('peer', 'test-app')
+        harness.begin_with_initial_hooks()
+        # If the peer relation is already defined by the user, we don't create the relation a
+        # second time, but we do still fire relation-created.
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'relation-created',
+                 'relation': 'peer',
+                 'data': {
+                     'relation_id': peer_rel_id,
+                     'unit': None,
+                     'app': 'test-app',
+                 }},
+                {'name': 'leader-settings-changed'},
+                {'name': 'config-changed', 'data': {}},
+                {'name': 'start'},
+            ])
+
+    def test_begin_with_initial_hooks_with_one_relation(self):
+        class CharmWithDB(RelationEventCharm):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.observe_relation_events('db')
+        harness = Harness(CharmWithDB, meta='''
+            name: test-app
+            requires:
+              db:
+                interface: sql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_leader()
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'data'})
+        harness.begin_with_initial_hooks()
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'relation-created',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': None,
+                     'app': 'postgresql',
+                 }},
+                {'name': 'leader-elected'},
+                {'name': 'config-changed', 'data': {}},
+                {'name': 'start'},
+                {'name': 'relation-joined',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': 'postgresql/0',
+                     'app': 'postgresql',
+                 }},
+                {'name': 'relation-changed',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': 'postgresql/0',
+                     'app': 'postgresql',
+                 }},
+            ])
+
+    def test_begin_with_initial_hooks_with_application_data(self):
+        class CharmWithDB(RelationEventCharm):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.observe_relation_events('db')
+        harness = Harness(CharmWithDB, meta='''
+            name: test-app
+            requires:
+              db:
+                interface: sql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_leader()
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
+        harness.begin_with_initial_hooks()
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'relation-created',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': None,
+                     'app': 'postgresql',
+                 }},
+                {'name': 'leader-elected'},
+                {'name': 'config-changed', 'data': {}},
+                {'name': 'start'},
+                {'name': 'relation-changed',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': None,
+                     'app': 'postgresql',
+                 }},
+                {'name': 'relation-joined',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': 'postgresql/0',
+                     'app': 'postgresql',
+                 }},
+                {'name': 'relation-changed',
+                 'relation': 'db',
+                 'data': {
+                     'relation_id': rel_id,
+                     'unit': 'postgresql/0',
+                     'app': 'postgresql',
+                 }},
+            ])
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -1058,7 +1230,7 @@ class RelationEventCharm(RecordingCharm):
         if event.app is not None:
             app_name = event.app.name
         self.changes.append(
-            dict(name=event_name,
+            dict(name=event_name, relation=event.relation.name,
                  data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id)))
 
 
