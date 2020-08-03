@@ -168,19 +168,20 @@ class Harness:
         items = list(self._meta.relations.items())
         random.shuffle(items)
         this_app_name = self._meta.name
-        for relname, meta in items:
-            if meta.role == charm.RelationRole.peer:
+        for relname, rel_meta in items:
+            if rel_meta.role == charm.RelationRole.peer:
                 # If the user has directly added a relation, leave it be, but otherwise ensure
                 # that peer relations are always established at before leader-elected.
                 rel_ids = self._backend._relation_ids_map.get(relname)
                 if rel_ids is None:
                     self.add_relation(relname, self._meta.name)
                 else:
+                    random.shuffle(rel_ids)
                     for rel_id in rel_ids:
-                        # TODO: jam 2020-08-03 We should fire relation-created for these
                         self._emit_relation_created(relname, rel_id, this_app_name)
             else:
                 rel_ids = self._backend._relation_ids_map.get(relname)
+                random.shuffle(rel_ids)
                 for rel_id in rel_ids:
                     app_name = self._backend._relation_app_and_units[rel_id]["app"]
                     self._emit_relation_created(relname, rel_id, app_name)
@@ -190,12 +191,11 @@ class Harness:
             self._charm.on.leader_settings_changed.emit()
         self._charm.on.config_changed.emit()
         self._charm.on.start.emit()
-        all_ids = self._backend._relation_names.items()
+        all_ids = list(self._backend._relation_names.items())
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
             rel_app_and_units = self._backend._relation_app_and_units[rel_id]
             app_name = rel_app_and_units["app"]
-            # TODO: Handle app data if it has been set
             # Note: Juju *does* fire relation events for a given relation in the sorted order of
             # the unit names. It also always fires relation-changed immediately after
             # relation-joined for the same unit.
@@ -211,10 +211,6 @@ class Harness:
                     relation, remote_unit.app, remote_unit)
                 self._charm.on[rel_name].relation_changed.emit(
                     relation, remote_unit.app, remote_unit)
-
-        # TODO: jam 2020-08-03 relation-joined and relation-changed hooks fire here
-        # TODO: jam 2020-08-03 what about update-status and collect-metrics? Those are fired
-        #  based on timing
 
     def cleanup(self) -> None:
         """Called by your test infrastructure to cleanup any temporary directories/files/etc.

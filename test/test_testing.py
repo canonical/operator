@@ -1176,6 +1176,95 @@ class TestHarness(unittest.TestCase):
                  }},
             ])
 
+    def test_begin_with_initial_hooks_multiple_relation_same_endpoint(self):
+        class CharmWithDB(RelationEventCharm):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.observe_relation_events('db')
+        harness = Harness(CharmWithDB, meta='''
+            name: test-app
+            requires:
+              db:
+                interface: sql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_leader()
+        rel_id_a = harness.add_relation('db', 'pg-a')
+        harness.add_relation_unit(rel_id_a, 'pg-a/0')
+        rel_id_b = harness.add_relation('db', 'pg-b')
+        harness.add_relation_unit(rel_id_b, 'pg-b/0')
+        harness.begin_with_initial_hooks()
+        changes = harness.charm.changes[:]
+        expected_prefix = [
+            {'name': 'install'},
+        ]
+        # The first events are always the same
+        self.assertEqual(changes[:len(expected_prefix)], expected_prefix)
+        changes = changes[len(expected_prefix):]
+        # However, the order of relation-created events can be in any order
+        expected_relation_created = [
+            {'name': 'relation-created',
+             'relation': 'db',
+             'data': {
+                 'relation_id': rel_id_a,
+                 'unit': None,
+                 'app': 'pg-a',
+             }},
+            {'name': 'relation-created',
+             'relation': 'db',
+             'data': {
+                 'relation_id': rel_id_b,
+                 'unit': None,
+                 'app': 'pg-b',
+             }},
+        ]
+        if changes[:2] != expected_relation_created:
+            # change the order
+            expected_relation_created = [expected_relation_created[1],
+                                         expected_relation_created[0]]
+        self.assertEqual(changes[:2], expected_relation_created)
+        changes = changes[2:]
+        expected_middle = [
+            {'name': 'leader-elected'},
+            {'name': 'config-changed', 'data': {}},
+            {'name': 'start'},
+        ]
+        self.assertEqual(changes[:len(expected_middle)], expected_middle)
+        changes = changes[len(expected_middle):]
+        a_first = [
+            {'name': 'relation-joined',
+             'relation': 'db',
+             'data': {
+                 'relation_id': rel_id_a,
+                 'unit': 'pg-a/0',
+                 'app': 'pg-a',
+             }},
+            {'name': 'relation-changed',
+             'relation': 'db',
+             'data': {
+                 'relation_id': rel_id_a,
+                 'unit': 'pg-a/0',
+                 'app': 'pg-a',
+             }},
+            {'name': 'relation-joined',
+             'relation': 'db',
+             'data': {
+                 'relation_id': rel_id_b,
+                 'unit': 'pg-b/0',
+                 'app': 'pg-b',
+             }},
+            {'name': 'relation-changed',
+             'relation': 'db',
+             'data': {
+                 'relation_id': rel_id_b,
+                 'unit': 'pg-b/0',
+                 'app': 'pg-b',
+             }},
+        ]
+        if changes != a_first:
+            b_first = [a_first[2], a_first[3], a_first[0], a_first[1]]
+            self.assertEqual(changes, b_first)
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
