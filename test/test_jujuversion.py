@@ -60,6 +60,10 @@ class TestJujuVersion(unittest.TestCase):
         self.assertTrue(JujuVersion('2.7.0').has_app_data())
         self.assertFalse(JujuVersion('2.6.9').has_app_data())
 
+    def test_is_dispatch_aware(self):
+        self.assertTrue(JujuVersion('2.8.0').is_dispatch_aware())
+        self.assertFalse(JujuVersion('2.7.9').is_dispatch_aware())
+
     def test_parsing_errors(self):
         invalid_versions = [
             "xyz",

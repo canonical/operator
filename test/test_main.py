@@ -88,6 +88,7 @@ class CharmInitTestCase(unittest.TestCase):
         fake_environ = {
             'JUJU_UNIT_NAME': 'test_main/0',
             'JUJU_MODEL_NAME': 'mymodel',
+            'JUJU_VERSION': '2.7.0',
         }
         fake_script(self, 'juju-log', "exit 0")
         with patch.dict(os.environ, fake_environ):
@@ -136,6 +137,64 @@ class CharmInitTestCase(unittest.TestCase):
 
         warn_cm = self._check(MyCharm)
         self.assertFalse(warn_cm)
+
+
+@patch('sys.argv', new=("hooks/config-changed",))
+class TestDispatch(unittest.TestCase):
+    def _check(self, *, with_dispatch=False, dispatch_path=''):
+        """Helper for below tests."""
+        class MyCharm(CharmBase):
+            def __init__(self, framework):
+                super().__init__(framework)
+
+        fake_environ = {
+            'JUJU_UNIT_NAME': 'test_main/0',
+            'JUJU_MODEL_NAME': 'mymodel',
+        }
+        if dispatch_path:
+            fake_environ['JUJU_DISPATCH_PATH'] = dispatch_path
+            fake_environ['JUJU_VERSION'] = '2.8.0'
+        else:
+            fake_environ['JUJU_VERSION'] = '2.7.0'
+        fake_script(self, 'juju-log', "exit 0")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            fake_metadata = tmpdir / 'metadata.yaml'
+            with fake_metadata.open('wb') as fh:
+                fh.write(b'name: test')
+            if with_dispatch:
+                dispatch = tmpdir / 'dispatch'
+                with dispatch.open('wt', encoding='utf8') as fh:
+                    fh.write('')
+                    os.fchmod(fh.fileno(), 0o755)
+
+            with patch.dict(os.environ, fake_environ):
+                with patch('ops.main._emit_charm_event') as mock_charm_event:
+                    with patch('ops.main._get_charm_dir') as mock_charmdir:
+                        mock_charmdir.return_value = tmpdir
+                        main(MyCharm)
+
+        self.assertEqual(mock_charm_event.call_count, 1)
+        return mock_charm_event.call_args[0][1]
+
+    def test_most_legacy(self):
+        """Without dispatch, sys.argv[0] is used
+        """
+        event = self._check()
+        self.assertEqual(event, 'config_changed')
+
+    def test_with_dispatch(self):
+        """With dispatch, dispatch is used
+        """
+        event = self._check(with_dispatch=True, dispatch_path='hooks/potatos')
+        self.assertEqual(event, 'potatos')
+
+    def test_with_dispatch_path_but_no_dispatch(self):
+        """Dispatch path overwrites sys.argv[0] even if no actual dispatch
+        """
+        event = self._check(with_dispatch=False, dispatch_path='hooks/foo')
+        self.assertEqual(event, 'foo')
 
 
 class _TestMain(abc.ABC):
@@ -564,6 +623,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         path.symlink_to(self.charm_exec_path)
 
     def _call_event(self, rel_path, env):
+        env['JUJU_VERSION'] = '2.7.0'
         event_file = self.JUJU_CHARM_DIR / rel_path
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
@@ -582,6 +642,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
             EventSpec(StartEvent, 'start'),
             EventSpec(UpgradeCharmEvent, 'upgrade-charm'),
         }
+        initial_hooks = {'hooks/' + ev.event_name for ev in initial_events}
 
         def _assess_event_links(event_spec):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
@@ -589,7 +650,15 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
                 hook_path = self.JUJU_CHARM_DIR / event_hook
                 self.assertTrue(hook_path.exists(), 'Missing hook: ' + event_hook)
                 if self.hooks_are_symlinks:
+                    self.assertTrue(hook_path.is_symlink())
                     self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
+                elif event_hook in initial_hooks:
+                    self.assertFalse(hook_path.is_symlink())
+                else:
+                    # hooks are not symlinks, and this hook is not one of the initial ones
+                    # check that it's a symlink to the inital ones
+                    self.assertTrue(hook_path.is_symlink())
+                    self.assertEqual(os.readlink(str(hook_path)), event_spec.event_name)
 
         for initial_event in initial_events:
             self._setup_charm_dir()
@@ -609,7 +678,8 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
 class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
     def _call_event(self, rel_path, env):
-        env["JUJU_DISPATCH_PATH"] = str(rel_path)
+        env['JUJU_DISPATCH_PATH'] = str(rel_path)
+        env['JUJU_VERSION'] = '2.8.0'
         super()._call_event(rel_path, env)
 
 
@@ -631,7 +701,8 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
             path.symlink_to('src/charm.py')
 
     def _call_event(self, rel_path, env):
-        env["JUJU_DISPATCH_PATH"] = str(rel_path)
+        env['JUJU_DISPATCH_PATH'] = str(rel_path)
+        env['JUJU_VERSION'] = '2.8.0'
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
         subprocess.run(
             [sys.executable, str(dispatch)],
@@ -781,7 +852,8 @@ class TestMainWithDispatchAsScript(TestMainWithDispatch):
             path.chmod(0o755)
 
     def _call_event(self, rel_path, env):
-        env["JUJU_DISPATCH_PATH"] = str(rel_path)
+        env['JUJU_DISPATCH_PATH'] = str(rel_path)
+        env['JUJU_VERSION'] = '2.8.0'
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
         subprocess.check_call([str(dispatch)],
                               env=env, cwd=str(self.JUJU_CHARM_DIR))

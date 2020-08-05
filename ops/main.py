@@ -28,6 +28,7 @@ import ops.model
 import ops.storage
 
 from ops.log import setup_root_logging
+from ops.jujuversion import JujuVersion
 
 CHARM_STATE_FILE = '.unit-state.db'
 
@@ -45,11 +46,12 @@ def _get_charm_dir():
     return charm_dir
 
 
-def _create_event_link(charm, bound_event):
+def _create_event_link(charm, bound_event, link_to):
     """Create a symlink for a particular event.
 
     charm -- A charm object.
     bound_event -- An event for which to create a symlink.
+    link_to -- What the event link should point to
     """
     if issubclass(bound_event.event_type, ops.charm.HookEvent):
         event_dir = charm.framework.charm_dir / 'hooks'
@@ -70,7 +72,7 @@ def _create_event_link(charm, bound_event):
         # CPython has different implementations for populating sys.argv[0] for Linux and Windows.
         # For Windows it is always an absolute path (any symlinks are resolved)
         # while for Linux it can be a relative path.
-        target_path = os.path.relpath(os.path.realpath(sys.argv[0]), str(event_dir))
+        target_path = os.path.relpath(link_to, str(event_dir))
 
         # Ignore the non-symlink files or directories
         # assuming the charm author knows what they are doing.
@@ -94,10 +96,11 @@ def _setup_event_links(charm_dir, charm):
     charm -- An instance of the Charm class.
 
     """
+    link_to = os.path.realpath(os.environ.get("JUJU_DISPATCH_PATH", sys.argv[0]))
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         if issubclass(bound_event.event_type, (ops.charm.HookEvent, ops.charm.ActionEvent)):
-            _create_event_link(charm, bound_event)
+            _create_event_link(charm, bound_event, link_to)
 
 
 def _emit_charm_event(charm, event_name):
@@ -159,15 +162,15 @@ class _Dispatcher:
     Attributes:
         event_name: the name of the event to run
         is_dispatch_aware: are we running under a Juju that knows about the
-            dispatch binary?
+            dispatch binary, and is that binary present?
 
     """
 
     def __init__(self, charm_dir: Path):
         self._charm_dir = charm_dir
-        self._exec_path = Path(sys.argv[0])
+        self._exec_path = Path(os.environ.get('JUJU_DISPATCH_PATH', sys.argv[0]))
 
-        if 'JUJU_DISPATCH_PATH' in os.environ and (charm_dir / 'dispatch').exists():
+        if JujuVersion.from_environ().is_dispatch_aware() and (charm_dir / 'dispatch').exists():
             self._init_dispatch()
         else:
             self._init_legacy()
@@ -211,7 +214,7 @@ class _Dispatcher:
             logger.warning("Legacy %s exists but is not executable.", self._dispatch_path)
             return
 
-        if dispatch_path.resolve() == self._exec_path.resolve():
+        if dispatch_path.resolve() == Path(sys.argv[0]).resolve():
             logger.debug("Legacy %s is just a link to ourselves.", self._dispatch_path)
             return
 
