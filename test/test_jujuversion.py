@@ -135,15 +135,17 @@ class TestJujuVersion(unittest.TestCase):
             ("2.0.0.0", "2.0.0.0", False, True),
             ("2.0.0.1", "2.0.0.0", False, False),
             ("2.0.1.10", "2.0.0.0", False, False),
+            ("2.10.0", "2.8.0", False, False),
         ]
 
         for a, b, expected_strict, expected_weak in test_cases:
-            self.assertEqual(JujuVersion(a) < JujuVersion(b), expected_strict)
-            self.assertEqual(JujuVersion(a) <= JujuVersion(b), expected_weak)
-            self.assertEqual(JujuVersion(b) > JujuVersion(a), expected_strict)
-            self.assertEqual(JujuVersion(b) >= JujuVersion(a), expected_weak)
-            # Implicit conversion.
-            self.assertEqual(JujuVersion(a) < b, expected_strict)
-            self.assertEqual(JujuVersion(a) <= b, expected_weak)
-            self.assertEqual(b > JujuVersion(a), expected_strict)
-            self.assertEqual(b >= JujuVersion(a), expected_weak)
+            with self.subTest(a=a, b=b):
+                self.assertEqual(JujuVersion(a) < JujuVersion(b), expected_strict)
+                self.assertEqual(JujuVersion(a) <= JujuVersion(b), expected_weak)
+                self.assertEqual(JujuVersion(b) > JujuVersion(a), expected_strict)
+                self.assertEqual(JujuVersion(b) >= JujuVersion(a), expected_weak)
+                # Implicit conversion.
+                self.assertEqual(JujuVersion(a) < b, expected_strict)
+                self.assertEqual(JujuVersion(a) <= b, expected_weak)
+                self.assertEqual(b > JujuVersion(a), expected_strict)
+                self.assertEqual(b >= JujuVersion(a), expected_weak)

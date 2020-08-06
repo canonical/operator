@@ -179,20 +179,17 @@ class TestDispatch(unittest.TestCase):
         return mock_charm_event.call_args[0][1]
 
     def test_most_legacy(self):
-        """Without dispatch, sys.argv[0] is used
-        """
+        """Without dispatch, sys.argv[0] is used."""
         event = self._check()
         self.assertEqual(event, 'config_changed')
 
     def test_with_dispatch(self):
-        """With dispatch, dispatch is used
-        """
+        """With dispatch, dispatch is used."""
         event = self._check(with_dispatch=True, dispatch_path='hooks/potatos')
         self.assertEqual(event, 'potatos')
 
     def test_with_dispatch_path_but_no_dispatch(self):
-        """Dispatch path overwrites sys.argv[0] even if no actual dispatch
-        """
+        """Dispatch path overwrites sys.argv[0] even if no actual dispatch."""
         event = self._check(with_dispatch=False, dispatch_path='hooks/foo')
         self.assertEqual(event, 'foo')
 
@@ -494,8 +491,7 @@ class _TestMain(abc.ABC):
                                  expected_event_data[event_spec.event_name])
 
     def test_event_not_implemented(self):
-        """Make sure events without implementation do not cause non-zero exit.
-        """
+        """Make sure events without implementation do not cause non-zero exit."""
         # Simulate a scenario where there is a symlink for an event that
         # a charm does not know how to handle.
         hook_path = self.JUJU_CHARM_DIR / 'hooks/not-implemented-event'
@@ -632,8 +628,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
             check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
 
     def test_setup_event_links(self):
-        """Test auto-creation of symlinks caused by initial events.
-        """
+        """Test auto-creation of symlinks caused by initial events."""
         all_event_hooks = ['hooks/' + e.replace("_", "-")
                            for e in self.charm_module.Charm.on.events().keys()]
         initial_events = {
@@ -680,6 +675,12 @@ class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
+        super()._call_event(rel_path, env)
+
+
+class TestMainWithNoDispatchButDispatchPathIsSet(TestMainWithNoDispatch):
+    def _call_event(self, rel_path, env):
+        env['JUJU_DISPATCH_PATH'] = str(rel_path)
         super()._call_event(rel_path, env)
 
 
@@ -838,8 +839,7 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
 
 
 class TestMainWithDispatchAsScript(TestMainWithDispatch):
-    """Here dispatch is a script that execs the charm.py instead of a symlink.
-    """
+    """Here dispatch is a script that execs the charm.py instead of a symlink."""
 
     has_dispatch = True
 
