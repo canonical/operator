@@ -28,9 +28,16 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
+import yaml
 
 import ops
 from ops.jujuversion import JujuVersion
+
+
+if yaml.__with_libyaml__:
+    _DefaultDumper = yaml.CSafeDumper
+else:
+    _DefaultDumper = yaml.SafeDumper
 
 
 class Model:
@@ -1070,12 +1077,14 @@ class _ModelBackend:
     def pod_spec_set(self, spec, k8s_resources):
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
         try:
-            spec_path = tmpdir / 'spec.json'
-            spec_path.write_text(json.dumps(spec))
+            spec_path = tmpdir / 'spec.yaml'
+            with spec_path.open("wt", encoding="utf8") as f:
+                yaml.dump(spec, stream=f, Dumper=_DefaultDumper)
             args = ['--file', str(spec_path)]
             if k8s_resources:
-                k8s_res_path = tmpdir / 'k8s-resources.json'
-                k8s_res_path.write_text(json.dumps(k8s_resources))
+                k8s_res_path = tmpdir / 'k8s-resources.yaml'
+                with k8s_res_path.open("wt", encoding="utf8") as f:
+                    yaml.dump(k8s_resources, stream=f, Dumper=_DefaultDumper)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:
