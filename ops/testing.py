@@ -517,6 +517,9 @@ class Harness:
 
         This will trigger a `config_changed` event.
 
+        Note that the `key_values` mapping will only add or update configuration items.
+        To remove existing ones, see the `unset` parameter.
+
         Args:
             key_values: A Mapping of key:value pairs to update in config.
             unset: An iterable of keys to remove from Config. (Note that this does

@@ -77,7 +77,7 @@ That should be enough for you to be able to run
 ```
 $ charmcraft build
 Done, charm left in 'my-charm.charm'
-$ juju deploy my-charm.charm
+$ juju deploy ./my-charm.charm
 ```
 
 > 🛈 More information on [`charmcraft`](https://pypi.org/project/charmcraft/) can
