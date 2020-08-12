@@ -452,15 +452,15 @@ class TestModel(unittest.TestCase):
             self.assertRegex(pod_spec_call[2], '.*/tmp[A-Za-z0-9._-]{8}-pod-spec-set')
 
         model.pod.set_spec({'foo': 'bar'})
-        self.assertEqual(spec_path.read_text(), '{"foo": "bar"}')
+        self.assertEqual(spec_path.read_text(), 'foo: bar\n')
         self.assertFalse(k8s_res_path.exists())
 
         fake_calls = fake_script_calls(self, clear=True)
         check_calls(fake_calls)
 
         model.pod.set_spec({'bar': 'foo'}, {'qux': 'baz'})
-        self.assertEqual(spec_path.read_text(), '{"bar": "foo"}')
-        self.assertEqual(k8s_res_path.read_text(), '{"qux": "baz"}')
+        self.assertEqual(spec_path.read_text(), 'bar: foo\n')
+        self.assertEqual(k8s_res_path.read_text(), 'qux: baz\n')
 
         fake_calls = fake_script_calls(self, clear=True)
         check_calls(fake_calls)
