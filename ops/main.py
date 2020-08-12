@@ -276,10 +276,50 @@ class _Dispatcher:
         return self.event_name in ('collect_metrics',)
 
 
-def main(charm_class, use_juju_for_storage=False):
+def _should_use_controller_storage(db_path: Path, meta: ops.charm.CharmMeta) -> bool:
+    """Figure out whether we want to use controller storag or not."""
+    # if you've previously used local state, carry on using that
+    if db_path.exists():
+        logger.debug("Using local storage: %s already exists", db_path)
+        return False
+
+    # if you're not in k8s you don't need controller storage
+    if 'kubernetes' not in meta.series:
+        logger.debug("Using local storage: not a kubernetes charm")
+        return False
+
+    # if the charm specifies a min juju version, use that
+    if meta.min_juju_version is not None:
+        min_version = JujuVersion(meta.min_juju_version)
+        if min_version.has_controller_storage():
+            logger.debug("Using controller storage: min_juju_version: %s", min_version)
+            return True
+        else:
+            logger.debug("Using local storage: min_juju_version: %s", min_version)
+            return False
+
+    # min_juju_version not set, check current juju version
+    cur_version = JujuVersion.from_environ()
+
+    if cur_version.has_controller_storage():
+        logger.debug("Using controller storage: JUJU_VERSION=%s", cur_version)
+        return True
+    else:
+        logger.debug("Using local storage: JUJU_VERSION=%s", cur_version)
+        return False
+
+
+def main(charm_class: ops.charm.CharmBase, use_juju_for_storage: bool = None):
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
+
+    Args:
+        charm_class: your charm class.
+        use_juju_for_storage: whether to use controller-side storage. If not specified
+            then kubernetes charms that haven't previoulsy used local storage and that
+            are running on a new enough Juju default to controller-side storage,
+            otherwise local storage is used.
     """
     charm_dir = _get_charm_dir()
 
@@ -303,10 +343,11 @@ def main(charm_class, use_juju_for_storage=False):
     meta = ops.charm.CharmMeta.from_yaml(metadata, actions_metadata)
     model = ops.model.Model(meta, model_backend)
 
-    # TODO: If Juju unit agent crashes after exit(0) from the charm code
-    # the framework will commit the snapshot but Juju will not commit its
-    # operation.
     charm_state_path = charm_dir / CHARM_STATE_FILE
+
+    if use_juju_for_storage is None:
+        use_juju_for_storage = _should_use_controller_storage(charm_state_path, meta)
+
     if use_juju_for_storage:
         if dispatcher.is_restricted_context():
             # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event

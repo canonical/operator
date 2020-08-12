@@ -100,3 +100,7 @@ class JujuVersion:
     def is_dispatch_aware(self) -> bool:
         """Determine whether this juju version knows about dispatch."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
+
+    def has_controller_storage(self) -> bool:
+        """Determine whether this juju version supports controller-side storage."""
+        return (self.major, self.minor, self.patch) >= (2, 8, 0)

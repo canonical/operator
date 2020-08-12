@@ -64,6 +64,10 @@ class TestJujuVersion(unittest.TestCase):
         self.assertTrue(JujuVersion('2.8.0').is_dispatch_aware())
         self.assertFalse(JujuVersion('2.7.9').is_dispatch_aware())
 
+    def test_has_controller_storage(self):
+        self.assertTrue(JujuVersion('2.8.0').has_controller_storage())
+        self.assertFalse(JujuVersion('2.7.9').has_controller_storage())
+
     def test_parsing_errors(self):
         invalid_versions = [
             "xyz",
