@@ -17,7 +17,6 @@
 import io
 import unittest
 from unittest.mock import patch
-import importlib
 
 import logging
 import ops.log
@@ -38,25 +37,20 @@ class FakeModelBackend:
         self._calls.append((message, level))
 
 
-def reset_logging():
-    logging.shutdown()
-    importlib.reload(logging)
-
-
 class TestLogging(unittest.TestCase):
 
     def setUp(self):
         self.backend = FakeModelBackend()
 
-        reset_logging()
-        self.addCleanup(reset_logging)
+    def tearDown(self):
+        logging.getLogger().handlers.clear()
 
     def test_default_logging(self):
         ops.log.setup_root_logging(self.backend)
 
         logger = logging.getLogger()
         self.assertEqual(logger.level, logging.DEBUG)
-        self.assertIsInstance(logger.handlers[0], ops.log.JujuLogHandler)
+        self.assertIsInstance(logger.handlers[-1], ops.log.JujuLogHandler)
 
         test_cases = [(
             lambda: logger.critical('critical'), [('CRITICAL', 'critical')]
