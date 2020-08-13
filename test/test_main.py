@@ -609,7 +609,6 @@ class _TestMain(abc.ABC):
         self.assertEqual(state.status_message, 'help meeee')
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
     has_dispatch = False
     hooks_are_symlinks = True
@@ -671,7 +670,6 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         self.assertTrue(action_hook.exists())
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
@@ -679,14 +677,12 @@ class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
         super()._call_event(rel_path, env)
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class TestMainWithNoDispatchButDispatchPathIsSet(TestMainWithNoDispatch):
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         super()._call_event(rel_path, env)
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
     hooks_are_symlinks = False
 
@@ -696,7 +692,6 @@ class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
         shutil.copy(charm_path, str(path))
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class TestMainWithDispatch(_TestMain, unittest.TestCase):
     has_dispatch = True
 
@@ -841,7 +836,6 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
         ])
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class TestMainWithDispatchAsScript(TestMainWithDispatch):
     """Here dispatch is a script that execs the charm.py instead of a symlink."""
 
