@@ -81,6 +81,7 @@ class EventSpec:
         self.set_in_env = set_in_env
 
 
+@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
 
     def _check(self, charm_class):
@@ -90,7 +91,6 @@ class CharmInitTestCase(unittest.TestCase):
             'JUJU_MODEL_NAME': 'mymodel',
             'JUJU_VERSION': '2.7.0',
         }
-        fake_script(self, 'juju-log', "exit 0")
         with patch.dict(os.environ, fake_environ):
             with patch('ops.main._emit_charm_event'):
                 with patch('ops.main._get_charm_dir') as mock_charmdir:
@@ -140,6 +140,7 @@ class CharmInitTestCase(unittest.TestCase):
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
+@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class TestDispatch(unittest.TestCase):
     def _check(self, *, with_dispatch=False, dispatch_path=''):
         """Helper for below tests."""
@@ -156,7 +157,6 @@ class TestDispatch(unittest.TestCase):
             fake_environ['JUJU_VERSION'] = '2.8.0'
         else:
             fake_environ['JUJU_VERSION'] = '2.7.0'
-        fake_script(self, 'juju-log', "exit 0")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
@@ -506,7 +506,6 @@ class _TestMain(abc.ABC):
 
     def test_collect_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
-        fake_script(self, 'juju-log', 'exit 0')
         self._simulate_event(EventSpec(InstallEvent, 'install'))
         # Clear the calls during 'install'
         fake_script_calls(self, clear=True)
@@ -820,7 +819,6 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
         hook_path = self.hooks_dir / 'install'
         path = (self.hooks_dir / self.charm_exec_path).resolve()
         shutil.copy(str(path), str(hook_path))
-        fake_script(self, 'juju-log', 'exit 0')
 
         event = EventSpec(InstallEvent, 'install')
         state = self._simulate_event(event)
