@@ -987,6 +987,8 @@ class _ModelBackend:
             result = run(args, check=True, **kwargs)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(args[0]) from e
         if return_output:
             if result.stdout is None:
                 return ''
