@@ -9,5 +9,8 @@ else
     # windows
     _python=python
 fi
+export PYTHONVERBOSE=1
+
+"$_python" --version
 
 "$_python" -m unittest "$@"
