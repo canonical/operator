@@ -45,13 +45,15 @@ def fake_script(test_case, name, content):
         'content': content,
     }
 
-    with (test_case.fake_script_path / (name + _ModelBackend.EXE)).open('wt') as f:
+    fake_script = test_case.fake_script_path / (name + _ModelBackend.EXE)
+    with fake_script.open('wt') as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
         # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
         f.write('''#!/bin/sh
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
 {content}'''.format_map(template_args))
-    os.chmod(str(test_case.fake_script_path / name), 0o755)
+        if getattr(os, 'fchmod', None) is not None:
+            os.fchmod(f.fileno(), 0o755)
 
 
 def fake_script_calls(test_case, clear=False):
