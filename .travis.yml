@@ -7,15 +7,15 @@ arch:
     # - arm64
 
 python:
-    - "3.5"
+    # - "3.5"
     # - "3.6"
     # - "3.7"
     - "3.8"
 
 matrix:
     include:
-        - os: osx
-          language: generic
+        # - os: osx
+        #   language: generic
         - os: windows
           language: shell
           before_install:
