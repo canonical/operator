@@ -36,6 +36,8 @@ def fake_script(test_case, name, content):
 
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)
+        if _ModelBackend.EXE:
+            _ModelBackend.EXE = '.sh'
 
     template_args = {
         'name': name,
@@ -43,7 +45,7 @@ def fake_script(test_case, name, content):
         'content': content,
     }
 
-    with (test_case.fake_script_path / name).open('wt') as f:
+    with (test_case.fake_script_path / (name + _ModelBackend.EXE)).open('wt') as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
         # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
         f.write('''#!/bin/sh

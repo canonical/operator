@@ -23,6 +23,7 @@ import tempfile
 import time
 import typing
 import weakref
+import sysconfig
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
@@ -962,6 +963,7 @@ class _ModelBackend:
     """
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
+    EXE = sysconfig.get_config_var('EXE')
 
     def __init__(self, unit_name=None, model_name=None):
         if unit_name is None:
@@ -977,6 +979,7 @@ class _ModelBackend:
         self._leader_check_time = None
 
     def _run(self, *args, return_output=False, use_json=False):
+        args = [args[0] + self.EXE, *args[1:]]
         kwargs = dict(stdout=PIPE, stderr=PIPE)
         if use_json:
             args += ('--format=json',)
