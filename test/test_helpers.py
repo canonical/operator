@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import pathlib
-import subprocess
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -38,6 +40,7 @@ def fake_script(test_case, name, content):
         test_case.fake_script_path = pathlib.Path(fake_script_path)
 
     template_args = {
+        'exe': sys.executable,
         'name': name,
         'path': test_case.fake_script_path,
         'content': content,
@@ -45,17 +48,22 @@ def fake_script(test_case, name, content):
 
     with (test_case.fake_script_path / name).open('wt') as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
-        # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
-        f.write('''#!/bin/sh
-{{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
-{content}'''.format_map(template_args))
+        f.write('''#!{exe}
+import json
+import sys
+
+with open("{path}/calls.txt", "at", encoding="utf8") as f:
+    print(json.dumps(["{name}", *sys.argv[1:]]), file=f)
+
+{content}
+'''.format_map(template_args))
     os.chmod(str(test_case.fake_script_path / name), 0o755)
 
 
 def fake_script_calls(test_case, clear=False):
     try:
         with (test_case.fake_script_path / 'calls.txt').open('r+t') as f:
-            calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]
+            calls = [json.loads(line) for line in f]
             if clear:
                 f.truncate(0)
             return calls
@@ -66,8 +74,8 @@ def fake_script_calls(test_case, clear=False):
 class FakeScriptTest(unittest.TestCase):
 
     def test_fake_script_works(self):
-        fake_script(self, 'foo', 'echo foo runs')
-        fake_script(self, 'bar', 'echo bar runs')
+        fake_script(self, 'foo', 'print("foo runs")')
+        fake_script(self, 'bar', 'print("bar runs")')
         output = subprocess.getoutput('foo a "b c "; bar "d e" f')
         self.assertEqual(output, 'foo runs\nbar runs')
         self.assertEqual(fake_script_calls(self), [
@@ -76,14 +84,14 @@ class FakeScriptTest(unittest.TestCase):
         ])
 
     def test_fake_script_clear(self):
-        fake_script(self, 'foo', 'echo foo runs')
+        fake_script(self, 'foo', 'print("foo runs")')
 
         output = subprocess.getoutput('foo a "b c"')
         self.assertEqual(output, 'foo runs')
 
         self.assertEqual(fake_script_calls(self, clear=True), [['foo', 'a', 'b c']])
 
-        fake_script(self, 'bar', 'echo bar runs')
+        fake_script(self, 'bar', 'print("bar runs")')
 
         output = subprocess.getoutput('bar "d e" f')
         self.assertEqual(output, 'bar runs')

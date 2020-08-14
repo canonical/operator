@@ -34,6 +34,13 @@ from test.test_helpers import (
 )
 
 
+_state_set_copy = """
+import shutil
+with open("{}", "at", encoding="utf8") as f:
+    shutil.copyfileobj(sys.stdin, f)
+"""
+
+
 class StoragePermutations(abc.ABC):
 
     def create_framework(self) -> framework.Framework:
@@ -204,8 +211,6 @@ def setup_juju_backend(test_case, state_file):
     }
 
     fake_script(test_case, 'state-set', dedent('''\
-        {executable} -c '
-        import sys
         if "{pthpth}" not in sys.path:
             sys.path.append("{pthpth}")
         import sys, yaml, pathlib, pickle
@@ -221,12 +226,9 @@ def setup_juju_backend(test_case, state_file):
             state[k] = v
         with state_file.open("wb") as f:
             pickle.dump(state, f)
-        ' "$@"
         ''').format(**template_args))
 
     fake_script(test_case, 'state-get', dedent('''\
-        {executable} -Sc '
-        import sys
         if "{pthpth}" not in sys.path:
             sys.path.append("{pthpth}")
         import sys, pathlib, pickle
@@ -239,12 +241,9 @@ def setup_juju_backend(test_case, state_file):
             state = {{}}
         result = state.get(sys.argv[1], "\\n")
         sys.stdout.write(result)
-        ' "$@"
         ''').format(**template_args))
 
     fake_script(test_case, 'state-delete', dedent('''\
-        {executable} -Sc '
-        import sys
         if "{pthpth}" not in sys.path:
             sys.path.append("{pthpth}")
         import sys, pathlib, pickle
@@ -258,7 +257,6 @@ def setup_juju_backend(test_case, state_file):
         state.pop(sys.argv[1], None)
         with state_file.open("wb") as f:
             pickle.dump(state, f)
-        ' "$@"
         ''').format(**template_args))
 
 
@@ -320,15 +318,13 @@ class TestJujuStateBackend(BaseTestCase):
         self.assertFalse(storage._JujuStorageBackend.is_available())
 
     def test_is_available(self):
-        fake_script(self, 'state-get', 'echo ""')
+        fake_script(self, 'state-get', 'print()')
         self.assertTrue(storage._JujuStorageBackend.is_available())
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
     def test_set_encodes_args(self):
         t = tempfile.NamedTemporaryFile()
-        fake_script(self, 'state-set', dedent("""
-            cat >> {}
-            """).format(t.name))
+        fake_script(self, 'state-set', _state_set_copy.format(t.name))
         backend = storage._JujuStorageBackend()
         backend.set('key', {'foo': 2})
         self.assertEqual(fake_script_calls(self, clear=True), [
@@ -342,9 +338,7 @@ class TestJujuStateBackend(BaseTestCase):
             """))
 
     def test_get(self):
-        fake_script(self, 'state-get', dedent("""
-            echo 'foo: "bar"'
-            """))
+        fake_script(self, 'state-get', """print('foo: "bar"')""")
         backend = storage._JujuStorageBackend()
         value = backend.get('key')
         self.assertEqual(value, {'foo': 'bar'})
@@ -354,9 +348,7 @@ class TestJujuStateBackend(BaseTestCase):
 
     def test_set_and_get_complex_value(self):
         t = tempfile.NamedTemporaryFile()
-        fake_script(self, 'state-set', dedent("""
-            cat >> {}
-            """).format(t.name))
+        fake_script(self, 'state-set', _state_set_copy.format(t.name))
         backend = storage._JujuStorageBackend()
         complex_val = {
             'foo': 2,
@@ -393,16 +385,16 @@ class TestJujuStateBackend(BaseTestCase):
                 """))
         # Note that the content is yaml in a string, embedded inside YAML to declare the Key:
         # Value of where to store the entry.
-        fake_script(self, 'state-get', dedent("""
-            echo "foo: 2
+        fake_script(self, 'state-get', dedent('''
+            print("""foo: 2
             3: [1, 2, '3']
             four: !!set {2: null, 3: null}
             five: {a: 2, b: 3.0}
             six: !!python/tuple [a, b]
             seven: !!binary |
               MTIzNA==
-            "
-        """))
+            """)
+        '''))
         out = backend.get('Class[foo]/_stored')
         self.assertEqual(out, complex_val)
 
