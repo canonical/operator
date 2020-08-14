@@ -72,4 +72,5 @@ version = {!r}
     )
 
 finally:
+    version_path.unlink()
     version_backup.rename(version_path)
