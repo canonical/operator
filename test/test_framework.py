@@ -1696,7 +1696,7 @@ class DebugHookTests(BaseTestCase):
         publisher = CustomEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.foobar_action, observer.callback_method)
-        fake_script(self, 'action-get', "echo {}")
+        fake_script(self, 'action-get', "print('{}')")
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:

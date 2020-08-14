@@ -266,7 +266,7 @@ start:
             def _on_start_action(self, event):
                 pass
 
-        fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
+        fake_script(self, cmd_type + '-get', """print('{"foo-name": "name", "silent": true}')""")
         fake_script(self, cmd_type + '-set', "")
         fake_script(self, cmd_type + '-log', "")
         fake_script(self, cmd_type + '-fail', "")
@@ -308,7 +308,7 @@ start:
             def _on_start_action(self, event):
                 event.defer()
 
-        fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
+        fake_script(self, cmd_type + '-get', """print('{"foo-name": "name", "silent": true}')""")
         self.meta = self._get_action_test_meta()
 
         os.environ['JUJU_{}_NAME'.format(cmd_type.upper())] = 'start'

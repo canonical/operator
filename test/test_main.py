@@ -233,7 +233,7 @@ class _TestMain(abc.ABC):
             CharmBase.on = CharmEvents()
         self.addCleanup(cleanup)
 
-        fake_script(self, 'juju-log', "exit 0")
+        fake_script(self, 'juju-log', '')
 
         # set to something other than None for tests that care
         self.stdout = None
@@ -361,7 +361,7 @@ class _TestMain(abc.ABC):
             ['ConfigChangedEvent', 'UpdateStatusEvent'])
 
     def test_no_reemission_on_collect_metrics(self):
-        fake_script(self, 'add-metric', 'exit 0')
+        fake_script(self, 'add-metric', '')
 
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(InstallEvent, 'install'))
@@ -378,7 +378,7 @@ class _TestMain(abc.ABC):
     def test_multiple_events_handled(self):
         self._prepare_actions()
 
-        fake_script(self, 'action-get', "echo '{}'")
+        fake_script(self, 'action-get', 'print("{}")')
 
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
@@ -505,7 +505,7 @@ class _TestMain(abc.ABC):
                       ' results in a non-zero exit code returned')
 
     def test_collect_metrics(self):
-        fake_script(self, 'add-metric', 'exit 0')
+        fake_script(self, 'add-metric', '')
         self._simulate_event(EventSpec(InstallEvent, 'install'))
         # Clear the calls during 'install'
         fake_script_calls(self, clear=True)
@@ -526,7 +526,7 @@ class _TestMain(abc.ABC):
         self.assertEqual(calls, expected)
 
     def test_logger(self):
-        fake_script(self, 'action-get', "echo '{}'")
+        fake_script(self, 'action-get', 'print("{}")')
 
         test_cases = [(
             EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME'),
@@ -580,7 +580,7 @@ class _TestMain(abc.ABC):
     def test_sets_model_name(self):
         self._prepare_actions()
 
-        fake_script(self, 'action-get', "echo '{}'")
+        fake_script(self, 'action-get', 'print("{}")')
         state = self._simulate_event(EventSpec(
             ActionEvent, 'get_model_name_action',
             env_var='JUJU_ACTION_NAME',
@@ -591,8 +591,8 @@ class _TestMain(abc.ABC):
     def test_has_valid_status(self):
         self._prepare_actions()
 
-        fake_script(self, 'action-get', "echo '{}'")
-        fake_script(self, 'status-get', """echo '{"status": "unknown", "message": ""}'""")
+        fake_script(self, 'action-get', 'print("{}")')
+        fake_script(self, 'status-get', '''print('{"status": "unknown", "message": ""}')''')
         state = self._simulate_event(EventSpec(
             ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
@@ -600,7 +600,7 @@ class _TestMain(abc.ABC):
         self.assertEqual(state.status_name, 'unknown')
         self.assertEqual(state.status_message, '')
         fake_script(
-            self, 'status-get', """echo '{"status": "blocked", "message": "help meeee"}'""")
+            self, 'status-get', '''print('{"status": "blocked", "message": "help meeee"}')''')
         state = self._simulate_event(EventSpec(
             ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
@@ -737,11 +737,11 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
     def test_hook_and_dispatch(self):
         old_path = self.fake_script_path
         self.fake_script_path = self.hooks_dir
-        fake_script(self, 'install', 'exit 0')
+        fake_script(self, 'install', '')
         state = self._simulate_event(EventSpec(InstallEvent, 'install'))
 
         # the script was called, *and*, the .on. was called
-        self.assertEqual(fake_script_calls(self), [['install', '']])
+        self.assertEqual(fake_script_calls(self), [['install']])
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
         self.fake_script_path = old_path
@@ -771,7 +771,7 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
 
         old_path = self.fake_script_path
         self.fake_script_path = self.hooks_dir
-        fake_script(self, 'install', 'exit 42')
+        fake_script(self, 'install', 'sys.exit(42)')
         event = EventSpec(InstallEvent, 'install')
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(event)
