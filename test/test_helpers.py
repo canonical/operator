@@ -39,7 +39,7 @@ def fake_script(test_case, name, content):
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)
         if _ModelBackend.EXE:
-            _ModelBackend.EXE = '.sh'
+            _ModelBackend.EXE = '.py'
 
     template_args = {
         'exe': sys.executable,
