@@ -298,9 +298,9 @@ class _TestMain(abc.ABC):
         ppath = Path(__file__).parent
         pypath = str(ppath.parent)
         if 'PYTHONPATH' in os.environ:
-            pypath += ':' + os.environ['PYTHONPATH']
+            pypath += os.pathsep + os.environ['PYTHONPATH']
         env = {
-            'PATH': "{}:{}".format(ppath / 'bin', os.environ['PATH']),
+            'PATH': "{}{}{}".format(ppath / 'bin', os.pathsep, os.environ['PATH']),
             'PYTHONPATH': pypath,
             'JUJU_CHARM_DIR': str(self.JUJU_CHARM_DIR),
             'JUJU_UNIT_NAME': 'test_main/0',

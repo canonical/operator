@@ -39,7 +39,8 @@ class TestCharm(unittest.TestCase):
             os.environ.update(env)
         self.addCleanup(restore_env, os.environ.copy())
 
-        os.environ['PATH'] = "{}:{}".format(Path(__file__).parent / 'bin', os.environ['PATH'])
+        os.environ['PATH'] = "{}{}{}".format(
+            Path(__file__).parent / 'bin', os.pathsep, os.environ['PATH'])
         os.environ['JUJU_UNIT_NAME'] = 'local/0'
 
         self.tmpdir = Path(tempfile.mkdtemp())

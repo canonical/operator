@@ -30,11 +30,11 @@ from ops.storage import SQLiteStorage
 def fake_script(test_case, name, content):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
-        os.environ['PATH'] = '{}:{}'.format(fake_script_path, os.environ["PATH"])
+        os.environ['PATH'] = fake_script_path + os.pathsep + os.environ["PATH"]
 
         def cleanup():
             shutil.rmtree(fake_script_path)
-            os.environ['PATH'] = os.environ['PATH'].replace(fake_script_path + ':', '')
+            os.environ['PATH'] = os.environ['PATH'].replace(fake_script_path + os.pathsep, '')
 
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)
@@ -54,8 +54,9 @@ def fake_script(test_case, name, content):
         f.write('''#!{exe}
 import json
 import sys
+import os.path
 
-with open("{path}/calls.txt", "at", encoding="utf8") as f:
+with open(os.path.join("{path}", "calls.txt"), "at", encoding="utf8") as f:
     print(json.dumps(["{name}", *sys.argv[1:]]), file=f)
 
 {content}
