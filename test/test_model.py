@@ -43,6 +43,9 @@ class TestModel(unittest.TestCase):
             peers:
               db2:
                 interface: db2
+            resources:
+              foo: {type: file, filename: foo.txt}
+              bar: {type: file, filename: bar.txt}
         ''')
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
         self.model = self.harness.model
@@ -409,69 +412,30 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([])
 
     def test_resources(self):
-        # TODO: (jam) 2020-05-07 Harness doesn't yet support resource-get issue #262
-        meta = ops.charm.CharmMeta()
-        meta.resources = {'foo': None, 'bar': None}
-        model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
+        with self.assertRaises(ops.model.ModelError):
+            self.harness.model.resources.fetch('foo')
+
+        self.harness.add_resource('foo', 'foo contents\n')
+        self.harness.add_resource('bar', '')
 
         with self.assertRaises(RuntimeError):
-            model.resources.fetch('qux')
+            self.harness.model.resources.fetch('qux')
 
-        fake_script(self, 'resource-get', 'exit 1')
-        with self.assertRaises(ops.model.ModelError):
-            model.resources.fetch('foo')
-
-        fake_script(self, 'resource-get',
-                    'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
-        self.assertEqual(model.resources.fetch('foo').name, 'foo.tgz')
-        self.assertEqual(model.resources.fetch('bar').name, 'bar.tgz')
+        self.assertEqual(self.harness.model.resources.fetch('foo').name, 'foo.txt')
+        self.assertEqual(self.harness.model.resources.fetch('bar').name, 'bar.txt')
 
     def test_pod_spec(self):
-        # TODO: (jam) 2020-05-07 Harness doesn't yet expose pod-spec-set issue #261
-        meta = ops.charm.CharmMeta.from_yaml('''
-            name: myapp
-        ''')
-        model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
-        fake_script(self, 'pod-spec-set', """
-                    cat $2 > $(dirname $0)/spec.json
-                    [ -n "$4" ] && cat "$4" > $(dirname $0)/k8s_res.json || true
-                    """)
-        fake_script(self, 'is-leader', 'echo true')
-        spec_path = self.fake_script_path / 'spec.json'
-        k8s_res_path = self.fake_script_path / 'k8s_res.json'
+        self.harness.set_leader(True)
+        self.harness.model.pod.set_spec({'foo': 'bar'})
+        self.assertEqual(self.harness.get_pod_spec(), ({'foo': 'bar'}, None))
 
-        def check_calls(calls):
-            # There may 1 or 2 calls because of is-leader.
-            self.assertLessEqual(len(fake_calls), 2)
-            pod_spec_call = next(filter(lambda c: c[0] == 'pod-spec-set', calls))
-            self.assertEqual(pod_spec_call[:2], ['pod-spec-set', '--file'])
+        self.harness.model.pod.set_spec({'bar': 'foo'}, {'qux': 'baz'})
+        self.assertEqual(self.harness.get_pod_spec(), ({'bar': 'foo'}, {'qux': 'baz'}))
 
-            # 8 bytes are used as of python 3.4.0, see Python bug #12015.
-            # Other characters are from POSIX 3.282 (Portable Filename
-            # Character Set) a subset of which Python's mkdtemp uses.
-            self.assertRegex(pod_spec_call[2], '.*/tmp[A-Za-z0-9._-]{8}-pod-spec-set')
-
-        model.pod.set_spec({'foo': 'bar'})
-        self.assertEqual(spec_path.read_text(), 'foo: bar\n')
-        self.assertFalse(k8s_res_path.exists())
-
-        fake_calls = fake_script_calls(self, clear=True)
-        check_calls(fake_calls)
-
-        model.pod.set_spec({'bar': 'foo'}, {'qux': 'baz'})
-        self.assertEqual(spec_path.read_text(), 'bar: foo\n')
-        self.assertEqual(k8s_res_path.read_text(), 'qux: baz\n')
-
-        fake_calls = fake_script_calls(self, clear=True)
-        check_calls(fake_calls)
-
-        # Create a new model to drop is-leader caching result.
-        self.backend = ops.model._ModelBackend('myapp/0')
-        meta = ops.charm.CharmMeta()
-        model = ops.model.Model(meta, self.backend)
-        fake_script(self, 'is-leader', 'echo false')
+        # no leader -> no set pod spec
+        self.harness.set_leader(False)
         with self.assertRaises(ops.model.ModelError):
-            model.pod.set_spec({'foo': 'bar'})
+            self.harness.model.pod.set_spec({'foo': 'bar'})
 
     def test_base_status_instance_raises(self):
         with self.assertRaises(TypeError):
@@ -647,22 +611,20 @@ class TestModel(unittest.TestCase):
         meta.storages = {'disks': None, 'data': None}
         model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
 
-        fake_script(self, 'storage-list', '''
-            if [ "$1" = disks ]; then
-                echo '["disks/0", "disks/1"]'
-            else
-                echo '[]'
-            fi
-        ''')
-        fake_script(self, 'storage-get', '''
-            if [ "$2" = disks/0 ]; then
-                echo '"/var/srv/disks/0"'
-            elif [ "$2" = disks/1 ]; then
-                echo '"/var/srv/disks/1"'
-            else
-                exit 2
-            fi
-        ''')
+        fake_script(self, 'storage-list', dedent('''
+            if sys.argv[1] == "disks":
+                print('["disks/0", "disks/1"]')
+            else:
+                print('[]')
+            '''))
+        fake_script(self, 'storage-get', dedent('''
+            if sys.argv[2] == "disks/0":
+                print('"/var/srv/disks/0"')
+            elif sys.argv[2] == "disks/1":
+                print('"/var/srv/disks/1"')
+            else:
+                sys.exit(2)
+        '''))
         fake_script(self, 'storage-add', '')
 
         self.assertEqual(len(model.storages), 2)
@@ -722,9 +684,18 @@ class TestModelBindings(unittest.TestCase):
         self.backend = ops.model._ModelBackend('myapp/0')
         self.model = ops.model.Model(meta, self.backend)
 
-        fake_script(self, 'relation-ids',
-                    """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
-        fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
+        fake_script(self, 'relation-ids', dedent("""
+            if sys.argv[1] == "db0":
+                print('["db0:4"]')
+            else:
+                print('[]')
+            """))
+        fake_script(self, 'relation-list', dedent("""
+            if sys.argv[2] == "4":
+                print('["remoteapp1/0"]')
+            else:
+                sys.exit(2)
+            """))
         self.network_get_out = '''{
   "bind-addresses": [
     {
@@ -809,14 +780,14 @@ class TestModelBindings(unittest.TestCase):
         fake_script(
             self,
             'network-get',
-            '''
-                if [ "$1" = db0 ] && [ "$2" = --format=json ]; then
-                    echo '{}'
-                else
-                    echo ERROR invalid value "$2" for option -r: relation not found >&2
-                    exit 2
-                fi
-            '''.format(self.network_get_out))
+            dedent('''
+                if sys.argv[1:3] == ["db0", "--format=json"]:
+                    print("""{}""")
+                    sys.exit(0)
+                msg = 'ERROR invalid value "%s" for option -r: relation not found' % (sys.argv[2],)
+                print(msg, file=sys.stderr)
+                sys.exit(2)
+                ''').format(self.network_get_out))
         # Validate the behavior for dead relations.
         binding = ops.model.Binding('db0', 42, self.model._backend)
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
@@ -826,8 +797,12 @@ class TestModelBindings(unittest.TestCase):
         ])
 
     def test_binding_by_relation_name(self):
-        fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
+        fake_script(self, 'network-get', dedent('''
+            if sys.argv[1] == "db0":
+                print("""{}""")
+            else:
+                sys.exit(1)
+            ''').format(self.network_get_out))
         binding_name = 'db0'
         expected_calls = [['network-get', 'db0', '--format=json']]
 
@@ -836,8 +811,12 @@ class TestModelBindings(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
     def test_binding_by_relation(self):
-        fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
+        fake_script(self, 'network-get', dedent('''
+            if sys.argv[1] == "db0":
+                print("""{}""")
+            else:
+                sys.exit(1)
+            ''').format(self.network_get_out))
         binding_name = 'db0'
         expected_calls = [
             ['relation-ids', 'db0', '--format=json'],
@@ -882,11 +861,11 @@ class TestModelBackend(unittest.TestCase):
             name: myapp
         ''')
         model = ops.model.Model(meta, self.backend)
-        fake_script(self, 'is-leader', 'echo false')
+        fake_script(self, 'is-leader', 'print("false")')
         self.assertFalse(model.unit.is_leader())
 
         # Change the leadership status
-        fake_script(self, 'is-leader', 'echo true')
+        fake_script(self, 'is-leader', 'print("true")')
         # If you don't force it, we don't check, so we won't see the change
         self.assertFalse(model.unit.is_leader())
         # If we force a recheck, then we notice
@@ -894,52 +873,58 @@ class TestModelBackend(unittest.TestCase):
         self.assertTrue(model.unit.is_leader())
 
         # Force a recheck without changing the leadership status.
-        fake_script(self, 'is-leader', 'echo true')
+        fake_script(self, 'is-leader', 'print("true")')
         self.backend._leader_check_time = None
         self.assertTrue(model.unit.is_leader())
 
     def test_relation_tool_errors(self):
         self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
         os.environ['JUJU_VERSION'] = '2.8.0'
-        err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
+        err_msg = 'ERROR invalid value "{[2]}" for option -r: relation not found'
 
         test_cases = [(
-            lambda: fake_script(self, 'relation-list', 'echo fooerror >&2 ; exit 1'),
+            ('relation-list', 'print("fooerror", file=sys.stderr); sys.exit(1)'),
             lambda: self.backend.relation_list(3),
             ops.model.ModelError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-list', 'echo {} >&2 ; exit 2'.format(err_msg)),
+            (
+                'relation-list',
+                "print('{}'.format(sys.argv), file=sys.stderr); sys.exit(2)".format(err_msg)),
             lambda: self.backend.relation_list(3),
             ops.model.RelationNotFoundError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-set', 'echo fooerror >&2 ; exit 1'),
+            ('relation-set', 'print("fooerror", file=sys.stderr); sys.exit(1)'),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.ModelError,
             [['relation-set', '-r', '3', 'foo=bar']],
         ), (
-            lambda: fake_script(self, 'relation-set', 'echo {} >&2 ; exit 2'.format(err_msg)),
+            (
+                'relation-set',
+                "print('{}'.format(sys.argv), file=sys.stderr); sys.exit(2)".format(err_msg)),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-set', '-r', '3', 'foo=bar']],
         ), (
-            lambda: None,
+            None,
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=True),
             ops.model.RelationNotFoundError,
             [['relation-set', '-r', '3', 'foo=bar', '--app']],
         ), (
-            lambda: fake_script(self, 'relation-get', 'echo fooerror >&2 ; exit 1'),
+            ('relation-get', 'print("fooerror", file=sys.stderr); sys.exit(1)'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.ModelError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-get', 'echo {} >&2 ; exit 2'.format(err_msg)),
+            (
+                'relation-get',
+                "print('{}'.format(sys.argv), file=sys.stderr); sys.exit(2)".format(err_msg)),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
         ), (
-            lambda: None,
+            None,
             lambda: self.backend.relation_get(3, 'remote/0', is_app=True),
             ops.model.RelationNotFoundError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--app', '--format=json']],
@@ -947,7 +932,8 @@ class TestModelBackend(unittest.TestCase):
 
         for i, (do_fake, run, exception, calls) in enumerate(test_cases):
             with self.subTest(i):
-                do_fake()
+                if do_fake is not None:
+                    fake_script(self, *do_fake)
                 with self.assertRaises(exception):
                     run()
                 self.assertEqual(fake_script_calls(self, clear=True), calls)
@@ -955,7 +941,7 @@ class TestModelBackend(unittest.TestCase):
     def test_relation_get_juju_version_quirks(self):
         self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
 
-        fake_script(self, 'relation-get', '''echo '{"foo": "bar"}' ''')
+        fake_script(self, 'relation-get', '''print('{"foo": "bar"}')''')
 
         # on 2.7.0+, things proceed as expected
         for v in ['2.8.0', '2.7.0']:
@@ -975,7 +961,7 @@ class TestModelBackend(unittest.TestCase):
     def test_relation_set_juju_version_quirks(self):
         self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
 
-        fake_script(self, 'relation-set', 'exit 0')
+        fake_script(self, 'relation-set', '')
 
         # on 2.7.0+, things proceed as expected
         for v in ['2.8.0', '2.7.0']:
@@ -994,7 +980,7 @@ class TestModelBackend(unittest.TestCase):
     def test_status_get(self):
         # taken from actual Juju output
         content = '{"message": "", "status": "unknown", "status-data": {}}'
-        fake_script(self, 'status-get', "echo '{}'".format(content))
+        fake_script(self, 'status-get', "print('{}')".format(content))
         s = self.backend.status_get(is_app=False)
         self.assertEqual(s['status'], "unknown")
         self.assertEqual(s['message'], "")
@@ -1015,7 +1001,7 @@ class TestModelBackend(unittest.TestCase):
                 }
             }
             """)
-        fake_script(self, 'status-get', "echo '{}'".format(content))
+        fake_script(self, 'status-get', "print('''{}''')".format(content))
         s = self.backend.status_get(is_app=True)
         self.assertEqual(s['status'], "maintenance")
         self.assertEqual(s['message'], "installing")
@@ -1025,8 +1011,8 @@ class TestModelBackend(unittest.TestCase):
         ])
 
     def test_status_is_app_forced_kwargs(self):
-        fake_script(self, 'status-get', 'exit 1')
-        fake_script(self, 'status-set', 'exit 1')
+        fake_script(self, 'status-get', 'sys.exit(1)')
+        fake_script(self, 'status-set', 'sys.exit(1)')
 
         test_cases = (
             lambda: self.backend.status_get(False),
@@ -1045,8 +1031,8 @@ class TestModelBackend(unittest.TestCase):
             name: myapp
         ''')
         model = ops.model.Model(meta, self.backend)
-        fake_script(self, 'status-set', 'exit 1')
-        fake_script(self, 'is-leader', 'echo true')
+        fake_script(self, 'status-set', 'sys.exit(1)')
+        fake_script(self, 'is-leader', 'print("true")')
 
         with self.assertRaises(ops.model.ModelError):
             model.unit.status = ops.model.UnknownStatus()
@@ -1071,36 +1057,37 @@ class TestModelBackend(unittest.TestCase):
 
     def test_storage_tool_errors(self):
         test_cases = [(
-            lambda: fake_script(self, 'storage-list', 'echo fooerror >&2 ; exit 1'),
+            ('storage-list', 'print("fooerror", file=sys.stderr); sys.exit(1)'),
             lambda: self.backend.storage_list('foobar'),
             ops.model.ModelError,
             [['storage-list', 'foobar', '--format=json']],
         ), (
-            lambda: fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1'),
+            ('storage-get', 'print("fooerror", file=sys.stderr); sys.exit(1)'),
             lambda: self.backend.storage_get('foobar', 'someattr'),
             ops.model.ModelError,
             [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
         ), (
-            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
+            ('storage-add', 'print("fooerror", file=sys.stderr); sys.exit(1)'),
             lambda: self.backend.storage_add('foobar', count=2),
             ops.model.ModelError,
             [['storage-add', 'foobar=2']],
         ), (
-            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
+            ('storage-add', 'print("fooerror", file=sys.stderr); sys.exit(1)'),
             lambda: self.backend.storage_add('foobar', count=object),
             TypeError,
             [],
         ), (
-            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
+            ('storage-add', 'print("fooerror", file=sys.stderr); sys.exit(1)'),
             lambda: self.backend.storage_add('foobar', count=True),
             TypeError,
             [],
         )]
-        for do_fake, run, exception, calls in test_cases:
-            do_fake()
-            with self.assertRaises(exception):
-                run()
-            self.assertEqual(fake_script_calls(self, clear=True), calls)
+        for i, (do_fake, run, exception, calls) in enumerate(test_cases):
+            with self.subTest(i):
+                fake_script(self, *do_fake)
+                with self.assertRaises(exception):
+                    run()
+                self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_network_get(self):
         network_get_out = '''{
@@ -1124,8 +1111,12 @@ class TestModelBackend(unittest.TestCase):
     "192.0.2.2"
   ]
 }'''
-        fake_script(self, 'network-get',
-                    '''[ "$1" = deadbeef ] && echo '{}' || exit 1'''.format(network_get_out))
+        fake_script(self, 'network-get', dedent('''
+            if sys.argv[1] == "deadbeef":
+                print("""{}""")
+            else:
+                sys.exit(1)
+            ''').format(network_get_out))
         network_info = self.backend.network_get('deadbeef')
         self.assertEqual(network_info, json.loads(network_get_out))
         self.assertEqual(fake_script_calls(self, clear=True),
@@ -1137,83 +1128,77 @@ class TestModelBackend(unittest.TestCase):
                          [['network-get', 'deadbeef', '-r', '1', '--format=json']])
 
     def test_network_get_errors(self):
-        err_no_endpoint = 'ERROR no network config found for binding "$2"'
-        err_no_rel = 'ERROR invalid value "$3" for option -r: relation not found'
+        err_no_endpoint = 'ERROR no network config found for binding "{[2]}"'
+        err_no_rel = 'ERROR invalid value "{[3]}" for option -r: relation not found'
 
         test_cases = [(
-            lambda: fake_script(self, 'network-get',
-                                'echo {} >&2 ; exit 1'.format(err_no_endpoint)),
+            "print('{}'.format(sys.argv), file=sys.stderr); sys.exit(1)".format(err_no_endpoint),
             lambda: self.backend.network_get("deadbeef"),
             ops.model.ModelError,
             [['network-get', 'deadbeef', '--format=json']],
         ), (
-            lambda: fake_script(self, 'network-get', 'echo {} >&2 ; exit 2'.format(err_no_rel)),
+            "print('{}'.format(sys.argv), file=sys.stderr); sys.exit(2)".format(err_no_rel),
             lambda: self.backend.network_get("deadbeef", 3),
             ops.model.RelationNotFoundError,
             [['network-get', 'deadbeef', '-r', '3', '--format=json']],
         )]
-        for do_fake, run, exception, calls in test_cases:
-            do_fake()
-            with self.assertRaises(exception):
-                run()
-            self.assertEqual(fake_script_calls(self, clear=True), calls)
+        for i, (do_fake, run, exception, calls) in enumerate(test_cases):
+            with self.subTest(i):
+                fake_script(self, 'network-get', do_fake)
+                with self.assertRaises(exception):
+                    run()
+                self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_action_get_error(self):
-        fake_script(self, 'action-get', '')
-        fake_script(self, 'action-get', 'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-get', 'print(fooerror, file=sys.stderr); sys.exit(1)')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_get()
         calls = [['action-get', '--format=json']]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_action_set_error(self):
-        fake_script(self, 'action-get', '')
-        fake_script(self, 'action-set', 'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-set', 'print(fooerror, file=sys.stderr); sys.exit(1)')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
         calls = [["action-set", "foo=bar", "dead=beef cafe"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_action_log_error(self):
-        fake_script(self, 'action-get', '')
-        fake_script(self, 'action-log', 'echo fooerror >&2 ; exit 1')
+        fake_script(self, 'action-log', 'print(fooerror, file=sys.stderr); sys.exit(1)')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_log('log-message')
         calls = [["action-log", "log-message"]]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_action_get(self):
-        fake_script(self, 'action-get', """echo '{"foo-name": "bar", "silent": false}'""")
+        fake_script(self, 'action-get', """print('{"foo-name": "bar", "silent": false}')""")
         params = self.backend.action_get()
         self.assertEqual(params['foo-name'], 'bar')
         self.assertEqual(params['silent'], False)
         self.assertEqual(fake_script_calls(self), [['action-get', '--format=json']])
 
     def test_action_set(self):
-        fake_script(self, 'action-get', 'exit 1')
-        fake_script(self, 'action-set', 'exit 0')
+        fake_script(self, 'action-set', '')
         self.backend.action_set(OrderedDict([('x', 'dead beef'), ('y', 1)]))
         self.assertEqual(fake_script_calls(self), [['action-set', 'x=dead beef', 'y=1']])
 
     def test_action_fail(self):
-        fake_script(self, 'action-get', 'exit 1')
-        fake_script(self, 'action-fail', 'exit 0')
+        fake_script(self, 'action-fail', '')
         self.backend.action_fail('error 42')
         self.assertEqual(fake_script_calls(self), [['action-fail', 'error 42']])
 
     def test_action_log(self):
-        fake_script(self, 'action-get', 'exit 1')
-        fake_script(self, 'action-log', 'exit 0')
+        fake_script(self, 'action-log', '')
         self.backend.action_log('progress: 42%')
         self.assertEqual(fake_script_calls(self), [['action-log', 'progress: 42%']])
 
     def test_application_version_set(self):
-        fake_script(self, 'application-version-set', 'exit 0')
+        fake_script(self, 'application-version-set', '')
         self.backend.application_version_set('1.2b3')
         self.assertEqual(fake_script_calls(self), [['application-version-set', '--', '1.2b3']])
 
     def test_application_version_set_invalid(self):
-        fake_script(self, 'application-version-set', 'exit 0')
+        fake_script(self, 'application-version-set', '')
         with self.assertRaises(TypeError):
             self.backend.application_version_set(2)
         with self.assertRaises(TypeError):
@@ -1221,7 +1206,7 @@ class TestModelBackend(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [])
 
     def test_juju_log(self):
-        fake_script(self, 'juju-log', 'exit 0')
+        fake_script(self, 'juju-log', '')
         self.backend.juju_log('WARNING', 'foo')
         self.assertEqual(fake_script_calls(self, clear=True),
                          [['juju-log', '--log-level', 'WARNING', 'foo']])
@@ -1230,14 +1215,14 @@ class TestModelBackend(unittest.TestCase):
             self.backend.juju_log('DEBUG')
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
-        fake_script(self, 'juju-log', 'exit 1')
+        fake_script(self, 'juju-log', 'sys.exit(1)')
         with self.assertRaises(ops.model.ModelError):
             self.backend.juju_log('BAR', 'foo')
         self.assertEqual(fake_script_calls(self, clear=True),
                          [['juju-log', '--log-level', 'BAR', 'foo']])
 
     def test_valid_metrics(self):
-        fake_script(self, 'add-metric', 'exit 0')
+        fake_script(self, 'add-metric', '')
         test_cases = [(
             OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
             OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
