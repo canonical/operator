@@ -50,6 +50,9 @@ class TestModel(unittest.TestCase):
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
         self.model = self.harness.model
 
+    def tearDown(self):
+        self.harness.cleanup()
+
     def test_model_attributes(self):
         self.assertIs(self.model.app, self.model.unit.app)
         self.assertIsNone(self.model.name)
