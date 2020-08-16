@@ -756,14 +756,16 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.populate_oci_resources()
         path = harness.model.resources.fetch('image')
-        self.assertTrue(str(path).endswith('/image/contents.yaml'))
+        self.assertEqual(path.name, 'contents.yaml')
+        self.assertEqual(path.parent.name, 'image')
         with path.open('r') as resource_file:
             contents = yaml.safe_load(resource_file.read())
         self.assertEqual(contents['registrypath'], 'registrypath')
         self.assertEqual(contents['username'], 'username')
         self.assertEqual(contents['password'], 'password')
         path = harness.model.resources.fetch('image2')
-        self.assertTrue(str(path).endswith('/image2/contents.yaml'))
+        self.assertEqual(path.name, 'contents.yaml')
+        self.assertEqual(path.parent.name, 'image2')
 
     def test_resource_folder_cleanup(self):
         harness = Harness(CharmBase, meta='''
@@ -855,9 +857,8 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.add_resource('image', 'foo contents\n')
         path = harness.model.resources.fetch('image')
-        self.assertTrue(
-            str(path).endswith('/image/foo.txt'),
-            msg='expected {} to end with /image/foo.zip')
+        self.assertEqual(path.name, 'foo.txt')
+        self.assertEqual(path.parent.name, 'image')
         with path.open('rt') as f:
             self.assertEqual('foo contents\n', f.read())
 
@@ -874,9 +875,8 @@ class TestHarness(unittest.TestCase):
         raw_contents = b'\xff\xff\x00blah\n'
         harness.add_resource('image', raw_contents)
         path = harness.model.resources.fetch('image')
-        self.assertTrue(
-            str(path).endswith('/image/foo.zip'),
-            msg='expected {} to end with /image/foo.zip')
+        self.assertEqual(path.name, 'foo.zip')
+        self.assertEqual(path.parent.name, 'image')
         with path.open('rb') as f:
             self.assertEqual(raw_contents, f.read())
 
@@ -891,9 +891,8 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.add_resource('image', 'foo contents\n')
         path = harness.model.resources.fetch('image')
-        self.assertTrue(
-            str(path).endswith('/image/image'),
-            msg='expected {} to end with /image/image')
+        self.assertEqual(path.name, 'image')
+        self.assertEqual(path.parent.name, 'image')
 
     def test_get_pod_spec(self):
         harness = Harness(CharmBase, meta='''
