@@ -47,11 +47,9 @@ class TestModel(unittest.TestCase):
               foo: {type: file, filename: foo.txt}
               bar: {type: file, filename: bar.txt}
         ''')
+        self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
         self.model = self.harness.model
-
-    def tearDown(self):
-        self.harness.cleanup()
 
     def test_model_attributes(self):
         self.assertIs(self.model.app, self.model.unit.app)
