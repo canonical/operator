@@ -487,7 +487,7 @@ class Network:
             information about how your application should be configured (eg, what
             IP addresses should you bind to.)
             Note that multiple addresses for a single interface are represented as multiple
-            interfaces. (eg, ``[NetworKInfo('ens1', '10.1.1.1/32'),
+            interfaces. (eg, ``[NetworkInfo('ens1', '10.1.1.1/32'),
             NetworkInfo('ens1', '10.1.2.1/32'])``)
         ingress_addresses: A list of :class:`ipaddress.ip_address` objects representing the IP
             addresses that other units should use to get in touch with you.
@@ -851,6 +851,7 @@ class Pod:
         """Set the specification for pods that Juju should start in kubernetes.
 
         See `juju help-tool pod-spec-set` for details of what should be passed.
+        
         Args:
             spec: The mapping defining the pod specification
             k8s_resources: Additional kubernetes specific specification.
