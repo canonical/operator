@@ -851,7 +851,7 @@ class Pod:
         """Set the specification for pods that Juju should start in kubernetes.
 
         See `juju help-tool pod-spec-set` for details of what should be passed.
-        
+
         Args:
             spec: The mapping defining the pod specification
             k8s_resources: Additional kubernetes specific specification.
