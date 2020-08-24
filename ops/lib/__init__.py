@@ -109,9 +109,9 @@ def _find_all_specs(path):
         except (FileNotFoundError, NotADirectoryError):
             continue
         except OSError as e:
-            logger.debug("Tried to look for ops.lib packages under %r: %s", sys_dir, e)
+            logger.debug("Tried to look for ops.lib packages under '%s': %s", sys_dir, e)
             continue
-        logger.debug("Looking for ops.lib packages under %r", sys_dir)
+        logger.debug("Looking for ops.lib packages under '%s'", sys_dir)
         for top_dir in top_dirs:
             opslib = os.path.join(sys_dir, top_dir, 'opslib')
             try:
@@ -119,16 +119,16 @@ def _find_all_specs(path):
             except (FileNotFoundError, NotADirectoryError):
                 continue
             except OSError as e:
-                logger.debug("  Tried %r: %s", opslib, e)  # *lots* of things checked here
+                logger.debug("  Tried '%s': %s", opslib, e)  # *lots* of things checked here
                 continue
             else:
-                logger.debug("  Trying %r", opslib)
+                logger.debug("  Trying '%s'", opslib)
             finder = get_importer(opslib)
             if finder is None:
-                logger.debug("  Finder for %r is None", opslib)
+                logger.debug("  Finder for '%s' is None", opslib)
                 continue
             if not hasattr(finder, 'find_spec'):
-                logger.debug("  Finder for %r has no find_spec", opslib)
+                logger.debug("  Finder for '%s' has no find_spec", opslib)
                 continue
             for lib_dir in lib_dirs:
                 spec_name = "{}.opslib.{}".format(top_dir, lib_dir)
