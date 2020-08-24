@@ -131,6 +131,12 @@ Or you can use a virtualenv:
 
 Then you can try `./run_tests`, it should all go green.
 
+If you see the error `yaml does not have libyaml extensions, using slower pure
+Python yaml`, you need to reinstall pyyaml with the correct extensions:
+
+    apt-get install libyaml-dev
+    pip install --force-reinstall --no-cache-dir pyyaml
+
 If you want to build the documentation you'll need the requirements from
 `docs/requirements.txt`, or in your virtualenv
 
