@@ -43,6 +43,9 @@ class TestModel(unittest.TestCase):
             peers:
               db2:
                 interface: db2
+            resources:
+              foo: {type: file, filename: foo.txt}
+              bar: {type: file, filename: bar.txt}
         ''')
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
         self.model = self.harness.model
@@ -409,69 +412,30 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([])
 
     def test_resources(self):
-        # TODO: (jam) 2020-05-07 Harness doesn't yet support resource-get issue #262
-        meta = ops.charm.CharmMeta()
-        meta.resources = {'foo': None, 'bar': None}
-        model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
+        with self.assertRaises(ops.model.ModelError):
+            self.harness.model.resources.fetch('foo')
+
+        self.harness.add_resource('foo', 'foo contents\n')
+        self.harness.add_resource('bar', '')
 
         with self.assertRaises(RuntimeError):
-            model.resources.fetch('qux')
+            self.harness.model.resources.fetch('qux')
 
-        fake_script(self, 'resource-get', 'exit 1')
-        with self.assertRaises(ops.model.ModelError):
-            model.resources.fetch('foo')
-
-        fake_script(self, 'resource-get',
-                    'echo /var/lib/juju/agents/unit-test-0/resources/$1/$1.tgz')
-        self.assertEqual(model.resources.fetch('foo').name, 'foo.tgz')
-        self.assertEqual(model.resources.fetch('bar').name, 'bar.tgz')
+        self.assertEqual(self.harness.model.resources.fetch('foo').name, 'foo.txt')
+        self.assertEqual(self.harness.model.resources.fetch('bar').name, 'bar.txt')
 
     def test_pod_spec(self):
-        # TODO: (jam) 2020-05-07 Harness doesn't yet expose pod-spec-set issue #261
-        meta = ops.charm.CharmMeta.from_yaml('''
-            name: myapp
-        ''')
-        model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
-        fake_script(self, 'pod-spec-set', """
-                    cat $2 > $(dirname $0)/spec.json
-                    [ -n "$4" ] && cat "$4" > $(dirname $0)/k8s_res.json || true
-                    """)
-        fake_script(self, 'is-leader', 'echo true')
-        spec_path = self.fake_script_path / 'spec.json'
-        k8s_res_path = self.fake_script_path / 'k8s_res.json'
+        self.harness.set_leader(True)
+        self.harness.model.pod.set_spec({'foo': 'bar'})
+        self.assertEqual(self.harness.get_pod_spec(), ({'foo': 'bar'}, None))
 
-        def check_calls(calls):
-            # There may 1 or 2 calls because of is-leader.
-            self.assertLessEqual(len(fake_calls), 2)
-            pod_spec_call = next(filter(lambda c: c[0] == 'pod-spec-set', calls))
-            self.assertEqual(pod_spec_call[:2], ['pod-spec-set', '--file'])
+        self.harness.model.pod.set_spec({'bar': 'foo'}, {'qux': 'baz'})
+        self.assertEqual(self.harness.get_pod_spec(), ({'bar': 'foo'}, {'qux': 'baz'}))
 
-            # 8 bytes are used as of python 3.4.0, see Python bug #12015.
-            # Other characters are from POSIX 3.282 (Portable Filename
-            # Character Set) a subset of which Python's mkdtemp uses.
-            self.assertRegex(pod_spec_call[2], '.*/tmp[A-Za-z0-9._-]{8}-pod-spec-set')
-
-        model.pod.set_spec({'foo': 'bar'})
-        self.assertEqual(spec_path.read_text(), 'foo: bar\n')
-        self.assertFalse(k8s_res_path.exists())
-
-        fake_calls = fake_script_calls(self, clear=True)
-        check_calls(fake_calls)
-
-        model.pod.set_spec({'bar': 'foo'}, {'qux': 'baz'})
-        self.assertEqual(spec_path.read_text(), 'bar: foo\n')
-        self.assertEqual(k8s_res_path.read_text(), 'qux: baz\n')
-
-        fake_calls = fake_script_calls(self, clear=True)
-        check_calls(fake_calls)
-
-        # Create a new model to drop is-leader caching result.
-        self.backend = ops.model._ModelBackend('myapp/0')
-        meta = ops.charm.CharmMeta()
-        model = ops.model.Model(meta, self.backend)
-        fake_script(self, 'is-leader', 'echo false')
+        # no leader -> no set pod spec
+        self.harness.set_leader(False)
         with self.assertRaises(ops.model.ModelError):
-            model.pod.set_spec({'foo': 'bar'})
+            self.harness.model.pod.set_spec({'foo': 'bar'})
 
     def test_base_status_instance_raises(self):
         with self.assertRaises(TypeError):

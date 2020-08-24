@@ -106,8 +106,9 @@ class InfrastructureTests(unittest.TestCase):
         proc = subprocess.run(
             (sys.executable, 'setup.py') + args,
             stdout=subprocess.PIPE,
+            universal_newlines=True,
             check=True)
-        return proc.stdout.strip().decode("utf8")
+        return proc.stdout.strip()
 
     def test_setup_version(self):
         setup_version = self._run_setup('--version')
@@ -145,11 +146,13 @@ class ImportersTestCase(unittest.TestCase):
 
     def check(self, name):
         """Helper function to run the test."""
-        _, testfile = tempfile.mkstemp()
+        fd, testfile = tempfile.mkstemp()
         self.addCleanup(os.unlink, testfile)
 
-        with open(testfile, 'wt', encoding='utf8') as fh:
+        with open(fd, 'wt', encoding='utf8') as fh:
             fh.write(self.template.format(module_name=name))
 
-        proc = subprocess.run([sys.executable, testfile], env={'PYTHONPATH': os.getcwd()})
+        proc = subprocess.run(
+            [sys.executable, testfile],
+            env={'PYTHONPATH': os.getcwd(), **os.environ})
         self.assertEqual(proc.returncode, 0)

@@ -44,8 +44,9 @@ class TestJujuVersion(unittest.TestCase):
 
     @unittest.mock.patch('os.environ', new={})
     def test_from_environ(self):
-        with self.assertRaisesRegex(RuntimeError, 'environ has no JUJU_VERSION'):
-            JujuVersion.from_environ()
+        # JUJU_VERSION is not set
+        v = JujuVersion.from_environ()
+        self.assertEqual(v, JujuVersion('0.0.0'))
 
         os.environ['JUJU_VERSION'] = 'no'
         with self.assertRaisesRegex(RuntimeError, 'not a valid Juju version'):
