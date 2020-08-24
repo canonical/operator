@@ -277,7 +277,7 @@ class _Dispatcher:
 
 
 def _should_use_controller_storage(db_path: Path, meta: ops.charm.CharmMeta) -> bool:
-    """Figure out whether we want to use controller storag or not."""
+    """Figure out whether we want to use controller storage or not."""
     # if you've previously used local state, carry on using that
     if db_path.exists():
         logger.debug("Using local storage: %s already exists", db_path)
@@ -288,17 +288,7 @@ def _should_use_controller_storage(db_path: Path, meta: ops.charm.CharmMeta) -> 
         logger.debug("Using local storage: not a kubernetes charm")
         return False
 
-    # if the charm specifies a min juju version, use that
-    if meta.min_juju_version is not None:
-        min_version = JujuVersion(meta.min_juju_version)
-        if min_version.has_controller_storage():
-            logger.debug("Using controller storage: min_juju_version: %s", min_version)
-            return True
-        else:
-            logger.debug("Using local storage: min_juju_version: %s", min_version)
-            return False
-
-    # min_juju_version not set, check current juju version
+    # are we in a new enough Juju?
     cur_version = JujuVersion.from_environ()
 
     if cur_version.has_controller_storage():

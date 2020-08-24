@@ -881,20 +881,6 @@ class TestStorageHeuristics(unittest.TestCase):
             self.assertTrue(_should_use_controller_storage(Path("/xyzzy"), meta))
             self.assertLogged('Using controller storage: JUJU_VERSION=2.8.0')
 
-    def test_use_min_juju_version_if_set__too_old(self):
-        meta = CharmMeta.from_yaml("{series: [kubernetes], min-juju-version: '1.0'}")
-        with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
-            # note JUJU_VERSION is ignored
-            self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
-            self.assertLogged('Using local storage: min_juju_version: 1.0.0')
-
-    def test_use_min_juju_version_if_set__new_enough(self):
-        meta = CharmMeta.from_yaml("{series: [kubernetes], min-juju-version: '2.8'}")
-        with patch.dict(os.environ, {"JUJU_VERSION": "1.0"}):
-            # note JUJU_VERSION is ignored
-            self.assertTrue(_should_use_controller_storage(Path("/xyzzy"), meta))
-            self.assertLogged('Using controller storage: min_juju_version: 2.8.0')
-
     def test_not_if_not_in_k8s(self):
         meta = CharmMeta.from_yaml("series: [ecs]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
