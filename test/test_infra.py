@@ -109,7 +109,10 @@ class InfrastructureTests(unittest.TestCase):
             (sys.executable, 'setup.py') + args,
             stdout=subprocess.PIPE,
             check=True)
-        return proc.stdout.strip().replace(b"\r\n", b"\n").decode("utf8")
+        out = proc.stdout.strip().decode("utf8")
+        if os.linesep != '\n':
+            out = out.replace(os.linesep, '\n')
+        return out
 
     def test_setup_version(self):
         setup_version = self._run_setup('--version')
