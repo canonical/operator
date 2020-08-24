@@ -241,7 +241,7 @@ class _TestMain(abc.ABC):
         self.stderr = None
 
     def _setup_charm_dir(self):
-        self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-'))
+        self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-')).resolve()
         self.addCleanup(shutil.rmtree, str(self._tmpdir))
         self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
         self.CHARM_STATE_FILE = self.JUJU_CHARM_DIR / CHARM_STATE_FILE
