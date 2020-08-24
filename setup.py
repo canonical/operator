@@ -35,6 +35,9 @@ def _get_version() -> str:
 version = _get_version()
 version_path = Path("ops/version.py")
 version_backup = Path("ops/version.py~")
+if version_backup.exists():
+    # unlink(missing_ok=True) is a 3.8-ish
+    version_backup.unlink()
 version_path.rename(version_backup)
 try:
     with version_path.open("wt", encoding="utf8") as fh:
@@ -72,4 +75,5 @@ version = {!r}
     )
 
 finally:
+    version_path.unlink()
     version_backup.rename(version_path)
