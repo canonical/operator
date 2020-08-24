@@ -106,8 +106,9 @@ class InfrastructureTests(unittest.TestCase):
         proc = subprocess.run(
             (sys.executable, 'setup.py') + args,
             stdout=subprocess.PIPE,
+            universal_newlines=True,
             check=True)
-        return proc.stdout.strip().decode("utf8").replace("\r\n", "\n")
+        return proc.stdout.strip()
 
     def test_setup_version(self):
         setup_version = self._run_setup('--version')
