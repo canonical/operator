@@ -80,7 +80,7 @@ class TestLibFinder(TestCase):
 
         self.assertEqual(
             _flatten(ops.lib._find_all_specs([tmpdir])),
-            [tmpdir + '/foo/opslib/bar'])
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
         self.assertLoggedDebug("Found", "foo.opslib.bar")
 
     def test_multi(self):
@@ -125,7 +125,7 @@ class TestLibFinder(TestCase):
 
         self.assertEqual(
             _flatten(ops.lib._find_all_specs(dirs)),
-            ['./foo/opslib/bar'])
+            [os.path.join('.', 'foo', 'opslib', 'bar')])
 
     def test_bogus_topdir(self):
         """Check that having one bogus dir in sys.path doesn't cause the finder to abort."""
@@ -139,7 +139,7 @@ class TestLibFinder(TestCase):
 
         self.assertEqual(
             _flatten(ops.lib._find_all_specs(dirs)),
-            [tmpdir + '/foo/opslib/bar'])
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
 
     def test_bogus_opsdir(self):
         """Check that having one bogus opslib doesn't cause the finder to abort."""
@@ -156,7 +156,7 @@ class TestLibFinder(TestCase):
 
         self.assertEqual(
             _flatten(ops.lib._find_all_specs([tmpdir])),
-            [tmpdir + '/foo/opslib/bar'])
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
 
     def test_namespace(self):
         """Check that namespace packages are ignored."""

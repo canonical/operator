@@ -89,8 +89,8 @@ class JujuVersion:
     def from_environ(cls) -> 'JujuVersion':
         """Build a JujuVersion from JUJU_VERSION."""
         v = os.environ.get('JUJU_VERSION')
-        if not v:
-            raise RuntimeError('environ has no JUJU_VERSION')
+        if v is None:
+            v = '0.0.0'
         return cls(v)
 
     def has_app_data(self) -> bool:
@@ -99,4 +99,8 @@ class JujuVersion:
 
     def is_dispatch_aware(self) -> bool:
         """Determine whether this juju version knows about dispatch."""
+        return (self.major, self.minor, self.patch) >= (2, 8, 0)
+
+    def has_controller_storage(self) -> bool:
+        """Determine whether this juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
