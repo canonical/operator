@@ -89,8 +89,8 @@ class JujuVersion:
     def from_environ(cls) -> 'JujuVersion':
         """Build a JujuVersion from JUJU_VERSION."""
         v = os.environ.get('JUJU_VERSION')
-        if not v:
-            raise RuntimeError('environ has no JUJU_VERSION')
+        if v is None:
+            v = '0.0.0'
         return cls(v)
 
     def has_app_data(self) -> bool:
