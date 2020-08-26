@@ -15,10 +15,11 @@
 import inspect
 import pathlib
 import random
-from textwrap import dedent
 import tempfile
 import typing
 import yaml
+from contextlib import contextmanager
+from textwrap import dedent
 
 from ops import (
     charm,
@@ -320,6 +321,24 @@ class Harness:
         enable them again.
         """
         self._hooks_enabled = True
+
+    @contextmanager
+    def hooks_disabled(self):
+        """A context manager to run code with hooks disabled.
+
+        Example::
+
+            with harness.disable_hooks():
+                # things in here don't fire events
+                harness.set_leader(True)
+                harness.update_config(unset=['foo', 'bar'])
+            # things here will again fire events
+        """
+        self.disable_hooks()
+        try:
+            yield None
+        finally:
+            self.enable_hooks()
 
     def _next_relation_id(self):
         rel_id = self._relation_id_counter
