@@ -15,8 +15,10 @@
 import inspect
 import logging
 import os
+import shutil
 import subprocess
 import sys
+import typing
 import warnings
 from pathlib import Path
 
@@ -34,6 +36,17 @@ CHARM_STATE_FILE = '.unit-state.db'
 
 
 logger = logging.getLogger()
+
+
+def _exe_path(path: Path) -> typing.Optional[Path]:
+    """Find and return the full path to the given binary.
+
+    Here path is the absolute path to a binary, but might be missing an extension.
+    """
+    p = shutil.which(path.name, path=str(path.parent))
+    if p is None:
+        return None
+    return Path(p)
 
 
 def _get_charm_dir():
@@ -69,9 +82,6 @@ def _create_event_link(charm, bound_event, link_to):
 
     event_dir.mkdir(exist_ok=True)
     if not event_path.exists():
-        # CPython has different implementations for populating sys.argv[0] for Linux and Windows.
-        # For Windows it is always an absolute path (any symlinks are resolved)
-        # while for Linux it can be a relative path.
         target_path = os.path.relpath(link_to, str(event_dir))
 
         # Ignore the non-symlink files or directories
@@ -96,6 +106,9 @@ def _setup_event_links(charm_dir, charm):
     charm -- An instance of the Charm class.
 
     """
+    # XXX: on windows this is almost certainly completely broken
+    #      it creates symlinks with no extension pointing to a .py
+    #      and juju only knows how to handle .exe, .bat, .cmd, and .ps1
     link_to = os.path.realpath(os.environ.get("JUJU_DISPATCH_PATH", sys.argv[0]))
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
@@ -170,7 +183,8 @@ class _Dispatcher:
         self._charm_dir = charm_dir
         self._exec_path = Path(os.environ.get('JUJU_DISPATCH_PATH', sys.argv[0]))
 
-        if JujuVersion.from_environ().is_dispatch_aware() and (charm_dir / 'dispatch').exists():
+        dispatch = charm_dir / 'dispatch'
+        if JujuVersion.from_environ().is_dispatch_aware() and _exe_path(dispatch) is not None:
             self._init_dispatch()
         else:
             self._init_legacy()
@@ -204,8 +218,8 @@ class _Dispatcher:
             # we *are* the legacy hook
             return
 
-        dispatch_path = self._charm_dir / self._dispatch_path
-        if not dispatch_path.exists():
+        dispatch_path = _exe_path(self._charm_dir / self._dispatch_path)
+        if dispatch_path is None:
             logger.debug("Legacy %s does not exist.", self._dispatch_path)
             return
 
@@ -224,10 +238,11 @@ class _Dispatcher:
         try:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
-            logger.warning(
-                "Legacy %s exited with status %d.",
-                self._dispatch_path, e.returncode)
+            logger.warning("Legacy %s exited with status %d.", self._dispatch_path, e.returncode)
             sys.exit(e.returncode)
+        except OSError as e:
+            logger.warning("Unable to run legacy %s: %s", self._dispatch_path, e)
+            sys.exit(1)
         else:
             logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
 

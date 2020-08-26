@@ -26,41 +26,50 @@ from ops.storage import SQLiteStorage
 
 
 def fake_script(test_case, name, content):
+    # raise unittest.SkipTest("fake_script not working on windows yet")
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
-        os.environ['PATH'] = '{}:{}'.format(fake_script_path, os.environ["PATH"])
+        test_case._old_path = os.environ["PATH"]
+        os.environ['PATH'] = os.pathsep.join([fake_script_path, os.environ["PATH"]])
 
         def cleanup():
             shutil.rmtree(fake_script_path)
-            os.environ['PATH'] = os.environ['PATH'].replace(fake_script_path + ':', '')
+            os.environ['PATH'] = test_case._old_path
 
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)
 
     template_args = {
         'name': name,
-        'path': test_case.fake_script_path,
+        'path': test_case.fake_script_path.as_posix(),
         'content': content,
     }
 
-    with (test_case.fake_script_path / name).open('wt') as f:
+    path = test_case.fake_script_path / name
+    with path.open('wt') as f:
         # Before executing the provided script, dump the provided arguments in calls.txt.
         # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
         f.write('''#!/bin/sh
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
 {content}'''.format_map(template_args))
-    os.chmod(str(test_case.fake_script_path / name), 0o755)
+    os.chmod(str(path), 0o755)
+    # TODO fix path maybe
+    path.with_suffix(".bat").write_text(
+        '@"\\Program Files\\git\\bin\\bash.exe" {} %*\n'.format(path))
 
 
 def fake_script_calls(test_case, clear=False):
-    try:
-        with (test_case.fake_script_path / 'calls.txt').open('r+t') as f:
-            calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]
-            if clear:
-                f.truncate(0)
-            return calls
-    except FileNotFoundError:
+    calls_file = test_case.fake_script_path / 'calls.txt'
+    if not calls_file.exists():
         return []
+
+    # newline and encoding forced to linuxy defaults because on
+    # windows they're written from git-bash
+    with calls_file.open('r+t', newline='\n', encoding='utf8') as f:
+        calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]
+        if clear:
+            f.truncate(0)
+    return calls
 
 
 class FakeScriptTest(unittest.TestCase):
@@ -68,7 +77,9 @@ class FakeScriptTest(unittest.TestCase):
     def test_fake_script_works(self):
         fake_script(self, 'foo', 'echo foo runs')
         fake_script(self, 'bar', 'echo bar runs')
-        output = subprocess.getoutput('foo a "b c "; bar "d e" f')
+        # subprocess.getoutput goes via the shell, so it needs to be
+        # something both sh and CMD understand
+        output = subprocess.getoutput('foo a "b c " && bar "d e" f')
         self.assertEqual(output, 'foo runs\nbar runs')
         self.assertEqual(fake_script_calls(self), [
             ['foo', 'a', 'b c '],

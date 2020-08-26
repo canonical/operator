@@ -978,11 +978,12 @@ class _ModelBackend:
         self._leader_check_time = None
 
     def _run(self, *args, return_output=False, use_json=False):
-        kwargs = dict(stdout=PIPE, stderr=PIPE)
+        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)
+        args = (shutil.which(args[0]),) + args[1:]
         if use_json:
             args += ('--format=json',)
         try:
-            result = run(args, check=True, **kwargs)
+            result = run(args, **kwargs)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:

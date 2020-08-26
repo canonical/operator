@@ -16,6 +16,7 @@ import abc
 import logging
 import logassert
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -52,6 +53,8 @@ from ops.storage import SQLiteStorage
 from ops.version import version
 
 from .test_helpers import fake_script, fake_script_calls
+
+is_windows = platform.system() == 'Windows'
 
 # This relies on the expected repository structure to find a path to
 # source of the charm under test.
@@ -168,7 +171,8 @@ class TestDispatch(unittest.TestCase):
                 dispatch = tmpdir / 'dispatch'
                 with dispatch.open('wt', encoding='utf8') as fh:
                     fh.write('')
-                    os.fchmod(fh.fileno(), 0o755)
+                    if getattr(os, 'fchmod', None) is not None:
+                        os.fchmod(fh.fileno(), 0o755)
 
             with patch.dict(os.environ, fake_environ):
                 with patch('ops.main._emit_charm_event') as mock_charm_event:
@@ -299,13 +303,14 @@ class _TestMain(abc.ABC):
         ppath = Path(__file__).parent
         pypath = str(ppath.parent)
         if 'PYTHONPATH' in os.environ:
-            pypath += ':' + os.environ['PYTHONPATH']
-        env = {
-            'PATH': "{}:{}".format(ppath / 'bin', os.environ['PATH']),
+            pypath += os.pathsep + os.environ['PYTHONPATH']
+        env = os.environ.copy()
+        env.update({
+            'PATH': os.pathsep.join([str(ppath / 'bin'), env['PATH']]),
             'PYTHONPATH': pypath,
             'JUJU_CHARM_DIR': str(self.JUJU_CHARM_DIR),
             'JUJU_UNIT_NAME': 'test_main/0',
-        }
+        })
         if event_spec.set_in_env is not None:
             env.update(event_spec.set_in_env)
         if issubclass(event_spec.event_type, RelationEvent):
@@ -524,7 +529,7 @@ class _TestMain(abc.ABC):
         if self.has_dispatch:
             expected.insert(1, [
                 'juju-log', '--log-level', 'DEBUG',
-                'Legacy hooks/collect-metrics does not exist.'])
+                'Legacy {} does not exist.'.format(Path('hooks/collect-metrics'))])
 
         self.assertEqual(calls, expected)
 
@@ -555,6 +560,7 @@ class _TestMain(abc.ABC):
             self._simulate_event(event_spec)
             self.assertIn(calls, fake_script_calls(self, clear=True))
 
+    @unittest.skipIf(is_windows, 'TODO windows multiline args are hard')
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(InstallEvent, 'install',
@@ -567,7 +573,8 @@ class _TestMain(abc.ABC):
         if self.has_dispatch:
             self.assertEqual(
                 calls.pop(0),
-                'juju-log --log-level DEBUG Legacy hooks/install does not exist.')
+                'juju-log --log-level DEBUG Legacy {} does not exist.'.format(
+                    Path("hooks/install")))
 
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
 
@@ -697,23 +704,8 @@ class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
         shutil.copy(charm_path, str(path))
 
 
-class TestMainWithDispatch(_TestMain, unittest.TestCase):
+class _TestMainWithDispatch(_TestMain):
     has_dispatch = True
-
-    def _setup_entry_point(self, directory, entry_point):
-        path = self.JUJU_CHARM_DIR / 'dispatch'
-        if not path.exists():
-            path.symlink_to('src/charm.py')
-
-    def _call_event(self, rel_path, env):
-        env['JUJU_DISPATCH_PATH'] = str(rel_path)
-        env['JUJU_VERSION'] = '2.8.0'
-        dispatch = self.JUJU_CHARM_DIR / 'dispatch'
-        subprocess.run(
-            [sys.executable, str(dispatch)],
-            # stdout=self.stdout,
-            # stderr=self.stderr,
-            check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
 
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events does _not_ happen when using dispatch.
@@ -750,14 +742,16 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
         self.fake_script_path = old_path
+        hook = Path('hooks/install')
         self.assertEqual(fake_script_calls(self), [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
-            ['juju-log', '--log-level', 'DEBUG', 'Legacy hooks/install exited with status 0.'],
+            ['juju-log', '--log-level', 'INFO', 'Running legacy %s.' % (hook,)],
+            ['juju-log', '--log-level', 'DEBUG', 'Legacy %s exited with status 0.' % (hook,)],
             ['juju-log', '--log-level', 'DEBUG', 'Using local storage: not a kubernetes charm'],
             ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
         ])
 
+    @unittest.skipIf(is_windows, "this is UNIXish; TODO: write equivalent windows test")
     def test_non_executable_hook_and_dispatch(self):
         (self.hooks_dir / "install").write_text("")
         state = self._simulate_event(EventSpec(InstallEvent, 'install'))
@@ -787,16 +781,19 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
         self.stdout.seek(0)
         self.assertEqual(self.stdout.read(), b'')
         calls = fake_script_calls(self)
+        hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
-            ['juju-log', '--log-level', 'WARNING', 'Legacy hooks/install exited with status 42.'],
+            ['juju-log', '--log-level', 'INFO', 'Running legacy %s.' % (hook,)],
+            ['juju-log', '--log-level', 'WARNING', 'Legacy %s exited with status 42.' % (hook,)],
         ]
         self.assertEqual(calls, expected)
 
     def test_hook_and_dispatch_but_hook_is_dispatch(self):
         event = EventSpec(InstallEvent, 'install')
         hook_path = self.hooks_dir / 'install'
+        if is_windows:
+            hook_path = hook_path.with_suffix('.bat')
         for ((rel, ind), path) in {
                 # relative and indirect
                 (True, True): Path('../dispatch'),
@@ -808,9 +805,11 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
                 (False, True): self.JUJU_CHARM_DIR / 'dispatch',
         }.items():
             with self.subTest(path=path, rel=rel, ind=ind):
+                if is_windows:
+                    path = path.with_suffix('.sh')
                 # sanity check
                 self.assertEqual(path.is_absolute(), not rel)
-                self.assertEqual(path.name == 'dispatch', ind)
+                self.assertEqual(path.with_suffix('').name == 'dispatch', ind)
                 try:
                     hook_path.symlink_to(path)
 
@@ -822,6 +821,7 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
                 finally:
                     hook_path.unlink()
 
+    @unittest.skipIf(is_windows, "this needs rethinking on Windows")
     def test_hook_and_dispatch_but_hook_is_dispatch_copy(self):
         hook_path = self.hooks_dir / 'install'
         path = (self.hooks_dir / self.charm_exec_path).resolve()
@@ -833,26 +833,55 @@ class TestMainWithDispatch(_TestMain, unittest.TestCase):
         # the .on. was only called once
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
         self.assertEqual(list(state.on_install), ['InstallEvent'])
+        hook = Path('hooks/install')
         self.assertEqual(fake_script_calls(self), [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy hooks/install.'],
+            ['juju-log', '--log-level', 'INFO', 'Running legacy %s.' % (hook,)],
             VERSION_LOGLINE,    # because it called itself
-            ['juju-log', '--log-level', 'DEBUG', 'Charm called itself via hooks/install.'],
-            ['juju-log', '--log-level', 'DEBUG', 'Legacy hooks/install exited with status 0.'],
+            ['juju-log', '--log-level', 'DEBUG', 'Charm called itself via %s.' % (hook,)],
+            ['juju-log', '--log-level', 'DEBUG', 'Legacy %s exited with status 0.' % (hook,)],
             ['juju-log', '--log-level', 'DEBUG', 'Using local storage: not a kubernetes charm'],
             ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
         ])
 
 
-class TestMainWithDispatchAsScript(TestMainWithDispatch):
+# NOTE
+#  AIUI On windows dispatch must be a script (see TestMainWithDispatchAsScript),
+#  because Juju won't call python even if we rename dispatch to dispatch.py
+@unittest.skipIf(is_windows, "Juju on windows won't make this work (see note)")
+class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
+    def _setup_entry_point(self, directory, entry_point):
+        path = self.JUJU_CHARM_DIR / 'dispatch'
+        if not path.exists():
+            path.symlink_to(os.path.join('src', 'charm.py'))
+
+    def _call_event(self, rel_path, env):
+        env['JUJU_DISPATCH_PATH'] = str(rel_path)
+        env['JUJU_VERSION'] = '2.8.0'
+        dispatch = self.JUJU_CHARM_DIR / 'dispatch'
+        subprocess.run(
+            [sys.executable, str(dispatch)],
+            # stdout=self.stdout,
+            # stderr=self.stderr,
+            check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
+
+
+class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
     """Here dispatch is a script that execs the charm.py instead of a symlink."""
 
     has_dispatch = True
 
+    if is_windows:
+        suffix = '.BAT'
+        script = '@ECHO OFF\n"{}" "{}"\n'
+    else:
+        suffix = ''
+        script = '#!/bin/sh\nexec "{}" "{}"\n'
+
     def _setup_entry_point(self, directory, entry_point):
-        path = self.JUJU_CHARM_DIR / 'dispatch'
+        path = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
         if not path.exists():
-            path.write_text('#!/bin/sh\nexec "{}" "{}"\n'.format(
+            path.write_text(self.script.format(
                 sys.executable,
                 self.JUJU_CHARM_DIR / 'src/charm.py'))
             path.chmod(0o755)
@@ -860,9 +889,8 @@ class TestMainWithDispatchAsScript(TestMainWithDispatch):
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
-        dispatch = self.JUJU_CHARM_DIR / 'dispatch'
-        subprocess.check_call([str(dispatch)],
-                              env=env, cwd=str(self.JUJU_CHARM_DIR))
+        dispatch = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
+        subprocess.check_call([str(dispatch)], env=env, cwd=str(self.JUJU_CHARM_DIR))
 
 
 class TestStorageHeuristics(unittest.TestCase):
