@@ -328,7 +328,7 @@ class Harness:
 
         Example::
 
-            with harness.disable_hooks():
+            with harness.hooks_disabled():
                 # things in here don't fire events
                 harness.set_leader(True)
                 harness.update_config(unset=['foo', 'bar'])
