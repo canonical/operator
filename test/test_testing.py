@@ -540,6 +540,28 @@ class TestHarness(unittest.TestCase):
             harness.charm.get_changes(reset=True),
             [{'name': 'config-changed', 'data': {'value': 'fourth', 'third': '3'}}])
 
+    def test_hooks_disabled_contextmanager(self):
+        harness = Harness(RecordingCharm, meta='''
+            name: test-charm
+        ''')
+        self.addCleanup(harness.cleanup)
+        # Before begin() there are no events.
+        harness.update_config({'value': 'first'})
+        # By default, after begin the charm is set up to receive events.
+        harness.begin()
+        harness.update_config({'value': 'second'})
+        self.assertEqual(
+            harness.charm.get_changes(reset=True),
+            [{'name': 'config-changed', 'data': {'value': 'second'}}])
+        # Once disabled, we won't see config-changed when we make an update
+        with harness.hooks_disabled():
+            harness.update_config({'third': '3'})
+        self.assertEqual(harness.charm.get_changes(reset=True), [])
+        harness.update_config({'value': 'fourth'})
+        self.assertEqual(
+            harness.charm.get_changes(reset=True),
+            [{'name': 'config-changed', 'data': {'value': 'fourth', 'third': '3'}}])
+
     def test_metadata_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(tmp))
