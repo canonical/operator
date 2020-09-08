@@ -301,6 +301,26 @@ class TestModel(unittest.TestCase):
             ('relation_set', relation_id, 'host', '', False),
         ])
 
+    def test_relation_data_del_missing_key(self):
+        relation_id = self.harness.add_relation('db1', 'remoteapp1')
+        self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
+        self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
+        self.resetBackendCalls()
+
+        rel_db1 = self.model.get_relation('db1')
+        # Force memory cache to be loaded.
+        self.assertIn('host', rel_db1.data[self.model.unit])
+        rel_db1.data[self.model.unit]['port'] = ''   # Same as a delete, should not fail.
+        self.assertNotIn('port', rel_db1.data[self.model.unit])
+        self.assertEqual({'host': 'bar'}, self.harness.get_relation_data(relation_id, 'myapp/0'))
+
+        self.assertBackendCalls([
+            ('relation_ids', 'db1'),
+            ('relation_list', relation_id),
+            ('relation_get', relation_id, 'myapp/0', False),
+            ('relation_set', relation_id, 'port', '', False),
+        ])
+
     def test_relation_set_fail(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'myapp-0'})

@@ -694,7 +694,8 @@ class RelationDataContent(LazyMapping, MutableMapping):
             if value == '':
                 # Match the behavior of Juju, which is that setting the value to an
                 # empty string will remove the key entirely from the relation data.
-                del self._data[key]
+                if key in self._data:
+                    del self._data[key]
             else:
                 self._data[key] = value
 
