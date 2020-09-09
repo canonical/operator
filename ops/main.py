@@ -307,7 +307,7 @@ def main(charm_class: ops.charm.CharmBase, use_juju_for_storage: bool = None):
     Args:
         charm_class: your charm class.
         use_juju_for_storage: whether to use controller-side storage. If not specified
-            then kubernetes charms that haven't previoulsy used local storage and that
+            then kubernetes charms that haven't previously used local storage and that
             are running on a new enough Juju default to controller-side storage,
             otherwise local storage is used.
     """
