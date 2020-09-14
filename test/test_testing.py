@@ -579,6 +579,42 @@ class TestHarness(unittest.TestCase):
         # The charm_dir also gets set
         self.assertEqual(harness.framework.charm_dir, tmp)
 
+    def test_config_from_directory(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, str(tmp))
+        config_filename = tmp / 'config.yaml'
+        with config_filename.open('wt') as config:
+            config.write(textwrap.dedent('''
+            options:
+                opt_str:
+                    type: string
+                    default: "val"
+                opt_str_empty:
+                    type: string
+                    default: ""
+                opt_null:
+                    type: string
+                    default: null
+                opt_bool:
+                    type: boolean
+                    default: true
+                opt_int:
+                    type: int
+                    default: 1
+                opt_float:
+                    type: float
+                    default: 1.0
+            '''))
+        harness = self._get_dummy_charm_harness(tmp)
+        self.assertEqual(harness.model.config['opt_str'], 'val')
+        self.assertEqual(harness.model.config['opt_str_empty'], '')
+        self.assertIsNone(harness.model.config['opt_null'])
+        self.assertIs(harness.model.config['opt_bool'], True)
+        self.assertEqual(harness.model.config['opt_int'], 1)
+        self.assertIsInstance(harness.model.config['opt_int'], int)
+        self.assertEqual(harness.model.config['opt_float'], 1.0)
+        self.assertIsInstance(harness.model.config['opt_float'], float)
+
     def test_set_model_name(self):
         harness = Harness(CharmBase, meta='''
             name: test-charm
