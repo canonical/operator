@@ -87,7 +87,7 @@ class Harness:
         self._oci_resources = {}
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
-        self.update_config(key_values=self._load_config_defaults(config))
+        self._update_config(key_values=self._load_config_defaults(config))
 
     @property
     def charm(self) -> charm.CharmBase:
@@ -557,6 +557,34 @@ class Harness:
             args = (relation, app)
         self._charm.on[rel_name].relation_changed.emit(*args)
 
+    def _update_config(
+            self,
+            key_values: typing.Mapping[str, str] = None,
+            unset: typing.Iterable[str] = (),
+    ) -> None:
+        """Update the config as seen by the charm.
+
+        This will *not* trigger a `config_changed` event, and is intended for internal use.
+
+        Note that the `key_values` mapping will only add or update configuration items.
+        To remove existing ones, see the `unset` parameter.
+
+        Args:
+            key_values: A Mapping of key:value pairs to update in config.
+            unset: An iterable of keys to remove from Config. (Note that this does
+                not currently reset the config values to the default defined in config.yaml.)
+        """
+        # NOTE: jam 2020-03-01 Note that this sort of works "by accident". Config
+        # is a LazyMapping, but its _load returns a dict and this method mutates
+        # the dict that Config is caching. Arguably we should be doing some sort
+        # of charm.framework.model.config._invalidate()
+        config = self._backend._config
+        if key_values is not None:
+            for key, value in key_values.items():
+                config[key] = value
+        for key in unset:
+            config.pop(key, None)
+
     def update_config(
             self,
             key_values: typing.Mapping[str, str] = None,
@@ -574,16 +602,7 @@ class Harness:
             unset: An iterable of keys to remove from Config. (Note that this does
                 not currently reset the config values to the default defined in config.yaml.)
         """
-        config = self._backend._config
-        if key_values is not None:
-            for key, value in key_values.items():
-                config[key] = value
-        for key in unset:
-            config.pop(key, None)
-        # NOTE: jam 2020-03-01 Note that this sort of works "by accident". Config
-        # is a LazyMapping, but its _load returns a dict and this method mutates
-        # the dict that Config is caching. Arguably we should be doing some sort
-        # of charm.framework.model.config._invalidate()
+        self._update_config(key_values, unset)
         if self._charm is None or not self._hooks_enabled:
             return
         self._charm.on.config_changed.emit()
