@@ -604,6 +604,8 @@ class TestHarness(unittest.TestCase):
                 opt_float:
                     type: float
                     default: 1.0
+                opt_no_default:
+                    type: string
             '''))
         harness = self._get_dummy_charm_harness(tmp)
         self.assertEqual(harness.model.config['opt_str'], 'val')
@@ -614,6 +616,7 @@ class TestHarness(unittest.TestCase):
         self.assertIsInstance(harness.model.config['opt_int'], int)
         self.assertEqual(harness.model.config['opt_float'], 1.0)
         self.assertIsInstance(harness.model.config['opt_float'], float)
+        self.assertNotIn('opt_no_default', harness.model.config)
 
     def test_set_model_name(self):
         harness = Harness(CharmBase, meta='''
