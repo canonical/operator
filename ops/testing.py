@@ -394,7 +394,11 @@ class Harness:
           rel_id = harness.add_relation('db', 'postgresql')
           harness.add_relation_unit(rel_id, 'postgresql/0')
 
-        This will trigger a `relation_joined` event and a `relation_changed` event.
+        This will trigger a `relation_joined` event. This would naturally be
+        followed by a `relation_changed` event, which you can trigger with
+        :meth:`.update_relation_data`. This separation is artificial in the
+        sense that Juju will always fire the two, but is intended to make
+        testing relations and their data bags slightly more natural.
 
         Args:
             relation_id: The integer relation identifier (as returned by add_relation).
