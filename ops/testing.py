@@ -181,7 +181,7 @@ class Harness:
                     for rel_id in rel_ids:
                         self._emit_relation_created(relname, rel_id, this_app_name)
             else:
-                rel_ids = self._backend._relation_ids_map.get(relname)
+                rel_ids = self._backend._relation_ids_map.get(relname, [])
                 random.shuffle(rel_ids)
                 for rel_id in rel_ids:
                     app_name = self._backend._relation_app_and_units[rel_id]["app"]
