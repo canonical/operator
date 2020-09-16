@@ -1032,6 +1032,29 @@ class TestHarness(unittest.TestCase):
                 {'name': 'start'},
             ])
 
+    def test_begin_with_initial_hooks_relation_charm_with_no_relation(self):
+        class CharmWithDB(RelationEventCharm):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.observe_relation_events('db')
+        harness = Harness(CharmWithDB, meta='''
+            name: test-app
+            requires:
+              db:
+                interface: sql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_leader()
+        harness.begin_with_initial_hooks()
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'leader-elected'},
+                {'name': 'config-changed', 'data': {}},
+                {'name': 'start'},
+            ])
+
     def test_begin_with_initial_hooks_with_one_relation(self):
         class CharmWithDB(RelationEventCharm):
             def __init__(self, framework):
