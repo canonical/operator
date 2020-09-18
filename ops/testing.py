@@ -61,6 +61,9 @@ class Harness:
         actions: A string or file-like object containing the contents of
             actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
             parent directory of the Charm.
+        config: A string or file-like object containing the contents of
+            config.yaml. If not supplied, we will look for a 'config.yaml' file in the
+            parent directory of the Charm.
     """
 
     def __init__(
@@ -68,9 +71,8 @@ class Harness:
             charm_cls: typing.Type[charm.CharmBase],
             *,
             meta: OptionalYAML = None,
-            actions: OptionalYAML = None):
-        # TODO: jam 2020-03-05 We probably want to take config as a parameter as well, since
-        #       it would define the default values of config that the charm would see.
+            actions: OptionalYAML = None,
+            config: OptionalYAML = None):
         self._charm_cls = charm_cls
         self._charm = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
@@ -85,6 +87,7 @@ class Harness:
         self._oci_resources = {}
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
+        self._update_config(key_values=self._load_config_defaults(config))
 
     @property
     def charm(self) -> charm.CharmBase:
@@ -249,6 +252,29 @@ class Harness:
             action_metadata = dedent(action_metadata)
 
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
+
+    def _load_config_defaults(self, charm_config):
+        """Load default values from config.yaml
+
+        Handle the case where a user doesn't supply explicit config snippets.
+        """
+        filename = inspect.getfile(self._charm_cls)
+        charm_dir = pathlib.Path(filename).parents[1]
+
+        if charm_config is None:
+            config_path = charm_dir / 'config.yaml'
+            if config_path.is_file():
+                charm_config = config_path.read_text()
+                self._charm_dir = charm_dir
+            else:
+                # The simplest of config that the framework can support
+                charm_config = '{}'
+        elif isinstance(charm_config, str):
+            charm_config = dedent(charm_config)
+        charm_config = yaml.load(charm_config, Loader=yaml.SafeLoader)
+        charm_config = charm_config.get('options', {})
+        return {key: value['default'] for key, value in charm_config.items()
+                if 'default' in value}
 
     def add_oci_resource(self, resource_name: str,
                          contents: typing.Mapping[str, str] = None) -> None:
@@ -531,6 +557,34 @@ class Harness:
             args = (relation, app)
         self._charm.on[rel_name].relation_changed.emit(*args)
 
+    def _update_config(
+            self,
+            key_values: typing.Mapping[str, str] = None,
+            unset: typing.Iterable[str] = (),
+    ) -> None:
+        """Update the config as seen by the charm.
+
+        This will *not* trigger a `config_changed` event, and is intended for internal use.
+
+        Note that the `key_values` mapping will only add or update configuration items.
+        To remove existing ones, see the `unset` parameter.
+
+        Args:
+            key_values: A Mapping of key:value pairs to update in config.
+            unset: An iterable of keys to remove from Config. (Note that this does
+                not currently reset the config values to the default defined in config.yaml.)
+        """
+        # NOTE: jam 2020-03-01 Note that this sort of works "by accident". Config
+        # is a LazyMapping, but its _load returns a dict and this method mutates
+        # the dict that Config is caching. Arguably we should be doing some sort
+        # of charm.framework.model.config._invalidate()
+        config = self._backend._config
+        if key_values is not None:
+            for key, value in key_values.items():
+                config[key] = value
+        for key in unset:
+            config.pop(key, None)
+
     def update_config(
             self,
             key_values: typing.Mapping[str, str] = None,
@@ -548,16 +602,7 @@ class Harness:
             unset: An iterable of keys to remove from Config. (Note that this does
                 not currently reset the config values to the default defined in config.yaml.)
         """
-        config = self._backend._config
-        if key_values is not None:
-            for key, value in key_values.items():
-                config[key] = value
-        for key in unset:
-            config.pop(key, None)
-        # NOTE: jam 2020-03-01 Note that this sort of works "by accident". Config
-        # is a LazyMapping, but its _load returns a dict and this method mutates
-        # the dict that Config is caching. Arguably we should be doing some sort
-        # of charm.framework.model.config._invalidate()
+        self._update_config(key_values, unset)
         if self._charm is None or not self._hooks_enabled:
             return
         self._charm.on.config_changed.emit()
