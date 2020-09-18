@@ -43,7 +43,7 @@ def _exe_path(path: Path) -> typing.Optional[Path]:
 
     Here path is the absolute path to a binary, but might be missing an extension.
     """
-    p = shutil.which(path.name, path=str(path.parent))
+    p = shutil.which(path.name, mode=os.F_OK, path=str(path.parent))
     if p is None:
         return None
     return Path(p)
