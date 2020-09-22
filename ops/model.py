@@ -98,7 +98,7 @@ class Model:
 
     @property
     def pod(self) -> 'Pod':
-        """Used ``model.pod.set_spec`` to set the container specification for Kubernetes charms."""
+        """Use ``model.pod.set_spec`` to set the container specification for Kubernetes charms."""
         return self._pod
 
     @property
