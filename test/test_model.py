@@ -391,6 +391,10 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([('config_get',)])
 
+    def test_config_immutable(self):
+        with self.assertRaises(AttributeError):
+            self.model.config = {}
+
     def test_is_leader(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')

@@ -51,7 +51,6 @@ class Model:
         app: A :class:`Application` that represents the application this unit is a part of.
         relations: Mapping of endpoint to list of :class:`Relation` answering the question
             "what am I currently related to". See also :meth:`.get_relation`
-        config: A dict of the config for the current application.
         resources: Access to resources for this charm. Use ``model.resources.fetch(resource_name)``
             to get the path on disk where the resource can be found.
         storages: Mapping of storage_name to :class:`Storage` for the storage points defined in
@@ -66,11 +65,16 @@ class Model:
         self.unit = self.get_unit(self._backend.unit_name)
         self.app = self.unit.app
         self.relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
-        self.config = ConfigData(self._backend)
         self.resources = Resources(list(meta.resources), self._backend)
         self.pod = Pod(self._backend)
         self.storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
+        self._config = ConfigData(self._backend)
+
+    @property
+    def config(self) -> 'ConfigData':
+        """Return a mapping of config for the current application."""
+        return self._config
 
     @property
     def name(self) -> str:
