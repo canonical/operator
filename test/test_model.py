@@ -55,6 +55,14 @@ class TestModel(unittest.TestCase):
         self.assertIs(self.model.app, self.model.unit.app)
         self.assertIsNone(self.model.name)
 
+    def test_unit_immutable(self):
+        with self.assertRaises(AttributeError):
+            self.model.unit = object()
+
+    def test_app_immutable(self):
+        with self.assertRaises(AttributeError):
+            self.model.app = object()
+
     def test_model_name_from_backend(self):
         self.harness.set_model_name('default')
         m = ops.model.Model(ops.charm.CharmMeta(), self.harness._backend)
@@ -82,6 +90,10 @@ class TestModel(unittest.TestCase):
             ('relation_list', rel_app1),
             ('relation_list', rel_app2),
         ])
+
+    def test_relations_immutable(self):
+        with self.assertRaises(AttributeError):
+            self.model.relations = {}
 
     def test_get_relation(self):
         # one relation on db1
@@ -449,6 +461,10 @@ class TestModel(unittest.TestCase):
         self.assertEqual(self.harness.model.resources.fetch('foo').name, 'foo.txt')
         self.assertEqual(self.harness.model.resources.fetch('bar').name, 'bar.txt')
 
+    def test_resources_immutable(self):
+        with self.assertRaises(AttributeError):
+            self.model.resources = object()
+
     def test_pod_spec(self):
         self.harness.set_leader(True)
         self.harness.model.pod.set_spec({'foo': 'bar'})
@@ -461,6 +477,10 @@ class TestModel(unittest.TestCase):
         self.harness.set_leader(False)
         with self.assertRaises(ops.model.ModelError):
             self.harness.model.pod.set_spec({'foo': 'bar'})
+
+    def test_pod_immutable(self):
+        with self.assertRaises(AttributeError):
+            self.model.pod = object()
 
     def test_base_status_instance_raises(self):
         with self.assertRaises(TypeError):
@@ -688,6 +708,10 @@ class TestModel(unittest.TestCase):
         for count_v in [None, False, 2.0, 'a', b'beef', object]:
             with self.assertRaises(TypeError):
                 model.storages.request('data', count_v)
+
+    def test_storages_immutable(self):
+        with self.assertRaises(AttributeError):
+            self.model.storages = {}
 
     def resetBackendCalls(self):
         self.harness._get_backend_calls(reset=True)
