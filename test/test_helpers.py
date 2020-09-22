@@ -26,15 +26,14 @@ from ops.storage import SQLiteStorage
 
 
 def fake_script(test_case, name, content):
-    # raise unittest.SkipTest("fake_script not working on windows yet")
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
-        test_case._old_path = os.environ["PATH"]
+        old_path = os.environ["PATH"]
         os.environ['PATH'] = os.pathsep.join([fake_script_path, os.environ["PATH"]])
 
         def cleanup():
             shutil.rmtree(fake_script_path)
-            os.environ['PATH'] = test_case._old_path
+            os.environ['PATH'] = old_path
 
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)
@@ -53,7 +52,8 @@ def fake_script(test_case, name, content):
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
 {content}'''.format_map(template_args))
     os.chmod(str(path), 0o755)
-    # TODO fix path maybe
+    # TODO: this hardcodes the path to bash.exe, which works for now but might
+    #       need to be set via environ or something like that.
     path.with_suffix(".bat").write_text(
         '@"\\Program Files\\git\\bin\\bash.exe" {} %*\n'.format(path))
 

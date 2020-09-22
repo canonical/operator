@@ -106,9 +106,11 @@ def _setup_event_links(charm_dir, charm):
     charm -- An instance of the Charm class.
 
     """
-    # XXX: on windows this is almost certainly completely broken
+    # XXX: on windows this function does not accomplish what it wants to:
     #      it creates symlinks with no extension pointing to a .py
     #      and juju only knows how to handle .exe, .bat, .cmd, and .ps1
+    #      so it does its job, but does not accomplish anything as the
+    #      hooks aren't 'callable'.
     link_to = os.path.realpath(os.environ.get("JUJU_DISPATCH_PATH", sys.argv[0]))
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.

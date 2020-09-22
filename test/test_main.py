@@ -169,10 +169,8 @@ class TestDispatch(unittest.TestCase):
                 fh.write(b'name: test')
             if with_dispatch:
                 dispatch = tmpdir / 'dispatch'
-                with dispatch.open('wt', encoding='utf8') as fh:
-                    fh.write('')
-                    if getattr(os, 'fchmod', None) is not None:
-                        os.fchmod(fh.fileno(), 0o755)
+                dispatch.write_text('', encoding='utf8')
+                dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
                 with patch('ops.main._emit_charm_event') as mock_charm_event:
@@ -745,8 +743,8 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         self.assertEqual(fake_script_calls(self), [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy %s.' % (hook,)],
-            ['juju-log', '--log-level', 'DEBUG', 'Legacy %s exited with status 0.' % (hook,)],
+            ['juju-log', '--log-level', 'INFO', 'Running legacy {}.'.format(hook)],
+            ['juju-log', '--log-level', 'DEBUG', 'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', 'Using local storage: not a kubernetes charm'],
             ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
         ])
@@ -784,8 +782,9 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy %s.' % (hook,)],
-            ['juju-log', '--log-level', 'WARNING', 'Legacy %s exited with status 42.' % (hook,)],
+            ['juju-log', '--log-level', 'INFO', 'Running legacy {}.'.format(hook)],
+            ['juju-log', '--log-level', 'WARNING',
+             'Legacy {} exited with status 42.'.format(hook)],
         ]
         self.assertEqual(calls, expected)
 
@@ -836,10 +835,10 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         self.assertEqual(fake_script_calls(self), [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy %s.' % (hook,)],
+            ['juju-log', '--log-level', 'INFO', 'Running legacy {}.'.format(hook)],
             VERSION_LOGLINE,    # because it called itself
-            ['juju-log', '--log-level', 'DEBUG', 'Charm called itself via %s.' % (hook,)],
-            ['juju-log', '--log-level', 'DEBUG', 'Legacy %s exited with status 0.' % (hook,)],
+            ['juju-log', '--log-level', 'DEBUG', 'Charm called itself via {}.'.format(hook)],
+            ['juju-log', '--log-level', 'DEBUG', 'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', 'Using local storage: not a kubernetes charm'],
             ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
         ])
