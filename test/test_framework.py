@@ -161,12 +161,15 @@ class TestFramework(BaseTestCase):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
+                self.reprs = []
 
             def on_any(self, event):
                 self.seen.append("on_any:" + event.handle.kind)
+                self.reprs.append(repr(event))
 
             def on_foo(self, event):
                 self.seen.append("on_foo:" + event.handle.kind)
+                self.reprs.append(repr(event))
 
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
@@ -181,6 +184,10 @@ class TestFramework(BaseTestCase):
         pub.bar.emit()
 
         self.assertEqual(obs.seen, ["on_any:foo", "on_any:bar"])
+        self.assertEqual(obs.reprs, [
+            "<MyEvent via MyNotifier[1]/foo[1]>",
+            "<MyEvent via MyNotifier[1]/bar[2]>",
+        ])
 
     def test_bad_sig_observer(self):
 
