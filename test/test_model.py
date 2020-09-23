@@ -222,12 +222,14 @@ class TestModel(unittest.TestCase):
         ])
 
         # this will fire more backend calls
-        self.assertEqual(
-            repr(rel_db1.data),
-            "{<ops.model.Unit myapp/0>: {},"
-            " <ops.model.Application myapp>: {},"
-            " <ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'},"
-            " <ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}}")
+        # the CountEqual and weird (and brittle) splitting is to accommodate python 3.5
+        # TODO: switch to assertEqual when we drop 3.5
+        self.assertCountEqual(
+            repr(rel_db1.data)[1:-1].split(', '),
+            ["<ops.model.Unit myapp/0>: {}",
+             "<ops.model.Application myapp>: {}",
+             "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}",
+             "<ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}"])
 
     def test_relation_data_modify_our(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
