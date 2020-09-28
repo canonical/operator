@@ -140,18 +140,18 @@ class CharmInitTestCase(unittest.TestCase):
         self.assertFalse(warn_cm)
 
     def test_storage_no_storage(self):
-        # here we patch is_available so it refuses to set it up
-        with patch('ops.storage._JujuStorageBackend.is_available') as juju_storage_is_available:
-            juju_storage_is_available.return_value = False
+        # here we patch juju_backend_available so it refuses to set it up
+        with patch('ops.storage.juju_backend_available') as juju_backend_available:
+            juju_backend_available.return_value = False
             with self.assertRaisesRegex(
                     RuntimeError,
                     'charm set use_juju_for_storage=True, but Juju .* does not support it'):
                 self._check(CharmBase, use_juju_for_storage=True)
 
     def test_storage_with_storage(self):
-        # here we patch is_available, so it gets set up and falls over when used
-        with patch('ops.storage._JujuStorageBackend.is_available') as juju_storage_is_available:
-            juju_storage_is_available.return_value = True
+        # here we patch juju_backend_available, so it gets set up and falls over when used
+        with patch('ops.storage.juju_backend_available') as juju_backend_available:
+            juju_backend_available.return_value = True
             with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
                 self._check(CharmBase, use_juju_for_storage=True)
 
