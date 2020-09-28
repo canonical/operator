@@ -317,11 +317,11 @@ class TestSimpleLoader(BaseTestCase):
 class TestJujuStateBackend(BaseTestCase):
 
     def test_is_not_available(self):
-        self.assertFalse(storage._JujuStorageBackend.is_available())
+        self.assertFalse(storage.juju_backend_available())
 
     def test_is_available(self):
         fake_script(self, 'state-get', 'echo ""')
-        self.assertTrue(storage._JujuStorageBackend.is_available())
+        self.assertTrue(storage.juju_backend_available())
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
     def test_set_encodes_args(self):

@@ -45,32 +45,61 @@ class Model:
 
     This should not be instantiated directly by Charmers, but can be accessed as `self.model`
     from any class that derives from Object.
-
-    Attributes:
-        unit: A :class:`Unit` that represents the unit that is running this code (eg yourself)
-        app: A :class:`Application` that represents the application this unit is a part of.
-        relations: Mapping of endpoint to list of :class:`Relation` answering the question
-            "what am I currently related to". See also :meth:`.get_relation`
-        config: A dict of the config for the current application.
-        resources: Access to resources for this charm. Use ``model.resources.fetch(resource_name)``
-            to get the path on disk where the resource can be found.
-        storages: Mapping of storage_name to :class:`Storage` for the storage points defined in
-            metadata.yaml
-        pod: Used to get access to ``model.pod.set_spec`` to set the container specification
-            for Kubernetes charms.
     """
 
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(backend)
         self._backend = backend
-        self.unit = self.get_unit(self._backend.unit_name)
-        self.app = self.unit.app
-        self.relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
-        self.config = ConfigData(self._backend)
-        self.resources = Resources(list(meta.resources), self._backend)
-        self.pod = Pod(self._backend)
-        self.storages = StorageMapping(list(meta.storages), self._backend)
+        self._unit = self.get_unit(self._backend.unit_name)
+        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
+        self._config = ConfigData(self._backend)
+        self._resources = Resources(list(meta.resources), self._backend)
+        self._pod = Pod(self._backend)
+        self._storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
+
+    @property
+    def unit(self) -> 'Unit':
+        """A :class:`Unit` that represents the unit that is running this code (eg yourself)"""
+        return self._unit
+
+    @property
+    def app(self):
+        """A :class:`Application` that represents the application this unit is a part of."""
+        return self._unit.app
+
+    @property
+    def relations(self) -> 'RelationMapping':
+        """Mapping of endpoint to list of :class:`Relation`
+
+        Answers the question "what am I currently related to".
+        See also :meth:`.get_relation`.
+        """
+        return self._relations
+
+    @property
+    def config(self) -> 'ConfigData':
+        """Return a mapping of config for the current application."""
+        return self._config
+
+    @property
+    def resources(self) -> 'Resources':
+        """Access to resources for this charm.
+
+        Use ``model.resources.fetch(resource_name)`` to get the path on disk
+        where the resource can be found.
+        """
+        return self._resources
+
+    @property
+    def storages(self) -> 'StorageMapping':
+        """Mapping of storage_name to :class:`Storage` as defined in metadata.yaml"""
+        return self._storages
+
+    @property
+    def pod(self) -> 'Pod':
+        """Use ``model.pod.set_spec`` to set the container specification for Kubernetes charms."""
+        return self._pod
 
     @property
     def name(self) -> str:
