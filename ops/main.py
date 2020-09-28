@@ -352,6 +352,11 @@ def main(charm_class: ops.charm.CharmBase, use_juju_for_storage: bool = None):
 
     charm_state_path = charm_dir / CHARM_STATE_FILE
 
+    if use_juju_for_storage and not ops.storage.juju_backend_available():
+        # raise an exception; the charm is broken and needs fixing.
+        msg = 'charm set use_juju_for_storage=True, but Juju version {} does not support it'
+        raise RuntimeError(msg.format(JujuVersion.from_environ()))
+
     if use_juju_for_storage is None:
         use_juju_for_storage = _should_use_controller_storage(charm_state_path, meta)
 
