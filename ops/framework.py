@@ -120,6 +120,9 @@ class EventBase:
         self.handle = handle
         self.deferred = False
 
+    def __repr__(self):
+        return "<%s via %s>" % (self.__class__.__name__, self.handle)
+
     def defer(self):
         self.deferred = True
 

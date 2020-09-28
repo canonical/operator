@@ -348,6 +348,9 @@ class LazyMapping(Mapping, ABC):
     def __getitem__(self, key):
         return self._data[key]
 
+    def __repr__(self):
+        return repr(self._data)
+
 
 class RelationMapping(Mapping):
     """Map of relation names to lists of :class:`Relation` instances."""
@@ -647,6 +650,9 @@ class RelationData(Mapping):
 
     def __getitem__(self, key):
         return self._data[key]
+
+    def __repr__(self):
+        return repr(self._data)
 
 
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
