@@ -85,7 +85,7 @@ class EventSpec:
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
 
-    def _check(self, charm_class):
+    def _check(self, charm_class, **kwargs):
         """Helper for below tests."""
         fake_environ = {
             'JUJU_UNIT_NAME': 'test_main/0',
@@ -103,7 +103,7 @@ class CharmInitTestCase(unittest.TestCase):
                         mock_charmdir.return_value = tmpdirname
 
                         with warnings.catch_warnings(record=True) as warnings_cm:
-                            main(charm_class)
+                            main(charm_class, **kwargs)
 
         return warnings_cm
 
@@ -138,6 +138,22 @@ class CharmInitTestCase(unittest.TestCase):
 
         warn_cm = self._check(MyCharm)
         self.assertFalse(warn_cm)
+
+    def test_storage_no_storage(self):
+        # here we patch juju_backend_available so it refuses to set it up
+        with patch('ops.storage.juju_backend_available') as juju_backend_available:
+            juju_backend_available.return_value = False
+            with self.assertRaisesRegex(
+                    RuntimeError,
+                    'charm set use_juju_for_storage=True, but Juju .* does not support it'):
+                self._check(CharmBase, use_juju_for_storage=True)
+
+    def test_storage_with_storage(self):
+        # here we patch juju_backend_available, so it gets set up and falls over when used
+        with patch('ops.storage.juju_backend_available') as juju_backend_available:
+            juju_backend_available.return_value = True
+            with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
+                self._check(CharmBase, use_juju_for_storage=True)
 
 
 @patch('sys.argv', new=("hooks/config-changed",))

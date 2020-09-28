@@ -248,17 +248,14 @@ _SimpleDumper.represent_tuple = yaml.Dumper.represent_tuple
 _SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)
 
 
+def juju_backend_available() -> bool:
+    """Check if Juju state storage is available."""
+    p = shutil.which('state-get')
+    return p is not None
+
+
 class _JujuStorageBackend:
     """Implements the interface from the Operator framework to Juju's state-get/set/etc."""
-
-    @staticmethod
-    def is_available() -> bool:
-        """Check if Juju state storage is available.
-
-        This checks if there is a 'state-get' executable in PATH.
-        """
-        p = shutil.which('state-get')
-        return p is not None
 
     def set(self, key: str, value: typing.Any) -> None:
         """Set a key to a given value.
