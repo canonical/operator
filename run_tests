@@ -1,3 +1,13 @@
 #!/bin/bash
 
-python3 -m unittest "$@"
+if command -v python3 >/dev/null; then
+    # linux or macos
+    _python=python3
+else
+    # windows
+    _python=python
+fi
+
+"$_python" --version
+
+"$_python" -m unittest "$@"
