@@ -23,7 +23,10 @@ import yaml
 
 
 def _run(args, **kw):
-    return subprocess.run([shutil.which(args[0]), *args[1:]], **kw)
+    cmd = shutil.which(args[0])
+    if cmd is None:
+        raise FileNotFoundError(args[0])
+    return subprocess.run([cmd, *args[1:]], **kw)
 
 
 class SQLiteStorage:
