@@ -32,9 +32,9 @@ def _loadYaml(source):
 class HookEvent(EventBase):
     """A base class for events raised by Juju to progress a charm's lifecycle.
 
-    Hooks are callback functions, defined in a Charm, that are invoked
-    in response to events raised by Juju. These hooks are the means by
-    which a Charm governs the life cycle of its application.
+    Hooks are methods of a charm class (a subclass of :class:`CharmBase`) that
+    are invoked in response to events raised by Juju. These hooks are the means
+    by which a charm governs the lifecycle of its application.
 
     The :class:`HookEvent` class is the base of a type hierarchy of events
     related to hooks.
