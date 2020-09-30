@@ -36,8 +36,8 @@ class HookEvent(EventBase):
     in response to events raised by Juju. These hooks are the means by
     which a Charm governs the life cycle of its application.
 
-    This class is used to create a type hierarchy of events related to
-    hooks, and forms the base of this hierarchy.
+    The :class:`HookEvent` class is the base of a type hierarchy of events
+    related to hooks.
 
     HookEvent subtypes are grouped into the following categories
     - Core lifecycle hooks
