@@ -42,7 +42,7 @@ class HookEvent(EventBase):
     :class:`HookEvent` subtypes are grouped into the following categories
     - Core lifecycle hooks
     - Relation hooks
-    - Storage Charm Hooks
+    - Storage hooks
     - Metric Hooks
 
     """
