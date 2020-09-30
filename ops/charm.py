@@ -39,7 +39,7 @@ class HookEvent(EventBase):
     The :class:`HookEvent` class is the base of a type hierarchy of events
     related to hooks.
 
-    HookEvent subtypes are grouped into the following categories
+    :class:`HookEvent` subtypes are grouped into the following categories
     - Core lifecycle hooks
     - Relation hooks
     - Storage Charm Hooks
