@@ -30,38 +30,44 @@ def _loadYaml(source):
 
 
 class HookEvent(EventBase):
-    """A base class for events raised by Juju to progress a charm's lifecycle.
+    """Events raised by Juju to progress a charm's lifecycle.
 
-    Hooks are methods of a charm class (a subclass of :class:`CharmBase`) that
-    are invoked in response to events raised by Juju. These hooks are the means
-    by which a charm governs the lifecycle of its application.
+    Hooks are callback methods of a Charm class (a subclass of
+    :class:`CharmBase`) that are invoked in response to events raised
+    by Juju. These callback methods are the means by which a charm
+    governs the lifecycle of its application.
 
     The :class:`HookEvent` class is the base of a type hierarchy of events
-    related to hooks.
+    related to charm lifecycle.
 
     :class:`HookEvent` subtypes are grouped into the following categories
-    - Core lifecycle hooks
-    - Relation hooks
-    - Storage hooks
-    - Metric Hooks
-
+    - Core lifecycle events
+    - Relation events
+    - Storage events
+    - Metric events
     """
 
 
 class ActionEvent(EventBase):
-    """A base class for events raised by Juju when a user invokes an Juju Action.
+    """Events raised by Juju when an operator invokes a Juju Action.
+
+    This class is the data type of events triggered when an operator
+    invokes a Juju Action. Callback bound to these events, may be used
+    for responding to the operator's Juju Action request.
 
     To read the parameters for the action, see the instance variable `params`.
     To respond with the result of the action, call `set_results`. To add progress
     messages that are visible as the action is progressing use `log`.
 
     :ivar params: The parameters passed to the action (read by action-get)
+
     """
 
     def defer(self):
         """Action events are not deferable like other events.
 
-        This is because an action runs synchronously and the user is waiting for the result.
+        This is because an action runs synchronously and the operator
+        is waiting for the result.
         """
         raise RuntimeError('cannot defer action events')
 
@@ -105,34 +111,35 @@ class ActionEvent(EventBase):
 
 
 class InstallEvent(HookEvent):
-    """Represents the `install` hook from Juju.
+    """Event triggered when a charm is installed.
 
-    The InstallEvent is run at the beginning of a charm lifecycle. The
-    hook should be used to perform one-time setup operations, such as
-    installing prerequisite software that will not change with
-    configuration changes.
+    This event is triggered at the beginning of a charm's
+    lifecycle. Any associated callback method should be used to
+    perform one-time setup operations, such as installing prerequisite
+    software.
     """
 
 
 class StartEvent(HookEvent):
-    """Represents the `start` hook from Juju.
+    """Event triggered immediately after first configuation change.
 
-    The StartEvent hook runs immediately after the first ConfigChanged
-    hook. It should be used to ensure the charm’s software is
-    running. Note that the charm’s software should be configured so as
-    to persist through reboots without further intervention on juju’s
-    part.
+    This event is triggered immediately after the first :class:
+    `ConfigChangedEvent` event. Callback methods bound to the event,
+    should be used to ensure that the charm’s software is in a running
+    state. Note that the charm’s software should be configured so as
+    to persist in this state through reboots without further
+    intervention on Juju’s part.
     """
 
 
 class StopEvent(HookEvent):
-    """Represents the `stop` hook from Juju.
+    """Event triggered when a charm is shut down.
 
-    The StopEvent hook runs immediately before the end of the unit’s
-    destruction sequence. It should be used to ensure that the charm’s
-    software is not running, and will not start again on reboot.
-    This hook is called when an application removal is requested by
-    the client.
+    This event is triggered when an application's removal is requested
+    by the client. The event fires immediately before the end of the
+    unit’s destruction sequence. Callback methods bound to this event,
+    should be used to ensure that the charm’s software is not running,
+    and will not start again on reboot.
     """
 
 
@@ -142,112 +149,112 @@ class RemoveEvent(HookEvent):
 
 
 class ConfigChangedEvent(HookEvent):
-    """Represents the `config-changed` hook from Juju.
+    """Event triggered when a configuration change is requested.
 
-    The ConfigChanged hook runs in several different situations.
+    This event fires in several different situations.
 
-    - immediately after `install`
-    - immediately after `upgrade-charm`
+    - immediately after `install` event.
+    - immediately after `upgrade_charm` event.
     - at least once when the unit agent is restarted (but, if the unit
       is in an error state, it won’t be run until after the error
       state is cleared).
     - after changing charm configuration using the GUI or command line
       interface
 
-    It cannot assume that the software has already been started; it
-    should not start stopped software, but should (if appropriate)
-    restart running software to take configuration changes into
-    account.
+    Any callback method bound to this event cannot assume that the
+    software has already been started; it should not start stopped
+    software, but should (if appropriate) restart running software to
+    take configuration changes into account.
     """
 
 
 class UpdateStatusEvent(HookEvent):
-    """Represents the `update-status` hook from Juju.
+    """Event triggered by a status update request from Juju.
 
-    The UpdateStatus hook provides constant feedback to the user about
-    the status of the application the charm is modeling. The charm is
-    run by Juju at regular intervals, and gives authors an opportunity
-    to run code that gets the “health” of the application.
+    This event is periodically triggered by Jujus so that it can
+    provide constant feedback to the operator about the status of the
+    application the charm is modeling. Any callback method bound to
+    this event should determined "health" of the application and set
+    the status appropriately.
     """
 
 
 class UpgradeCharmEvent(HookEvent):
-    """Represents the `upgrade-charm` hook from Juju.
+    """Event triggered by request to upgrade the charm.
 
-    This will be triggered when a user has run `juju upgrade-charm`.
-    It is run after Juju has unpacked the upgraded charm code, and so
-    this event will be handled with new code.
-
-    The UpgradeCharmEvent hook runs immediately after any upgrade
-    operation that does not itself interrupt an existing error
-    state. It should be used to reconcile local state written by some
-    other version of the charm into whatever form it needs to take to
-    be manipulated by the current version.
+    This event will be triggered when an operator executes `juju
+    upgrade-charm`. The event fires after Juju has unpacked the
+    upgraded charm code, and so this event will be handled by the
+    callback method bound to the event in the new codebase. The
+    associated callback method is invoked provided there is no
+    existing error state. The callback method should be used to
+    reconcile current state written by older version of the charm into
+    whatever form that is needed by the current charm version.
     """
 
 
 class PreSeriesUpgradeEvent(HookEvent):
-    """Represents the `pre-series-upgrade` hook from Juju.
+    """Event triggered to prepare a unit for series upgrade.
 
-    This happens when a user has run `juju upgrade-series MACHINE prepare` and
-    will fire for each unit that is running on the machine, telling them that
-    the user is preparing to upgrade the Machine's series.
+    This event triggers when an operator executes `juju upgrade-series
+    MACHINE prepare`. The event will fire for each unit that is
+    running on the specified machine. Any callback method bound to
+    this event must prepare the charm upgrade to the Machine's series.
 
-    Once all units on a machine have run `pre-series-upgrade`, the
-    user will initiate the steps to actually upgrade the machine.
-    When the upgrade has been completed, the
-    :class:`PostSeriesUpgradeEvent` will fire.
+    It can be assumed that only after all units on a machine have
+    executed the callback method associated with this event, the
+    operator will initiate steps to actually upgrade the machine.
+    After the upgrade has been completed, the
+    :class:`PostSeriesUpgradeEvent` event will fire.
     """
 
 
 class PostSeriesUpgradeEvent(HookEvent):
-    """Represents the `post-series-upgrade` hook from Juju.
+    """Event triggered after a series upgrade.
 
-    This is run after the user has done a distribution upgrade (or
-    rolled back and kept the same series). It is called in response to
-    `juju upgrade-series MACHINE complete`. Charms are expected to do
-    whatever steps are necessary to reconfigure their applications for
-    the new series.
+    This event is triggered after the operator has done a distribution
+    upgrade (or rolled back and kept the same series). It is called in
+    response to `juju upgrade-series MACHINE complete`. Associated
+    charm callback methods are expected to do whatever steps are
+    necessary to reconfigure their applications for the new series.
+
     """
 
 
 class LeaderElectedEvent(HookEvent):
-    """Represents the `leader-elected` hook from Juju.
+    """Event triggered when a new leader has been elected.
 
-    Juju will trigger this when a new leader unit is chosen for a
-    given application.
+    Juju will trigger this event when a new leader unit is chosen for
+    a given application.
 
-    The LeaderElectedHook is run at least once to signify that Juju
-    decided this unit is the leader. Authors can use this hook to take
-    action if the protocols for leadership, consensus, raft, or quorum
-    require one unit to assert leadership. If the election process is
-    done internally to the application, other code should be used to
-    signal the leader to Juju.
+    This event fires at least once after Juju selects a leader
+    unit. Callback method bound to this event may take any action
+    required for the elected unit to assert leadership and for other
+    units to acknowledge it.
     """
 
 
 class LeaderSettingsChangedEvent(HookEvent):
-    """Represents the `leader-settings-changed` hook from Juju.
+    """Event triggered when leader changes any settings
 
-    Deprecated. This represents when a lead unit would call `leader-set` to inform
-    the other units of an application that they have new information to handle.
-    This has been deprecated in favor of using a Peer relation, and having the
-    leader set a value in the Application data bag for that peer relation.
-    (see :class:`RelationChangedEvent`).
+    DEPRECATED NOTICE
+
+    This event has been deprecated in favor of using a Peer relation,
+    and having the leader set a value in the Application data bag for
+    that peer relation.  (see :class:`RelationChangedEvent`).
     """
 
 
 class CollectMetricsEvent(HookEvent):
-    """Represents the `collect-metrics` hook from Juju.
+    """Event triggered by Juju to collect metrics.
 
-    Juju executes the collect-metrics hook every five minutes for the
-    lifetime of the unit. Use the `add_metric` method of this class to
-    send measurements to Juju.
+    Juju fires this event every five minutes for the lifetime of the
+    unit. Callback methods bound to this event may use the
+    `add_metric` method of this class to send measurements to Juju.
 
-    Note that events firing during a CollectMetricsEvent are currently
-    sandboxed in how they can interact with Juju. To report metrics
-    use :meth:`.add_metrics`.
-
+    Note that associated callback methods are currently sandboxed in
+    how they can interact with Juju. To report metrics use
+    :meth:`.add_metrics`.
     """
 
     def add_metrics(self, metrics: typing.Mapping, labels: typing.Mapping = None) -> None:
@@ -267,7 +274,7 @@ class RelationEvent(HookEvent):
 
     Relation lifecycle events are generated when application units
     participate in relations.  Units can only participate in relations
-    after they’re been "started", and before they’ve been
+    after they have been "started", and before they have been
     "stopped". Within that time window, the unit may participate in
     several different relations at a time, including multiple
     relations with the same name.
@@ -328,7 +335,7 @@ class RelationEvent(HookEvent):
 
 
 class RelationCreatedEvent(RelationEvent):
-    """Represents the `relation-created` hook from Juju.
+    """Event triggered when a new relation is created.
 
     This is triggered when a new relation to another app is added in Juju. This
     can occur before units for those applications have started. All existing
@@ -337,117 +344,122 @@ class RelationCreatedEvent(RelationEvent):
 
 
 class RelationJoinedEvent(RelationEvent):
-    """Represents the `relation-joined` hook from Juju.
+    """Event triggered when a new unit joins a relation.
 
-    This is triggered whenever a new unit of a related application
-    joins the relation.  The RelationJoinedEvent is run only when that
-    remote unit is first observed by the unit. It should be used to
-    `relation-set` any local unit settings that can be determined
-    using no more than the name of the joining unit and the remote
-    private-address setting, which is always available when the
-    relation is created and is by convention not deleted.
+    This event is triggered whenever a new unit of a related
+    application joins the relation.  The event fires only when that
+    remote unit is first observed by the unit. Callback methods bound
+    to this event may set any local unit settings that can be
+    determined using no more than the name of the joining unit and the
+    remote `private-address` setting, which is always available when
+    the relation is created and is by convention not deleted.
     """
 
 
 class RelationChangedEvent(RelationEvent):
-    """Represents the `relation-changed` hook from Juju.
+    """Event triggered when relation data changes.
 
-    This is triggered whenever there is a change to the data bucket
-    for a related application or unit. Look at
-    `event.relation.data[event.unit/app]` to see the new information.
+    This event is triggered whenever there is a change to the data
+    bucket for a related application or unit. Look at
+    `event.relation.data[event.unit/app]` to see the new information,
+    where `event` is the event object passed to the callback method
+    bound to this event.
 
-    RelationChangedEvent is always run once, after
-    RelationJoinedEvent, and will subsequently be run whenever that
-    remote unit changes its settings for the relation. It should be
-    the only hook that relies upon remote relation settings from
-    `relation-get`, and it should not error if the settings are
-    incomplete, since it can be guaranteed that when the remote unit
-    changes its settings, the hook will be run again.
+    This event always fires once, after :class: `RelationJoinedEvent`
+    event, and will subsequently be fire whenever that remote unit
+    changes its settings for the relation. Callback methods bound to
+    this event should be the only ones that rely on remote relation
+    settings. They should not error if the settings are incomplete,
+    since it can be guaranteed that when the remote unit changes its
+    settings, the event will be fire again.
 
-    The settings that be querried, or set, are determined by the
+    The settings that be queried, or set, are determined by the
     relation’s interface.
     """
 
 
 class RelationDepartedEvent(RelationEvent):
-    """Represents the `relation-departed` hook from Juju.
+    """Event triggered when a unit leaves a relation.
 
-    This is the inverse of the RelationJoinedEvent, representing when
-    a unit is leaving the relation (the unit is being removed, the app
-    is being removed, the relation is being removed). It is fired once
-    for each unit that is going away.
+    This is the inverse of the :class: `RelationJoinedEvent`,
+    representing when a unit is leaving the relation (the unit is
+    being removed, the app is being removed, the relation is being
+    removed). It is fired once for each unit that is going away.
 
     When the remote unit is known to be leaving the relation, this
-    will result in the RelationChangedEvent hook to run at least once,
-    after which the RelationDepartedEvent hook will run. The
-    RelationDepartedEvent hook is run once only. Once the
-    RelationDepartedEvent hook has run no further RelationChangedEvent
-    hooks will be run.
+    will result in the :class: `RelationChangedEvent` firing at least
+    once, after which the :class: `RelationDepartedEvent` will
+    fire. The :class: `RelationDepartedEvent` will fire once
+    only. Once the :class: `RelationDepartedEvent` has fired no
+    further :class: `RelationChangedEvent` events will fire.
 
-    The RelationDepartedEvent hook should be used to remove all
+    Callback methods bound to this event may be used to remove all
     references to the departing remote unit, because there’s no
     guarantee that it’s still part of the system; it’s perfectly
     probable (although not guaranteed) that the system running that
     unit has already shut down.
 
-    Once all necessary RelationDepartedEvent hooks have been run for
-    such a relation, the unit agent will run the final relation hook,
-    the RelationBrokenEvent hook.
+    Once all callback methods bound to this event have been run for
+    such a relation, the unit agent will fire, the :class:
+    `RelationBrokenEvent` event.
     """
 
 
 class RelationBrokenEvent(RelationEvent):
-    """Represents the `relation-broken` hook from Juju.
+    """Event triggered when a relation is removed.
 
     If a relation is being removed (`juju remove-relation` or `juju
-    remove-application`), once all the units have been removed,
-    RelationBrokenEvent will fire to signal that the relationship has
-    been fully terminated.
+    remove-application`), once all the units have been removed, this
+    event will fire to signal that the relationship has been fully
+    terminated.
 
-    The RelationBrokenEvent hook indicates that the current relation
-    is no longer valid, and that the charm’s software must be
-    configured as though the relation had never existed. It will only
-    be called after every necessary RelationDepartedEvent hook has
-    been run. If the RelationBrokenEvent hook is being executed, it is
-    gauranteed that no remote units are currently known locally.
+    The event indicates that the current relation is no longer valid,
+    and that the charm’s software must be configured as though the
+    relation had never existed. It will only be called after every
+    callback method bound to :class: `RelationDepartedEvent` event has
+    been run. If a callback method bound to this event is being
+    executed, it is gauranteed that no remote units are currently
+    known locally.
     """
 
 
 class StorageEvent(HookEvent):
     """Base class representing Storage related events.
 
-    Juju can provide a variety of storage to charms. The charms can
-    define several different types of storage that are allocated from
-    Juju. Changes in state of storage trigger sub-types of
-    StorageEvent hooks.
+    Juju can provide a variety of storage types to a charms. The
+    charms can define several different types of storage that are
+    allocated from Juju. Changes in state of storage trigger sub-types
+    of :class: `StorageEvent` events.
     """
 
 
 class StorageAttachedEvent(StorageEvent):
-    """Represents the `storage-attached` hook from Juju.
+    """Event triggered when new storage becomes available.
 
-    Called when new storage is available for the charm to use.
+    This event is triggered when new storage is available for the
+    charm to use.
 
-    StorageAttachedEvent hook allows the charm to run code when
-    storage has been added. The StorageAttachedEvent hooks will be run
-    before the install hook, so that the installation routine may use
-    the storage. The name prefix of this hook will depend on the
+    Callback methods bound to this event allows the charm to run code
+    when storage has been added. Such methods will be run before the
+    :class: `InstallEvent` fires, so that the installation routine may
+    use the storage. The name prefix of this hook will depend on the
     storage key defined in the `metadata.yaml` file.
     """
 
 
 class StorageDetachingEvent(StorageEvent):
-    """Represents the `storage-detaching` hook from Juju.
+    """Event triggered prior to removal of storage.
 
-    Called when storage a charm has been using, is going away.
+    This event is triggered when storage a charm has been using is
+    going away.
 
-    StorageDetachingEvent hook allows the charm to run code before
-    storage is removed. The StorageDetachingEvent hooks will be run
-    before storage is detached, and always before the stop hook is
-    run, to allow the charm to gracefully release resources before
-    they are removed and before the unit terminates. The name prefix
-    of the hook will depend on the storage key defined in the
-    `metadata.yaml` file.
+    Callback methods bound to this event allows the charm to run code
+    before storage is removed. Such methods will be run before storage
+    is detached, and always before the :class: `StopEvent` fires, thereby
+    allowing the charm to gracefully release resources before they are
+    removed and before the unit terminates. The name prefix of the
+    hook will depend on the storage key defined in the `metadata.yaml`
+    file.
     """
 
 
@@ -476,7 +488,7 @@ class CharmEvents(ObjectEvents):
     ```
 
     In addition to these named relation and storage events may also be
-    defined, depending on the Charm's metadata (`metadata.yaml`).
+    defined, depending on the charm's metadata (`metadata.yaml`).
     These named events are created by CharmBase using Charm Metadata.
     The named events may be accessed as
     ```
@@ -529,8 +541,8 @@ class CharmBase(Object):
         main(MyCharm)
     ```
 
-    As shown, in the example above, a charm class is instantiated by
-    ops.main.main() rather than Charm authors directly instantiating a
+    As shown in the example above, a charm class is instantiated by
+    ops.main.main() rather than charm authors directly instantiating a
     Charm.
 
     Args:
@@ -685,12 +697,12 @@ class CharmMeta:
 
 
 class RelationRole(enum.Enum):
-    """An annotation for a Charm's Role in a Relations
+    """An annotation for a charm's Role in a Relations
 
-    For each relation a Charms role may be
+    For each relation a charm's role may be
     - A Peer
-    - A consumer in the relation ('requires')
-    - A producer in the relation ('provides')
+    - A service consumer in the relation ('requires')
+    - A service provider in the relation ('provides')
     """
     peer = 'peer'
     requires = 'requires'
@@ -734,7 +746,7 @@ class StorageMeta:
     storage_name: Name of storage
     type: Storage type
     description: A text description of the storage
-    read_only: Is the storage read only
+    read_only: Whether or not the storage is read only
     minimum_size: Minimum size of storage
     location: Mount point of storage
     multiple_range: Range of numeric qualifiers when multiple storage units are used
