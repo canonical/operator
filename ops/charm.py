@@ -172,7 +172,7 @@ class ConfigChangedEvent(HookEvent):
 class UpdateStatusEvent(HookEvent):
     """Event triggered by a status update request from Juju.
 
-    This event is periodically triggered by Jujus so that it can
+    This event is periodically triggered by Juju so that it can
     provide constant feedback to the administrator about the status of
     the application the charm is modeling. Any callback method bound
     to this event should determined "health" of the application and
