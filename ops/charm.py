@@ -124,7 +124,7 @@ class StartEvent(HookEvent):
     """Event triggered immediately after first configuation change.
 
     This event is triggered immediately after the first :class:
-    `ConfigChangedEvent` event. Callback methods bound to the event,
+    `ConfigChangedEvent` event. Callback methods bound to the event
     should be used to ensure that the charm’s software is in a running
     state. Note that the charm’s software should be configured so as
     to persist in this state through reboots without further
