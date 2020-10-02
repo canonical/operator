@@ -697,7 +697,7 @@ class CharmMeta:
 
 
 class RelationRole(enum.Enum):
-    """An annotation for a charm's Role in a Relations
+    """An annotation for a charm's role in a relation.
 
     For each relation a charm's role may be
     - A Peer
