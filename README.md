@@ -131,7 +131,7 @@ Or you can use a virtualenv:
 
 Then you can try `./run_tests`, it should all go green.
 
-For improved performance on the tests, you will ensure that you have PyYAML
+For improved performance on the tests, ensure that you have PyYAML
 installed with the correct extensions:
 
     apt-get install libyaml-dev
