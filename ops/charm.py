@@ -38,7 +38,7 @@ class HookEvent(EventBase):
     governs the lifecycle of its application.
 
     The :class:`HookEvent` class is the base of a type hierarchy of events
-    related to charm lifecycle.
+    related to the charm's lifecycle.
 
     :class:`HookEvent` subtypes are grouped into the following categories
     - Core lifecycle events
