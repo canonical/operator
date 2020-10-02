@@ -105,6 +105,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(charm.unit, framework.model.unit)
         self.assertEqual(charm.meta, framework.meta)
         self.assertEqual(charm.charm_dir, framework.charm_dir)
+        self.assertIs(charm.config, framework.model.config)
 
     def test_relation_events(self):
 

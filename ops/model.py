@@ -535,15 +535,17 @@ class Network:
         self.interfaces = []
         # Treat multiple addresses on an interface as multiple logical
         # interfaces with the same name.
-        for interface_info in network_info['bind-addresses']:
-            interface_name = interface_info['interface-name']
-            for address_info in interface_info['addresses']:
+        for interface_info in network_info.get('bind-addresses', []):
+            interface_name = interface_info.get('interface-name')
+            if not interface_name:
+                continue
+            for address_info in interface_info.get('addresses', []):
                 self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
-        for address in network_info['ingress-addresses']:
+        for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(ipaddress.ip_address(address))
         self.egress_subnets = []
-        for subnet in network_info['egress-subnets']:
+        for subnet in network_info.get('egress-subnets', []):
             self.egress_subnets.append(ipaddress.ip_network(subnet))
 
     @property
@@ -554,7 +556,10 @@ class Network:
         address from :attr:`.interfaces` that can be used to configure where your
         application should bind() and listen().
         """
-        return self.interfaces[0].address
+        if self.interfaces:
+            return self.interfaces[0].address
+        else:
+            return None
 
     @property
     def ingress_address(self):
@@ -564,7 +569,10 @@ class Network:
         to is not always the address other people can use to connect() to you.
         This is just the first address from :attr:`.ingress_addresses`.
         """
-        return self.ingress_addresses[0]
+        if self.ingress_addresses:
+            return self.ingress_addresses[0]
+        else:
+            return None
 
 
 class NetworkInterface:
@@ -582,14 +590,21 @@ class NetworkInterface:
     def __init__(self, name: str, address_info: dict):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
-        self.address = ipaddress.ip_address(address_info['value'])
-        cidr = address_info['cidr']
-        if not cidr:
-            # The cidr field may be empty, see LP: #1864102.
-            # In this case, make it a /32 or /128 IP network.
-            self.subnet = ipaddress.ip_network(address_info['value'])
+        address = address_info.get('value')
+        # The value field may be empty.
+        if address:
+            self.address = ipaddress.ip_address(address)
         else:
+            self.address = None
+        cidr = address_info.get('cidr')
+        # The cidr field may be empty, see LP: #1864102.
+        if cidr:
             self.subnet = ipaddress.ip_network(cidr)
+        elif address:
+            # If we have an address, convert it to a /32 or /128 IP network.
+            self.subnet = ipaddress.ip_network(address)
+        else:
+            self.subnet = None
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
