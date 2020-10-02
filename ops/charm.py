@@ -49,11 +49,11 @@ class HookEvent(EventBase):
 
 
 class ActionEvent(EventBase):
-    """Events raised by Juju when an operator invokes a Juju Action.
+    """Events raised by Juju when an administrator invokes a Juju Action.
 
-    This class is the data type of events triggered when an operator
+    This class is the data type of events triggered when an administrator
     invokes a Juju Action. Callbacks bound to these events may be used
-    for responding to the operator's Juju Action request.
+    for responding to the administrator's Juju Action request.
 
     To read the parameters for the action, see the instance variable `params`.
     To respond with the result of the action, call `set_results`. To add progress
@@ -66,7 +66,7 @@ class ActionEvent(EventBase):
     def defer(self):
         """Action events are not deferable like other events.
 
-        This is because an action runs synchronously and the operator
+        This is because an action runs synchronously and the administrator
         is waiting for the result.
         """
         raise RuntimeError('cannot defer action events')
@@ -172,17 +172,17 @@ class UpdateStatusEvent(HookEvent):
     """Event triggered by a status update request from Juju.
 
     This event is periodically triggered by Jujus so that it can
-    provide constant feedback to the operator about the status of the
-    application the charm is modeling. Any callback method bound to
-    this event should determined "health" of the application and set
-    the status appropriately.
+    provide constant feedback to the administrator about the status of
+    the application the charm is modeling. Any callback method bound
+    to this event should determined "health" of the application and
+    set the status appropriately.
     """
 
 
 class UpgradeCharmEvent(HookEvent):
     """Event triggered by request to upgrade the charm.
 
-    This event will be triggered when an operator executes `juju
+    This event will be triggered when an administrator executes `juju
     upgrade-charm`. The event fires after Juju has unpacked the
     upgraded charm code, and so this event will be handled by the
     callback method bound to the event in the new codebase. The
@@ -196,14 +196,15 @@ class UpgradeCharmEvent(HookEvent):
 class PreSeriesUpgradeEvent(HookEvent):
     """Event triggered to prepare a unit for series upgrade.
 
-    This event triggers when an operator executes `juju upgrade-series
-    MACHINE prepare`. The event will fire for each unit that is
-    running on the specified machine. Any callback method bound to
-    this event must prepare the charm upgrade to the Machine's series.
+    This event triggers when an administrator executes `juju
+    upgrade-series MACHINE prepare`. The event will fire for each unit
+    that is running on the specified machine. Any callback method
+    bound to this event must prepare the charm upgrade to the
+    Machine's series.
 
     It can be assumed that only after all units on a machine have
     executed the callback method associated with this event, the
-    operator will initiate steps to actually upgrade the machine.
+    administrator will initiate steps to actually upgrade the machine.
     After the upgrade has been completed, the
     :class:`PostSeriesUpgradeEvent` event will fire.
     """
@@ -212,12 +213,12 @@ class PreSeriesUpgradeEvent(HookEvent):
 class PostSeriesUpgradeEvent(HookEvent):
     """Event triggered after a series upgrade.
 
-    This event is triggered after the operator has done a distribution
-    upgrade (or rolled back and kept the same series). It is called in
-    response to `juju upgrade-series MACHINE complete`. Associated
-    charm callback methods are expected to do whatever steps are
-    necessary to reconfigure their applications for the new series.
-
+    This event is triggered after the administrator has done a
+    distribution upgrade (or rolled back and kept the same series). It
+    is called in response to `juju upgrade-series MACHINE
+    complete`. Associated charm callback methods are expected to do
+    whatever steps are necessary to reconfigure their applications for
+    the new series.
     """
 
 
