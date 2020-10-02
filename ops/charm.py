@@ -52,7 +52,7 @@ class ActionEvent(EventBase):
     """Events raised by Juju when an operator invokes a Juju Action.
 
     This class is the data type of events triggered when an operator
-    invokes a Juju Action. Callback bound to these events, may be used
+    invokes a Juju Action. Callbacks bound to these events may be used
     for responding to the operator's Juju Action request.
 
     To read the parameters for the action, see the instance variable `params`.
