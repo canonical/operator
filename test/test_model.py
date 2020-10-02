@@ -874,6 +874,60 @@ class TestModelBindings(unittest.TestCase):
         self._check_binding_data(binding_name, binding)
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
+    def test_missing_bind_addresses(self):
+        network_data = json.dumps({})
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(binding.network.interfaces, [])
+
+    def test_empty_bind_addresses(self):
+        network_data = json.dumps({'bind-addresses': [{}]})
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(binding.network.interfaces, [])
+
+    def test_empty_interface_info(self):
+        network_data = json.dumps({
+            'bind-addresses': [{
+                'interface-name': 'eth0',
+                'addresses': [{}],
+            }],
+        })
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(len(binding.network.interfaces), 1)
+        interface = binding.network.interfaces[0]
+        self.assertIsNone(interface.address)
+        self.assertIsNone(interface.subnet)
+
+    def test_missing_ingress_addresses(self):
+        network_data = json.dumps({
+            'bind-addresses': [],
+        })
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(binding.network.ingress_addresses, [])
+        self.assertEqual(binding.network.ingress_address, None)
+
+    def test_missing_egress_subnets(self):
+        network_data = json.dumps({
+            'bind-addresses': [],
+            'ingress-addresses': [],
+        })
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(binding.network.egress_subnets, [])
+
 
 class TestModelBackend(unittest.TestCase):
 
