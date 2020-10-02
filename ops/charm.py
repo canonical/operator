@@ -138,7 +138,7 @@ class StopEvent(HookEvent):
 
     This event is triggered when an application's removal is requested
     by the client. The event fires immediately before the end of the
-    unit’s destruction sequence. Callback methods bound to this event,
+    unit’s destruction sequence. Callback methods bound to this event
     should be used to ensure that the charm’s software is not running,
     and will not start again on reboot.
     """
