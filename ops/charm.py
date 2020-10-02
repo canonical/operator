@@ -177,6 +177,9 @@ class UpdateStatusEvent(HookEvent):
     the application the charm is modeling. Any callback method bound
     to this event should determined "health" of the application and
     set the status appropriately.
+
+    The interval between `update-status` events can be configured model-wide, e.g.
+    `juju model-config update-status-hook-interval=1m`.
     """
 
 
