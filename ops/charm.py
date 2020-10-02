@@ -153,8 +153,8 @@ class ConfigChangedEvent(HookEvent):
 
     This event fires in several different situations.
 
-    - immediately after `install` event.
-    - immediately after `upgrade_charm` event.
+    - immediately after `install` event (:class: `InstallEvent`).
+    - immediately after `upgrade_charm` event (:class: `UpgradeCharmEvent`).
     - at least once when the unit agent is restarted (but, if the unit
       is in an error state, it won’t be run until after the error
       state is cleared).
