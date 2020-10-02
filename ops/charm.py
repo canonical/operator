@@ -175,7 +175,7 @@ class UpdateStatusEvent(HookEvent):
     This event is periodically triggered by Juju so that it can
     provide constant feedback to the administrator about the status of
     the application the charm is modeling. Any callback method bound
-    to this event should determined "health" of the application and
+    to this event should determine the "health" of the application and
     set the status appropriately.
 
     The interval between `update-status` events can be configured model-wide, e.g.
