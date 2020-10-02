@@ -140,7 +140,7 @@ class StopEvent(HookEvent):
     by the client. The event fires immediately before the end of the
     unit’s destruction sequence. Callback methods bound to this event
     should be used to ensure that the charm’s software is not running,
-    and will not start again on reboot.
+    and that it will not start again on reboot.
     """
 
 
