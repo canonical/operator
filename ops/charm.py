@@ -204,11 +204,13 @@ class PreSeriesUpgradeEvent(HookEvent):
     upgrade-series MACHINE prepare`. The event will fire for each unit
     that is running on the specified machine. Any callback method
     bound to this event must prepare the charm upgrade to the
-    Machine's series.
+    series. This may include things like exporting database content to a
+    version neutral format, or evacuating running instances to other
+    machines.
 
     It can be assumed that only after all units on a machine have
     executed the callback method associated with this event, the
-    administrator will initiate steps to actually upgrade the machine.
+    administrator will initiate steps to actually upgrade the series.
     After the upgrade has been completed, the
     :class:`PostSeriesUpgradeEvent` event will fire.
     """
@@ -222,7 +224,10 @@ class PostSeriesUpgradeEvent(HookEvent):
     is called in response to `juju upgrade-series MACHINE
     complete`. Associated charm callback methods are expected to do
     whatever steps are necessary to reconfigure their applications for
-    the new series.
+    the new series. This may include things like populate the upgraded
+    version of a database. Note however charms are expected to check
+    if the series has actually changed or whether it was rolled back
+    to the original series.
     """
 
 
@@ -234,8 +239,8 @@ class LeaderElectedEvent(HookEvent):
 
     This event fires at least once after Juju selects a leader
     unit. Callback method bound to this event may take any action
-    required for the elected unit to assert leadership and for other
-    units to acknowledge it.
+    required for the elected unit to assert leadership. Note that only
+    the elected leader unit will receive this event.
     """
 
 
@@ -375,8 +380,8 @@ class RelationChangedEvent(RelationEvent):
     changes its settings for the relation. Callback methods bound to
     this event should be the only ones that rely on remote relation
     settings. They should not error if the settings are incomplete,
-    since it can be guaranteed that when the remote unit changes its
-    settings, the event will be fire again.
+    since it can be guaranteed that when the remote unit or
+    application changes its settings, the event will be fire again.
 
     The settings that be queried, or set, are determined by the
     relation’s interface.
