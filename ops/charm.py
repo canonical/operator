@@ -59,7 +59,8 @@ class ActionEvent(EventBase):
     To respond with the result of the action, call `set_results`. To add progress
     messages that are visible as the action is progressing use `log`.
 
-    :ivar params: The parameters passed to the action (read by action-get)
+    Attributes
+        params: The parameters passed to the action.
 
     """
 
@@ -155,11 +156,9 @@ class ConfigChangedEvent(HookEvent):
 
     - immediately after `install` event (:class: `InstallEvent`).
     - immediately after `upgrade_charm` event (:class: `UpgradeCharmEvent`).
-    - at least once when the unit agent is restarted (but, if the unit
-      is in an error state, it won’t be run until after the error
-      state is cleared).
     - after changing charm configuration using the GUI or command line
       interface
+    - if there is a change to network configuration
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
@@ -520,27 +519,25 @@ class CharmBase(Object):
     setup the required event handlers (hooks) in its constructor as
     shown below
 
-    ```
-    import logging
+        import logging
 
-    from ops.charm import CharmBase
-    from ops.main import main
+        from ops.charm import CharmBase
+        from ops.main import main
 
-    logger = logging.getLogger(__name__)
+        logger = logging.getLogger(__name__)
 
-    def MyCharm(CharmBase):
-        def __init__(self, *args):
-            logger.debug('Initializing Charm')
+        def MyCharm(CharmBase):
+            def __init__(self, *args):
+                logger.debug('Initializing Charm')
 
-            super().__init__(*args)
+                super().__init__(*args)
 
-            self.framework.observe(self.on.config_changed, self._on_config_changed)
-            self.framework.observe(self.on.stop, self._on_stop)
-            ....
+                self.framework.observe(self.on.config_changed, self._on_config_changed)
+                self.framework.observe(self.on.stop, self._on_stop)
+                ....
 
-    if __name__ == "__main__":
-        main(MyCharm)
-    ```
+        if __name__ == "__main__":
+            main(MyCharm)
 
     As shown in the example above, a charm class is instantiated by
     ops.main.main() rather than charm authors directly instantiating a
@@ -550,7 +547,6 @@ class CharmBase(Object):
         framework: The framework responsible for managing the Model and events for this
             Charm.
         key: Ignored; will remove after deprecation period of the signature change.
-
     """
 
     on = CharmEvents()
@@ -744,13 +740,13 @@ class StorageMeta:
     """Object containing metadata about a storage definition.
 
     Attributes:
-    storage_name: Name of storage
-    type: Storage type
-    description: A text description of the storage
-    read_only: Whether or not the storage is read only
-    minimum_size: Minimum size of storage
-    location: Mount point of storage
-    multiple_range: Range of numeric qualifiers when multiple storage units are used
+        storage_name: Name of storage
+        type: Storage type
+        description: A text description of the storage
+        read_only: Whether or not the storage is read only
+        minimum_size: Minimum size of storage
+        location: Mount point of storage
+        multiple_range: Range of numeric qualifiers when multiple storage units are used
     """
 
     def __init__(self, name, raw):
@@ -775,9 +771,9 @@ class ResourceMeta:
     """Object containing metadata about a resource definition.
 
     Attributes:
-    resource_name: Name of resource
-    filename: Name of file
-    description: A text description of resource
+        resource_name: Name of resource
+        filename: Name of file
+        description: A text description of resource
     """
 
     def __init__(self, name, raw):
@@ -791,8 +787,8 @@ class PayloadMeta:
     """Object containing metadata about a payload definition.
 
     Attributes:
-    payload_name: Name of payload
-    type: Payload Type
+        payload_name: Name of payload
+        type: Payload Type
     """
 
     def __init__(self, name, raw):
@@ -802,8 +798,6 @@ class PayloadMeta:
 
 class ActionMeta:
     """Object containing metadata about an action's definition.
-
-    Attributes:
     """
 
     def __init__(self, name, raw=None):
