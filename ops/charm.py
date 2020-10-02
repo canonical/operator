@@ -513,7 +513,7 @@ class CharmEvents(ObjectEvents):
 class CharmBase(Object):
     """Base class that represents the Charm overall.
 
-    CharmBase is used to create a charms. This is done by inheriting
+    CharmBase is used to create a charm. This is done by inheriting
     from CharmBase and customising the sub class as required. So to
     create your own charm, say "MyCharm" define a charm class and
     setup the required event handlers (hooks) in its constructor as
