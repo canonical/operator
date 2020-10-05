@@ -157,10 +157,13 @@ class ConfigChangedEvent(HookEvent):
     This event fires in several different situations.
 
     - immediately after `install` event (:class: `InstallEvent`).
-    - immediately after `upgrade_charm` event (:class: `UpgradeCharmEvent`).
+    - after a relation is created (:class: `RelationCreatedEvent`).
+    - after a leader is elected (:class: `LeaderElectedEvent`).
     - after changing charm configuration using the GUI or command line
       interface
-    - if there is a change to network configuration
+    - when the charm starts (:class: `StartEvent`).
+    - when a new unit joins a relation (:class: `RelationJoinedEvent`).
+    - when there is a change to an existing relation (:class: `RelationChangedEvent`).
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
