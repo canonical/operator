@@ -360,11 +360,14 @@ class Harness:
                 harness.update_config(unset=['foo', 'bar'])
             # things here will again fire events
         """
-        self.disable_hooks()
-        try:
+        if self._hooks_enabled:
+            self.disable_hooks()
+            try:
+                yield None
+            finally:
+                self.enable_hooks()
+        else:
             yield None
-        finally:
-            self.enable_hooks()
 
     def _next_relation_id(self):
         rel_id = self._relation_id_counter
