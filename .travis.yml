@@ -16,9 +16,19 @@ matrix:
     include:
         - os: osx
           language: generic
+        - os: windows
+          language: shell
+          before_install:
+            - choco install python --version 3.8.5
+            - python -m pip install --upgrade pip
+          env:
+            - PATH=/c/Python38:/c/Python38/Scripts:$PATH
 
 install:
     - pip3 install -r requirements-dev.txt
 
+before_script:
+    - printenv | sort
+
 script:
-    - ./run_tests
+    - ./run_tests -v

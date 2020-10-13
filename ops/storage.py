@@ -22,6 +22,13 @@ import typing
 import yaml
 
 
+def _run(args, **kw):
+    cmd = shutil.which(args[0])
+    if cmd is None:
+        raise FileNotFoundError(args[0])
+    return subprocess.run([cmd, *args[1:]], **kw)
+
+
 class SQLiteStorage:
 
     DB_LOCK_TIMEOUT = timedelta(hours=1)
@@ -248,17 +255,14 @@ _SimpleDumper.represent_tuple = yaml.Dumper.represent_tuple
 _SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)
 
 
+def juju_backend_available() -> bool:
+    """Check if Juju state storage is available."""
+    p = shutil.which('state-get')
+    return p is not None
+
+
 class _JujuStorageBackend:
     """Implements the interface from the Operator framework to Juju's state-get/set/etc."""
-
-    @staticmethod
-    def is_available() -> bool:
-        """Check if Juju state storage is available.
-
-        This checks if there is a 'state-get' executable in PATH.
-        """
-        p = shutil.which('state-get')
-        return p is not None
 
     def set(self, key: str, value: typing.Any) -> None:
         """Set a key to a given value.
@@ -275,10 +279,10 @@ class _JujuStorageBackend:
         # have the same default style.
         encoded_value = yaml.dump(value, Dumper=_SimpleDumper, default_flow_style=None)
         content = yaml.dump(
-            {key: encoded_value}, encoding='utf-8', default_style='|',
+            {key: encoded_value}, encoding='utf8', default_style='|',
             default_flow_style=False,
             Dumper=_SimpleDumper)
-        subprocess.run(["state-set", "--file", "-"], input=content, check=True)
+        _run(["state-set", "--file", "-"], input=content, check=True)
 
     def get(self, key: str) -> typing.Any:
         """Get the bytes value associated with a given key.
@@ -289,12 +293,8 @@ class _JujuStorageBackend:
             CalledProcessError: if 'state-get' returns an error code.
         """
         # We don't capture stderr here so it can end up in debug logs.
-        p = subprocess.run(
-            ["state-get", key],
-            stdout=subprocess.PIPE,
-            check=True,
-        )
-        if p.stdout == b'' or p.stdout == b'\n':
+        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True, universal_newlines=True)
+        if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
         return yaml.load(p.stdout, Loader=_SimpleLoader)
 
@@ -306,7 +306,7 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-delete' returns an error code.
         """
-        subprocess.run(["state-delete", key], check=True)
+        _run(["state-delete", key], check=True)
 
 
 class NoSnapshotError(Exception):

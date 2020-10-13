@@ -39,7 +39,9 @@ class TestCharm(unittest.TestCase):
             os.environ.update(env)
         self.addCleanup(restore_env, os.environ.copy())
 
-        os.environ['PATH'] = "{}:{}".format(Path(__file__).parent / 'bin', os.environ['PATH'])
+        os.environ['PATH'] = os.pathsep.join([
+            str(Path(__file__).parent / 'bin'),
+            os.environ['PATH']])
         os.environ['JUJU_UNIT_NAME'] = 'local/0'
 
         self.tmpdir = Path(tempfile.mkdtemp())
@@ -103,6 +105,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(charm.unit, framework.model.unit)
         self.assertEqual(charm.meta, framework.meta)
         self.assertEqual(charm.charm_dir, framework.charm_dir)
+        self.assertIs(charm.config, framework.model.config)
 
     def test_relation_events(self):
 

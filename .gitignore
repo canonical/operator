@@ -1,4 +1,8 @@
 __pycache__
 /sandbox
+/build
+/dist
+/ops.egg-info
 .idea
-docs/_build
+/docs/_build
+*~

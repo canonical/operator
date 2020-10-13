@@ -45,32 +45,61 @@ class Model:
 
     This should not be instantiated directly by Charmers, but can be accessed as `self.model`
     from any class that derives from Object.
-
-    Attributes:
-        unit: A :class:`Unit` that represents the unit that is running this code (eg yourself)
-        app: A :class:`Application` that represents the application this unit is a part of.
-        relations: Mapping of endpoint to list of :class:`Relation` answering the question
-            "what am I currently related to". See also :meth:`.get_relation`
-        config: A dict of the config for the current application.
-        resources: Access to resources for this charm. Use ``model.resources.fetch(resource_name)``
-            to get the path on disk where the resource can be found.
-        storages: Mapping of storage_name to :class:`Storage` for the storage points defined in
-            metadata.yaml
-        pod: Used to get access to ``model.pod.set_spec`` to set the container specification
-            for Kubernetes charms.
     """
 
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(backend)
         self._backend = backend
-        self.unit = self.get_unit(self._backend.unit_name)
-        self.app = self.unit.app
-        self.relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
-        self.config = ConfigData(self._backend)
-        self.resources = Resources(list(meta.resources), self._backend)
-        self.pod = Pod(self._backend)
-        self.storages = StorageMapping(list(meta.storages), self._backend)
+        self._unit = self.get_unit(self._backend.unit_name)
+        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
+        self._config = ConfigData(self._backend)
+        self._resources = Resources(list(meta.resources), self._backend)
+        self._pod = Pod(self._backend)
+        self._storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
+
+    @property
+    def unit(self) -> 'Unit':
+        """A :class:`Unit` that represents the unit that is running this code (eg yourself)"""
+        return self._unit
+
+    @property
+    def app(self):
+        """A :class:`Application` that represents the application this unit is a part of."""
+        return self._unit.app
+
+    @property
+    def relations(self) -> 'RelationMapping':
+        """Mapping of endpoint to list of :class:`Relation`
+
+        Answers the question "what am I currently related to".
+        See also :meth:`.get_relation`.
+        """
+        return self._relations
+
+    @property
+    def config(self) -> 'ConfigData':
+        """Return a mapping of config for the current application."""
+        return self._config
+
+    @property
+    def resources(self) -> 'Resources':
+        """Access to resources for this charm.
+
+        Use ``model.resources.fetch(resource_name)`` to get the path on disk
+        where the resource can be found.
+        """
+        return self._resources
+
+    @property
+    def storages(self) -> 'StorageMapping':
+        """Mapping of storage_name to :class:`Storage` as defined in metadata.yaml"""
+        return self._storages
+
+    @property
+    def pod(self) -> 'Pod':
+        """Use ``model.pod.set_spec`` to set the container specification for Kubernetes charms."""
+        return self._pod
 
     @property
     def name(self) -> str:
@@ -348,6 +377,9 @@ class LazyMapping(Mapping, ABC):
     def __getitem__(self, key):
         return self._data[key]
 
+    def __repr__(self):
+        return repr(self._data)
+
 
 class RelationMapping(Mapping):
     """Map of relation names to lists of :class:`Relation` instances."""
@@ -503,15 +535,17 @@ class Network:
         self.interfaces = []
         # Treat multiple addresses on an interface as multiple logical
         # interfaces with the same name.
-        for interface_info in network_info['bind-addresses']:
-            interface_name = interface_info['interface-name']
-            for address_info in interface_info['addresses']:
+        for interface_info in network_info.get('bind-addresses', []):
+            interface_name = interface_info.get('interface-name')
+            if not interface_name:
+                continue
+            for address_info in interface_info.get('addresses', []):
                 self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
-        for address in network_info['ingress-addresses']:
+        for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(ipaddress.ip_address(address))
         self.egress_subnets = []
-        for subnet in network_info['egress-subnets']:
+        for subnet in network_info.get('egress-subnets', []):
             self.egress_subnets.append(ipaddress.ip_network(subnet))
 
     @property
@@ -522,7 +556,10 @@ class Network:
         address from :attr:`.interfaces` that can be used to configure where your
         application should bind() and listen().
         """
-        return self.interfaces[0].address
+        if self.interfaces:
+            return self.interfaces[0].address
+        else:
+            return None
 
     @property
     def ingress_address(self):
@@ -532,7 +569,10 @@ class Network:
         to is not always the address other people can use to connect() to you.
         This is just the first address from :attr:`.ingress_addresses`.
         """
-        return self.ingress_addresses[0]
+        if self.ingress_addresses:
+            return self.ingress_addresses[0]
+        else:
+            return None
 
 
 class NetworkInterface:
@@ -550,14 +590,21 @@ class NetworkInterface:
     def __init__(self, name: str, address_info: dict):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
-        self.address = ipaddress.ip_address(address_info['value'])
-        cidr = address_info['cidr']
-        if not cidr:
-            # The cidr field may be empty, see LP: #1864102.
-            # In this case, make it a /32 or /128 IP network.
-            self.subnet = ipaddress.ip_network(address_info['value'])
+        address = address_info.get('value')
+        # The value field may be empty.
+        if address:
+            self.address = ipaddress.ip_address(address)
         else:
+            self.address = None
+        cidr = address_info.get('cidr')
+        # The cidr field may be empty, see LP: #1864102.
+        if cidr:
             self.subnet = ipaddress.ip_network(cidr)
+        elif address:
+            # If we have an address, convert it to a /32 or /128 IP network.
+            self.subnet = ipaddress.ip_network(address)
+        else:
+            self.subnet = None
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
@@ -648,6 +695,9 @@ class RelationData(Mapping):
     def __getitem__(self, key):
         return self._data[key]
 
+    def __repr__(self):
+        return repr(self._data)
+
 
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
@@ -694,7 +744,7 @@ class RelationDataContent(LazyMapping, MutableMapping):
             if value == '':
                 # Match the behavior of Juju, which is that setting the value to an
                 # empty string will remove the key entirely from the relation data.
-                del self._data[key]
+                self._data.pop(key, None)
             else:
                 self._data[key] = value
 
@@ -978,11 +1028,12 @@ class _ModelBackend:
         self._leader_check_time = None
 
     def _run(self, *args, return_output=False, use_json=False):
-        kwargs = dict(stdout=PIPE, stderr=PIPE)
+        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)
+        args = (shutil.which(args[0]),) + args[1:]
         if use_json:
             args += ('--format=json',)
         try:
-            result = run(args, check=True, **kwargs)
+            result = run(args, **kwargs)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:

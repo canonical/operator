@@ -388,6 +388,11 @@ class CharmBase(Object):
         """
         return self.framework.charm_dir
 
+    @property
+    def config(self) -> model.ConfigData:
+        """A mapping containing the charm's config and current values."""
+        return self.model.config
+
 
 class CharmMeta:
     """Object containing the metadata for the charm.

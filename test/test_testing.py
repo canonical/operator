@@ -540,6 +540,28 @@ class TestHarness(unittest.TestCase):
             harness.charm.get_changes(reset=True),
             [{'name': 'config-changed', 'data': {'value': 'fourth', 'third': '3'}}])
 
+    def test_hooks_disabled_contextmanager(self):
+        harness = Harness(RecordingCharm, meta='''
+            name: test-charm
+        ''')
+        self.addCleanup(harness.cleanup)
+        # Before begin() there are no events.
+        harness.update_config({'value': 'first'})
+        # By default, after begin the charm is set up to receive events.
+        harness.begin()
+        harness.update_config({'value': 'second'})
+        self.assertEqual(
+            harness.charm.get_changes(reset=True),
+            [{'name': 'config-changed', 'data': {'value': 'second'}}])
+        # Once disabled, we won't see config-changed when we make an update
+        with harness.hooks_disabled():
+            harness.update_config({'third': '3'})
+        self.assertEqual(harness.charm.get_changes(reset=True), [])
+        harness.update_config({'value': 'fourth'})
+        self.assertEqual(
+            harness.charm.get_changes(reset=True),
+            [{'name': 'config-changed', 'data': {'value': 'fourth', 'third': '3'}}])
+
     def test_metadata_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(tmp))
@@ -556,6 +578,45 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(list(harness.model.relations), ['db'])
         # The charm_dir also gets set
         self.assertEqual(harness.framework.charm_dir, tmp)
+
+    def test_config_from_directory(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, str(tmp))
+        config_filename = tmp / 'config.yaml'
+        with config_filename.open('wt') as config:
+            config.write(textwrap.dedent('''
+            options:
+                opt_str:
+                    type: string
+                    default: "val"
+                opt_str_empty:
+                    type: string
+                    default: ""
+                opt_null:
+                    type: string
+                    default: null
+                opt_bool:
+                    type: boolean
+                    default: true
+                opt_int:
+                    type: int
+                    default: 1
+                opt_float:
+                    type: float
+                    default: 1.0
+                opt_no_default:
+                    type: string
+            '''))
+        harness = self._get_dummy_charm_harness(tmp)
+        self.assertEqual(harness.model.config['opt_str'], 'val')
+        self.assertEqual(harness.model.config['opt_str_empty'], '')
+        self.assertIsNone(harness.model.config['opt_null'])
+        self.assertIs(harness.model.config['opt_bool'], True)
+        self.assertEqual(harness.model.config['opt_int'], 1)
+        self.assertIsInstance(harness.model.config['opt_int'], int)
+        self.assertEqual(harness.model.config['opt_float'], 1.0)
+        self.assertIsInstance(harness.model.config['opt_float'], float)
+        self.assertNotIn('opt_no_default', harness.model.config)
 
     def test_set_model_name(self):
         harness = Harness(CharmBase, meta='''
@@ -1006,6 +1067,29 @@ class TestHarness(unittest.TestCase):
                      'app': 'test-app',
                  }},
                 {'name': 'leader-settings-changed'},
+                {'name': 'config-changed', 'data': {}},
+                {'name': 'start'},
+            ])
+
+    def test_begin_with_initial_hooks_relation_charm_with_no_relation(self):
+        class CharmWithDB(RelationEventCharm):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.observe_relation_events('db')
+        harness = Harness(CharmWithDB, meta='''
+            name: test-app
+            requires:
+              db:
+                interface: sql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_leader()
+        harness.begin_with_initial_hooks()
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'install'},
+                {'name': 'leader-elected'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},
             ])

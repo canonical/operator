@@ -120,7 +120,11 @@ class EventBase:
         self.handle = handle
         self.deferred = False
 
+    def __repr__(self):
+        return "<%s via %s>" % (self.__class__.__name__, self.handle)
+
     def defer(self):
+        logger.debug("Deferring %s.", self)
         self.deferred = True
 
     def snapshot(self):
@@ -654,6 +658,8 @@ class Framework(Object):
             event.deferred = False
             observer = self._observer.get(observer_path)
             if observer:
+                if single_event_path is None:
+                    logger.debug("Re-emitting %s.", event)
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)

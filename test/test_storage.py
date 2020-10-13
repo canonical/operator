@@ -198,9 +198,9 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
 def setup_juju_backend(test_case, state_file):
     """Create fake scripts for pretending to be state-set and state-get"""
     template_args = {
-        'executable': sys.executable,
-        'pthpth': os.path.dirname(pathlib.__file__),
-        'state_file': str(state_file),
+        'executable': str(pathlib.Path(sys.executable).as_posix()),
+        'pthpth': repr(os.path.dirname(pathlib.__file__))[1:-1],
+        'state_file': str(state_file.as_posix()),
     }
 
     fake_script(test_case, 'state-set', dedent('''\
@@ -265,7 +265,9 @@ def setup_juju_backend(test_case, state_file):
 class TestJujuStorage(StoragePermutations, BaseTestCase):
 
     def create_storage(self):
-        state_file = pathlib.Path(tempfile.mkstemp(prefix='tmp-ops-test-state-')[1])
+        fd, fn = tempfile.mkstemp(prefix='tmp-ops-test-state-')
+        os.close(fd)
+        state_file = pathlib.Path(fn)
         self.addCleanup(state_file.unlink)
         setup_juju_backend(self, state_file)
         return storage.JujuStorage()
@@ -317,18 +319,18 @@ class TestSimpleLoader(BaseTestCase):
 class TestJujuStateBackend(BaseTestCase):
 
     def test_is_not_available(self):
-        self.assertFalse(storage._JujuStorageBackend.is_available())
+        self.assertFalse(storage.juju_backend_available())
 
     def test_is_available(self):
         fake_script(self, 'state-get', 'echo ""')
-        self.assertTrue(storage._JujuStorageBackend.is_available())
+        self.assertTrue(storage.juju_backend_available())
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
     def test_set_encodes_args(self):
         t = tempfile.NamedTemporaryFile()
         fake_script(self, 'state-set', dedent("""
             cat >> {}
-            """).format(t.name))
+            """).format(pathlib.Path(t.name).as_posix()))
         backend = storage._JujuStorageBackend()
         backend.set('key', {'foo': 2})
         self.assertEqual(fake_script_calls(self, clear=True), [
@@ -356,7 +358,7 @@ class TestJujuStateBackend(BaseTestCase):
         t = tempfile.NamedTemporaryFile()
         fake_script(self, 'state-set', dedent("""
             cat >> {}
-            """).format(t.name))
+            """).format(pathlib.Path(t.name).as_posix()))
         backend = storage._JujuStorageBackend()
         complex_val = {
             'foo': 2,
