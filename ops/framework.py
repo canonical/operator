@@ -536,12 +536,12 @@ class Framework(Object):
         """Register observer to be called when bound_event is emitted.
 
         The bound_event is generally provided as an attribute of the object that emits
-        the event, and is created in this style:
+        the event, and is created in this style::
 
             class SomeObject:
                 something_happened = Event(SomethingHappened)
 
-        That event may be observed as:
+        That event may be observed as::
 
             framework.observe(someobj.something_happened, self._on_something_happened)
 

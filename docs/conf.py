@@ -24,6 +24,19 @@ author = 'Canonical Ltd'
 # cannot be found.
 nitpicky = True
 
+# A list of (type, target) tuples (by default empty) that should be ignored when
+# generating warnings in “nitpicky mode”. Note that type should include the
+# domain name if present. Example entries would be ('py:func', 'int') or
+# ('envvar', 'LD_LIBRARY_PATH').
+nitpick_ignore = [
+    ('py:class', 'TextIO'),  # typing.TextIO confuses the nitpicker
+    ('py:class', 'method'),  # types.Method confuses the nitpicker
+    ('py:class', '_ModelBackend'),  # private
+    ('py:class', '_ModelCache'), # private
+    ('py:class', 'ipaddress.ip_address'), # fake (AFAIK there is no ABC)
+    ('py:class', 'ipaddress.ip_network'), # ditto
+]
+
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
