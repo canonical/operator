@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2020 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Setup script for the Operator Framework."""
+
 from importlib.util import spec_from_file_location, module_from_spec
 from pathlib import Path
 from setuptools import setup, find_packages
 
 
 def _read_me() -> str:
+    """Return the README content from the file."""
     with open("README.md", "rt", encoding="utf8") as fh:
         readme = fh.read()
     return readme
 
 
 def _get_version() -> str:
-    """Get the version via ops/version.py, without loading ops/__init__.py"""
+    """Get the version via ops/version.py, without loading ops/__init__.py."""
     spec = spec_from_file_location('ops.version', 'ops/version.py')
     module = module_from_spec(spec)
     spec.loader.exec_module(module)

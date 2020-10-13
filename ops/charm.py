@@ -102,7 +102,7 @@ class StopEvent(HookEvent):
 
 
 class RemoveEvent(HookEvent):
-    """Represents the `remove` hook from Juju. """
+    """Represents the `remove` hook from Juju."""
 
 
 class ConfigChangedEvent(HookEvent):
@@ -378,14 +378,12 @@ class CharmBase(Object):
 
     @property
     def meta(self) -> 'CharmMeta':
-        """CharmMeta of this charm.
-        """
+        """The correspondant CharmMeta of this charm."""
         return self.framework.meta
 
     @property
     def charm_dir(self) -> pathlib.Path:
-        """Root directory of the Charm as it is running.
-        """
+        """Root directory of the Charm as it is running."""
         return self.framework.charm_dir
 
     @property
