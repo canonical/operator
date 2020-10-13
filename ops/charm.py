@@ -146,7 +146,7 @@ class StopEvent(HookEvent):
 
 class RemoveEvent(HookEvent):
     """Event triggered when a unit is about to be terminated.
-    
+
     This event fires prior to Juju removing the charm and terminating its unit.
     """
 
