@@ -5,3 +5,4 @@ __pycache__
 /ops.egg-info
 .idea
 /docs/_build
+*~
