@@ -79,11 +79,12 @@ class InfrastructureTests(unittest.TestCase):
 
     def test_pep257(self):
         python_filepaths = get_python_filepaths(include_tests=False)
-        ignore = [
+        to_ignore = {
             'D105',  # Missing docstring in magic method
             'D107',  # Missing docstring in __init__
-        ]
-        errors = list(pydocstyle.check(python_filepaths, ignore=ignore))
+        }
+        to_include = pydocstyle.violations.conventions.google - to_ignore
+        errors = list(pydocstyle.check(python_filepaths, select=to_include))
 
         # if nothing to report, we're done
         if not errors:
