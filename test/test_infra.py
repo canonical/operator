@@ -23,15 +23,19 @@ import unittest
 from unittest.mock import patch
 
 import autopep8
+import pydocstyle
 from flake8.api.legacy import get_style_guide
 
 import ops
 
 
-def get_python_filepaths():
+def get_python_filepaths(include_tests=True):
     """Helper to retrieve paths of Python files."""
     python_paths = ['setup.py']
-    for root in ['ops', 'test']:
+    roots = ['ops']
+    if include_tests:
+        roots.append('test')
+    for root in roots:
         for dirpath, dirnames, filenames in os.walk(root):
             for filename in filenames:
                 if filename.endswith(".py"):
@@ -71,6 +75,22 @@ class InfrastructureTests(unittest.TestCase):
 
         report = ["Please fix files as suggested by autopep8:"] + issues
         report += ["\n-- Original flake8 reports:"] + flake8_issues
+        self.fail("\n".join(report))
+
+    def test_pep257(self):
+        python_filepaths = get_python_filepaths(include_tests=False)
+        ignore = [
+            'D105',  # Missing docstring in magic method
+            'D107',  # Missing docstring in __init__
+        ]
+        errors = list(pydocstyle.check(python_filepaths, ignore=ignore))
+
+        # if nothing to report, we're done
+        if not errors:
+            return
+
+        report = ["Please fix files as suggested by pydocstyle ({:d} issues):".format(len(errors))]
+        report.extend(str(e) for e in errors)
         self.fail("\n".join(report))
 
     def test_quote_backslashes(self):
