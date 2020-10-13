@@ -20,6 +20,10 @@ author = 'Canonical Ltd'
 
 # -- General configuration ---------------------------------------------------
 
+# If true, Sphinx will warn about all references where the target
+# cannot be found.
+nitpicky = True
+
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
@@ -82,6 +86,12 @@ autodoc_typehints = 'description'
 #              concatenated and inserted.
 #     'init' - Only the __init__ method’s docstring is inserted.
 autoclass_content = 'both'
+
+# This value selects if automatically documented members are sorted
+# alphabetical (value 'alphabetical'), by member type (value
+# 'groupwise') or by source order (value 'bysource'). The default is
+# alphabetical.
+autodoc_member_order = 'bysource'
 
 autodoc_default_options = {
     'members': None,            # None here means "yes"

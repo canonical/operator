@@ -32,7 +32,7 @@ def _loadYaml(source):
 class HookEvent(EventBase):
     """Events raised by Juju to progress a charm's lifecycle.
 
-    Hooks are callback methods of a Charm class (a subclass of
+    Hooks are callback methods of a charm class (a subclass of
     :class:`CharmBase`) that are invoked in response to events raised
     by Juju. These callback methods are the means by which a charm
     governs the lifecycle of its application.
@@ -41,6 +41,7 @@ class HookEvent(EventBase):
     related to the charm's lifecycle.
 
     :class:`HookEvent` subtypes are grouped into the following categories
+
     - Core lifecycle events
     - Relation events
     - Storage events
@@ -55,13 +56,13 @@ class ActionEvent(EventBase):
     invokes a Juju Action. Callbacks bound to these events may be used
     for responding to the administrator's Juju Action request.
 
-    To read the parameters for the action, see the instance variable `params`.
-    To respond with the result of the action, call `set_results`. To add progress
-    messages that are visible as the action is progressing use `log`.
+    To read the parameters for the action, see the instance variable :attr:`params`.
+    To respond with the result of the action, call :meth:`set_results`. To add
+    progress messages that are visible as the action is progressing use
+    :meth:`log`.
 
-    Attributes
+    Attributes:
         params: The parameters passed to the action.
-
     """
 
     def defer(self):
@@ -75,7 +76,7 @@ class ActionEvent(EventBase):
     def restore(self, snapshot: dict) -> None:
         """Used by the operator framework to record the action.
 
-        Not meant to be called directly by Charm code.
+        Not meant to be called directly by charm code.
         """
         env_action_name = os.environ.get('JUJU_ACTION_NAME')
         event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
@@ -124,12 +125,11 @@ class InstallEvent(HookEvent):
 class StartEvent(HookEvent):
     """Event triggered immediately after first configuation change.
 
-    This event is triggered immediately after the first :class:
-    `ConfigChangedEvent` event. Callback methods bound to the event
-    should be used to ensure that the charm’s software is in a running
-    state. Note that the charm’s software should be configured so as
-    to persist in this state through reboots without further
-    intervention on Juju’s part.
+    This event is triggered immediately after the first
+    :class:`ConfigChangedEvent`. Callback methods bound to the event should be
+    used to ensure that the charm’s software is in a running state. Note that
+    the charm’s software should be configured so as to persist in this state
+    through reboots without further intervention on Juju’s part.
     """
 
 
@@ -156,14 +156,14 @@ class ConfigChangedEvent(HookEvent):
 
     This event fires in several different situations.
 
-    - immediately after `install` event (:class: `InstallEvent`).
-    - after a relation is created (:class: `RelationCreatedEvent`).
-    - after a leader is elected (:class: `LeaderElectedEvent`).
+    - immediately after the :class:`install <InstallEvent>` event.
+    - after a :class:`relation is created <RelationCreatedEvent>`.
+    - after a :class:`leader is elected <LeaderElectedEvent>`.
     - after changing charm configuration using the GUI or command line
       interface
-    - when the charm starts (:class: `StartEvent`).
-    - when a new unit joins a relation (:class: `RelationJoinedEvent`).
-    - when there is a change to an existing relation (:class: `RelationChangedEvent`).
+    - when the charm :class:`starts <StartEvent>`.
+    - when a new unit :class:`joins a relation <RelationJoinedEvent>`.
+    - when there is a :class:`change to an existing relation <RelationChangedEvent>`.
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
@@ -181,56 +181,53 @@ class UpdateStatusEvent(HookEvent):
     to this event should determine the "health" of the application and
     set the status appropriately.
 
-    The interval between `update-status` events can be configured model-wide, e.g.
-    `juju model-config update-status-hook-interval=1m`.
+    The interval between :class:`update-status <UpdateStatusEvent>` events can
+    be configured model-wide, e.g.  ``juju model-config
+    update-status-hook-interval=1m``.
     """
 
 
 class UpgradeCharmEvent(HookEvent):
     """Event triggered by request to upgrade the charm.
 
-    This event will be triggered when an administrator executes `juju
-    upgrade-charm`. The event fires after Juju has unpacked the
-    upgraded charm code, and so this event will be handled by the
-    callback method bound to the event in the new codebase. The
-    associated callback method is invoked provided there is no
-    existing error state. The callback method should be used to
-    reconcile current state written by older version of the charm into
-    whatever form that is needed by the current charm version.
+    This event will be triggered when an administrator executes ``juju
+    upgrade-charm``. The event fires after Juju has unpacked the upgraded charm
+    code, and so this event will be handled by the callback method bound to the
+    event in the new codebase. The associated callback method is invoked
+    provided there is no existing error state. The callback method should be
+    used to reconcile current state written by an older version of the charm
+    into whatever form that is needed by the current charm version.
     """
 
 
 class PreSeriesUpgradeEvent(HookEvent):
     """Event triggered to prepare a unit for series upgrade.
 
-    This event triggers when an administrator executes `juju
-    upgrade-series MACHINE prepare`. The event will fire for each unit
-    that is running on the specified machine. Any callback method
-    bound to this event must prepare the charm upgrade to the
-    series. This may include things like exporting database content to a
-    version neutral format, or evacuating running instances to other
-    machines.
+    This event triggers when an administrator executes ``juju upgrade-series
+    MACHINE prepare``. The event will fire for each unit that is running on the
+    specified machine. Any callback method bound to this event must prepare the
+    charm for an upgrade to the series. This may include things like exporting
+    database content to a version neutral format, or evacuating running
+    instances to other machines.
 
-    It can be assumed that only after all units on a machine have
-    executed the callback method associated with this event, the
-    administrator will initiate steps to actually upgrade the series.
-    After the upgrade has been completed, the
-    :class:`PostSeriesUpgradeEvent` event will fire.
+    It can be assumed that only after all units on a machine have executed the
+    callback method associated with this event, the administrator will initiate
+    steps to actually upgrade the series.  After the upgrade has been completed,
+    the :class:`PostSeriesUpgradeEvent` will fire.
     """
 
 
 class PostSeriesUpgradeEvent(HookEvent):
     """Event triggered after a series upgrade.
 
-    This event is triggered after the administrator has done a
-    distribution upgrade (or rolled back and kept the same series). It
-    is called in response to `juju upgrade-series MACHINE
-    complete`. Associated charm callback methods are expected to do
-    whatever steps are necessary to reconfigure their applications for
-    the new series. This may include things like populate the upgraded
-    version of a database. Note however charms are expected to check
-    if the series has actually changed or whether it was rolled back
-    to the original series.
+    This event is triggered after the administrator has done a distribution
+    upgrade (or rolled back and kept the same series). It is called in response
+    to ``juju upgrade-series MACHINE complete``. Associated charm callback
+    methods are expected to do whatever steps are necessary to reconfigure their
+    applications for the new series. This may include things like populating the
+    upgraded version of a database. Note however charms are expected to check if
+    the series has actually changed or whether it was rolled back to the
+    original series.
     """
 
 
@@ -241,7 +238,7 @@ class LeaderElectedEvent(HookEvent):
     a given application.
 
     This event fires at least once after Juju selects a leader
-    unit. Callback method bound to this event may take any action
+    unit. Callback methods bound to this event may take any action
     required for the elected unit to assert leadership. Note that only
     the elected leader unit will receive this event.
     """
@@ -262,12 +259,11 @@ class CollectMetricsEvent(HookEvent):
     """Event triggered by Juju to collect metrics.
 
     Juju fires this event every five minutes for the lifetime of the
-    unit. Callback methods bound to this event may use the
-    `add_metric` method of this class to send measurements to Juju.
+    unit. Callback methods bound to this event may use the :meth:`add_metrics`
+    method of this class to send measurements to Juju.
 
     Note that associated callback methods are currently sandboxed in
-    how they can interact with Juju. To report metrics use
-    :meth:`.add_metrics`.
+    how they can interact with Juju.
     """
 
     def add_metrics(self, metrics: typing.Mapping, labels: typing.Mapping = None) -> None:
@@ -293,10 +289,12 @@ class RelationEvent(HookEvent):
     relations with the same name.
 
     Attributes:
-        relation: The Relation involved in this event
-        app: The remote application that has triggered this event
-        unit: The remote unit that has triggered this event. This may be None
-              if the relation event was triggered as an Application level event
+        relation: The :class:`~ops.model.Relation` involved in this event
+        app: The remote :class:`~ops.model.Application` that has triggered this
+             event
+        unit: The remote unit that has triggered this event. This may be
+              ``None`` if the relation event was triggered as an
+              :class:`~ops.model.Application` level event
 
     """
 
@@ -314,7 +312,7 @@ class RelationEvent(HookEvent):
     def snapshot(self) -> dict:
         """Used by the framework to serialize the event to disk.
 
-        Not meant to be called by Charm code.
+        Not meant to be called by charm code.
         """
         snapshot = {
             'relation_name': self.relation.name,
@@ -329,7 +327,7 @@ class RelationEvent(HookEvent):
     def restore(self, snapshot: dict) -> None:
         """Used by the framework to deserialize the event from disk.
 
-        Not meant to be called by Charm code.
+        Not meant to be called by charm code.
         """
         self.relation = self.framework.model.get_relation(
             snapshot['relation_name'], snapshot['relation_id'])
@@ -364,7 +362,7 @@ class RelationJoinedEvent(RelationEvent):
     remote unit is first observed by the unit. Callback methods bound
     to this event may set any local unit settings that can be
     determined using no more than the name of the joining unit and the
-    remote `private-address` setting, which is always available when
+    remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
     """
 
@@ -372,39 +370,36 @@ class RelationJoinedEvent(RelationEvent):
 class RelationChangedEvent(RelationEvent):
     """Event triggered when relation data changes.
 
-    This event is triggered whenever there is a change to the data
-    bucket for a related application or unit. Look at
-    `event.relation.data[event.unit/app]` to see the new information,
-    where `event` is the event object passed to the callback method
-    bound to this event.
+    This event is triggered whenever there is a change to the data bucket for a
+    related application or unit. Look at ``event.relation.data[event.unit/app]``
+    to see the new information, where ``event`` is the event object passed to
+    the callback method bound to this event.
 
-    This event always fires once, after :class: `RelationJoinedEvent`
-    event, and will subsequently be fire whenever that remote unit
-    changes its settings for the relation. Callback methods bound to
-    this event should be the only ones that rely on remote relation
-    settings. They should not error if the settings are incomplete,
-    since it can be guaranteed that when the remote unit or
-    application changes its settings, the event will be fire again.
+    This event always fires once, after :class:`RelationJoinedEvent`, and
+    will subsequently fire whenever that remote unit changes its settings for
+    the relation. Callback methods bound to this event should be the only ones
+    that rely on remote relation settings. They should not error if the settings
+    are incomplete, since it can be guaranteed that when the remote unit or
+    application changes its settings, the event will fire again.
 
-    The settings that be queried, or set, are determined by the
-    relation’s interface.
+    The settings that may be queried, or set, are determined by the relation’s
+    interface.
     """
 
 
 class RelationDepartedEvent(RelationEvent):
     """Event triggered when a unit leaves a relation.
 
-    This is the inverse of the :class: `RelationJoinedEvent`,
-    representing when a unit is leaving the relation (the unit is
-    being removed, the app is being removed, the relation is being
-    removed). It is fired once for each unit that is going away.
+    This is the inverse of the :class:`RelationJoinedEvent`, representing when a
+    unit is leaving the relation (the unit is being removed, the app is being
+    removed, the relation is being removed). It is fired once for each unit that
+    is going away.
 
-    When the remote unit is known to be leaving the relation, this
-    will result in the :class: `RelationChangedEvent` firing at least
-    once, after which the :class: `RelationDepartedEvent` will
-    fire. The :class: `RelationDepartedEvent` will fire once
-    only. Once the :class: `RelationDepartedEvent` has fired no
-    further :class: `RelationChangedEvent` events will fire.
+    When the remote unit is known to be leaving the relation, this will result
+    in the :class:`RelationChangedEvent` firing at least once, after which the
+    :class:`RelationDepartedEvent` will fire. The :class:`RelationDepartedEvent`
+    will fire once only. Once the :class:`RelationDepartedEvent` has fired no
+    further :class:`RelationChangedEvent` will fire.
 
     Callback methods bound to this event may be used to remove all
     references to the departing remote unit, because there’s no
@@ -412,37 +407,34 @@ class RelationDepartedEvent(RelationEvent):
     probable (although not guaranteed) that the system running that
     unit has already shut down.
 
-    Once all callback methods bound to this event have been run for
-    such a relation, the unit agent will fire, the :class:
-    `RelationBrokenEvent` event.
+    Once all callback methods bound to this event have been run for such a
+    relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
 
 
 class RelationBrokenEvent(RelationEvent):
     """Event triggered when a relation is removed.
 
-    If a relation is being removed (`juju remove-relation` or `juju
-    remove-application`), once all the units have been removed, this
-    event will fire to signal that the relationship has been fully
-    terminated.
+    If a relation is being removed (``juju remove-relation`` or ``juju
+    remove-application``), once all the units have been removed, this event will
+    fire to signal that the relationship has been fully terminated.
 
-    The event indicates that the current relation is no longer valid,
-    and that the charm’s software must be configured as though the
-    relation had never existed. It will only be called after every
-    callback method bound to :class: `RelationDepartedEvent` event has
-    been run. If a callback method bound to this event is being
-    executed, it is gauranteed that no remote units are currently
-    known locally.
+    The event indicates that the current relation is no longer valid, and that
+    the charm’s software must be configured as though the relation had never
+    existed. It will only be called after every callback method bound to
+    :class:`RelationDepartedEvent` has been run. If a callback method
+    bound to this event is being executed, it is gauranteed that no remote units
+    are currently known locally.
     """
 
 
 class StorageEvent(HookEvent):
-    """Base class representing Storage related events.
+    """Base class representing storage-related events.
 
     Juju can provide a variety of storage types to a charms. The
     charms can define several different types of storage that are
     allocated from Juju. Changes in state of storage trigger sub-types
-    of :class: `StorageEvent` events.
+    of :class:`StorageEvent`.
     """
 
 
@@ -452,11 +444,11 @@ class StorageAttachedEvent(StorageEvent):
     This event is triggered when new storage is available for the
     charm to use.
 
-    Callback methods bound to this event allows the charm to run code
+    Callback methods bound to this event allow the charm to run code
     when storage has been added. Such methods will be run before the
-    :class: `InstallEvent` fires, so that the installation routine may
+    :class:`InstallEvent` fires, so that the installation routine may
     use the storage. The name prefix of this hook will depend on the
-    storage key defined in the `metadata.yaml` file.
+    storage key defined in the ``metadata.yaml`` file.
     """
 
 
@@ -466,12 +458,12 @@ class StorageDetachingEvent(StorageEvent):
     This event is triggered when storage a charm has been using is
     going away.
 
-    Callback methods bound to this event allows the charm to run code
+    Callback methods bound to this event allow the charm to run code
     before storage is removed. Such methods will be run before storage
-    is detached, and always before the :class: `StopEvent` fires, thereby
+    is detached, and always before the :class:`StopEvent` fires, thereby
     allowing the charm to gracefully release resources before they are
     removed and before the unit terminates. The name prefix of the
-    hook will depend on the storage key defined in the `metadata.yaml`
+    hook will depend on the storage key defined in the ``metadata.yaml``
     file.
     """
 
@@ -479,34 +471,29 @@ class StorageDetachingEvent(StorageEvent):
 class CharmEvents(ObjectEvents):
     """Events generated by Juju pertaining to application lifecycle.
 
-    This class is used to create an event descriptor (`self.on`)
-    attribute for a Charm class that inherits from CharmBase. The
-    event descriptor may be used to setup event handlers for
-    corresponding events.
+    This class is used to create an event descriptor (``self.on``) attribute for
+    a charm class that inherits from :class:`CharmBase`. The event descriptor
+    may be used to set up event handlers for corresponding events.
 
     By default the following events will be provided through
-    CharmBase:
+    :class:`CharmBase`::
 
-    ```
-    self.on.install
-    self.on.start
-    self.on.remove
-    self.on.update_status
-    self.on.config_changed
-    self.on.upgrade_charm
-    self.on.pre_series_upgrade
-    self.on.post_series_upgrade
-    self.on.leader_elected
-    self.on.collect_metrics
-    ```
+        self.on.install
+        self.on.start
+        self.on.remove
+        self.on.update_status
+        self.on.config_changed
+        self.on.upgrade_charm
+        self.on.pre_series_upgrade
+        self.on.post_series_upgrade
+        self.on.leader_elected
+        self.on.collect_metrics
 
-    In addition to these named relation and storage events may also be
-    defined, depending on the charm's metadata (`metadata.yaml`).
-    These named events are created by CharmBase using Charm Metadata.
-    The named events may be accessed as
-    ```
-    self.on[<name>].<relation_or_storage_event>
-    ```
+
+    In addition to these, depending on the charm's metadata (``metadata.yaml``),
+    named relation and storage events may also be defined.  These named events
+    are created by :class:`CharmBase` using charm metadata.  The named events may be
+    accessed as ``self.on[<name>].<relation_or_storage_event>``
     """
 
     install = EventSource(InstallEvent)
@@ -524,13 +511,12 @@ class CharmEvents(ObjectEvents):
 
 
 class CharmBase(Object):
-    """Base class that represents the Charm overall.
+    """Base class that represents the charm overall.
 
-    CharmBase is used to create a charm. This is done by inheriting
-    from CharmBase and customising the sub class as required. So to
-    create your own charm, say "MyCharm" define a charm class and
-    setup the required event handlers (hooks) in its constructor as
-    shown below
+    :class:`CharmBase` is used to create a charm. This is done by inheriting
+    from :class:`CharmBase` and customising the sub class as required. So to
+    create your own charm, say ``MyCharm``, define a charm class and set up the
+    required event handlers (“hooks”) in its constructor::
 
         import logging
 
@@ -547,21 +533,25 @@ class CharmBase(Object):
 
                 self.framework.observe(self.on.config_changed, self._on_config_changed)
                 self.framework.observe(self.on.stop, self._on_stop)
-                ....
+                # ...
 
         if __name__ == "__main__":
             main(MyCharm)
 
     As shown in the example above, a charm class is instantiated by
-    ops.main.main() rather than charm authors directly instantiating a
-    Charm.
+    :func:`~ops.main.main` rather than charm authors directly instantiating a
+    charm.
 
     Args:
         framework: The framework responsible for managing the Model and events for this
-            Charm.
+            charm.
         key: Ignored; will remove after deprecation period of the signature change.
+
     """
 
+    # note that without the #: below, sphinx will copy the whole of CharmEvents
+    # docstring inline which is less than ideal.
+    #: Used to set up event handlers; see :class:`CharmEvents`.
     on = CharmEvents()
 
     def __init__(self, framework: Framework, key: typing.Optional = None):
@@ -596,32 +586,33 @@ class CharmBase(Object):
 
     @property
     def meta(self) -> 'CharmMeta':
-        """CharmMeta of this charm.
-        """
+        """Metadata of this charm."""
         return self.framework.meta
 
     @property
     def charm_dir(self) -> pathlib.Path:
-        """Root directory of the Charm as it is running.
-        """
+        """Root directory of the charm as it is running."""
         return self.framework.charm_dir
 
 
 class CharmMeta:
     """Object containing the metadata for the charm.
 
-    This is read from metadata.yaml and/or actions.yaml. Generally charms will
-    define this information, rather than reading it at runtime. This class is
-    mostly for the framework to understand what the charm has defined.
+    This is read from ``metadata.yaml`` and/or ``actions.yaml``. Generally
+    charms will define this information, rather than reading it at runtime. This
+    class is mostly for the framework to understand what the charm has defined.
 
-    The maintainers, tags, terms, series, and extra_bindings attributes are all
-    lists of strings.  The requires, provides, peers, relations, storage,
-    resources, and payloads attributes are all mappings of names to instances
-    of the respective RelationMeta, StorageMeta, ResourceMeta, or PayloadMeta.
+    The :attr:`maintainers`, :attr:`tags`, :attr:`terms`, :attr:`series`, and
+    :attr:`extra_bindings` attributes are all lists of strings.  The
+    :attr:`requires`, :attr:`provides`, :attr:`peers`, :attr:`relations`,
+    :attr:`storages`, :attr:`resources`, and :attr:`payloads` attributes are all
+    mappings of names to instances of the respective :class:`RelationMeta`,
+    :class:`StorageMeta`, :class:`ResourceMeta`, or :class:`PayloadMeta`.
 
-    The relations attribute is a convenience accessor which includes all of the
-    requires, provides, and peers RelationMeta items.  If needed, the role of
-    the relation definition can be obtained from its role attribute.
+    The :attr:`relations` attribute is a convenience accessor which includes all
+    of the ``requires``, ``provides``, and ``peers`` :class:`RelationMeta`
+    items.  If needed, the role of the relation definition can be obtained from
+    its :attr:`role <RelationMeta.role>` attribute.
 
     Attributes:
         name: The name of this charm
@@ -653,6 +644,7 @@ class CharmMeta:
     Args:
         raw: a mapping containing the contents of metadata.yaml
         actions_raw: a mapping containing the contents of actions.yaml
+
     """
 
     def __init__(self, raw: dict = {}, actions_raw: dict = {}):
@@ -710,6 +702,7 @@ class RelationRole(enum.Enum):
     """An annotation for a charm's role in a relation.
 
     For each relation a charm's role may be
+
     - A Peer
     - A service consumer in the relation ('requires')
     - A service provider in the relation ('provides')
@@ -729,12 +722,12 @@ class RelationRole(enum.Enum):
 class RelationMeta:
     """Object containing metadata about a relation definition.
 
-    Should not be constructed directly by Charm code. Is gotten from one of
+    Should not be constructed directly by charm code. Is gotten from one of
     :attr:`CharmMeta.peers`, :attr:`CharmMeta.requires`, :attr:`CharmMeta.provides`,
     or :attr:`CharmMeta.relations`.
 
     Attributes:
-        role: This is one of peer/requires/provides
+        role: This is :class:`RelationRole`; one of peer/requires/provides
         relation_name: Name of this relation from metadata.yaml
         interface_name: Optional definition of the interface protocol.
         scope: "global" or "container" scope based on how the relation should be used.
@@ -801,7 +794,7 @@ class PayloadMeta:
 
     Attributes:
         payload_name: Name of payload
-        type: Payload Type
+        type: Payload type
     """
 
     def __init__(self, name, raw):
@@ -810,8 +803,7 @@ class PayloadMeta:
 
 
 class ActionMeta:
-    """Object containing metadata about an action's definition.
-    """
+    """Object containing metadata about an action's definition."""
 
     def __init__(self, name, raw=None):
         raw = raw or {}
