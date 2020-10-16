@@ -192,8 +192,7 @@ class _Dispatcher:
             self._init_legacy()
 
     def ensure_event_links(self, charm):
-        """Make sure necessary symlinks are present on disk"""
-
+        """Make sure necessary symlinks are present on disk."""
         if self.is_dispatch_aware:
             # links aren't needed
             return
@@ -215,7 +214,6 @@ class _Dispatcher:
         If there is both a dispatch file and a legacy hook for the
         current event, run the wanted legacy hook.
         """
-
         if not self.is_dispatch_aware:
             # we *are* the legacy hook
             return
@@ -284,7 +282,7 @@ class _Dispatcher:
         self._set_name_from_path(self._dispatch_path)
 
     def is_restricted_context(self):
-        """"Return True if we are running in a restricted Juju context.
+        """Return True if we are running in a restricted Juju context.
 
         When in a restricted context, most commands (relation-get, config-get,
         state-get) are not available. As such, we change how we interact with

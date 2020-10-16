@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Infrastructure for the opslib functionality."""
+
 import logging
 import os
 import re
@@ -45,6 +47,7 @@ def use(name: str, api: int, author: str) -> ModuleType:
         api: the API version of the library.
         author: the author of the library. If not given, requests the
             one in the standard library.
+
     Raises:
         ImportError: if the library cannot be found.
         TypeError: if the name, api, or author are the wrong type.
@@ -160,8 +163,7 @@ def _join_and(keys: List[str]) -> str:
 
 
 class _Missing:
-    """A silly little helper to only work out the difference between
-    what was found and what was needed when logging"""
+    """Helper to get the difference between what was found and what was needed when logging."""
 
     def __init__(self, found):
         self._found = found

@@ -60,7 +60,7 @@ class Model:
 
     @property
     def unit(self) -> 'Unit':
-        """A :class:`Unit` that represents the unit that is running this code (eg yourself)"""
+        """A :class:`Unit` that represents the unit that is running this code (eg yourself)."""
         return self._unit
 
     @property
@@ -70,7 +70,7 @@ class Model:
 
     @property
     def relations(self) -> 'RelationMapping':
-        """Mapping of endpoint to list of :class:`Relation`
+        """Mapping of endpoint to list of :class:`Relation`.
 
         Answers the question "what am I currently related to".
         See also :meth:`.get_relation`.
@@ -93,7 +93,7 @@ class Model:
 
     @property
     def storages(self) -> 'StorageMapping':
-        """Mapping of storage_name to :class:`Storage` as defined in metadata.yaml"""
+        """Mapping of storage_name to :class:`Storage` as defined in metadata.yaml."""
         return self._storages
 
     @property
@@ -138,6 +138,7 @@ class Model:
             relation_name: The name of the endpoint for this charm
             relation_id: An identifier for a specific relation. Used to disambiguate when a
                 given application has more than one relation on a given endpoint.
+
         Raises:
             TooManyRelatedAppsError: is raised if there is more than one relation to the
                 supplied relation_name and no relation_id was supplied
@@ -149,6 +150,7 @@ class Model:
 
         Args:
             binding_key: The relation name or instance to obtain bindings for.
+
         Returns:
             If ``binding_key`` is a relation name, the method returns the default binding
             for that relation. If a relation instance is provided, the method first looks
@@ -315,6 +317,7 @@ class Unit:
         """Return whether this unit is the leader of its application.
 
         This can only be called for your own unit.
+
         Returns:
             True if you are the leader, False otherwise
         Raises:
@@ -868,8 +871,7 @@ class WaitingStatus(StatusBase):
 
 
 class Resources:
-    """Object representing resources for the charm.
-    """
+    """Object representing resources for the charm."""
 
     def __init__(self, names: typing.Iterable[str], backend: '_ModelBackend'):
         self._backend = backend
@@ -951,7 +953,7 @@ class StorageMapping(Mapping):
 
 
 class Storage:
-    """"Represents a storage as defined in metadata.yaml
+    """Represents a storage as defined in metadata.yaml.
 
     Attributes:
         name: Simple string name of the storage
@@ -1178,8 +1180,8 @@ class _ModelBackend:
         """Set a status of a unit or an application.
 
         Args:
-            app: A boolean indicating whether the status should be set for a unit or an
-                application.
+            is_app: A boolean indicating whether the status should be set for a unit or an
+                    application.
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
