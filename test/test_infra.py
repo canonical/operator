@@ -158,7 +158,7 @@ class ImportersTestCase(unittest.TestCase):
 
         environ = os.environ.copy()
         if 'PYTHONPATH' in environ:
-            environ['PYTHONPATH'] += ':' + os.getcwd()
+            environ['PYTHONPATH'] = os.getcwd() + os.pathsep + environ['PYTHONPATH']
         else:
             environ['PYTHONPATH'] = os.getcwd()
         proc = subprocess.run([sys.executable, testfile], env=environ)
