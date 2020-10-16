@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Representations of Juju's model, application, unit, and other entities."""
+
 import datetime
 import decimal
 import ipaddress

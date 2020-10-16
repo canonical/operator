@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""A helper to work with the Juju version."""
+
 import os
 import re
 from functools import total_ordering
