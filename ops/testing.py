@@ -111,7 +111,7 @@ class Harness:
     def begin(self) -> None:
         """Instantiate the Charm and start handling events.
 
-        Before calling :meth:`.begin`(), there is no Charm instance, so changes to the Model won't
+        Before calling :meth:`begin`, there is no Charm instance, so changes to the Model won't
         emit events. You must call :meth:`.begin` before :attr:`.charm` is valid.
         """
         if self._charm is not None:
@@ -360,11 +360,14 @@ class Harness:
                 harness.update_config(unset=['foo', 'bar'])
             # things here will again fire events
         """
-        self.disable_hooks()
-        try:
+        if self._hooks_enabled:
+            self.disable_hooks()
+            try:
+                yield None
+            finally:
+                self.enable_hooks()
+        else:
             yield None
-        finally:
-            self.enable_hooks()
 
     def _next_relation_id(self):
         rel_id = self._relation_id_counter

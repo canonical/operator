@@ -562,6 +562,32 @@ class TestHarness(unittest.TestCase):
             harness.charm.get_changes(reset=True),
             [{'name': 'config-changed', 'data': {'value': 'fourth', 'third': '3'}}])
 
+    def test_hooks_disabled_nested_contextmanager(self):
+        harness = Harness(RecordingCharm, meta='''
+            name: test-charm
+        ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        # Context manager can be nested, so a test using it can invoke a helper using it.
+        with harness.hooks_disabled():
+            with harness.hooks_disabled():
+                harness.update_config({'fifth': '5'})
+            harness.update_config({'sixth': '6'})
+        self.assertEqual(harness.charm.get_changes(reset=True), [])
+
+    def test_hooks_disabled_noop(self):
+        harness = Harness(RecordingCharm, meta='''
+            name: test-charm
+        ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        # If hooks are already disabled, it is a no op, and on exit hooks remain disabled.
+        harness.disable_hooks()
+        with harness.hooks_disabled():
+            harness.update_config({'seventh': '7'})
+        harness.update_config({'eighth': '8'})
+        self.assertEqual(harness.charm.get_changes(reset=True), [])
+
     def test_metadata_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(tmp))

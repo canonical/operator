@@ -615,7 +615,7 @@ class Relation:
     """Represents an established relation between this application and another application.
 
     This class should not be instantiated directly, instead use :meth:`Model.get_relation`
-    or :attr:`RelationEvent.relation`.
+    or :attr:`ops.charm.RelationEvent.relation`.
 
     Attributes:
         name: The name of the local endpoint of the relation (eg 'db')
