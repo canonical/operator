@@ -89,6 +89,7 @@ class SQLiteStorage:
 
         Args:
             handle_path: The string identifying the snapshot.
+
         Raises:
             NoSnapshotError: if there is no snapshot for the given handle_path.
         """
@@ -118,7 +119,7 @@ class SQLiteStorage:
                 yield row[0]
 
     def save_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
-        """Part of the Storage API, record an notice (event and observer)"""
+        """Part of the Storage API, record an notice (event and observer)."""
         self._db.execute('INSERT INTO notice VALUES (NULL, ?, ?, ?)',
                          (event_path, observer_path, method_name))
 
@@ -138,6 +139,7 @@ class SQLiteStorage:
         Args:
             event_path: If supplied, will only yield events that match event_path. If not
                 supplied (or None/'') will return all events.
+
         Returns:
             Iterable of (event_path, observer_path, method_name) tuples
         """
@@ -163,7 +165,7 @@ class SQLiteStorage:
 
 
 class JujuStorage:
-    """"Storing the content tracked by the Framework in Juju.
+    """Storing the content tracked by the Framework in Juju.
 
     This uses :class:`_JujuStorageBackend` to interact with state-get/state-set
     as the way to store state for the framework and for components.
@@ -244,7 +246,7 @@ _SimpleLoader.add_constructor(
 
 
 class _SimpleDumper(getattr(yaml, 'CSafeDumper', yaml.SafeDumper)):
-    """Add types supported by 'marshal'
+    """Add types supported by 'marshal'.
 
     YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So
     we want to only support dumping out types that are safe to load.
@@ -270,6 +272,7 @@ class _JujuStorageBackend:
         Args:
             key: The string key that will be used to find the value later
             value: Arbitrary content that will be returned by get().
+
         Raises:
             CalledProcessError: if 'state-set' returns an error code.
         """

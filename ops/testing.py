@@ -111,7 +111,7 @@ class Harness:
     def begin(self) -> None:
         """Instantiate the Charm and start handling events.
 
-        Before calling :meth:`.begin`(), there is no Charm instance, so changes to the Model won't
+        Before calling :meth:`begin`, there is no Charm instance, so changes to the Model won't
         emit events. You must call :meth:`.begin` before :attr:`.charm` is valid.
         """
         if self._charm is not None:
@@ -254,7 +254,7 @@ class Harness:
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
 
     def _load_config_defaults(self, charm_config):
-        """Load default values from config.yaml
+        """Load default values from config.yaml.
 
         Handle the case where a user doesn't supply explicit config snippets.
         """
@@ -309,7 +309,7 @@ class Harness:
 
         Args:
             resource_name: The name of the resource being added
-            contents: Either string or bytes content, which will be the content of the filename
+            content: Either string or bytes content, which will be the content of the filename
                 returned by resource-get. If contents is a string, it will be encoded in utf-8
         """
         if resource_name not in self._meta.resources.keys():
@@ -360,11 +360,14 @@ class Harness:
                 harness.update_config(unset=['foo', 'bar'])
             # things here will again fire events
         """
-        self.disable_hooks()
-        try:
+        if self._hooks_enabled:
+            self.disable_hooks()
+            try:
+                yield None
+            finally:
+                self.enable_hooks()
+        else:
             yield None
-        finally:
-            self.enable_hooks()
 
     def _next_relation_id(self):
         rel_id = self._relation_id_counter
@@ -429,6 +432,7 @@ class Harness:
         Args:
             relation_id: The integer relation identifier (as returned by add_relation).
             remote_unit_name: A string representing the remote unit that is being added.
+
         Return:
             None
         """
@@ -464,6 +468,7 @@ class Harness:
             app_or_unit: The name of the application or unit whose data we want to read
         Return:
             a dict containing the relation data for `app_or_unit` or None.
+
         Raises:
             KeyError: if relation_id doesn't exist
         """
@@ -631,6 +636,7 @@ class Harness:
         Args:
             reset: If True, reset the calls list back to empty, if false, the call list is
                 preserved.
+
         Return:
             ``[(call1, args...), (call2, args...)]``
         """

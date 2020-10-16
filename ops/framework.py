@@ -337,8 +337,7 @@ class ObjectEvents(Object):
         setattr(cls, event_kind, event_descriptor)
 
     def events(self):
-        """Return a mapping of event_kinds to bound_events for all available events.
-        """
+        """Return a mapping of event_kinds to bound_events for all available events."""
         events_map = {}
         # We have to iterate over the class rather than instance to allow for properties which
         # might call this method (e.g., event views), leading to infinite recursion.
@@ -536,12 +535,12 @@ class Framework(Object):
         """Register observer to be called when bound_event is emitted.
 
         The bound_event is generally provided as an attribute of the object that emits
-        the event, and is created in this style:
+        the event, and is created in this style::
 
             class SomeObject:
                 something_happened = Event(SomethingHappened)
 
-        That event may be observed as:
+        That event may be observed as::
 
             framework.observe(someobj.something_happened, self._on_something_happened)
 
@@ -605,7 +604,6 @@ class Framework(Object):
 
     def _emit(self, event):
         """See BoundEvent.emit for the public way to call this."""
-
         saved = False
         event_path = event.handle.path
         event_kind = event.handle.kind
@@ -814,7 +812,7 @@ class BoundStoredState:
         self._data[key] = _unwrap_stored(self._data, value)
 
     def set_default(self, **kwargs):
-        """"Set the value of any given key if it has not already been set"""
+        """Set the value of any given key if it has not already been set."""
         for k, v in kwargs.items():
             if k not in self._data:
                 self._data[k] = v
