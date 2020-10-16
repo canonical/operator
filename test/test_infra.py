@@ -177,7 +177,10 @@ class ImportersTestCase(unittest.TestCase):
         with open(fd, 'wt', encoding='utf8') as fh:
             fh.write(self.template.format(module_name=name))
 
-        proc = subprocess.run(
-            [sys.executable, testfile],
-            env={'PYTHONPATH': os.getcwd(), **os.environ})
+        environ = os.environ.copy()
+        if 'PYTHONPATH' in environ:
+            environ['PYTHONPATH'] = os.getcwd() + os.pathsep + environ['PYTHONPATH']
+        else:
+            environ['PYTHONPATH'] = os.getcwd()
+        proc = subprocess.run([sys.executable, testfile], env=environ)
         self.assertEqual(proc.returncode, 0)
