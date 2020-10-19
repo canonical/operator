@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Infrastructure to build unittests for Charms using the Operator Framework."""
+
 import inspect
 import pathlib
 import random

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Base objects for the Charm, events and metadata."""
+
 import enum
 import os
 import pathlib
@@ -245,7 +247,7 @@ class LeaderElectedEvent(HookEvent):
 
 
 class LeaderSettingsChangedEvent(HookEvent):
-    """Event triggered when leader changes any settings
+    """Event triggered when leader changes any settings.
 
     DEPRECATED NOTICE
 
