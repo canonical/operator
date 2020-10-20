@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Structures to offer storage to the charm (through Juju or locally)."""
+
 from datetime import timedelta
 import pickle
 import shutil
@@ -30,6 +32,7 @@ def _run(args, **kw):
 
 
 class SQLiteStorage:
+    """Storage using SQLite backend."""
 
     DB_LOCK_TIMEOUT = timedelta(hours=1)
 
@@ -42,6 +45,7 @@ class SQLiteStorage:
         self._setup()
 
     def _setup(self):
+        """Make the database ready to be used as storage."""
         # Make sure that the database is locked until the connection is closed,
         # not until the transaction ends.
         self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
@@ -61,9 +65,11 @@ class SQLiteStorage:
             self._db.commit()
 
     def close(self):
+        """Part of the Storage API, close the storage backend."""
         self._db.close()
 
     def commit(self):
+        """Part of the Storage API, commit latest changes in the storage backend."""
         self._db.commit()
 
     # There's commit but no rollback. For abort to be supported, we'll need logic that
@@ -179,15 +185,36 @@ class JujuStorage:
             self._backend = _JujuStorageBackend()
 
     def close(self):
-        return
+        """Part of the Storage API, close the storage backend.
+
+        Nothing to be done for Juju backend, as it's transactional.
+        """
 
     def commit(self):
-        return
+        """Part of the Storage API, commit latest changes in the storage backend.
+
+        Nothing to be done for Juju backend, as it's transactional.
+        """
 
     def save_snapshot(self, handle_path: str, snapshot_data: typing.Any) -> None:
+        """Part of the Storage API, persist a snapshot data under the given handle.
+
+        Args:
+            handle_path: The string identifying the snapshot.
+            snapshot_data: The data to be persisted. (as returned by Object.snapshot()). This
+                might be a dict/tuple/int, but must only contain 'simple' python types.
+        """
         self._backend.set(handle_path, snapshot_data)
 
     def load_snapshot(self, handle_path):
+        """Part of the Storage API, retrieve a snapshot that was previously saved.
+
+        Args:
+            handle_path: The string identifying the snapshot.
+
+        Raises:
+            NoSnapshotError: if there is no snapshot for the given handle_path.
+        """
         try:
             content = self._backend.get(handle_path)
         except KeyError:
@@ -195,19 +222,34 @@ class JujuStorage:
         return content
 
     def drop_snapshot(self, handle_path):
+        """Part of the Storage API, remove a snapshot that was previously saved.
+
+        Dropping a snapshot that doesn't exist is treated as a no-op.
+        """
         self._backend.delete(handle_path)
 
     def save_notice(self, event_path: str, observer_path: str, method_name: str):
+        """Part of the Storage API, record an notice (event and observer)."""
         notice_list = self._load_notice_list()
         notice_list.append([event_path, observer_path, method_name])
         self._save_notice_list(notice_list)
 
     def drop_notice(self, event_path: str, observer_path: str, method_name: str):
+        """Part of the Storage API, remove a notice that was previously recorded."""
         notice_list = self._load_notice_list()
         notice_list.remove([event_path, observer_path, method_name])
         self._save_notice_list(notice_list)
 
     def notices(self, event_path: str):
+        """Part of the Storage API, return all notices that begin with event_path.
+
+        Args:
+            event_path: If supplied, will only yield events that match event_path. If not
+                supplied (or None/'') will return all events.
+
+        Returns:
+            Iterable of (event_path, observer_path, method_name) tuples
+        """
         notice_list = self._load_notice_list()
         for row in notice_list:
             if row[0] != event_path:
@@ -215,6 +257,11 @@ class JujuStorage:
             yield tuple(row)
 
     def _load_notice_list(self) -> typing.List[typing.Tuple[str]]:
+        """Load a notice list from current key.
+
+        Returns:
+            List of (event_path, observer_path, method_name) tuples; empty if no key or is None.
+        """
         try:
             notice_list = self._backend.get(self.NOTICE_KEY)
         except KeyError:
@@ -224,6 +271,11 @@ class JujuStorage:
         return notice_list
 
     def _save_notice_list(self, notices: typing.List[typing.Tuple[str]]) -> None:
+        """Save a notice list under current key.
+
+        Args:
+            List of (event_path, observer_path, method_name) tuples.
+        """
         self._backend.set(self.NOTICE_KEY, notices)
 
 
@@ -313,6 +365,7 @@ class _JujuStorageBackend:
 
 
 class NoSnapshotError(Exception):
+    """Exception to flag that there is no snapshot for the given handle_path."""
 
     def __init__(self, handle_path):
         self.handle_path = handle_path
