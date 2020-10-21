@@ -26,6 +26,7 @@ class JujuLogHandler(logging.Handler):
         self.model_backend = model_backend
 
     def emit(self, record):
+        """Send the specified logging record to the Juju backend."""
         self.model_backend.juju_log(record.levelname, self.format(record))
 
 
