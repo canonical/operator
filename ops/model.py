@@ -707,6 +707,7 @@ class RelationData(Mapping):
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
 class RelationDataContent(LazyMapping, MutableMapping):
+    """Data content of a unit or application in a relation."""
 
     def __init__(self, relation, entity, backend):
         self.relation = relation
@@ -715,6 +716,7 @@ class RelationDataContent(LazyMapping, MutableMapping):
         self._is_app = isinstance(entity, Application)
 
     def _load(self):
+        """Load the data from the current entity / relation."""
         try:
             return self._backend.relation_get(self.relation.id, self._entity.name, self._is_app)
         except RelationNotFoundError:
@@ -722,6 +724,7 @@ class RelationDataContent(LazyMapping, MutableMapping):
             return {}
 
     def _is_mutable(self):
+        """Return if the data content can be modified."""
         if self._is_app:
             is_our_app = self._backend.app_name == self._entity.name
             if not is_our_app:
@@ -760,6 +763,7 @@ class RelationDataContent(LazyMapping, MutableMapping):
 
 
 class ConfigData(LazyMapping):
+    """Configuration data."""
 
     def __init__(self, backend):
         self._backend = backend
@@ -796,6 +800,7 @@ class StatusBase:
 
     @classmethod
     def from_name(cls, name: str, message: str):
+        """Get the specific Status for the name (or UnknownStatus if not registered)."""
         if name == 'unknown':
             # unknown is special
             return UnknownStatus()
@@ -804,6 +809,7 @@ class StatusBase:
 
     @classmethod
     def register(cls, child):
+        """Register a Status for the child's name."""
         if child.name is None:
             raise AttributeError('cannot register a Status which has no name')
         cls._statuses[child.name] = child
@@ -970,6 +976,7 @@ class Storage:
 
     @property
     def location(self):
+        """Return the location of the storage."""
         if self._location is None:
             raw = self._backend.storage_get('{}/{}'.format(self.name, self.id), "location")
             self._location = Path(raw)
@@ -1182,6 +1189,8 @@ class _ModelBackend:
         """Set a status of a unit or an application.
 
         Args:
+            status: The status to set.
+            message: The message to set in the status.
             is_app: A boolean indicating whether the status should be set for a unit or an
                     application.
         """
