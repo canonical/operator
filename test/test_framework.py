@@ -528,6 +528,8 @@ class TestFramework(BaseTestCase):
         pub.on.foo.emit()
 
         self.assertEqual(obs.seen, ["on_foo:foo"])
+        fqn = pub.on.__class__.__module__ + "." + pub.on.__class__.__qualname__
+        self.assertEqual(repr(pub.on), "<{}: bar, foo>".format(fqn))
 
     def test_conflicting_event_attributes(self):
         class MyEvent(EventBase):

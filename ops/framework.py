@@ -338,22 +338,29 @@ class ObjectEvents(Object):
         event_descriptor._set_name(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
 
-    def events(self):
-        """Return a mapping of event_kinds to bound_events for all available events."""
-        events_map = {}
+    def _event_kinds(self):
+        event_kinds = list()
         # We have to iterate over the class rather than instance to allow for properties which
         # might call this method (e.g., event views), leading to infinite recursion.
         for attr_name, attr_value in inspect.getmembers(type(self)):
             if isinstance(attr_value, EventSource):
                 # We actually care about the bound_event, however, since it
                 # provides the most info for users of this method.
-                event_kind = attr_name
-                bound_event = getattr(self, event_kind)
-                events_map[event_kind] = bound_event
-        return events_map
+                event_kinds.append(attr_name)
+        return event_kinds
+
+    def events(self):
+        """Return a mapping of event_kinds to bound_events for all available events."""
+        return {event_kind: getattr(self, event_kind) for event_kind in self._event_kinds()}
 
     def __getitem__(self, key):
         return PrefixedEvents(self, key)
+
+    def __repr__(self):
+        k = type(self)
+        return '<{}.{}: {}>'.format(
+            k.__module__, k.__qualname__,
+            ', '.join(sorted(self._event_kinds())))
 
 
 class PrefixedEvents:

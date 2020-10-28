@@ -147,6 +147,8 @@ peers:
 
         charm = MyCharm(self.create_framework())
 
+        self.assertIn('pro_2_relation_broken', repr(charm.on))
+
         rel = charm.framework.model.get_relation('req1', 1)
         unit = charm.framework.model.get_unit('remote/0')
         charm.on['req1'].relation_joined.emit(rel, unit)
