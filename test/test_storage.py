@@ -169,6 +169,22 @@ class StoragePermutations(abc.ABC):
             list(store.notices('event')),
             [('event', 'observer', 'method')])
 
+    def test_all_notices(self):
+        notices = [('e1', 'o1', 'm1'), ('e1', 'o2', 'm2'), ('e2', 'o3', 'm3')]
+        store = self.create_storage()
+        for notice in notices:
+            store.save_notice(*notice)
+
+        for arg, expected in [
+                ('e1', notices[:2]),
+                ('e2', notices[2:]),
+                (None, notices),
+                ('', notices),
+                ]:
+            with self.subTest(arg):
+                self.assertEqual(list(store.notices(arg)), expected)
+        self.assertEqual(list(store.notices()), expected)
+
     def test_load_notices(self):
         store = self.create_storage()
         self.assertEqual(list(store.notices('path')), [])
