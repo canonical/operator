@@ -175,15 +175,18 @@ class StoragePermutations(abc.ABC):
         for notice in notices:
             store.save_notice(*notice)
 
-        for arg, expected in [
-                ('e1', notices[:2]),
-                ('e2', notices[2:]),
-                (None, notices),
-                ('', notices),
-                ]:
-            with self.subTest(arg):
-                self.assertEqual(list(store.notices(arg)), expected)
-        self.assertEqual(list(store.notices()), expected)
+        # passing in the arg, you get the ones that match
+        self.assertEqual(list(store.notices('e1')), notices[:2])
+        self.assertEqual(list(store.notices('e2')), notices[2:])
+        # the match is exact
+        self.assertEqual(list(store.notices('e%')), [])
+        self.assertEqual(list(store.notices('e*')), [])
+        self.assertEqual(list(store.notices('e.')), [])
+        self.assertEqual(list(store.notices('e')), [])
+        # no arg, or non-arg, means all
+        self.assertEqual(list(store.notices()), notices)
+        self.assertEqual(list(store.notices(None)), notices)
+        self.assertEqual(list(store.notices('')), notices)
 
     def test_load_notices(self):
         store = self.create_storage()
