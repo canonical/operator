@@ -1485,6 +1485,18 @@ class BreakpointTests(BaseTestCase):
         logassert.setup(self, 'ops')
 
     def test_ignored(self, fake_stderr):
+        # 3.5 doesn't have sys.breakpointhook so a bit of wrangling is needed
+        missing = object()
+        old_breakpointhook = getattr(sys, 'breakpointhook', missing)
+
+        def _cleanup():
+            if old_breakpointhook is missing:
+                if hasattr(sys, 'breakpointhook'):
+                    del sys.breakpointhook
+            else:
+                sys.breakpointhook = old_breakpointhook
+        self.addCleanup(_cleanup)
+
         # It doesn't do anything really unless proper environment is there.
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
@@ -1492,9 +1504,11 @@ class BreakpointTests(BaseTestCase):
 
         with patch('pdb.Pdb.set_trace') as mock:
             framework.breakpoint()
+
         self.assertEqual(mock.call_count, 0)
         self.assertEqual(fake_stderr.getvalue(), "")
         self.assertNotLoggedWarning("Breakpoint", "skipped")
+        self.assertIs(getattr(sys, 'breakpointhook', missing), old_breakpointhook)
 
     def test_pdb_properly_called(self, fake_stderr):
         # The debugger needs to leave the user in the frame where the breakpoint is executed,

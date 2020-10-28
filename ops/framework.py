@@ -438,16 +438,19 @@ class Framework(Object):
             self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
 
-        # Hook into builtin breakpoint, so if Python >= 3.7, devs will be able to just do
-        # breakpoint(); if Python < 3.7, this doesn't affect anything
-        sys.breakpointhook = self.breakpoint
+        # Parse once the env var, which may be used multiple times later
+        debug_at = os.environ.get('JUJU_DEBUG_AT')
+        if debug_at:
+            self._juju_debug_at = debug_at.split(',')
+
+            # Hook into builtin breakpoint, so if Python >= 3.7, devs will be able to just do
+            # breakpoint(); if Python < 3.7, this doesn't affect anything
+            sys.breakpointhook = self.breakpoint
+        else:
+            self._juju_debug_at = ()
 
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
         self._breakpoint_welcomed = False
-
-        # Parse once the env var, which may be used multiple times later
-        debug_at = os.environ.get('JUJU_DEBUG_AT')
-        self._juju_debug_at = debug_at.split(',') if debug_at else ()
 
     def close(self):
         self._storage.close()
