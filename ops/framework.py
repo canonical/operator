@@ -208,6 +208,7 @@ class EventSource:
 
 
 class BoundEvent:
+    """Event bound to an Object."""
 
     def __repr__(self):
         return '<BoundEvent {} bound to {}.{} at {}>'.format(
@@ -374,6 +375,7 @@ class ObjectEvents(Object):
 
 
 class PrefixedEvents:
+    """Events to be found in all events using a specific prefix."""
 
     def __init__(self, emitter, key):
         self._emitter = emitter
@@ -384,19 +386,21 @@ class PrefixedEvents:
 
 
 class PreCommitEvent(EventBase):
-    pass
+    """Events that will be emited first on commit."""
 
 
 class CommitEvent(EventBase):
-    pass
+    """Events that will be emited second on commit."""
 
 
 class FrameworkEvents(ObjectEvents):
+    """Manager of all framework events."""
     pre_commit = EventSource(PreCommitEvent)
     commit = EventSource(CommitEvent)
 
 
 class NoTypeError(Exception):
+    """No class to hold it was found when restoring an event."""
 
     def __init__(self, handle_path):
         self.handle_path = handle_path
@@ -419,6 +423,7 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 
 
 class Framework(Object):
+    """Main interface to from the Charm to the Operator Framework internals."""
 
     on = FrameworkEvents()
 
@@ -467,6 +472,7 @@ class Framework(Object):
         self._juju_debug_at = debug_at.split(',') if debug_at else ()
 
     def close(self):
+        """Close the underlying backends."""
         self._storage.close()
 
     def _track(self, obj):
@@ -484,6 +490,7 @@ class Framework(Object):
         self._objects.pop(obj.handle.path, None)
 
     def commit(self):
+        """Save changes to the underlying backends."""
         # Give a chance for objects to persist data they want to before a commit is made.
         self.on.pre_commit.emit()
         # Make sure snapshots are saved by instances of StoredStateData. Any possible state
@@ -494,6 +501,7 @@ class Framework(Object):
         self._storage.commit()
 
     def register_type(self, cls, parent, kind=None):
+        """Register a type to a handle."""
         if parent and not isinstance(parent, Handle):
             parent = parent.handle
         if parent:
@@ -533,6 +541,7 @@ class Framework(Object):
         self._storage.save_snapshot(value.handle.path, data)
 
     def load_snapshot(self, handle):
+        """Load a persistent snapshot."""
         parent_path = None
         if handle.parent:
             parent_path = handle.parent.path
@@ -548,6 +557,7 @@ class Framework(Object):
         return obj
 
     def drop_snapshot(self, handle):
+        """Discard a persistent snapshot."""
         self._storage.drop_snapshot(handle.path)
 
     def observe(self, bound_event: BoundEvent, observer: types.MethodType):
@@ -763,6 +773,7 @@ class Framework(Object):
 
 
 class StoredStateData(Object):
+    """Manager of the stored data."""
 
     def __init__(self, parent, attr_name):
         super().__init__(parent, attr_name)
@@ -780,19 +791,23 @@ class StoredStateData(Object):
         return key in self._cache
 
     def snapshot(self):
+        """Return the current state."""
         return self._cache
 
     def restore(self, snapshot):
+        """Restore current state to the given snapshot."""
         self._cache = snapshot
         self.dirty = False
 
     def on_commit(self, event):
+        """Save changes to the storage backend."""
         if self.dirty:
             self.framework.save_snapshot(self)
             self.dirty = False
 
 
 class BoundStoredState:
+    """Stored state data bound to a specific Object."""
 
     def __init__(self, parent, attr_name):
         parent.framework.register_type(StoredStateData, parent)
@@ -931,6 +946,7 @@ def _unwrap_stored(parent_data, value):
 
 
 class StoredDict(collections.abc.MutableMapping):
+    """A dict-like object that uses the StoredState as backend."""
 
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
@@ -963,6 +979,7 @@ class StoredDict(collections.abc.MutableMapping):
 
 
 class StoredList(collections.abc.MutableSequence):
+    """A list-like object that uses the StoredState as backend."""
 
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
@@ -983,10 +1000,12 @@ class StoredList(collections.abc.MutableSequence):
         return len(self._under)
 
     def insert(self, index, value):
+        """Insert value before index."""
         self._under.insert(index, value)
         self._stored_data.dirty = True
 
     def append(self, value):
+        """Append value to the end of the list."""
         self._under.append(value)
         self._stored_data.dirty = True
 
@@ -1032,16 +1051,25 @@ class StoredList(collections.abc.MutableSequence):
 
 
 class StoredSet(collections.abc.MutableSet):
+    """A set-like object that uses the StoredState as backend."""
 
     def __init__(self, stored_data, under):
         self._stored_data = stored_data
         self._under = under
 
     def add(self, key):
+        """Add a key to a set.
+
+        This has no effect if the key is already present.
+        """
         self._under.add(key)
         self._stored_data.dirty = True
 
     def discard(self, key):
+        """Remove a key from a set if it is a member.
+
+        If the key is not a member, do nothing.
+        """
         self._under.discard(key)
         self._stored_data.dirty = True
 
