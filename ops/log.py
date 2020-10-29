@@ -26,7 +26,11 @@ class JujuLogHandler(logging.Handler):
         self.model_backend = model_backend
 
     def emit(self, record):
-        """Send the specified logging record to the Juju backend."""
+        """Send the specified logging record to the Juju backend.
+
+        This method is not used directly by the Operator Framework code, but by
+        :class:`logging.Handler` itself as part of the logging machinery.
+        """
         self.model_backend.juju_log(record.levelname, self.format(record))
 
 
