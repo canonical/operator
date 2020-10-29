@@ -339,7 +339,7 @@ class ObjectEvents(Object):
         setattr(cls, event_kind, event_descriptor)
 
     def _event_kinds(self):
-        event_kinds = list()
+        event_kinds = []
         # We have to iterate over the class rather than instance to allow for properties which
         # might call this method (e.g., event views), leading to infinite recursion.
         for attr_name, attr_value in inspect.getmembers(type(self)):
@@ -358,9 +358,8 @@ class ObjectEvents(Object):
 
     def __repr__(self):
         k = type(self)
-        return '<{}.{}: {}>'.format(
-            k.__module__, k.__qualname__,
-            ', '.join(sorted(self._event_kinds())))
+        event_kinds = ', '.join(sorted(self._event_kinds()))
+        return '<{}.{}: {}>'.format(k.__module__, k.__qualname__, event_kinds)
 
 
 class PrefixedEvents:
