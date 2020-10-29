@@ -21,6 +21,12 @@ from functools import total_ordering
 
 @total_ordering
 class JujuVersion:
+    """Helper to work with the Juju version.
+
+    It knows how to parse the ``JUJU_VERSION`` environment variable, and exposes different
+    capabilities according to the specific version, allowing also to compare with other
+    versions.
+    """
 
     PATTERN = r'''^
     (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there

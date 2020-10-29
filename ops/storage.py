@@ -274,7 +274,7 @@ class JujuStorage:
         """Save a notice list under current key.
 
         Args:
-            List of (event_path, observer_path, method_name) tuples.
+            notices: List of (event_path, observer_path, method_name) tuples.
         """
         self._backend.set(self.NOTICE_KEY, notices)
 
