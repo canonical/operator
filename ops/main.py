@@ -375,6 +375,7 @@ def main(charm_class: ops.charm.CharmBase, use_juju_for_storage: bool = None):
     else:
         store = ops.storage.SQLiteStorage(charm_state_path)
     framework = ops.framework.Framework(store, charm_dir, meta, model)
+    framework.set_breakpointhook()
     try:
         sig = inspect.signature(charm_class)
         try:

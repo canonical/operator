@@ -21,6 +21,7 @@ import re
 import shutil
 import sys
 import tempfile
+import unittest
 from unittest.mock import patch
 from pathlib import Path
 
@@ -1530,15 +1531,45 @@ class BreakpointTests(BaseTestCase):
             framework.breakpoint()
             self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
+    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
+    def test_breakpoint_builtin_sanity(self, fake_stderr):
+        # this just checks that calling breakpoint() works as expected
+        # nothing really framework-dependent
+        with patch.dict(os.environ):
+            os.environ.pop('JUJU_DEBUG_AT', None)
+            self.create_framework()
+
+        with patch('pdb.Pdb.set_trace') as mock:
+            this_frame = inspect.currentframe()
+            breakpoint()
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertEqual(mock.call_args, ((this_frame,), {}))
+
+    @unittest.skipIf(sys.version_info < (3, 7), "no sys.breakpointhook for Python < 3.7")
     def test_builtin_breakpoint_hooked(self, fake_stderr):
         # Verify that the proper hook is set.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            self.create_framework()  # creating the framework setups the hook
+            framework = self.create_framework()
+        old_breakpointhook = framework.set_breakpointhook()
+        self.addCleanup(setattr, sys, 'breakpointhook', old_breakpointhook)
         with patch('pdb.Pdb.set_trace') as mock:
-            # Calling through sys, not breakpoint() directly, so we can run the
-            # tests with Py < 3.7.
-            sys.breakpointhook()
+            breakpoint()
         self.assertEqual(mock.call_count, 1)
+
+    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
+    def test_breakpoint_builtin_unset(self, fake_stderr):
+        # if no JUJU_DEBUG_AT, no call to pdb is done
+        with patch.dict(os.environ):
+            os.environ.pop('JUJU_DEBUG_AT', None)
+            framework = self.create_framework()
+        old_breakpointhook = framework.set_breakpointhook()
+        self.addCleanup(setattr, sys, 'breakpointhook', old_breakpointhook)
+
+        with patch('pdb.Pdb.set_trace') as mock:
+            breakpoint()
+
+        self.assertEqual(mock.call_count, 0)
 
     def test_breakpoint_names(self, fake_stderr):
         framework = self.create_framework()
