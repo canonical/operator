@@ -138,7 +138,7 @@ class SQLiteStorage:
                AND method_name=?
             ''', (event_path, observer_path, method_name))
 
-    def notices(self, event_path: typing.Optional[str]) ->\
+    def notices(self, event_path: str = None) ->\
             typing.Generator[typing.Tuple[str, str, str], None, None]:
         """Part of the Storage API, return all notices that begin with event_path.
 
@@ -240,7 +240,7 @@ class JujuStorage:
         notice_list.remove([event_path, observer_path, method_name])
         self._save_notice_list(notice_list)
 
-    def notices(self, event_path: str):
+    def notices(self, event_path: str = None):
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -252,7 +252,7 @@ class JujuStorage:
         """
         notice_list = self._load_notice_list()
         for row in notice_list:
-            if row[0] != event_path:
+            if event_path and row[0] != event_path:
                 continue
             yield tuple(row)
 
