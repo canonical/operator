@@ -763,7 +763,10 @@ class RelationDataContent(LazyMapping, MutableMapping):
 
 
 class ConfigData(LazyMapping):
-    """Configuration data."""
+    """Configuration data.
+
+    This class should not be created directly. It should be accessed via :attr:`Model.config`.
+    """
 
     def __init__(self, backend):
         self._backend = backend
@@ -786,6 +789,7 @@ class StatusBase:
         self.message = message
 
     def __new__(cls, *args, **kwargs):
+        """Forbid the usage of StatusBase directly."""
         if cls is StatusBase:
             raise TypeError("cannot instantiate a base class")
         return super().__new__(cls)

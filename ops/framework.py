@@ -69,6 +69,7 @@ class Handle:
                 self._path = "{}".format(kind)
 
     def nest(self, kind, key):
+        """Create a new handle as child of the current one."""
         return Handle(self, kind, key)
 
     def __hash__(self):
@@ -82,22 +83,27 @@ class Handle:
 
     @property
     def parent(self):
+        """Return own parent handle."""
         return self._parent
 
     @property
     def kind(self):
+        """Return the handle's kind."""
         return self._kind
 
     @property
     def key(self):
+        """Return the handle's key."""
         return self._key
 
     @property
     def path(self):
+        """Return the handle's path."""
         return self._path
 
     @classmethod
     def from_path(cls, path):
+        """Build a handle from the indicated path."""
         handle = None
         for pair in path.split("/"):
             pair = pair.split("[")
@@ -117,6 +123,10 @@ class Handle:
 
 
 class EventBase:
+    """The base for all the different Events.
+
+    Inherit this and override 'snapshot' and 'restore' methods to build a custom event.
+    """
 
     def __init__(self, handle):
         self.handle = handle
@@ -126,6 +136,11 @@ class EventBase:
         return "<%s via %s>" % (self.__class__.__name__, self.handle)
 
     def defer(self):
+        """Defer the event to the future.
+
+        After being deferred, this event will be re-emited the next time there's
+        any other event for the charm.
+        """
         logger.debug("Deferring %s.", self)
         self.deferred = True
 
@@ -265,6 +280,7 @@ class _Metaclass(type):
 
 
 class Object(metaclass=_Metaclass):
+    """Base class of all the charm-related objects."""
 
     handle_kind = HandleKind()
 
@@ -285,6 +301,7 @@ class Object(metaclass=_Metaclass):
 
     @property
     def model(self):
+        """Shortcut for more simple access the model."""
         return self.framework.model
 
 
