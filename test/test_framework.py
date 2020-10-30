@@ -1541,7 +1541,7 @@ class BreakpointTests(BaseTestCase):
 
         with patch('pdb.Pdb.set_trace') as mock:
             this_frame = inspect.currentframe()
-            breakpoint()
+            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
 
         self.assertEqual(mock.call_count, 1)
         self.assertEqual(mock.call_args, ((this_frame,), {}))
@@ -1554,7 +1554,7 @@ class BreakpointTests(BaseTestCase):
         old_breakpointhook = framework.set_breakpointhook()
         self.addCleanup(setattr, sys, 'breakpointhook', old_breakpointhook)
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()
+            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
         self.assertEqual(mock.call_count, 1)
 
     @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
@@ -1567,7 +1567,7 @@ class BreakpointTests(BaseTestCase):
         self.addCleanup(setattr, sys, 'breakpointhook', old_breakpointhook)
 
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()
+            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
 
         self.assertEqual(mock.call_count, 0)
 

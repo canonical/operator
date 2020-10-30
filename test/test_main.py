@@ -98,7 +98,7 @@ class CharmInitTestCase(unittest.TestCase):
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': 'all'})
 
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()
+            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
 
         self.assertEqual(mock.call_count, 1)
         self.assertIn('Starting pdb to debug charm operator', fake_stderr.getvalue())
@@ -110,7 +110,7 @@ class CharmInitTestCase(unittest.TestCase):
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': ''})
 
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()
+            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
 
         self.assertEqual(mock.call_count, 0)
 
