@@ -466,16 +466,33 @@ class Framework(Object):
             self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
 
-        # Hook into builtin breakpoint, so if Python >= 3.7, devs will be able to just do
-        # breakpoint(); if Python < 3.7, this doesn't affect anything
-        sys.breakpointhook = self.breakpoint
-
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
         self._breakpoint_welcomed = False
 
-        # Parse once the env var, which may be used multiple times later
+        # Parse the env var once, which may be used multiple times later
         debug_at = os.environ.get('JUJU_DEBUG_AT')
         self._juju_debug_at = debug_at.split(',') if debug_at else ()
+
+    def set_breakpointhook(self):
+        """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
+
+        This method is called by ``main``, and is not intended to be
+        called by users of the framework itself outside of perhaps
+        some testing scenarios.
+
+        It returns the old value of sys.excepthook.
+
+        The breakpoint function is a Python >= 3.7 feature.
+
+        This method was added in ops 1.0; before that, it was done as
+        part of the Framework's __init__.
+        """
+        old_breakpointhook = getattr(sys, 'breakpointhook', None)
+        if old_breakpointhook is not None:
+            # Hook into builtin breakpoint, so if Python >= 3.7, devs will be able to just do
+            # breakpoint()
+            sys.breakpointhook = self.breakpoint
+        return old_breakpointhook
 
     def close(self):
         """Close the underlying backends."""

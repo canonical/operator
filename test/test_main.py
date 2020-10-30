@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import io
 import logging
 import logassert
 import os
@@ -89,13 +90,39 @@ class EventSpec:
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
 
-    def _check(self, charm_class, **kwargs):
+    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
+    @patch('sys.stderr', new_callable=io.StringIO)
+    def test_breakpoint(self, fake_stderr):
+        class MyCharm(CharmBase):
+            pass
+        self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': 'all'})
+
+        with patch('pdb.Pdb.set_trace') as mock:
+            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertIn('Starting pdb to debug charm operator', fake_stderr.getvalue())
+
+    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
+    def test_no_debug_breakpoint(self):
+        class MyCharm(CharmBase):
+            pass
+        self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': ''})
+
+        with patch('pdb.Pdb.set_trace') as mock:
+            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+
+        self.assertEqual(mock.call_count, 0)
+
+    def _check(self, charm_class, *, extra_environ=None, **kwargs):
         """Helper for below tests."""
         fake_environ = {
             'JUJU_UNIT_NAME': 'test_main/0',
             'JUJU_MODEL_NAME': 'mymodel',
             'JUJU_VERSION': '2.7.0',
         }
+        if extra_environ is not None:
+            fake_environ.update(extra_environ)
         with patch.dict(os.environ, fake_environ):
             with patch('ops.main._emit_charm_event'):
                 with patch('ops.main._get_charm_dir') as mock_charmdir:
