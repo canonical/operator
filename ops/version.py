@@ -22,7 +22,7 @@ from pathlib import Path
 
 __all__ = ('version',)
 
-_FALLBACK = '0.8'  # this gets bumped after release
+_FALLBACK = '1.0'  # this gets bumped after release
 
 
 def _get_version():
