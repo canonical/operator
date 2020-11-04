@@ -59,6 +59,7 @@ class Model:
         self._pod = Pod(self._backend)
         self._storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
+        self._goal = GoalState(self._backend)
 
     @property
     def unit(self) -> 'Unit':
@@ -110,6 +111,11 @@ class Model:
         This is read from the environment variable ``JUJU_MODEL_NAME``.
         """
         return self._backend.model_name
+
+    @property
+    def goal(self) -> int:
+        """Return :class: GoalState object representing the goal-state of the Juju model."""
+        return self._goal
 
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
@@ -987,6 +993,17 @@ class Storage:
         return self._location
 
 
+class GoalState:
+    """Represents goal state of the Juju model."""
+    def __init__(self, backend):
+        self._backend = backend
+
+    @property
+    def num_units(self):
+        raw = self._backend.goal_state()
+        return len(raw['units'].keys())
+
+
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
     pass
@@ -1271,7 +1288,7 @@ class _ModelBackend:
         self._run(*cmd)
 
     def goal_state(self):
-        return self._run('goal-state', use_json=True)
+        return self._run('goal-state', return_output=True, use_json=True)
 
 
 class _ModelBackendValidator:
