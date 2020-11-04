@@ -824,3 +824,6 @@ class _TestingModelBackend:
 
     def network_get(self, endpoint_name, relation_id=None):
         raise NotImplementedError(self.network_get)
+
+    def goal_state(self):
+        return {'units': {}, 'relations': {}}
