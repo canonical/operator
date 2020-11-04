@@ -1270,6 +1270,9 @@ class _ModelBackend:
         cmd.extend(metric_args)
         self._run(*cmd)
 
+    def goal_state(self):
+        return self._run('goal-state', use_json=True)
+
 
 class _ModelBackendValidator:
     """Provides facilities for validating inputs and formatting them for model backends."""
