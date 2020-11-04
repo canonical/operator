@@ -1000,6 +1000,7 @@ class GoalState:
 
     @property
     def num_units(self):
+        """Return the number of expected peer units."""
         raw = self._backend.goal_state()
         return len(raw['units'].keys())
 
