@@ -1591,3 +1591,17 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertIn(
             "units/unit-test-app-0/resources/foo: resource#test-app/foo not found",
             str(cm.exception))
+
+    def test_goal_state_default(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            peers:
+                test-app:
+                    interface: test-app-peer
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        goal_state = backend.goal_state()
+        self.assertEqual(
+            goal_state,
+            {'units': {}, 'relations': {}})
