@@ -874,6 +874,40 @@ class TestModelBindings(unittest.TestCase):
         self._check_binding_data(binding_name, binding)
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
+    def test_binding_no_iface_name(self):
+        network_get_out_obj = {
+            'bind-addresses': [
+                {
+                    'mac-address': '',
+                    'interface-name': '',
+                    'addresses': [
+                        {
+                            'hostname':  '',
+                            'value': '10.1.89.35',
+                            'cidr': ''
+                        }
+                    ]
+                }
+            ],
+            'egress-subnets': [
+                '10.152.183.158/32'
+            ],
+            'ingress-addresses': [
+                '10.152.183.158'
+            ]
+        }
+        network_get_out = json.dumps(network_get_out_obj)
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_get_out))
+        binding_name = 'db0'
+        expected_calls = [['network-get', 'db0', '--format=json']]
+
+        binding = self.model.get_binding(binding_name)
+        self.assertEqual(binding.name, 'db0')
+        self.assertEqual(binding.network.bind_address, ipaddress.ip_address('10.1.89.35'))
+        self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('10.152.183.158'))
+        self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
+
     def test_missing_bind_addresses(self):
         network_data = json.dumps({})
         fake_script(self, 'network-get',
