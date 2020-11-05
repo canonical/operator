@@ -542,8 +542,6 @@ class Network:
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
             interface_name = interface_info.get('interface-name')
-            if not interface_name:
-                continue
             for address_info in interface_info.get('addresses', []):
                 self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
