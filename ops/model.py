@@ -1002,7 +1002,11 @@ class GoalState:
     def num_units(self):
         """Return the number of expected peer units."""
         raw = self._backend.goal_state()
-        return len(raw['units'].keys())
+        units = raw.get('units')
+        if units is None:
+            return 0
+        else:
+            return len(units)
 
 
 class ModelError(Exception):
