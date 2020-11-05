@@ -113,7 +113,7 @@ class Model:
         return self._backend.model_name
 
     @property
-    def goal(self) -> int:
+    def goal(self) -> 'GoalState':
         """Return :class: GoalState object representing the goal-state of the Juju model."""
         return self._goal
 
@@ -999,7 +999,7 @@ class GoalState:
         self._backend = backend
 
     @property
-    def num_units(self):
+    def num_units(self) -> int:
         """Return the number of expected peer units."""
         raw = self._backend.goal_state()
         units = raw.get('units')
