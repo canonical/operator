@@ -138,8 +138,11 @@ class EventBase:
     def defer(self):
         """Defer the event to the future.
 
-        After being deferred, this event will be re-emited the next time there's
-        any other event for the charm.
+        After being deferred, this event will be re-emitted the next time there's
+        any other event for the charm. However the current event handler will
+        continue execution, in the absence of an explicit return statement. Further
+        when the event is re-emitted, the corresponding event handler will being
+        execution again from its first executable statement.
         """
         logger.debug("Deferring %s.", self)
         self.deferred = True
