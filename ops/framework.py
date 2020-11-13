@@ -138,11 +138,52 @@ class EventBase:
     def defer(self):
         """Defer the event to the future.
 
-        After being deferred, this event will be re-emitted the next time there's
-        any other event for the charm. However the current event handler will
-        continue execution, in the absence of an explicit return statement. Further
-        when the event is re-emitted, the corresponding event handler will being
-        execution again from its first executable statement.
+        Deferring an event from a handler puts that handler into a queue, to be
+        called again the next time the charm is invoked. This invocation may be
+        the result of an action, or any event other than metric events. The
+        queue of events will be dispatched before the new event is processed.
+
+        From the above you may deduce, but it's important to point out:
+
+        * ``defer()`` does not interrupt the execution of the current event
+          handler. In almost all cases, a call to ``defer()`` should be followed
+          by an explicit ``return`` from the handler;
+
+        * the re-execution of the deferred event handler starts from the top of
+          the handler method (not where defer was called);
+
+        * only the handlers that actually called ``defer()`` are called again
+          (that is: despite talking about “deferring an event” it is actually
+          the handler/event combination that is deferred); and
+
+        * any deferred events get processed before the event (or action) that
+          caused the current invocation of the charm.
+
+        The general desire to call ``defer()`` happens when some precondition
+        isn't yet met. However, care should be exercised as to whether it is
+        better to defer this event so that you see it again, or whether it is
+        better to just wait for the event that indicates the precondition has
+        been met.
+
+        For example, if ``config-changed`` is fired, and you are waiting for
+        different config, there is no reason to defer the event because there
+        will be a *different* ``config-changed`` event when the config actually
+        changes, rather than checking to see if maybe config has changed prior
+        to every other event that occurs.
+
+        Similarly, if you need 2 events to occur before you are ready to
+        proceed (say event A and B). When you see event A, you could chose to
+        ``defer()`` it because you haven't seen B yet. However, that leads to:
+
+        1. event A fires, calls defer()
+
+        2. event B fires, event A handler is called first, still hasn't seen B
+           happen, so is deferred again. Then B happens, which progresses since
+           it has seen A.
+
+        3. At some future time, event C happens, which also checks if A can
+           proceed.
+
         """
         logger.debug("Deferring %s.", self)
         self.deferred = True

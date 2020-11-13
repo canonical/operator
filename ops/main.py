@@ -391,7 +391,8 @@ def main(charm_class: ops.charm.CharmBase, use_juju_for_storage: bool = None):
         dispatcher.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant
-        #       Juju changes are made.
+        #       Juju changes are made. Also adjust the docstring on
+        #       EventBase.defer().
         #
         # Skip reemission of deferred events for collect-metrics events because
         # they do not have the full access to all hook tools.
