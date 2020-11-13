@@ -968,6 +968,14 @@ def _unwrap_stored(parent_data, value):
     return value
 
 
+def _wrapped_repr(obj):
+    t = type(obj)
+    if obj._under:
+        return "{}.{}({!r})".format(t.__module__, t.__name__, obj._under)
+    else:
+        return "{}.{}()".format(t.__module__, t.__name__)
+
+
 class StoredDict(collections.abc.MutableMapping):
     """A dict-like object that uses the StoredState as backend."""
 
@@ -999,6 +1007,8 @@ class StoredDict(collections.abc.MutableMapping):
             return self._under == other
         else:
             return NotImplemented
+
+    __repr__ = _wrapped_repr
 
 
 class StoredList(collections.abc.MutableSequence):
@@ -1072,6 +1082,8 @@ class StoredList(collections.abc.MutableSequence):
         else:
             return NotImplemented
 
+    __repr__ = _wrapped_repr
+
 
 class StoredSet(collections.abc.MutableSet):
     """A set-like object that uses the StoredState as backend."""
@@ -1139,3 +1151,5 @@ class StoredSet(collections.abc.MutableSet):
             return self._under == other
         else:
             return NotImplemented
+
+    __repr__ = _wrapped_repr
