@@ -91,8 +91,8 @@ driven through the OLM.
 
 # Getting started
 
-A package of operator code is called a charm. You will use the charmcraft
-tool to register your operator name, and publish it when you are ready.
+A package of operator code is called a charm. You will use `charmcraft`
+to register your operator name, and publish it when you are ready.
 
 ```
 $ sudo snap install charmcraft --beta
