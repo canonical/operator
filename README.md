@@ -1,19 +1,23 @@
 # The Operator Framework
 
-The Operator Framework simplifies Kubernetes operator development for
-better application management.
+This Operator Framework simplifies [Kubernetes
+operator](https://charmhub.io/about) development for 
+[model-driven application
+management](https://juju.is/model-driven-operations).
 
 A Kubernetes operator is a container that drives lifecycle management,
 configuration, integration and daily actions for an application.
 Operators simplify software management and operations. They capture
-app domain knowledge from experts in a reusable component that can
-be shared.
+reusable app domain knowledge from experts in a software component that
+can be shared.
 
-This project extends the operator pattern to make it universal, not just
+This project extends the operator pattern to enable 
+[universal operators](https://juju.is/universal-operators), not just
 for Kubernetes but also operators for traditional Linux or Windows
 application management.
 
-Operators use an Operator Lifecycle Manager (OLM) to coordinate their
+Operators use an [Operator Lifecycle Manager
+(OLM)](https://juju.is/operator-lifecycle-manager) to coordinate their
 work in a cluster. The system uses Golang for concurrent event
 processing under the hood, but enables the operators to be written in
 Python.
@@ -21,8 +25,8 @@ Python.
 ## Simple, composable operators
 
 Operators should 'do one thing and do it well'. Each operator drives a
-single microservice and can be composed with other operators to deliver
-a complex application.
+single microservice and can be [composed with other 
+operators](https://juju.is/integration) to deliver a complex application.
 
 It is better to have small, reusable operators that each drive a single
 microservice very well. The operator handles instantiation, scaling,
@@ -40,9 +44,8 @@ represents the application graph, and an event distribution mechanism for
 distributed system coordination and communication.
 
 The OLM is written in Golang for efficient concurrency in event handling
-and distribution. The operators interact with the OLM in a language-neutral
-fashion. We recommend this Python framework for ease of design, development
-and collaboration.
+and distribution. Operators can be written in any language. We recommend
+this Python framework for ease of design, development and collaboration.
 
 ## Better collaboration
 
@@ -61,21 +64,23 @@ high quality operator engineering.
 
 Distributed systems can be hard! So this framework exists to make it much
 simpler to reason about operator behaviour, especially in complex deployments.
+The OLM provides [operator services](https://juju.is/operator-services) such
+as provisioning, event delivery, leader election and model management.
 
 Coordination between operators is provided by a cluster-wide event
 distribution system. Events are serialized to avoid race conditions in any
 given container or machine. This greatly simplifies the development of
 operators for high availability, scale-out and integrated applications.
 
-Operators can request services such as leader election, persistent state,
-secrets and messaging from the operator lifecycle manager.
-
 ## Model-driven Operator Lifecycle Manager
 
 A key goal of the project is to improve the user experience for admins
 working with multiple different operators.
 
-We embrace model-driven operations in the Operator Lifecycle Manager.
+We embrace [model-driven operations](https://juju.is/model-driven-operations)
+in the Operator Lifecycle Manager. The model encompasses capacity,
+storage, networking, the application graph and administrative access.
+
 Admins describe the application graph of integrated microservices, and
 the OLM then drives instantiation. A change in the model is propagated
 to all affected operators, reducing the duplication of effort and
@@ -102,25 +107,7 @@ The dependencies of the operator framework are kept as minimal as possible;
 currently that's Python 3.5 or greater, and `PyYAML` (both are included by
 default in Ubuntu's cloud images from 16.04 on).
 
-## The Juju OLM
-
-The [Juju OLM](https://juju.is/) makes it possible to create operators not
-only on Kubernetes, where they run in containers and drive cloud-native
-applications, but also on traditional Linux or Windows environments.
-
-<!--
-If you're new to the world of Juju and charms, you should probably dive into our
-[tutorial](/TBD).
-
-If you have used Juju, or have written charms that didn't use the operator
-framework, we have an [introduction to the operator framework](/TBD) just
-for you.
-
-If you've gone through the above already and just want a refresher, or are
-really impatient and need to dive in, feel free to carry on down.
--->
-
-## A Quick Introduction
+# A quick introduction
 
 Make an empty directory `my-charm` and cd into it. Then start a new charm
 with:
@@ -143,8 +130,6 @@ be any filename, by default this is `src/charm.py` which must be executable
 You need a `metadata.yaml` to describe your charm, and if you will support
 configuration of your charm then `config.yaml` files is required too. The
 `requirements.txt` specifies any Python dependencies.
-
-
 
 ```
 $ tree my-charm/
@@ -199,10 +184,10 @@ Happy charming!
 
 # Testing your charms
 
-The operator framework provides a testing harness, so that you can check your
-charm does the right thing when presented with different scenarios, without
-having to have a full deployment. `pydoc3 ops.testing` has the details,
-including this example:
+The operator framework provides a testing harness, so you can check your
+charm does the right thing in different scenarios, without having to create
+a full deployment. `pydoc3 ops.testing` has the details, including this
+example:
 
 ```python
 harness = Harness(MyCharm)
@@ -221,7 +206,7 @@ self.assertEqual(harness.charm. ...)
 If you need help, have ideas, or would just like to chat with us, reach out on
 IRC: we're in [#smooth-operator] on freenode (or try the [webchat]).
 
-We also pay attention to the [Charmhub discourse](https://discourse.charmhub.io/)
+We also pay attention to [Charmhub discourse](https://discourse.charmhub.io/)
 
 You can also deep dive into the [API docs] if that's your thing.
 
@@ -232,9 +217,9 @@ You can also deep dive into the [API docs] if that's your thing.
 
 ## Operator Framework development
 
-If you want to work in the framework *itself* you will need Python >= 3.5 and
-the dependencies declared in `requirements-dev.txt` installed in your system.
-Or you can use a virtualenv:
+To work in the framework itself you will need Python >= 3.5 and the
+dependencies in `requirements-dev.txt` installed in your system, or a
+virtualenv:
 
     virtualenv --python=python3 env
     source env/bin/activate
