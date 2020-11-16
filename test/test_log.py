@@ -52,22 +52,19 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(logger.level, logging.DEBUG)
         self.assertIsInstance(logger.handlers[-1], ops.log.JujuLogHandler)
 
-        test_cases = [(
-            lambda: logger.critical('critical'), [('CRITICAL', 'critical')]
-        ), (
-            lambda: logger.error('error'), [('ERROR', 'error')]
-        ), (
-            lambda: logger.warning('warning'), [('WARNING', 'warning')]
-        ), (
-            lambda: logger.info('info'), [('INFO', 'info')]
-        ), (
-            lambda: logger.debug('debug'), [('DEBUG', 'debug')]
-        )]
+        test_cases = [
+            (logger.critical, 'critical', ('CRITICAL', 'critical')),
+            (logger.error, 'error', ('ERROR', 'error')),
+            (logger.warning, 'warning', ('WARNING', 'warning')),
+            (logger.info, 'info', ('INFO', 'info')),
+            (logger.debug, 'debug', ('DEBUG', 'debug')),
+        ]
 
-        for do, res in test_cases:
-            do()
-            calls = self.backend.calls(clear=True)
-            self.assertEqual(calls, res)
+        for method, message, result in test_cases:
+            with self.subTest(message):
+                method(message)
+                calls = self.backend.calls(clear=True)
+                self.assertEqual(calls, [result])
 
     def test_handler_filtering(self):
         logger = logging.getLogger()
