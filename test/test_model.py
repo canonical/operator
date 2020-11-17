@@ -725,6 +725,37 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.model.storages = {}
 
+    def test_goal_state_num_units_with_no_relations(self):
+        self.assertEqual(
+            0,
+            self.harness.model.goal.num_units
+        )
+
+    def test_goal_state_num_units_with_peers_and_no_relations(self):
+        rel_id = self.harness.add_relation('db2', 'peer0')
+        self.harness.add_relation_unit(rel_id, 'app/0')
+        self.assertEqual(1, self.harness.model.goal.num_units)
+        self.harness.add_relation_unit(rel_id, 'app/1')
+        self.assertEqual(2, self.harness.model.goal.num_units)
+
+    def test_goal_state_num_units_with_peers_and_relations(self):
+        # add non-peer relations and units
+        rel_id0 = self.harness.add_relation('db0', 'remoteapp0')
+        self.harness.add_relation_unit(rel_id0, 'remoteapp0/0')
+        self.harness.add_relation_unit(rel_id0, 'remoteapp0/1')
+        self.harness.add_relation_unit(rel_id0, 'remoteapp0/2')
+        rel_id1 = self.harness.add_relation('db1', 'remoteapp1')
+        self.harness.add_relation_unit(rel_id1, 'remoteapp1/0')
+        self.harness.add_relation_unit(rel_id1, 'remoteapp1/1')
+        self.assertEqual(0, self.harness.model.goal.num_units)
+
+        # add peer relations and units
+        peer_rel_id = self.harness.add_relation('db2', 'peer')
+        self.harness.add_relation_unit(peer_rel_id, 'app/0')
+        self.assertEqual(1, self.harness.model.goal.num_units)
+        self.harness.add_relation_unit(peer_rel_id, 'app/1')
+        self.assertEqual(2, self.harness.model.goal.num_units)
+
     def resetBackendCalls(self):
         self.harness._get_backend_calls(reset=True)
 
