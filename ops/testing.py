@@ -825,5 +825,51 @@ class _TestingModelBackend:
     def network_get(self, endpoint_name, relation_id=None):
         raise NotImplementedError(self.network_get)
 
+    def _get_goal_units(self):
+        """Gets the 'units' component of goal-state."""
+        # dummy variable
+        unit_status = {'status': 'active'}
+        # build peer unit goal state
+        units = {}
+        peer_names = set(self._meta.peers.keys())
+        for peer_id, peer_name in self._relation_names.items():
+            if peer_name not in peer_names:
+                continue
+            peer_units = self._relation_list_map[peer_id]
+            units.update({unit: unit_status for unit in peer_units})
+
+        return units
+
+    def _get_goal_relations(self):
+        """Gets the 'relations' component of goal-state."""
+        # dummy statuses
+        unit_status = {'status': 'active'}
+        app_status = {'status': 'joined'}
+
+        # build relations goal state
+        relations = {}
+        peer_names = set(self._meta.peers.keys())
+        for rel_id, rel_name in self._relation_names.items():
+            if rel_name in peer_names:
+                continue
+
+            app_and_units = self._relation_app_and_units[rel_id]
+            app = app_and_units['app']
+            units = app_and_units['units']
+            if not units:
+                continue
+            if relations.get(rel_name) is None:
+                relations.update({rel_name: {}})
+            relations[rel_name].update({app: app_status})
+            relations[rel_name].update({unit: unit_status for unit in units})
+
+        return relations
+
     def goal_state(self):
-        return {'units': {}, 'relations': {}}
+        # build peer unit goal state
+        peers = self._get_goal_units()
+        # build relations goal state
+        relations = self._get_goal_relations()
+        goal_state = {'units': peers, 'relations': relations}
+
+        return goal_state
