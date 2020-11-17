@@ -1605,3 +1605,54 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertEqual(
             goal_state,
             {'units': {}, 'relations': {}})
+
+    def test_goal_state_with_peer_units(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            peers:
+                test-app:
+                    interface: test-app-peer
+            ''')
+        self.addCleanup(harness.cleanup)
+        rel_id = harness.add_relation('test-app', 'app')
+        harness.add_relation_unit(rel_id, 'app/0')
+        backend = harness._backend
+        goal_state = backend.goal_state()
+        self.assertEqual(
+            goal_state,
+            {
+                'units': {
+                    'app/0': {
+                        'status': 'active'
+                    }
+                },
+                'relations': {}
+            })
+
+    def test_goal_state_with_relation_units(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                test-app:
+                    interface: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        rel_id = harness.add_relation('test-app', 'app')
+        harness.add_relation_unit(rel_id, 'app/0')
+        backend = harness._backend
+        goal_state = backend.goal_state()
+        self.assertEqual(
+            goal_state,
+            {
+                'units': {},
+                'relations': {
+                    'test-app': {
+                        'app': {
+                            'status': 'joined'
+                        },
+                        'app/0': {
+                            'status': 'active'
+                        }
+                    }
+                }
+            })
