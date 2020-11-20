@@ -1230,7 +1230,7 @@ class _ModelBackend:
         self._run('application-version-set', '--', version)
 
     def juju_log(self, level, message):
-        self._run('juju-log', '--log-level', level, message)
+        self._run('juju-log', '--log-level', level, "--", message)
 
     def network_get(self, binding_name, relation_id=None):
         """Return network info provided by network-get for a given binding.

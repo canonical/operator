@@ -1337,7 +1337,7 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'juju-log', 'exit 0')
         self.backend.juju_log('WARNING', 'foo')
         self.assertEqual(fake_script_calls(self, clear=True),
-                         [['juju-log', '--log-level', 'WARNING', 'foo']])
+                         [['juju-log', '--log-level', 'WARNING', '--', 'foo']])
 
         with self.assertRaises(TypeError):
             self.backend.juju_log('DEBUG')
@@ -1347,7 +1347,7 @@ class TestModelBackend(unittest.TestCase):
         with self.assertRaises(ops.model.ModelError):
             self.backend.juju_log('BAR', 'foo')
         self.assertEqual(fake_script_calls(self, clear=True),
-                         [['juju-log', '--log-level', 'BAR', 'foo']])
+                         [['juju-log', '--log-level', 'BAR', '--', 'foo']])
 
     def test_valid_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')

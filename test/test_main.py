@@ -63,9 +63,14 @@ is_windows = platform.system() == 'Windows'
 TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
 
 VERSION_LOGLINE = [
-    'juju-log', '--log-level', 'DEBUG',
+    'juju-log', '--log-level', 'DEBUG', '--',
     'Operator Framework {} up and running.'.format(version),
 ]
+SLOW_YAML_LOGLINE = [
+    'juju-log', '--log-level', 'DEBUG', '--',
+    'yaml does not have libyaml extensions, using slower pure Python yaml loader',
+]
+
 logger = logging.getLogger(__name__)
 
 
@@ -561,20 +566,18 @@ class _TestMain(abc.ABC):
 
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'DEBUG',
+            ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: {} already exists'.format(self.CHARM_STATE_FILE)],
-            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event collect_metrics.'],
+            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
         ]
         if not yaml.__with_libyaml__:
-            expected.insert(1, ['juju-log', '--log-level', 'DEBUG',
-                                'yaml does not have libyaml extensions, '
-                                'using slower pure Python yaml loader'])
+            expected.insert(1, SLOW_YAML_LOGLINE)
         calls = fake_script_calls(self)
 
         if self.has_dispatch:
             expected.insert(1, [
-                'juju-log', '--log-level', 'DEBUG',
+                'juju-log', '--log-level', 'DEBUG', '--',
                 'Legacy {} does not exist.'.format(Path('hooks/collect-metrics'))])
 
         self.assertEqual(calls, expected)
@@ -584,19 +587,19 @@ class _TestMain(abc.ABC):
 
         test_cases = [(
             EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME'),
-            ['juju-log', '--log-level', 'CRITICAL', 'super critical'],
+            ['juju-log', '--log-level', 'CRITICAL', '--', 'super critical'],
         ), (
             EventSpec(ActionEvent, 'log_error_action',
                       env_var='JUJU_ACTION_NAME'),
-            ['juju-log', '--log-level', 'ERROR', 'grave error'],
+            ['juju-log', '--log-level', 'ERROR', '--', 'grave error'],
         ), (
             EventSpec(ActionEvent, 'log_warning_action',
                       env_var='JUJU_ACTION_NAME'),
-            ['juju-log', '--log-level', 'WARNING', 'wise warning'],
+            ['juju-log', '--log-level', 'WARNING', '--', 'wise warning'],
         ), (
             EventSpec(ActionEvent, 'log_info_action',
                       env_var='JUJU_ACTION_NAME'),
-            ['juju-log', '--log-level', 'INFO', 'useful info'],
+            ['juju-log', '--log-level', 'INFO', '--', 'useful info'],
         )]
 
         # Set up action symlinks.
@@ -619,18 +622,18 @@ class _TestMain(abc.ABC):
         if self.has_dispatch:
             self.assertEqual(
                 calls.pop(0),
-                'juju-log --log-level DEBUG Legacy {} does not exist.'.format(
+                'juju-log --log-level DEBUG -- Legacy {} does not exist.'.format(
                     Path("hooks/install")))
 
         if not yaml.__with_libyaml__:
-            self.assertRegex(calls.pop(0), 'yaml does not have libyaml extensions')
+            self.assertEquals(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
 
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
 
         self.maxDiff = None
         self.assertRegex(
             calls[0],
-            '(?ms)juju-log --log-level ERROR Uncaught exception while in charm code:\n'
+            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
             'Traceback .most recent call last.:\n'
             '  .*'
             '    raise RuntimeError."failing as requested".\n'
@@ -794,15 +797,17 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy {}.'.format(hook)],
-            ['juju-log', '--log-level', 'DEBUG', 'Legacy {} exited with status 0.'.format(hook)],
-            ['juju-log', '--log-level', 'DEBUG', 'Using local storage: not a kubernetes charm'],
-            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+            ['juju-log', '--log-level', 'INFO', '--',
+             'Running legacy {}.'.format(hook)],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Legacy {} exited with status 0.'.format(hook)],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Using local storage: not a kubernetes charm'],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Emitting Juju event install.'],
         ]
         if not yaml.__with_libyaml__:
-            expected.insert(3, ['juju-log', '--log-level', 'DEBUG',
-                                'yaml does not have libyaml extensions, '
-                                'using slower pure Python yaml loader'])
+            expected.insert(3, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
 
     @unittest.skipIf(is_windows, "this is UNIXish; TODO: write equivalent windows test")
@@ -814,15 +819,15 @@ class _TestMainWithDispatch(_TestMain):
 
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'WARNING',
+            ['juju-log', '--log-level', 'WARNING', '--',
              'Legacy hooks/install exists but is not executable.'],
-            ['juju-log', '--log-level', 'DEBUG', 'Using local storage: not a kubernetes charm'],
-            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Using local storage: not a kubernetes charm'],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Emitting Juju event install.'],
         ]
         if not yaml.__with_libyaml__:
-            expected.insert(2, ['juju-log', '--log-level', 'DEBUG',
-                                'yaml does not have libyaml extensions, '
-                                'using slower pure Python yaml loader'])
+            expected.insert(2, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
 
     def test_hook_and_dispatch_with_failing_hook(self):
@@ -843,8 +848,8 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy {}.'.format(hook)],
-            ['juju-log', '--log-level', 'WARNING',
+            ['juju-log', '--log-level', 'INFO', '--', 'Running legacy {}.'.format(hook)],
+            ['juju-log', '--log-level', 'WARNING', '--',
              'Legacy {} exited with status 42.'.format(hook)],
         ]
         self.assertEqual(calls, expected)
@@ -896,17 +901,20 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', 'Running legacy {}.'.format(hook)],
+            ['juju-log', '--log-level', 'INFO', '--',
+             'Running legacy {}.'.format(hook)],
             VERSION_LOGLINE,    # because it called itself
-            ['juju-log', '--log-level', 'DEBUG', 'Charm called itself via {}.'.format(hook)],
-            ['juju-log', '--log-level', 'DEBUG', 'Legacy {} exited with status 0.'.format(hook)],
-            ['juju-log', '--log-level', 'DEBUG', 'Using local storage: not a kubernetes charm'],
-            ['juju-log', '--log-level', 'DEBUG', 'Emitting Juju event install.'],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Charm called itself via {}.'.format(hook)],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Legacy {} exited with status 0.'.format(hook)],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Using local storage: not a kubernetes charm'],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+             'Emitting Juju event install.'],
         ]
         if not yaml.__with_libyaml__:
-            expected.insert(5, ['juju-log', '--log-level', 'DEBUG',
-                                'yaml does not have libyaml extensions, '
-                                'using slower pure Python yaml loader'])
+            expected.insert(5, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
 
 
