@@ -756,6 +756,21 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(peer_rel_id, 'app/1')
         self.assertEqual(2, self.harness.model.goal.num_units)
 
+    def test_goal_state_pending_units_with_peers_and_no_relations(self):
+        rel_id = self.harness.add_relation('db2', 'peer0')
+        self.harness.add_relation_unit(rel_id, 'app/0', 'waiting')
+        self.assertEqual(1, self.harness.model.goal.pending_units)
+        self.assertEqual(1, self.harness.model.goal.num_units)
+        self.harness.add_relation_unit(rel_id, 'app/1', 'maintenance')
+        self.assertEqual(2, self.harness.model.goal.pending_units)
+        self.assertEqual(2, self.harness.model.goal.num_units)
+        self.harness.update_unit_status(rel_id, 'app/0', 'active')
+        self.assertEqual(1, self.harness.model.goal.pending_units)
+        self.assertEqual(2, self.harness.model.goal.num_units)
+        self.harness.update_unit_status(rel_id, 'app/1', 'active')
+        self.assertEqual(0, self.harness.model.goal.pending_units)
+        self.assertEqual(2, self.harness.model.goal.num_units)
+
     def resetBackendCalls(self):
         self.harness._get_backend_calls(reset=True)
 
