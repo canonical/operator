@@ -1008,6 +1008,18 @@ class GoalState:
         else:
             return len(units)
 
+    @property
+    def pending_units(self) -> int:
+        """Return the number of pending (non-Active) peer units."""
+        raw = self._backend.goal_state()
+        units = raw.get('units')
+        if units is None:
+            return 0
+        else:
+            return len([name
+                        for name, status in units.items()
+                        if status['status'].lower() != 'active'])
+
 
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
