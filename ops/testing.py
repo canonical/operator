@@ -399,7 +399,7 @@ class Harness:
             "app": remote_app,
             "units": [],
         }
-        self._backend._relation_unit_statues[rel_id] = {}
+        self._backend.relation_unit_statuses[rel_id] = {}
         # Reload the relation_ids list
         if self._model is not None:
             self._model.relations._invalidate(relation_name)
@@ -483,7 +483,7 @@ class Harness:
         Return:
             None
         """
-        self._backend._relation_unit_statues[relation_id].update(
+        self._backend.relation_unit_statuses[relation_id].update(
             {remote_unit_name: {"status": remote_unit_status}}
         )
 
@@ -730,7 +730,7 @@ class _TestingModelBackend:
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
         self._relation_app_and_units = {}
         # {relation_id: {unit/0: unit0_status, unit/1: unit1_status,...}}
-        self._relation_unit_statues = {}
+        self.relation_unit_statuses = {}
         self._config = {}
         self._is_leader = False
         self._resources_map = {}  # {resource_name: resource_content}
@@ -866,7 +866,7 @@ class _TestingModelBackend:
                 continue
             peer_units = self._relation_list_map[peer_id]
             units.update(
-                {unit: self._relation_unit_statues[peer_id][unit] for unit in peer_units}
+                {unit: self.relation_unit_statuses[peer_id][unit] for unit in peer_units}
             )
 
         return units
@@ -892,7 +892,7 @@ class _TestingModelBackend:
                 relations.update({rel_name: {}})
             relations[rel_name].update({app: app_status})
             relations[rel_name].update(
-                {unit: self._relation_unit_statues[rel_id][unit] for unit in units}
+                {unit: self.relation_unit_statuses[rel_id][unit] for unit in units}
             )
 
         return relations
