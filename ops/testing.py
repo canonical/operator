@@ -399,6 +399,7 @@ class Harness:
             "app": remote_app,
             "units": [],
         }
+        self._backend._relation_unit_statues[rel_id] = {}
         # Reload the relation_ids list
         if self._model is not None:
             self._model.relations._invalidate(relation_name)
@@ -417,13 +418,15 @@ class Harness:
         self._charm.on[relation_name].relation_created.emit(
             relation, app)
 
-    def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
+    def add_relation_unit(self, relation_id: int, remote_unit_name: str,
+                          remote_unit_status: str = "active") -> None:
         """Add a new unit to a relation.
 
         Example::
 
           rel_id = harness.add_relation('db', 'postgresql')
           harness.add_relation_unit(rel_id, 'postgresql/0')
+          harness.add_relation_unit(rel_id, 'postgresql/1', 'maintenance')
 
         This will trigger a `relation_joined` event. This would naturally be
         followed by a `relation_changed` event, which you can trigger with
@@ -434,6 +437,7 @@ class Harness:
         Args:
             relation_id: The integer relation identifier (as returned by add_relation).
             remote_unit_name: A string representing the remote unit that is being added.
+            remote_unit_status: A string specifying the unit's status
 
         Return:
             None
@@ -443,6 +447,7 @@ class Harness:
         # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
         #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
         self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
+        self.update_unit_status(relation_id, remote_unit_name, remote_unit_status)
         relation_name = self._backend._relation_names[relation_id]
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
@@ -457,6 +462,30 @@ class Harness:
             return
         self._charm.on[relation_name].relation_joined.emit(
             relation, remote_unit.app, remote_unit)
+
+    def update_unit_status(self, relation_id: int, remote_unit_name: str,
+                           remote_unit_status: str) -> None:
+        """Update the status of a unit.
+
+        Example::
+          rel_id = harness.add_relation('db', 'postgresql')
+          harness.add_relation_unit(rel_id, 'postgresql/0')  # default status is 'active'
+          harness.update_unit_status(rel_id, postgresql/0, 'waiting')
+
+        If testing components that rely on model.goal.pending_units, this is the way to
+        change the status of a unit.
+
+        Args:
+            relation_id: The integer relation identifier (as returned by add_relation).
+            remote_unit_name: A string representing the remote unit that is being added.
+            remote_unit_status: A string specifying the unit's status
+
+        Return:
+            None
+        """
+        self._backend._relation_unit_statues[relation_id].update(
+            {remote_unit_name: {"status": remote_unit_status}}
+        )
 
     def get_relation_data(self, relation_id: int, app_or_unit: str) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
@@ -700,6 +729,8 @@ class _TestingModelBackend:
         self._relation_data = {}  # {relation_id: {name: data}}
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
         self._relation_app_and_units = {}
+        # {relation_id: {unit/0: unit0_status, unit/1: unit1_status,...}}
+        self._relation_unit_statues = {}
         self._config = {}
         self._is_leader = False
         self._resources_map = {}  # {resource_name: resource_content}
@@ -827,8 +858,6 @@ class _TestingModelBackend:
 
     def _get_goal_units(self):
         """Gets the 'units' component of goal-state."""
-        # dummy variable
-        unit_status = {'status': 'active'}
         # build peer unit goal state
         units = {}
         peer_names = set(self._meta.peers.keys())
@@ -836,14 +865,15 @@ class _TestingModelBackend:
             if peer_name not in peer_names:
                 continue
             peer_units = self._relation_list_map[peer_id]
-            units.update({unit: unit_status for unit in peer_units})
+            units.update(
+                {unit: self._relation_unit_statues[peer_id][unit] for unit in peer_units}
+            )
 
         return units
 
     def _get_goal_relations(self):
         """Gets the 'relations' component of goal-state."""
-        # dummy statuses
-        unit_status = {'status': 'active'}
+        # dummy app status
         app_status = {'status': 'joined'}
 
         # build relations goal state
@@ -861,7 +891,9 @@ class _TestingModelBackend:
             if relations.get(rel_name) is None:
                 relations.update({rel_name: {}})
             relations[rel_name].update({app: app_status})
-            relations[rel_name].update({unit: unit_status for unit in units})
+            relations[rel_name].update(
+                {unit: self._relation_unit_statues[rel_id][unit] for unit in units}
+            )
 
         return relations
 
