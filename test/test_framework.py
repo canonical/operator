@@ -40,7 +40,9 @@ from ops.framework import (
     Handle,
     Object,
     PreCommitEvent,
+    StoredDict,
     StoredList,
+    StoredSet,
     StoredState,
     StoredStateData,
 )
@@ -887,6 +889,18 @@ class TestStoredState(BaseTestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
+
+    def test_stored_dict_repr(self):
+        self.assertEqual(repr(StoredDict(None, {})), "ops.framework.StoredDict()")
+        self.assertEqual(repr(StoredDict(None, {"a": 1})), "ops.framework.StoredDict({'a': 1})")
+
+    def test_stored_list_repr(self):
+        self.assertEqual(repr(StoredList(None, [])), "ops.framework.StoredList()")
+        self.assertEqual(repr(StoredList(None, [1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
+
+    def test_stored_set_repr(self):
+        self.assertEqual(repr(StoredSet(None, set())), 'ops.framework.StoredSet()')
+        self.assertEqual(repr(StoredSet(None, {1})), 'ops.framework.StoredSet({1})')
 
     def test_basic_state_storage(self):
         class SomeObject(Object):
