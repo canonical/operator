@@ -746,7 +746,6 @@ class _TestingModelBackend:
         self.model_name = None
         self._calls = []
         self._meta = meta
-        self._is_leader = None
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
         self._relation_names = {}  # reverse map from relation_id to relation_name
         self._relation_list_map = {}  # relation_id: [unit_name,...]
