@@ -73,18 +73,20 @@ class Charm(CharmBase):
         self.framework.observe(self.on.mon_relation_departed, self._on_mon_relation_departed)
         self.framework.observe(self.on.ha_relation_broken, self._on_ha_relation_broken)
 
-        self.framework.observe(self.on.start_action, self._on_start_action)
-        self.framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
-        self.framework.observe(self.on.get_model_name_action, self._on_get_model_name_action)
-        self.framework.observe(self.on.get_status_action, self._on_get_status_action)
+        actions = self.charm_dir / 'actions.yaml'
+        if actions.exists() and actions.read_bytes():
+            self.framework.observe(self.on.start_action, self._on_start_action)
+            self.framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
+            self.framework.observe(self.on.get_model_name_action, self._on_get_model_name_action)
+            self.framework.observe(self.on.get_status_action, self._on_get_status_action)
+
+            self.framework.observe(self.on.log_critical_action, self._on_log_critical_action)
+            self.framework.observe(self.on.log_error_action, self._on_log_error_action)
+            self.framework.observe(self.on.log_warning_action, self._on_log_warning_action)
+            self.framework.observe(self.on.log_info_action, self._on_log_info_action)
+            self.framework.observe(self.on.log_debug_action, self._on_log_debug_action)
 
         self.framework.observe(self.on.collect_metrics, self._on_collect_metrics)
-
-        self.framework.observe(self.on.log_critical_action, self._on_log_critical_action)
-        self.framework.observe(self.on.log_error_action, self._on_log_error_action)
-        self.framework.observe(self.on.log_warning_action, self._on_log_warning_action)
-        self.framework.observe(self.on.log_info_action, self._on_log_info_action)
-        self.framework.observe(self.on.log_debug_action, self._on_log_debug_action)
 
         if os.getenv('TRY_EXCEPTHOOK', False):
             raise RuntimeError("failing as requested")

@@ -326,8 +326,12 @@ class _TestMain(abc.ABC):
         if self.CHARM_STATE_FILE.stat().st_size:
             storage = SQLiteStorage(self.CHARM_STATE_FILE)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
-                with (self.JUJU_CHARM_DIR / 'actions.yaml').open() as a:
-                    meta = CharmMeta.from_yaml(m, a)
+                af = (self.JUJU_CHARM_DIR / 'actions.yaml')
+                if af.exists():
+                    with af.open() as a:
+                        meta = CharmMeta.from_yaml(m, a)
+                else:
+                    meta = CharmMeta.from_yaml(m)
             framework = Framework(storage, self.JUJU_CHARM_DIR, meta, None)
 
             class ThisCharmEvents(CharmEvents):
@@ -556,6 +560,14 @@ class _TestMain(abc.ABC):
         except subprocess.CalledProcessError:
             self.fail('Event simulation for an unsupported event'
                       ' results in a non-zero exit code returned')
+
+    def test_no_actions(self):
+        (self.JUJU_CHARM_DIR / 'actions.yaml').unlink()
+        self._simulate_event(EventSpec(InstallEvent, 'install'))
+
+    def test_empty_actions(self):
+        (self.JUJU_CHARM_DIR / 'actions.yaml').write_text('')
+        self._simulate_event(EventSpec(InstallEvent, 'install'))
 
     def test_collect_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
