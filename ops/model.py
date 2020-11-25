@@ -1069,6 +1069,8 @@ class _ModelBackend:
 
         self._is_leader = None
         self._leader_check_time = None
+        self._goal_state = None
+        self._goal_state_check_time = None
 
     def _run(self, *args, return_output=False, use_json=False):
         kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)
@@ -1299,7 +1301,23 @@ class _ModelBackend:
         self._run(*cmd)
 
     def goal_state(self):
-        return self._run('goal-state', return_output=True, use_json=True)
+        """Return the result of goal-state
+
+        The value is cached for the duration of a lease which is 30s in Juju.
+        """
+        now = time.monotonic()
+        if self._goal_state_check_time is None:
+            check = True
+        else:
+            time_since_check = datetime.timedelta(seconds=now - self._goal_state_check_time)
+            check = (time_since_check > self.LEASE_RENEWAL_PERIOD or self._goal_state is None)
+        if check:
+            # Current time MUST be saved before running goal-state to ensure the cache
+            # is only used inside the window that goal-state itself asserts.
+            self._goal_state_check_time = now
+            self._goal_state = self._run('goal-state', return_output=True, use_json=True)
+
+        return self._goal_state
 
 
 class _ModelBackendValidator:
