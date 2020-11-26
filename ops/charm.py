@@ -714,6 +714,7 @@ class RelationRole(enum.Enum):
     - A service consumer in the relation ('requires')
     - A service provider in the relation ('provides')
     """
+
     peer = 'peer'
     requires = 'requires'
     provides = 'provides'

@@ -286,6 +286,7 @@ class _SimpleLoader(getattr(yaml, 'CSafeLoader', yaml.SafeLoader)):
     that it *doesn't* handle is tuples. We don't want to support arbitrary types, so we just
     subclass SafeLoader and add tuples back in.
     """
+
     # Taken from the example at:
     # https://stackoverflow.com/questions/9169025/how-can-i-add-a-python-tuple-to-a-yaml-file-using-pyyaml
 

@@ -826,6 +826,7 @@ class UnknownStatus(StatusBase):
     charm has not called status-set yet.
 
     """
+
     name = 'unknown'
 
     def __init__(self):
@@ -842,6 +843,7 @@ class ActiveStatus(StatusBase):
 
     The unit believes it is correctly offering all the services it has been asked to offer.
     """
+
     name = 'active'
 
     def __init__(self, message: str = ''):
@@ -854,6 +856,7 @@ class BlockedStatus(StatusBase):
 
     An operator has to manually intervene to unblock the unit and let it proceed.
     """
+
     name = 'blocked'
 
 
@@ -866,6 +869,7 @@ class MaintenanceStatus(StatusBase):
     reflects activity on the unit itself, not on peers or related units.
 
     """
+
     name = 'maintenance'
 
 
@@ -877,6 +881,7 @@ class WaitingStatus(StatusBase):
     it is related is not running.
 
     """
+
     name = 'waiting'
 
 
@@ -987,6 +992,7 @@ class Storage:
 
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
+
     pass
 
 

@@ -445,6 +445,7 @@ class CommitEvent(EventBase):
 
 class FrameworkEvents(ObjectEvents):
     """Manager of all framework events."""
+
     pre_commit = EventSource(PreCommitEvent)
     commit = EventSource(CommitEvent)
 
