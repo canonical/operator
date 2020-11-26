@@ -518,7 +518,7 @@ class Framework(Object):
         self._juju_debug_at = debug_at.split(',') if debug_at else ()
 
     def set_breakpointhook(self):
-        """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
+        """Add hook into sys.breakpointhook so the builtin breakpoint() works as expected.
 
         This method is called by ``main``, and is not intended to be
         called by users of the framework itself outside of perhaps

@@ -62,17 +62,17 @@ class Model:
 
     @property
     def unit(self) -> 'Unit':
-        """A :class:`Unit` that represents the unit that is running this code (eg yourself)."""
+        """Fetch :class:`Unit` that represents the unit that is running this code (eg yourself)."""
         return self._unit
 
     @property
     def app(self):
-        """A :class:`Application` that represents the application this unit is a part of."""
+        """Fetch :class:`Application` that represents the application this unit is a part of."""
         return self._unit.app
 
     @property
     def relations(self) -> 'RelationMapping':
-        """Mapping of endpoint to list of :class:`Relation`.
+        """Fetch mapping of endpoint to list of :class:`Relation`.
 
         Answers the question "what am I currently related to".
         See also :meth:`.get_relation`.
@@ -95,7 +95,7 @@ class Model:
 
     @property
     def storages(self) -> 'StorageMapping':
-        """Mapping of storage_name to :class:`Storage` as defined in metadata.yaml."""
+        """Fetch mapping of storage_name to :class:`Storage` as defined in metadata.yaml."""
         return self._storages
 
     @property
@@ -201,7 +201,7 @@ class Application:
 
     @property
     def status(self) -> 'StatusBase':
-        """Used to report or read the status of the overall application.
+        """Report or read the status of the overall application.
 
         Can only be read and set by the lead unit of the application.
 
@@ -277,7 +277,7 @@ class Unit:
 
     @property
     def status(self) -> 'StatusBase':
-        """Used to report or read the status of a specific unit.
+        """Report or read the status of a specific unit.
 
         The status of any unit other than yourself is always Unknown.
 
@@ -420,7 +420,7 @@ class RelationMapping(Mapping):
         return relation_list
 
     def _invalidate(self, relation_name):
-        """Used to wipe the cache of a given relation_name.
+        """Wipe the cache of a given relation_name.
 
         Not meant to be used by Charm authors. The content of relation data is
         static for the lifetime of a hook, so it is safe to cache in memory once
@@ -500,7 +500,7 @@ class Binding:
 
     @property
     def network(self) -> 'Network':
-        """The network information for this binding."""
+        """Fetch the network information for this binding."""
         if self._network is None:
             try:
                 self._network = Network(self._backend.network_get(self.name, self._relation_id))
@@ -553,7 +553,7 @@ class Network:
 
     @property
     def bind_address(self):
-        """A single address that your application should bind() to.
+        """Fetch a single address that your application should bind() to.
 
         For the common case where there is a single answer. This represents a single
         address from :attr:`.interfaces` that can be used to configure where your
@@ -566,7 +566,7 @@ class Network:
 
     @property
     def ingress_address(self):
-        """The address other applications should use to connect to your unit.
+        """Fetch the address other applications should use to connect to your unit.
 
         Due to things like public/private addresses, NAT and tunneling, the address you bind()
         to is not always the address other people can use to connect() to you.
@@ -951,7 +951,7 @@ class StorageMapping(Mapping):
         return storage_list
 
     def request(self, storage_name: str, count: int = 1):
-        """Requests new storage instances of a given name.
+        """Request new storage instances of a given name.
 
         Uses storage-add tool to request additional storage. Juju will notify the unit
         via <storage-name>-storage-attached events when it becomes available.

@@ -138,7 +138,7 @@ class Harness:
         self._charm = TestCharm(self._framework)
 
     def begin_with_initial_hooks(self) -> None:
-        """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
+        """Start the Harness with the same hooks that Juju would fire at startup.
 
         This triggers install, relation-created, config-changed, start, and any relation-joined
         hooks. Based on what relations have been defined before you called begin().
@@ -219,7 +219,7 @@ class Harness:
                     relation, remote_unit.app, remote_unit)
 
     def cleanup(self) -> None:
-        """Called by your test infrastructure to cleanup any temporary directories/files/etc.
+        """Ask test infrastructure to cleanup any temporary directories/files/etc.
 
         Currently this only needs to be called if you test with resources. But it is reasonable
         to always include a `testcase.addCleanup(harness.cleanup)` just in case.
@@ -352,7 +352,7 @@ class Harness:
 
     @contextmanager
     def hooks_disabled(self):
-        """A context manager to run code with hooks disabled.
+        """Run code with hooks disabled using this context manager.
 
         Example::
 

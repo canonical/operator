@@ -68,7 +68,7 @@ class ActionEvent(EventBase):
     """
 
     def defer(self):
-        """Action events are not deferable like other events.
+        """Prevent action events from being deferred like other events.
 
         This is because an action runs synchronously and the administrator
         is waiting for the result.
@@ -76,7 +76,7 @@ class ActionEvent(EventBase):
         raise RuntimeError('cannot defer action events')
 
     def restore(self, snapshot: dict) -> None:
-        """Used by the operator framework to record the action.
+        """Ask operator framework to record the action.
 
         Not meant to be called directly by charm code.
         """
@@ -312,7 +312,7 @@ class RelationEvent(HookEvent):
         self.unit = unit
 
     def snapshot(self) -> dict:
-        """Used by the framework to serialize the event to disk.
+        """Ask operator framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
@@ -327,7 +327,7 @@ class RelationEvent(HookEvent):
         return snapshot
 
     def restore(self, snapshot: dict) -> None:
-        """Used by the framework to deserialize the event from disk.
+        """Ask operator framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
         """
@@ -583,7 +583,7 @@ class CharmBase(Object):
 
     @property
     def unit(self) -> model.Unit:
-        """Unit that this execution is responsible for."""
+        """Fetch unit that this execution is responsible for."""
         return self.framework.model.unit
 
     @property
@@ -598,7 +598,7 @@ class CharmBase(Object):
 
     @property
     def config(self) -> model.ConfigData:
-        """A mapping containing the charm's config and current values."""
+        """Fetch mapping containing the charm's config and current values."""
         return self.model.config
 
 

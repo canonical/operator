@@ -121,7 +121,7 @@ def _setup_event_links(charm_dir, charm):
 
 
 def _emit_charm_event(charm, event_name):
-    """Emits a charm event based on a Juju event name.
+    """Emit a charm event based on a Juju event name.
 
     charm -- A charm instance to emit an event from.
     event_name -- A Juju event name to emit on a charm.
@@ -249,7 +249,7 @@ class _Dispatcher:
             logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
 
     def _set_name_from_path(self, path: Path):
-        """Sets the name attribute to that which can be inferred from the given path."""
+        """Set the name attribute to that which can be inferred from the given path."""
         name = path.name.replace('-', '_')
         if path.parent.name == 'actions':
             name = '{}_action'.format(name)
@@ -317,7 +317,7 @@ def _should_use_controller_storage(db_path: Path, meta: ops.charm.CharmMeta) -> 
 
 
 def main(charm_class: ops.charm.CharmBase, use_juju_for_storage: bool = None):
-    """Setup the charm and dispatch the observed event.
+    """Construct the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
 
