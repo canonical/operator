@@ -59,7 +59,7 @@ class Model:
         self._pod = Pod(self._backend)
         self._storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
-        self._goal = GoalState(self._backend)
+        self._goal = GoalState(self._backend, self._cache)
 
     @property
     def unit(self) -> 'Unit':
@@ -115,7 +115,7 @@ class Model:
     @property
     def goal(self) -> 'GoalState':
         """Return :class: GoalState object representing the goal-state of the Juju model."""
-        return self._goal
+        return self._cache.get(GoalState)
 
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
@@ -995,8 +995,9 @@ class Storage:
 
 class GoalState:
     """Represents goal state of the Juju model."""
-    def __init__(self, backend):
+    def __init__(self, backend, cache):
         self._backend = backend
+        self._cache = cache
 
     @property
     def num_units(self) -> int:
@@ -1069,8 +1070,6 @@ class _ModelBackend:
 
         self._is_leader = None
         self._leader_check_time = None
-        self._goal_state = None
-        self._goal_state_check_time = None
 
     def _run(self, *args, return_output=False, use_json=False):
         kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)
@@ -1301,23 +1300,8 @@ class _ModelBackend:
         self._run(*cmd)
 
     def goal_state(self):
-        """Return the result of goal-state
-
-        The value is cached for the duration of a lease which is 30s in Juju.
-        """
-        now = time.monotonic()
-        if self._goal_state_check_time is None:
-            check = True
-        else:
-            time_since_check = datetime.timedelta(seconds=now - self._goal_state_check_time)
-            check = (time_since_check > self.LEASE_RENEWAL_PERIOD or self._goal_state is None)
-        if check:
-            # Current time MUST be saved before running goal-state to ensure the cache
-            # is only used inside the window that goal-state itself asserts.
-            self._goal_state_check_time = now
-            self._goal_state = self._run('goal-state', return_output=True, use_json=True)
-
-        return self._goal_state
+        """Return the result of goal-state."""
+        return self._run('goal-state', return_output=True, use_json=True)
 
 
 class _ModelBackendValidator:
