@@ -702,6 +702,8 @@ class CharmMeta:
         raw_actions = {}
         if actions is not None:
             raw_actions = _loadYaml(actions)
+            if raw_actions is None:
+                raw_actions = {}
         return cls(meta, raw_actions)
 
 

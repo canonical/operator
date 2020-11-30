@@ -94,6 +94,10 @@ class TestCharm(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "observer methods must now be explicitly provided"):
             framework.observe(charm.on.start, charm)
 
+    def test_empty_action(self):
+        meta = CharmMeta.from_yaml('name: my-charm', '')
+        self.assertEqual(meta.actions, {})
+
     def test_helper_properties(self):
         framework = self.create_framework()
 
