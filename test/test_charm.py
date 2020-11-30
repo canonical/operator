@@ -95,7 +95,8 @@ class TestCharm(unittest.TestCase):
             framework.observe(charm.on.start, charm)
 
     def test_empty_action(self):
-        CharmMeta.from_yaml('name: my-charm', '')
+        meta = CharmMeta.from_yaml('name: my-charm', '')
+        self.assertEqual(meta.actions, {})
 
     def test_helper_properties(self):
         framework = self.create_framework()
