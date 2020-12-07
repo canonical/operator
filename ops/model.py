@@ -59,7 +59,7 @@ class Model:
         self._pod = Pod(self._backend)
         self._storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
-        self._goal = GoalState(self._backend, self._cache)
+        self._goal = GoalState(self._backend)
 
     @property
     def unit(self) -> 'Unit':
@@ -115,7 +115,7 @@ class Model:
     @property
     def goal(self) -> 'GoalState':
         """Return :class: GoalState object representing the goal-state of the Juju model."""
-        return self._cache.get(GoalState)
+        return self._goal
 
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
@@ -995,25 +995,34 @@ class Storage:
 
 class GoalState:
     """Represents goal state of the Juju model."""
-    def __init__(self, backend, cache):
+    def __init__(self, backend):
         self._backend = backend
-        self._cache = cache
+        self._goal_state = None
 
     @property
     def num_units(self) -> int:
         """Return the number of expected peer units."""
-        raw = self._backend.goal_state()
-        units = raw.get('units', {})
+        goal_state = self.get_goal_state()
+        units = goal_state.get('units', {})
         return len(units)
 
     @property
     def pending_units(self) -> int:
         """Return the number of pending (non-Active) peer units."""
-        raw = self._backend.goal_state()
-        units = raw.get('units', {})
+        goal_state = self.get_goal_state()
+        units = goal_state.get('units', {})
         return len([name
                     for name, status in units.items()
                     if status['status'].lower() != 'active'])
+
+    def get_goal_state(self) -> dict:
+        """Return the result of goal-state.
+
+        This might return a cached result if self._goal_state has already been set.
+        """
+        if self._goal_state is None:
+            self._goal_state = self._backend.goal_state()
+        return self._goal_state
 
 
 class ModelError(Exception):
