@@ -731,14 +731,14 @@ class TestModel(unittest.TestCase):
             self.harness.model.goal.num_units
         )
 
-    def test_goal_state_num_units_with_peers_and_no_relations(self):
+    def test_goal_state_with_peers_and_no_relations(self):
         rel_id = self.harness.add_relation('db2', 'peer0')
         self.harness.add_relation_unit(rel_id, 'app/0')
-        self.assertEqual(1, self.harness.model.goal.num_units)
-        self.harness.add_relation_unit(rel_id, 'app/1')
+        self.harness.add_relation_unit(rel_id, 'app/1', 'waiting')
         self.assertEqual(2, self.harness.model.goal.num_units)
+        self.assertEqual(1, self.harness.model.goal.pending_units)
 
-    def test_goal_state_num_units_with_peers_and_relations(self):
+    def test_goal_state_with_peers_and_relations(self):
         # add non-peer relations and units
         rel_id0 = self.harness.add_relation('db0', 'remoteapp0')
         self.harness.add_relation_unit(rel_id0, 'remoteapp0/0')
@@ -747,28 +747,33 @@ class TestModel(unittest.TestCase):
         rel_id1 = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(rel_id1, 'remoteapp1/0')
         self.harness.add_relation_unit(rel_id1, 'remoteapp1/1')
-        self.assertEqual(0, self.harness.model.goal.num_units)
 
         # add peer relations and units
         peer_rel_id = self.harness.add_relation('db2', 'peer')
         self.harness.add_relation_unit(peer_rel_id, 'app/0')
-        self.assertEqual(1, self.harness.model.goal.num_units)
         self.harness.add_relation_unit(peer_rel_id, 'app/1')
         self.assertEqual(2, self.harness.model.goal.num_units)
+        self.assertEqual(0, self.harness.model.goal.pending_units)
 
     def test_goal_state_pending_units_with_peers_and_no_relations(self):
         rel_id = self.harness.add_relation('db2', 'peer0')
         self.harness.add_relation_unit(rel_id, 'app/0', 'waiting')
-        self.assertEqual(1, self.harness.model.goal.pending_units)
-        self.assertEqual(1, self.harness.model.goal.num_units)
+        self.harness.add_relation_unit(rel_id, 'app/1', 'maintenance')
+        self.harness.update_unit_status(rel_id, 'app/0', 'active')
+        self.harness.update_unit_status(rel_id, 'app/1', 'active')
+        self.assertEqual(0, self.harness.model.goal.pending_units)
+        self.assertEqual(2, self.harness.model.goal.num_units)
+
+    def test_cached_goal_state(self):
+        rel_id = self.harness.add_relation('db2', 'peer0')
+        self.harness.add_relation_unit(rel_id, 'app/0', 'waiting')
         self.harness.add_relation_unit(rel_id, 'app/1', 'maintenance')
         self.assertEqual(2, self.harness.model.goal.pending_units)
         self.assertEqual(2, self.harness.model.goal.num_units)
+        # even after making the units active, there should still be 2 pending units
         self.harness.update_unit_status(rel_id, 'app/0', 'active')
-        self.assertEqual(1, self.harness.model.goal.pending_units)
-        self.assertEqual(2, self.harness.model.goal.num_units)
         self.harness.update_unit_status(rel_id, 'app/1', 'active')
-        self.assertEqual(0, self.harness.model.goal.pending_units)
+        self.assertEqual(2, self.harness.model.goal.pending_units)
         self.assertEqual(2, self.harness.model.goal.num_units)
 
     def resetBackendCalls(self):
