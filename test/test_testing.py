@@ -34,6 +34,8 @@ from ops.model import (
     UnknownStatus,
     ModelError,
     RelationNotFoundError,
+    Application,
+    Unit,
 )
 from ops.testing import Harness
 
@@ -265,6 +267,15 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(KeyError):
             # unknown relation id
             harness.get_relation_data(99, 'postgresql')
+
+        t_app = Application('test-app', harness._backend, None)
+        t_unit0 = Unit('test-app/0', harness._backend, {Application: t_app})
+        t_unit1 = Unit('test-app/1', harness._backend, {Application: t_app})
+        self.assertEqual(harness.get_relation_data(rel_id, t_app), {})
+        self.assertEqual(harness.get_relation_data(rel_id, t_unit0), {})
+        self.assertEqual(harness.get_relation_data(rel_id, t_unit1), None)
+        pg_app = Application('postgresql', harness._backend, None)
+        self.assertEqual(harness.get_relation_data(rel_id, pg_app), {'remote': 'data'})
 
     def test_create_harness_twice(self):
         metadata = '''
