@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1591,3 +1591,14 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertIn(
             "units/unit-test-app-0/resources/foo: resource#test-app/foo not found",
             str(cm.exception))
+
+    def test_leader_get_set(self):
+        harness = Harness(CharmBase)
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+
+        self.assertEqual(backend.leader_get(), {})
+        backend.leader_set('foo', 'value')
+        self.assertEqual(backend.leader_get(), {'foo': 'value'})
+        backend.leader_set('foo', '')
+        self.assertEqual(backend.leader_get(), {})

@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ class Model:
         self._pod = Pod(self._backend)
         self._storages = StorageMapping(list(meta.storages), self._backend)
         self._bindings = BindingMapping(self._backend)
+        self._leadership_settings = LeadershipSettings(self._backend)
 
     @property
     def unit(self) -> 'Unit':
@@ -92,6 +93,17 @@ class Model:
     def storages(self) -> 'StorageMapping':
         """Mapping of storage_name to :class:`Storage` as defined in metadata.yaml."""
         return self._storages
+
+    @property
+    def leadership_settings(self) -> 'LeadershipSettings':
+        """Return the leadership settings for this charm as a mapping.
+
+        Leadership settings are visible to all units in the current application,
+        but modifications can only be made by the leader. Modifications made by the
+        leader will cause the leadership-changed hook to be fired on all other units
+        in the current application.
+        """
+        return self._leadership_settings
 
     @property
     def pod(self) -> 'Pod':
@@ -1077,6 +1089,48 @@ class ContainerMapping(Mapping):
         return repr(self._containers)
 
 
+class LeadershipSettings(LazyMapping, MutableMapping):
+    """Juju Leadership Settings.
+
+    This class provides direct access to the Juju Leadership Settings,
+    a bag of data shared between peer units. Only the leader can set
+    items. Keys all share the same namespace, so beware of collisions.
+
+    This MutableMapping implements Juju behavior. Only strings are
+    supported as keys and values. Deleting an entry is the same as
+    setting it to the empty string.
+    """
+
+    def __init__(self, backend):
+        self._backend = backend
+
+    def _load(self):
+        return self._backend.leader_get()
+
+    def __setitem__(self, key: str, value: str):
+        if not self._backend.is_leader():
+            raise LeadershipSettingsError('non-leader cannot modify leadership settings data')
+        if not isinstance(key, str):
+            raise LeadershipSettingsError('leadership settings data keys must be strings')
+        if "=" in key:
+            raise LeadershipSettingsError("leadership settings data keys may not contain '='")
+        if value is None:
+            value = ''
+        elif not isinstance(value, str):
+            raise LeadershipSettingsError('leadership settings data values must be strings')
+        self._backend.leader_set(key, value)
+        if self._lazy_data is not None:
+            if value:
+                self._data[key] = value
+            else:
+                self._data.pop(key, None)
+
+    def __delitem__(self, key: str):
+        # Match the behavior of Juju, which is that setting the value to an empty
+        # string will remove the key entirely from the leadership settings data.
+        self.__setitem__(key, '')
+
+
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
     pass
@@ -1108,6 +1162,14 @@ class RelationNotFoundError(ModelError):
 
 class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
+
+
+class LeadershipSettingsError(ModelError):
+    """Raised by invalid modifications to ``LeadershipSettings``.
+
+    This is raised if a non-leader attempts to modify the leadership settings data, or if
+    keys or values are not valid strings.
+    """
 
 
 class _ModelBackend:
@@ -1205,6 +1267,12 @@ class _ModelBackend:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
             raise
+
+    def leader_get(self):
+        return self._run('leader-get', return_output=True, use_json=True)
+
+    def leader_set(self, key, value):
+        self._run('leader-set', '{}={}'.format(key, value or ''))
 
     def config_get(self):
         return self._run('config-get', return_output=True, use_json=True)

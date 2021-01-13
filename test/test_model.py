@@ -449,6 +449,58 @@ class TestModel(unittest.TestCase):
             ('is_leader',),
         ])
 
+    def test_leader_get(self):
+        self.assertEqual(self.model.leadership_settings, {})
+        self.assertBackendCalls([('leader_get',)])
+        self.harness.set_leader(True)
+        self.resetBackendCalls()
+
+        self.model.leadership_settings['key'] = 'value'
+        self.assertBackendCalls([('is_leader',), ('leader_set', 'key', 'value')], reset=True)
+
+        self.assertEqual(self.model.leadership_settings, {'key': 'value'})
+        self.assertBackendCalls([], reset=True)  # Cached, no leader_get
+
+        del self.model.leadership_settings['key']
+        self.assertEqual(self.model.leadership_settings, {})
+        self.assertBackendCalls([
+            ('is_leader',),
+            ('leader_set', 'key', ''),
+        ])
+
+    def test_leader_set(self):
+        self.harness.set_leader(True)
+        self.model.leadership_settings['key'] = 'value'
+        self.assertEqual(self.model.leadership_settings, {'key': 'value'})
+        self.model.leadership_settings['key'] = ''
+        self.assertEqual(self.model.leadership_settings, {})
+        self.assertBackendCalls([
+            ('is_leader',),
+            ('leader_set', 'key', 'value'),
+            ('leader_get',),  # Not called earlier, lazy.
+            ('is_leader',),
+            ('leader_set', 'key', ''),
+        ])
+
+    def test_leader_set_nonleader(self):
+        self.harness.set_leader(False)
+        with self.assertRaises(ops.model.LeadershipSettingsError):
+            self.model.leadership_settings['key'] = 'value'
+
+    def test_leader_set_invalid_key(self):
+        self.harness.set_leader(True)
+        self.model.leadership_settings['key'] = 'value'
+        with self.assertRaises(ops.model.LeadershipSettingsError):
+            self.model.leadership_settings['key='] = 'value'
+        with self.assertRaises(ops.model.LeadershipSettingsError):
+            self.model.leadership_settings[23] = 'value'
+
+    def test_leader_set_invalid_value(self):
+        self.harness.set_leader(True)
+        self.model.leadership_settings['key'] = 'value'
+        with self.assertRaises(ops.model.LeadershipSettingsError):
+            self.model.leadership_settings['key'] = 12
+
     def test_workload_version(self):
         self.model.unit.set_workload_version('1.2.3')
         self.assertBackendCalls([

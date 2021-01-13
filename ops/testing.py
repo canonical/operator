@@ -1,4 +1,4 @@
-# Copyright 2020 Canonical Ltd.
+# Copyright 2020-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -708,6 +708,7 @@ class _TestingModelBackend:
         self._unit_status = {'status': 'maintenance', 'message': ''}
         self._workload_version = None
         self._resource_dir = None
+        self._leader_data = {}
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -800,6 +801,15 @@ class _TestingModelBackend:
             self._app_status = {'status': status, 'message': message}
         else:
             self._unit_status = {'status': status, 'message': message}
+
+    def leader_get(self):
+        return self._leader_data
+
+    def leader_set(self, key, value) -> None:
+        if value:
+            self._leader_data[key] = str(value)
+        else:
+            self._leader_data.pop(key, None)
 
     def storage_list(self, name):
         raise NotImplementedError(self.storage_list)
