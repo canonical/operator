@@ -14,6 +14,11 @@
 
 """Client for the Pebble API (HTTP over Unix socket)."""
 
+# TODO(benhoyt): consider the following:
+# - think about how we'll handle API versioning
+# - add automatic retries
+# - unify errors into package-local error
+
 from typing import Dict, List, Optional
 import datetime
 import enum
@@ -58,7 +63,7 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
 _TIMESTAMP_RE = re.compile(r'(.*)\.(\d+)(.*)')
 
 
-def parse_timestamp(s):
+def _parse_timestamp(s):
     """Parse timestamp from Go-encoded JSON (which uses 9 decimal places for seconds."""
     match = _TIMESTAMP_RE.match(s)
     if not match:
@@ -102,14 +107,13 @@ class ChangeState(enum.Enum):
 class SystemInfo:
     """System information object."""
 
-    version: str
+    def __init__(self, version: str):
+        self.version = version
 
     @classmethod
     def from_dict(cls, d: Dict) -> 'SystemInfo':
         """Create new object from dict parsed from JSON."""
-        s = cls()
-        s.version = d['version']
-        return s
+        return SystemInfo(version=d['version'])
 
     def __repr__(self):
         return 'SystemInfo(version={!r})'.format(self.version)
@@ -120,24 +124,33 @@ class SystemInfo:
 class Warning:
     """Warning object."""
 
-    message: str
-    first_added: datetime.datetime
-    last_added: datetime.datetime
-    last_shown: Optional[datetime.datetime]
-    expire_after: str
-    repeat_after: str
+    def __init__(
+        self,
+        message: str,
+        first_added: datetime.datetime,
+        last_added: datetime.datetime,
+        last_shown: Optional[datetime.datetime],
+        expire_after: str,
+        repeat_after: str,
+    ):
+        self.message = message
+        self.first_added = first_added
+        self.last_added = last_added
+        self.last_shown = last_shown
+        self.expire_after = expire_after
+        self.repeat_after = repeat_after
 
     @classmethod
     def from_dict(cls, d: Dict) -> 'Warning':
         """Create new object from dict parsed from JSON."""
-        w = cls()
-        w.message = d['message']
-        w.first_added = parse_timestamp(d['first-added'])
-        w.last_added = parse_timestamp(d['last-added'])
-        w.last_shown = parse_timestamp(d['last-shown']) if d.get('last-shown') else None
-        w.expire_after = d['expire-after']
-        w.repeat_after = d['repeat-after']
-        return w
+        return Warning(
+            message=d['message'],
+            first_added=_parse_timestamp(d['first-added']),
+            last_added=_parse_timestamp(d['last-added']),
+            last_shown=_parse_timestamp(d['last-shown']) if d.get('last-shown') else None,
+            expire_after=d['expire-after'],
+            repeat_after=d['repeat-after'],
+        )
 
     def __repr__(self):
         return """Warning(
@@ -162,18 +175,24 @@ class Warning:
 class TaskProgress:
     """Task progress object."""
 
-    label: str
-    done: int
-    total: int
+    def __init__(
+        self,
+        label: str,
+        done: int,
+        total: int,
+    ):
+        self.label = label
+        self.done = done
+        self.total = total
 
     @classmethod
     def from_dict(cls, d: Dict) -> 'TaskProgress':
         """Create new object from dict parsed from JSON."""
-        t = cls()
-        t.label = d['label']
-        t.done = d['done']
-        t.total = d['total']
-        return t
+        return TaskProgress(
+            label=d['label'],
+            done=d['done'],
+            total=d['total'],
+        )
 
     def __repr__(self):
         return 'TaskProgress(label={!r}, done={!r}, total={!r})'.format(
@@ -185,31 +204,49 @@ class TaskProgress:
     __str__ = __repr__
 
 
+class TaskID(str):
+    """Task ID (a more strongly-typed string)."""
+
+    def __repr__(self):
+        return 'TaskID({!r})'.format(str(self))
+
+
 class Task:
     """Task object."""
 
-    id: str
-    kind: str
-    summary: str
-    status: str
-    log: List[str]
-    progress: TaskProgress
-    spawn_time: datetime.datetime
-    ready_time: Optional[datetime.datetime]
+    def __init__(
+        self,
+        id: TaskID,
+        kind: str,
+        summary: str,
+        status: str,
+        log: List[str],
+        progress: TaskProgress,
+        spawn_time: datetime.datetime,
+        ready_time: Optional[datetime.datetime],
+    ):
+        self.id = id
+        self.kind = kind
+        self.summary = summary
+        self.status = status
+        self.log = log
+        self.progress = progress
+        self.spawn_time = spawn_time
+        self.ready_time = ready_time
 
     @classmethod
     def from_dict(cls, d: Dict) -> 'Task':
         """Create new object from dict parsed from JSON."""
-        t = cls()
-        t.id = d['id']
-        t.kind = d['kind']
-        t.summary = d['summary']
-        t.status = d['status']
-        t.log = d.get('log') or []
-        t.progress = TaskProgress.from_dict(d['progress'])
-        t.spawn_time = parse_timestamp(d['spawn-time'])
-        t.ready_time = parse_timestamp(d['ready-time']) if d.get('ready-time') else None
-        return t
+        return Task(
+            id=TaskID(d['id']),
+            kind=d['kind'],
+            summary=d['summary'],
+            status=d['status'],
+            log=d.get('log') or [],
+            progress=TaskProgress.from_dict(d['progress']),
+            spawn_time=_parse_timestamp(d['spawn-time']),
+            ready_time=_parse_timestamp(d['ready-time']) if d.get('ready-time') else None,
+        )
 
     def __repr__(self):
         return """Task(
@@ -235,33 +272,52 @@ class Task:
     __str__ = __repr__
 
 
+class ChangeID(str):
+    """Change ID (a more strongly-typed string)."""
+
+    def __repr__(self):
+        return 'ChangeID({!r})'.format(str(self))
+
+
 class Change:
     """Change object."""
 
-    id: str
-    kind: str
-    summary: str
-    status: str
-    tasks: List[Task]
-    ready: bool
-    err: Optional[str]
-    spawn_time: datetime.datetime
-    ready_time: Optional[datetime.datetime]
+    def __init__(
+        self,
+        id: ChangeID,
+        kind: str,
+        summary: str,
+        status: str,
+        tasks: List[Task],
+        ready: bool,
+        err: Optional[str],
+        spawn_time: datetime.datetime,
+        ready_time: Optional[datetime.datetime],
+    ):
+        self.id = id
+        self.kind = kind
+        self.summary = summary
+        self.status = status
+        self.tasks = tasks
+        self.ready = ready
+        self.err = err
+        self.spawn_time = spawn_time
+        self.ready_time = ready_time
 
     @classmethod
     def from_dict(cls, d: Dict) -> 'Change':
         """Create new object from dict parsed from JSON."""
-        c = cls()
-        c.id = d['id']
-        c.kind = d['kind']
-        c.summary = d['summary']
-        c.status = d['status']
-        c.tasks = [Task.from_dict(t) for t in d.get('tasks') or []]
-        c.ready = d['ready']
-        c.err = d.get('err')
-        c.spawn_time = parse_timestamp(d['spawn-time'])
-        c.ready_time = parse_timestamp(d['ready-time']) if d.get('ready-time') else None
-        return c
+        return Change(
+            id=ChangeID(d['id']),
+            kind=d['kind'],
+            summary=d['summary'],
+            status=d['status'],
+            tasks=[Task.from_dict(t) for t in d.get('tasks') or []],
+            ready=d['ready'],
+            err=d.get('err'),
+            spawn_time=_parse_timestamp(d['spawn-time']),
+            ready_time=_parse_timestamp(d['ready-time']) if d.get('ready-time') else None,
+        )
 
     def __repr__(self):
         return """Change(
@@ -344,7 +400,7 @@ class API:
         return [Warning.from_dict(w) for w in result['result']]
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
-        """Acknowledge warnings up to given timestamp."""
+        """Acknowledge warnings up to given timestamp, return number acknowledged."""
         body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
         result = self._request('POST', '/v1/warnings', body=body)
         return result['result']
@@ -357,18 +413,18 @@ class API:
         result = self._request('GET', '/v1/changes', query)
         return [Change.from_dict(c) for c in result['result']]
 
-    def get_change(self, change_id: str) -> Change:
+    def get_change(self, change_id: ChangeID) -> Change:
         """Get single change by ID."""
         result = self._request('GET', '/v1/changes/{}'.format(change_id))
         return Change.from_dict(result['result'])
 
-    def abort_change(self, change_id: str) -> Change:
+    def abort_change(self, change_id: ChangeID) -> Change:
         """Abort change with given ID."""
         body = {'action': 'abort'}
         result = self._request('POST', '/v1/changes/{}'.format(change_id), body=body)
         return Change.from_dict(result['result'])
 
-    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> str:
+    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Start the autostart services and wait (poll) for them to be started.
 
         If timeout is 0, submit the action but don't wait.
@@ -376,32 +432,36 @@ class API:
         return self._services_action('autostart', [], timeout, delay)
 
     def start_services(
-            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
-    ) -> str:
+        self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> ChangeID:
         """Start services by name and wait (poll) for them to be started.
 
-        If timeout is 0 or None, submit the action but don't wait.
+        If timeout is 0, submit the action but don't wait.
         """
         return self._services_action('start', services, timeout, delay)
 
-    def stop_services(self, services: List[str], timeout: float = 30.0, delay: float = 0.1) -> str:
+    def stop_services(
+        self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> ChangeID:
         """Stop services by name and wait (poll) for them to be started.
 
-        If timeout is 0 or None, submit the action but don't wait.
+        If timeout is 0, submit the action but don't wait.
         """
         return self._services_action('stop', services, timeout, delay)
 
     def _services_action(
-            self, action: str, services: List[str], timeout: float, delay: float,
-    ) -> str:
+        self, action: str, services: List[str], timeout: float, delay: float,
+    ) -> ChangeID:
         body = {'action': action, 'services': services}
         result = self._request('POST', '/v1/services', body=body)
-        change_id = result['change']
+        change_id = ChangeID(result['change'])
         if timeout:
             self.wait_change(change_id, timeout=timeout, delay=delay)
         return change_id
 
-    def wait_change(self, change_id: str, timeout: float = 30.0, delay: float = 0.1) -> Change:
+    def wait_change(
+        self, change_id: ChangeID, timeout: float = 30.0, delay: float = 0.1,
+    ) -> Change:
         """Poll change every delay seconds (up to timeout) for it to be ready."""
         deadline = time.time() + timeout
 
