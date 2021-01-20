@@ -1,3 +1,18 @@
+# Copyright 2019-2020 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Client for the Pebble API (HTTP over Unix socket)."""
 
 from typing import Dict, List, Optional
 import datetime
@@ -8,13 +23,16 @@ import os
 import re
 import socket
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
 
-class UnixSocketConnection(http.client.HTTPConnection):
+class _UnixSocketConnection(http.client.HTTPConnection):
+    """Implementation of HTTPConnection that connects to a named Unix socket."""
+
     def __init__(self, host, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, socket_path=None):
-        super(UnixSocketConnection, self).__init__(host, timeout=timeout)
+        super(_UnixSocketConnection, self).__init__(host, timeout=timeout)
         self.socket_path = socket_path
 
     def connect(self):
@@ -24,21 +42,25 @@ class UnixSocketConnection(http.client.HTTPConnection):
             self.sock.settimeout(self.timeout)
 
 
-class UnixSocketHandler(urllib.request.AbstractHTTPHandler):
+class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
+    """Implementation of HTTPHandler that uses a named Unix socket."""
+
     def __init__(self, socket_path):
-        super(UnixSocketHandler, self).__init__()
+        super(_UnixSocketHandler, self).__init__()
         self.socket_path = socket_path
 
     def http_open(self, req):
-        return self.do_open(UnixSocketConnection, req, socket_path=self.socket_path)
+        return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
     http_request = urllib.request.AbstractHTTPHandler.do_request_
 
 
-TIMESTAMP_RE = re.compile(r'(.*)\.(\d+)(.*)')
+_TIMESTAMP_RE = re.compile(r'(.*)\.(\d+)(.*)')
+
 
 def parse_timestamp(s):
-    match = TIMESTAMP_RE.match(s)
+    """Parse timestamp from Go-encoded JSON (which uses 9 decimal places for seconds."""
+    match = _TIMESTAMP_RE.match(s)
     if not match:
         return datetime.datetime.fromisoformat(s)
     head, subsecond, rest = match.groups()
@@ -46,11 +68,14 @@ def parse_timestamp(s):
     return datetime.datetime.fromisoformat(head + '.' + subsecond + rest)
 
 
-def indent(s, indent='    '):
-    return '\n'.join(indent+l for l in s.splitlines())
+def _indent(s, indent='    '):
+    """Indent each line in string s with given indent."""
+    return '\n'.join(indent+line for line in s.splitlines())
 
 
 class ServiceError(Exception):
+    """Raised by API.wait_change when a service change is ready but has an error."""
+
     def __init__(self, err, change):
         self.err = err
         self.change = change
@@ -60,21 +85,28 @@ class ServiceError(Exception):
 
 
 class WarningState(enum.Enum):
+    """Enum of states for API.get_warnings() select parameter."""
+
     ALL = 'all'
     PENDING = 'pending'
 
 
 class ChangeState(enum.Enum):
+    """Enum of states for API.get_changes() select parameter."""
+
     ALL = 'all'
     IN_PROGRESS = 'in-progress'
     READY = 'ready'
 
 
 class SystemInfo:
+    """System information object."""
+
     version: str
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, d: Dict) -> 'SystemInfo':
+        """Create new object from dict parsed from JSON."""
         s = cls()
         s.version = d['version']
         return s
@@ -86,6 +118,8 @@ class SystemInfo:
 
 
 class Warning:
+    """Warning object."""
+
     message: str
     first_added: datetime.datetime
     last_added: datetime.datetime
@@ -94,7 +128,8 @@ class Warning:
     repeat_after: str
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, d: Dict) -> 'Warning':
+        """Create new object from dict parsed from JSON."""
         w = cls()
         w.message = d['message']
         w.first_added = parse_timestamp(d['first-added'])
@@ -125,12 +160,15 @@ class Warning:
 
 
 class TaskProgress:
+    """Task progress object."""
+
     label: str
     done: int
     total: int
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, d: Dict) -> 'TaskProgress':
+        """Create new object from dict parsed from JSON."""
         t = cls()
         t.label = d['label']
         t.done = d['done']
@@ -148,6 +186,8 @@ class TaskProgress:
 
 
 class Task:
+    """Task object."""
+
     id: str
     kind: str
     summary: str
@@ -158,7 +198,8 @@ class Task:
     ready_time: Optional[datetime.datetime]
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, d: Dict) -> 'Task':
+        """Create new object from dict parsed from JSON."""
         t = cls()
         t.id = d['id']
         t.kind = d['kind']
@@ -195,18 +236,21 @@ class Task:
 
 
 class Change:
+    """Change object."""
+
     id: str
     kind: str
     summary: str
     status: str
     tasks: List[Task]
     ready: bool
-    err: str
+    err: Optional[str]
     spawn_time: datetime.datetime
     ready_time: Optional[datetime.datetime]
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, d: Dict) -> 'Change':
+        """Create new object from dict parsed from JSON."""
         c = cls()
         c.id = d['id']
         c.kind = d['kind']
@@ -235,7 +279,8 @@ class Change:
             self.kind,
             self.summary,
             self.status,
-            '[\n' + indent(',\n'.join(indent(repr(t)) for t in self.tasks)) + ',\n    ]' if self.tasks else '[]',
+            '[\n' + _indent(',\n'.join(_indent(repr(t)) for t in self.tasks)) +
+            ',\n    ]' if self.tasks else '[]',
             self.ready,
             self.err,
             self.spawn_time,
@@ -246,7 +291,10 @@ class Change:
 
 
 class API:
+    """Pebble API client."""
+
     def __init__(self, socket_path=None, opener=None, base_url='http://localhost', timeout=5.0):
+        """Initialize an instance. Defaults to Unix socket "$PEBBLE/.pebble.socket"."""
         if opener is None:
             opener = self._get_default_opener(socket_path)
         self.opener = opener
@@ -262,7 +310,7 @@ class API:
             socket_path = os.path.join(PEBBLE, '.pebble.socket')
 
         opener = urllib.request.OpenerDirector()
-        opener.add_handler(UnixSocketHandler(socket_path))
+        opener.add_handler(_UnixSocketHandler(socket_path))
         opener.add_handler(urllib.request.HTTPDefaultErrorHandler())
         opener.add_handler(urllib.request.HTTPRedirectHandler())
         opener.add_handler(urllib.request.HTTPErrorProcessor())
@@ -322,23 +370,30 @@ class API:
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> str:
         """Start the autostart services and wait (poll) for them to be started.
+
         If timeout is 0, submit the action but don't wait.
         """
         return self._services_action('autostart', [], timeout, delay)
 
-    def start_services(self, services: List[str], timeout: float = 30.0, delay: float = 0.1) -> str:
+    def start_services(
+            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> str:
         """Start services by name and wait (poll) for them to be started.
+
         If timeout is 0 or None, submit the action but don't wait.
         """
         return self._services_action('start', services, timeout, delay)
 
     def stop_services(self, services: List[str], timeout: float = 30.0, delay: float = 0.1) -> str:
         """Stop services by name and wait (poll) for them to be started.
+
         If timeout is 0 or None, submit the action but don't wait.
         """
         return self._services_action('stop', services, timeout, delay)
 
-    def _services_action(self, action: str, services: List[str], timeout: float, delay: float) -> str:
+    def _services_action(
+            self, action: str, services: List[str], timeout: float, delay: float,
+    ) -> str:
         body = {'action': action, 'services': services}
         result = self._request('POST', '/v1/services', body=body)
         change_id = result['change']
@@ -359,7 +414,8 @@ class API:
 
             time.sleep(delay)
 
-        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
+        raise TimeoutError(
+            'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
 
 api = API()
