@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import json
 import os
 import re
 import socket
+import textwrap
 import time
 import urllib.error
 import urllib.parse
@@ -57,8 +58,6 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
     def http_open(self, req):
         return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
-    http_request = urllib.request.AbstractHTTPHandler.do_request_
-
 
 _TIMESTAMP_RE = re.compile(r'(.*)\.(\d+)(.*)')
 
@@ -71,11 +70,6 @@ def _parse_timestamp(s):
     head, subsecond, rest = match.groups()
     subsecond = subsecond[:6]  # fromisoformat supports at most 6 decimal places
     return datetime.datetime.fromisoformat(head + '.' + subsecond + rest)
-
-
-def _indent(s, indent='    '):
-    """Indent each line in string s with given indent."""
-    return '\n'.join(indent+line for line in s.splitlines())
 
 
 class ServiceError(Exception):
@@ -113,10 +107,10 @@ class SystemInfo:
     @classmethod
     def from_dict(cls, d: Dict) -> 'SystemInfo':
         """Create new object from dict parsed from JSON."""
-        return SystemInfo(version=d['version'])
+        return cls(version=d['version'])
 
     def __repr__(self):
-        return 'SystemInfo(version={!r})'.format(self.version)
+        return 'SystemInfo(version={self.version!r})'.format(self=self)
 
     __str__ = __repr__
 
@@ -143,7 +137,7 @@ class Warning:
     @classmethod
     def from_dict(cls, d: Dict) -> 'Warning':
         """Create new object from dict parsed from JSON."""
-        return Warning(
+        return cls(
             message=d['message'],
             first_added=_parse_timestamp(d['first-added']),
             last_added=_parse_timestamp(d['last-added']),
@@ -154,20 +148,13 @@ class Warning:
 
     def __repr__(self):
         return """Warning(
-    message={!r},
-    first_added={!r},
-    last_added={!r},
-    last_shown={!r},
-    expire_after={!r},
-    repeat_after={!r},
-)""".format(
-            self.message,
-            self.first_added,
-            self.last_added,
-            self.last_shown,
-            self.expire_after,
-            self.repeat_after,
-        )
+    message={self.message!r},
+    first_added={self.first_added!r},
+    last_added={self.last_added!r},
+    last_shown={self.last_shown!r},
+    expire_after={self.expire_after!r},
+    repeat_after={self.repeat_after!r},
+)""".format(self=self)
 
     __str__ = __repr__
 
@@ -188,18 +175,15 @@ class TaskProgress:
     @classmethod
     def from_dict(cls, d: Dict) -> 'TaskProgress':
         """Create new object from dict parsed from JSON."""
-        return TaskProgress(
+        return cls(
             label=d['label'],
             done=d['done'],
             total=d['total'],
         )
 
     def __repr__(self):
-        return 'TaskProgress(label={!r}, done={!r}, total={!r})'.format(
-            self.label,
-            self.done,
-            self.total,
-        )
+        return ('TaskProgress(label={self.label!r}, done={self.done!r}, '
+                'total={self.total!r})').format(self=self)
 
     __str__ = __repr__
 
@@ -237,7 +221,7 @@ class Task:
     @classmethod
     def from_dict(cls, d: Dict) -> 'Task':
         """Create new object from dict parsed from JSON."""
-        return Task(
+        return cls(
             id=TaskID(d['id']),
             kind=d['kind'],
             summary=d['summary'],
@@ -250,24 +234,15 @@ class Task:
 
     def __repr__(self):
         return """Task(
-    id={!r},
-    kind={!r},
-    summary={!r},
-    status={!r},
-    log={!r},
-    progress={!r},
-    spawn_time={!r},
-    ready_time={!r},
-)""".format(
-            self.id,
-            self.kind,
-            self.summary,
-            self.status,
-            self.log,
-            self.progress,
-            self.spawn_time,
-            self.ready_time,
-        )
+    id={self.id!r},
+    kind={self.kind!r},
+    summary={self.summary!r},
+    status={self.status!r},
+    log={self.log!r},
+    progress={self.progress!r},
+    spawn_time={self.spawn_time!r},
+    ready_time={self.ready_time!r},
+)""".format(self=self)
 
     __str__ = __repr__
 
@@ -307,7 +282,7 @@ class Change:
     @classmethod
     def from_dict(cls, d: Dict) -> 'Change':
         """Create new object from dict parsed from JSON."""
-        return Change(
+        return cls(
             id=ChangeID(d['id']),
             kind=d['kind'],
             summary=d['summary'],
@@ -320,27 +295,20 @@ class Change:
         )
 
     def __repr__(self):
+        tasks_str = ',\n'.join(textwrap.indent(repr(t), '    ') for t in self.tasks or [])
         return """Change(
-    id={!r},
-    kind={!r},
-    summary={!r},
-    status={!r},
-    tasks={},
-    ready={!r},
-    err={!r},
-    spawn_time={!r},
-    ready_time={!r},
+    id={self.id!r},
+    kind={self.kind!r},
+    summary={self.summary!r},
+    status={self.status!r},
+    tasks={tasks},
+    ready={self.ready!r},
+    err={self.err!r},
+    spawn_time={self.spawn_time!r},
+    ready_time={self.ready_time!r},
 )""".format(
-            self.id,
-            self.kind,
-            self.summary,
-            self.status,
-            '[\n' + _indent(',\n'.join(_indent(repr(t)) for t in self.tasks)) +
-            ',\n    ]' if self.tasks else '[]',
-            self.ready,
-            self.err,
-            self.spawn_time,
-            self.ready_time,
+            self=self,
+            tasks='[\n' + textwrap.indent(tasks_str, '    ') + ',\n    ]' if self.tasks else '[]',
         )
 
     __str__ = __repr__
