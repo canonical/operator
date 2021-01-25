@@ -27,24 +27,30 @@ import json
 import os
 import re
 import socket
-import textwrap
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
 
+_default_timeout = object()
+
+
 class _UnixSocketConnection(http.client.HTTPConnection):
     """Implementation of HTTPConnection that connects to a named Unix socket."""
 
-    def __init__(self, host, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, socket_path=None):
-        super(_UnixSocketConnection, self).__init__(host, timeout=timeout)
+    def __init__(self, host, timeout=_default_timeout, socket_path=None):
+        if timeout is _default_timeout:
+            super().__init__(host)
+        else:
+            super().__init__(host, timeout=timeout)
         self.socket_path = socket_path
 
     def connect(self):
+        """Override connect to use Unix socket (instead of TCP socket)."""
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
-        if self.timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+        if self.timeout is not _default_timeout:
             self.sock.settimeout(self.timeout)
 
 
@@ -52,10 +58,11 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
     """Implementation of HTTPHandler that uses a named Unix socket."""
 
     def __init__(self, socket_path):
-        super(_UnixSocketHandler, self).__init__()
+        super().__init__()
         self.socket_path = socket_path
 
     def http_open(self, req):
+        """Override http_open to use a Unix socket connection (instead of TCP)."""
         return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
 
@@ -85,6 +92,7 @@ class ServiceError(Exception):
     """Raised by API.wait_change when a service change is ready but has an error."""
 
     def __init__(self, err, change):
+        super().__init__(err, change)
         self.err = err
         self.change = change
 
@@ -121,8 +129,6 @@ class SystemInfo:
     def __repr__(self):
         return 'SystemInfo(version={self.version!r})'.format(self=self)
 
-    __str__ = __repr__
-
 
 class Warning:
     """Warning object."""
@@ -156,16 +162,14 @@ class Warning:
         )
 
     def __repr__(self):
-        return """Warning(
-    message={self.message!r},
-    first_added={self.first_added!r},
-    last_added={self.last_added!r},
-    last_shown={self.last_shown!r},
-    expire_after={self.expire_after!r},
-    repeat_after={self.repeat_after!r},
-)""".format(self=self)
-
-    __str__ = __repr__
+        return ('Warning('
+                'message={self.message!r}, '
+                'first_added={self.first_added!r}, '
+                'last_added={self.last_added!r}, '
+                'last_shown={self.last_shown!r}, '
+                'expire_after={self.expire_after!r}, '
+                'repeat_after={self.repeat_after!r})'
+                ).format(self=self)
 
 
 class TaskProgress:
@@ -191,10 +195,11 @@ class TaskProgress:
         )
 
     def __repr__(self):
-        return ('TaskProgress(label={self.label!r}, done={self.done!r}, '
-                'total={self.total!r})').format(self=self)
-
-    __str__ = __repr__
+        return ('TaskProgress('
+                'label={self.label!r}, '
+                'done={self.done!r}, '
+                'total={self.total!r})'
+                ).format(self=self)
 
 
 class TaskID(str):
@@ -242,18 +247,16 @@ class Task:
         )
 
     def __repr__(self):
-        return """Task(
-    id={self.id!r},
-    kind={self.kind!r},
-    summary={self.summary!r},
-    status={self.status!r},
-    log={self.log!r},
-    progress={self.progress!r},
-    spawn_time={self.spawn_time!r},
-    ready_time={self.ready_time!r},
-)""".format(self=self)
-
-    __str__ = __repr__
+        return ('Task('
+                'id={self.id!r}, '
+                'kind={self.kind!r}, '
+                'summary={self.summary!r}, '
+                'status={self.status!r}, '
+                'log={self.log!r}, '
+                'progress={self.progress!r}, '
+                'spawn_time={self.spawn_time!r}, '
+                'ready_time={self.ready_time!r})'
+                ).format(self=self)
 
 
 class ChangeID(str):
@@ -304,23 +307,17 @@ class Change:
         )
 
     def __repr__(self):
-        tasks_str = ',\n'.join(textwrap.indent(repr(t), '    ') for t in self.tasks or [])
-        return """Change(
-    id={self.id!r},
-    kind={self.kind!r},
-    summary={self.summary!r},
-    status={self.status!r},
-    tasks={tasks},
-    ready={self.ready!r},
-    err={self.err!r},
-    spawn_time={self.spawn_time!r},
-    ready_time={self.ready_time!r},
-)""".format(
-            self=self,
-            tasks='[\n' + textwrap.indent(tasks_str, '    ') + ',\n    ]' if self.tasks else '[]',
-        )
-
-    __str__ = __repr__
+        return ('Change('
+                'id={self.id!r}, '
+                'kind={self.kind!r}, '
+                'summary={self.summary!r}, '
+                'status={self.status!r}, '
+                'tasks={self.tasks!r}, '
+                'ready={self.ready!r}, '
+                'err={self.err!r}, '
+                'spawn_time={self.spawn_time!r}, '
+                'ready_time={self.ready_time!r})'
+                ).format(self=self)
 
 
 class API:
@@ -336,10 +333,14 @@ class API:
 
     @classmethod
     def _get_default_opener(cls, socket_path):
+        """Build the default urllib opener to use for requests.
+
+        If socket_path is None, use "$PEBBLE/.pebble.socket".
+        """
         if socket_path is None:
             PEBBLE = os.getenv('PEBBLE')
             if not PEBBLE:
-                raise Exception('You must specify socket_path or set $PEBBLE')
+                raise ValueError('You must specify socket_path or set $PEBBLE')
             socket_path = os.path.join(PEBBLE, '.pebble.socket')
 
         opener = urllib.request.OpenerDirector()
@@ -350,6 +351,12 @@ class API:
         return opener
 
     def _request(self, method: str, path: str, query: Dict = None, body: Dict = None) -> Dict:
+        """Make a request with the given HTTP method and path to the Pebble API.
+
+        If query dict is provided, it is encoded and appended as a query string
+        to the URL. If body dict is provided, it is serialied as JSON and used
+        as the HTTP body (with Content-Type "application/json").
+        """
         url = self.base_url + path
         if query:
             url = url + '?' + urllib.parse.urlencode(query)
@@ -370,7 +377,7 @@ class API:
         result = self._request('GET', '/v1/system-info')
         return SystemInfo.from_dict(result['result'])
 
-    def get_warnings(self, select=WarningState.PENDING) -> List[Warning]:
+    def get_warnings(self, select: WarningState = WarningState.PENDING) -> List[Warning]:
         """Get list of warnings in given state (pending or all)."""
         query = {'select': select.value}
         result = self._request('GET', '/v1/warnings', query)
@@ -382,7 +389,9 @@ class API:
         result = self._request('POST', '/v1/warnings', body=body)
         return result['result']
 
-    def get_changes(self, select=ChangeState.IN_PROGRESS, service=None) -> List[Change]:
+    def get_changes(
+        self, select: ChangeState = ChangeState.IN_PROGRESS, service: str = None,
+    ) -> List[Change]:
         """Get list of changes in given state, filter by service name if given."""
         query = {'select': select.value}
         if service is not None:
@@ -482,13 +491,13 @@ if __name__ == '__main__':
                    choices=[s.value for s in ChangeState], default='all')
     p.add_argument('--service', help='optional service name to filter on')
 
-    p = subparsers.add_parser('info', help='show Pebble system information')
-
     p = subparsers.add_parser('start', help='start service(s)')
     p.add_argument('service', help='name of service to start (can specify multiple)', nargs='+')
 
     p = subparsers.add_parser('stop', help='stop service(s)')
     p.add_argument('service', help='name of service to stop (can specify multiple)', nargs='+')
+
+    p = subparsers.add_parser('system-info', help='show Pebble system information')
 
     p = subparsers.add_parser('warnings', help='show (filtered) warnings')
     p.add_argument('--select', help='warning state to filter on, default %(default)s',
@@ -496,7 +505,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    api = API(socket_path=args.socket)
+    try:
+        api = API(socket_path=args.socket)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
     try:
         result = None  # type: Any
@@ -511,23 +524,23 @@ if __name__ == '__main__':
             result = api.get_change(ChangeID(args.change_id))
         elif args.command == 'changes':
             result = api.get_changes(select=ChangeState(args.select), service=args.service)
-        elif args.command == 'info':
-            result = api.get_system_info()
         elif args.command == 'start':
             result = api.start_services(args.service)
         elif args.command == 'stop':
             result = api.stop_services(args.service)
+        elif args.command == 'system-info':
+            result = api.get_system_info()
         elif args.command == 'warnings':
             result = api.get_warnings(select=WarningState(args.select))
         else:
             parser.error('command required')
     except urllib.error.HTTPError as e:
-        print(e)
+        print(e, file=sys.stderr)
         obj = json.load(e)
-        print(json.dumps(obj, sort_keys=True, indent=4))
+        print(json.dumps(obj, sort_keys=True, indent=4), file=sys.stderr)
         sys.exit(1)
     except ServiceError as e:
-        print('ServiceError:', e.err)
+        print('ServiceError:', e.err, file=sys.stderr)
         sys.exit(1)
 
     if isinstance(result, list):
