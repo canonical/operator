@@ -499,7 +499,7 @@ if __name__ == '__main__':
     api = API(socket_path=args.socket)
 
     try:
-        result: Any = None
+        result = None  # type: Any
         if args.command == 'abort':
             result = api.abort_change(ChangeID(args.change_id))
         elif args.command == 'ack':
@@ -527,7 +527,7 @@ if __name__ == '__main__':
         print(json.dumps(obj, sort_keys=True, indent=4))
         sys.exit(1)
     except ServiceError as e:
-        print(e.err)
+        print('ServiceError:', e.err)
         sys.exit(1)
 
     if isinstance(result, list):
