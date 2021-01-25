@@ -19,7 +19,7 @@
 # - add automatic retries
 # - unify errors into package-local error
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import datetime
 import enum
 import http.client
@@ -59,17 +59,26 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
 
+def _fromisoformat(s):
+    """Convert datetime string in ISO format to a datetime object.
+
+    Equivalent to datetime.fromisoformat (for our purposes), but that was only
+    introduced in Python 3.7, and we need to support Python 3.5.
+    """
+    return datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
+
+
 _TIMESTAMP_RE = re.compile(r'(.*)\.(\d+)(.*)')
 
 
 def _parse_timestamp(s):
-    """Parse timestamp from Go-encoded JSON (which uses 9 decimal places for seconds."""
+    """Parse timestamp from Go-encoded JSON (which uses 9 decimal places for seconds)."""
     match = _TIMESTAMP_RE.match(s)
     if not match:
-        return datetime.datetime.fromisoformat(s)
+        return _fromisoformat(s)
     head, subsecond, rest = match.groups()
     subsecond = subsecond[:6]  # fromisoformat supports at most 6 decimal places
-    return datetime.datetime.fromisoformat(head + '.' + subsecond + rest)
+    return _fromisoformat(head + '.' + subsecond + rest)
 
 
 class ServiceError(Exception):
@@ -446,10 +455,83 @@ class API:
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
 
-api = API()
-try:
-    for c in api.get_changes(select=ChangeState.ALL):
-        print(c)
-except urllib.error.HTTPError as e:
-    print(e)
-    print(e.read().decode('utf-8'))
+# Make useable as a command line client for local testing
+if __name__ == '__main__':
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--socket', help='pebble socket path, default $PEBBLE/.pebble.socket')
+    subparsers = parser.add_subparsers(dest='command', metavar='command')
+
+    p = subparsers.add_parser('abort', help='abort a change by ID')
+    p.add_argument('change_id', help='ID of change to abort')
+
+    p = subparsers.add_parser('ack', help='acknowledge warnings up to given time')
+    p.add_argument('--timestamp', help='time to acknowledge up to (YYYY-mm-ddTHH:MM:SS.f+ZZ:zz'
+                                       'format), default current time',
+                   type=_parse_timestamp)
+
+    p = subparsers.add_parser('autostart', help='autostart default service(s)')
+
+    p = subparsers.add_parser('change', help='show a single change by ID')
+    p.add_argument('change_id', help='ID of change to fetch')
+
+    p = subparsers.add_parser('changes', help='show (filtered) changes')
+    p.add_argument('--select', help='change state to filter on, default %(default)s',
+                   choices=[s.value for s in ChangeState], default='all')
+    p.add_argument('--service', help='optional service name to filter on')
+
+    p = subparsers.add_parser('info', help='show Pebble system information')
+
+    p = subparsers.add_parser('start', help='start service(s)')
+    p.add_argument('service', help='name of service to start (can specify multiple)', nargs='+')
+
+    p = subparsers.add_parser('stop', help='stop service(s)')
+    p.add_argument('service', help='name of service to stop (can specify multiple)', nargs='+')
+
+    p = subparsers.add_parser('warnings', help='show (filtered) warnings')
+    p.add_argument('--select', help='warning state to filter on, default %(default)s',
+                   choices=[s.value for s in WarningState], default='all')
+
+    args = parser.parse_args()
+
+    api = API(socket_path=args.socket)
+
+    try:
+        result: Any = None
+        if args.command == 'abort':
+            result = api.abort_change(ChangeID(args.change_id))
+        elif args.command == 'ack':
+            timestamp = args.timestamp or datetime.datetime.now(tz=datetime.timezone.utc)
+            result = api.ack_warnings(timestamp)
+        elif args.command == 'autostart':
+            result = api.autostart_services()
+        elif args.command == 'change':
+            result = api.get_change(ChangeID(args.change_id))
+        elif args.command == 'changes':
+            result = api.get_changes(select=ChangeState(args.select), service=args.service)
+        elif args.command == 'info':
+            result = api.get_system_info()
+        elif args.command == 'start':
+            result = api.start_services(args.service)
+        elif args.command == 'stop':
+            result = api.stop_services(args.service)
+        elif args.command == 'warnings':
+            result = api.get_warnings(select=WarningState(args.select))
+        else:
+            parser.error('command required')
+    except urllib.error.HTTPError as e:
+        print(e)
+        obj = json.load(e)
+        print(json.dumps(obj, sort_keys=True, indent=4))
+        sys.exit(1)
+    except ServiceError as e:
+        print(e.err)
+        sys.exit(1)
+
+    if isinstance(result, list):
+        for x in result:
+            print(x)
+    else:
+        print(result)
