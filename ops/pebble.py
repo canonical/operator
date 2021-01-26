@@ -14,11 +14,6 @@
 
 """Client for the Pebble API (HTTP over Unix socket)."""
 
-# TODO(benhoyt): consider the following:
-# - think about how we'll handle API versioning
-# - add automatic retries
-# - unify errors into package-local error
-
 from typing import Any, Dict, List, Optional
 import datetime
 import enum
