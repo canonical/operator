@@ -61,26 +61,22 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
 
-def _fromisoformat(s):
-    """Convert datetime string in ISO format to a datetime object.
-
-    Equivalent to datetime.fromisoformat (for our purposes), but that was only
-    introduced in Python 3.7, and we need to support Python 3.5.
-    """
-    return datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
-
-
-_TIMESTAMP_RE = re.compile(r'(.*)\.(\d+)(.*)')
+# Matches yyyy-mm-ddTHH:MM:SS.sss[-+]zz(:)zz
+_TIMESTAMP_RE = re.compile(
+    r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d+)([-+])(\d{2}):?(\d{2})')
 
 
 def _parse_timestamp(s):
     """Parse timestamp from Go-encoded JSON (which uses 9 decimal places for seconds)."""
     match = _TIMESTAMP_RE.match(s)
     if not match:
-        return _fromisoformat(s)
-    head, subsecond, rest = match.groups()
-    subsecond = subsecond[:6]  # fromisoformat supports at most 6 decimal places
-    return _fromisoformat(head + '.' + subsecond + rest)
+        raise ValueError('invalid timestamp {!r}'.format(s))
+    y, m, d, hh, mm, ss, sub, plus_minus, z1, z2 = match.groups()
+    s = '{y}-{m}-{d}T{hh}:{mm}:{ss}.{sub}{plus_minus}{z1}{z2}'.format(
+        y=y, m=m, d=d, hh=hh, mm=mm, ss=ss, sub=sub[:6],
+        plus_minus=plus_minus, z1=z1, z2=z2,
+    )
+    return datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
 
 
 class ServiceError(Exception):
