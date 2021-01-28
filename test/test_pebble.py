@@ -71,7 +71,6 @@ class TestTypes(unittest.TestCase):
         error = pebble.ServiceError('Some error', change)
         self.assertEqual(error.err, 'Some error')
         self.assertEqual(error.change, change)
-        self.assertEqual(error.args, ('Some error', change))
         self.assertEqual(str(error), 'Some error')
 
     def test_warning_state(self):
@@ -95,12 +94,10 @@ class TestTypes(unittest.TestCase):
     def test_system_info_init(self):
         info = pebble.SystemInfo(version='1.2.3')
         self.assertEqual(info.version, '1.2.3')
-        self.assertEqual(repr(info), "SystemInfo(version='1.2.3')")
 
     def test_system_info_from_dict(self):
         info = pebble.SystemInfo.from_dict({'version': '3.2.1'})
         self.assertEqual(info.version, '3.2.1')
-        self.assertEqual(repr(info), "SystemInfo(version='3.2.1')")
 
     def test_warning_init(self):
         warning = pebble.Warning(
@@ -117,14 +114,6 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(warning.last_shown, None)
         self.assertEqual(warning.expire_after, '1s')
         self.assertEqual(warning.repeat_after, '2s')
-        self.assertEqual(repr(warning), (
-            "Warning("
-            "message='Beware!', "
-            "first_added=datetime.datetime(2021, 1, 1, 1, 1, 1, tzinfo=datetime.timezone.utc), "
-            "last_added=datetime.datetime(2021, 1, 26, 2, 3, 4, tzinfo=datetime.timezone.utc), "
-            "last_shown=None, "
-            "expire_after='1s', "
-            "repeat_after='2s')"))
 
     def test_warning_from_dict(self):
         d = {
@@ -141,14 +130,6 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(warning.last_shown, None)
         self.assertEqual(warning.expire_after, '1s')
         self.assertEqual(warning.repeat_after, '2s')
-        self.assertEqual(repr(warning), (
-            "Warning("
-            "message='Look out...', "
-            "first_added=datetime.datetime(2020, 12, 25, 17, 18, 54, 16273, "+NZDT_STR+"), "
-            "last_added=datetime.datetime(2021, 1, 26, 17, 1, 2, 123450, "+NZDT_STR+"), "
-            "last_shown=None, "
-            "expire_after='1s', "
-            "repeat_after='2s')"))
 
         d['last-shown'] = None
         warning = pebble.Warning.from_dict(d)
@@ -163,7 +144,6 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(tp.label, 'foo')
         self.assertEqual(tp.done, 3)
         self.assertEqual(tp.total, 7)
-        self.assertEqual(repr(tp), "TaskProgress(label='foo', done=3, total=7)")
 
     def test_task_progress_from_dict(self):
         tp = pebble.TaskProgress.from_dict({
@@ -174,11 +154,9 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(tp.label, 'foo')
         self.assertEqual(tp.done, 3)
         self.assertEqual(tp.total, 7)
-        self.assertEqual(repr(tp), "TaskProgress(label='foo', done=3, total=7)")
 
     def test_task_id(self):
         task_id = pebble.TaskID('1234')
-        self.assertEqual(repr(task_id), "TaskID('1234')")
         self.assertEqual(task_id, '1234')
 
     def test_task_init(self):
@@ -202,16 +180,6 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(task.progress.total, 7)
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
         self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
-        self.assertEqual(repr(task), (
-            "Task(id=TaskID('42'), "
-            "kind='start', "
-            "summary='Start service \"svc\"', "  # NOQA
-            "status='Done', "
-            "log=[], "
-            "progress=TaskProgress(label='foo', done=3, total=7), "
-            "spawn_time=datetime.datetime(2021, 1, 28, 14, 37, 3, 270218, "+NZDT_STR+"), "
-            "ready_time=datetime.datetime(2021, 1, 28, 14, 37, 2, 247158, "+NZDT_STR+"))"),
-        )
 
     def test_task_from_dict(self):
         task = pebble.Task.from_dict({
@@ -237,20 +205,9 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(task.progress.total, 1)
         self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
-        self.assertEqual(repr(task), (
-            "Task(id=TaskID('78'), "
-            "kind='start', "
-            "summary='Start service \"svc\"', "  # NOQA
-            "status='Done', "
-            "log=[], "
-            "progress=TaskProgress(label='', done=1, total=1), "
-            "spawn_time=datetime.datetime(2021, 1, 28, 14, 37, 2, 247158, "+NZDT_STR+"), "
-            "ready_time=datetime.datetime(2021, 1, 28, 14, 37, 3, 270218, "+NZDT_STR+"))"),
-        )
 
     def test_change_id(self):
         change_id = pebble.ChangeID('1234')
-        self.assertEqual(repr(change_id), "ChangeID('1234')")
         self.assertEqual(change_id, '1234')
 
     def test_change_init(self):
@@ -274,16 +231,6 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.status, 'Done')
         self.assertEqual(change.summary, 'Autostart service "svc"')
         self.assertEqual(change.tasks, [])
-        self.assertEqual(repr(change), (
-            "Change(id=ChangeID('70'), "
-            "kind='autostart', "
-            "summary='Autostart service \"svc\"', "  # NOQA
-            "status='Done', "
-            "tasks=[], "
-            "ready=True, "
-            "err='SILLY', "
-            "spawn_time=datetime.datetime(2021, 1, 28, 14, 37, 2, 247202, "+NZDT_STR+"), "
-            "ready_time=datetime.datetime(2021, 1, 28, 14, 37, 4, 291517, "+NZDT_STR+"))"))
 
     def test_change_from_dict(self):
         change = pebble.Change.from_dict({
@@ -306,16 +253,6 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.status, 'Done')
         self.assertEqual(change.summary, 'Autostart service "svc"')
         self.assertEqual(change.tasks, [])
-        self.assertEqual(repr(change), (
-            "Change(id=ChangeID('70'), "
-            "kind='autostart', "
-            "summary='Autostart service \"svc\"', "  # NOQA
-            "status='Done', "
-            "tasks=[], "
-            "ready=True, "
-            "err='SILLY', "
-            "spawn_time=datetime.datetime(2021, 1, 28, 14, 37, 2, 247202, "+NZDT_STR+"), "
-            "ready_time=datetime.datetime(2021, 1, 28, 14, 37, 4, 291517, "+NZDT_STR+"))"))
 
 
 class MockAPI(pebble.API):

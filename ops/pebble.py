@@ -83,12 +83,9 @@ class ServiceError(Exception):
     """Raised by API.wait_change when a service change is ready but has an error."""
 
     def __init__(self, err, change):
-        super().__init__(err, change)
+        super().__init__(err)
         self.err = err
         self.change = change
-
-    def __str__(self):
-        return self.err
 
 
 class WarningState(enum.Enum):
