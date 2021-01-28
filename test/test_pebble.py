@@ -205,7 +205,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(repr(task), (
             "Task(id=TaskID('42'), "
             "kind='start', "
-            "summary='Start service \"svc\"', "
+            "summary='Start service \"svc\"', "  # NOQA
             "status='Done', "
             "log=[], "
             "progress=TaskProgress(label='foo', done=3, total=7), "
@@ -225,7 +225,7 @@ class TestTypes(unittest.TestCase):
             "ready-time": "2021-01-28T14:37:03.270218778+13:00",
             "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
             "status": "Done",
-            "summary": "Start service \"svc\"",
+            "summary": 'Start service "svc"',
         })
         self.assertEqual(task.id, '78')
         self.assertEqual(task.kind, 'start')
@@ -240,7 +240,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(repr(task), (
             "Task(id=TaskID('78'), "
             "kind='start', "
-            "summary='Start service \"svc\"', "
+            "summary='Start service \"svc\"', "  # NOQA
             "status='Done', "
             "log=[], "
             "progress=TaskProgress(label='', done=1, total=1), "
@@ -277,7 +277,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(repr(change), (
             "Change(id=ChangeID('70'), "
             "kind='autostart', "
-            "summary='Autostart service \"svc\"', "
+            "summary='Autostart service \"svc\"', "  # NOQA
             "status='Done', "
             "tasks=[], "
             "ready=True, "
@@ -294,7 +294,7 @@ class TestTypes(unittest.TestCase):
             "ready-time": "2021-01-28T14:37:04.291517768+13:00",
             "spawn-time": "2021-01-28T14:37:02.247202105+13:00",
             "status": "Done",
-            "summary": "Autostart service \"svc\"",
+            "summary": 'Autostart service "svc"',
             "tasks": [],
         })
         self.assertEqual(change.id, '70')
@@ -309,7 +309,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(repr(change), (
             "Change(id=ChangeID('70'), "
             "kind='autostart', "
-            "summary='Autostart service \"svc\"', "
+            "summary='Autostart service \"svc\"', "  # NOQA
             "status='Done', "
             "tasks=[], "
             "ready=True, "
@@ -394,7 +394,7 @@ class TestAPI(unittest.TestCase):
             "ready-time": "2021-01-28T14:37:04.291517768+13:00",
             "spawn-time": "2021-01-28T14:37:02.247202105+13:00",
             "status": "Done",
-            "summary": "Autostart service \"svc\"",
+            "summary": 'Autostart service "svc"',
             "tasks": [
                 {
                     "id": "78",
@@ -408,7 +408,7 @@ class TestAPI(unittest.TestCase):
                     "ready-time": "2021-01-28T14:37:03.270218778+13:00",
                     "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
                     "status": "Done",
-                    "summary": "Start service \"svc\"",
+                    "summary": 'Start service "svc"',
                     "extra-field": "foo",
                 },
             ],
