@@ -22,10 +22,10 @@ jobs:
 
     - name: TODO - test where git/bash live
       run: |
-        where git
         dir "c:/program files/git"
         dir "c:/program files/git/bin"
-        where bash
+        dir "C:\\Program Files\\git\\bin\\bash.exe"
+        echo %CD%
 
     - name: Install dev dependencies
       run: |
