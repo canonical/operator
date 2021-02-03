@@ -28,14 +28,14 @@ import urllib.parse
 import urllib.request
 
 
-_default_timeout = object()
+_not_provided = object()
 
 
 class _UnixSocketConnection(http.client.HTTPConnection):
     """Implementation of HTTPConnection that connects to a named Unix socket."""
 
-    def __init__(self, host, timeout=_default_timeout, socket_path=None):
-        if timeout is _default_timeout:
+    def __init__(self, host, timeout=_not_provided, socket_path=None):
+        if timeout is _not_provided:
             super().__init__(host)
         else:
             super().__init__(host, timeout=timeout)
@@ -45,7 +45,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
         """Override connect to use Unix socket (instead of TCP socket)."""
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
-        if self.timeout is not _default_timeout:
+        if self.timeout is not _not_provided:
             self.sock.settimeout(self.timeout)
 
 

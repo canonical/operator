@@ -15,6 +15,7 @@
 
 import datetime
 import unittest
+import unittest.mock
 import unittest.util
 
 import ops.pebble as pebble
@@ -22,8 +23,6 @@ import ops.pebble as pebble
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000
-
-NZDT_STR = 'tzinfo=datetime.timezone(datetime.timedelta(seconds=46800))'
 
 
 def datetime_utc(y, m, d, hour, min, sec, micro=0):
@@ -139,6 +138,14 @@ class TestTypes(unittest.TestCase):
         warning = pebble.Warning.from_dict(d)
         self.assertEqual(warning.last_shown, datetime_nzdt(2021, 8, 4, 3, 2, 1))
 
+        d['first-added'] = '2020-02-03T02:00:40.000000+00:00'
+        d['last-added'] = '2021-03-04T03:01:41.100000+00:00'
+        d['last-shown'] = '2022-04-05T06:02:42.200000+00:00'
+        warning = pebble.Warning.from_dict(d)
+        self.assertEqual(warning.first_added, datetime_utc(2020, 2, 3, 2, 0, 40, 0))
+        self.assertEqual(warning.last_added, datetime_utc(2021, 3, 4, 3, 1, 41, 100000))
+        self.assertEqual(warning.last_shown, datetime_utc(2022, 4, 5, 6, 2, 42, 200000))
+
     def test_task_progress_init(self):
         tp = pebble.TaskProgress(label='foo', done=3, total=7)
         self.assertEqual(tp.label, 'foo')
@@ -182,7 +189,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
 
     def test_task_from_dict(self):
-        task = pebble.Task.from_dict({
+        d = {
             "id": "78",
             "kind": "start",
             "progress": {
@@ -194,7 +201,8 @@ class TestTypes(unittest.TestCase):
             "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
             "status": "Done",
             "summary": 'Start service "svc"',
-        })
+        }
+        task = pebble.Task.from_dict(d)
         self.assertEqual(task.id, '78')
         self.assertEqual(task.kind, 'start')
         self.assertEqual(task.summary, 'Start service "svc"')
@@ -205,6 +213,12 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(task.progress.total, 1)
         self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
+
+        d['ready-time'] = '2021-01-28T14:37:03.270218778+00:00'
+        d['spawn-time'] = '2021-01-28T14:37:02.247158162+00:00'
+        task = pebble.Task.from_dict(d)
+        self.assertEqual(task.ready_time, datetime_utc(2021, 1, 28, 14, 37, 3, 270218))
+        self.assertEqual(task.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247158))
 
     def test_change_id(self):
         change_id = pebble.ChangeID('1234')
@@ -233,7 +247,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.tasks, [])
 
     def test_change_from_dict(self):
-        change = pebble.Change.from_dict({
+        d = {
             "id": "70",
             "kind": "autostart",
             "err": "SILLY",
@@ -243,7 +257,8 @@ class TestTypes(unittest.TestCase):
             "status": "Done",
             "summary": 'Autostart service "svc"',
             "tasks": [],
-        })
+        }
+        change = pebble.Change.from_dict(d)
         self.assertEqual(change.id, '70')
         self.assertEqual(change.kind, 'autostart')
         self.assertEqual(change.err, 'SILLY')
@@ -254,8 +269,16 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.summary, 'Autostart service "svc"')
         self.assertEqual(change.tasks, [])
 
+        d['ready-time'] = '2021-01-28T14:37:04.291517768+00:00'
+        d['spawn-time'] = '2021-01-28T14:37:02.247202105+00:00'
+        change = pebble.Change.from_dict(d)
+        self.assertEqual(change.ready_time, datetime_utc(2021, 1, 28, 14, 37, 4, 291517))
+        self.assertEqual(change.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247202))
+
 
 class MockAPI(pebble.API):
+    """Mock Pebble client that simply records reqeusts and returns stored responses."""
+
     def __init__(self):
         self.requests = []
         self.responses = []
@@ -263,6 +286,22 @@ class MockAPI(pebble.API):
     def _request(self, method, path, query=None, body=None):
         self.requests.append((method, path, query, body))
         return self.responses.pop(0)
+
+
+class MockTime:
+    """Mocked versions of time.time() and time.sleep().
+
+    MockTime.sleep() advances the clock and MockTime.time() returns the current time.
+    """
+
+    def __init__(self):
+        self._time = 0
+
+    def time(self):
+        return self._time
+
+    def sleep(self, delay):
+        self._time += delay
 
 
 class TestAPI(unittest.TestCase):
@@ -323,7 +362,7 @@ class TestAPI(unittest.TestCase):
             }),
         ])
 
-    def get_mock_change_dict(self):
+    def build_mock_change_dict(self):
         return {
             "id": "70",
             "kind": "autostart",
@@ -396,7 +435,7 @@ class TestAPI(unittest.TestCase):
 
         self.api.responses.append({
             "result": [
-                self.get_mock_change_dict(),
+                self.build_mock_change_dict(),
             ],
             "status": "OK",
             "status-code": 200,
@@ -415,7 +454,7 @@ class TestAPI(unittest.TestCase):
 
     def test_get_change(self):
         self.api.responses.append({
-            "result": self.get_mock_change_dict(),
+            "result": self.build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
@@ -428,7 +467,7 @@ class TestAPI(unittest.TestCase):
 
     def test_abort_change(self):
         self.api.responses.append({
-            "result": self.get_mock_change_dict(),
+            "result": self.build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
@@ -439,7 +478,7 @@ class TestAPI(unittest.TestCase):
             ('POST', '/v1/changes/70', None, {'action': 'abort'}),
         ])
 
-    def _test_services_action(self, action, api_func, services):
+    def _services_action_helper(self, action, api_func, services):
         self.api.responses.append({
             "change": "70",
             "result": None,
@@ -447,7 +486,7 @@ class TestAPI(unittest.TestCase):
             "status-code": 202,
             "type": "async"
         })
-        change = self.get_mock_change_dict()
+        change = self.build_mock_change_dict()
         change['ready'] = False
         self.api.responses.append({
             "result": change,
@@ -455,7 +494,7 @@ class TestAPI(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        change = self.get_mock_change_dict()
+        change = self.build_mock_change_dict()
         change['ready'] = True
         self.api.responses.append({
             "result": change,
@@ -471,7 +510,7 @@ class TestAPI(unittest.TestCase):
             ('GET', '/v1/changes/70', None, None),
         ])
 
-    def _test_services_action_async(self, action, api_func, services):
+    def _services_action_async_helper(self, action, api_func, services):
         self.api.responses.append({
             "change": "70",
             "result": None,
@@ -486,27 +525,48 @@ class TestAPI(unittest.TestCase):
         ])
 
     def test_autostart_services(self):
-        self._test_services_action('autostart', self.api.autostart_services, [])
+        self._services_action_helper('autostart', self.api.autostart_services, [])
 
     def test_autostart_services_async(self):
-        self._test_services_action_async('autostart', self.api.autostart_services, [])
+        self._services_action_async_helper('autostart', self.api.autostart_services, [])
 
     def test_start_services(self):
         def api_func():
             return self.api.start_services(['svc'])
-        self._test_services_action('start', api_func, ['svc'])
+        self._services_action_helper('start', api_func, ['svc'])
 
     def test_start_services_async(self):
         def api_func(timeout=30):
             return self.api.start_services(['svc'], timeout=timeout)
-        self._test_services_action_async('start', api_func, ['svc'])
+        self._services_action_async_helper('start', api_func, ['svc'])
 
     def test_stop_services(self):
         def api_func():
             return self.api.stop_services(['svc'])
-        self._test_services_action('stop', api_func, ['svc'])
+        self._services_action_helper('stop', api_func, ['svc'])
 
     def test_stop_services_async(self):
         def api_func(timeout=30):
             return self.api.stop_services(['svc'], timeout=timeout)
-        self._test_services_action_async('stop', api_func, ['svc'])
+        self._services_action_async_helper('stop', api_func, ['svc'])
+
+    def test_wait_change_timeout(self):
+        with unittest.mock.patch('ops.pebble.time', MockTime()):
+            change = self.build_mock_change_dict()
+            change['ready'] = False
+            for _ in range(3):
+                self.api.responses.append({
+                    "result": change,
+                    "status": "OK",
+                    "status-code": 200,
+                    "type": "sync"
+                })
+
+            with self.assertRaises(TimeoutError):
+                self.api.wait_change('70', timeout=3, delay=1)
+
+            self.assertEqual(self.api.requests, [
+                ('GET', '/v1/changes/70', None, None),
+                ('GET', '/v1/changes/70', None, None),
+                ('GET', '/v1/changes/70', None, None),
+            ])
