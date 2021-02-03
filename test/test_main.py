@@ -638,7 +638,7 @@ class _TestMain(abc.ABC):
                     Path("hooks/install")))
 
         if not yaml.__with_libyaml__:
-            self.assertEquals(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
+            self.assertEqual(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
 
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
 

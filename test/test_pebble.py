@@ -17,8 +17,11 @@ import datetime
 import unittest
 import unittest.mock
 import unittest.util
+import urllib.error
+import sys
 
 import ops.pebble as pebble
+import test.fake_pebble as fake_pebble
 
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
@@ -276,7 +279,137 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247202))
 
 
-class MockAPI(pebble.API):
+class TestLayer(unittest.TestCase):
+    def _assert_empty(self, layer):
+        self.assertEqual(layer.summary, '')
+        self.assertEqual(layer.description, '')
+        self.assertEqual(layer.services, {})
+        self.assertEqual(layer.to_dict(), {})
+
+    def test_no_args(self):
+        s = pebble.Layer()
+        self._assert_empty(s)
+
+    def test_dict(self):
+        s = pebble.Layer({})
+        self._assert_empty(s)
+
+        d = {
+            'summary': 'Sum Mary',
+            'description': 'The quick brown fox!',
+            'services': {
+                'foo': {
+                    'summary': 'Foo',
+                    'command': 'echo foo',
+                },
+                'bar': {
+                    'summary': 'Bar',
+                    'command': 'echo bar',
+                },
+            }
+        }
+        s = pebble.Layer(d)
+        self.assertEqual(s.summary, 'Sum Mary')
+        self.assertEqual(s.description, 'The quick brown fox!')
+        self.assertEqual(s.services['foo'].name, 'foo')
+        self.assertEqual(s.services['foo'].summary, 'Foo')
+        self.assertEqual(s.services['foo'].command, 'echo foo')
+        self.assertEqual(s.services['bar'].name, 'bar')
+        self.assertEqual(s.services['bar'].summary, 'Bar')
+        self.assertEqual(s.services['bar'].command, 'echo bar')
+
+        self.assertEqual(s.to_dict(), d)
+
+    def test_yaml(self):
+        s = pebble.Layer('')
+        self._assert_empty(s)
+
+        yaml = """description: The quick brown fox!
+services:
+  bar:
+    command: echo bar
+    summary: Bar
+  foo:
+    command: echo foo
+    summary: Foo
+summary: Sum Mary
+"""
+        s = pebble.Layer(yaml)
+        self.assertEqual(s.summary, 'Sum Mary')
+        self.assertEqual(s.description, 'The quick brown fox!')
+        self.assertEqual(s.services['foo'].name, 'foo')
+        self.assertEqual(s.services['foo'].summary, 'Foo')
+        self.assertEqual(s.services['foo'].command, 'echo foo')
+        self.assertEqual(s.services['bar'].name, 'bar')
+        self.assertEqual(s.services['bar'].summary, 'Bar')
+        self.assertEqual(s.services['bar'].command, 'echo bar')
+
+        self.assertEqual(s.to_yaml(), yaml)
+        self.assertEqual(str(s), yaml)
+
+
+class TestService(unittest.TestCase):
+    def _assert_empty(self, service, name):
+        self.assertEqual(service.name, name)
+        self.assertEqual(service.summary, '')
+        self.assertEqual(service.description, '')
+        self.assertEqual(service.default, '')
+        self.assertEqual(service.override, '')
+        self.assertEqual(service.command, '')
+        self.assertEqual(service.after, [])
+        self.assertEqual(service.before, [])
+        self.assertEqual(service.requires, [])
+        self.assertEqual(service.environment, {})
+        self.assertEqual(service.to_dict(), {})
+
+    def test_name_only(self):
+        s = pebble.Service('Name 0')
+        self._assert_empty(s, 'Name 0')
+
+    def test_dict(self):
+        s = pebble.Service('Name 1', {})
+        self._assert_empty(s, 'Name 1')
+
+        d = {
+            'summary': 'Sum Mary',
+            'description': 'The lazy quick brown',
+            'default': 'Dee Fault',
+            'override': 'override',
+            'command': 'echo sum mary',
+            'after': ['a1', 'a2'],
+            'before': ['b1', 'b2'],
+            'requires': ['r1', 'r2'],
+            'environment': {'k1': 'v1', 'k2': 'v2'},
+        }
+        s = pebble.Service('Name 2', d)
+        self.assertEqual(s.name, 'Name 2')
+        self.assertEqual(s.description, 'The lazy quick brown')
+        self.assertEqual(s.default, 'Dee Fault')
+        self.assertEqual(s.override, 'override')
+        self.assertEqual(s.command, 'echo sum mary')
+        self.assertEqual(s.after, ['a1', 'a2'])
+        self.assertEqual(s.before, ['b1', 'b2'])
+        self.assertEqual(s.requires, ['r1', 'r2'])
+        self.assertEqual(s.environment, {'k1': 'v1', 'k2': 'v2'})
+
+        self.assertEqual(s.to_dict(), d)
+
+        # Ensure pebble.Service has made copies of mutable objects
+        s.after.append('a3')
+        s.before.append('b3')
+        s.requires.append('r3')
+        s.environment['k3'] = 'v3'
+        self.assertEqual(s.after, ['a1', 'a2', 'a3'])
+        self.assertEqual(s.before, ['b1', 'b2', 'b3'])
+        self.assertEqual(s.requires, ['r1', 'r2', 'r3'])
+        self.assertEqual(s.environment, {'k1': 'v1', 'k2': 'v2', 'k3': 'v3'})
+        self.assertEqual(d['after'], ['a1', 'a2'])
+        self.assertEqual(d['before'], ['b1', 'b2'])
+        self.assertEqual(d['requires'], ['r1', 'r2'])
+        self.assertEqual(d['environment'], {'k1': 'v1', 'k2': 'v2'})
+
+
+class MockClient(pebble.Client):
     """Mock Pebble client that simply records reqeusts and returns stored responses."""
 
     def __init__(self):
@@ -304,14 +437,19 @@ class MockTime:
         self._time += delay
 
 
-class TestAPI(unittest.TestCase):
+class TestClient(unittest.TestCase):
     maxDiff = None
 
     def setUp(self):
-        self.api = MockAPI()
+        self.client = MockClient()
+
+    def test_client_init(self):
+        pebble.Client(socket_path='foo')  # test that constructor runs
+        with self.assertRaises(ValueError):
+            pebble.Client()  # socket_path arg required
 
     def test_get_system_info(self):
-        self.api.responses.append({
+        self.client.responses.append({
             "result": {
                 "version": "1.2.3",
                 "extra-field": "foo",
@@ -320,9 +458,9 @@ class TestAPI(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        info = self.api.get_system_info()
+        info = self.client.get_system_info()
         self.assertEqual(info.version, '1.2.3')
-        self.assertEqual(self.api.requests, [
+        self.assertEqual(self.client.requests, [
             ('GET', '/v1/system-info', None, None),
         ])
 
@@ -333,29 +471,29 @@ class TestAPI(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         }
-        self.api.responses.append(empty)
-        warnings = self.api.get_warnings()
+        self.client.responses.append(empty)
+        warnings = self.client.get_warnings()
         self.assertEqual(warnings, [])
 
-        self.api.responses.append(empty)
-        warnings = self.api.get_warnings(select=pebble.WarningState.ALL)
+        self.client.responses.append(empty)
+        warnings = self.client.get_warnings(select=pebble.WarningState.ALL)
         self.assertEqual(warnings, [])
 
-        self.assertEqual(self.api.requests, [
+        self.assertEqual(self.client.requests, [
             ('GET', '/v1/warnings', {'select': 'pending'}, None),
             ('GET', '/v1/warnings', {'select': 'all'}, None),
         ])
 
     def test_ack_warnings(self):
-        self.api.responses.append({
+        self.client.responses.append({
             "result": 0,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        num = self.api.ack_warnings(datetime_nzdt(2021, 1, 28, 15, 11, 0))
+        num = self.client.ack_warnings(datetime_nzdt(2021, 1, 28, 15, 11, 0))
         self.assertEqual(num, 0)
-        self.assertEqual(self.api.requests, [
+        self.assertEqual(self.client.requests, [
             ('POST', '/v1/warnings', None, {
                 'action': 'okay',
                 'timestamp': '2021-01-28T15:11:00+13:00',
@@ -421,19 +559,19 @@ class TestAPI(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         }
-        self.api.responses.append(empty)
-        changes = self.api.get_changes()
+        self.client.responses.append(empty)
+        changes = self.client.get_changes()
         self.assertEqual(changes, [])
 
-        self.api.responses.append(empty)
-        changes = self.api.get_changes(select=pebble.ChangeState.ALL)
+        self.client.responses.append(empty)
+        changes = self.client.get_changes(select=pebble.ChangeState.ALL)
         self.assertEqual(changes, [])
 
-        self.api.responses.append(empty)
-        changes = self.api.get_changes(select=pebble.ChangeState.ALL, service='foo')
+        self.client.responses.append(empty)
+        changes = self.client.get_changes(select=pebble.ChangeState.ALL, service='foo')
         self.assertEqual(changes, [])
 
-        self.api.responses.append({
+        self.client.responses.append({
             "result": [
                 self.build_mock_change_dict(),
             ],
@@ -441,11 +579,11 @@ class TestAPI(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        changes = self.api.get_changes()
+        changes = self.client.get_changes()
         self.assertEqual(len(changes), 1)
         self.assert_mock_change(changes[0])
 
-        self.assertEqual(self.api.requests, [
+        self.assertEqual(self.client.requests, [
             ('GET', '/v1/changes', {'select': 'in-progress'}, None),
             ('GET', '/v1/changes', {'select': 'all'}, None),
             ('GET', '/v1/changes', {'select': 'all', 'for': 'foo'}, None),
@@ -453,33 +591,33 @@ class TestAPI(unittest.TestCase):
         ])
 
     def test_get_change(self):
-        self.api.responses.append({
+        self.client.responses.append({
             "result": self.build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        change = self.api.get_change('70')
+        change = self.client.get_change('70')
         self.assert_mock_change(change)
-        self.assertEqual(self.api.requests, [
+        self.assertEqual(self.client.requests, [
             ('GET', '/v1/changes/70', None, None),
         ])
 
     def test_abort_change(self):
-        self.api.responses.append({
+        self.client.responses.append({
             "result": self.build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        change = self.api.abort_change('70')
+        change = self.client.abort_change('70')
         self.assert_mock_change(change)
-        self.assertEqual(self.api.requests, [
+        self.assertEqual(self.client.requests, [
             ('POST', '/v1/changes/70', None, {'action': 'abort'}),
         ])
 
     def _services_action_helper(self, action, api_func, services):
-        self.api.responses.append({
+        self.client.responses.append({
             "change": "70",
             "result": None,
             "status": "Accepted",
@@ -488,7 +626,7 @@ class TestAPI(unittest.TestCase):
         })
         change = self.build_mock_change_dict()
         change['ready'] = False
-        self.api.responses.append({
+        self.client.responses.append({
             "result": change,
             "status": "OK",
             "status-code": 200,
@@ -496,7 +634,7 @@ class TestAPI(unittest.TestCase):
         })
         change = self.build_mock_change_dict()
         change['ready'] = True
-        self.api.responses.append({
+        self.client.responses.append({
             "result": change,
             "status": "OK",
             "status-code": 200,
@@ -504,14 +642,14 @@ class TestAPI(unittest.TestCase):
         })
         change_id = api_func()
         self.assertEqual(change_id, '70')
-        self.assertEqual(self.api.requests, [
+        self.assertEqual(self.client.requests, [
             ('POST', '/v1/services', None, {'action': action, 'services': services}),
             ('GET', '/v1/changes/70', None, None),
             ('GET', '/v1/changes/70', None, None),
         ])
 
     def _services_action_async_helper(self, action, api_func, services):
-        self.api.responses.append({
+        self.client.responses.append({
             "change": "70",
             "result": None,
             "status": "Accepted",
@@ -520,42 +658,64 @@ class TestAPI(unittest.TestCase):
         })
         change_id = api_func(timeout=0)
         self.assertEqual(change_id, '70')
-        self.assertEqual(self.api.requests, [
+        self.assertEqual(self.client.requests, [
             ('POST', '/v1/services', None, {'action': action, 'services': services}),
         ])
 
     def test_autostart_services(self):
-        self._services_action_helper('autostart', self.api.autostart_services, [])
+        self._services_action_helper('autostart', self.client.autostart_services, [])
 
     def test_autostart_services_async(self):
-        self._services_action_async_helper('autostart', self.api.autostart_services, [])
+        self._services_action_async_helper('autostart', self.client.autostart_services, [])
 
     def test_start_services(self):
         def api_func():
-            return self.api.start_services(['svc'])
+            return self.client.start_services(['svc'])
         self._services_action_helper('start', api_func, ['svc'])
 
     def test_start_services_async(self):
         def api_func(timeout=30):
-            return self.api.start_services(['svc'], timeout=timeout)
+            return self.client.start_services(['svc'], timeout=timeout)
         self._services_action_async_helper('start', api_func, ['svc'])
 
     def test_stop_services(self):
         def api_func():
-            return self.api.stop_services(['svc'])
+            return self.client.stop_services(['svc'])
         self._services_action_helper('stop', api_func, ['svc'])
 
     def test_stop_services_async(self):
         def api_func(timeout=30):
-            return self.api.stop_services(['svc'], timeout=timeout)
+            return self.client.stop_services(['svc'], timeout=timeout)
         self._services_action_async_helper('stop', api_func, ['svc'])
+
+    def test_service_error(self):
+        self.client.responses.append({
+            "change": "70",
+            "result": None,
+            "status": "Accepted",
+            "status-code": 202,
+            "type": "async"
+        })
+        change = self.build_mock_change_dict()
+        change['err'] = 'Some kind of service error'
+        self.client.responses.append({
+            "result": change,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        with self.assertRaises(pebble.ServiceError) as cm:
+            self.client.autostart_services()
+        self.assertEqual(cm.exception.err, 'Some kind of service error')
+        self.assertIsInstance(cm.exception.change, pebble.Change)
+        self.assertEqual(cm.exception.change.id, '70')
 
     def test_wait_change_timeout(self):
         with unittest.mock.patch('ops.pebble.time', MockTime()):
             change = self.build_mock_change_dict()
             change['ready'] = False
             for _ in range(3):
-                self.api.responses.append({
+                self.client.responses.append({
                     "result": change,
                     "status": "OK",
                     "status-code": 200,
@@ -563,10 +723,38 @@ class TestAPI(unittest.TestCase):
                 })
 
             with self.assertRaises(TimeoutError):
-                self.api.wait_change('70', timeout=3, delay=1)
+                self.client.wait_change('70', timeout=3, delay=1)
 
-            self.assertEqual(self.api.requests, [
+            self.assertEqual(self.client.requests, [
                 ('GET', '/v1/changes/70', None, None),
                 ('GET', '/v1/changes/70', None, None),
                 ('GET', '/v1/changes/70', None, None),
             ])
+
+
+class TestSocketClient(unittest.TestCase):
+    @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
+    def test_socket_not_found(self):
+        client = pebble.Client(socket_path='does_not_exist')
+        with self.assertRaises(urllib.error.URLError):
+            client.get_system_info()
+
+    @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
+    def test_real_client(self):
+        server, thread, socket_path = fake_pebble.start_server()
+
+        try:
+            client = pebble.Client(socket_path=socket_path)
+            info = client.get_system_info()
+            self.assertEqual(info.version, '3.14.159')
+
+            change_id = client.start_services(['foo'], timeout=0)
+            self.assertEqual(change_id, '1234')
+
+            with self.assertRaises(urllib.error.HTTPError) as cm:
+                client.start_services(['bar'], timeout=0)
+            self.assertEqual(cm.exception.code, 400)
+
+        finally:
+            server.shutdown()
+            thread.join()

@@ -687,6 +687,12 @@ class CharmMeta:
         self.extra_bindings = raw.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw.items()}
 
+        # This is taken from Charm Metadata v2, but only the "containers" and
+        # "containers.name" fields that we need right now for Pebble. See:
+        # https://discourse.charmhub.io/t/charm-metadata-v2/3674
+        self.containers = {name: ContainerMeta(name, container)
+                           for name, container in raw.get('containers', {}).items()}
+
     @classmethod
     def from_yaml(
             cls, metadata: typing.Union[str, typing.TextIO],
@@ -821,3 +827,17 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
+
+
+class ContainerMeta:
+    """Metadata about an individual container.
+
+    NOTE: this is extremely lightweight right now, and just includes the fields we need for
+    Pebble interaction.
+
+    Attributes:
+        name: Name of container (key in the YAML)
+    """
+
+    def __init__(self, name, raw):
+        self.name = name

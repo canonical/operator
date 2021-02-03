@@ -33,6 +33,7 @@ from subprocess import run, PIPE, CalledProcessError
 import yaml
 
 import ops
+import ops.pebble as pebble
 from ops.jujuversion import JujuVersion
 
 
@@ -50,7 +51,7 @@ class Model:
     """
 
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
-        self._cache = _ModelCache(backend)
+        self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
@@ -164,7 +165,8 @@ class Model:
 
 class _ModelCache:
 
-    def __init__(self, backend):
+    def __init__(self, meta, backend):
+        self._meta = meta
         self._backend = backend
         self._weakrefs = weakref.WeakValueDictionary()
 
@@ -272,6 +274,9 @@ class Unit:
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
 
+        if self._is_our_unit:
+            self._containers = ContainerMapping(cache._meta.containers)
+
     def _invalidate(self):
         self._status = None
 
@@ -345,6 +350,24 @@ class Unit:
             raise TypeError("workload version must be a str, not {}: {!r}".format(
                 type(version).__name__, version))
         self._backend.application_version_set(version)
+
+    @property
+    def containers(self) -> typing.Dict[str, 'Container']:
+        """Return a dict of containers indexed by name."""
+        if not self._is_our_unit:
+            raise RuntimeError('cannot get container for a remote unit {}'.format(self))
+        return self._containers
+
+    def get_container(self, container_name: str) -> 'Container':
+        """Get a single container by name.
+
+        Raises:
+            ModelError: if the named container doesn't exist
+        """
+        try:
+            return self.containers[container_name]
+        except KeyError:
+            raise ModelError('container {!r} not found'.format(container_name))
 
 
 class LazyMapping(Mapping, ABC):
@@ -983,6 +1006,78 @@ class Storage:
             raw = self._backend.storage_get('{}/{}'.format(self.name, self.id), "location")
             self._location = Path(raw)
         return self._location
+
+
+class Container:
+    """Represents a named container in a unit.
+
+    Attributes:
+        name: The name of the container from metadata.yaml (eg, 'postgres').
+    """
+
+    def __init__(self, name, pebble_client=None):
+        self.name = name
+
+        if pebble_client is None:
+            socket_path = '/charm/containers/{}/pebble/.pebble.socket'.format(name)
+            pebble_client = pebble.Client(socket_path=socket_path)
+        self._pebble = pebble_client
+
+    @property
+    def pebble(self) -> 'pebble.Client':
+        """Return the low-level Pebble client instance for this container."""
+        return self._pebble
+
+    def autostart(self):
+        """Autostart all default services."""
+        self._pebble.autostart_services()
+
+    def start(self, *service_names: typing.List[str]):
+        """Start given service(s) by name."""
+        self._pebble.start_services(service_names)
+
+    def stop(self, *service_names: typing.List[str]):
+        """Stop given service(s) by name."""
+        self._pebble.stop_services(service_names)
+
+    def add_layer(self, layer: typing.Union[str, typing.Dict, 'pebble.Layer']):
+        """Dynamically add a setup layer.
+
+        Args:
+            layer: A YAML string, setup layer dict, or pebble.Layer object
+                containing the Pebble layer to add.
+        """
+        if isinstance(layer, dict):
+            layer = pebble.Layer(layer)
+        self._pebble.add_layer(layer)
+
+    def get_layer(self) -> 'pebble.Layer':
+        """Fetch the flattened setup layers as a pebble.Layer object."""
+        setup_yaml = self._pebble.get_layer()
+        return pebble.Layer(setup_yaml)
+
+
+class ContainerMapping(Mapping):
+    """Map of container names to Container objects.
+
+    This is done as a mapping object rather than a plain dictionary so that we
+    can extend it later, and so it's not mutable.
+    """
+
+    def __init__(self, names: typing.Iterable[str]):
+        self._containers = {name: Container(name) for name in names}
+
+    def __getitem__(self, key: str):
+        return self._containers[key]
+
+    def __iter__(self):
+        return iter(self._containers)
+
+    def __len__(self):
+        return len(self._containers)
+
+    def __repr__(self):
+        return repr(self._containers)
 
 
 class ModelError(Exception):
