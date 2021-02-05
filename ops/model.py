@@ -174,7 +174,7 @@ class _ModelCache:
         key = (entity_type,) + args
         entity = self._weakrefs.get(key)
         if entity is None:
-            entity = entity_type(*args, backend=self._backend, cache=self)
+            entity = entity_type(*args, meta=self._meta, backend=self._backend, cache=self)
             self._weakrefs[key] = entity
         return entity
 
@@ -191,7 +191,7 @@ class Application:
             the charm, if the user has deployed it to a different name.
     """
 
-    def __init__(self, name, backend, cache):
+    def __init__(self, name, meta, backend, cache):
         self.name = name
         self._backend = backend
         self._cache = cache
@@ -263,7 +263,7 @@ class Unit:
         app: The Application the unit is a part of.
     """
 
-    def __init__(self, name, backend, cache):
+    def __init__(self, name, meta, backend, cache):
         self.name = name
 
         app_name = name.split('/')[0]
@@ -275,7 +275,7 @@ class Unit:
         self._status = None
 
         if self._is_our_unit:
-            self._containers = ContainerMapping(cache._meta.containers)
+            self._containers = ContainerMapping(meta.containers, backend)
 
     def _invalidate(self):
         self._status = None
@@ -1011,16 +1011,18 @@ class Storage:
 class Container:
     """Represents a named container in a unit.
 
+    This class should not be instantiated directly, instead use :meth:`Unit.get_container`
+    or :attr:`Unit.containers`.
+
     Attributes:
         name: The name of the container from metadata.yaml (eg, 'postgres').
     """
 
-    def __init__(self, name, pebble_client=None):
+    def __init__(self, name, backend, pebble_client=None):
         self.name = name
 
         if pebble_client is None:
-            socket_path = '/charm/containers/{}/pebble/.pebble.socket'.format(name)
-            pebble_client = pebble.Client(socket_path=socket_path)
+            pebble_client = backend.get_pebble(name)
         self._pebble = pebble_client
 
     @property
@@ -1064,8 +1066,8 @@ class ContainerMapping(Mapping):
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, names: typing.Iterable[str]):
-        self._containers = {name: Container(name) for name in names}
+    def __init__(self, names: typing.Iterable[str], backend: '_ModelBackend'):
+        self._containers = {name: Container(name, backend) for name in names}
 
     def __getitem__(self, key: str):
         return self._containers[key]
@@ -1362,6 +1364,11 @@ class _ModelBackend:
             metric_args.append('{}={}'.format(k, metric_value))
         cmd.extend(metric_args)
         self._run(*cmd)
+
+    def get_pebble(self, container_name: str) -> 'pebble.Client':
+        """Create a pebble.Client instance for given container name."""
+        socket_path = '/charm/containers/{}/pebble/.pebble.socket'.format(container_name)
+        return pebble.Client(socket_path=socket_path)
 
 
 class _ModelBackendValidator:

@@ -824,3 +824,9 @@ class _TestingModelBackend:
 
     def network_get(self, endpoint_name, relation_id=None):
         raise NotImplementedError(self.network_get)
+
+    def add_metrics(self, metrics, labels=None):
+        raise NotImplementedError(self.add_metrics)
+
+    def get_pebble(self, container_name):
+        raise NotImplementedError(self.get_pebble)
