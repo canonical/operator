@@ -30,17 +30,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
-import yaml
 
 import ops
 import ops.pebble as pebble
 from ops.jujuversion import JujuVersion
-
-
-if yaml.__with_libyaml__:
-    _DefaultDumper = yaml.CSafeDumper
-else:
-    _DefaultDumper = yaml.SafeDumper
+from ops import _yaml
 
 
 class Model:
@@ -1241,12 +1235,12 @@ class _ModelBackend:
         try:
             spec_path = tmpdir / 'spec.yaml'
             with spec_path.open("wt", encoding="utf8") as f:
-                yaml.dump(spec, stream=f, Dumper=_DefaultDumper)
+                _yaml.safe_dump(spec, stream=f)
             args = ['--file', str(spec_path)]
             if k8s_resources:
                 k8s_res_path = tmpdir / 'k8s-resources.yaml'
                 with k8s_res_path.open("wt", encoding="utf8") as f:
-                    yaml.dump(k8s_resources, stream=f, Dumper=_DefaultDumper)
+                    _yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:

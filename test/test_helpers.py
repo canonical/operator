@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import os
 import pathlib
 import subprocess
@@ -19,6 +20,7 @@ import shutil
 import tempfile
 import unittest
 
+from ops import _yaml
 from ops.framework import Framework
 from ops.model import Model, _ModelBackend
 from ops.charm import CharmMeta
@@ -130,3 +132,19 @@ class BaseTestCase(unittest.TestCase):
         meta = CharmMeta()
         model = Model(meta, backend)
         return model
+
+
+class TestYAML(unittest.TestCase):
+    def test_safe_load(self):
+        d = _yaml.safe_load('foo: bar\nbaz: 123\n')
+        self.assertEqual(len(d), 2)
+        self.assertEqual(d['foo'], 'bar')
+        self.assertEqual(d['baz'], 123)
+
+    def test_safe_dump(self):
+        s = _yaml.safe_dump({'foo': 'bar', 'baz': 123})
+        self.assertEqual(s, 'baz: 123\nfoo: bar\n')
+
+        f = io.StringIO()
+        s = _yaml.safe_dump({'foo': 'bar', 'baz': 123}, stream=f)
+        self.assertEqual(f.getvalue(), 'baz: 123\nfoo: bar\n')

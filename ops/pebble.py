@@ -28,14 +28,7 @@ import urllib.parse
 import urllib.request
 import sys
 
-import yaml
-
-
-_safe_dumper = None  # type: Any
-if yaml.__with_libyaml__:
-    _safe_dumper = yaml.CSafeDumper
-else:
-    _safe_dumper = yaml.SafeDumper
+from ops import _yaml
 
 
 _not_provided = object()
@@ -329,7 +322,7 @@ class Layer:
 
     def __init__(self, raw: Union[str, Dict] = None):
         if isinstance(raw, str):
-            d = yaml.safe_load(raw) or {}
+            d = _yaml.safe_load(raw) or {}
         else:
             d = raw or {}
         self.summary = d.get('summary', '')
@@ -339,7 +332,7 @@ class Layer:
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
-        return yaml.dump(self.to_dict(), Dumper=_safe_dumper)
+        return _yaml.safe_dump(self.to_dict())
 
     def to_dict(self) -> Dict:
         """Convert this layer to its dict representation."""
