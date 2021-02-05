@@ -173,10 +173,20 @@ def start_server():
     thread = threading.Thread(target=server.serve_forever)
     thread.start()
 
-    return (server, thread, socket_path)
+    def shutdown():
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+    return (shutdown, socket_path)
 
 
 if __name__ == '__main__':
-    _, thread, socket_path = start_server()
+    import time
+
+    shutdown, socket_path = start_server()
     print('Serving HTTP over socket', socket_path)
-    thread.join()  # wait forever (or till Ctrl-C pressed)
+
+    # Wait forever (or till Ctrl-C pressed)
+    while True:
+        time.sleep(1)

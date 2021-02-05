@@ -741,7 +741,7 @@ class TestSocketClient(unittest.TestCase):
 
     @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
     def test_real_client(self):
-        server, thread, socket_path = fake_pebble.start_server()
+        shutdown, socket_path = fake_pebble.start_server()
 
         try:
             client = pebble.Client(socket_path=socket_path)
@@ -756,5 +756,4 @@ class TestSocketClient(unittest.TestCase):
             self.assertEqual(cm.exception.code, 400)
 
         finally:
-            server.shutdown()
-            thread.join()
+            shutdown()
