@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Client for the Pebble API (HTTP over Unix socket)."""
+"""Client for the Pebble API (HTTP over Unix socket).
 
-from typing import Any, Dict, List, Optional, Union
+For a command-line interface for local testing, see test/pebble_cli.py.
+"""
+
+from typing import Dict, List, Optional, Union
 import datetime
 import enum
 import http.client
 import json
-import os
 import re
 import socket
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 import sys
@@ -544,99 +545,3 @@ class Client:
         """Get the flattened setup layers as a YAML string."""
         # TODO(benhoyt) - fetch setup YAML from Pebble when that API is implemented
         raise NotImplementedError('get_layer not yet implemented in Pebble')
-
-
-# Make useable as a command line client for local testing
-if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--socket', help='pebble socket path, default $PEBBLE/.pebble.socket')
-    subparsers = parser.add_subparsers(dest='command', metavar='command')
-
-    p = subparsers.add_parser('abort', help='abort a change by ID')
-    p.add_argument('change_id', help='ID of change to abort')
-
-    p = subparsers.add_parser('ack', help='acknowledge warnings up to given time')
-    p.add_argument('--timestamp', help='time to acknowledge up to (YYYY-mm-ddTHH:MM:SS.f+ZZ:zz'
-                                       'format), default current time',
-                   type=_parse_timestamp)
-
-    p = subparsers.add_parser('autostart', help='autostart default service(s)')
-
-    p = subparsers.add_parser('change', help='show a single change by ID')
-    p.add_argument('change_id', help='ID of change to fetch')
-
-    p = subparsers.add_parser('changes', help='show (filtered) changes')
-    p.add_argument('--select', help='change state to filter on, default %(default)s',
-                   choices=[s.value for s in ChangeState], default='all')
-    p.add_argument('--service', help='optional service name to filter on')
-
-    p = subparsers.add_parser('start', help='start service(s)')
-    p.add_argument('service', help='name of service to start (can specify multiple)', nargs='+')
-
-    p = subparsers.add_parser('stop', help='stop service(s)')
-    p.add_argument('service', help='name of service to stop (can specify multiple)', nargs='+')
-
-    p = subparsers.add_parser('system-info', help='show Pebble system information')
-
-    p = subparsers.add_parser('warnings', help='show (filtered) warnings')
-    p.add_argument('--select', help='warning state to filter on, default %(default)s',
-                   choices=[s.value for s in WarningState], default='all')
-
-    args = parser.parse_args()
-
-    if not args.command:
-        parser.error('argument command: required')
-
-    socket_path = args.socket
-    if socket_path is None:
-        pebble_env = os.getenv('PEBBLE')
-        if not pebble_env:
-            print('cannot create Pebble client (set PEBBLE or specify --socket)', file=sys.stderr)
-            sys.exit(1)
-        socket_path = os.path.join(pebble_env, '.pebble.socket')
-
-    client = Client(socket_path=socket_path)
-
-    try:
-        result = None  # type: Any
-        if args.command == 'abort':
-            result = client.abort_change(ChangeID(args.change_id))
-        elif args.command == 'ack':
-            timestamp = args.timestamp or datetime.datetime.now(tz=datetime.timezone.utc)
-            result = client.ack_warnings(timestamp)
-        elif args.command == 'autostart':
-            result = client.autostart_services()
-        elif args.command == 'change':
-            result = client.get_change(ChangeID(args.change_id))
-        elif args.command == 'changes':
-            result = client.get_changes(select=ChangeState(args.select), service=args.service)
-        elif args.command == 'start':
-            result = client.start_services(args.service)
-        elif args.command == 'stop':
-            result = client.stop_services(args.service)
-        elif args.command == 'system-info':
-            result = client.get_system_info()
-        elif args.command == 'warnings':
-            result = client.get_warnings(select=WarningState(args.select))
-        else:
-            raise AssertionError("shouldn't happen")
-    except urllib.error.HTTPError as e:
-        print(e, file=sys.stderr)
-        obj = json.load(e)
-        print(json.dumps(obj, sort_keys=True, indent=4), file=sys.stderr)
-        sys.exit(1)
-    except urllib.error.URLError as e:
-        print('cannot connect to Pebble socket {!r}: {}'.format(socket_path, e.reason),
-              file=sys.stderr)
-        sys.exit(1)
-    except ServiceError as e:
-        print('ServiceError:', e.err, file=sys.stderr)
-        sys.exit(1)
-
-    if isinstance(result, list):
-        for x in result:
-            print(x)
-    else:
-        print(result)
