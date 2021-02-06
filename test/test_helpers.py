@@ -20,6 +20,8 @@ import shutil
 import tempfile
 import unittest
 
+import yaml
+
 from ops import _yaml
 from ops.framework import Framework
 from ops.model import Model, _ModelBackend
@@ -134,12 +136,20 @@ class BaseTestCase(unittest.TestCase):
         return model
 
 
+class YAMLTest:
+    pass
+
+
 class TestYAML(unittest.TestCase):
     def test_safe_load(self):
         d = _yaml.safe_load('foo: bar\nbaz: 123\n')
         self.assertEqual(len(d), 2)
         self.assertEqual(d['foo'], 'bar')
         self.assertEqual(d['baz'], 123)
+
+        # Should error -- it's not safe to load an instance of a user-defined class
+        with self.assertRaises(yaml.YAMLError):
+            _yaml.safe_load('!!python/object:test.test_helpers.YAMLTest {}')
 
     def test_safe_dump(self):
         s = _yaml.safe_dump({'foo': 'bar', 'baz': 123})
@@ -148,3 +158,7 @@ class TestYAML(unittest.TestCase):
         f = io.StringIO()
         s = _yaml.safe_dump({'foo': 'bar', 'baz': 123}, stream=f)
         self.assertEqual(f.getvalue(), 'baz: 123\nfoo: bar\n')
+
+        # Should error -- it's not safe to dump an instance of a user-defined class
+        with self.assertRaises(yaml.YAMLError):
+            _yaml.safe_dump(YAMLTest())
