@@ -31,10 +31,10 @@ from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
+from ops._private import yaml
+from ops.jujuversion import JujuVersion
 import ops
 import ops.pebble as pebble
-from ops.jujuversion import JujuVersion
-from ops import _yaml
 
 
 class Model:
@@ -1236,12 +1236,12 @@ class _ModelBackend:
         try:
             spec_path = tmpdir / 'spec.yaml'
             with spec_path.open("wt", encoding="utf8") as f:
-                _yaml.safe_dump(spec, stream=f)
+                yaml.safe_dump(spec, stream=f)
             args = ['--file', str(spec_path)]
             if k8s_resources:
                 k8s_res_path = tmpdir / 'k8s-resources.yaml'
                 with k8s_res_path.open("wt", encoding="utf8") as f:
-                    _yaml.safe_dump(k8s_resources, stream=f)
+                    yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:

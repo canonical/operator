@@ -29,7 +29,7 @@ import urllib.parse
 import urllib.request
 import sys
 
-from ops import _yaml
+from ops._private import yaml
 
 
 _not_provided = object()
@@ -323,7 +323,7 @@ class Layer:
 
     def __init__(self, raw: Union[str, Dict] = None):
         if isinstance(raw, str):
-            d = _yaml.safe_load(raw) or {}
+            d = yaml.safe_load(raw) or {}
         else:
             d = raw or {}
         self.summary = d.get('summary', '')
@@ -333,7 +333,7 @@ class Layer:
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
-        return _yaml.safe_dump(self.to_dict())
+        return yaml.safe_dump(self.to_dict())
 
     def to_dict(self) -> Dict:
         """Convert this layer to its dict representation."""
