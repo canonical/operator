@@ -20,7 +20,6 @@ import os
 import pathlib
 from textwrap import dedent
 import unittest
-import unittest.mock
 
 import ops.model
 import ops.charm
@@ -789,9 +788,8 @@ containers:
   c1:
     k: v
 """)
-        backend = ops.model._ModelBackend('myapp/0')
-        with unittest.mock.patch('ops.pebble.Client', MockPebbleClient):
-            self.model = ops.model.Model(meta, backend)
+        backend = MockPebbleBackend('myapp/0')
+        self.model = ops.model.Model(meta, backend)
         self.container = self.model.unit.containers['c1']
         self.pebble = self.container.pebble
 
@@ -834,6 +832,11 @@ containers:
         self.assertEqual(self.pebble.requests, [('get_layer',)])
         self.assertIsInstance(layer, ops.pebble.Layer)
         self.assertEqual(layer.summary, 'foo')
+
+
+class MockPebbleBackend(ops.model._ModelBackend):
+    def get_pebble(self, socket_path):
+        return MockPebbleClient(socket_path)
 
 
 class MockPebbleClient:
