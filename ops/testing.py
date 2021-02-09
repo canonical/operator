@@ -19,11 +19,11 @@ import pathlib
 import random
 import tempfile
 import typing
-import yaml
 from contextlib import contextmanager
 from textwrap import dedent
 
 from ops import (
+    _yaml,
     charm,
     framework,
     model,
@@ -273,7 +273,7 @@ class Harness:
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        charm_config = yaml.load(charm_config, Loader=yaml.SafeLoader)
+        charm_config = _yaml.safe_load(charm_config)
         charm_config = charm_config.get('options', {})
         return {key: value['default'] for key, value in charm_config.items()
                 if 'default' in value}
@@ -300,7 +300,7 @@ class Harness:
         if self._meta.resources[resource_name].type != "oci-image":
             raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
 
-        as_yaml = yaml.dump(contents, Dumper=yaml.SafeDumper)
+        as_yaml = _yaml.safe_dump(contents)
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
 
     def add_resource(self, resource_name: str, content: typing.AnyStr) -> None:
@@ -824,3 +824,9 @@ class _TestingModelBackend:
 
     def network_get(self, endpoint_name, relation_id=None):
         raise NotImplementedError(self.network_get)
+
+    def add_metrics(self, metrics, labels=None):
+        raise NotImplementedError(self.add_metrics)
+
+    def get_pebble(self, container_name):
+        raise NotImplementedError(self.get_pebble)

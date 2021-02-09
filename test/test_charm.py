@@ -23,6 +23,7 @@ from ops.charm import (
     CharmBase,
     CharmMeta,
     CharmEvents,
+    ContainerMeta,
 )
 from ops.framework import Framework, EventSource, EventBase
 from ops.model import Model, _ModelBackend
@@ -329,3 +330,17 @@ start:
 
     def test_action_event_defer_fails(self):
         self._test_action_event_defer_fails('action')
+
+    def test_containers(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  test1:
+    k: v
+  test2:
+    k: v
+""")
+        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test2'], ContainerMeta)
+        self.assertEqual(meta.containers['test1'].name, 'test1')
+        self.assertEqual(meta.containers['test2'].name, 'test2')

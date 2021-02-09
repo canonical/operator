@@ -20,9 +20,11 @@ import os
 import pathlib
 from textwrap import dedent
 import unittest
+import unittest.mock
 
 import ops.model
 import ops.charm
+import ops.pebble
 import ops.testing
 from ops.charm import RelationMeta, RelationRole
 
@@ -730,6 +732,133 @@ class TestModel(unittest.TestCase):
 
     def assertBackendCalls(self, expected, *, reset=True):
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
+
+
+class TestContainers(unittest.TestCase):
+    def setUp(self):
+        meta = ops.charm.CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  c1:
+    k: v
+  c2:
+    k: v
+""")
+        backend = ops.model._ModelBackend('myapp/0')
+        self.model = ops.model.Model(meta, backend)
+
+    def test_unit_containers(self):
+        containers = self.model.unit.containers
+        self.assertEqual(sorted(containers), ['c1', 'c2'])
+        self.assertEqual(len(containers), 2)
+        self.assertIn('c1', containers)
+        self.assertIn('c2', containers)
+        self.assertNotIn('c3', containers)
+        for name in ['c1', 'c2']:
+            container = containers[name]
+            self.assertIsInstance(container, ops.model.Container)
+            self.assertEqual(container.name, name)
+            self.assertIsInstance(container.pebble, ops.pebble.Client)
+        with self.assertRaises(KeyError):
+            containers['c3']
+
+        with self.assertRaises(RuntimeError):
+            other_unit = self.model.get_unit('other')
+            other_unit.containers
+
+    def test_unit_get_container(self):
+        unit = self.model.unit
+        for name in ['c1', 'c2']:
+            container = unit.get_container(name)
+            self.assertIsInstance(container, ops.model.Container)
+            self.assertEqual(container.name, name)
+            self.assertIsInstance(container.pebble, ops.pebble.Client)
+        with self.assertRaises(ops.model.ModelError):
+            unit.get_container('c3')
+
+        with self.assertRaises(RuntimeError):
+            other_unit = self.model.get_unit('other')
+            other_unit.get_container('foo')
+
+
+class TestContainerPebble(unittest.TestCase):
+    def setUp(self):
+        meta = ops.charm.CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  c1:
+    k: v
+""")
+        backend = ops.model._ModelBackend('myapp/0')
+        with unittest.mock.patch('ops.pebble.Client', MockPebbleClient):
+            self.model = ops.model.Model(meta, backend)
+        self.container = self.model.unit.containers['c1']
+        self.pebble = self.container.pebble
+
+    def test_socket_path(self):
+        self.assertEqual(self.pebble.socket_path, '/charm/containers/c1/pebble/.pebble.socket')
+
+    def test_autostart(self):
+        self.container.autostart()
+        self.assertEqual(self.pebble.requests, [('autostart',)])
+
+    def test_start(self):
+        self.container.start('foo')
+        self.container.start('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('start', ('foo',)),
+            ('start', ('foo', 'bar')),
+        ])
+
+    def test_stop(self):
+        self.container.stop('foo')
+        self.container.stop('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('stop', ('foo',)),
+            ('stop', ('foo', 'bar')),
+        ])
+
+    def test_add_layer(self):
+        self.container.add_layer('summary: str\n')
+        self.container.add_layer({'summary': 'dict'})
+        self.container.add_layer(ops.pebble.Layer('summary: Layer'))
+        self.assertEqual(self.pebble.requests, [
+            ('add_layer', 'summary: str\n'),
+            ('add_layer', 'summary: dict\n'),
+            ('add_layer', 'summary: Layer\n'),
+        ])
+
+    def test_get_layer(self):
+        self.pebble.responses.append('summary: foo')
+        layer = self.container.get_layer()
+        self.assertEqual(self.pebble.requests, [('get_layer',)])
+        self.assertIsInstance(layer, ops.pebble.Layer)
+        self.assertEqual(layer.summary, 'foo')
+
+
+class MockPebbleClient:
+    def __init__(self, socket_path):
+        self.socket_path = socket_path
+        self.requests = []
+        self.responses = []
+
+    def autostart_services(self):
+        self.requests.append(('autostart',))
+
+    def start_services(self, service_names):
+        self.requests.append(('start', service_names))
+
+    def stop_services(self, service_names):
+        self.requests.append(('stop', service_names))
+
+    def add_layer(self, layer):
+        if isinstance(layer, ops.pebble.Layer):
+            layer = layer.to_yaml()
+        self.requests.append(('add_layer', layer))
+
+    def get_layer(self):
+        self.requests.append(('get_layer',))
+        return self.responses.pop(0)
 
 
 class TestModelBindings(unittest.TestCase):

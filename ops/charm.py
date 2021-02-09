@@ -19,16 +19,9 @@ import os
 import pathlib
 import typing
 
-import yaml
-
 from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
+from ops import _yaml
 from ops import model
-
-
-def _loadYaml(source):
-    if yaml.__with_libyaml__:
-        return yaml.load(source, Loader=yaml.CSafeLoader)
-    return yaml.load(source, Loader=yaml.SafeLoader)
 
 
 class HookEvent(EventBase):
@@ -687,6 +680,12 @@ class CharmMeta:
         self.extra_bindings = raw.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw.items()}
 
+        # This is taken from Charm Metadata v2, but only the "containers" and
+        # "containers.name" fields that we need right now for Pebble. See:
+        # https://discourse.charmhub.io/t/charm-metadata-v2/3674
+        self.containers = {name: ContainerMeta(name, container)
+                           for name, container in raw.get('containers', {}).items()}
+
     @classmethod
     def from_yaml(
             cls, metadata: typing.Union[str, typing.TextIO],
@@ -698,10 +697,10 @@ class CharmMeta:
                 This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
             actions: YAML description of Actions for this charm (eg actions.yaml)
         """
-        meta = _loadYaml(metadata)
+        meta = _yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = _loadYaml(actions)
+            raw_actions = _yaml.safe_load(actions)
             if raw_actions is None:
                 raw_actions = {}
         return cls(meta, raw_actions)
@@ -821,3 +820,17 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
+
+
+class ContainerMeta:
+    """Metadata about an individual container.
+
+    NOTE: this is extremely lightweight right now, and just includes the fields we need for
+    Pebble interaction.
+
+    Attributes:
+        name: Name of container (key in the YAML)
+    """
+
+    def __init__(self, name, raw):
+        self.name = name
