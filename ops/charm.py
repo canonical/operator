@@ -19,9 +19,9 @@ import os
 import pathlib
 import typing
 
-from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
-from ops import _yaml
 from ops import model
+from ops._private import yaml
+from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
 
 
 class HookEvent(EventBase):
@@ -697,10 +697,10 @@ class CharmMeta:
                 This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
             actions: YAML description of Actions for this charm (eg actions.yaml)
         """
-        meta = _yaml.safe_load(metadata)
+        meta = yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = _yaml.safe_load(actions)
+            raw_actions = yaml.safe_load(actions)
             if raw_actions is None:
                 raw_actions = {}
         return cls(meta, raw_actions)
