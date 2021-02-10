@@ -43,6 +43,9 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789+13:00'),
                          datetime_nzdt(2020, 12, 25, 13, 45, 50, 123456))
 
+        self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22.118970777Z'),
+                         datetime_utc(2021, 2, 10, 4, 36, 22, 118970))
+
         self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789+00:00'),
                          datetime_utc(2020, 12, 25, 13, 45, 50, 123456))
 
@@ -53,6 +56,18 @@ class TestHelpers(unittest.TestCase):
         tzinfo = datetime.timezone(datetime.timedelta(hours=4))
         self.assertEqual(pebble._parse_timestamp('2000-01-02T03:04:05.006000+0400'),
                          datetime.datetime(2000, 1, 2, 3, 4, 5, 6000, tzinfo=tzinfo))
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp('')
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp('foobar')
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp(pebble._parse_timestamp('2021-02-10T04:36:22.118970777x'))
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp(pebble._parse_timestamp('2021-02-10T04:36:22.118970777-99:99'))
 
 
 class TestTypes(unittest.TestCase):

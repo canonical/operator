@@ -67,9 +67,12 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
 
-# Matches yyyy-mm-ddTHH:MM:SS.sss[-+]zz(:)zz
+# Matches yyyy-mm-ddTHH:MM:SS.sssZZZ
 _TIMESTAMP_RE = re.compile(
-    r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d+)([-+])(\d{2}):?(\d{2})')
+    r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d+)(.*)')
+
+# Matches [-+]HH:MM or [-+]HHMM
+_TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):?(\d{2})')
 
 
 def _parse_timestamp(s):
@@ -77,12 +80,21 @@ def _parse_timestamp(s):
     match = _TIMESTAMP_RE.match(s)
     if not match:
         raise ValueError('invalid timestamp {!r}'.format(s))
-    y, m, d, hh, mm, ss, sub, plus_minus, z1, z2 = match.groups()
-    s = '{y}-{m}-{d}T{hh}:{mm}:{ss}.{sub}{plus_minus}{z1}{z2}'.format(
+    y, m, d, hh, mm, ss, sub, zone = match.groups()
+
+    if zone == 'Z':
+        zsign, zh, zm = '+', '00', '00'
+    else:
+        match = _TIMEOFFSET_RE.match(zone)
+        if not match:
+            raise ValueError('invalid timestamp {!r}'.format(s))
+        zsign, zh, zm = match.groups()
+
+    canonical = '{y}-{m}-{d}T{hh}:{mm}:{ss}.{sub}{zsign}{zh}{zm}'.format(
         y=y, m=m, d=d, hh=hh, mm=mm, ss=ss, sub=sub[:6],
-        plus_minus=plus_minus, z1=z1, z2=z2,
+        zsign=zsign, zh=zh, zm=zm,
     )
-    return datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
+    return datetime.datetime.strptime(canonical, '%Y-%m-%dT%H:%M:%S.%f%z')
 
 
 class ServiceError(Exception):
