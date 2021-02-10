@@ -47,7 +47,7 @@ class TestModel(unittest.TestCase):
             resources:
               foo: {type: file, filename: foo.txt}
               bar: {type: file, filename: bar.txt}
-        ''')
+        ''', remote_app_name='remoteapp1')
         self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
         self.model = self.harness.model
@@ -116,7 +116,11 @@ class TestModel(unittest.TestCase):
         ])
         dead_rel = self.model.get_relation('db1', 7)
         self.assertIsInstance(dead_rel, ops.model.Relation)
-        self.assertEqual(set(dead_rel.data.keys()), {self.model.unit, self.model.unit.app})
+        self.assertEqual(set(dead_rel.data.keys()), {
+            self.model.unit,
+            self.model.unit.app,
+            self.model.get_app('remoteapp1'),
+        })
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertBackendCalls([
             ('relation_list', 7),
@@ -402,6 +406,12 @@ class TestModel(unittest.TestCase):
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
         ])
+
+    def test_relation_no_units(self):
+        self.harness.add_relation('db1', 'remoteapp1')
+        rel = self.model.get_relation('db1')
+        self.assertEqual(rel.units, set())
+        self.assertIs(rel.app, self.model.get_app('remoteapp1'))
 
     def test_config(self):
         self.harness.update_config({'foo': 'foo', 'bar': 1, 'qux': True})

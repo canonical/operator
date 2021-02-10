@@ -652,18 +652,27 @@ class Relation:
         self.app = None
         self.units = set()
 
-        # For peer relations, both the remote and the local app are the same.
         if is_peer:
+            # For peer relations, both the remote and the local app are the same.
             self.app = our_unit.app
+        elif backend.remote_app_name is not None:
+            # For non-peer relations, use the remote app name directly.
+            self.app = cache.get(Application, backend.remote_app_name)
+
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
                 if self.app is None:
+                    # Fallback to using the app of one of the units if
+                    # JUJU_REMOTE_APP is not set (should only happen on Juju
+                    # before 2.7, when we added JUJU_REMOTE_APP). This is not
+                    # great, as the event can fire before any units are up.
                     self.app = unit.app
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
+
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
@@ -1119,7 +1128,7 @@ class _ModelBackend:
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
 
-    def __init__(self, unit_name=None, model_name=None):
+    def __init__(self, unit_name=None, model_name=None, remote_app_name=None):
         if unit_name is None:
             self.unit_name = os.environ['JUJU_UNIT_NAME']
         else:
@@ -1128,6 +1137,10 @@ class _ModelBackend:
             model_name = os.environ.get('JUJU_MODEL_NAME')
         self.model_name = model_name
         self.app_name = self.unit_name.split('/')[0]
+
+        if remote_app_name is None:
+            remote_app_name = os.environ.get('JUJU_REMOTE_APP')
+        self.remote_app_name = remote_app_name
 
         self._is_leader = None
         self._leader_check_time = None
