@@ -40,19 +40,46 @@ def datetime_nzdt(y, m, d, hour, min, sec, micro=0):
 
 class TestHelpers(unittest.TestCase):
     def test_parse_timestamp(self):
+        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50+13:00'),
+                         datetime_nzdt(2020, 12, 25, 13, 45, 50, 0))
+
         self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789+13:00'),
-                         datetime_nzdt(2020, 12, 25, 13, 45, 50, 123456))
+                         datetime_nzdt(2020, 12, 25, 13, 45, 50, 123457))
+
+        self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22Z'),
+                         datetime_utc(2021, 2, 10, 4, 36, 22, 0))
+
+        self.assertEqual(pebble._parse_timestamp('2021-02-10t04:36:22z'),
+                         datetime_utc(2021, 2, 10, 4, 36, 22, 0))
+
+        self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22.118970777Z'),
+                         datetime_utc(2021, 2, 10, 4, 36, 22, 118971))
 
         self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789+00:00'),
-                         datetime_utc(2020, 12, 25, 13, 45, 50, 123456))
+                         datetime_utc(2020, 12, 25, 13, 45, 50, 123457))
 
         tzinfo = datetime.timezone(datetime.timedelta(hours=-11, minutes=-30))
-        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789-1130'),
-                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123456, tzinfo=tzinfo))
+        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789-11:30'),
+                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=tzinfo))
 
         tzinfo = datetime.timezone(datetime.timedelta(hours=4))
-        self.assertEqual(pebble._parse_timestamp('2000-01-02T03:04:05.006000+0400'),
+        self.assertEqual(pebble._parse_timestamp('2000-01-02T03:04:05.006000+04:00'),
                          datetime.datetime(2000, 1, 2, 3, 4, 5, 6000, tzinfo=tzinfo))
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp('')
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp('foobar')
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp('2021-99-99T04:36:22Z')
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp(pebble._parse_timestamp('2021-02-10T04:36:22.118970777x'))
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp(pebble._parse_timestamp('2021-02-10T04:36:22.118970777-99:99'))
 
 
 class TestTypes(unittest.TestCase):
@@ -127,7 +154,7 @@ class TestTypes(unittest.TestCase):
         }
         warning = pebble.Warning.from_dict(d)
         self.assertEqual(warning.message, 'Look out...')
-        self.assertEqual(warning.first_added, datetime_nzdt(2020, 12, 25, 17, 18, 54, 16273))
+        self.assertEqual(warning.first_added, datetime_nzdt(2020, 12, 25, 17, 18, 54, 16274))
         self.assertEqual(warning.last_added, datetime_nzdt(2021, 1, 26, 17, 1, 2, 123450))
         self.assertEqual(warning.last_shown, None)
         self.assertEqual(warning.expire_after, '1s')
@@ -214,13 +241,13 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(task.progress.label, '')
         self.assertEqual(task.progress.done, 1)
         self.assertEqual(task.progress.total, 1)
-        self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
+        self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219))
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
 
         d['ready-time'] = '2021-01-28T14:37:03.270218778+00:00'
         d['spawn-time'] = '2021-01-28T14:37:02.247158162+00:00'
         task = pebble.Task.from_dict(d)
-        self.assertEqual(task.ready_time, datetime_utc(2021, 1, 28, 14, 37, 3, 270218))
+        self.assertEqual(task.ready_time, datetime_utc(2021, 1, 28, 14, 37, 3, 270219))
         self.assertEqual(task.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247158))
 
     def test_change_id(self):
@@ -266,7 +293,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.kind, 'autostart')
         self.assertEqual(change.err, 'SILLY')
         self.assertEqual(change.ready, True)
-        self.assertEqual(change.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291517))
+        self.assertEqual(change.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(change.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202))
         self.assertEqual(change.status, 'Done')
         self.assertEqual(change.summary, 'Autostart service "svc"')
@@ -275,7 +302,7 @@ class TestTypes(unittest.TestCase):
         d['ready-time'] = '2021-01-28T14:37:04.291517768+00:00'
         d['spawn-time'] = '2021-01-28T14:37:02.247202105+00:00'
         change = pebble.Change.from_dict(d)
-        self.assertEqual(change.ready_time, datetime_utc(2021, 1, 28, 14, 37, 4, 291517))
+        self.assertEqual(change.ready_time, datetime_utc(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(change.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247202))
 
 
@@ -544,12 +571,12 @@ class TestClient(unittest.TestCase):
         self.assertEqual(change.tasks[0].progress.label, '')
         self.assertEqual(change.tasks[0].progress.total, 1)
         self.assertEqual(change.tasks[0].ready_time,
-                         datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
+                         datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219))
         self.assertEqual(change.tasks[0].spawn_time,
                          datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
         self.assertEqual(change.ready, True)
         self.assertEqual(change.err, None)
-        self.assertEqual(change.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291517))
+        self.assertEqual(change.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(change.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202))
 
     def test_get_changes(self):
