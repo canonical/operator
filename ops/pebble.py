@@ -101,8 +101,8 @@ class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
 
 
-class PollTimeout(TimeoutError, Error):
-    """Raised when the wait_change() polling times out."""
+class TimeoutError(TimeoutError, Error):
+    """Raised when a polling timeout occurs."""
 
 
 class ConnectionError(Error):
@@ -572,7 +572,7 @@ class Client:
 
             time.sleep(delay)
 
-        raise PollTimeout(
+        raise TimeoutError(
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
     def add_layer(self, layer: Union[str, dict, Layer]):

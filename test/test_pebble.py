@@ -61,9 +61,10 @@ class TestTypes(unittest.TestCase):
         error = pebble.Error('error')
         self.assertIsInstance(error, Exception)
 
-    def test_poll_timeout(self):
-        error = pebble.PollTimeout('timeout!')
+    def test_timeout_error(self):
+        error = pebble.TimeoutError('timeout!')
         self.assertIsInstance(error, pebble.Error)
+        self.assertIsInstance(error, TimeoutError)
         self.assertEqual(str(error), 'timeout!')
 
     def test_connection_error(self):
@@ -745,7 +746,7 @@ class TestClient(unittest.TestCase):
                     "type": "sync"
                 })
 
-            with self.assertRaises(pebble.PollTimeout) as cm:
+            with self.assertRaises(pebble.TimeoutError) as cm:
                 self.client.wait_change('70', timeout=3, delay=1)
             self.assertIsInstance(cm.exception, pebble.Error)
             self.assertIsInstance(cm.exception, TimeoutError)
