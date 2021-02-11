@@ -68,22 +68,43 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
 
-# Matches yyyy-mm-ddTHH:MM:SS.sss[-+]zz(:)zz
+# Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
 _TIMESTAMP_RE = re.compile(
-    r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d+)([-+])(\d{2}):?(\d{2})')
+    r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
+
+# Matches [-+]HH:MM
+_TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
 
 
 def _parse_timestamp(s):
-    """Parse timestamp from Go-encoded JSON (which uses 9 decimal places for seconds)."""
+    """Parse timestamp from Go-encoded JSON.
+
+    This parses RFC3339 timestamps (which are a subset of ISO8601 timestamps)
+    that Go's encoding/json package produces for time.Time values.
+
+    Unfortunately we can't use datetime.fromisoformat(), as that does not
+    support more than 6 digits for the fractional second, nor the 'Z' for UTC.
+    Also, it was only introduced in Python 3.7.
+    """
     match = _TIMESTAMP_RE.match(s)
     if not match:
         raise ValueError('invalid timestamp {!r}'.format(s))
-    y, m, d, hh, mm, ss, sub, plus_minus, z1, z2 = match.groups()
-    s = '{y}-{m}-{d}T{hh}:{mm}:{ss}.{sub}{plus_minus}{z1}{z2}'.format(
-        y=y, m=m, d=d, hh=hh, mm=mm, ss=ss, sub=sub[:6],
-        plus_minus=plus_minus, z1=z1, z2=z2,
-    )
-    return datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
+    y, m, d, hh, mm, ss, sfrac, zone = match.groups()
+
+    if zone in ('Z', 'z'):
+        tz = datetime.timezone.utc
+    else:
+        match = _TIMEOFFSET_RE.match(zone)
+        if not match:
+            raise ValueError('invalid timestamp {!r}'.format(s))
+        sign, zh, zm = match.groups()
+        tz_delta = datetime.timedelta(hours=int(zh), minutes=int(zm))
+        tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
+
+    microsecond = round(float(sfrac or '0') * 1000000)
+
+    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
+                             microsecond=microsecond, tzinfo=tz)
 
 
 def _json_loads(s: Union[str, bytes]) -> Dict:
