@@ -66,10 +66,10 @@ class TestTypes(unittest.TestCase):
         self.assertIsInstance(error, pebble.Error)
         self.assertEqual(str(error), 'timeout!')
 
-    def test_socket_error(self):
-        error = pebble.SocketError('sockerr!')
+    def test_connection_error(self):
+        error = pebble.ConnectionError('connerr!')
         self.assertIsInstance(error, pebble.Error)
-        self.assertEqual(str(error), 'sockerr!')
+        self.assertEqual(str(error), 'connerr!')
 
     def test_api_error(self):
         body = {
@@ -87,24 +87,6 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(error.status, 'Bad Request')
         self.assertEqual(error.message, 'no services')
         self.assertEqual(str(error), 'no services')
-
-    def test_service_error(self):
-        change = pebble.Change(
-            id=pebble.ChangeID('1234'),
-            kind='start',
-            summary='Start service "foo"',
-            status='Done',
-            tasks=[],
-            ready=True,
-            err=None,
-            spawn_time=datetime.datetime.now(),
-            ready_time=datetime.datetime.now(),
-        )
-        error = pebble.ServiceError('Some error', change)
-        self.assertIsInstance(error, pebble.Error)
-        self.assertEqual(error.err, 'Some error')
-        self.assertEqual(error.change, change)
-        self.assertEqual(str(error), 'Some error')
 
     def test_warning_state(self):
         self.assertEqual(list(pebble.WarningState), [
@@ -737,14 +719,7 @@ class TestClient(unittest.TestCase):
             return self.client.stop_services(['svc'], timeout=timeout)
         self._services_action_async_helper('stop', api_func, ['svc'])
 
-    def test_service_error(self):
-        self.client.responses.append({
-            "change": "70",
-            "result": None,
-            "status": "Accepted",
-            "status-code": 202,
-            "type": "async"
-        })
+    def test_change_error(self):
         change = self.build_mock_change_dict()
         change['err'] = 'Some kind of service error'
         self.client.responses.append({
@@ -753,12 +728,10 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        with self.assertRaises(pebble.ServiceError) as cm:
-            self.client.autostart_services()
-        self.assertIsInstance(cm.exception, pebble.Error)
-        self.assertEqual(cm.exception.err, 'Some kind of service error')
-        self.assertIsInstance(cm.exception.change, pebble.Change)
-        self.assertEqual(cm.exception.change.id, '70')
+        change = self.client.wait_change(pebble.ChangeID('70'))
+        self.assertIsInstance(change, pebble.Change)
+        self.assertEqual(change.id, '70')
+        self.assertEqual(change.err, 'Some kind of service error')
 
     def test_wait_change_timeout(self):
         with unittest.mock.patch('ops.pebble.time', MockTime()):
@@ -788,7 +761,7 @@ class TestSocketClient(unittest.TestCase):
     @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
     def test_socket_not_found(self):
         client = pebble.Client(socket_path='does_not_exist')
-        with self.assertRaises(pebble.SocketError) as cm:
+        with self.assertRaises(pebble.ConnectionError) as cm:
             client.get_system_info()
         self.assertIsInstance(cm.exception, pebble.Error)
 

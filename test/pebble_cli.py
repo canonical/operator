@@ -105,7 +105,7 @@ def main():
     except pebble.APIError as e:
         print('{} {}: {}'.format(e.code, e.status, e.message), file=sys.stderr)
         sys.exit(1)
-    except pebble.SocketError as e:
+    except pebble.ConnectionError as e:
         print('cannot connect to socket {!r}: {}'.format(socket_path, e),
               file=sys.stderr)
         sys.exit(1)

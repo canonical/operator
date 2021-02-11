@@ -105,7 +105,7 @@ class PollTimeout(TimeoutError, Error):
     """Raised when the wait_change() polling times out."""
 
 
-class SocketError(Error):
+class ConnectionError(Error):
     """Raised when the Pebble client can't connect to the socket."""
 
 
@@ -119,16 +119,6 @@ class APIError(Error):
         self.code = code
         self.status = status
         self.message = message
-
-
-class ServiceError(Error):
-    """Raised by wait_change() when a service change is ready but has an error."""
-
-    def __init__(self, err, change):
-        """This shouldn't be instantiated directly."""
-        super().__init__(err)
-        self.err = err
-        self.change = change
 
 
 class WarningState(enum.Enum):
@@ -476,13 +466,13 @@ class Client:
             try:
                 body = _json_loads(e.read())
                 message = body['result']['message']
-            except Exception as json_exc:
-                # Catch-all in case the response isn't correct JSON
+            except (IOError, ValueError, KeyError) as e2:
+                # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
-                message = '{} - {}'.format(type(json_exc).__name__, json_exc)
+                message = '{} - {}'.format(type(e2).__name__, e2)
             raise APIError(body, code, status, message)
         except urllib.error.URLError as e:
-            raise SocketError(e.reason)
+            raise ConnectionError(e.reason)
 
         response_data = response.read()
         result = _json_loads(response_data)
@@ -577,8 +567,7 @@ class Client:
         while time.time() < deadline:
             change = self.get_change(change_id)
             if change.ready:
-                if change.err:
-                    raise ServiceError(change.err, change)
+                # Note that the Change may be an error, if change.err is set.
                 return change
 
             time.sleep(delay)
