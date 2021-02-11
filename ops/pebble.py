@@ -69,32 +69,41 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
 
 # Matches yyyy-mm-ddTHH:MM:SS.sssZZZ
 _TIMESTAMP_RE = re.compile(
-    r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d+)(.*)')
+    r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
 
-# Matches [-+]HH:MM or [-+]HHMM
-_TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):?(\d{2})')
+# Matches [-+]HH:MM
+_TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
 
 
 def _parse_timestamp(s):
-    """Parse timestamp from Go-encoded JSON (which uses 9 decimal places for seconds)."""
+    """Parse timestamp from Go-encoded JSON.
+
+    This parses the subset of RFC3339 (which in turn is a subset of ISO8601)
+    that Go's encoding/json package produces for time.Time values.
+
+    Unfortunately we can't use datetime.fromisoformat(), as that does not
+    support more than 6 digits for the fractional second, nor the 'Z' for UTC.
+    Also, it was only introduced in Python 3.7.
+    """
     match = _TIMESTAMP_RE.match(s)
     if not match:
         raise ValueError('invalid timestamp {!r}'.format(s))
-    y, m, d, hh, mm, ss, sub, zone = match.groups()
+    y, m, d, hh, mm, ss, sfrac, zone = match.groups()
 
     if zone == 'Z':
-        zsign, zh, zm = '+', '00', '00'
+        tz = datetime.timezone.utc
     else:
         match = _TIMEOFFSET_RE.match(zone)
         if not match:
             raise ValueError('invalid timestamp {!r}'.format(s))
-        zsign, zh, zm = match.groups()
+        sign, zh, zm = match.groups()
+        tz_delta = datetime.timedelta(hours=int(zh), minutes=int(zm))
+        tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
 
-    canonical = '{y}-{m}-{d}T{hh}:{mm}:{ss}.{sub}{zsign}{zh}{zm}'.format(
-        y=y, m=m, d=d, hh=hh, mm=mm, ss=ss, sub=sub[:6],
-        zsign=zsign, zh=zh, zm=zm,
-    )
-    return datetime.datetime.strptime(canonical, '%Y-%m-%dT%H:%M:%S.%f%z')
+    microsecond = int(float(sfrac or '0') * 1000000)
+
+    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
+                             microsecond=microsecond, tzinfo=tz)
 
 
 class ServiceError(Exception):
