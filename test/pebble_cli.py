@@ -23,10 +23,8 @@ PEBBLE=pebble_dir python -m test.pebble_cli system-info
 
 import argparse
 import datetime
-import json
 import os
 import sys
-import urllib.error
 
 from ops import pebble
 
@@ -104,17 +102,15 @@ def main():
             result = client.get_warnings(select=pebble.WarningState(args.select))
         else:
             raise AssertionError("shouldn't happen")
-    except urllib.error.HTTPError as e:
-        print(e, file=sys.stderr)
-        obj = json.load(e)
-        print(json.dumps(obj, sort_keys=True, indent=4), file=sys.stderr)
+    except pebble.APIError as e:
+        print('{} {}: {}'.format(e.code, e.status, e.message), file=sys.stderr)
         sys.exit(1)
-    except urllib.error.URLError as e:
-        print('cannot connect to Pebble socket {!r}: {}'.format(socket_path, e.reason),
+    except pebble.SocketError as e:
+        print('cannot connect to socket {!r}: {}'.format(socket_path, e),
               file=sys.stderr)
         sys.exit(1)
     except pebble.ServiceError as e:
-        print('ServiceError:', e.err, file=sys.stderr)
+        print('ServiceError:', e, file=sys.stderr)
         sys.exit(1)
 
     if isinstance(result, list):

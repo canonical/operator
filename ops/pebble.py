@@ -25,6 +25,7 @@ import json
 import re
 import socket
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import sys
@@ -85,10 +86,35 @@ def _parse_timestamp(s):
     return datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
 
 
-class ServiceError(Exception):
+class Error(Exception):
+    """Base class of most errors raised by the Pebble client."""
+
+
+class PollTimeout(TimeoutError, Error):
+    """Raised when the wait_change() polling times out."""
+
+
+class SocketError(Error):
+    """Raised when the Pebble client can't connect to the socket."""
+
+
+class APIError(Error):
+    """Raised when an HTTP API error occurs talking to the Pebble server."""
+
+    def __init__(self, body, code, status, message):
+        """This shouldn't be instantiated directly."""
+        super().__init__(message)
+        self.body = body
+        self.code = code
+        self.status = status
+        self.message = message
+
+
+class ServiceError(Error):
     """Raised by wait_change() when a service change is ready but has an error."""
 
     def __init__(self, err, change):
+        """This shouldn't be instantiated directly."""
         super().__init__(err)
         self.err = err
         self.change = change
@@ -430,7 +456,23 @@ class Client:
             headers['Content-Type'] = 'application/json'
 
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
-        response = self.opener.open(request, timeout=self.timeout)
+
+        try:
+            response = self.opener.open(request, timeout=self.timeout)
+        except urllib.error.HTTPError as e:
+            code = e.code
+            status = e.reason
+            try:
+                body = json.load(e)
+                message = body['result']['message']
+            except Exception as json_exc:
+                # Catch-all in case the response isn't correct JSON
+                body = {}
+                message = '{} - {}'.format(type(json_exc).__name__, json_exc)
+            raise APIError(body, code, status, message)
+        except urllib.error.URLError as e:
+            raise SocketError(e.reason)
+
         response_data = response.read()
         if isinstance(response_data, bytes):
             # read() returns bytes on Python 3.5, and json.load doesn't handle bytes
@@ -504,6 +546,13 @@ class Client:
     def _services_action(
         self, action: str, services: List[str], timeout: float, delay: float,
     ) -> ChangeID:
+        if not isinstance(services, (list, tuple)):
+            raise TypeError('services must be a list of str, not {}'.format(
+                type(services).__name__))
+        for s in services:
+            if not isinstance(s, str):
+                raise TypeError('service names must be str, not {}'.format(type(s).__name__))
+
         body = {'action': action, 'services': services}
         result = self._request('POST', '/v1/services', body=body)
         change_id = ChangeID(result['change'])
@@ -526,7 +575,7 @@ class Client:
 
             time.sleep(delay)
 
-        raise TimeoutError(
+        raise PollTimeout(
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
     def add_layer(self, layer: Union[str, dict, Layer]):
