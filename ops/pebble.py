@@ -67,7 +67,7 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
 
-# Matches yyyy-mm-ddTHH:MM:SS.sssZZZ
+# Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
 _TIMESTAMP_RE = re.compile(
     r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
 
