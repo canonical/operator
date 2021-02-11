@@ -49,6 +49,9 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22Z'),
                          datetime_utc(2021, 2, 10, 4, 36, 22, 0))
 
+        self.assertEqual(pebble._parse_timestamp('2021-02-10t04:36:22z'),
+                         datetime_utc(2021, 2, 10, 4, 36, 22, 0))
+
         self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22.118970777Z'),
                          datetime_utc(2021, 2, 10, 4, 36, 22, 118970))
 

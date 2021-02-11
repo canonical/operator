@@ -69,7 +69,7 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
 
 # Matches yyyy-mm-ddTHH:MM:SS.sssZZZ
 _TIMESTAMP_RE = re.compile(
-    r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
+    r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
 
 # Matches [-+]HH:MM
 _TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
@@ -78,7 +78,7 @@ _TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
 def _parse_timestamp(s):
     """Parse timestamp from Go-encoded JSON.
 
-    This parses the subset of RFC3339 (which in turn is a subset of ISO8601)
+    This parses RFC3339 timestamps (which are a subset of ISO8601 timestamps)
     that Go's encoding/json package produces for time.Time values.
 
     Unfortunately we can't use datetime.fromisoformat(), as that does not
@@ -90,7 +90,7 @@ def _parse_timestamp(s):
         raise ValueError('invalid timestamp {!r}'.format(s))
     y, m, d, hh, mm, ss, sfrac, zone = match.groups()
 
-    if zone == 'Z':
+    if zone in ('Z', 'z'):
         tz = datetime.timezone.utc
     else:
         match = _TIMEOFFSET_RE.match(zone)
