@@ -86,6 +86,17 @@ def _parse_timestamp(s):
     return datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
 
 
+def _json_loads(s: Union[str, bytes]) -> Dict:
+    """Like json.loads(), but handle str or bytes.
+
+    This is needed because an HTTP response's read() method returns bytes on
+    Python 3.5, and json.load doesn't handle bytes.
+    """
+    if isinstance(s, bytes):
+        s = s.decode('utf-8')
+    return json.loads(s)
+
+
 class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
 
@@ -463,7 +474,7 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                body = json.load(e)
+                body = _json_loads(e.read())
                 message = body['result']['message']
             except Exception as json_exc:
                 # Catch-all in case the response isn't correct JSON
@@ -474,10 +485,7 @@ class Client:
             raise SocketError(e.reason)
 
         response_data = response.read()
-        if isinstance(response_data, bytes):
-            # read() returns bytes on Python 3.5, and json.load doesn't handle bytes
-            response_data = response_data.decode('utf-8')
-        result = json.loads(response_data)
+        result = _json_loads(response_data)
         return result
 
     def get_system_info(self) -> SystemInfo:
