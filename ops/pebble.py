@@ -121,6 +121,23 @@ class APIError(Error):
         self.message = message
 
 
+class ServiceError(Error):
+    """Raised when a service change is ready but has an error.
+
+    For example, this happens when you attempt to start an already-started
+    service:
+
+    cannot perform the following tasks:
+    - Start service "test" (service "test" was previously started)
+    """
+
+    def __init__(self, err, change):
+        """This shouldn't be instantiated directly."""
+        super().__init__(err)
+        self.err = err
+        self.change = change
+
+
 class WarningState(enum.Enum):
     """Enum of states for get_warnings() select parameter."""
 
@@ -567,7 +584,8 @@ class Client:
         while time.time() < deadline:
             change = self.get_change(change_id)
             if change.ready:
-                # Note that the Change may be an error, if change.err is set.
+                if change.err:
+                    raise ServiceError(change.err, change)
                 return change
 
             time.sleep(delay)
