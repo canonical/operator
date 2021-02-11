@@ -100,7 +100,7 @@ def _parse_timestamp(s):
         tz_delta = datetime.timedelta(hours=int(zh), minutes=int(zm))
         tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
 
-    microsecond = int(float(sfrac or '0') * 1000000)
+    microsecond = round(float(sfrac or '0') * 1000000)
 
     return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
                              microsecond=microsecond, tzinfo=tz)
