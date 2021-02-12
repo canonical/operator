@@ -655,9 +655,12 @@ class Relation:
         if is_peer:
             # For peer relations, both the remote and the local app are the same.
             self.app = our_unit.app
-        elif backend.remote_app_name is not None:
-            # For non-peer relations, use the remote app name directly.
-            self.app = cache.get(Application, backend.remote_app_name)
+        else:
+            # For non-peer relations, use the remote app name for this
+            # relation (if we have it).
+            app_name = backend.relation_remote_app(relation_id)
+            if app_name is not None:
+                self.app = cache.get(Application, app_name)
 
         try:
             for unit_name in backend.relation_list(self.id):
@@ -665,9 +668,9 @@ class Relation:
                 self.units.add(unit)
                 if self.app is None:
                     # Fallback to using the app of one of the units if
-                    # JUJU_REMOTE_APP is not set (should only happen on Juju
-                    # before 2.7, when we added JUJU_REMOTE_APP). This is not
-                    # great, as the event can fire before any units are up.
+                    # JUJU_REMOTE_APP is not set (pre Juju 2.7) or this is not
+                    # the current event's relation. The fallback is not
+                    # perfect, as an event can fire before any units are up.
                     self.app = unit.app
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
@@ -1128,7 +1131,8 @@ class _ModelBackend:
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
 
-    def __init__(self, unit_name=None, model_name=None, remote_app_name=None):
+    def __init__(self, unit_name=None, model_name=None, remote_app_name=None,
+                 event_relation_id=None):
         if unit_name is None:
             self.unit_name = os.environ['JUJU_UNIT_NAME']
         else:
@@ -1141,6 +1145,10 @@ class _ModelBackend:
         if remote_app_name is None:
             remote_app_name = os.environ.get('JUJU_REMOTE_APP')
         self.remote_app_name = remote_app_name
+
+        if event_relation_id is None and 'JUJU_RELATION_ID' in os.environ:
+            event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+        self.event_relation_id = event_relation_id
 
         self._is_leader = None
         self._leader_check_time = None
@@ -1176,6 +1184,14 @@ class _ModelBackend:
             if 'relation not found' in str(e):
                 raise RelationNotFoundError() from e
             raise
+
+    def relation_remote_app(self, relation_id: int):
+        """Return remote app name for given relation ID, or None if not known."""
+        if relation_id == self.event_relation_id:
+            return self.remote_app_name
+        # TODO(benhoyt) - implement for other relation IDs, perhaps via a new
+        # "--app" arg on relation-list command
+        return None
 
     def relation_get(self, relation_id, member_name, is_app):
         if not isinstance(is_app, bool):

@@ -74,8 +74,7 @@ class Harness:
             *,
             meta: OptionalYAML = None,
             actions: OptionalYAML = None,
-            config: OptionalYAML = None,
-            remote_app_name: str = None):
+            config: OptionalYAML = None):
         self._charm_cls = charm_cls
         self._charm = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
@@ -84,7 +83,7 @@ class Harness:
         self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
-        self._backend = _TestingModelBackend(self._unit_name, self._meta, remote_app_name)
+        self._backend = _TestingModelBackend(self._unit_name, self._meta)
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
         self._oci_resources = {}
@@ -688,11 +687,10 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name, meta, remote_app_name):
+    def __init__(self, unit_name, meta):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
-        self.remote_app_name = remote_app_name
         self._calls = []
         self._meta = meta
         self._is_leader = None
@@ -737,6 +735,12 @@ class _TestingModelBackend:
             return self._relation_list_map[relation_id]
         except KeyError as e:
             raise model.RelationNotFoundError from e
+
+    def relation_remote_app(self, relation_id):
+        if relation_id not in self._relation_app_and_units:
+            # Non-existent or dead relation
+            return None
+        return self._relation_app_and_units[relation_id]['app']
 
     def relation_get(self, relation_id, member_name, is_app):
         if is_app and '/' in member_name:

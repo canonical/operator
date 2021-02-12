@@ -47,7 +47,7 @@ class TestModel(unittest.TestCase):
             resources:
               foo: {type: file, filename: foo.txt}
               bar: {type: file, filename: bar.txt}
-        ''', remote_app_name='remoteapp1')
+        ''')
         self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
         self.model = self.harness.model
@@ -88,7 +88,9 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', rel_app1),
+            ('relation_remote_app', 2),
             ('relation_list', rel_app2),
         ])
 
@@ -112,17 +114,15 @@ class TestModel(unittest.TestCase):
         self.assertIsInstance(rel_db1, ops.model.Relation)
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id_db1),
         ])
         dead_rel = self.model.get_relation('db1', 7)
         self.assertIsInstance(dead_rel, ops.model.Relation)
-        self.assertEqual(set(dead_rel.data.keys()), {
-            self.model.unit,
-            self.model.unit.app,
-            self.model.get_app('remoteapp1'),
-        })
+        self.assertEqual(set(dead_rel.data.keys()), {self.model.unit, self.model.unit.app})
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertBackendCalls([
+            ('relation_remote_app', 7),
             ('relation_list', 7),
             ('relation_get', 7, 'myapp/0', False),
         ])
@@ -137,7 +137,9 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db0'),
+            ('relation_remote_app', 0),
             ('relation_list', self.relation_id_db0),
+            ('relation_remote_app', 2),
             ('relation_list', relation_id_db0_b),
         ])
 
@@ -158,6 +160,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id)
         ])
 
@@ -185,6 +188,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'remoteapp1/0', False),
         ])
@@ -209,6 +213,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'remoteapp1', True),
         ])
@@ -234,6 +239,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'remoteapp1/0', False),
         ])
@@ -282,6 +288,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp', True),
             ('is_leader',),
@@ -305,6 +312,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp', True),
             ('is_leader',),
@@ -325,6 +333,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
             ('relation_set', relation_id, 'host', '', False),
@@ -345,6 +354,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
             ('relation_set', relation_id, 'port', '', False),
@@ -379,6 +389,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
             ('relation_set', relation_id, 'host', 'bar', False),
@@ -403,6 +414,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
         ])
@@ -455,6 +467,7 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([
             ('is_leader',),
             ('relation_ids', 'db1'),
+            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('is_leader',),
         ])

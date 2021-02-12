@@ -762,6 +762,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness._get_backend_calls(reset=True), [
                 ('relation_ids', 'db'),
+                ('relation_remote_app', 0),
                 ('relation_list', rel_id),
             ])
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
@@ -772,12 +773,14 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness._get_backend_calls(reset=False), [
                 ('relation_ids', 'db'),
+                ('relation_remote_app', 0),
                 ('relation_list', rel_id),
             ])
         # If we check again, they are still there, but now we reset it
         self.assertEqual(
             harness._get_backend_calls(reset=True), [
                 ('relation_ids', 'db'),
+                ('relation_remote_app', 0),
                 ('relation_list', rel_id),
             ])
         # And the calls are gone
