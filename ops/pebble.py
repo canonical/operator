@@ -17,7 +17,7 @@
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Union
 import datetime
 import enum
 import http.client
@@ -133,13 +133,17 @@ class ConnectionError(Error):
 class APIError(Error):
     """Raised when an HTTP API error occurs talking to the Pebble server."""
 
-    def __init__(self, body, code, status, message):
+    def __init__(self, body: Dict, code: int, status: str, message: str):
         """This shouldn't be instantiated directly."""
-        super().__init__(message)
+        super().__init__(message)  # Makes str(e) return message
         self.body = body
         self.code = code
         self.status = status
         self.message = message
+
+    def __repr__(self):
+        return 'APIError({!r}, {!r}, {!r}, {!r})'.format(
+            self.body, self.code, self.status, self.message)
 
 
 class ServiceError(Error):
@@ -152,11 +156,14 @@ class ServiceError(Error):
     - Start service "test" (service "test" was previously started)
     """
 
-    def __init__(self, err, change):
+    def __init__(self, err: str, change: 'Change'):
         """This shouldn't be instantiated directly."""
-        super().__init__(err)
+        super().__init__(err)  # Makes str(e) return err
         self.err = err
         self.change = change
+
+    def __repr__(self):
+        return 'ServiceError({!r}, {!r})'.format(self.err, self.change)
 
 
 class WarningState(enum.Enum):
@@ -580,7 +587,7 @@ class Client:
         return self._services_action('stop', services, timeout, delay)
 
     def _services_action(
-        self, action: str, services: List[str], timeout: float, delay: float,
+        self, action: str, services: Iterable[str], timeout: float, delay: float,
     ) -> ChangeID:
         if not isinstance(services, (list, tuple)):
             raise TypeError('services must be a list of str, not {}'.format(
