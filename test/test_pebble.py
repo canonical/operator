@@ -116,7 +116,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(error.message, 'no services')
         self.assertEqual(str(error), 'no services')
 
-    def test_service_error(self):
+    def test_change_error(self):
         change = pebble.Change(
             id=pebble.ChangeID('1234'),
             kind='start',
@@ -128,7 +128,7 @@ class TestTypes(unittest.TestCase):
             spawn_time=datetime.datetime.now(),
             ready_time=datetime.datetime.now(),
         )
-        error = pebble.ServiceError('Some error', change)
+        error = pebble.ChangeError('Some error', change)
         self.assertIsInstance(error, pebble.Error)
         self.assertEqual(error.err, 'Some error')
         self.assertEqual(error.change, change)
@@ -765,7 +765,7 @@ class TestClient(unittest.TestCase):
             return self.client.stop_services(['svc'], timeout=timeout)
         self._services_action_async_helper('stop', api_func, ['svc'])
 
-    def test_service_error(self):
+    def test_change_error(self):
         self.client.responses.append({
             "change": "70",
             "result": None,
@@ -781,7 +781,7 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        with self.assertRaises(pebble.ServiceError) as cm:
+        with self.assertRaises(pebble.ChangeError) as cm:
             self.client.autostart_services()
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(cm.exception.err, 'Some kind of service error')
@@ -810,6 +810,20 @@ class TestClient(unittest.TestCase):
                 ('GET', '/v1/changes/70', None, None),
                 ('GET', '/v1/changes/70', None, None),
             ])
+
+    def test_wait_change_error(self):
+        change = self.build_mock_change_dict()
+        change['err'] = 'Some kind of service error'
+        self.client.responses.append({
+            "result": change,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        # wait_change() itself shouldn't raise an error
+        response = self.client.wait_change('70')
+        self.assertEqual(response.id, '70')
+        self.assertEqual(response.err, 'Some kind of service error')
 
 
 class TestSocketClient(unittest.TestCase):

@@ -146,8 +146,8 @@ class APIError(Error):
             self.body, self.code, self.status, self.message)
 
 
-class ServiceError(Error):
-    """Raised when a service change is ready but has an error.
+class ChangeError(Error):
+    """Raised by actions when a change is ready but has an error.
 
     For example, this happens when you attempt to start an already-started
     service:
@@ -163,7 +163,7 @@ class ServiceError(Error):
         self.change = change
 
     def __repr__(self):
-        return 'ServiceError({!r}, {!r})'.format(self.err, self.change)
+        return 'ChangeError({!r}, {!r})'.format(self.err, self.change)
 
 
 class WarningState(enum.Enum):
@@ -564,7 +564,9 @@ class Client:
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Start the autostart services and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't start. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('autostart', [], timeout, delay)
 
@@ -573,7 +575,9 @@ class Client:
     ) -> ChangeID:
         """Start services by name and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't start. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -582,7 +586,9 @@ class Client:
     ) -> ChangeID:
         """Stop services by name and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't stop. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('stop', services, timeout, delay)
 
@@ -600,7 +606,9 @@ class Client:
         result = self._request('POST', '/v1/services', body=body)
         change_id = ChangeID(result['change'])
         if timeout:
-            self.wait_change(change_id, timeout=timeout, delay=delay)
+            change = self.wait_change(change_id, timeout=timeout, delay=delay)
+            if change.err:
+                raise ChangeError(change.err, change)
         return change_id
 
     def wait_change(
@@ -612,8 +620,6 @@ class Client:
         while time.time() < deadline:
             change = self.get_change(change_id)
             if change.ready:
-                if change.err:
-                    raise ServiceError(change.err, change)
                 return change
 
             time.sleep(delay)

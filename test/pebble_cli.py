@@ -109,8 +109,8 @@ def main():
         print('cannot connect to socket {!r}: {}'.format(socket_path, e),
               file=sys.stderr)
         sys.exit(1)
-    except pebble.ServiceError as e:
-        print('ServiceError:', e, file=sys.stderr)
+    except pebble.ChangeError as e:
+        print('ChangeError:', e, file=sys.stderr)
         sys.exit(1)
 
     if isinstance(result, list):
