@@ -1597,7 +1597,31 @@ class TestModelBackend(unittest.TestCase):
         os.environ['JUJU_RELATION_ID'] = '5'
         self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
 
+        fake_script(self, 'relation-list', r"""
+echo '"remoteapp2"'
+""")
+        self.assertEqual(self.backend.relation_remote_app_name(1), 'remoteapp2')
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '1', '--app', '--format=json'],
+        ])
+
+        fake_script(self, 'relation-list', r"""
+echo "ERROR invalid value \"6\" for option -r: relation not found" >&2  # NOQA
+exit 2
+""")
         self.assertIs(self.backend.relation_remote_app_name(6), None)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '6', '--app', '--format=json'],
+        ])
+
+        fake_script(self, 'relation-list', r"""
+echo "ERROR option provided but not defined: --app" >&2
+exit 2
+""")
+        self.assertIs(self.backend.relation_remote_app_name(6), None)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '6', '--app', '--format=json'],
+        ])
 
 
 class TestLazyMapping(unittest.TestCase):

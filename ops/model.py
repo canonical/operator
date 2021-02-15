@@ -668,8 +668,7 @@ class Relation:
             pass
 
         # If we didn't get the remote app via our_unit.app or the units list,
-        # look it up via JUJU_REMOTE_APP (works in the case where this is the
-        # event's relation, i.e., relation_id == JUJU_RELATION_ID).
+        # look it up via JUJU_REMOTE_APP or "relation-list --app".
         if self.app is None:
             app_name = backend.relation_remote_app_name(relation_id)
             if app_name is not None:
@@ -1182,9 +1181,20 @@ class _ModelBackend:
         event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
         if relation_id == event_relation_id:
             return os.environ.get('JUJU_REMOTE_APP')
-        # TODO(benhoyt) - implement for other relation IDs, perhaps via a new
-        # "--app" arg on relation-list command
-        return None
+
+        # If caller is asking for information about another relation, use
+        # "relation-list --app" to get it.
+        try:
+            return self._run('relation-list', '-r', str(relation_id), '--app',
+                             return_output=True, use_json=True)
+        except ModelError as e:
+            if 'relation not found' in str(e):
+                return None
+            if 'option provided but not defined: --app' in str(e):
+                # "--app" was introduced to relation-list in Juju 2.8.1, so
+                # handle previous verions of Juju gracefully
+                return None
+            raise
 
     def relation_get(self, relation_id, member_name, is_app):
         if not isinstance(is_app, bool):
