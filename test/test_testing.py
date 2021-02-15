@@ -762,8 +762,8 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness._get_backend_calls(reset=True), [
                 ('relation_ids', 'db'),
-                ('relation_remote_app', 0),
                 ('relation_list', rel_id),
+                ('relation_remote_app_name', 0),
             ])
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
         harness.add_relation_unit(rel_id, 'postgresql/0')
@@ -773,14 +773,12 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness._get_backend_calls(reset=False), [
                 ('relation_ids', 'db'),
-                ('relation_remote_app', 0),
                 ('relation_list', rel_id),
             ])
         # If we check again, they are still there, but now we reset it
         self.assertEqual(
             harness._get_backend_calls(reset=True), [
                 ('relation_ids', 'db'),
-                ('relation_remote_app', 0),
                 ('relation_list', rel_id),
             ])
         # And the calls are gone
@@ -1594,3 +1592,20 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertIn(
             "units/unit-test-app-0/resources/foo: resource#test-app/foo not found",
             str(cm.exception))
+
+    def test_relation_remote_app_name(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+
+        self.assertIs(backend.relation_remote_app_name(1), None)
+
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertEqual(backend.relation_remote_app_name(rel_id), 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.add_relation_unit(rel_id, 'postgresql/1')
+        self.assertEqual(backend.relation_remote_app_name(rel_id), 'postgresql')
+
+        self.assertIs(backend.relation_remote_app_name(7), None)

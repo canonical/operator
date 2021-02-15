@@ -736,7 +736,7 @@ class _TestingModelBackend:
         except KeyError as e:
             raise model.RelationNotFoundError from e
 
-    def relation_remote_app(self, relation_id):
+    def relation_remote_app_name(self, relation_id: int) -> typing.Optional[str]:
         if relation_id not in self._relation_app_and_units:
             # Non-existent or dead relation
             return None

@@ -88,9 +88,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', rel_app1),
-            ('relation_remote_app', 2),
             ('relation_list', rel_app2),
         ])
 
@@ -114,7 +112,6 @@ class TestModel(unittest.TestCase):
         self.assertIsInstance(rel_db1, ops.model.Relation)
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id_db1),
         ])
         dead_rel = self.model.get_relation('db1', 7)
@@ -122,8 +119,8 @@ class TestModel(unittest.TestCase):
         self.assertEqual(set(dead_rel.data.keys()), {self.model.unit, self.model.unit.app})
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertBackendCalls([
-            ('relation_remote_app', 7),
             ('relation_list', 7),
+            ('relation_remote_app_name', 7),
             ('relation_get', 7, 'myapp/0', False),
         ])
 
@@ -137,10 +134,10 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db0'),
-            ('relation_remote_app', 0),
             ('relation_list', self.relation_id_db0),
-            ('relation_remote_app', 2),
+            ('relation_remote_app_name', 0),
             ('relation_list', relation_id_db0_b),
+            ('relation_remote_app_name', 2),
         ])
 
     def test_peer_relation_app(self):
@@ -160,7 +157,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id)
         ])
 
@@ -188,7 +184,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'remoteapp1/0', False),
         ])
@@ -213,7 +208,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'remoteapp1', True),
         ])
@@ -239,7 +233,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'remoteapp1/0', False),
         ])
@@ -288,7 +281,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp', True),
             ('is_leader',),
@@ -312,7 +304,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp', True),
             ('is_leader',),
@@ -333,7 +324,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
             ('relation_set', relation_id, 'host', '', False),
@@ -354,7 +344,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
             ('relation_set', relation_id, 'port', '', False),
@@ -389,7 +378,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
             ('relation_set', relation_id, 'host', 'bar', False),
@@ -414,7 +402,6 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
         ])
@@ -424,6 +411,11 @@ class TestModel(unittest.TestCase):
         rel = self.model.get_relation('db1')
         self.assertEqual(rel.units, set())
         self.assertIs(rel.app, self.model.get_app('remoteapp1'))
+        self.assertBackendCalls([
+            ('relation_ids', 'db1'),
+            ('relation_list', 1),
+            ('relation_remote_app_name', 1),
+        ])
 
     def test_config(self):
         self.harness.update_config({'foo': 'foo', 'bar': 1, 'qux': True})
@@ -467,7 +459,6 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([
             ('is_leader',),
             ('relation_ids', 'db1'),
-            ('relation_remote_app', 1),
             ('relation_list', relation_id),
             ('is_leader',),
         ])
@@ -1589,6 +1580,24 @@ class TestModelBackend(unittest.TestCase):
         for metrics, labels in invalid_inputs:
             with self.assertRaises(ops.model.ModelError):
                 self.backend.add_metrics(metrics, labels)
+
+    def test_relation_remote_app_name(self):
+        self.addCleanup(os.environ.pop, 'JUJU_RELATION_ID', None)
+        self.addCleanup(os.environ.pop, 'JUJU_REMOTE_APP', None)
+
+        # With JUJU_RELATION_ID not set it should return None
+        self.assertIs(self.backend.relation_remote_app_name(5), None)
+
+        # With JUJU_RELATION_ID but JUJU_REMOTE_APP not set it'll return None too
+        os.environ['JUJU_RELATION_ID'] = 'x:5'
+        self.assertIs(self.backend.relation_remote_app_name(5), None)
+
+        os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
+        os.environ['JUJU_RELATION_ID'] = '5'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
+
+        self.assertIs(self.backend.relation_remote_app_name(6), None)
 
 
 class TestLazyMapping(unittest.TestCase):
