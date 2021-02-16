@@ -17,7 +17,7 @@
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Union
 import datetime
 import enum
 import http.client
@@ -25,6 +25,7 @@ import json
 import re
 import socket
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import sys
@@ -106,13 +107,63 @@ def _parse_timestamp(s):
                              microsecond=microsecond, tzinfo=tz)
 
 
-class ServiceError(Exception):
-    """Raised by wait_change() when a service change is ready but has an error."""
+def _json_loads(s: Union[str, bytes]) -> Dict:
+    """Like json.loads(), but handle str or bytes.
 
-    def __init__(self, err, change):
-        super().__init__(err)
+    This is needed because an HTTP response's read() method returns bytes on
+    Python 3.5, and json.load doesn't handle bytes.
+    """
+    if isinstance(s, bytes):
+        s = s.decode('utf-8')
+    return json.loads(s)
+
+
+class Error(Exception):
+    """Base class of most errors raised by the Pebble client."""
+
+
+class TimeoutError(TimeoutError, Error):
+    """Raised when a polling timeout occurs."""
+
+
+class ConnectionError(Error):
+    """Raised when the Pebble client can't connect to the socket."""
+
+
+class APIError(Error):
+    """Raised when an HTTP API error occurs talking to the Pebble server."""
+
+    def __init__(self, body: Dict, code: int, status: str, message: str):
+        """This shouldn't be instantiated directly."""
+        super().__init__(message)  # Makes str(e) return message
+        self.body = body
+        self.code = code
+        self.status = status
+        self.message = message
+
+    def __repr__(self):
+        return 'APIError({!r}, {!r}, {!r}, {!r})'.format(
+            self.body, self.code, self.status, self.message)
+
+
+class ChangeError(Error):
+    """Raised by actions when a change is ready but has an error.
+
+    For example, this happens when you attempt to start an already-started
+    service:
+
+    cannot perform the following tasks:
+    - Start service "test" (service "test" was previously started)
+    """
+
+    def __init__(self, err: str, change: 'Change'):
+        """This shouldn't be instantiated directly."""
+        super().__init__(err)  # Makes str(e) return err
         self.err = err
         self.change = change
+
+    def __repr__(self):
+        return 'ChangeError({!r}, {!r})'.format(self.err, self.change)
 
 
 class WarningState(enum.Enum):
@@ -451,12 +502,25 @@ class Client:
             headers['Content-Type'] = 'application/json'
 
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
-        response = self.opener.open(request, timeout=self.timeout)
+
+        try:
+            response = self.opener.open(request, timeout=self.timeout)
+        except urllib.error.HTTPError as e:
+            code = e.code
+            status = e.reason
+            try:
+                body = _json_loads(e.read())
+                message = body['result']['message']
+            except (IOError, ValueError, KeyError) as e2:
+                # Will only happen on read error or if Pebble sends invalid JSON.
+                body = {}
+                message = '{} - {}'.format(type(e2).__name__, e2)
+            raise APIError(body, code, status, message)
+        except urllib.error.URLError as e:
+            raise ConnectionError(e.reason)
+
         response_data = response.read()
-        if isinstance(response_data, bytes):
-            # read() returns bytes on Python 3.5, and json.load doesn't handle bytes
-            response_data = response_data.decode('utf-8')
-        result = json.loads(response_data)
+        result = _json_loads(response_data)
         return result
 
     def get_system_info(self) -> SystemInfo:
@@ -500,7 +564,9 @@ class Client:
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Start the autostart services and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't start. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('autostart', [], timeout, delay)
 
@@ -509,7 +575,9 @@ class Client:
     ) -> ChangeID:
         """Start services by name and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't start. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -518,18 +586,29 @@ class Client:
     ) -> ChangeID:
         """Stop services by name and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't stop. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('stop', services, timeout, delay)
 
     def _services_action(
-        self, action: str, services: List[str], timeout: float, delay: float,
+        self, action: str, services: Iterable[str], timeout: float, delay: float,
     ) -> ChangeID:
+        if not isinstance(services, (list, tuple)):
+            raise TypeError('services must be a list of str, not {}'.format(
+                type(services).__name__))
+        for s in services:
+            if not isinstance(s, str):
+                raise TypeError('service names must be str, not {}'.format(type(s).__name__))
+
         body = {'action': action, 'services': services}
         result = self._request('POST', '/v1/services', body=body)
         change_id = ChangeID(result['change'])
         if timeout:
-            self.wait_change(change_id, timeout=timeout, delay=delay)
+            change = self.wait_change(change_id, timeout=timeout, delay=delay)
+            if change.err:
+                raise ChangeError(change.err, change)
         return change_id
 
     def wait_change(
@@ -541,8 +620,6 @@ class Client:
         while time.time() < deadline:
             change = self.get_change(change_id)
             if change.ready:
-                if change.err:
-                    raise ServiceError(change.err, change)
                 return change
 
             time.sleep(delay)
