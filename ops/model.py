@@ -1029,11 +1029,11 @@ class Container:
         """Autostart all default services."""
         self._pebble.autostart_services()
 
-    def start(self, *service_names: typing.List[str]):
+    def start(self, *service_names: str):
         """Start given service(s) by name."""
         self._pebble.start_services(service_names)
 
-    def stop(self, *service_names: typing.List[str]):
+    def stop(self, *service_names: str):
         """Stop given service(s) by name."""
         self._pebble.stop_services(service_names)
 

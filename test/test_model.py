@@ -816,6 +816,24 @@ containers:
             ('stop', ('foo', 'bar')),
         ])
 
+    def test_type_errors(self):
+        meta = ops.charm.CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  c1:
+    k: v
+""")
+        # Only the real pebble Client checks types, so use actual backend class
+        backend = ops.model._ModelBackend('myapp/0')
+        model = ops.model.Model(meta, backend)
+        container = model.unit.containers['c1']
+
+        with self.assertRaises(TypeError):
+            container.start(['foo'])
+
+        with self.assertRaises(TypeError):
+            container.stop(['foo'])
+
     def test_add_layer(self):
         self.container.add_layer('summary: str\n')
         self.container.add_layer({'summary': 'dict'})
