@@ -1016,7 +1016,7 @@ class Container:
         self.name = name
 
         if pebble_client is None:
-            socket_path = '/charm/containers/{}/pebble/.pebble.socket'.format(name)
+            socket_path = '/charm/containers/{}/pebble.socket'.format(name)
             pebble_client = backend.get_pebble(socket_path)
         self._pebble = pebble_client
 

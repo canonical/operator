@@ -794,7 +794,7 @@ containers:
         self.pebble = self.container.pebble
 
     def test_socket_path(self):
-        self.assertEqual(self.pebble.socket_path, '/charm/containers/c1/pebble/.pebble.socket')
+        self.assertEqual(self.pebble.socket_path, '/charm/containers/c1/pebble.socket')
 
     def test_autostart(self):
         self.container.autostart()
