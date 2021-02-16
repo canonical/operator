@@ -1161,6 +1161,10 @@ class _ModelBackend:
                 else:
                     return text
 
+    @staticmethod
+    def _is_relation_not_found(model_error):
+        return 'relation not found' in str(model_error)
+
     def relation_ids(self, relation_name):
         relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
@@ -1170,17 +1174,17 @@ class _ModelBackend:
             return self._run('relation-list', '-r', str(relation_id),
                              return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
     def relation_remote_app_name(self, relation_id: int) -> typing.Optional[str]:
         """Return remote app name for given relation ID, or None if not known."""
-        if 'JUJU_RELATION_ID' not in os.environ:
-            return None
-        event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
-        if relation_id == event_relation_id:
-            return os.environ.get('JUJU_REMOTE_APP')
+        if 'JUJU_RELATION_ID' in os.environ and 'JUJU_REMOTE_APP' in os.environ:
+            event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+            if relation_id == event_relation_id:
+                # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
+                return os.environ['JUJU_REMOTE_APP']
 
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
@@ -1188,7 +1192,7 @@ class _ModelBackend:
             return self._run('relation-list', '-r', str(relation_id), '--app',
                              return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 return None
             if 'option provided but not defined: --app' in str(e):
                 # "--app" was introduced to relation-list in Juju 2.8.1, so
@@ -1213,7 +1217,7 @@ class _ModelBackend:
         try:
             return self._run(*args, return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
@@ -1234,7 +1238,7 @@ class _ModelBackend:
         try:
             return self._run(*args)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
@@ -1369,7 +1373,7 @@ class _ModelBackend:
         try:
             return self._run(*cmd, return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 

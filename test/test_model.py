@@ -1581,22 +1581,21 @@ class TestModelBackend(unittest.TestCase):
             with self.assertRaises(ops.model.ModelError):
                 self.backend.add_metrics(metrics, labels)
 
-    def test_relation_remote_app_name(self):
+    def test_relation_remote_app_name_env(self):
         self.addCleanup(os.environ.pop, 'JUJU_RELATION_ID', None)
         self.addCleanup(os.environ.pop, 'JUJU_REMOTE_APP', None)
 
-        # With JUJU_RELATION_ID not set it should return None
-        self.assertIs(self.backend.relation_remote_app_name(5), None)
-
-        # With JUJU_RELATION_ID but JUJU_REMOTE_APP not set it'll return None too
         os.environ['JUJU_RELATION_ID'] = 'x:5'
-        self.assertIs(self.backend.relation_remote_app_name(5), None)
-
         os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
         self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
         os.environ['JUJU_RELATION_ID'] = '5'
         self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
 
+    def test_relation_remote_app_name_script_success(self):
+        self.addCleanup(os.environ.pop, 'JUJU_RELATION_ID', None)
+        self.addCleanup(os.environ.pop, 'JUJU_REMOTE_APP', None)
+
+        # JUJU_RELATION_ID and JUJU_REMOTE_APP both unset
         fake_script(self, 'relation-list', r"""
 echo '"remoteapp2"'
 """)
@@ -1605,6 +1604,20 @@ echo '"remoteapp2"'
             ['relation-list', '-r', '1', '--app', '--format=json'],
         ])
 
+        # JUJU_RELATION_ID set but JUJU_REMOTE_APP unset
+        os.environ['JUJU_RELATION_ID'] = 'x:5'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+        # JUJU_RELATION_ID unset but JUJU_REMOTE_APP set
+        del os.environ['JUJU_RELATION_ID']
+        os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+        # Both set, but JUJU_RELATION_ID a different relation
+        os.environ['JUJU_RELATION_ID'] = 'x:6'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+    def test_relation_remote_app_name_script_errors(self):
         fake_script(self, 'relation-list', r"""
 echo "ERROR invalid value \"6\" for option -r: relation not found" >&2  # NOQA
 exit 2
