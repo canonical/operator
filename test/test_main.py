@@ -48,6 +48,8 @@ from ops.charm import (
     StorageAttachedEvent,
     ActionEvent,
     CollectMetricsEvent,
+    WorkloadEvent,
+    WorkloadReadyEvent,
 )
 from ops.framework import Framework, StoredStateData
 from ops.main import main, CHARM_STATE_FILE, _should_use_controller_storage
@@ -81,7 +83,7 @@ class SymlinkTargetError(Exception):
 class EventSpec:
     def __init__(self, event_type, event_name, env_var=None,
                  relation_id=None, remote_app=None, remote_unit=None,
-                 model_name=None, set_in_env=None):
+                 model_name=None, set_in_env=None, workload_name=None):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -90,6 +92,7 @@ class EventSpec:
         self.remote_unit = remote_unit
         self.model_name = model_name
         self.set_in_env = set_in_env
+        self.workload_name = workload_name
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
@@ -385,6 +388,10 @@ class _TestMain(abc.ABC):
                 'JUJU_REMOTE_UNIT': '',
                 'JUJU_REMOTE_APP': '',
             })
+        if issubclass(event_spec.event_type, WorkloadEvent):
+            env.update({
+                'JUJU_WORKLOAD_NAME': event_spec.workload_name,
+            })
         if issubclass(event_spec.event_type, ActionEvent):
             event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
             env.update({
@@ -521,6 +528,10 @@ class _TestMain(abc.ABC):
             EventSpec(ActionEvent, 'foo_bar_action',
                       env_var='JUJU_ACTION_NAME'),
             {},
+        ), (
+            EventSpec(WorkloadReadyEvent, 'test_workload_ready',
+                      workload_name='test'),
+            {'container_name': 'test'},
         )]
 
         logger.debug('Expected events %s', events_under_test)
