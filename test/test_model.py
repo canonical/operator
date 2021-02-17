@@ -120,6 +120,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertBackendCalls([
             ('relation_list', 7),
+            ('relation_remote_app_name', 7),
             ('relation_get', 7, 'myapp/0', False),
         ])
 
@@ -134,7 +135,9 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([
             ('relation_ids', 'db0'),
             ('relation_list', self.relation_id_db0),
+            ('relation_remote_app_name', 0),
             ('relation_list', relation_id_db0_b),
+            ('relation_remote_app_name', 2),
         ])
 
     def test_peer_relation_app(self):
@@ -401,6 +404,17 @@ class TestModel(unittest.TestCase):
             ('relation_ids', 'db1'),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
+        ])
+
+    def test_relation_no_units(self):
+        self.harness.add_relation('db1', 'remoteapp1')
+        rel = self.model.get_relation('db1')
+        self.assertEqual(rel.units, set())
+        self.assertIs(rel.app, self.model.get_app('remoteapp1'))
+        self.assertBackendCalls([
+            ('relation_ids', 'db1'),
+            ('relation_list', 1),
+            ('relation_remote_app_name', 1),
         ])
 
     def test_config(self):
@@ -1566,6 +1580,61 @@ class TestModelBackend(unittest.TestCase):
         for metrics, labels in invalid_inputs:
             with self.assertRaises(ops.model.ModelError):
                 self.backend.add_metrics(metrics, labels)
+
+    def test_relation_remote_app_name_env(self):
+        self.addCleanup(os.environ.pop, 'JUJU_RELATION_ID', None)
+        self.addCleanup(os.environ.pop, 'JUJU_REMOTE_APP', None)
+
+        os.environ['JUJU_RELATION_ID'] = 'x:5'
+        os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
+        os.environ['JUJU_RELATION_ID'] = '5'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
+
+    def test_relation_remote_app_name_script_success(self):
+        self.addCleanup(os.environ.pop, 'JUJU_RELATION_ID', None)
+        self.addCleanup(os.environ.pop, 'JUJU_REMOTE_APP', None)
+
+        # JUJU_RELATION_ID and JUJU_REMOTE_APP both unset
+        fake_script(self, 'relation-list', r"""
+echo '"remoteapp2"'
+""")
+        self.assertEqual(self.backend.relation_remote_app_name(1), 'remoteapp2')
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '1', '--app', '--format=json'],
+        ])
+
+        # JUJU_RELATION_ID set but JUJU_REMOTE_APP unset
+        os.environ['JUJU_RELATION_ID'] = 'x:5'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+        # JUJU_RELATION_ID unset but JUJU_REMOTE_APP set
+        del os.environ['JUJU_RELATION_ID']
+        os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+        # Both set, but JUJU_RELATION_ID a different relation
+        os.environ['JUJU_RELATION_ID'] = 'x:6'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+    def test_relation_remote_app_name_script_errors(self):
+        fake_script(self, 'relation-list', r"""
+echo "ERROR invalid value \"6\" for option -r: relation not found" >&2  # NOQA
+exit 2
+""")
+        self.assertIs(self.backend.relation_remote_app_name(6), None)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '6', '--app', '--format=json'],
+        ])
+
+        fake_script(self, 'relation-list', r"""
+echo "ERROR option provided but not defined: --app" >&2
+exit 2
+""")
+        self.assertIs(self.backend.relation_remote_app_name(6), None)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '6', '--app', '--format=json'],
+        ])
 
 
 class TestLazyMapping(unittest.TestCase):

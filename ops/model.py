@@ -652,18 +652,28 @@ class Relation:
         self.app = None
         self.units = set()
 
-        # For peer relations, both the remote and the local app are the same.
         if is_peer:
+            # For peer relations, both the remote and the local app are the same.
             self.app = our_unit.app
+
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
                 if self.app is None:
+                    # Use the app of one of the units if available.
                     self.app = unit.app
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
+
+        # If we didn't get the remote app via our_unit.app or the units list,
+        # look it up via JUJU_REMOTE_APP or "relation-list --app".
+        if self.app is None:
+            app_name = backend.relation_remote_app_name(relation_id)
+            if app_name is not None:
+                self.app = cache.get(Application, app_name)
+
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
@@ -1151,6 +1161,10 @@ class _ModelBackend:
                 else:
                     return text
 
+    @staticmethod
+    def _is_relation_not_found(model_error):
+        return 'relation not found' in str(model_error)
+
     def relation_ids(self, relation_name):
         relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
@@ -1160,8 +1174,30 @@ class _ModelBackend:
             return self._run('relation-list', '-r', str(relation_id),
                              return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
+            raise
+
+    def relation_remote_app_name(self, relation_id: int) -> typing.Optional[str]:
+        """Return remote app name for given relation ID, or None if not known."""
+        if 'JUJU_RELATION_ID' in os.environ and 'JUJU_REMOTE_APP' in os.environ:
+            event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+            if relation_id == event_relation_id:
+                # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
+                return os.environ['JUJU_REMOTE_APP']
+
+        # If caller is asking for information about another relation, use
+        # "relation-list --app" to get it.
+        try:
+            return self._run('relation-list', '-r', str(relation_id), '--app',
+                             return_output=True, use_json=True)
+        except ModelError as e:
+            if self._is_relation_not_found(e):
+                return None
+            if 'option provided but not defined: --app' in str(e):
+                # "--app" was introduced to relation-list in Juju 2.8.1, so
+                # handle previous verions of Juju gracefully
+                return None
             raise
 
     def relation_get(self, relation_id, member_name, is_app):
@@ -1181,7 +1217,7 @@ class _ModelBackend:
         try:
             return self._run(*args, return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
@@ -1202,7 +1238,7 @@ class _ModelBackend:
         try:
             return self._run(*args)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
@@ -1337,7 +1373,7 @@ class _ModelBackend:
         try:
             return self._run(*cmd, return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
