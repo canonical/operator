@@ -1030,6 +1030,9 @@ class Container:
             pebble_client = backend.get_pebble(socket_path)
         self._pebble = pebble_client
 
+        self._backend = backend
+        self._pebble_layers_dir = '/charm/containers/{}/pebble/layers'.format(name)
+
     @property
     def pebble(self) -> 'pebble.Client':
         """Return the low-level Pebble client instance for this container."""
@@ -1054,9 +1057,18 @@ class Container:
             layer: A YAML string, setup layer dict, or pebble.Layer object
                 containing the Pebble layer to add.
         """
-        if isinstance(layer, dict):
-            layer = pebble.Layer(layer)
-        self._pebble.add_layer(layer)
+        if isinstance(layer, str):
+            layer_yaml = layer
+        elif isinstance(layer, dict):
+            layer_yaml = pebble.Layer(layer).to_yaml()
+        else:
+            layer_yaml = layer.to_yaml()
+        self._backend.add_pebble_layer_file(self._pebble_layers_dir, layer_yaml)
+
+        # TODO(benhoyt) - use Pebble dynamic layer API when it's available
+        # if isinstance(layer, dict):
+        #     layer = pebble.Layer(layer)
+        # self._pebble.add_layer(layer)
 
     def get_layer(self) -> 'pebble.Layer':
         """Fetch the flattened setup layers as a pebble.Layer object."""
@@ -1128,6 +1140,8 @@ class _ModelBackend:
     """
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
+
+    PEBBLE_LAYER_FILE_RE = re.compile(r'\d{3}-.+\.yaml')
 
     def __init__(self, unit_name=None, model_name=None):
         if unit_name is None:
@@ -1399,6 +1413,27 @@ class _ModelBackend:
     def get_pebble(self, socket_path: str) -> 'pebble.Client':
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
+
+    def add_pebble_layer_file(self, layers_dir, layer_yaml, layer_name='layer'):
+        # Create the directory if it doesn't exist
+        os.makedirs(layers_dir, exist_ok=True)
+
+        # Fetch the sorted filenames of the current layers (e.g., "001-foo.yaml")
+        layers = sorted(n for n in os.listdir(layers_dir)
+                        if self.PEBBLE_LAYER_FILE_RE.match(n))
+
+        if layers:
+            # Find the last layer number
+            last = int(layers[-1].split('-', 1)[0])
+            assert 1 <= last <= 999, last
+        else:
+            last = 0
+
+        # Make the new layer file path (e.g., "002-layer.yaml")
+        path = os.path.join(layers_dir, '{:03}-{}.yaml'.format(last + 1, layer_name))
+
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(layer_yaml)
 
 
 class _ModelBackendValidator:
