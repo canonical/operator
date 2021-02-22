@@ -1414,7 +1414,7 @@ class _ModelBackend:
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
 
-    def add_pebble_layer_file(self, layers_dir, layer_yaml, layer_name='layer'):
+    def add_pebble_layer_file(self, layers_dir, layer_yaml):
         # Create the directory if it doesn't exist
         os.makedirs(layers_dir, exist_ok=True)
 
@@ -1425,12 +1425,13 @@ class _ModelBackend:
         if layers:
             # Find the last layer number
             last = int(layers[-1].split('-', 1)[0])
-            assert 1 <= last <= 999, last
+            if last >= 999:
+                raise RuntimeError('cannot add more than 999 layers')
         else:
             last = 0
 
         # Make the new layer file path (e.g., "002-layer.yaml")
-        path = os.path.join(layers_dir, '{:03}-{}.yaml'.format(last + 1, layer_name))
+        path = os.path.join(layers_dir, '{:03}-layer.yaml'.format(last + 1))
 
         with open(path, 'w', encoding='utf-8') as f:
             f.write(layer_yaml)
