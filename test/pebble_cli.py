@@ -42,6 +42,9 @@ def main():
                                        'format), default current time',
                    type=pebble._parse_timestamp)
 
+    p = subparsers.add_parser('add-layer', help='add a setup layer dynamically')
+    p.add_argument('layer_path', help='path of layer YAML file')
+
     p = subparsers.add_parser('autostart', help='autostart default service(s)')
 
     p = subparsers.add_parser('change', help='show a single change by ID')
@@ -51,6 +54,8 @@ def main():
     p.add_argument('--select', help='change state to filter on, default %(default)s',
                    choices=[s.value for s in pebble.ChangeState], default='all')
     p.add_argument('--service', help='optional service name to filter on')
+
+    p = subparsers.add_parser('layer', help='show flattened setup layers')
 
     p = subparsers.add_parser('start', help='start service(s)')
     p.add_argument('service', help='name of service to start (can specify multiple)', nargs='+')
@@ -100,6 +105,15 @@ def main():
             result = client.get_system_info()
         elif args.command == 'warnings':
             result = client.get_warnings(select=pebble.WarningState(args.select))
+        elif args.command == 'add-layer':
+            try:
+                with open(args.layer_path, encoding='utf-8') as f:
+                    layer = f.read()
+            except IOError as e:
+                parser.error('cannot read layer YAML: {}'.format(e))
+            result = client.add_layer(layer)
+        elif args.command == 'layer':
+            result = client.get_layer()
         else:
             raise AssertionError("shouldn't happen")
     except pebble.APIError as e:

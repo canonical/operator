@@ -627,19 +627,20 @@ class Client:
         raise TimeoutError(
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
-    def add_layer(self, layer: Union[str, dict, Layer]):
-        """Dynamically add a layer to the Pebble setup."""
+    def add_layer(self, layer: Union[str, dict, Layer]) -> int:
+        """Dynamically add a layer to the Pebble setup and return the layer's order."""
         if isinstance(layer, str):
             layer_yaml = layer
         elif isinstance(layer, dict):
             layer_yaml = Layer(layer).to_yaml()
         else:
             layer_yaml = layer.to_yaml()
-        _ = layer_yaml
-        # TODO(benhoyt) - send layer_yaml to Pebble when that API is implemented
-        raise NotImplementedError('add_layer not yet implemented in Pebble')
+
+        body = {'layer': layer_yaml}
+        result = self._request('POST', '/v1/layers', body=body)
+        return result['result']
 
     def get_layer(self) -> str:
         """Get the flattened setup layers as a YAML string."""
-        # TODO(benhoyt) - fetch setup YAML from Pebble when that API is implemented
-        raise NotImplementedError('get_layer not yet implemented in Pebble')
+        result = self._request('GET', '/v1/layers')
+        return result['result']
