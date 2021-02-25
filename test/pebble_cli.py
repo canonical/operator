@@ -42,9 +42,6 @@ def main():
                                        'format), default current time',
                    type=pebble._parse_timestamp)
 
-    p = subparsers.add_parser('add-layer', help='add a setup layer dynamically')
-    p.add_argument('layer_path', help='path of layer YAML file')
-
     p = subparsers.add_parser('autostart', help='autostart default service(s)')
 
     p = subparsers.add_parser('change', help='show a single change by ID')
@@ -55,7 +52,10 @@ def main():
                    choices=[s.value for s in pebble.ChangeState], default='all')
     p.add_argument('--service', help='optional service name to filter on')
 
-    p = subparsers.add_parser('layer', help='show flattened setup layers')
+    p = subparsers.add_parser('flatten', help='show flattened setup layer')
+
+    p = subparsers.add_parser('merge', help='merge a dynamic setup layer')
+    p.add_argument('layer_path', help='path of layer YAML file')
 
     p = subparsers.add_parser('start', help='start service(s)')
     p.add_argument('service', help='name of service to start (can specify multiple)', nargs='+')
@@ -97,6 +97,15 @@ def main():
         elif args.command == 'changes':
             result = client.get_changes(select=pebble.ChangeState(args.select),
                                         service=args.service)
+        elif args.command == 'flatten':
+            result = client.get_layer()
+        elif args.command == 'merge':
+            try:
+                with open(args.layer_path, encoding='utf-8') as f:
+                    layer_yaml = f.read()
+            except IOError as e:
+                parser.error('cannot read layer YAML: {}'.format(e))
+            result = client.merge_layer(layer_yaml)
         elif args.command == 'start':
             result = client.start_services(args.service)
         elif args.command == 'stop':
@@ -105,15 +114,6 @@ def main():
             result = client.get_system_info()
         elif args.command == 'warnings':
             result = client.get_warnings(select=pebble.WarningState(args.select))
-        elif args.command == 'add-layer':
-            try:
-                with open(args.layer_path, encoding='utf-8') as f:
-                    layer = f.read()
-            except IOError as e:
-                parser.error('cannot read layer YAML: {}'.format(e))
-            result = client.add_layer(layer)
-        elif args.command == 'layer':
-            result = client.get_layer()
         else:
             raise AssertionError("shouldn't happen")
     except pebble.APIError as e:

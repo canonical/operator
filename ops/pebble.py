@@ -627,8 +627,13 @@ class Client:
         raise TimeoutError(
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
-    def add_layer(self, layer: Union[str, dict, Layer]) -> int:
-        """Dynamically add a layer to the Pebble setup and return the layer's order."""
+    def merge_layer(self, layer: Union[str, dict, Layer]):
+        """Dynamically merge layer onto the Pebble setup layers.
+
+        Pebble merges the layer with the existing dynamic layer according to
+        its flattening/override rules, or adds a new dynamic if there are no
+        dynamic layers.
+        """
         if isinstance(layer, str):
             layer_yaml = layer
         elif isinstance(layer, dict):
@@ -636,11 +641,12 @@ class Client:
         else:
             layer_yaml = layer.to_yaml()
 
-        body = {'layer': layer_yaml}
+        body = {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}
         result = self._request('POST', '/v1/layers', body=body)
         return result['result']
 
     def get_layer(self) -> str:
         """Get the flattened setup layers as a YAML string."""
-        result = self._request('GET', '/v1/layers')
+        body = {'action': 'flatten', 'format': 'yaml'}
+        result = self._request('POST', '/v1/layers', body=body)
         return result['result']

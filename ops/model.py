@@ -1047,8 +1047,12 @@ class Container:
         """Stop given service(s) by name."""
         self._pebble.stop_services(service_names)
 
-    def add_layer(self, layer: typing.Union[str, typing.Dict, 'pebble.Layer']):
-        """Dynamically add a setup layer.
+    def merge_layer(self, layer: typing.Union[str, typing.Dict, 'pebble.Layer']):
+        """Dynamically merge layer onto the Pebble setup layers.
+
+        Pebble merges the layer with the existing dynamic layer according to
+        its flattening/override rules, or adds a new dynamic if there are no
+        dynamic layers.
 
         Args:
             layer: A YAML string, setup layer dict, or pebble.Layer object
@@ -1056,7 +1060,7 @@ class Container:
         """
         if isinstance(layer, dict):
             layer = pebble.Layer(layer)
-        self._pebble.add_layer(layer)
+        self._pebble.merge_layer(layer)
 
     def get_layer(self) -> 'pebble.Layer':
         """Fetch the flattened setup layers as a pebble.Layer object."""

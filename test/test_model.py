@@ -848,14 +848,14 @@ containers:
         with self.assertRaises(TypeError):
             container.stop(['foo'])
 
-    def test_add_layer(self):
-        self.container.add_layer('summary: str\n')
-        self.container.add_layer({'summary': 'dict'})
-        self.container.add_layer(ops.pebble.Layer('summary: Layer'))
+    def test_merge_layer(self):
+        self.container.merge_layer('summary: str\n')
+        self.container.merge_layer({'summary': 'dict'})
+        self.container.merge_layer(ops.pebble.Layer('summary: Layer'))
         self.assertEqual(self.pebble.requests, [
-            ('add_layer', 'summary: str\n'),
-            ('add_layer', 'summary: dict\n'),
-            ('add_layer', 'summary: Layer\n'),
+            ('merge_layer', 'summary: str\n'),
+            ('merge_layer', 'summary: dict\n'),
+            ('merge_layer', 'summary: Layer\n'),
         ])
 
     def test_get_layer(self):
@@ -886,10 +886,10 @@ class MockPebbleClient:
     def stop_services(self, service_names):
         self.requests.append(('stop', service_names))
 
-    def add_layer(self, layer):
+    def merge_layer(self, layer):
         if isinstance(layer, ops.pebble.Layer):
             layer = layer.to_yaml()
-        self.requests.append(('add_layer', layer))
+        self.requests.append(('merge_layer', layer))
 
     def get_layer(self):
         self.requests.append(('get_layer',))

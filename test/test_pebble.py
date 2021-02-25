@@ -788,6 +788,11 @@ class TestClient(unittest.TestCase):
         self.assertIsInstance(cm.exception.change, pebble.Change)
         self.assertEqual(cm.exception.change.id, '70')
 
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/services', None, {'action': 'autostart', 'services': []}),
+            ('GET', '/v1/changes/70', None, None),
+        ])
+
     def test_wait_change_timeout(self):
         with unittest.mock.patch('ops.pebble.time', MockTime()):
             change = self.build_mock_change_dict()
@@ -824,6 +829,62 @@ class TestClient(unittest.TestCase):
         response = self.client.wait_change('70')
         self.assertEqual(response.id, '70')
         self.assertEqual(response.err, 'Some kind of service error')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70', None, None),
+        ])
+
+    def test_merge_layer(self):
+        okay_response = {
+            "result": True,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        }
+        self.client.responses.append(okay_response)
+        self.client.responses.append(okay_response)
+        self.client.responses.append(okay_response)
+
+        layer_yaml = """
+services:
+  foo:
+    command: echo bar
+    override: replace
+"""[1:]
+        layer = pebble.Layer(layer_yaml)
+
+        self.assertEqual(self.client.merge_layer(layer), True)
+        self.assertEqual(self.client.merge_layer(layer.to_yaml()), True)
+        self.assertEqual(self.client.merge_layer(layer.to_dict()), True)
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/layers', None,
+                {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}),
+            ('POST', '/v1/layers', None,
+                {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}),
+            ('POST', '/v1/layers', None,
+                {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}),
+        ])
+
+    def test_get_layer(self):
+        layer_yaml = """
+services:
+  foo:
+    command: echo bar
+    override: replace
+"""[1:]
+        self.client.responses.append({
+            "result": layer_yaml,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        response = self.client.get_layer()
+        self.assertEqual(response, layer_yaml)
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/layers', None, {'action': 'flatten', 'format': 'yaml'}),
+        ])
 
 
 class TestSocketClient(unittest.TestCase):
