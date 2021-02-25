@@ -1058,8 +1058,6 @@ class Container:
             layer: A YAML string, setup layer dict, or pebble.Layer object
                 containing the Pebble layer to add.
         """
-        if isinstance(layer, dict):
-            layer = pebble.Layer(layer)
         self._pebble.merge_layer(layer)
 
     def get_layer(self) -> 'pebble.Layer':

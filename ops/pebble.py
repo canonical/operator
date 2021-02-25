@@ -638,8 +638,11 @@ class Client:
             layer_yaml = layer
         elif isinstance(layer, dict):
             layer_yaml = Layer(layer).to_yaml()
-        else:
+        elif isinstance(layer, Layer):
             layer_yaml = layer.to_yaml()
+        else:
+            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
+                type(layer).__name__))
 
         body = {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}
         result = self._request('POST', '/v1/layers', body=body)

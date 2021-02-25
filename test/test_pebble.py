@@ -866,6 +866,10 @@ services:
                 {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}),
         ])
 
+    def test_merge_layer_invalid_type(self):
+        with self.assertRaises(TypeError):
+            self.client.merge_layer(42)
+
     def test_get_layer(self):
         layer_yaml = """
 services:

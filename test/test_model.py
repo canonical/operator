@@ -887,7 +887,9 @@ class MockPebbleClient:
         self.requests.append(('stop', service_names))
 
     def merge_layer(self, layer):
-        if isinstance(layer, ops.pebble.Layer):
+        if isinstance(layer, dict):
+            layer = ops.pebble.Layer(layer).to_yaml()
+        elif isinstance(layer, ops.pebble.Layer):
             layer = layer.to_yaml()
         self.requests.append(('merge_layer', layer))
 
