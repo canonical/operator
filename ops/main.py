@@ -144,7 +144,11 @@ def _get_event_args(charm, bound_event):
     event_type = bound_event.event_type
     model = charm.framework.model
 
-    if issubclass(event_type, ops.charm.RelationEvent):
+    if issubclass(event_type, ops.charm.WorkloadEvent):
+        workload_name = os.environ['JUJU_WORKLOAD_NAME']
+        container = model.unit.get_container(workload_name)
+        return [container], {}
+    elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
         relation = model.get_relation(relation_name, relation_id)

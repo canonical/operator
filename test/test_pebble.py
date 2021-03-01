@@ -17,7 +17,6 @@ import datetime
 import unittest
 import unittest.mock
 import unittest.util
-import urllib.error
 import sys
 
 import ops.pebble as pebble
@@ -40,25 +39,84 @@ def datetime_nzdt(y, m, d, hour, min, sec, micro=0):
 
 class TestHelpers(unittest.TestCase):
     def test_parse_timestamp(self):
+        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50+13:00'),
+                         datetime_nzdt(2020, 12, 25, 13, 45, 50, 0))
+
         self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789+13:00'),
-                         datetime_nzdt(2020, 12, 25, 13, 45, 50, 123456))
+                         datetime_nzdt(2020, 12, 25, 13, 45, 50, 123457))
+
+        self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22Z'),
+                         datetime_utc(2021, 2, 10, 4, 36, 22, 0))
+
+        self.assertEqual(pebble._parse_timestamp('2021-02-10t04:36:22z'),
+                         datetime_utc(2021, 2, 10, 4, 36, 22, 0))
+
+        self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22.118970777Z'),
+                         datetime_utc(2021, 2, 10, 4, 36, 22, 118971))
 
         self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789+00:00'),
-                         datetime_utc(2020, 12, 25, 13, 45, 50, 123456))
+                         datetime_utc(2020, 12, 25, 13, 45, 50, 123457))
 
         tzinfo = datetime.timezone(datetime.timedelta(hours=-11, minutes=-30))
-        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789-1130'),
-                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123456, tzinfo=tzinfo))
+        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789-11:30'),
+                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=tzinfo))
 
         tzinfo = datetime.timezone(datetime.timedelta(hours=4))
-        self.assertEqual(pebble._parse_timestamp('2000-01-02T03:04:05.006000+0400'),
+        self.assertEqual(pebble._parse_timestamp('2000-01-02T03:04:05.006000+04:00'),
                          datetime.datetime(2000, 1, 2, 3, 4, 5, 6000, tzinfo=tzinfo))
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp('')
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp('foobar')
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp('2021-99-99T04:36:22Z')
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp(pebble._parse_timestamp('2021-02-10T04:36:22.118970777x'))
+
+        with self.assertRaises(ValueError):
+            pebble._parse_timestamp(pebble._parse_timestamp('2021-02-10T04:36:22.118970777-99:99'))
 
 
 class TestTypes(unittest.TestCase):
     maxDiff = None
 
-    def test_service_error(self):
+    def test_error(self):
+        error = pebble.Error('error')
+        self.assertIsInstance(error, Exception)
+
+    def test_timeout_error(self):
+        error = pebble.TimeoutError('timeout!')
+        self.assertIsInstance(error, pebble.Error)
+        self.assertIsInstance(error, TimeoutError)
+        self.assertEqual(str(error), 'timeout!')
+
+    def test_connection_error(self):
+        error = pebble.ConnectionError('connerr!')
+        self.assertIsInstance(error, pebble.Error)
+        self.assertEqual(str(error), 'connerr!')
+
+    def test_api_error(self):
+        body = {
+            "result": {
+                "message": "no services to start provided"
+            },
+            "status": "Bad Request",
+            "status-code": 400,
+            "type": "error"
+        }
+        error = pebble.APIError(body, 400, "Bad Request", "no services")
+        self.assertIsInstance(error, pebble.Error)
+        self.assertEqual(error.body, body)
+        self.assertEqual(error.code, 400)
+        self.assertEqual(error.status, 'Bad Request')
+        self.assertEqual(error.message, 'no services')
+        self.assertEqual(str(error), 'no services')
+
+    def test_change_error(self):
         change = pebble.Change(
             id=pebble.ChangeID('1234'),
             kind='start',
@@ -70,7 +128,8 @@ class TestTypes(unittest.TestCase):
             spawn_time=datetime.datetime.now(),
             ready_time=datetime.datetime.now(),
         )
-        error = pebble.ServiceError('Some error', change)
+        error = pebble.ChangeError('Some error', change)
+        self.assertIsInstance(error, pebble.Error)
         self.assertEqual(error.err, 'Some error')
         self.assertEqual(error.change, change)
         self.assertEqual(str(error), 'Some error')
@@ -127,7 +186,7 @@ class TestTypes(unittest.TestCase):
         }
         warning = pebble.Warning.from_dict(d)
         self.assertEqual(warning.message, 'Look out...')
-        self.assertEqual(warning.first_added, datetime_nzdt(2020, 12, 25, 17, 18, 54, 16273))
+        self.assertEqual(warning.first_added, datetime_nzdt(2020, 12, 25, 17, 18, 54, 16274))
         self.assertEqual(warning.last_added, datetime_nzdt(2021, 1, 26, 17, 1, 2, 123450))
         self.assertEqual(warning.last_shown, None)
         self.assertEqual(warning.expire_after, '1s')
@@ -214,13 +273,13 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(task.progress.label, '')
         self.assertEqual(task.progress.done, 1)
         self.assertEqual(task.progress.total, 1)
-        self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
+        self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219))
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
 
         d['ready-time'] = '2021-01-28T14:37:03.270218778+00:00'
         d['spawn-time'] = '2021-01-28T14:37:02.247158162+00:00'
         task = pebble.Task.from_dict(d)
-        self.assertEqual(task.ready_time, datetime_utc(2021, 1, 28, 14, 37, 3, 270218))
+        self.assertEqual(task.ready_time, datetime_utc(2021, 1, 28, 14, 37, 3, 270219))
         self.assertEqual(task.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247158))
 
     def test_change_id(self):
@@ -266,7 +325,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.kind, 'autostart')
         self.assertEqual(change.err, 'SILLY')
         self.assertEqual(change.ready, True)
-        self.assertEqual(change.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291517))
+        self.assertEqual(change.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(change.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202))
         self.assertEqual(change.status, 'Done')
         self.assertEqual(change.summary, 'Autostart service "svc"')
@@ -275,7 +334,7 @@ class TestTypes(unittest.TestCase):
         d['ready-time'] = '2021-01-28T14:37:04.291517768+00:00'
         d['spawn-time'] = '2021-01-28T14:37:02.247202105+00:00'
         change = pebble.Change.from_dict(d)
-        self.assertEqual(change.ready_time, datetime_utc(2021, 1, 28, 14, 37, 4, 291517))
+        self.assertEqual(change.ready_time, datetime_utc(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(change.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247202))
 
 
@@ -544,12 +603,12 @@ class TestClient(unittest.TestCase):
         self.assertEqual(change.tasks[0].progress.label, '')
         self.assertEqual(change.tasks[0].progress.total, 1)
         self.assertEqual(change.tasks[0].ready_time,
-                         datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
+                         datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219))
         self.assertEqual(change.tasks[0].spawn_time,
                          datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
         self.assertEqual(change.ready, True)
         self.assertEqual(change.err, None)
-        self.assertEqual(change.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291517))
+        self.assertEqual(change.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(change.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202))
 
     def test_get_changes(self):
@@ -673,6 +732,15 @@ class TestClient(unittest.TestCase):
             return self.client.start_services(['svc'])
         self._services_action_helper('start', api_func, ['svc'])
 
+        with self.assertRaises(TypeError):
+            self.client.start_services(1)
+
+        with self.assertRaises(TypeError):
+            self.client.start_services([1])
+
+        with self.assertRaises(TypeError):
+            self.client.start_services([['foo']])
+
     def test_start_services_async(self):
         def api_func(timeout=30):
             return self.client.start_services(['svc'], timeout=timeout)
@@ -683,12 +751,21 @@ class TestClient(unittest.TestCase):
             return self.client.stop_services(['svc'])
         self._services_action_helper('stop', api_func, ['svc'])
 
+        with self.assertRaises(TypeError):
+            self.client.stop_services(1)
+
+        with self.assertRaises(TypeError):
+            self.client.stop_services([1])
+
+        with self.assertRaises(TypeError):
+            self.client.stop_services([['foo']])
+
     def test_stop_services_async(self):
         def api_func(timeout=30):
             return self.client.stop_services(['svc'], timeout=timeout)
         self._services_action_async_helper('stop', api_func, ['svc'])
 
-    def test_service_error(self):
+    def test_change_error(self):
         self.client.responses.append({
             "change": "70",
             "result": None,
@@ -704,8 +781,9 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        with self.assertRaises(pebble.ServiceError) as cm:
+        with self.assertRaises(pebble.ChangeError) as cm:
             self.client.autostart_services()
+        self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(cm.exception.err, 'Some kind of service error')
         self.assertIsInstance(cm.exception.change, pebble.Change)
         self.assertEqual(cm.exception.change.id, '70')
@@ -722,8 +800,10 @@ class TestClient(unittest.TestCase):
                     "type": "sync"
                 })
 
-            with self.assertRaises(TimeoutError):
+            with self.assertRaises(pebble.TimeoutError) as cm:
                 self.client.wait_change('70', timeout=3, delay=1)
+            self.assertIsInstance(cm.exception, pebble.Error)
+            self.assertIsInstance(cm.exception, TimeoutError)
 
             self.assertEqual(self.client.requests, [
                 ('GET', '/v1/changes/70', None, None),
@@ -731,13 +811,28 @@ class TestClient(unittest.TestCase):
                 ('GET', '/v1/changes/70', None, None),
             ])
 
+    def test_wait_change_error(self):
+        change = self.build_mock_change_dict()
+        change['err'] = 'Some kind of service error'
+        self.client.responses.append({
+            "result": change,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        # wait_change() itself shouldn't raise an error
+        response = self.client.wait_change('70')
+        self.assertEqual(response.id, '70')
+        self.assertEqual(response.err, 'Some kind of service error')
+
 
 class TestSocketClient(unittest.TestCase):
     @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
     def test_socket_not_found(self):
         client = pebble.Client(socket_path='does_not_exist')
-        with self.assertRaises(urllib.error.URLError):
+        with self.assertRaises(pebble.ConnectionError) as cm:
             client.get_system_info()
+        self.assertIsInstance(cm.exception, pebble.Error)
 
     @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
     def test_real_client(self):
@@ -751,9 +846,12 @@ class TestSocketClient(unittest.TestCase):
             change_id = client.start_services(['foo'], timeout=0)
             self.assertEqual(change_id, '1234')
 
-            with self.assertRaises(urllib.error.HTTPError) as cm:
+            with self.assertRaises(pebble.APIError) as cm:
                 client.start_services(['bar'], timeout=0)
+            self.assertIsInstance(cm.exception, pebble.Error)
             self.assertEqual(cm.exception.code, 400)
+            self.assertEqual(cm.exception.status, 'Bad Request')
+            self.assertEqual(cm.exception.message, 'service "bar" does not exist')
 
         finally:
             shutdown()

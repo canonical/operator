@@ -236,6 +236,47 @@ storage:
             'StorageAttachedEvent',
         ])
 
+    def test_workload_events(self):
+
+        class MyCharm(CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.seen = []
+                self.count = 0
+                for workload in ('container-a', 'containerb'):
+                    # Hook up relation events to generic handler.
+                    self.framework.observe(
+                        self.on[workload].workload_ready,
+                        self.on_any_workload_ready)
+
+            def on_any_workload_ready(self, event):
+                self.seen.append(type(event).__name__)
+                self.count += 1
+
+        # language=YAML
+        self.meta = CharmMeta.from_yaml(metadata='''
+name: my-charm
+containers:
+  container-a:
+  containerb:
+''')
+
+        charm = MyCharm(self.create_framework())
+
+        self.assertIn('container_a_workload_ready', repr(charm.on))
+        self.assertIn('containerb_workload_ready', repr(charm.on))
+
+        charm.on['container-a'].workload_ready.emit(
+            charm.framework.model.unit.get_container('container-a'))
+        charm.on['containerb'].workload_ready.emit(
+            charm.framework.model.unit.get_container('containerb'))
+
+        self.assertEqual(charm.seen, [
+            'WorkloadReadyEvent',
+            'WorkloadReadyEvent'
+        ])
+        self.assertEqual(charm.count, 2)
+
     @classmethod
     def _get_action_test_meta(cls):
         # language=YAML

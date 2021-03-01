@@ -17,7 +17,7 @@
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Union
 import datetime
 import enum
 import http.client
@@ -25,11 +25,12 @@ import json
 import re
 import socket
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import sys
 
-from ops import _yaml
+from ops._private import yaml
 
 
 _not_provided = object()
@@ -67,31 +68,102 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
 
 
-# Matches yyyy-mm-ddTHH:MM:SS.sss[-+]zz(:)zz
+# Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
 _TIMESTAMP_RE = re.compile(
-    r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d+)([-+])(\d{2}):?(\d{2})')
+    r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
+
+# Matches [-+]HH:MM
+_TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
 
 
 def _parse_timestamp(s):
-    """Parse timestamp from Go-encoded JSON (which uses 9 decimal places for seconds)."""
+    """Parse timestamp from Go-encoded JSON.
+
+    This parses RFC3339 timestamps (which are a subset of ISO8601 timestamps)
+    that Go's encoding/json package produces for time.Time values.
+
+    Unfortunately we can't use datetime.fromisoformat(), as that does not
+    support more than 6 digits for the fractional second, nor the 'Z' for UTC.
+    Also, it was only introduced in Python 3.7.
+    """
     match = _TIMESTAMP_RE.match(s)
     if not match:
         raise ValueError('invalid timestamp {!r}'.format(s))
-    y, m, d, hh, mm, ss, sub, plus_minus, z1, z2 = match.groups()
-    s = '{y}-{m}-{d}T{hh}:{mm}:{ss}.{sub}{plus_minus}{z1}{z2}'.format(
-        y=y, m=m, d=d, hh=hh, mm=mm, ss=ss, sub=sub[:6],
-        plus_minus=plus_minus, z1=z1, z2=z2,
-    )
-    return datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
+    y, m, d, hh, mm, ss, sfrac, zone = match.groups()
+
+    if zone in ('Z', 'z'):
+        tz = datetime.timezone.utc
+    else:
+        match = _TIMEOFFSET_RE.match(zone)
+        if not match:
+            raise ValueError('invalid timestamp {!r}'.format(s))
+        sign, zh, zm = match.groups()
+        tz_delta = datetime.timedelta(hours=int(zh), minutes=int(zm))
+        tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
+
+    microsecond = round(float(sfrac or '0') * 1000000)
+
+    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
+                             microsecond=microsecond, tzinfo=tz)
 
 
-class ServiceError(Exception):
-    """Raised by wait_change() when a service change is ready but has an error."""
+def _json_loads(s: Union[str, bytes]) -> Dict:
+    """Like json.loads(), but handle str or bytes.
 
-    def __init__(self, err, change):
-        super().__init__(err)
+    This is needed because an HTTP response's read() method returns bytes on
+    Python 3.5, and json.load doesn't handle bytes.
+    """
+    if isinstance(s, bytes):
+        s = s.decode('utf-8')
+    return json.loads(s)
+
+
+class Error(Exception):
+    """Base class of most errors raised by the Pebble client."""
+
+
+class TimeoutError(TimeoutError, Error):
+    """Raised when a polling timeout occurs."""
+
+
+class ConnectionError(Error):
+    """Raised when the Pebble client can't connect to the socket."""
+
+
+class APIError(Error):
+    """Raised when an HTTP API error occurs talking to the Pebble server."""
+
+    def __init__(self, body: Dict, code: int, status: str, message: str):
+        """This shouldn't be instantiated directly."""
+        super().__init__(message)  # Makes str(e) return message
+        self.body = body
+        self.code = code
+        self.status = status
+        self.message = message
+
+    def __repr__(self):
+        return 'APIError({!r}, {!r}, {!r}, {!r})'.format(
+            self.body, self.code, self.status, self.message)
+
+
+class ChangeError(Error):
+    """Raised by actions when a change is ready but has an error.
+
+    For example, this happens when you attempt to start an already-started
+    service:
+
+    cannot perform the following tasks:
+    - Start service "test" (service "test" was previously started)
+    """
+
+    def __init__(self, err: str, change: 'Change'):
+        """This shouldn't be instantiated directly."""
+        super().__init__(err)  # Makes str(e) return err
         self.err = err
         self.change = change
+
+    def __repr__(self):
+        return 'ChangeError({!r}, {!r})'.format(self.err, self.change)
 
 
 class WarningState(enum.Enum):
@@ -323,7 +395,7 @@ class Layer:
 
     def __init__(self, raw: Union[str, Dict] = None):
         if isinstance(raw, str):
-            d = _yaml.safe_load(raw) or {}
+            d = yaml.safe_load(raw) or {}
         else:
             d = raw or {}
         self.summary = d.get('summary', '')
@@ -333,7 +405,7 @@ class Layer:
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
-        return _yaml.safe_dump(self.to_dict())
+        return yaml.safe_dump(self.to_dict())
 
     def to_dict(self) -> Dict:
         """Convert this layer to its dict representation."""
@@ -430,12 +502,25 @@ class Client:
             headers['Content-Type'] = 'application/json'
 
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
-        response = self.opener.open(request, timeout=self.timeout)
+
+        try:
+            response = self.opener.open(request, timeout=self.timeout)
+        except urllib.error.HTTPError as e:
+            code = e.code
+            status = e.reason
+            try:
+                body = _json_loads(e.read())
+                message = body['result']['message']
+            except (IOError, ValueError, KeyError) as e2:
+                # Will only happen on read error or if Pebble sends invalid JSON.
+                body = {}
+                message = '{} - {}'.format(type(e2).__name__, e2)
+            raise APIError(body, code, status, message)
+        except urllib.error.URLError as e:
+            raise ConnectionError(e.reason)
+
         response_data = response.read()
-        if isinstance(response_data, bytes):
-            # read() returns bytes on Python 3.5, and json.load doesn't handle bytes
-            response_data = response_data.decode('utf-8')
-        result = json.loads(response_data)
+        result = _json_loads(response_data)
         return result
 
     def get_system_info(self) -> SystemInfo:
@@ -479,7 +564,9 @@ class Client:
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Start the autostart services and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't start. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('autostart', [], timeout, delay)
 
@@ -488,7 +575,9 @@ class Client:
     ) -> ChangeID:
         """Start services by name and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't start. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -497,18 +586,29 @@ class Client:
     ) -> ChangeID:
         """Stop services by name and wait (poll) for them to be started.
 
-        If timeout is 0, submit the action but don't wait.
+        Raises ChangeError if one or more of the services didn't stop. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
         """
         return self._services_action('stop', services, timeout, delay)
 
     def _services_action(
-        self, action: str, services: List[str], timeout: float, delay: float,
+        self, action: str, services: Iterable[str], timeout: float, delay: float,
     ) -> ChangeID:
+        if not isinstance(services, (list, tuple)):
+            raise TypeError('services must be a list of str, not {}'.format(
+                type(services).__name__))
+        for s in services:
+            if not isinstance(s, str):
+                raise TypeError('service names must be str, not {}'.format(type(s).__name__))
+
         body = {'action': action, 'services': services}
         result = self._request('POST', '/v1/services', body=body)
         change_id = ChangeID(result['change'])
         if timeout:
-            self.wait_change(change_id, timeout=timeout, delay=delay)
+            change = self.wait_change(change_id, timeout=timeout, delay=delay)
+            if change.err:
+                raise ChangeError(change.err, change)
         return change_id
 
     def wait_change(
@@ -520,8 +620,6 @@ class Client:
         while time.time() < deadline:
             change = self.get_change(change_id)
             if change.ready:
-                if change.err:
-                    raise ServiceError(change.err, change)
                 return change
 
             time.sleep(delay)

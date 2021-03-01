@@ -23,12 +23,12 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from ops import (
-    _yaml,
     charm,
     framework,
     model,
     storage,
 )
+from ops._private import yaml
 
 
 # OptionalYAML is something like metadata.yaml or actions.yaml. You can
@@ -273,7 +273,7 @@ class Harness:
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        charm_config = _yaml.safe_load(charm_config)
+        charm_config = yaml.safe_load(charm_config)
         charm_config = charm_config.get('options', {})
         return {key: value['default'] for key, value in charm_config.items()
                 if 'default' in value}
@@ -300,7 +300,7 @@ class Harness:
         if self._meta.resources[resource_name].type != "oci-image":
             raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
 
-        as_yaml = _yaml.safe_dump(contents)
+        as_yaml = yaml.safe_dump(contents)
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
 
     def add_resource(self, resource_name: str, content: typing.AnyStr) -> None:
@@ -736,6 +736,12 @@ class _TestingModelBackend:
             return self._relation_list_map[relation_id]
         except KeyError as e:
             raise model.RelationNotFoundError from e
+
+    def relation_remote_app_name(self, relation_id: int) -> typing.Optional[str]:
+        if relation_id not in self._relation_app_and_units:
+            # Non-existent or dead relation
+            return None
+        return self._relation_app_and_units[relation_id]['app']
 
     def relation_get(self, relation_id, member_name, is_app):
         if is_app and '/' in member_name:
