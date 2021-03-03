@@ -386,11 +386,29 @@ class Change:
                 ).format(self=self)
 
 
+class Plan:
+    """Represents a Pebble plan (service configuration).
+
+    Currently this only holds the combined services, not the individual
+    layers. The "raw_yaml" attribute is set to a YAML string for access to the
+    exact YAML that Pebble's plan API sent over the wire.
+    """
+
+    def __init__(self, raw: str = None):
+        if raw is not None:
+            d = yaml.safe_load(raw)
+        else:
+            d = {}
+        self.raw_yaml = raw
+        self.services = {name: Service(name, service)
+                         for name, service in d.get('services', {}).items()}
+
+
 class Layer:
-    """Represents a Pebble setup layer (or flattened setup).
+    """Represents a Pebble configuration layer.
 
     The format of this is not documented, but is captured in code here:
-    https://github.com/canonical/pebble/blob/master/internal/setup/setup.go
+    https://github.com/canonical/pebble/blob/master/internal/plan/plan.go
     """
 
     def __init__(self, raw: Union[str, Dict] = None):
@@ -423,7 +441,7 @@ class Layer:
 
 
 class Service:
-    """Represents a service description in a Pebble setup layer."""
+    """Represents a service description in a Pebble configuration layer."""
 
     def __init__(self, name: str, raw: Dict = None):
         self.name = name
@@ -627,13 +645,17 @@ class Client:
         raise TimeoutError(
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
-    def merge_layer(self, layer: Union[str, dict, Layer]):
-        """Dynamically merge layer onto the Pebble setup layers.
+    def add_layer(self, label: str, layer: Union[str, dict, Layer], combine: bool = False):
+        """Dynamically add a new layer onto the Pebble configuration layers.
 
-        Pebble merges the layer with the existing dynamic layer according to
-        its flattening/override rules, or adds a new dynamic if there are no
-        dynamic layers.
+        If combine is False (the default), append the new layer as the top
+        layer with the given label. If combine is True, combine the new layer
+        with the layer that has the given label; combining is done according
+        to Pebble's override rules.
         """
+        if not isinstance(label, str):
+            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+
         if isinstance(layer, str):
             layer_yaml = layer
         elif isinstance(layer, dict):
@@ -644,12 +666,16 @@ class Client:
             raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
                 type(layer).__name__))
 
-        body = {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}
-        result = self._request('POST', '/v1/layers', body=body)
-        return result['result']
+        body = {
+            'action': 'add',
+            'combine': combine,
+            'label': label,
+            'format': 'yaml',
+            'layer': layer_yaml,
+        }
+        self._request('POST', '/v1/layers', body=body)
 
-    def get_layer(self) -> str:
-        """Get the flattened setup layers as a YAML string."""
-        body = {'action': 'flatten', 'format': 'yaml'}
-        result = self._request('POST', '/v1/layers', body=body)
-        return result['result']
+    def get_plan(self) -> Plan:
+        """Get the Pebble plan (currently contains only combined services)."""
+        result = self._request('GET', '/v1/plan', {'format': 'yaml'})
+        return Plan(result['result'])

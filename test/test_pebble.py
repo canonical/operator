@@ -834,13 +834,14 @@ class TestClient(unittest.TestCase):
             ('GET', '/v1/changes/70', None, None),
         ])
 
-    def test_merge_layer(self):
+    def test_add_layer(self):
         okay_response = {
             "result": True,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         }
+        self.client.responses.append(okay_response)
         self.client.responses.append(okay_response)
         self.client.responses.append(okay_response)
         self.client.responses.append(okay_response)
@@ -853,41 +854,54 @@ services:
 """[1:]
         layer = pebble.Layer(layer_yaml)
 
-        self.assertEqual(self.client.merge_layer(layer), True)
-        self.assertEqual(self.client.merge_layer(layer.to_yaml()), True)
-        self.assertEqual(self.client.merge_layer(layer.to_dict()), True)
+        self.client.add_layer('a', layer)
+        self.client.add_layer('b', layer.to_yaml())
+        self.client.add_layer('c', layer.to_dict())
+        self.client.add_layer('d', layer, combine=True)
+
+        def build_expected(label, combine):
+            return {
+                'action': 'add',
+                'combine': combine,
+                'label': label,
+                'format': 'yaml',
+                'layer': layer_yaml,
+            }
 
         self.assertEqual(self.client.requests, [
-            ('POST', '/v1/layers', None,
-                {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}),
-            ('POST', '/v1/layers', None,
-                {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}),
-            ('POST', '/v1/layers', None,
-                {'action': 'merge', 'format': 'yaml', 'layer': layer_yaml}),
+            ('POST', '/v1/layers', None, build_expected('a', False)),
+            ('POST', '/v1/layers', None, build_expected('b', False)),
+            ('POST', '/v1/layers', None, build_expected('c', False)),
+            ('POST', '/v1/layers', None, build_expected('d', True)),
         ])
 
-    def test_merge_layer_invalid_type(self):
+    def test_add_layer_invalid_type(self):
         with self.assertRaises(TypeError):
-            self.client.merge_layer(42)
+            self.client.add_layer('foo', 42)
+        with self.assertRaises(TypeError):
+            self.client.add_layer(42, 'foo')
 
-    def test_get_layer(self):
-        layer_yaml = """
+    def test_get_plan(self):
+        plan_yaml = """
 services:
   foo:
     command: echo bar
     override: replace
 """[1:]
         self.client.responses.append({
-            "result": layer_yaml,
+            "result": plan_yaml,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        response = self.client.get_layer()
-        self.assertEqual(response, layer_yaml)
+        plan = self.client.get_plan()
+        self.assertEqual(plan.raw_yaml, plan_yaml)
+        self.assertEqual(len(plan.services), 1)
+        self.assertEqual(plan.services['foo'].command, 'echo bar')
+        self.assertEqual(plan.services['foo'].override, 'replace')
 
         self.assertEqual(self.client.requests, [
-            ('POST', '/v1/layers', None, {'action': 'flatten', 'format': 'yaml'}),
+            ('GET', '/v1/plan', {'format': 'yaml'}, None),
         ])
 
 

@@ -848,22 +848,25 @@ containers:
         with self.assertRaises(TypeError):
             container.stop(['foo'])
 
-    def test_merge_layer(self):
-        self.container.merge_layer('summary: str\n')
-        self.container.merge_layer({'summary': 'dict'})
-        self.container.merge_layer(ops.pebble.Layer('summary: Layer'))
+    def test_add_layer(self):
+        self.container.add_layer('a', 'summary: str\n')
+        self.container.add_layer('b', {'summary': 'dict'})
+        self.container.add_layer('c', ops.pebble.Layer('summary: Layer'))
+        self.container.add_layer('d', 'summary: str\n', combine=True)
         self.assertEqual(self.pebble.requests, [
-            ('merge_layer', 'summary: str\n'),
-            ('merge_layer', 'summary: dict\n'),
-            ('merge_layer', 'summary: Layer\n'),
+            ('add_layer', 'a', 'summary: str\n', False),
+            ('add_layer', 'b', 'summary: dict\n', False),
+            ('add_layer', 'c', 'summary: Layer\n', False),
+            ('add_layer', 'd', 'summary: str\n', True),
         ])
 
-    def test_get_layer(self):
-        self.pebble.responses.append('summary: foo')
-        layer = self.container.get_layer()
-        self.assertEqual(self.pebble.requests, [('get_layer',)])
-        self.assertIsInstance(layer, ops.pebble.Layer)
-        self.assertEqual(layer.summary, 'foo')
+    def test_get_plan(self):
+        plan_yaml = 'services:\n foo:\n  override: replace\n  command: bar'
+        self.pebble.responses.append(ops.pebble.Plan(plan_yaml))
+        plan = self.container.get_plan()
+        self.assertEqual(self.pebble.requests, [('get_plan',)])
+        self.assertIsInstance(plan, ops.pebble.Plan)
+        self.assertEqual(plan.raw_yaml, plan_yaml)
 
 
 class MockPebbleBackend(ops.model._ModelBackend):
@@ -886,15 +889,15 @@ class MockPebbleClient:
     def stop_services(self, service_names):
         self.requests.append(('stop', service_names))
 
-    def merge_layer(self, layer):
+    def add_layer(self, label, layer, combine=False):
         if isinstance(layer, dict):
             layer = ops.pebble.Layer(layer).to_yaml()
         elif isinstance(layer, ops.pebble.Layer):
             layer = layer.to_yaml()
-        self.requests.append(('merge_layer', layer))
+        self.requests.append(('add_layer', label, layer, combine))
 
-    def get_layer(self):
-        self.requests.append(('get_layer',))
+    def get_plan(self):
+        self.requests.append(('get_plan',))
         return self.responses.pop(0)
 
 
