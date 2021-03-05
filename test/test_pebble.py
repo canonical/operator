@@ -360,12 +360,12 @@ class TestPlan(unittest.TestCase):
 
     def test_yaml(self):
         plan = pebble.Plan('')
-        self.assertEqual(plan.as_yaml(), '')
+        self.assertEqual(plan.to_yaml(), '')
         self.assertEqual(str(plan), '')
 
         yaml = 'services:\n foo:\n  override: replace\n  command: echo foo'
         plan = pebble.Plan(yaml)
-        self.assertEqual(plan.as_yaml(), yaml)
+        self.assertEqual(plan.to_yaml(), yaml)
         self.assertEqual(str(plan), yaml)
 
 
@@ -374,7 +374,7 @@ class TestLayer(unittest.TestCase):
         self.assertEqual(layer.summary, '')
         self.assertEqual(layer.description, '')
         self.assertEqual(layer.services, {})
-        self.assertEqual(layer.as_dict(), {})
+        self.assertEqual(layer.to_dict(), {})
 
     def test_no_args(self):
         s = pebble.Layer()
@@ -408,7 +408,7 @@ class TestLayer(unittest.TestCase):
         self.assertEqual(s.services['bar'].summary, 'Bar')
         self.assertEqual(s.services['bar'].command, 'echo bar')
 
-        self.assertEqual(s.as_dict(), d)
+        self.assertEqual(s.to_dict(), d)
 
     def test_yaml(self):
         s = pebble.Layer('')
@@ -434,7 +434,7 @@ summary: Sum Mary
         self.assertEqual(s.services['bar'].summary, 'Bar')
         self.assertEqual(s.services['bar'].command, 'echo bar')
 
-        self.assertEqual(s.as_yaml(), yaml)
+        self.assertEqual(s.to_yaml(), yaml)
         self.assertEqual(str(s), yaml)
 
 
@@ -450,7 +450,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(service.before, [])
         self.assertEqual(service.requires, [])
         self.assertEqual(service.environment, {})
-        self.assertEqual(service.as_dict(), {})
+        self.assertEqual(service.to_dict(), {})
 
     def test_name_only(self):
         s = pebble.Service('Name 0')
@@ -482,7 +482,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(s.requires, ['r1', 'r2'])
         self.assertEqual(s.environment, {'k1': 'v1', 'k2': 'v2'})
 
-        self.assertEqual(s.as_dict(), d)
+        self.assertEqual(s.to_dict(), d)
 
         # Ensure pebble.Service has made copies of mutable objects
         s.after.append('a3')
@@ -886,8 +886,8 @@ services:
         layer = pebble.Layer(layer_yaml)
 
         self.client.add_layer('a', layer)
-        self.client.add_layer('b', layer.as_yaml())
-        self.client.add_layer('c', layer.as_dict())
+        self.client.add_layer('b', layer.to_yaml())
+        self.client.add_layer('c', layer.to_dict())
         self.client.add_layer('d', layer, combine=True)
 
         def build_expected(label, combine):
@@ -926,7 +926,7 @@ services:
             "type": "sync"
         })
         plan = self.client.get_plan()
-        self.assertEqual(plan.as_yaml(), plan_yaml)
+        self.assertEqual(plan.to_yaml(), plan_yaml)
         self.assertEqual(len(plan.services), 1)
         self.assertEqual(plan.services['foo'].command, 'echo bar')
         self.assertEqual(plan.services['foo'].override, 'replace')

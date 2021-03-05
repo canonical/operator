@@ -403,7 +403,7 @@ class Plan:
         """
         return self._services
 
-    def as_yaml(self) -> str:
+    def to_yaml(self) -> str:
         """Return this plan's YAML representation.
 
         This returns the exact YAML passed to Plan() without re-serialization,
@@ -411,7 +411,7 @@ class Plan:
         """
         return self._raw
 
-    __str__ = as_yaml
+    __str__ = to_yaml
 
 
 class Layer:
@@ -431,23 +431,23 @@ class Layer:
         self.services = {name: Service(name, service)
                          for name, service in d.get('services', {}).items()}
 
-    def as_yaml(self) -> str:
+    def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
-        return yaml.safe_dump(self.as_dict())
+        return yaml.safe_dump(self.to_dict())
 
-    def as_dict(self) -> Dict:
+    def to_dict(self) -> Dict:
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
             ('description', self.description),
-            ('services', {name: service.as_dict() for name, service in self.services.items()})
+            ('services', {name: service.to_dict() for name, service in self.services.items()})
         ]
         return {name: value for name, value in fields if value}
 
     def __repr__(self) -> str:
-        return 'Layer({!r})'.format(self.as_dict())
+        return 'Layer({!r})'.format(self.to_dict())
 
-    __str__ = as_yaml
+    __str__ = to_yaml
 
 
 class Service:
@@ -466,7 +466,7 @@ class Service:
         self.requires = list(raw.get('requires', []))
         self.environment = dict(raw.get('environment') or {})
 
-    def as_dict(self) -> Dict:
+    def to_dict(self) -> Dict:
         """Convert this service object to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -482,7 +482,7 @@ class Service:
         return {name: value for name, value in fields if value}
 
     def __repr__(self) -> str:
-        return 'Service({!r})'.format(self.as_dict())
+        return 'Service({!r})'.format(self.to_dict())
 
 
 class Client:
@@ -669,9 +669,9 @@ class Client:
         if isinstance(layer, str):
             layer_yaml = layer
         elif isinstance(layer, dict):
-            layer_yaml = Layer(layer).as_yaml()
+            layer_yaml = Layer(layer).to_yaml()
         elif isinstance(layer, Layer):
-            layer_yaml = layer.as_yaml()
+            layer_yaml = layer.to_yaml()
         else:
             raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
                 type(layer).__name__))

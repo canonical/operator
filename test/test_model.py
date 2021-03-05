@@ -866,7 +866,7 @@ containers:
         plan = self.container.get_plan()
         self.assertEqual(self.pebble.requests, [('get_plan',)])
         self.assertIsInstance(plan, ops.pebble.Plan)
-        self.assertEqual(plan.as_yaml(), plan_yaml)
+        self.assertEqual(plan.to_yaml(), plan_yaml)
 
 
 class MockPebbleBackend(ops.model._ModelBackend):
@@ -891,9 +891,9 @@ class MockPebbleClient:
 
     def add_layer(self, label, layer, combine=False):
         if isinstance(layer, dict):
-            layer = ops.pebble.Layer(layer).as_yaml()
+            layer = ops.pebble.Layer(layer).to_yaml()
         elif isinstance(layer, ops.pebble.Layer):
-            layer = layer.as_yaml()
+            layer = layer.to_yaml()
         self.requests.append(('add_layer', label, layer, combine))
 
     def get_plan(self):
