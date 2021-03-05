@@ -1057,14 +1057,15 @@ class Container:
             layer: A YAML string, configuration layer dict, or pebble.Layer
                 object containing the Pebble layer to add.
             combine: If combine is False (the default), append the new layer
-                as the top layer with the given label. If combine is True,
-                combine the new layer with the layer that has the given label;
-                combining is done according to Pebble's override rules.
+                as the top layer with the given label (must be unique). If
+                combine is True and the label already exists, the two layers
+                are combined into a single one considering the layer override
+                rules; if the layer doesn't exist, it is added as usual.
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
     def get_plan(self) -> 'pebble.Plan':
-        """Get the Pebble plan (currently contains only combined services)."""
+        """Get the current effective pebble configuration."""
         return self._pebble.get_plan()
 
 

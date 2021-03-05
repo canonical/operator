@@ -387,21 +387,31 @@ class Change:
 
 
 class Plan:
-    """Represents a Pebble plan (service configuration).
+    """Represents the effective Pebble configuration."""
 
-    Currently this only holds the combined services, not the individual
-    layers. The "raw_yaml" attribute is set to a YAML string for access to the
-    exact YAML that Pebble's plan API sent over the wire.
-    """
+    def __init__(self, raw: str):
+        d = yaml.safe_load(raw) or {}
+        self._raw = raw
+        self._services = {name: Service(name, service)
+                          for name, service in d.get('services', {}).items()}
 
-    def __init__(self, raw: str = None):
-        if raw is not None:
-            d = yaml.safe_load(raw)
-        else:
-            d = {}
-        self.raw_yaml = raw
-        self.services = {name: Service(name, service)
-                         for name, service in d.get('services', {}).items()}
+    @property
+    def services(self):
+        """This plan's services mapping (maps service name to Service).
+
+        This property is currently read-only.
+        """
+        return self._services
+
+    def as_yaml(self) -> str:
+        """Return this plan's YAML representation.
+
+        This returns the exact YAML passed to Plan() without re-serialization,
+        that is, the YAML that Client.get_plan() received from Pebble.
+        """
+        return self._raw
+
+    __str__ = as_yaml
 
 
 class Layer:
@@ -421,23 +431,23 @@ class Layer:
         self.services = {name: Service(name, service)
                          for name, service in d.get('services', {}).items()}
 
-    def to_yaml(self) -> str:
+    def as_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
-        return yaml.safe_dump(self.to_dict())
+        return yaml.safe_dump(self.as_dict())
 
-    def to_dict(self) -> Dict:
+    def as_dict(self) -> Dict:
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
             ('description', self.description),
-            ('services', {name: service.to_dict() for name, service in self.services.items()})
+            ('services', {name: service.as_dict() for name, service in self.services.items()})
         ]
         return {name: value for name, value in fields if value}
 
     def __repr__(self) -> str:
-        return 'Layer({!r})'.format(self.to_dict())
+        return 'Layer({!r})'.format(self.as_dict())
 
-    __str__ = to_yaml
+    __str__ = as_yaml
 
 
 class Service:
@@ -456,7 +466,7 @@ class Service:
         self.requires = list(raw.get('requires', []))
         self.environment = dict(raw.get('environment') or {})
 
-    def to_dict(self) -> Dict:
+    def as_dict(self) -> Dict:
         """Convert this service object to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -472,7 +482,7 @@ class Service:
         return {name: value for name, value in fields if value}
 
     def __repr__(self) -> str:
-        return 'Service({!r})'.format(self.to_dict())
+        return 'Service({!r})'.format(self.as_dict())
 
 
 class Client:
@@ -649,9 +659,9 @@ class Client:
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is False (the default), append the new layer as the top
-        layer with the given label. If combine is True, combine the new layer
-        with the layer that has the given label; combining is done according
-        to Pebble's override rules.
+        layer with the given label. If combine is True and the label already
+        exists, the two layers are combined into a single one considering the
+        layer override rules; if the layer doesn't exist, it is added as usual.
         """
         if not isinstance(label, str):
             raise TypeError('label must be a str, not {}'.format(type(label).__name__))
@@ -659,9 +669,9 @@ class Client:
         if isinstance(layer, str):
             layer_yaml = layer
         elif isinstance(layer, dict):
-            layer_yaml = Layer(layer).to_yaml()
+            layer_yaml = Layer(layer).as_yaml()
         elif isinstance(layer, Layer):
-            layer_yaml = layer.to_yaml()
+            layer_yaml = layer.as_yaml()
         else:
             raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
                 type(layer).__name__))
