@@ -386,11 +386,35 @@ class Change:
                 ).format(self=self)
 
 
+class Plan:
+    """Represents the effective Pebble configuration."""
+
+    def __init__(self, raw: str):
+        d = yaml.safe_load(raw) or {}
+        self._raw = raw
+        self._services = {name: Service(name, service)
+                          for name, service in d.get('services', {}).items()}
+
+    @property
+    def services(self):
+        """This plan's services mapping (maps service name to Service).
+
+        This property is currently read-only.
+        """
+        return self._services
+
+    def to_yaml(self) -> str:
+        """Return this plan's YAML representation."""
+        return self._raw
+
+    __str__ = to_yaml
+
+
 class Layer:
-    """Represents a Pebble setup layer (or flattened setup).
+    """Represents a Pebble configuration layer.
 
     The format of this is not documented, but is captured in code here:
-    https://github.com/canonical/pebble/blob/master/internal/setup/setup.go
+    https://github.com/canonical/pebble/blob/master/internal/plan/plan.go
     """
 
     def __init__(self, raw: Union[str, Dict] = None):
@@ -423,7 +447,7 @@ class Layer:
 
 
 class Service:
-    """Represents a service description in a Pebble setup layer."""
+    """Represents a service description in a Pebble configuration layer."""
 
     def __init__(self, name: str, raw: Dict = None):
         self.name = name
@@ -627,19 +651,37 @@ class Client:
         raise TimeoutError(
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
-    def add_layer(self, layer: Union[str, dict, Layer]):
-        """Dynamically add a layer to the Pebble setup."""
+    def add_layer(self, label: str, layer: Union[str, dict, Layer], combine: bool = False):
+        """Dynamically add a new layer onto the Pebble configuration layers.
+
+        If combine is False (the default), append the new layer as the top
+        layer with the given label. If combine is True and the label already
+        exists, the two layers are combined into a single one considering the
+        layer override rules; if the layer doesn't exist, it is added as usual.
+        """
+        if not isinstance(label, str):
+            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+
         if isinstance(layer, str):
             layer_yaml = layer
         elif isinstance(layer, dict):
             layer_yaml = Layer(layer).to_yaml()
-        else:
+        elif isinstance(layer, Layer):
             layer_yaml = layer.to_yaml()
-        _ = layer_yaml
-        # TODO(benhoyt) - send layer_yaml to Pebble when that API is implemented
-        raise NotImplementedError('add_layer not yet implemented in Pebble')
+        else:
+            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
+                type(layer).__name__))
 
-    def get_layer(self) -> str:
-        """Get the flattened setup layers as a YAML string."""
-        # TODO(benhoyt) - fetch setup YAML from Pebble when that API is implemented
-        raise NotImplementedError('get_layer not yet implemented in Pebble')
+        body = {
+            'action': 'add',
+            'combine': combine,
+            'label': label,
+            'format': 'yaml',
+            'layer': layer_yaml,
+        }
+        self._request('POST', '/v1/layers', body=body)
+
+    def get_plan(self) -> Plan:
+        """Get the Pebble plan (currently contains only combined services)."""
+        result = self._request('GET', '/v1/plan', {'format': 'yaml'})
+        return Plan(result['result'])

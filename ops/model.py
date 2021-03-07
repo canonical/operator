@@ -1047,21 +1047,26 @@ class Container:
         """Stop given service(s) by name."""
         self._pebble.stop_services(service_names)
 
-    def add_layer(self, layer: typing.Union[str, typing.Dict, 'pebble.Layer']):
-        """Dynamically add a setup layer.
+    def add_layer(self, label: str, layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
+                  combine: bool = False):
+        """Dynamically add a new layer onto the Pebble configuration layers.
 
         Args:
-            layer: A YAML string, setup layer dict, or pebble.Layer object
-                containing the Pebble layer to add.
+            label: Label for new layer (and label of layer to merge with if
+                combining).
+            layer: A YAML string, configuration layer dict, or pebble.Layer
+                object containing the Pebble layer to add.
+            combine: If combine is False (the default), append the new layer
+                as the top layer with the given label (must be unique). If
+                combine is True and the label already exists, the two layers
+                are combined into a single one considering the layer override
+                rules; if the layer doesn't exist, it is added as usual.
         """
-        if isinstance(layer, dict):
-            layer = pebble.Layer(layer)
-        self._pebble.add_layer(layer)
+        self._pebble.add_layer(label, layer, combine=combine)
 
-    def get_layer(self) -> 'pebble.Layer':
-        """Fetch the flattened setup layers as a pebble.Layer object."""
-        setup_yaml = self._pebble.get_layer()
-        return pebble.Layer(setup_yaml)
+    def get_plan(self) -> 'pebble.Plan':
+        """Get the current effective pebble configuration."""
+        return self._pebble.get_plan()
 
 
 class ContainerMapping(Mapping):

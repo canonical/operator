@@ -42,6 +42,11 @@ def main():
                                        'format), default current time',
                    type=pebble._parse_timestamp)
 
+    p = subparsers.add_parser('add', help='add a configuration layer dynamically')
+    p.add_argument('--combine', action='store_true', help='combine layer instead of appending')
+    p.add_argument('label', help='label for new layer')
+    p.add_argument('layer_path', help='path of layer YAML file')
+
     p = subparsers.add_parser('autostart', help='autostart default service(s)')
 
     p = subparsers.add_parser('change', help='show a single change by ID')
@@ -51,6 +56,8 @@ def main():
     p.add_argument('--select', help='change state to filter on, default %(default)s',
                    choices=[s.value for s in pebble.ChangeState], default='all')
     p.add_argument('--service', help='optional service name to filter on')
+
+    p = subparsers.add_parser('plan', help='show configuration plan (combined layers)')
 
     p = subparsers.add_parser('start', help='start service(s)')
     p.add_argument('service', help='name of service to start (can specify multiple)', nargs='+')
@@ -85,6 +92,15 @@ def main():
         elif args.command == 'ack':
             timestamp = args.timestamp or datetime.datetime.now(tz=datetime.timezone.utc)
             result = client.ack_warnings(timestamp)
+        elif args.command == 'add':
+            try:
+                with open(args.layer_path, encoding='utf-8') as f:
+                    layer_yaml = f.read()
+            except IOError as e:
+                parser.error('cannot read layer YAML: {}'.format(e))
+            client.add_layer(args.label, layer_yaml, combine=bool(args.combine))
+            result = 'Layer {!r} added successfully from {!r}'.format(
+                args.label, args.layer_path)
         elif args.command == 'autostart':
             result = client.autostart_services()
         elif args.command == 'change':
@@ -92,6 +108,8 @@ def main():
         elif args.command == 'changes':
             result = client.get_changes(select=pebble.ChangeState(args.select),
                                         service=args.service)
+        elif args.command == 'plan':
+            result = client.get_plan().raw_yaml
         elif args.command == 'start':
             result = client.start_services(args.service)
         elif args.command == 'stop':

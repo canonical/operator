@@ -338,6 +338,37 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247202))
 
 
+class TestPlan(unittest.TestCase):
+    def test_no_args(self):
+        with self.assertRaises(TypeError):
+            pebble.Plan()
+
+    def test_services(self):
+        plan = pebble.Plan('')
+        self.assertEqual(plan.services, {})
+
+        plan = pebble.Plan('services:\n foo:\n  override: replace\n  command: echo foo')
+
+        self.assertEqual(len(plan.services), 1)
+        self.assertEqual(plan.services['foo'].name, 'foo')
+        self.assertEqual(plan.services['foo'].override, 'replace')
+        self.assertEqual(plan.services['foo'].command, 'echo foo')
+
+        # Should be read-only ("can't set attribute")
+        with self.assertRaises(AttributeError):
+            plan.services = {}
+
+    def test_yaml(self):
+        plan = pebble.Plan('')
+        self.assertEqual(plan.to_yaml(), '')
+        self.assertEqual(str(plan), '')
+
+        yaml = 'services:\n foo:\n  override: replace\n  command: echo foo'
+        plan = pebble.Plan(yaml)
+        self.assertEqual(plan.to_yaml(), yaml)
+        self.assertEqual(str(plan), yaml)
+
+
 class TestLayer(unittest.TestCase):
     def _assert_empty(self, layer):
         self.assertEqual(layer.summary, '')
@@ -788,6 +819,11 @@ class TestClient(unittest.TestCase):
         self.assertIsInstance(cm.exception.change, pebble.Change)
         self.assertEqual(cm.exception.change.id, '70')
 
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/services', None, {'action': 'autostart', 'services': []}),
+            ('GET', '/v1/changes/70', None, None),
+        ])
+
     def test_wait_change_timeout(self):
         with unittest.mock.patch('ops.pebble.time', MockTime()):
             change = self.build_mock_change_dict()
@@ -824,6 +860,80 @@ class TestClient(unittest.TestCase):
         response = self.client.wait_change('70')
         self.assertEqual(response.id, '70')
         self.assertEqual(response.err, 'Some kind of service error')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70', None, None),
+        ])
+
+    def test_add_layer(self):
+        okay_response = {
+            "result": True,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        }
+        self.client.responses.append(okay_response)
+        self.client.responses.append(okay_response)
+        self.client.responses.append(okay_response)
+        self.client.responses.append(okay_response)
+
+        layer_yaml = """
+services:
+  foo:
+    command: echo bar
+    override: replace
+"""[1:]
+        layer = pebble.Layer(layer_yaml)
+
+        self.client.add_layer('a', layer)
+        self.client.add_layer('b', layer.to_yaml())
+        self.client.add_layer('c', layer.to_dict())
+        self.client.add_layer('d', layer, combine=True)
+
+        def build_expected(label, combine):
+            return {
+                'action': 'add',
+                'combine': combine,
+                'label': label,
+                'format': 'yaml',
+                'layer': layer_yaml,
+            }
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/layers', None, build_expected('a', False)),
+            ('POST', '/v1/layers', None, build_expected('b', False)),
+            ('POST', '/v1/layers', None, build_expected('c', False)),
+            ('POST', '/v1/layers', None, build_expected('d', True)),
+        ])
+
+    def test_add_layer_invalid_type(self):
+        with self.assertRaises(TypeError):
+            self.client.add_layer('foo', 42)
+        with self.assertRaises(TypeError):
+            self.client.add_layer(42, 'foo')
+
+    def test_get_plan(self):
+        plan_yaml = """
+services:
+  foo:
+    command: echo bar
+    override: replace
+"""[1:]
+        self.client.responses.append({
+            "result": plan_yaml,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        plan = self.client.get_plan()
+        self.assertEqual(plan.to_yaml(), plan_yaml)
+        self.assertEqual(len(plan.services), 1)
+        self.assertEqual(plan.services['foo'].command, 'echo bar')
+        self.assertEqual(plan.services['foo'].override, 'replace')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/plan', {'format': 'yaml'}, None),
+        ])
 
 
 class TestSocketClient(unittest.TestCase):
