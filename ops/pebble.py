@@ -404,11 +404,7 @@ class Plan:
         return self._services
 
     def to_yaml(self) -> str:
-        """Return this plan's YAML representation.
-
-        This returns the exact YAML passed to Plan() without re-serialization,
-        that is, the YAML that Client.get_plan() received from Pebble.
-        """
+        """Return this plan's YAML representation."""
         return self._raw
 
     __str__ = to_yaml
