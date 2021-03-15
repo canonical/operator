@@ -59,6 +59,9 @@ def main():
 
     p = subparsers.add_parser('plan', help='show configuration plan (combined layers)')
 
+    p = subparsers.add_parser('services', help='show service status')
+    p.add_argument('service', help='name of service (can specify multiple; none means all services)', nargs='*')
+
     p = subparsers.add_parser('start', help='start service(s)')
     p.add_argument('service', help='name of service to start (can specify multiple)', nargs='+')
 
@@ -110,6 +113,8 @@ def main():
                                         service=args.service)
         elif args.command == 'plan':
             result = client.get_plan().raw_yaml
+        elif args.command == 'services':
+            result = client.get_services(args.service)
         elif args.command == 'start':
             result = client.start_services(args.service)
         elif args.command == 'stop':

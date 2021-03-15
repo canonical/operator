@@ -1068,6 +1068,26 @@ class Container:
         """Get the current effective pebble configuration."""
         return self._pebble.get_plan()
 
+    def get_services(self, *service_names: str) -> typing.List['pebble.ServiceInfo']:
+        """Get a list of service status information.
+
+        If no service names are specified, return status information for all
+        services, otherwise return information for only the given services.
+        """
+        return self._pebble.get_services(service_names)
+
+    def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
+        """Get status information for a single named service.
+
+        Raises model error if service_name is not found.
+        """
+        services = self.get_services(service_name)
+        if not services:
+            raise ModelError('service {} not found'.format(service_name))
+        if len(services) > 1:
+            raise RuntimeError('expected 1 service, got {}'.format(len(services)))
+        return services[0]
+
 
 class ContainerMapping(Mapping):
     """Map of container names to Container objects.

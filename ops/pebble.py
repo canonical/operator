@@ -481,6 +481,55 @@ class Service:
         return 'Service({!r})'.format(self.to_dict())
 
 
+class ServiceDefault(enum.Enum):
+    """Enum of service default configurations."""
+
+    START = 'start'
+    STOP = 'stop'
+
+
+class ServiceStatus(enum.Enum):
+    """Enum of service statuses."""
+
+    ACTIVE = 'active'
+    INACTIVE = 'inactive'
+    ERROR = 'error'
+
+
+class ServiceInfo:
+    """Service status information."""
+
+    def __init__(
+        self,
+        name: str,
+        default: ServiceDefault,
+        status: ServiceStatus,
+        message: Optional[str],
+    ):
+        self.name = name
+        self.default = default
+        self.status = status
+        self.message = message
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'ServiceInfo':
+        """Create new object from dict parsed from JSON."""
+        return cls(
+            name=d['name'],
+            default=ServiceDefault(d['default']),
+            status=ServiceStatus(d['status']),
+            message=d.get('message') or None,
+        )
+
+    def __repr__(self):
+        return ('ServiceInfo('
+                'name={self.name!r}, '
+                'default={self.default}, '
+                'status={self.status}, '
+                'message={self.message!r})'
+                ).format(self=self)
+
+
 class Client:
     """Pebble API client."""
 
@@ -685,3 +734,14 @@ class Client:
         """Get the Pebble plan (currently contains only combined services)."""
         result = self._request('GET', '/v1/plan', {'format': 'yaml'})
         return Plan(result['result'])
+
+    def get_services(self, names: List[str] = None) -> List[ServiceInfo]:
+        """Get the service status for the configured services.
+
+        If names is specified, only fetch the service status for the services
+        named.
+        """
+        if names is None:
+            names = []
+        result = self._request('GET', '/v1/services', {'names': ','.join(names)})
+        return [ServiceInfo.from_dict(info) for info in result['result']]
