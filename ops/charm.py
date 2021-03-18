@@ -468,7 +468,7 @@ class WorkloadEvent(HookEvent):
 
     Workload events are generated for all containers that the charm
     expects in metadata. Workload containers currently only trigger
-    a WorkloadReadyEvent.
+    a PebbleReadyEvent.
 
     Attributes:
         workload: The :class:`~ops.model.Container` involved in this event.
@@ -504,8 +504,8 @@ class WorkloadEvent(HookEvent):
             self.workload = None
 
 
-class WorkloadReadyEvent(WorkloadEvent):
-    """Event triggered when a workload/container is ready.
+class PebbleReadyEvent(WorkloadEvent):
+    """Event triggered when pebble is ready for a workload.
 
     This event is triggered when the Pebble process for a workload/container
     starts up, allowing the charm to configure how services should be launched.
@@ -625,7 +625,7 @@ class CharmBase(Object):
 
         for container_name in self.framework.meta.containers:
             container_name = container_name.replace('-', '_')
-            self.on.define_event(container_name + '_workload_ready', WorkloadReadyEvent)
+            self.on.define_event(container_name + '_pebble_ready', PebbleReadyEvent)
 
     @property
     def app(self) -> model.Application:

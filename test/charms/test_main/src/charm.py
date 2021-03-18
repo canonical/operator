@@ -49,7 +49,7 @@ class Charm(CharmBase):
             on_start_action=[],
             _on_get_model_name_action=[],
             on_collect_metrics=[],
-            on_test_workload_ready=[],
+            on_test_pebble_ready=[],
 
             on_log_critical_action=[],
             on_log_error_action=[],
@@ -73,7 +73,7 @@ class Charm(CharmBase):
         self.framework.observe(self.on.mon_relation_changed, self._on_mon_relation_changed)
         self.framework.observe(self.on.mon_relation_departed, self._on_mon_relation_departed)
         self.framework.observe(self.on.ha_relation_broken, self._on_ha_relation_broken)
-        self.framework.observe(self.on.test_workload_ready, self._on_test_workload_ready)
+        self.framework.observe(self.on.test_pebble_ready, self._on_test_pebble_ready)
 
         actions = self.charm_dir / 'actions.yaml'
         if actions.exists() and actions.read_bytes():
@@ -147,12 +147,12 @@ class Charm(CharmBase):
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.ha_relation_broken_data = event.snapshot()
 
-    def _on_test_workload_ready(self, event):
+    def _on_test_pebble_ready(self, event):
         assert event.workload is not None, (
             'workload events must have a reference to a container')
-        self._stored.on_test_workload_ready.append(type(event).__name__)
+        self._stored.on_test_pebble_ready.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
-        self._stored.test_workload_ready_data = event.snapshot()
+        self._stored.test_pebble_ready_data = event.snapshot()
 
     def _on_start_action(self, event):
         assert event.handle.kind == 'start_action', (

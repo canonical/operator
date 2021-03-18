@@ -49,7 +49,7 @@ from ops.charm import (
     ActionEvent,
     CollectMetricsEvent,
     WorkloadEvent,
-    WorkloadReadyEvent,
+    PebbleReadyEvent,
 )
 from ops.framework import Framework, StoredStateData
 from ops.main import main, CHARM_STATE_FILE, _should_use_controller_storage
@@ -529,7 +529,7 @@ class _TestMain(abc.ABC):
                       env_var='JUJU_ACTION_NAME'),
             {},
         ), (
-            EventSpec(WorkloadReadyEvent, 'test_workload_ready',
+            EventSpec(PebbleReadyEvent, 'test_pebble_ready',
                       workload_name='test'),
             {'container_name': 'test'},
         )]
