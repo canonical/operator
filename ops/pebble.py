@@ -481,11 +481,11 @@ class Service:
         return 'Service({!r})'.format(self.to_dict())
 
 
-class ServiceDefault(enum.Enum):
-    """Enum of service default configurations."""
+class ServiceStartup(enum.Enum):
+    """Enum of service startup options."""
 
-    START = 'start'
-    STOP = 'stop'
+    ENABLED = 'enabled'
+    DISABLED = 'disabled'
 
 
 class ServiceStatus(enum.Enum):
@@ -502,31 +502,27 @@ class ServiceInfo:
     def __init__(
         self,
         name: str,
-        default: ServiceDefault,
-        status: ServiceStatus,
-        message: Optional[str],
+        startup: ServiceStartup,
+        current: ServiceStatus,
     ):
         self.name = name
-        self.default = default
-        self.status = status
-        self.message = message
+        self.startup = startup
+        self.current = current
 
     @classmethod
     def from_dict(cls, d: Dict) -> 'ServiceInfo':
         """Create new object from dict parsed from JSON."""
         return cls(
             name=d['name'],
-            default=ServiceDefault(d['default']),
-            status=ServiceStatus(d['status']),
-            message=d.get('message') or None,
+            startup=ServiceStartup(d['startup']),
+            current=ServiceStatus(d['current']),
         )
 
     def __repr__(self):
         return ('ServiceInfo('
                 'name={self.name!r}, '
-                'default={self.default}, '
-                'status={self.status}, '
-                'message={self.message!r})'
+                'startup={self.startup}, '
+                'current={self.current})'
                 ).format(self=self)
 
 
