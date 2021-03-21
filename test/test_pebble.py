@@ -418,6 +418,9 @@ class TestLayer(unittest.TestCase):
 services:
   bar:
     command: echo bar
+    environment:
+    - ENV1: value1
+    - ENV2: value2
     summary: Bar
   foo:
     command: echo foo
@@ -449,7 +452,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(service.after, [])
         self.assertEqual(service.before, [])
         self.assertEqual(service.requires, [])
-        self.assertEqual(service.environment, {})
+        self.assertEqual(service.environment, [])
         self.assertEqual(service.to_dict(), {})
 
     def test_name_only(self):
@@ -469,7 +472,7 @@ class TestService(unittest.TestCase):
             'after': ['a1', 'a2'],
             'before': ['b1', 'b2'],
             'requires': ['r1', 'r2'],
-            'environment': {'k1': 'v1', 'k2': 'v2'},
+            'environment': [{'k1': 'v1'}, {'k2': 'v2'}],
         }
         s = pebble.Service('Name 2', d)
         self.assertEqual(s.name, 'Name 2')
@@ -480,7 +483,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(s.after, ['a1', 'a2'])
         self.assertEqual(s.before, ['b1', 'b2'])
         self.assertEqual(s.requires, ['r1', 'r2'])
-        self.assertEqual(s.environment, {'k1': 'v1', 'k2': 'v2'})
+        self.assertEqual(s.environment, [('k1', 'v1'), ('k2', 'v2')])
 
         self.assertEqual(s.to_dict(), d)
 
@@ -488,15 +491,15 @@ class TestService(unittest.TestCase):
         s.after.append('a3')
         s.before.append('b3')
         s.requires.append('r3')
-        s.environment['k3'] = 'v3'
+        s.environment.append(('k3', 'v3'))
         self.assertEqual(s.after, ['a1', 'a2', 'a3'])
         self.assertEqual(s.before, ['b1', 'b2', 'b3'])
         self.assertEqual(s.requires, ['r1', 'r2', 'r3'])
-        self.assertEqual(s.environment, {'k1': 'v1', 'k2': 'v2', 'k3': 'v3'})
+        self.assertEqual(s.environment, [('k1', 'v1'), ('k2', 'v2'), ('k3', 'v3')])
         self.assertEqual(d['after'], ['a1', 'a2'])
         self.assertEqual(d['before'], ['b1', 'b2'])
         self.assertEqual(d['requires'], ['r1', 'r2'])
-        self.assertEqual(d['environment'], {'k1': 'v1', 'k2': 'v2'})
+        self.assertEqual(d['environment'], [{'k1': 'v1'}, {'k2': 'v2'}])
 
 
 class MockClient(pebble.Client):

@@ -109,7 +109,7 @@ def main():
             result = client.get_changes(select=pebble.ChangeState(args.select),
                                         service=args.service)
         elif args.command == 'plan':
-            result = client.get_plan().raw_yaml
+            result = client.get_plan().to_yaml()
         elif args.command == 'start':
             result = client.start_services(args.service)
         elif args.command == 'stop':
