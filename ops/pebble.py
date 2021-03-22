@@ -737,7 +737,8 @@ class Client:
         If names is specified, only fetch the service status for the services
         named.
         """
-        if names is None:
-            names = []
-        result = self._request('GET', '/v1/services', {'names': ','.join(names)})
+        query = None
+        if names is not None:
+            query = {'names': ','.join(names)}
+        result = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in result['result']]

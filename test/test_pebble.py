@@ -998,7 +998,7 @@ services:
         self.assertEqual(services[1].current, pebble.ServiceStatus.ACTIVE)
 
         self.assertEqual(self.client.requests, [
-            ('GET', '/v1/services', {'names': ''}, None),
+            ('GET', '/v1/services', None, None),
         ])
 
     def test_get_services_names(self):
