@@ -1083,7 +1083,7 @@ class Container:
         """
         services = self.get_services(service_name)
         if not services:
-            raise ModelError('service {} not found'.format(service_name))
+            raise ModelError('service {!r} not found'.format(service_name))
         if len(services) > 1:
             raise RuntimeError('expected 1 service, got {}'.format(len(services)))
         return services[0]

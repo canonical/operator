@@ -868,6 +868,64 @@ containers:
         self.assertIsInstance(plan, ops.pebble.Plan)
         self.assertEqual(plan.to_yaml(), plan_yaml)
 
+    @staticmethod
+    def _make_service(name, startup, current):
+        return ops.pebble.ServiceInfo.from_dict(
+            {'name': name, 'startup': startup, 'current': current})
+
+    def test_get_services(self):
+        two_services = [
+            self._make_service('s1', 'enabled', 'active'),
+            self._make_service('s2', 'disabled', 'inactive'),
+        ]
+        self.pebble.responses.append(two_services)
+        services = self.container.get_services()
+        self.assertEqual(len(services), 2)
+        self.assertEqual(services[0].name, 's1')
+        self.assertEqual(services[0].startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services[0].current, ops.pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(services[1].name, 's2')
+        self.assertEqual(services[1].startup, ops.pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services[1].current, ops.pebble.ServiceStatus.INACTIVE)
+
+        self.pebble.responses.append(two_services)
+        services = self.container.get_services('s1', 's2')
+        self.assertEqual(len(services), 2)
+        self.assertEqual(services[0].name, 's1')
+        self.assertEqual(services[0].startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services[0].current, ops.pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(services[1].name, 's2')
+        self.assertEqual(services[1].startup, ops.pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services[1].current, ops.pebble.ServiceStatus.INACTIVE)
+
+        self.assertEqual(self.pebble.requests, [
+            ('get_services', ()),
+            ('get_services', ('s1', 's2')),
+        ])
+
+    def test_get_service(self):
+        # Single service returned successfully
+        self.pebble.responses.append([self._make_service('s1', 'enabled', 'active')])
+        s = self.container.get_service('s1')
+        self.assertEqual(self.pebble.requests, [('get_services', ('s1', ))])
+        self.assertEqual(s.name, 's1')
+        self.assertEqual(s.startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(s.current, ops.pebble.ServiceStatus.ACTIVE)
+
+        # If Pebble returns no services, should be a ModelError
+        self.pebble.responses.append([])
+        with self.assertRaises(ops.model.ModelError) as cm:
+            self.container.get_service('s2')
+        self.assertEqual(str(cm.exception), "service 's2' not found")
+
+        # If Pebble returns more than one service, RuntimeError is raised
+        self.pebble.responses.append([
+            self._make_service('s1', 'enabled', 'active'),
+            self._make_service('s2', 'disabled', 'inactive'),
+        ])
+        with self.assertRaises(RuntimeError):
+            self.container.get_service('s1')
+
 
 class MockPebbleBackend(ops.model._ModelBackend):
     def get_pebble(self, socket_path):
@@ -898,6 +956,10 @@ class MockPebbleClient:
 
     def get_plan(self):
         self.requests.append(('get_plan',))
+        return self.responses.pop(0)
+
+    def get_services(self, names=None):
+        self.requests.append(('get_services', names))
         return self.responses.pop(0)
 
 
