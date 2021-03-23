@@ -518,8 +518,8 @@ class ServiceInfo:
     def __init__(
         self,
         name: str,
-        startup: ServiceStartup,
-        current: ServiceStatus,
+        startup: Union[ServiceStartup, str],
+        current: Union[ServiceStatus, str],
     ):
         self.name = name
         self.startup = startup
@@ -528,10 +528,18 @@ class ServiceInfo:
     @classmethod
     def from_dict(cls, d: Dict) -> 'ServiceInfo':
         """Create new object from dict parsed from JSON."""
+        try:
+            startup = ServiceStartup(d['startup'])
+        except ValueError:
+            startup = d['startup']
+        try:
+            current = ServiceStatus(d['current'])
+        except ValueError:
+            current = d['current']
         return cls(
             name=d['name'],
-            startup=ServiceStartup(d['startup']),
-            current=ServiceStatus(d['current']),
+            startup=startup,
+            current=current,
         )
 
     def __repr__(self):

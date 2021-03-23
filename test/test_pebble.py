@@ -538,6 +538,15 @@ class TestServiceInfo(unittest.TestCase):
         self.assertEqual(s.startup, pebble.ServiceStartup.DISABLED)
         self.assertEqual(s.current, pebble.ServiceStatus.INACTIVE)
 
+        s = pebble.ServiceInfo.from_dict({
+            'name': 'svc2',
+            'startup': 'thingy',
+            'current': 'bob',
+        })
+        self.assertEqual(s.name, 'svc2')
+        self.assertEqual(s.startup, 'thingy')
+        self.assertEqual(s.current, 'bob')
+
 
 class MockClient(pebble.Client):
     """Mock Pebble client that simply records reqeusts and returns stored responses."""
