@@ -459,7 +459,7 @@ class Service:
         raw = raw or {}
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
-        self.default = raw.get('default', '')
+        self.startup = raw.get('startup', '')
         self.override = raw.get('override', '')
         self.command = raw.get('command', '')
         self.after = list(raw.get('after', []))
@@ -483,7 +483,7 @@ class Service:
         fields = [
             ('summary', self.summary),
             ('description', self.description),
-            ('default', self.default),
+            ('startup', self.startup),
             ('override', self.override),
             ('command', self.command),
             ('after', self.after),
@@ -655,7 +655,7 @@ class Client:
         return Change.from_dict(result['result'])
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
-        """Start the autostart services and wait (poll) for them to be started.
+        """Start the startup-enabled services and wait (poll) for them to be started.
 
         Raises ChangeError if one or more of the services didn't start. If
         timeout is 0, submit the action but don't wait; just return the change

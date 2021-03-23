@@ -1036,7 +1036,7 @@ class Container:
         return self._pebble
 
     def autostart(self):
-        """Autostart all default services."""
+        """Autostart all services marked as startup: enabled."""
         self._pebble.autostart_services()
 
     def start(self, *service_names: str):
