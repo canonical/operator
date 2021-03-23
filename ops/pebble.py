@@ -465,7 +465,7 @@ class Service:
         self.after = list(raw.get('after', []))
         self.before = list(raw.get('before', []))
         self.requires = list(raw.get('requires', []))
-        self.environment = self._dicts_to_tuples(raw.get('environment') or [])
+        self.environment = self._dicts_to_tuples(raw.get('environment', []))
 
     @staticmethod
     def _dicts_to_tuples(dicts):

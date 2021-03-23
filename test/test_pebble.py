@@ -436,6 +436,8 @@ summary: Sum Mary
         self.assertEqual(s.services['bar'].name, 'bar')
         self.assertEqual(s.services['bar'].summary, 'Bar')
         self.assertEqual(s.services['bar'].command, 'echo bar')
+        self.assertEqual(s.services['bar'].environment,
+                         [('ENV1', 'value1'), ('ENV2', 'value2')])
 
         self.assertEqual(s.to_yaml(), yaml)
         self.assertEqual(str(s), yaml)
