@@ -447,7 +447,12 @@ class Layer:
 
 
 class Service:
-    """Represents a service description in a Pebble configuration layer."""
+    """Represents a service description in a Pebble configuration layer.
+
+    The "environment" attribute is parsed as a list of (key, value) tuples,
+    because that seems most natural for ordered keys and values in Python.
+    In the YAML, however, it's a list of 1-item {key: value} objects.
+    """
 
     def __init__(self, name: str, raw: Dict = None):
         self.name = name
@@ -460,7 +465,18 @@ class Service:
         self.after = list(raw.get('after', []))
         self.before = list(raw.get('before', []))
         self.requires = list(raw.get('requires', []))
-        self.environment = dict(raw.get('environment') or {})
+        self.environment = self._dicts_to_tuples(raw.get('environment', []))
+
+    @staticmethod
+    def _dicts_to_tuples(dicts):
+        """Convert list of 1-item {k: v} dicts to list of (k, v) tuples."""
+        tuples = []
+        for d in dicts:
+            if len(d) != 1:
+                raise ValueError('expected 1-item dict, got {!r}'.format(d))
+            kv = list(d.items())[0]
+            tuples.append(kv)
+        return tuples
 
     def to_dict(self) -> Dict:
         """Convert this service object to its dict representation."""
@@ -473,7 +489,7 @@ class Service:
             ('after', self.after),
             ('before', self.before),
             ('requires', self.requires),
-            ('environment', self.environment),
+            ('environment', [{k: v} for k, v in self.environment]),
         ]
         return {name: value for name, value in fields if value}
 
