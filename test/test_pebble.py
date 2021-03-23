@@ -504,6 +504,50 @@ class TestService(unittest.TestCase):
         self.assertEqual(d['environment'], [{'k1': 'v1'}, {'k2': 'v2'}])
 
 
+class TestServiceInfo(unittest.TestCase):
+    def test_service_startup(self):
+        self.assertEqual(list(pebble.ServiceStartup), [
+            pebble.ServiceStartup.ENABLED,
+            pebble.ServiceStartup.DISABLED,
+        ])
+        self.assertEqual(pebble.ServiceStartup.ENABLED.value, 'enabled')
+        self.assertEqual(pebble.ServiceStartup.DISABLED.value, 'disabled')
+
+    def test_service_status(self):
+        self.assertEqual(list(pebble.ServiceStatus), [
+            pebble.ServiceStatus.ACTIVE,
+            pebble.ServiceStatus.INACTIVE,
+            pebble.ServiceStatus.ERROR,
+        ])
+        self.assertEqual(pebble.ServiceStatus.ACTIVE.value, 'active')
+        self.assertEqual(pebble.ServiceStatus.INACTIVE.value, 'inactive')
+        self.assertEqual(pebble.ServiceStatus.ERROR.value, 'error')
+
+    def test_service_info(self):
+        s = pebble.ServiceInfo('svc1', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(s.name, 'svc1')
+        self.assertEqual(s.startup, pebble.ServiceStartup.ENABLED)
+        self.assertEqual(s.current, pebble.ServiceStatus.ACTIVE)
+
+        s = pebble.ServiceInfo.from_dict({
+            'name': 'svc2',
+            'startup': 'disabled',
+            'current': 'inactive',
+        })
+        self.assertEqual(s.name, 'svc2')
+        self.assertEqual(s.startup, pebble.ServiceStartup.DISABLED)
+        self.assertEqual(s.current, pebble.ServiceStatus.INACTIVE)
+
+        s = pebble.ServiceInfo.from_dict({
+            'name': 'svc2',
+            'startup': 'thingy',
+            'current': 'bob',
+        })
+        self.assertEqual(s.name, 'svc2')
+        self.assertEqual(s.startup, 'thingy')
+        self.assertEqual(s.current, 'bob')
+
+
 class MockClient(pebble.Client):
     """Mock Pebble client that simply records reqeusts and returns stored responses."""
 
@@ -938,6 +982,87 @@ services:
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/plan', {'format': 'yaml'}, None),
+        ])
+
+    def test_get_services_all(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    "current": "inactive",
+                    "name": "svc1",
+                    "startup": "disabled"
+                },
+                {
+                    "current": "active",
+                    "name": "svc2",
+                    "startup": "enabled"
+                }
+            ],
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        services = self.client.get_services()
+        self.assertEqual(len(services), 2)
+        self.assertEqual(services[0].name, 'svc1')
+        self.assertEqual(services[0].startup, pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services[0].current, pebble.ServiceStatus.INACTIVE)
+        self.assertEqual(services[1].name, 'svc2')
+        self.assertEqual(services[1].startup, pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services[1].current, pebble.ServiceStatus.ACTIVE)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/services', None, None),
+        ])
+
+    def test_get_services_names(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    "current": "inactive",
+                    "name": "svc1",
+                    "startup": "disabled"
+                },
+                {
+                    "current": "active",
+                    "name": "svc2",
+                    "startup": "enabled"
+                }
+            ],
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        services = self.client.get_services(['svc1', 'svc2'])
+        self.assertEqual(len(services), 2)
+        self.assertEqual(services[0].name, 'svc1')
+        self.assertEqual(services[0].startup, pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services[0].current, pebble.ServiceStatus.INACTIVE)
+        self.assertEqual(services[1].name, 'svc2')
+        self.assertEqual(services[1].startup, pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services[1].current, pebble.ServiceStatus.ACTIVE)
+
+        self.client.responses.append({
+            "result": [
+                {
+                    "current": "active",
+                    "name": "svc2",
+                    "startup": "enabled"
+                }
+            ],
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        services = self.client.get_services(['svc2'])
+        self.assertEqual(len(services), 1)
+        self.assertEqual(services[0].name, 'svc2')
+        self.assertEqual(services[0].startup, pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services[0].current, pebble.ServiceStatus.ACTIVE)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/services', {'names': 'svc1,svc2'}, None),
+            ('GET', '/v1/services', {'names': 'svc2'}, None),
         ])
 
 

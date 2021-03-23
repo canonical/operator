@@ -497,6 +497,59 @@ class Service:
         return 'Service({!r})'.format(self.to_dict())
 
 
+class ServiceStartup(enum.Enum):
+    """Enum of service startup options."""
+
+    ENABLED = 'enabled'
+    DISABLED = 'disabled'
+
+
+class ServiceStatus(enum.Enum):
+    """Enum of service statuses."""
+
+    ACTIVE = 'active'
+    INACTIVE = 'inactive'
+    ERROR = 'error'
+
+
+class ServiceInfo:
+    """Service status information."""
+
+    def __init__(
+        self,
+        name: str,
+        startup: Union[ServiceStartup, str],
+        current: Union[ServiceStatus, str],
+    ):
+        self.name = name
+        self.startup = startup
+        self.current = current
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'ServiceInfo':
+        """Create new object from dict parsed from JSON."""
+        try:
+            startup = ServiceStartup(d['startup'])
+        except ValueError:
+            startup = d['startup']
+        try:
+            current = ServiceStatus(d['current'])
+        except ValueError:
+            current = d['current']
+        return cls(
+            name=d['name'],
+            startup=startup,
+            current=current,
+        )
+
+    def __repr__(self):
+        return ('ServiceInfo('
+                'name={self.name!r}, '
+                'startup={self.startup}, '
+                'current={self.current})'
+                ).format(self=self)
+
+
 class Client:
     """Pebble API client."""
 
@@ -701,3 +754,15 @@ class Client:
         """Get the Pebble plan (currently contains only combined services)."""
         result = self._request('GET', '/v1/plan', {'format': 'yaml'})
         return Plan(result['result'])
+
+    def get_services(self, names: List[str] = None) -> List[ServiceInfo]:
+        """Get the service status for the configured services.
+
+        If names is specified, only fetch the service status for the services
+        named.
+        """
+        query = None
+        if names is not None:
+            query = {'names': ','.join(names)}
+        result = self._request('GET', '/v1/services', query)
+        return [ServiceInfo.from_dict(info) for info in result['result']]
