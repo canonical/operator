@@ -448,7 +448,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(service.name, name)
         self.assertEqual(service.summary, '')
         self.assertEqual(service.description, '')
-        self.assertEqual(service.default, '')
+        self.assertEqual(service.startup, '')
         self.assertEqual(service.override, '')
         self.assertEqual(service.command, '')
         self.assertEqual(service.after, [])
@@ -468,7 +468,7 @@ class TestService(unittest.TestCase):
         d = {
             'summary': 'Sum Mary',
             'description': 'The lazy quick brown',
-            'default': 'Dee Fault',
+            'startup': 'Start Up',
             'override': 'override',
             'command': 'echo sum mary',
             'after': ['a1', 'a2'],
@@ -479,7 +479,7 @@ class TestService(unittest.TestCase):
         s = pebble.Service('Name 2', d)
         self.assertEqual(s.name, 'Name 2')
         self.assertEqual(s.description, 'The lazy quick brown')
-        self.assertEqual(s.default, 'Dee Fault')
+        self.assertEqual(s.startup, 'Start Up')
         self.assertEqual(s.override, 'override')
         self.assertEqual(s.command, 'echo sum mary')
         self.assertEqual(s.after, ['a1', 'a2'])
