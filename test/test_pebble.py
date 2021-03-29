@@ -961,6 +961,10 @@ services:
         with self.assertRaises(TypeError):
             self.client.add_layer(42, 'foo')
 
+        # combine is a keyword-only arg (should be combine=True)
+        with self.assertRaises(TypeError):
+            self.client.add_layer('foo', {}, True)
+
     def test_get_plan(self):
         plan_yaml = """
 services:

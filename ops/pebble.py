@@ -704,7 +704,7 @@ class Client:
         raise TimeoutError(
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
-    def add_layer(self, label: str, layer: Union[str, dict, Layer], combine: bool = False):
+    def add_layer(self, label: str, layer: Union[str, dict, Layer], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is False (the default), append the new layer as the top

@@ -1047,7 +1047,7 @@ class Container:
         """Stop given service(s) by name."""
         self._pebble.stop_services(service_names)
 
-    def add_layer(self, label: str, layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
+    def add_layer(self, label: str, layer: typing.Union[str, typing.Dict, 'pebble.Layer'], *,
                   combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
