@@ -860,6 +860,10 @@ containers:
             ('add_layer', 'd', 'summary: str\n', True),
         ])
 
+        # combine is a keyword-only arg (should be combine=True)
+        with self.assertRaises(TypeError):
+            self.container.add_layer('x', {}, True)
+
     def test_get_plan(self):
         plan_yaml = 'services:\n foo:\n  override: replace\n  command: bar'
         self.pebble.responses.append(ops.pebble.Plan(plan_yaml))
