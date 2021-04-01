@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import importlib
+import inspect
 import pathlib
 import shutil
 import sys
@@ -21,6 +22,7 @@ import textwrap
 import unittest
 import yaml
 
+from ops import pebble
 from ops.charm import (
     CharmBase,
     RelationEvent,
@@ -34,6 +36,7 @@ from ops.model import (
     UnknownStatus,
     ModelError,
     RelationNotFoundError,
+    _ModelBackend,
 )
 from ops.testing import Harness
 
@@ -1496,7 +1499,29 @@ class RelationEventCharm(RecordingCharm):
                  data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id)))
 
 
+def get_public_methods(obj):
+    """Get the public attributes of obj to compare to another object."""
+    public = set()
+    members = inspect.getmembers(obj)
+    for name, member in members:
+        if name.startswith('_'):
+            continue
+        if inspect.isfunction(member) or inspect.ismethod(member):
+            public.add(name)
+    return public
+
+
 class TestTestingModelBackend(unittest.TestCase):
+
+    def test_conforms_to_model_backend(self):
+        harness = Harness(CharmBase, meta='''
+            name: app
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        mb_methods = get_public_methods(_ModelBackend)
+        backend_methods = get_public_methods(backend)
+        self.assertEqual(mb_methods, backend_methods)
 
     def test_status_set_get_unit(self):
         harness = Harness(CharmBase, meta='''
@@ -1609,3 +1634,16 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertEqual(backend.relation_remote_app_name(rel_id), 'postgresql')
 
         self.assertIs(backend.relation_remote_app_name(7), None)
+
+    def test_get_pebble_methods(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+
+        client = backend.get_pebble('/custom/socket/path')
+        self.assertIsNotNone(client)
+        pebble_client_methods = get_public_methods(pebble.Client)
+        testing_client_methods = get_public_methods(client)
+        self.assertEqual(pebble_client_methods, testing_client_methods)

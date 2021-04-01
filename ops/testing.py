@@ -1,4 +1,4 @@
-# Copyright 2020 Canonical Ltd.
+# Copyright 2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 """Infrastructure to build unittests for Charms using the Operator Framework."""
 
+import datetime
 import inspect
 import pathlib
 import random
@@ -26,6 +27,7 @@ from ops import (
     charm,
     framework,
     model,
+    pebble,
     storage,
 )
 from ops._private import yaml
@@ -708,6 +710,9 @@ class _TestingModelBackend:
         self._unit_status = {'status': 'maintenance', 'message': ''}
         self._workload_version = None
         self._resource_dir = None
+        # {socket_path : _TestingPebbleClient}
+        # socket_path = '/charm/containers/{container_name}/pebble.socket'
+        self._pebble_clients = {}
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -834,5 +839,120 @@ class _TestingModelBackend:
     def add_metrics(self, metrics, labels=None):
         raise NotImplementedError(self.add_metrics)
 
-    def get_pebble(self, container_name):
-        raise NotImplementedError(self.get_pebble)
+    def juju_log(self, level, msg):
+        raise NotImplementedError(self.juju_log)
+
+    def get_pebble(self, socket_path: str):
+        client = self._pebble_clients.get(socket_path, None)
+        if client is None:
+            client = _TestingPebbleClient(self)
+            self._pebble_clients[socket_path] = client
+        return client
+
+
+class _TestingPebbleClient:
+    """This conforms to the interface for pebble.Client but provides canned data.
+
+    DO NOT use this class directly, it is used by `Harness`_ to run interactions with Pebble.
+    `Harness`_ is responsible for maintaining the internal consistency of the values here,
+    as the only public methods of this type are for implementing Client.
+    """
+
+    def __init__(self, backend: _TestingModelBackend):
+        self._backend = _TestingModelBackend
+
+    def get_system_info(self) -> pebble.SystemInfo:
+        """Get system info."""
+        raise NotImplementedError(self.get_system_info)
+
+    def get_warnings(
+            self, select: pebble.WarningState = pebble.WarningState.PENDING,
+    ) -> typing.List['pebble.Warning']:
+        """Get list of warnings in given state (pending or all)."""
+        raise NotImplementedError(self.get_warnings)
+        query = {'select': select.value}
+        result = self._request('GET', '/v1/warnings', query)
+        return [Warning.from_dict(w) for w in result['result']]
+
+    def ack_warnings(self, timestamp: datetime.datetime) -> int:
+        """Acknowledge warnings up to given timestamp, return number acknowledged."""
+        raise NotImplementedError(self.ack_warnings)
+        body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
+        result = self._request('POST', '/v1/warnings', body=body)
+        return result['result']
+
+    def get_changes(
+            self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS, service: str = None,
+    ) -> typing.List[pebble.Change]:
+        """Get list of changes in given state, filter by service name if given."""
+        raise NotImplementedError(self.get_changes)
+
+    def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
+        """Get single change by ID."""
+        raise NotImplementedError(self.get_changes)
+
+    def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
+        """Abort change with given ID."""
+        raise NotImplementedError(self.abort_change)
+
+    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+        """Start the startup-enabled services and wait (poll) for them to be started.
+
+        Raises ChangeError if one or more of the services didn't start. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
+        """
+        raise NotImplementedError(self.autostart_services)
+
+    def start_services(
+            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.ChangeID:
+        """Start services by name and wait (poll) for them to be started.
+
+        Raises ChangeError if one or more of the services didn't start. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
+        """
+        raise NotImplementedError(self.start_services)
+
+    def stop_services(
+            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.ChangeID:
+        """Stop services by name and wait (poll) for them to be started.
+
+        Raises ChangeError if one or more of the services didn't stop. If
+        timeout is 0, submit the action but don't wait; just return the change
+        ID immediately.
+        """
+        raise NotImplementedError(self.stop_services)
+
+    def wait_change(
+            self, change_id: pebble.ChangeID, timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.Change:
+        """Poll change every delay seconds (up to timeout) for it to be ready."""
+        raise NotImplementedError(self.wait_change)
+
+    def add_layer(
+            self, label: str, layer: typing.Union[str, dict, pebble.Layer], *,
+            combine: bool = False,
+    ):
+        """Dynamically add a new layer onto the Pebble configuration layers.
+
+        If combine is False (the default), append the new layer as the top
+        layer with the given label. If combine is True and the label already
+        exists, the two layers are combined into a single one considering the
+        layer override rules; if the layer doesn't exist, it is added as usual.
+        """
+        raise NotImplementedError(self.add_layer)
+
+    def get_plan(self) -> pebble.Plan:
+        """Get the Pebble plan (currently contains only combined services)."""
+        raise NotImplementedError(self.get_plan)
+
+    def get_services(self, names: typing.List[str] = None) -> typing.List[pebble.ServiceInfo]:
+        """Get the service status for the configured services.
+
+        If names is specified, only fetch the service status for the services
+        named.
+        """
+        raise NotImplementedError(self.get_services)

@@ -1117,7 +1117,7 @@ class TestModelBindings(unittest.TestCase):
                     'interface-name': '',
                     'addresses': [
                         {
-                            'hostname':  '',
+                            'hostname': '',
                             'value': '10.1.89.35',
                             'cidr': ''
                         }
