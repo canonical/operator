@@ -19,6 +19,7 @@ import json
 import os
 import re
 import socketserver
+import tempfile
 import threading
 import urllib.parse
 
@@ -165,9 +166,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def start_server():
-    socket_path = 'test.socket'
-    if os.path.exists(socket_path):
-        os.remove(socket_path)
+    socket_dir = tempfile.mkdtemp(prefix='test-ops.pebble')
+    socket_path = os.path.join(socket_dir, 'test.socket')
 
     server = socketserver.UnixStreamServer(socket_path, Handler)
     thread = threading.Thread(target=server.serve_forever)
@@ -177,6 +177,8 @@ def start_server():
         server.shutdown()
         server.server_close()
         thread.join()
+        os.remove(socket_path)
+        os.rmdir(socket_dir)
 
     return (shutdown, socket_path)
 
@@ -188,5 +190,8 @@ if __name__ == '__main__':
     print('Serving HTTP over socket', socket_path)
 
     # Wait forever (or till Ctrl-C pressed)
-    while True:
-        time.sleep(1)
+    try:
+        while True:
+            time.sleep(1)
+    finally:
+        shutdown()
