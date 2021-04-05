@@ -590,7 +590,10 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                body = _json_loads(e.read())
+                b = e.read()
+                print('TODO:', b.decode('utf-8'))
+                body = _json_loads(b)
+                print("TODO handle these kind of errors:", body)
                 message = body['result']['message']
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
@@ -600,8 +603,12 @@ class Client:
         except urllib.error.URLError as e:
             raise ConnectionError(e.reason)
 
-        response_data = response.read()
-        result = _json_loads(response_data)
+        media_type = response.headers.get('Content-Type', '').split(';', 1)[0]
+        if media_type == 'multipart/form-data':
+            result = response.read()
+        else:
+            response_data = response.read()
+            result = _json_loads(response_data)
         return result
 
     def get_system_info(self) -> SystemInfo:
@@ -754,3 +761,155 @@ class Client:
             query = {'names': ','.join(names)}
         result = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in result['result']]
+
+    def read_file(self, remote_path: str) -> bytes:
+        query = {
+            'action': 'read',
+            'path': remote_path,
+        }
+        return self._request('GET', '/v1/files', query)
+
+    def _multipart_request(self, method: str, path: str, headers: Dict, body: bytes) -> Dict:
+        url = self.base_url + path
+
+        for k, v in sorted(headers.items()):
+            print(k+':', v)
+        print(body.decode('utf-8'))
+        print()
+        headers['Accept'] = 'application/json'
+        request = urllib.request.Request(url, method=method, data=body, headers=headers)
+
+        try:
+            response = self.opener.open(request, timeout=self.timeout)
+        except urllib.error.HTTPError as e:
+            code = e.code
+            status = e.reason
+            try:
+                body = _json_loads(e.read())
+                print("TODO handle these kind of errors:", body)
+                message = body['result']['message']
+            except (IOError, ValueError, KeyError) as e2:
+                # Will only happen on read error or if Pebble sends invalid JSON.
+                body = {}
+                message = '{} - {}'.format(type(e2).__name__, e2)
+            raise APIError(body, code, status, message)
+        except urllib.error.URLError as e:
+            raise ConnectionError(e.reason)
+
+        response_data = response.read()
+        result = _json_loads(response_data)
+        return result
+
+    def write_file(self, content: str, remote_path: str):
+        metadata = {
+            'action': 'write',
+            'files': [{'path': remote_path}],
+        }
+        body, headers = encode_multipart(
+            {'request': json.dumps(metadata, sort_keys=True, indent=4)},
+            {'file:'+remote_path: {'filename': 'f', 'content': content}},
+        )
+        assert isinstance(body, bytes), type(body)
+        return self._multipart_request('POST', '/v1/files', headers, body)
+
+    def list_files(self, pattern, directory=False): # TODO
+        query = {
+            'action': 'list',
+            'pattern': pattern,
+        }
+        if directory:
+            query['directory'] = 'true'
+        return self._request('GET', '/v1/files', query)
+
+    def make_dirs(self, paths: List[str], make_parents=True):
+        # TODO: should take objects with permissions etc
+        body = {
+            'action': 'make-dirs',
+            'dirs': [{'path': p, 'make-parents': make_parents} for p in paths],
+        }
+        return self._request('POST', '/v1/files', None, body)
+
+    def remove_paths(self, paths: List[str], recursive=True):
+        # TODO: recursive should apply per path
+        body = {
+            'action': 'remove',
+            'paths': [{'path': p, 'recursive': recursive} for p in paths],
+        }
+        return self._request('POST', '/v1/files', None, body)
+
+
+import mimetypes
+import random
+import string
+
+_BOUNDARY_CHARS = string.digits + string.ascii_letters
+
+def encode_multipart(fields, files, boundary=None):
+    r"""Encode dict of form fields and dict of files as multipart/form-data.
+    Return tuple of (body_string, headers_dict). Each value in files is a dict
+    with required keys 'filename' and 'content', and optional 'mimetype' (if
+    not specified, tries to guess mime type or uses 'application/octet-stream').
+
+    >>> body, headers = encode_multipart({'FIELD': 'VALUE'},
+    ...                                  {'FILE': {'filename': 'F.TXT', 'content': 'CONTENT'}},
+    ...                                  boundary='BOUNDARY')
+    >>> print('\n'.join(repr(l) for l in body.split('\r\n')))
+    '--BOUNDARY'
+    'Content-Disposition: form-data; name="FIELD"'
+    ''
+    'VALUE'
+    '--BOUNDARY'
+    'Content-Disposition: form-data; name="FILE"; filename="F.TXT"'
+    'Content-Type: text/plain'
+    ''
+    'CONTENT'
+    '--BOUNDARY--'
+    ''
+    >>> print(sorted(headers.items()))
+    [('Content-Length', '193'), ('Content-Type', 'multipart/form-data; boundary=BOUNDARY')]
+    >>> len(body)
+    193
+    """
+    def escape_quote(s):
+        return s.replace('"', '\\"')
+
+    if boundary is None:
+        boundary = ''.join(random.choice(_BOUNDARY_CHARS) for i in range(30))
+    lines = []
+
+    for name, value in fields.items():
+        lines.extend((
+            '--{0}'.format(boundary),
+            'Content-Disposition: form-data; name="{0}"'.format(escape_quote(name)),
+            '',
+            str(value),
+        ))
+
+    for name, value in files.items():
+        filename = value['filename']
+        if 'mimetype' in value:
+            mimetype = value['mimetype']
+        else:
+            mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        lines.extend((
+            '--{0}'.format(boundary),
+            'Content-Disposition: form-data; name="{0}"; filename="{1}"'.format(
+                    escape_quote(name), escape_quote(filename)),
+            'Content-Type: {0}'.format(mimetype),
+            '',
+            value['content'],
+        ))
+
+    lines.extend((
+        '--{0}--'.format(boundary),
+        '',
+    ))
+    body = '\r\n'.join(lines)
+    body = body.encode('utf-8')
+
+    headers = {
+        'Content-Type': 'multipart/form-data; boundary={0}'.format(boundary),
+        'Content-Length': str(len(body)),
+    }
+
+    return (body, headers)
