@@ -346,7 +346,7 @@ class Unit:
         self._backend.application_version_set(version)
 
     @property
-    def containers(self) -> typing.Mapping[str, 'Container']:
+    def containers(self) -> 'ContainerMapping':
         """Return a mapping of containers indexed by name."""
         if not self._is_our_unit:
             raise RuntimeError('cannot get container for a remote unit {}'.format(self))
@@ -1068,7 +1068,7 @@ class Container:
         """Get the current effective pebble configuration."""
         return self._pebble.get_plan()
 
-    def get_services(self, *service_names: str) -> typing.Mapping[str, 'pebble.ServiceInfo']:
+    def get_services(self, *service_names: str) -> 'ServiceInfoMapping':
         """Fetch and return a mapping of status information indexed by service name.
 
         If no service names are specified, return status information for all
