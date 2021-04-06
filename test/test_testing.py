@@ -38,7 +38,10 @@ from ops.model import (
     RelationNotFoundError,
     _ModelBackend,
 )
-from ops.testing import Harness
+from ops.testing import (
+    Harness,
+    _TestingPebbleClient,
+)
 
 
 class TestHarness(unittest.TestCase):
@@ -1636,6 +1639,19 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertIs(backend.relation_remote_app_name(7), None)
 
     def test_get_pebble_methods(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+
+        client = backend.get_pebble('/custom/socket/path')
+        self.assertIsInstance(client, _TestingPebbleClient)
+
+
+class TestTestingPebbleClient(unittest.TestCase):
+
+    def test_methods_match_pebble_client(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             ''')
