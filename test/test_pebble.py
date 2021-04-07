@@ -21,6 +21,7 @@ import sys
 
 import ops.pebble as pebble
 import test.fake_pebble as fake_pebble
+from ops._private import yaml
 
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
@@ -359,14 +360,22 @@ class TestPlan(unittest.TestCase):
             plan.services = {}
 
     def test_yaml(self):
+        # Starting with nothing, we get the empty result
         plan = pebble.Plan('')
-        self.assertEqual(plan.to_yaml(), '')
-        self.assertEqual(str(plan), '')
+        self.assertEqual(plan.to_yaml(), '{}\n')
+        self.assertEqual(str(plan), '{}\n')
 
-        yaml = 'services:\n foo:\n  override: replace\n  command: echo foo'
-        plan = pebble.Plan(yaml)
-        self.assertEqual(plan.to_yaml(), yaml)
-        self.assertEqual(str(plan), yaml)
+        # With a service, we return validated yaml content.
+        raw = '''\
+services:
+ foo:
+  override: replace
+  command: echo foo
+'''
+        plan = pebble.Plan(raw)
+        reformed = yaml.safe_dump(yaml.safe_load(raw))
+        self.assertEqual(plan.to_yaml(), reformed)
+        self.assertEqual(str(plan), reformed)
 
 
 class TestLayer(unittest.TestCase):

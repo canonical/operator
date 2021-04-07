@@ -403,9 +403,20 @@ class Plan:
         """
         return self._services
 
+    def to_dict(self) -> dict:
+        """Convert this plan to its dict representation."""
+        as_dicts = {}
+        for name, service in self._services.items():
+            as_dicts[name] = service.to_dict()
+        if not as_dicts:
+            return {}
+        return {
+            'services': as_dicts,
+        }
+
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
-        return self._raw
+        return yaml.safe_dump(self.to_dict())
 
     __str__ = to_yaml
 

@@ -1651,15 +1651,40 @@ class TestTestingModelBackend(unittest.TestCase):
 
 class TestTestingPebbleClient(unittest.TestCase):
 
-    def test_methods_match_pebble_client(self):
+    def get_testing_client(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             ''')
         self.addCleanup(harness.cleanup)
         backend = harness._backend
 
-        client = backend.get_pebble('/custom/socket/path')
+        return backend.get_pebble('/custom/socket/path')
+
+    def test_methods_match_pebble_client(self):
+        client = self.get_testing_client()
         self.assertIsNotNone(client)
         pebble_client_methods = get_public_methods(pebble.Client)
         testing_client_methods = get_public_methods(client)
         self.assertEqual(pebble_client_methods, testing_client_methods)
+
+    def test_add_layer(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        self.assertIsInstance(plan, pebble.Plan)
+        self.assertEqual('{}\n', plan.to_yaml())
+        client.add_layer('foo', pebble.Layer('''\
+summary: Foo
+description: |
+  A longer description about Foo
+services:
+  serv:
+    summary: Serv
+    description: |
+      A description about Serv the amazing service.
+    startup: enabled
+    override: replace
+    command: '/bin/echo hello'
+    environment:
+      KEY: VALUE
+'''))
+        plan = client.get_plan()

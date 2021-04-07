@@ -471,7 +471,7 @@ class Harness:
             relation_id: The relation whose content we want to look at.
             app_or_unit: The name of the application or unit whose data we want to read
         Return:
-            a dict containing the relation data for `app_or_unit` or None.
+            A dict containing the relation data for `app_or_unit` or None.
 
         Raises:
             KeyError: if relation_id doesn't exist
@@ -485,6 +485,23 @@ class Harness:
         See the signature of Model.pod.set_spec
         """
         return self._backend._pod_spec
+
+    def get_container_pebble_plan(
+            self, container_name: str
+    ) -> str:
+        """Return the current Plan that pebble is executing for the given container.
+
+        Args:
+            container_name: The simple name of the associated container
+        Return:
+            A list of service descriptions for the container.
+            Will return None if no pebble client exists for that container name.
+        """
+        socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
+        client = self._backend._pebble_clients.get(socket_path)
+        if client is None:
+            return None
+        return client.get_plan().to_yaml()
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -860,6 +877,7 @@ class _TestingPebbleClient:
 
     def __init__(self, backend: _TestingModelBackend):
         self._backend = _TestingModelBackend
+        self._layers = {}
 
     def get_system_info(self) -> pebble.SystemInfo:
         """Get system info."""
@@ -943,11 +961,40 @@ class _TestingPebbleClient:
         exists, the two layers are combined into a single one considering the
         layer override rules; if the layer doesn't exist, it is added as usual.
         """
-        raise NotImplementedError(self.add_layer)
+        # I wish we could combine some of this helpful object coraling with the actual backend,
+        # rather than having to re-implement it. Maybe we could subclass
+        if not isinstance(label, str):
+            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+
+        if isinstance(layer, (str, dict)):
+            layer_obj = pebble.Layer(layer)
+        elif isinstance(layer, pebble.Layer):
+            layer_obj = layer
+        else:
+            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
+                type(layer).__name__))
+        if label in self._layers and not combine:
+            raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+        self._layers[label] = layer_obj
+
+    def _render_services(self):
+        services = {}
+        for key in sorted(self._layers.keys()):
+            layer = self._layers[key]
+            for name, service in layer.services.items():
+                # TODO: (jam) 2021-04-07 have a way to merge existing services
+                services[name] = service
+        return services
 
     def get_plan(self) -> pebble.Plan:
         """Get the Pebble plan (currently contains only combined services)."""
-        raise NotImplementedError(self.get_plan)
+        plan = pebble.Plan('{}')
+        services = self._render_services()
+        if not services:
+            return plan
+        for name in sorted(services.keys()):
+            plan.services[name] = services[name]
+        return plan
 
     def get_services(self, names: typing.List[str] = None) -> typing.List[pebble.ServiceInfo]:
         """Get the service status for the configured services.
