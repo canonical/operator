@@ -99,6 +99,18 @@ class TestTypes(unittest.TestCase):
         self.assertIsInstance(error, pebble.Error)
         self.assertEqual(str(error), 'connerr!')
 
+    def test_protocol_error(self):
+        error = pebble.ProtocolError('protoerr!')
+        self.assertIsInstance(error, pebble.Error)
+        self.assertEqual(str(error), 'protoerr!')
+
+    def test_path_error(self):
+        error = pebble.PathError('not-found', 'thing not found')
+        self.assertIsInstance(error, pebble.Error)
+        self.assertEqual(error.kind, 'not-found')
+        self.assertEqual(error.message, 'thing not found')
+        self.assertEqual(str(error), 'not-found - thing not found')
+
     def test_api_error(self):
         body = {
             "result": {
@@ -336,6 +348,55 @@ class TestTypes(unittest.TestCase):
         change = pebble.Change.from_dict(d)
         self.assertEqual(change.ready_time, datetime_utc(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(change.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247202))
+
+    def test_file_type(self):
+        self.assertEqual(list(pebble.FileType), [
+            pebble.FileType.FILE,
+            pebble.FileType.DIRECTORY,
+            pebble.FileType.SYMLINK,
+            pebble.FileType.SOCKET,
+            pebble.FileType.NAMED_PIPE,
+            pebble.FileType.DEVICE,
+            pebble.FileType.UNKNOWN,
+        ])
+        self.assertEqual(pebble.FileType.FILE.value, 'file')
+        self.assertEqual(pebble.FileType.DIRECTORY.value, 'directory')
+        self.assertEqual(pebble.FileType.SYMLINK.value, 'symlink')
+        self.assertEqual(pebble.FileType.SOCKET.value, 'socket')
+        self.assertEqual(pebble.FileType.NAMED_PIPE.value, 'named-pipe')
+        self.assertEqual(pebble.FileType.DEVICE.value, 'device')
+        self.assertEqual(pebble.FileType.UNKNOWN.value, 'unknown')
+
+    def test_file_info_init(self):
+        info = pebble.FileInfo('/etc/hosts', 'hosts', pebble.FileType.FILE, 123, 0o644,
+                               datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+        self.assertEqual(info.path, '/etc/hosts')
+        self.assertEqual(info.name, 'hosts')
+        self.assertEqual(info.type, pebble.FileType.FILE)
+        self.assertEqual(info.size, 123)
+        self.assertEqual(info.permissions, 0o644)
+        self.assertEqual(info.last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+
+    def test_file_info_from_dict(self):
+        d = {
+            'path': '/etc/hosts',
+            'name': 'hosts',
+            'type': 'file',
+            'size': 123,
+            'permissions': '644',
+            'last-modified': '2021-01-28T14:37:04.291517768+13:00',
+        }
+        info = pebble.FileInfo.from_dict(d)
+        self.assertEqual(info.path, '/etc/hosts')
+        self.assertEqual(info.name, 'hosts')
+        self.assertEqual(info.type, pebble.FileType.FILE)
+        self.assertEqual(info.size, 123)
+        self.assertEqual(info.permissions, 0o644)
+        self.assertEqual(info.last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+
+        d['type'] = 'foobar'
+        info = pebble.FileInfo.from_dict(d)
+        self.assertEqual(info.type, 'foobar')
 
 
 class TestPlan(unittest.TestCase):
@@ -1074,6 +1135,79 @@ services:
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/services', {'names': 'svc1,svc2'}, None),
             ('GET', '/v1/services', {'names': 'svc2'}, None),
+        ])
+
+    def test_list_files_path(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    'path': '/etc/hosts',
+                    'name': 'hosts',
+                    'type': 'file',
+                    'size': 123,
+                    'permissions': '644',
+                    'last-modified': '2021-01-28T14:37:04.291517768+13:00',
+                },
+                {
+                    'path': '/etc/nginx',
+                    'name': 'nginx',
+                    'type': 'directory',
+                    'permissions': '755',
+                    'last-modified': '2020-01-01T01:01:01.000000+13:00',
+                },
+            ],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        infos = self.client.list_files('/etc')
+
+        self.assertEqual(len(infos), 2)
+        self.assertEqual(infos[0].path, '/etc/hosts')
+        self.assertEqual(infos[0].name, 'hosts')
+        self.assertEqual(infos[0].type, pebble.FileType.FILE)
+        self.assertEqual(infos[0].size, 123)
+        self.assertEqual(infos[0].permissions, 0o644)
+        self.assertEqual(infos[0].last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+        self.assertEqual(infos[1].path, '/etc/nginx')
+        self.assertEqual(infos[1].name, 'nginx')
+        self.assertEqual(infos[1].type, pebble.FileType.DIRECTORY)
+        self.assertEqual(infos[1].size, None)
+        self.assertEqual(infos[1].permissions, 0o755)
+        self.assertEqual(infos[1].last_modified, datetime_nzdt(2020, 1, 1, 1, 1, 1, 0))
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'list', 'path': '/etc'}, None),
+        ])
+
+    def test_list_files_pattern(self):
+        self.client.responses.append({
+            "result": [],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        infos = self.client.list_files('/etc', pattern='*.conf')
+
+        self.assertEqual(len(infos), 0)
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'list', 'path': '/etc', 'pattern': '*.conf'}, None),
+        ])
+
+    def test_list_files_itself(self):
+        self.client.responses.append({
+            "result": [],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        infos = self.client.list_files('/etc', itself=True)
+
+        self.assertEqual(len(infos), 0)
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'list', 'path': '/etc', 'itself': 'true'}, None),
         ])
 
 
