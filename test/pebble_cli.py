@@ -60,7 +60,8 @@ def main():
     p = subparsers.add_parser('ls', help='list files')
     p.add_argument('-d', '--directory', action='store_true',
                    help='list directories themselves, not their contents')
-    p.add_argument('pattern', help='name of directory or file, or glob pattern')
+    p.add_argument('-p', '--pattern', help='glob pattern to filter results')
+    p.add_argument('path', help='name of directory or file')
 
     p = subparsers.add_parser('mkdir', help='create directory')
     p.add_argument('-p', '--parents', action='store_true',
@@ -135,32 +136,27 @@ def main():
             result = client.get_changes(select=pebble.ChangeState(args.select),
                                         service=args.service)
         elif args.command == 'ls':
-            result = client.list_files(args.pattern, directory=args.directory)
-            import json
-            result = json.dumps(result, sort_keys=True, indent=4)
+            result = client.list_files(args.path, pattern=args.pattern, itself=args.directory)
         elif args.command == 'mkdir':
-            result = client.make_dirs([args.path], make_parents=bool(args.parents))
-            import json
-            result = json.dumps(result, sort_keys=True, indent=4)
+            client.make_dir(args.path, make_parents=bool(args.parents))
+            result = 'created remote directory {}'.format(args.path)
         elif args.command == 'plan':
             result = client.get_plan().to_yaml()
         elif args.command == 'pull':
-            result = client.read_file(args.remote_path)
             if args.local_path != '-':
                 with open(args.local_path, 'wb') as f:
-                    f.write(result)
-                    result = 'wrote remote file {} to {}'.format(args.remote_path, args.local_path)
+                    client.read_file(args.remote_path, f)
+                result = 'wrote remote file {} to {}'.format(args.remote_path, args.local_path)
             else:
-                result = result.decode('utf-8')
+                client.read_file(args.remote_path, sys.stdout.buffer)
+                return
         elif args.command == 'push':
             with open(args.local_path, 'rb') as f:
-                content = f.read()
-            client.write_file(content.decode('utf-8'), args.remote_path)
+                client.write_file(args.remote_path, f)
             result = 'wrote {} to remote file {}'.format(args.local_path, args.remote_path)
         elif args.command == 'rm':
-            result = client.remove_paths([args.path], recursive=bool(args.recursive))
-            import json
-            result = json.dumps(result, sort_keys=True, indent=4)
+            client.remove_path(args.path, recursive=bool(args.recursive))
+            result = 'removed remote path {}'.format(args.path)
         elif args.command == 'services':
             result = client.get_services(args.service)
         elif args.command == 'start':

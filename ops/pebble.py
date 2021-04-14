@@ -17,18 +17,21 @@
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
-from typing import Dict, Iterable, List, Optional, Union
+from email.mime.multipart import MIMEBase, MIMEMultipart
+from typing import BinaryIO, Dict, Iterable, List, Optional, Tuple, Union
+import cgi
 import datetime
+import email.parser
 import enum
 import http.client
 import json
 import re
 import socket
+import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import sys
 
 from ops._private import yaml
 
@@ -128,6 +131,25 @@ class TimeoutError(TimeoutError, Error):
 
 class ConnectionError(Error):
     """Raised when the Pebble client can't connect to the socket."""
+
+
+class ProtocolError(Error):
+    """Raised when there's a higher-level protocol error talking to Pebble."""
+
+
+class PathError(Error):
+    """Raised when there's an error with a specific path."""
+
+    def __init__(self, kind: str, message: str):
+        """This shouldn't be instantiated directly."""
+        self.kind = kind
+        self.message = message
+
+    def __str__(self):
+        return '{} - {}'.format(self.kind, self.message)
+
+    def __repr__(self):
+        return 'PathError({!r}, {!r})'.format(self.kind, self.message)
 
 
 class APIError(Error):
@@ -538,6 +560,64 @@ class ServiceInfo:
                 ).format(self=self)
 
 
+class FileType(enum.Enum):
+    """Enum of file types."""
+
+    FILE = 'file'
+    DIRECTORY = 'directory'
+    SYMLINK = 'symlink'
+    SOCKET = 'socket'
+    NAMED_PIPE = 'named-pipe'
+    DEVICE = 'device'
+    UNKNOWN = 'unknown'
+
+
+class FileInfo:
+    """Stat-like information about a single file."""
+
+    def __init__(
+        self,
+        path: str,
+        name: str,
+        type: Union['FileType', str],
+        size: Optional[int],
+        permissions: int,
+        last_modified: datetime.datetime,
+    ):
+        self.path = path
+        self.name = name
+        self.type = type
+        self.size = size
+        self.permissions = permissions
+        self.last_modified = last_modified
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'FileInfo':
+        """Create new object from dict parsed from JSON."""
+        try:
+            file_type = FileType(d['type'])
+        except ValueError:
+            file_type = d['type']
+        return cls(
+            path=d['path'],
+            name=d['name'],
+            type=file_type,
+            size=d.get('size'),
+            permissions=int(d['permissions'], 8),
+            last_modified=_parse_timestamp(d['last-modified']),
+        )
+
+    def __repr__(self):
+        return ('FileInfo('
+                'path={self.path!r}, '
+                'name={self.name!r}, '
+                'type={self.type}, '
+                'size={self.size}, '
+                'permissions=0o{self.permissions:o}, '
+                'last_modified={self.last_modified!r})'
+                ).format(self=self)
+
+
 class Client:
     """Pebble API client."""
 
@@ -566,22 +646,41 @@ class Client:
         return opener
 
     def _request(self, method: str, path: str, query: Dict = None, body: Dict = None) -> Dict:
-        """Make a request with the given HTTP method and path to the Pebble client.
+        """Make a JSON request with the given HTTP method and path to the Pebble client.
 
         If query dict is provided, it is encoded and appended as a query string
         to the URL. If body dict is provided, it is serialied as JSON and used
-        as the HTTP body (with Content-Type "application/json").
+        as the HTTP body (with Content-Type "application/json"). The resulting
+        body is decoded from JSON.
         """
-        url = self.base_url + path
-        if query:
-            url = url + '?' + urllib.parse.urlencode(query)
-
         headers = {'Accept': 'application/json'}
         data = None
         if body is not None:
             data = json.dumps(body).encode('utf-8')
             headers['Content-Type'] = 'application/json'
 
+        response = self._request_raw(method, path, query, headers, data)
+        self._parse_content_type(response.headers, 'application/json')
+        return _json_loads(response.read())
+
+    @staticmethod
+    def _parse_content_type(headers, expected):
+        ctype, options = cgi.parse_header(headers.get('Content-Type', ''))
+        if ctype != expected:
+            raise ProtocolError('expected Content-Type {}, got {}'.format(expected, ctype))
+        return options
+
+    def _request_raw(
+        self, method: str, path: str, query: Dict = None, headers: Dict = None,
+        data: bytes = None,
+    ) -> http.client.HTTPResponse:
+        """Make a raw request with the given HTTP method and path to the Pebble client."""
+        url = self.base_url + path
+        if query:
+            url = url + '?' + urllib.parse.urlencode(query)
+
+        if headers is None:
+            headers = {}
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
 
         try:
@@ -590,10 +689,7 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                b = e.read()
-                print('TODO:', b.decode('utf-8'))
-                body = _json_loads(b)
-                print("TODO handle these kind of errors:", body)
+                body = _json_loads(e.read())
                 message = body['result']['message']
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
@@ -603,30 +699,24 @@ class Client:
         except urllib.error.URLError as e:
             raise ConnectionError(e.reason)
 
-        media_type = response.headers.get('Content-Type', '').split(';', 1)[0]
-        if media_type == 'multipart/form-data':
-            result = response.read()
-        else:
-            response_data = response.read()
-            result = _json_loads(response_data)
-        return result
+        return response
 
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
-        result = self._request('GET', '/v1/system-info')
-        return SystemInfo.from_dict(result['result'])
+        resp = self._request('GET', '/v1/system-info')
+        return SystemInfo.from_dict(resp['result'])
 
     def get_warnings(self, select: WarningState = WarningState.PENDING) -> List[Warning]:
         """Get list of warnings in given state (pending or all)."""
         query = {'select': select.value}
-        result = self._request('GET', '/v1/warnings', query)
-        return [Warning.from_dict(w) for w in result['result']]
+        resp = self._request('GET', '/v1/warnings', query)
+        return [Warning.from_dict(w) for w in resp['result']]
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
         """Acknowledge warnings up to given timestamp, return number acknowledged."""
         body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
-        result = self._request('POST', '/v1/warnings', body=body)
-        return result['result']
+        resp = self._request('POST', '/v1/warnings', body=body)
+        return resp['result']
 
     def get_changes(
         self, select: ChangeState = ChangeState.IN_PROGRESS, service: str = None,
@@ -635,19 +725,19 @@ class Client:
         query = {'select': select.value}
         if service is not None:
             query['for'] = service
-        result = self._request('GET', '/v1/changes', query)
-        return [Change.from_dict(c) for c in result['result']]
+        resp = self._request('GET', '/v1/changes', query)
+        return [Change.from_dict(c) for c in resp['result']]
 
     def get_change(self, change_id: ChangeID) -> Change:
         """Get single change by ID."""
-        result = self._request('GET', '/v1/changes/{}'.format(change_id))
-        return Change.from_dict(result['result'])
+        resp = self._request('GET', '/v1/changes/{}'.format(change_id))
+        return Change.from_dict(resp['result'])
 
     def abort_change(self, change_id: ChangeID) -> Change:
         """Abort change with given ID."""
         body = {'action': 'abort'}
-        result = self._request('POST', '/v1/changes/{}'.format(change_id), body=body)
-        return Change.from_dict(result['result'])
+        resp = self._request('POST', '/v1/changes/{}'.format(change_id), body=body)
+        return Change.from_dict(resp['result'])
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Start the startup-enabled services and wait (poll) for them to be started.
@@ -691,8 +781,8 @@ class Client:
                 raise TypeError('service names must be str, not {}'.format(type(s).__name__))
 
         body = {'action': action, 'services': services}
-        result = self._request('POST', '/v1/services', body=body)
-        change_id = ChangeID(result['change'])
+        resp = self._request('POST', '/v1/services', body=body)
+        change_id = ChangeID(resp['change'])
         if timeout:
             change = self.wait_change(change_id, timeout=timeout, delay=delay)
             if change.err:
@@ -747,8 +837,8 @@ class Client:
 
     def get_plan(self) -> Plan:
         """Get the Pebble plan (currently contains only combined services)."""
-        result = self._request('GET', '/v1/plan', {'format': 'yaml'})
-        return Plan(result['result'])
+        resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
+        return Plan(resp['result'])
 
     def get_services(self, names: List[str] = None) -> List[ServiceInfo]:
         """Get the service status for the configured services.
@@ -759,157 +849,175 @@ class Client:
         query = None
         if names is not None:
             query = {'names': ','.join(names)}
-        result = self._request('GET', '/v1/services', query)
-        return [ServiceInfo.from_dict(info) for info in result['result']]
+        resp = self._request('GET', '/v1/services', query)
+        return [ServiceInfo.from_dict(info) for info in resp['result']]
 
-    def read_file(self, remote_path: str) -> bytes:
+    def read_file(self, path: str, destination: BinaryIO):
+        """Read a file from the remote system and write content to destination."""
         query = {
             'action': 'read',
-            'path': remote_path,
+            'path': path,
         }
-        return self._request('GET', '/v1/files', query)
+        headers = {'Accept': 'multipart/form-data'}
+        response = self._request_raw('GET', '/v1/files', query, headers)
+        resp = self._parse_multipart(response, {path: destination})
+        self._raise_on_path_error(resp, path)
 
-    def _multipart_request(self, method: str, path: str, headers: Dict, body: bytes) -> Dict:
-        url = self.base_url + path
+    @staticmethod
+    def _raise_on_path_error(resp, path):
+        result = resp['result'] or []  # in case it's null instead of []
+        paths = {item['path']: item for item in result}
+        if path not in paths:
+            raise ProtocolError('path not found in response metadata: {}'.format(resp))
+        error = paths[path].get('error')
+        if error:
+            raise PathError(error['kind'], error['message'])
 
-        for k, v in sorted(headers.items()):
-            print(k+':', v)
-        print(body.decode('utf-8'))
-        print()
-        headers['Accept'] = 'application/json'
-        request = urllib.request.Request(url, method=method, data=body, headers=headers)
+    @classmethod
+    def _parse_multipart(cls, response: http.client.HTTPResponse,
+                         destinations: Dict[str, BinaryIO]) -> Dict:
+        """Parse a multipart HTTP response.
 
-        try:
-            response = self.opener.open(request, timeout=self.timeout)
-        except urllib.error.HTTPError as e:
-            code = e.code
-            status = e.reason
-            try:
-                body = _json_loads(e.read())
-                print("TODO handle these kind of errors:", body)
-                message = body['result']['message']
-            except (IOError, ValueError, KeyError) as e2:
-                # Will only happen on read error or if Pebble sends invalid JSON.
-                body = {}
-                message = '{} - {}'.format(type(e2).__name__, e2)
-            raise APIError(body, code, status, message)
-        except urllib.error.URLError as e:
-            raise ConnectionError(e.reason)
+        Return "response" metadata field, decoded from JSON, and write content
+        to correct file-like object in files dictionary (keyed by path).
+        Currently the content is entirely loaded into memory, but the goal is
+        to stream that in future (the signature of read_file won't change).
+        """
+        options = cls._parse_content_type(response.headers, 'multipart/form-data')
+        boundary = options.get('boundary', '')
+        if len(boundary) < 8:
+            raise ProtocolError('invalid boundary {!r}'.format(boundary))
 
-        response_data = response.read()
-        result = _json_loads(response_data)
-        return result
+        # We have to manually write the Content-Type with boundary, because
+        # email.parser expects the entire multipart message with headers.
+        parser = email.parser.BytesFeedParser()
+        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
+                    boundary.encode('utf-8') + b'\r\n\r\n')
 
-    def write_file(self, content: str, remote_path: str):
+        # Then read the rest of the response and feed it to the parser.
+        while True:
+            chunk = response.read(8192)
+            if not chunk:
+                break
+            parser.feed(chunk)
+        message = parser.close()
+
+        resp = None
+        for part in message.walk():
+            name = part.get_param('name', header='Content-Disposition')
+            if name == 'response':
+                resp = _json_loads(part.get_payload())
+            elif name == 'files':
+                # decode=True, ironically, avoids decoding bytes to str
+                content = part.get_payload(decode=True)
+                filename = part.get_filename()
+                if filename not in destinations:
+                    raise ProtocolError('path not expected: {}'.format(filename))
+                destinations[filename].write(content)
+
+        if resp is None:
+            raise ProtocolError('no "response" field in multipart body')
+
+        return resp
+
+    def write_file(
+        self, path: str, source: BinaryIO, make_dirs: bool = False, permissions: int = None,
+        user: Union[str, int] = None, group: Union[str, int] = None,
+    ):
+        """Write data to given path on remote system, with the attributes provided."""
+        info = self._make_auth_dict(permissions, user, group)
+        info['path'] = path
+        if make_dirs:
+            info['make-dirs'] = True
+
         metadata = {
             'action': 'write',
-            'files': [{'path': remote_path}],
+            'files': [info],
         }
-        body, headers = encode_multipart(
-            {'request': json.dumps(metadata, sort_keys=True, indent=4)},
-            {'file:'+remote_path: {'filename': 'f', 'content': content}},
-        )
-        assert isinstance(body, bytes), type(body)
-        return self._multipart_request('POST', '/v1/files', headers, body)
+        body, content_type = self._encode_multipart(metadata, {path: source})
 
-    def list_files(self, pattern, directory=False): # TODO
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': content_type,
+        }
+        response = self._request_raw('POST', '/v1/files', None, headers, body)
+        self._parse_content_type(response.headers, 'application/json')
+        resp = _json_loads(response.read())
+        self._raise_on_path_error(resp, path)
+
+    @staticmethod
+    def _make_auth_dict(permissions, user, group) -> Dict:
+        d = {}
+        if permissions is not None:
+            d['permissions'] = format(permissions, '03o')
+        if user is not None:
+            if isinstance(user, int):
+                d['user-id'] = user
+            elif isinstance(user, str):
+                d['user'] = user
+            else:
+                raise TypeError('user must be int UID or string username')
+        if group is not None:
+            if isinstance(group, int):
+                d['group-id'] = group
+            elif isinstance(group, str):
+                d['group'] = group
+            else:
+                raise TypeError('group must be int GID or string group name')
+        return d
+
+    @staticmethod
+    def _encode_multipart(metadata: Dict, sources: Dict[str, BinaryIO]) -> Tuple[bytes, str]:
+        multipart = MIMEMultipart('form-data')
+
+        part = MIMEBase('application', 'json')
+        part.add_header('Content-Disposition', 'form-data', name='request')
+        part.set_payload(json.dumps(metadata))
+        multipart.attach(part)
+
+        for path, source in sources.items():
+            part = MIMEBase('application', 'octet-stream')
+            part.add_header('Content-Disposition', 'form-data', name='files', filename=path)
+            part.set_payload(source.read())
+            multipart.attach(part)
+
+        return (multipart.as_bytes(), multipart['Content-Type'])
+
+    def list_files(self, path: str, pattern: str = None, itself: bool = False) -> List[FileInfo]:
+        """Return list of file information in given path on remote system."""
         query = {
             'action': 'list',
-            'pattern': pattern,
+            'path': path,
         }
-        if directory:
-            query['directory'] = 'true'
-        return self._request('GET', '/v1/files', query)
+        if pattern:
+            query['pattern'] = pattern
+        if itself:
+            query['itself'] = 'true'
+        resp = self._request('GET', '/v1/files', query)
+        result = resp['result'] or []  # in case it's null instead of []
+        return [FileInfo.from_dict(d) for d in result]
 
-    def make_dirs(self, paths: List[str], make_parents=True):
-        # TODO: should take objects with permissions etc
+    def make_dir(
+        self, path: str, make_parents: bool = False, permissions: int = None,
+        user: Union[str, int] = None, group: Union[str, int] = None,
+    ):
+        """Create a directory on the remote system with the given attributes."""
+        info = self._make_auth_dict(permissions, user, group)
+        info['path'] = path
+        if make_parents:
+            info['make-parents'] = True
         body = {
             'action': 'make-dirs',
-            'dirs': [{'path': p, 'make-parents': make_parents} for p in paths],
+            'dirs': [info],
         }
-        return self._request('POST', '/v1/files', None, body)
+        resp = self._request('POST', '/v1/files', None, body)
+        self._raise_on_path_error(resp, path)
 
-    def remove_paths(self, paths: List[str], recursive=True):
-        # TODO: recursive should apply per path
+    def remove_path(self, path: str, recursive=True):
+        """Remove a file or directory on the remote system."""
         body = {
             'action': 'remove',
-            'paths': [{'path': p, 'recursive': recursive} for p in paths],
+            'paths': [{'path': path, 'recursive': recursive}],
         }
-        return self._request('POST', '/v1/files', None, body)
-
-
-import mimetypes
-import random
-import string
-
-_BOUNDARY_CHARS = string.digits + string.ascii_letters
-
-def encode_multipart(fields, files, boundary=None):
-    r"""Encode dict of form fields and dict of files as multipart/form-data.
-    Return tuple of (body_string, headers_dict). Each value in files is a dict
-    with required keys 'filename' and 'content', and optional 'mimetype' (if
-    not specified, tries to guess mime type or uses 'application/octet-stream').
-
-    >>> body, headers = encode_multipart({'FIELD': 'VALUE'},
-    ...                                  {'FILE': {'filename': 'F.TXT', 'content': 'CONTENT'}},
-    ...                                  boundary='BOUNDARY')
-    >>> print('\n'.join(repr(l) for l in body.split('\r\n')))
-    '--BOUNDARY'
-    'Content-Disposition: form-data; name="FIELD"'
-    ''
-    'VALUE'
-    '--BOUNDARY'
-    'Content-Disposition: form-data; name="FILE"; filename="F.TXT"'
-    'Content-Type: text/plain'
-    ''
-    'CONTENT'
-    '--BOUNDARY--'
-    ''
-    >>> print(sorted(headers.items()))
-    [('Content-Length', '193'), ('Content-Type', 'multipart/form-data; boundary=BOUNDARY')]
-    >>> len(body)
-    193
-    """
-    def escape_quote(s):
-        return s.replace('"', '\\"')
-
-    if boundary is None:
-        boundary = ''.join(random.choice(_BOUNDARY_CHARS) for i in range(30))
-    lines = []
-
-    for name, value in fields.items():
-        lines.extend((
-            '--{0}'.format(boundary),
-            'Content-Disposition: form-data; name="{0}"'.format(escape_quote(name)),
-            '',
-            str(value),
-        ))
-
-    for name, value in files.items():
-        filename = value['filename']
-        if 'mimetype' in value:
-            mimetype = value['mimetype']
-        else:
-            mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-        lines.extend((
-            '--{0}'.format(boundary),
-            'Content-Disposition: form-data; name="{0}"; filename="{1}"'.format(
-                    escape_quote(name), escape_quote(filename)),
-            'Content-Type: {0}'.format(mimetype),
-            '',
-            value['content'],
-        ))
-
-    lines.extend((
-        '--{0}--'.format(boundary),
-        '',
-    ))
-    body = '\r\n'.join(lines)
-    body = body.encode('utf-8')
-
-    headers = {
-        'Content-Type': 'multipart/form-data; boundary={0}'.format(boundary),
-        'Content-Length': str(len(body)),
-    }
-
-    return (body, headers)
+        resp = self._request('POST', '/v1/files', None, body)
+        self._raise_on_path_error(resp, path)
