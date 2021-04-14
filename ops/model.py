@@ -559,8 +559,10 @@ class Network:
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
             interface_name = interface_info.get('interface-name')
-            for address_info in interface_info.get('addresses', []):
-                self.interfaces.append(NetworkInterface(interface_name, address_info))
+            addrs = interface_info.get('addresses')
+            if addrs is not None:
+                for address_info in addrs:
+                    self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
         for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(ipaddress.ip_address(address))

@@ -1159,6 +1159,14 @@ class TestModelBindings(unittest.TestCase):
         binding = self.model.get_binding(self.model.get_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
+    def test_no_bind_addresses(self):
+        network_data = json.dumps({'bind-addresses': [{'addresses': None}]})
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(binding.network.interfaces, [])
+
     def test_empty_interface_info(self):
         network_data = json.dumps({
             'bind-addresses': [{
