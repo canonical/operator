@@ -646,7 +646,7 @@ class Client:
         return opener
 
     def _request(self, method: str, path: str, query: Dict = None, body: Dict = None) -> Dict:
-        """Make a JSON request with the given HTTP method and path to the Pebble client.
+        """Make a JSON request to the Pebble server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
         to the URL. If body dict is provided, it is serialied as JSON and used
@@ -665,6 +665,10 @@ class Client:
 
     @staticmethod
     def _parse_content_type(headers, expected):
+        """Parse Content-Type header from headers and ensure it's equal to "expected".
+
+        Return a dict of any options in the header, e.g., {'boundary': ...}.
+        """
         ctype, options = cgi.parse_header(headers.get('Content-Type', ''))
         if ctype != expected:
             raise ProtocolError('expected Content-Type {}, got {}'.format(expected, ctype))
@@ -674,7 +678,7 @@ class Client:
         self, method: str, path: str, query: Dict = None, headers: Dict = None,
         data: bytes = None,
     ) -> http.client.HTTPResponse:
-        """Make a raw request with the given HTTP method and path to the Pebble client."""
+        """Make a request to the Pebble server; return the raw HTTPResponse object."""
         url = self.base_url + path
         if query:
             url = url + '?' + urllib.parse.urlencode(query)
@@ -878,14 +882,14 @@ class Client:
                          destinations: Dict[str, BinaryIO]) -> Dict:
         """Parse a multipart HTTP response.
 
-        Return "response" metadata field, decoded from JSON, and write content
-        to correct file-like object in files dictionary (keyed by path).
+        Return "response" metadata field decoded from JSON, and write content
+        to file-like object in destinations dictionary (keyed by path).
         Currently the content is entirely loaded into memory, but the goal is
         to stream that in future (the signature of read_file won't change).
         """
         options = cls._parse_content_type(response.headers, 'multipart/form-data')
         boundary = options.get('boundary', '')
-        if len(boundary) < 8:
+        if len(boundary) < 32:
             raise ProtocolError('invalid boundary {!r}'.format(boundary))
 
         # We have to manually write the Content-Type with boundary, because
@@ -924,7 +928,12 @@ class Client:
         self, path: str, source: BinaryIO, make_dirs: bool = False, permissions: int = None,
         user: Union[str, int] = None, group: Union[str, int] = None,
     ):
-        """Write data to given path on remote system, with the attributes provided."""
+        """Write data from source to given file path on remote system.
+
+        If make_dirs is True, create parent directories if they don't exist.
+        Set file's mode, user, and group to those provided. User and group may
+        be either name strings or UID/GID integers.
+        """
         info = self._make_auth_dict(permissions, user, group)
         info['path'] = path
         if make_dirs:
@@ -984,7 +993,14 @@ class Client:
         return (multipart.as_bytes(), multipart['Content-Type'])
 
     def list_files(self, path: str, pattern: str = None, itself: bool = False) -> List[FileInfo]:
-        """Return list of file information in given path on remote system."""
+        """Return list of file information from given path on remote system.
+
+        If path is a directory (and "itself" is False), return a list of all
+        entries in that directory. If path is a file (or if "itself" is True),
+        return a one-element list with information about just that file. If
+        pattern is specified, filter the list to just the files that match,
+        for example "*.txt".
+        """
         query = {
             'action': 'list',
             'path': path,
@@ -1001,7 +1017,12 @@ class Client:
         self, path: str, make_parents: bool = False, permissions: int = None,
         user: Union[str, int] = None, group: Union[str, int] = None,
     ):
-        """Create a directory on the remote system with the given attributes."""
+        """Create a directory on the remote system with the given attributes.
+
+        If make_parents is True, create parent directories if they don't exist.
+        Set directory's mode, user, and group to those provided. User and group
+        may be either name strings or UID/GID integers.
+        """
         info = self._make_auth_dict(permissions, user, group)
         info['path'] = path
         if make_parents:
@@ -1014,7 +1035,10 @@ class Client:
         self._raise_on_path_error(resp, path)
 
     def remove_path(self, path: str, recursive=True):
-        """Remove a file or directory on the remote system."""
+        """Remove a file or directory on the remote system.
+
+        If "recursive" is True, recursively delete path and everything under it.
+        """
         body = {
             'action': 'remove',
             'paths': [{'path': path, 'recursive': recursive}],
