@@ -583,6 +583,8 @@ class FileInfo:
         size: Optional[int],
         permissions: int,
         last_modified: datetime.datetime,
+        user_id: Optional[int],
+        group_id: Optional[int],
     ):
         self.path = path
         self.name = name
@@ -590,6 +592,8 @@ class FileInfo:
         self.size = size
         self.permissions = permissions
         self.last_modified = last_modified
+        self.user_id = user_id
+        self.group_id = group_id
 
     @classmethod
     def from_dict(cls, d: Dict) -> 'FileInfo':
@@ -605,6 +609,8 @@ class FileInfo:
             size=d.get('size'),
             permissions=int(d['permissions'], 8),
             last_modified=_parse_timestamp(d['last-modified']),
+            user_id=d.get('user-id'),
+            group_id=d.get('group-id'),
         )
 
     def __repr__(self):
@@ -614,7 +620,9 @@ class FileInfo:
                 'type={self.type}, '
                 'size={self.size}, '
                 'permissions=0o{self.permissions:o}, '
-                'last_modified={self.last_modified!r})'
+                'last_modified={self.last_modified!r}, '
+                'user_id={self.user_id}, '
+                'group_id={self.group_id})'
                 ).format(self=self)
 
 
@@ -1011,6 +1019,7 @@ class Client:
             query['itself'] = 'true'
         resp = self._request('GET', '/v1/files', query)
         result = resp['result'] or []  # in case it's null instead of []
+        print(json.dumps(result, sort_keys=True, indent=4))
         return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(

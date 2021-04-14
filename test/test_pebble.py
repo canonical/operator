@@ -369,34 +369,42 @@ class TestTypes(unittest.TestCase):
 
     def test_file_info_init(self):
         info = pebble.FileInfo('/etc/hosts', 'hosts', pebble.FileType.FILE, 123, 0o644,
-                               datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+                               datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518), 12, 34)
         self.assertEqual(info.path, '/etc/hosts')
         self.assertEqual(info.name, 'hosts')
         self.assertEqual(info.type, pebble.FileType.FILE)
         self.assertEqual(info.size, 123)
         self.assertEqual(info.permissions, 0o644)
         self.assertEqual(info.last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+        self.assertEqual(info.user_id, 12)
+        self.assertEqual(info.group_id, 34)
 
     def test_file_info_from_dict(self):
         d = {
-            'path': '/etc/hosts',
-            'name': 'hosts',
-            'type': 'file',
-            'size': 123,
+            'path': '/etc',
+            'name': 'etc',
+            'type': 'directory',
             'permissions': '644',
             'last-modified': '2021-01-28T14:37:04.291517768+13:00',
         }
         info = pebble.FileInfo.from_dict(d)
-        self.assertEqual(info.path, '/etc/hosts')
-        self.assertEqual(info.name, 'hosts')
-        self.assertEqual(info.type, pebble.FileType.FILE)
-        self.assertEqual(info.size, 123)
+        self.assertEqual(info.path, '/etc')
+        self.assertEqual(info.name, 'etc')
+        self.assertEqual(info.type, pebble.FileType.DIRECTORY)
         self.assertEqual(info.permissions, 0o644)
         self.assertEqual(info.last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+        self.assertIs(info.user_id, None)
+        self.assertIs(info.group_id, None)
 
         d['type'] = 'foobar'
+        d['size'] = 123
+        d['user-id'] = 12
+        d['group-id'] = 34
         info = pebble.FileInfo.from_dict(d)
         self.assertEqual(info.type, 'foobar')
+        self.assertEqual(info.size, 123)
+        self.assertEqual(info.user_id, 12)
+        self.assertEqual(info.group_id, 34)
 
 
 class TestPlan(unittest.TestCase):
