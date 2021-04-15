@@ -509,6 +509,10 @@ class ServiceInfo:
         self.startup = startup
         self.current = current
 
+    def is_running(self) -> bool:
+        """Return True if this service is running (in the active state)."""
+        return self.current == ServiceStatus.ACTIVE
+
     @classmethod
     def from_dict(cls, d: Dict) -> 'ServiceInfo':
         """Create new object from dict parsed from JSON."""
