@@ -75,6 +75,10 @@ def main():
     p.add_argument('local_path', help='path of local file to copy to')
 
     p = subparsers.add_parser('push', help='copy file to remote system')
+    p.add_argument('-d', '--dirs', action='store_true', help='create parent directories')
+    p.add_argument('-m', '--mode', help='3-digit octal permissions')
+    p.add_argument('-u', '--user', help='user to set')
+    p.add_argument('-g', '--group', help='group to set')
     p.add_argument('local_path', help='path of local file')
     p.add_argument('remote_path', help='path of remote file to copy to')
 
@@ -152,7 +156,10 @@ def main():
                 return
         elif args.command == 'push':
             with open(args.local_path, 'rb') as f:
-                client.write_file(args.remote_path, f)
+                client.write_file(
+                    args.remote_path, f, make_dirs=args.dirs,
+                    permissions=int(args.mode, 8) if args.mode is not None else None,
+                    user=args.user, group=args.group)
             result = 'wrote {} to remote file {}'.format(args.local_path, args.remote_path)
         elif args.command == 'rm':
             client.remove_path(args.path, recursive=bool(args.recursive))
