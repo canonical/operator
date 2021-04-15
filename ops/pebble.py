@@ -1042,14 +1042,17 @@ class Client:
         resp = self._request('POST', '/v1/files', None, body)
         self._raise_on_path_error(resp, path)
 
-    def remove_path(self, path: str, recursive=True):
+    def remove_path(self, path: str, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         If "recursive" is True, recursively delete path and everything under it.
         """
+        info = {'path': path}
+        if recursive:
+            info['recursive'] = True
         body = {
             'action': 'remove',
-            'paths': [{'path': path, 'recursive': recursive}],
+            'paths': [info],
         }
         resp = self._request('POST', '/v1/files', None, body)
         self._raise_on_path_error(resp, path)
