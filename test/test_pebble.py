@@ -1155,6 +1155,8 @@ services:
                     'size': 123,
                     'permissions': '644',
                     'last-modified': '2021-01-28T14:37:04.291517768+13:00',
+                    'user-id': 12,
+                    'group-id': 34,
                 },
                 {
                     'path': '/etc/nginx',
@@ -1177,12 +1179,16 @@ services:
         self.assertEqual(infos[0].size, 123)
         self.assertEqual(infos[0].permissions, 0o644)
         self.assertEqual(infos[0].last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+        self.assertEqual(infos[0].user_id, 12)
+        self.assertEqual(infos[0].group_id, 34)
         self.assertEqual(infos[1].path, '/etc/nginx')
         self.assertEqual(infos[1].name, 'nginx')
         self.assertEqual(infos[1].type, pebble.FileType.DIRECTORY)
         self.assertEqual(infos[1].size, None)
         self.assertEqual(infos[1].permissions, 0o755)
         self.assertEqual(infos[1].last_modified, datetime_nzdt(2020, 1, 1, 1, 1, 1, 0))
+        self.assertIs(infos[1].user_id, None)
+        self.assertIs(infos[1].group_id, None)
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/files', {'action': 'list', 'path': '/etc'}, None),

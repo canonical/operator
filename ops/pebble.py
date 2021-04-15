@@ -1019,7 +1019,6 @@ class Client:
             query['itself'] = 'true'
         resp = self._request('GET', '/v1/files', query)
         result = resp['result'] or []  # in case it's null instead of []
-        print(json.dumps(result, sort_keys=True, indent=4))
         return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(
