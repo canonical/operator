@@ -1224,6 +1224,112 @@ services:
             ('GET', '/v1/files', {'action': 'list', 'path': '/etc', 'itself': 'true'}, None),
         ])
 
+    def test_make_dir_basic(self):
+        self.client.responses.append({
+            "result": [{'path': '/foo/bar'}],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        self.client.make_dir('/foo/bar')
+        dir_item = {
+            'path': '/foo/bar',
+        }
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/files', None, {'action': 'make-dirs', 'dirs': [dir_item]}),
+        ])
+
+    def test_make_dir_full(self):
+        self.client.responses.append({
+            "result": [{'path': '/foo/bar'}],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        self.client.make_dir('/foo/bar', make_parents=True, permissions=0o600,
+                             user=12, group=34)
+
+        dir_item = {
+            'path': '/foo/bar',
+            'make-parents': True,
+            'permissions': '600',
+            'user-id': 12,
+            'group-id': 34,
+        }
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/files', None, {'action': 'make-dirs', 'dirs': [dir_item]}),
+        ])
+
+    def test_make_dir_error(self):
+        self.client.responses.append({
+            "result": [{
+                'path': '/foo/bar',
+                'error': {
+                    'kind': 'permission-denied',
+                    'message': 'permission denied',
+                },
+            }],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.make_dir('/foo/bar')
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertEqual(cm.exception.kind, 'permission-denied')
+        self.assertEqual(cm.exception.message, 'permission denied')
+
+    def test_remove_path_basic(self):
+        self.client.responses.append({
+            "result": [{'path': '/boo/far'}],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        self.client.remove_path('/boo/far')
+        dir_item = {
+            'path': '/boo/far',
+        }
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/files', None, {'action': 'remove', 'paths': [dir_item]}),
+        ])
+
+    def test_remove_path_recursive(self):
+        self.client.responses.append({
+            "result": [{'path': '/boo/far'}],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        self.client.remove_path('/boo/far', recursive=True)
+
+        dir_item = {
+            'path': '/boo/far',
+            'recursive': True,
+        }
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/files', None, {'action': 'remove', 'paths': [dir_item]}),
+        ])
+
+    def test_remove_path_error(self):
+        self.client.responses.append({
+            "result": [{
+                'path': '/boo/far',
+                'error': {
+                    'kind': 'generic-file-error',
+                    'message': 'some other error',
+                },
+            }],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.remove_path('/boo/far')
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
+        self.assertEqual(cm.exception.message, 'some other error')
+
 
 class TestSocketClient(unittest.TestCase):
     @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
