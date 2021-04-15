@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import cgi
 import datetime
+import email.parser
+import io
+import json
 import unittest
 import unittest.mock
 import unittest.util
@@ -635,6 +639,18 @@ class MockClient(pebble.Client):
         self.requests.append((method, path, query, body))
         return self.responses.pop(0)
 
+    def _request_raw(self, method, path, query=None, headers=None, data=None):
+        self.requests.append((method, path, query, headers, data))
+        headers, body = self.responses.pop(0)
+        return MockHTTPResponse(headers, body)
+
+
+class MockHTTPResponse:
+    def __init__(self, headers, body):
+        self.headers = headers
+        reader = io.BytesIO(body)
+        self.read = reader.read
+
 
 class MockTime:
     """Mocked versions of time.time() and time.sleep().
@@ -1144,6 +1160,238 @@ services:
             ('GET', '/v1/services', {'names': 'svc1,svc2'}, None),
             ('GET', '/v1/services', {'names': 'svc2'}, None),
         ])
+
+    def test_read_file_success(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"
+
+127.0.0.1 localhost
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="response"
+
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+--01234567890123456789012345678901--
+""",
+        ))
+
+        dest = io.BytesIO()
+        self.client.read_file('/etc/hosts', dest)
+        self.assertEqual(dest.getvalue(), b'127.0.0.1 localhost')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
+    def test_read_file_path_error(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="response"
+
+{
+    "result": [
+        {"path": "/etc/hosts", "error": {"kind": "not-found", "message": "not found"}}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+--01234567890123456789012345678901--
+""",
+        ))
+
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.read_file('/etc/hosts', None)
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertEqual(cm.exception.kind, 'not-found')
+        self.assertEqual(cm.exception.message, 'not found')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
+    def test_read_file_protocol_errors(self):
+        self.client.responses.append(({'Content-Type': 'ct'}, b''))
+        with self.assertRaises(pebble.ProtocolError) as cm:
+            self.client.read_file('/etc/hosts', None)
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertEqual(str(cm.exception),
+                         "expected Content-Type 'multipart/form-data', got 'ct'")
+
+        self.client.responses.append(({'Content-Type': 'multipart/form-data; boundary=X'}, b''))
+        with self.assertRaises(pebble.ProtocolError) as cm:
+            self.client.read_file('/etc/hosts', None)
+        self.assertEqual(str(cm.exception), "invalid boundary 'X'")
+
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="files"; filename="/bad"
+
+bad path
+--01234567890123456789012345678901--
+""",
+        ))
+        with self.assertRaises(pebble.ProtocolError) as cm:
+            self.client.read_file('/etc/hosts', None)
+        self.assertEqual(str(cm.exception), "path not expected: /bad")
+
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"
+
+bad path
+--01234567890123456789012345678901--
+""",
+        ))
+        with self.assertRaises(pebble.ProtocolError) as cm:
+            self.client.read_file('/etc/hosts', io.BytesIO())
+        self.assertEqual(str(cm.exception), 'no "response" field in multipart body')
+
+    def test_write_file_simple(self):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar"}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        source = io.BytesIO(b'content')
+        self.client.write_file('/foo/bar', source)
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        dest = io.BytesIO()
+        req = self._parse_write_multipart(content_type, body, {'/foo/bar': dest})
+        self.assertEqual(dest.getvalue(), b'content')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{'path': '/foo/bar'}],
+        })
+
+    def test_write_file_options(self):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar"}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        source = io.BytesIO(b'content')
+        self.client.write_file('/foo/bar', source, make_dirs=True, permissions=0o600,
+                               user='bob', group='staff')
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        dest = io.BytesIO()
+        req = self._parse_write_multipart(content_type, body, {'/foo/bar': dest})
+        self.assertEqual(dest.getvalue(), b'content')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{
+                'path': '/foo/bar',
+                'make-dirs': True,
+                'permissions': '600',
+                'user': 'bob',
+                'group': 'staff',
+            }],
+        })
+
+    def test_write_file_path_error(self):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar", "error": {"kind": "not-found", "message": "not found"}}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        source = io.BytesIO(b'content')
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.write_file('/foo/bar', source)
+        self.assertEqual(cm.exception.kind, 'not-found')
+        self.assertEqual(cm.exception.message, 'not found')
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        dest = io.BytesIO()
+        req = self._parse_write_multipart(content_type, body, {'/foo/bar': dest})
+        self.assertEqual(dest.getvalue(), b'content')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{'path': '/foo/bar'}],
+        })
+
+    def _parse_write_multipart(self, content_type, body, destinations):
+        ctype, options = cgi.parse_header(content_type)
+        self.assertEqual(ctype, 'multipart/form-data')
+        boundary = options['boundary']
+
+        # We have to manually write the Content-Type with boundary, because
+        # email.parser expects the entire multipart message with headers.
+        parser = email.parser.BytesFeedParser()
+        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
+                    boundary.encode('utf-8') + b'\r\n\r\n')
+        parser.feed(body)
+        message = parser.close()
+
+        req = None
+        for part in message.walk():
+            name = part.get_param('name', header='Content-Disposition')
+            if name == 'request':
+                req = json.loads(part.get_payload())
+            elif name == 'files':
+                # decode=True, ironically, avoids decoding bytes to str
+                content = part.get_payload(decode=True)
+                filename = part.get_filename()
+                destinations[filename].write(content)
+        return req
 
     def test_list_files_path(self):
         self.client.responses.append({

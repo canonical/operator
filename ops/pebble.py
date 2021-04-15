@@ -679,7 +679,7 @@ class Client:
         """
         ctype, options = cgi.parse_header(headers.get('Content-Type', ''))
         if ctype != expected:
-            raise ProtocolError('expected Content-Type {}, got {}'.format(expected, ctype))
+            raise ProtocolError('expected Content-Type {!r}, got {!r}'.format(expected, ctype))
         return options
 
     def _request_raw(
@@ -872,7 +872,7 @@ class Client:
         }
         headers = {'Accept': 'multipart/form-data'}
         response = self._request_raw('GET', '/v1/files', query, headers)
-        resp = self._parse_multipart(response, {path: destination})
+        resp = self._parse_read_multipart(response, {path: destination})
         self._raise_on_path_error(resp, path)
 
     @staticmethod
@@ -886,9 +886,9 @@ class Client:
             raise PathError(error['kind'], error['message'])
 
     @classmethod
-    def _parse_multipart(cls, response: http.client.HTTPResponse,
-                         destinations: Dict[str, BinaryIO]) -> Dict:
-        """Parse a multipart HTTP response.
+    def _parse_read_multipart(cls, response: http.client.HTTPResponse,
+                              destinations: Dict[str, BinaryIO]) -> Dict:
+        """Parse a multipart HTTP response from the read-files API.
 
         Return "response" metadata field decoded from JSON, and write content
         to file-like object in destinations dictionary (keyed by path).
