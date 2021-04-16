@@ -547,6 +547,13 @@ class TestServiceInfo(unittest.TestCase):
         self.assertEqual(s.startup, 'thingy')
         self.assertEqual(s.current, 'bob')
 
+    def test_is_running(self):
+        s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
+        self.assertTrue(s.is_running())
+        for current in [pebble.ServiceStatus.INACTIVE, pebble.ServiceStatus.ERROR, 'other']:
+            s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, current)
+            self.assertFalse(s.is_running())
+
 
 class MockClient(pebble.Client):
     """Mock Pebble client that simply records reqeusts and returns stored responses."""

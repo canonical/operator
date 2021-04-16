@@ -346,8 +346,8 @@ class Unit:
         self._backend.application_version_set(version)
 
     @property
-    def containers(self) -> typing.Dict[str, 'Container']:
-        """Return a dict of containers indexed by name."""
+    def containers(self) -> 'ContainerMapping':
+        """Return a mapping of containers indexed by name."""
         if not self._is_our_unit:
             raise RuntimeError('cannot get container for a remote unit {}'.format(self))
         return self._containers
@@ -559,8 +559,10 @@ class Network:
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
             interface_name = interface_info.get('interface-name')
-            for address_info in interface_info.get('addresses', []):
-                self.interfaces.append(NetworkInterface(interface_name, address_info))
+            addrs = interface_info.get('addresses')
+            if addrs is not None:
+                for address_info in addrs:
+                    self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
         for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(ipaddress.ip_address(address))
@@ -1068,13 +1070,14 @@ class Container:
         """Get the current effective pebble configuration."""
         return self._pebble.get_plan()
 
-    def get_services(self, *service_names: str) -> typing.List['pebble.ServiceInfo']:
-        """Get a list of service status information.
+    def get_services(self, *service_names: str) -> 'ServiceInfoMapping':
+        """Fetch and return a mapping of status information indexed by service name.
 
         If no service names are specified, return status information for all
         services, otherwise return information for only the given services.
         """
-        return self._pebble.get_services(service_names)
+        services = self._pebble.get_services(service_names)
+        return ServiceInfoMapping(services)
 
     def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
         """Get status information for a single named service.
@@ -1086,7 +1089,7 @@ class Container:
             raise ModelError('service {!r} not found'.format(service_name))
         if len(services) > 1:
             raise RuntimeError('expected 1 service, got {}'.format(len(services)))
-        return services[0]
+        return services[service_name]
 
 
 class ContainerMapping(Mapping):
@@ -1110,6 +1113,29 @@ class ContainerMapping(Mapping):
 
     def __repr__(self):
         return repr(self._containers)
+
+
+class ServiceInfoMapping(Mapping):
+    """Map of service names to pebble.ServiceInfo objects.
+
+    This is done as a mapping object rather than a plain dictionary so that we
+    can extend it later, and so it's not mutable.
+    """
+
+    def __init__(self, services: typing.Iterable['pebble.ServiceInfo']):
+        self._services = {s.name: s for s in services}
+
+    def __getitem__(self, key: str):
+        return self._services[key]
+
+    def __iter__(self):
+        return iter(self._services)
+
+    def __len__(self):
+        return len(self._services)
+
+    def __repr__(self):
+        return repr(self._services)
 
 
 class ModelError(Exception):
