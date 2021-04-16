@@ -18,7 +18,6 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
 from email.mime.multipart import MIMEBase, MIMEMultipart
-from typing import BinaryIO, Dict, Iterable, List, Optional, Tuple, Union
 import cgi
 import datetime
 import email.parser
@@ -29,6 +28,7 @@ import re
 import socket
 import sys
 import time
+import typing
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -110,7 +110,7 @@ def _parse_timestamp(s):
                              microsecond=microsecond, tzinfo=tz)
 
 
-def _json_loads(s: Union[str, bytes]) -> Dict:
+def _json_loads(s: typing.Union[str, bytes]) -> typing.Dict:
     """Like json.loads(), but handle str or bytes.
 
     This is needed because an HTTP response's read() method returns bytes on
@@ -155,7 +155,7 @@ class PathError(Error):
 class APIError(Error):
     """Raised when an HTTP API error occurs talking to the Pebble server."""
 
-    def __init__(self, body: Dict, code: int, status: str, message: str):
+    def __init__(self, body: typing.Dict, code: int, status: str, message: str):
         """This shouldn't be instantiated directly."""
         super().__init__(message)  # Makes str(e) return message
         self.body = body
@@ -210,8 +210,8 @@ class SystemInfo:
         self.version = version
 
     @classmethod
-    def from_dict(cls, d: Dict) -> 'SystemInfo':
-        """Create new object from dict parsed from JSON."""
+    def from_dict(cls, d: typing.Dict) -> 'SystemInfo':
+        """Create new SystemInfo object from dict parsed from JSON."""
         return cls(version=d['version'])
 
     def __repr__(self):
@@ -226,7 +226,7 @@ class Warning:
         message: str,
         first_added: datetime.datetime,
         last_added: datetime.datetime,
-        last_shown: Optional[datetime.datetime],
+        last_shown: typing.Optional[datetime.datetime],
         expire_after: str,
         repeat_after: str,
     ):
@@ -238,8 +238,8 @@ class Warning:
         self.repeat_after = repeat_after
 
     @classmethod
-    def from_dict(cls, d: Dict) -> 'Warning':
-        """Create new object from dict parsed from JSON."""
+    def from_dict(cls, d: typing.Dict) -> 'Warning':
+        """Create new Warning object from dict parsed from JSON."""
         return cls(
             message=d['message'],
             first_added=_parse_timestamp(d['first-added']),
@@ -274,8 +274,8 @@ class TaskProgress:
         self.total = total
 
     @classmethod
-    def from_dict(cls, d: Dict) -> 'TaskProgress':
-        """Create new object from dict parsed from JSON."""
+    def from_dict(cls, d: typing.Dict) -> 'TaskProgress':
+        """Create new TaskProgress object from dict parsed from JSON."""
         return cls(
             label=d['label'],
             done=d['done'],
@@ -306,10 +306,10 @@ class Task:
         kind: str,
         summary: str,
         status: str,
-        log: List[str],
+        log: typing.List[str],
         progress: TaskProgress,
         spawn_time: datetime.datetime,
-        ready_time: Optional[datetime.datetime],
+        ready_time: typing.Optional[datetime.datetime],
     ):
         self.id = id
         self.kind = kind
@@ -321,8 +321,8 @@ class Task:
         self.ready_time = ready_time
 
     @classmethod
-    def from_dict(cls, d: Dict) -> 'Task':
-        """Create new object from dict parsed from JSON."""
+    def from_dict(cls, d: typing.Dict) -> 'Task':
+        """Create new Task object from dict parsed from JSON."""
         return cls(
             id=TaskID(d['id']),
             kind=d['kind'],
@@ -363,11 +363,11 @@ class Change:
         kind: str,
         summary: str,
         status: str,
-        tasks: List[Task],
+        tasks: typing.List[Task],
         ready: bool,
-        err: Optional[str],
+        err: typing.Optional[str],
         spawn_time: datetime.datetime,
-        ready_time: Optional[datetime.datetime],
+        ready_time: typing.Optional[datetime.datetime],
     ):
         self.id = id
         self.kind = kind
@@ -380,8 +380,8 @@ class Change:
         self.ready_time = ready_time
 
     @classmethod
-    def from_dict(cls, d: Dict) -> 'Change':
-        """Create new object from dict parsed from JSON."""
+    def from_dict(cls, d: typing.Dict) -> 'Change':
+        """Create new Change object from dict parsed from JSON."""
         return cls(
             id=ChangeID(d['id']),
             kind=d['kind'],
@@ -439,7 +439,7 @@ class Layer:
     https://github.com/canonical/pebble/blob/master/internal/plan/plan.go
     """
 
-    def __init__(self, raw: Union[str, Dict] = None):
+    def __init__(self, raw: typing.Union[str, typing.Dict] = None):
         if isinstance(raw, str):
             d = yaml.safe_load(raw) or {}
         else:
@@ -453,7 +453,7 @@ class Layer:
         """Convert this layer to its YAML representation."""
         return yaml.safe_dump(self.to_dict())
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> typing.Dict:
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -471,7 +471,7 @@ class Layer:
 class Service:
     """Represents a service description in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Dict = None):
+    def __init__(self, name: str, raw: typing.Dict = None):
         self.name = name
         raw = raw or {}
         self.summary = raw.get('summary', '')
@@ -484,7 +484,7 @@ class Service:
         self.requires = list(raw.get('requires', []))
         self.environment = dict(raw.get('environment', {}))
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> typing.Dict:
         """Convert this service object to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -524,8 +524,8 @@ class ServiceInfo:
     def __init__(
         self,
         name: str,
-        startup: Union[ServiceStartup, str],
-        current: Union[ServiceStatus, str],
+        startup: typing.Union[ServiceStartup, str],
+        current: typing.Union[ServiceStatus, str],
     ):
         self.name = name
         self.startup = startup
@@ -536,8 +536,8 @@ class ServiceInfo:
         return self.current == ServiceStatus.ACTIVE
 
     @classmethod
-    def from_dict(cls, d: Dict) -> 'ServiceInfo':
-        """Create new object from dict parsed from JSON."""
+    def from_dict(cls, d: typing.Dict) -> 'ServiceInfo':
+        """Create new ServiceInfo object from dict parsed from JSON."""
         try:
             startup = ServiceStartup(d['startup'])
         except ValueError:
@@ -579,14 +579,14 @@ class FileInfo:
         self,
         path: str,
         name: str,
-        type: Union['FileType', str],
-        size: Optional[int],
+        type: typing.Union['FileType', str],
+        size: typing.Optional[int],
         permissions: int,
         last_modified: datetime.datetime,
-        user_id: Optional[int],
-        user: Optional[str],
-        group_id: Optional[int],
-        group: Optional[str],
+        user_id: typing.Optional[int],
+        user: typing.Optional[str],
+        group_id: typing.Optional[int],
+        group: typing.Optional[str],
     ):
         self.path = path
         self.name = name
@@ -600,8 +600,8 @@ class FileInfo:
         self.group = group
 
     @classmethod
-    def from_dict(cls, d: Dict) -> 'FileInfo':
-        """Create new object from dict parsed from JSON."""
+    def from_dict(cls, d: typing.Dict) -> 'FileInfo':
+        """Create new FileInfo object from dict parsed from JSON."""
         try:
             file_type = FileType(d['type'])
         except ValueError:
@@ -661,12 +661,14 @@ class Client:
         opener.add_handler(urllib.request.HTTPErrorProcessor())
         return opener
 
-    def _request(self, method: str, path: str, query: Dict = None, body: Dict = None) -> Dict:
+    def _request(
+        self, method: str, path: str, query: typing.Dict = None, body: typing.Dict = None,
+    ) -> typing.Dict:
         """Make a JSON request to the Pebble server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
         to the URL. If body dict is provided, it is serialied as JSON and used
-        as the HTTP body (with Content-Type "application/json"). The resulting
+        as the HTTP body (with Content-Type: "application/json"). The resulting
         body is decoded from JSON.
         """
         headers = {'Accept': 'application/json'}
@@ -676,12 +678,12 @@ class Client:
             headers['Content-Type'] = 'application/json'
 
         response = self._request_raw(method, path, query, headers, data)
-        self._parse_content_type(response.headers, 'application/json')
+        self._ensure_content_type(response.headers, 'application/json')
         return _json_loads(response.read())
 
     @staticmethod
-    def _parse_content_type(headers, expected):
-        """Parse Content-Type header from headers and ensure it's equal to "expected".
+    def _ensure_content_type(headers, expected):
+        """Parse Content-Type header from headers and ensure it's equal to expected.
 
         Return a dict of any options in the header, e.g., {'boundary': ...}.
         """
@@ -691,7 +693,7 @@ class Client:
         return options
 
     def _request_raw(
-        self, method: str, path: str, query: Dict = None, headers: Dict = None,
+        self, method: str, path: str, query: typing.Dict = None, headers: typing.Dict = None,
         data: bytes = None,
     ) -> http.client.HTTPResponse:
         """Make a request to the Pebble server; return the raw HTTPResponse object."""
@@ -726,7 +728,7 @@ class Client:
         resp = self._request('GET', '/v1/system-info')
         return SystemInfo.from_dict(resp['result'])
 
-    def get_warnings(self, select: WarningState = WarningState.PENDING) -> List[Warning]:
+    def get_warnings(self, select: WarningState = WarningState.PENDING) -> typing.List[Warning]:
         """Get list of warnings in given state (pending or all)."""
         query = {'select': select.value}
         resp = self._request('GET', '/v1/warnings', query)
@@ -740,7 +742,7 @@ class Client:
 
     def get_changes(
         self, select: ChangeState = ChangeState.IN_PROGRESS, service: str = None,
-    ) -> List[Change]:
+    ) -> typing.List[Change]:
         """Get list of changes in given state, filter by service name if given."""
         query = {'select': select.value}
         if service is not None:
@@ -769,7 +771,7 @@ class Client:
         return self._services_action('autostart', [], timeout, delay)
 
     def start_services(
-        self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+        self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> ChangeID:
         """Start services by name and wait (poll) for them to be started.
 
@@ -780,7 +782,7 @@ class Client:
         return self._services_action('start', services, timeout, delay)
 
     def stop_services(
-        self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+        self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> ChangeID:
         """Stop services by name and wait (poll) for them to be started.
 
@@ -791,7 +793,7 @@ class Client:
         return self._services_action('stop', services, timeout, delay)
 
     def _services_action(
-        self, action: str, services: Iterable[str], timeout: float, delay: float,
+        self, action: str, services: typing.Iterable[str], timeout: float, delay: float,
     ) -> ChangeID:
         if not isinstance(services, (list, tuple)):
             raise TypeError('services must be a list of str, not {}'.format(
@@ -825,7 +827,9 @@ class Client:
         raise TimeoutError(
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
-    def add_layer(self, label: str, layer: Union[str, dict, Layer], *, combine: bool = False):
+    def add_layer(
+        self, label: str, layer: typing.Union[str, dict, Layer], *, combine: bool = False,
+    ):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is False (the default), append the new layer as the top
@@ -860,7 +864,7 @@ class Client:
         resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
         return Plan(resp['result'])
 
-    def get_services(self, names: List[str] = None) -> List[ServiceInfo]:
+    def get_services(self, names: typing.List[str] = None) -> typing.List[ServiceInfo]:
         """Get the service status for the configured services.
 
         If names is specified, only fetch the service status for the services
@@ -872,7 +876,7 @@ class Client:
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
-    def read_file(self, path: str, destination: BinaryIO):
+    def read_file(self, path: str, destination: typing.BinaryIO):
         """Read a file from the remote system and write content to destination."""
         query = {
             'action': 'read',
@@ -895,7 +899,7 @@ class Client:
 
     @classmethod
     def _parse_read_multipart(cls, response: http.client.HTTPResponse,
-                              destinations: Dict[str, BinaryIO]) -> Dict:
+                              destinations: typing.Dict[str, typing.BinaryIO]) -> typing.Dict:
         """Parse a multipart HTTP response from the read-files API.
 
         Return "response" metadata field decoded from JSON, and write content
@@ -903,9 +907,9 @@ class Client:
         Currently the content is entirely loaded into memory, but the goal is
         to stream that in future (the signature of read_file won't change).
         """
-        options = cls._parse_content_type(response.headers, 'multipart/form-data')
+        options = cls._ensure_content_type(response.headers, 'multipart/form-data')
         boundary = options.get('boundary', '')
-        if len(boundary) < 32:
+        if not boundary:
             raise ProtocolError('invalid boundary {!r}'.format(boundary))
 
         # We have to manually write the Content-Type with boundary, because
@@ -941,8 +945,8 @@ class Client:
         return resp
 
     def write_file(
-        self, path: str, source: BinaryIO, make_dirs: bool = False, permissions: int = None,
-        user: Union[str, int] = None, group: Union[str, int] = None,
+        self, path: str, source: typing.BinaryIO, make_dirs: bool = False, permissions: int = None,
+        user: typing.Union[str, int] = None, group: typing.Union[str, int] = None,
     ):
         """Write data from source to given file path on remote system.
 
@@ -966,12 +970,12 @@ class Client:
             'Content-Type': content_type,
         }
         response = self._request_raw('POST', '/v1/files', None, headers, body)
-        self._parse_content_type(response.headers, 'application/json')
+        self._ensure_content_type(response.headers, 'application/json')
         resp = _json_loads(response.read())
         self._raise_on_path_error(resp, path)
 
     @staticmethod
-    def _make_auth_dict(permissions, user, group) -> Dict:
+    def _make_auth_dict(permissions, user, group) -> typing.Dict:
         d = {}
         if permissions is not None:
             d['permissions'] = format(permissions, '03o')
@@ -992,7 +996,9 @@ class Client:
         return d
 
     @staticmethod
-    def _encode_multipart(metadata: Dict, sources: Dict[str, BinaryIO]) -> Tuple[bytes, str]:
+    def _encode_multipart(
+        metadata: typing.Dict, sources: typing.Dict[str, typing.BinaryIO],
+    ) -> typing.Tuple[bytes, str]:
         multipart = MIMEMultipart('form-data')
 
         part = MIMEBase('application', 'json')
@@ -1008,7 +1014,9 @@ class Client:
 
         return (multipart.as_bytes(), multipart['Content-Type'])
 
-    def list_files(self, path: str, pattern: str = None, itself: bool = False) -> List[FileInfo]:
+    def list_files(
+        self, path: str, pattern: str = None, itself: bool = False,
+    ) -> typing.List[FileInfo]:
         """Return list of file information from given path on remote system.
 
         If path is a directory (and "itself" is False), return a list of all
@@ -1031,7 +1039,7 @@ class Client:
 
     def make_dir(
         self, path: str, make_parents: bool = False, permissions: int = None,
-        user: Union[str, int] = None, group: Union[str, int] = None,
+        user: typing.Union[str, int] = None, group: typing.Union[str, int] = None,
     ):
         """Create a directory on the remote system with the given attributes.
 

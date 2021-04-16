@@ -1238,10 +1238,10 @@ Content-Disposition: form-data; name="response"
         self.assertEqual(str(cm.exception),
                          "expected Content-Type 'multipart/form-data', got 'ct'")
 
-        self.client.responses.append(({'Content-Type': 'multipart/form-data; boundary=X'}, b''))
+        self.client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
         with self.assertRaises(pebble.ProtocolError) as cm:
             self.client.read_file('/etc/hosts', None)
-        self.assertEqual(str(cm.exception), "invalid boundary 'X'")
+        self.assertEqual(str(cm.exception), "invalid boundary ''")
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
@@ -1495,11 +1495,11 @@ bad path
             'type': 'sync',
         })
         self.client.make_dir('/foo/bar')
-        dir_item = {
+        req = {'action': 'make-dirs', 'dirs': [{
             'path': '/foo/bar',
-        }
+        }]}
         self.assertEqual(self.client.requests, [
-            ('POST', '/v1/files', None, {'action': 'make-dirs', 'dirs': [dir_item]}),
+            ('POST', '/v1/files', None, req),
         ])
 
     def test_make_dir_full(self):
@@ -1512,15 +1512,15 @@ bad path
         self.client.make_dir('/foo/bar', make_parents=True, permissions=0o600,
                              user=12, group=34)
 
-        dir_item = {
+        req = {'action': 'make-dirs', 'dirs': [{
             'path': '/foo/bar',
             'make-parents': True,
             'permissions': '600',
             'user-id': 12,
             'group-id': 34,
-        }
+        }]}
         self.assertEqual(self.client.requests, [
-            ('POST', '/v1/files', None, {'action': 'make-dirs', 'dirs': [dir_item]}),
+            ('POST', '/v1/files', None, req),
         ])
 
     def test_make_dir_error(self):
@@ -1550,11 +1550,11 @@ bad path
             'type': 'sync',
         })
         self.client.remove_path('/boo/far')
-        dir_item = {
+        req = {'action': 'remove', 'paths': [{
             'path': '/boo/far',
-        }
+        }]}
         self.assertEqual(self.client.requests, [
-            ('POST', '/v1/files', None, {'action': 'remove', 'paths': [dir_item]}),
+            ('POST', '/v1/files', None, req),
         ])
 
     def test_remove_path_recursive(self):
@@ -1566,12 +1566,12 @@ bad path
         })
         self.client.remove_path('/boo/far', recursive=True)
 
-        dir_item = {
+        req = {'action': 'remove', 'paths': [{
             'path': '/boo/far',
             'recursive': True,
-        }
+        }]}
         self.assertEqual(self.client.requests, [
-            ('POST', '/v1/files', None, {'action': 'remove', 'paths': [dir_item]}),
+            ('POST', '/v1/files', None, req),
         ])
 
     def test_remove_path_error(self):
