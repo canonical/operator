@@ -1170,14 +1170,14 @@ services:
             ('GET', '/v1/services', {'names': 'svc2'}, None),
         ])
 
-    def test_read_file_success(self):
+    def test_read_content_str(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""
 --01234567890123456789012345678901
 Content-Disposition: form-data; name="files"; filename="/etc/hosts"
 
-127.0.0.1 localhost
+127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80' + b"""
 --01234567890123456789012345678901
 Content-Disposition: form-data; name="response"
 
@@ -1191,16 +1191,44 @@ Content-Disposition: form-data; name="response"
 """,
         ))
 
-        dest = io.BytesIO()
-        self.client.read_file('/etc/hosts', dest)
-        self.assertEqual(dest.getvalue(), b'127.0.0.1 localhost')
+        content = self.client.read_content('/etc/hosts')
+        self.assertEqual(content, '127.0.0.1 localhost  # 😀')
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
                 {'Accept': 'multipart/form-data'}, None),
         ])
 
-    def test_read_file_path_error(self):
+    def test_read_content_bytes(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"
+
+127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80' + b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="response"
+
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+--01234567890123456789012345678901--
+""",
+        ))
+
+        content = self.client.read_content('/etc/hosts', encoding=None)
+        self.assertEqual(content, b'127.0.0.1 localhost  # \xf0\x9f\x98\x80')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
+    def test_read_content_path_error(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""
@@ -1220,7 +1248,7 @@ Content-Disposition: form-data; name="response"
         ))
 
         with self.assertRaises(pebble.PathError) as cm:
-            self.client.read_file('/etc/hosts', None)
+            self.client.read_content('/etc/hosts')
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(cm.exception.kind, 'not-found')
         self.assertEqual(cm.exception.message, 'not found')
@@ -1230,17 +1258,17 @@ Content-Disposition: form-data; name="response"
                 {'Accept': 'multipart/form-data'}, None),
         ])
 
-    def test_read_file_protocol_errors(self):
+    def test_read_content_protocol_errors(self):
         self.client.responses.append(({'Content-Type': 'ct'}, b''))
         with self.assertRaises(pebble.ProtocolError) as cm:
-            self.client.read_file('/etc/hosts', None)
+            self.client.read_content('/etc/hosts')
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(str(cm.exception),
                          "expected Content-Type 'multipart/form-data', got 'ct'")
 
         self.client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
         with self.assertRaises(pebble.ProtocolError) as cm:
-            self.client.read_file('/etc/hosts', None)
+            self.client.read_content('/etc/hosts')
         self.assertEqual(str(cm.exception), "invalid boundary ''")
 
         self.client.responses.append((
@@ -1254,7 +1282,7 @@ bad path
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
-            self.client.read_file('/etc/hosts', None)
+            self.client.read_content('/etc/hosts')
         self.assertEqual(str(cm.exception), "path not expected: /bad")
 
         self.client.responses.append((
@@ -1268,10 +1296,10 @@ bad path
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
-            self.client.read_file('/etc/hosts', io.BytesIO())
+            self.client.read_content('/etc/hosts')
         self.assertEqual(str(cm.exception), 'no "response" field in multipart body')
 
-    def test_write_file_simple(self):
+    def test_write_content_str(self):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -1286,8 +1314,7 @@ bad path
 """,
         ))
 
-        source = io.BytesIO(b'content')
-        self.client.write_file('/foo/bar', source)
+        self.client.write_content('/foo/bar', 'content 😀')
 
         self.assertEqual(len(self.client.requests), 1)
         request = self.client.requests[0]
@@ -1295,15 +1322,15 @@ bad path
 
         headers, body = request[3:]
         content_type = headers['Content-Type']
-        dest = io.BytesIO()
-        req = self._parse_write_multipart(content_type, body, {'/foo/bar': dest})
-        self.assertEqual(dest.getvalue(), b'content')
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content \xf0\x9f\x98\x80')
         self.assertEqual(req, {
             'action': 'write',
             'files': [{'path': '/foo/bar'}],
         })
 
-    def test_write_file_options(self):
+    def test_write_content_bytes(self):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -1318,9 +1345,7 @@ bad path
 """,
         ))
 
-        source = io.BytesIO(b'content')
-        self.client.write_file('/foo/bar', source, make_dirs=True, permissions=0o600,
-                               user='bob', group='staff')
+        self.client.write_content('/foo/bar', b'content \xf0\x9f\x98\x80')
 
         self.assertEqual(len(self.client.requests), 1)
         request = self.client.requests[0]
@@ -1328,9 +1353,41 @@ bad path
 
         headers, body = request[3:]
         content_type = headers['Content-Type']
-        dest = io.BytesIO()
-        req = self._parse_write_multipart(content_type, body, {'/foo/bar': dest})
-        self.assertEqual(dest.getvalue(), b'content')
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content \xf0\x9f\x98\x80')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{'path': '/foo/bar'}],
+        })
+
+    def test_write_content_all_options(self):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar"}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        self.client.write_content('/foo/bar', 'content', make_dirs=True, permissions=0o600,
+                                  user='bob', group='staff')
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content')
         self.assertEqual(req, {
             'action': 'write',
             'files': [{
@@ -1342,7 +1399,42 @@ bad path
             }],
         })
 
-    def test_write_file_path_error(self):
+    def test_write_content_uid_gid(self):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar"}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        self.client.write_content('/foo/bar', 'content', user=12, group=34)
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{
+                'path': '/foo/bar',
+                'user-id': 12,
+                'group-id': 34,
+            }],
+        })
+
+    def test_write_content_path_error(self):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -1357,9 +1449,8 @@ bad path
 """,
         ))
 
-        source = io.BytesIO(b'content')
         with self.assertRaises(pebble.PathError) as cm:
-            self.client.write_file('/foo/bar', source)
+            self.client.write_content('/foo/bar', 'content')
         self.assertEqual(cm.exception.kind, 'not-found')
         self.assertEqual(cm.exception.message, 'not found')
 
@@ -1369,15 +1460,15 @@ bad path
 
         headers, body = request[3:]
         content_type = headers['Content-Type']
-        dest = io.BytesIO()
-        req = self._parse_write_multipart(content_type, body, {'/foo/bar': dest})
-        self.assertEqual(dest.getvalue(), b'content')
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content')
         self.assertEqual(req, {
             'action': 'write',
             'files': [{'path': '/foo/bar'}],
         })
 
-    def _parse_write_multipart(self, content_type, body, destinations):
+    def _parse_write_multipart(self, content_type, body):
         ctype, options = cgi.parse_header(content_type)
         self.assertEqual(ctype, 'multipart/form-data')
         boundary = options['boundary']
@@ -1391,6 +1482,8 @@ bad path
         message = parser.close()
 
         req = None
+        filename = None
+        content = None
         for part in message.walk():
             name = part.get_param('name', header='Content-Disposition')
             if name == 'request':
@@ -1399,8 +1492,7 @@ bad path
                 # decode=True, ironically, avoids decoding bytes to str
                 content = part.get_payload(decode=True)
                 filename = part.get_filename()
-                destinations[filename].write(content)
-        return req
+        return (req, filename, content)
 
     def test_list_files_path(self):
         self.client.responses.append({

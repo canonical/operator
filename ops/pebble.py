@@ -875,38 +875,26 @@ class Client:
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
-    def read_file(self, path: str, destination: typing.BinaryIO):
-        """Read a file from the remote system and write content to destination."""
+    def read_content(self, path: str, encoding: str = 'utf-8') -> typing.Union[bytes, str]:
+        """Read a file's content from the remote system to a string.
+
+        Args:
+            path: Path of the file to read from the remote system.
+            encoding: Encoding to use for decoding file's bytes to a text string
+                (or None to return raw bytes).
+
+        Returns:
+            File's content, decoded and returned as str if encoding is not None,
+            or returned as raw bytes if encoding is None.
+        """
         query = {
             'action': 'read',
             'path': path,
         }
         headers = {'Accept': 'multipart/form-data'}
         response = self._request_raw('GET', '/v1/files', query, headers)
-        resp = self._parse_read_multipart(response, {path: destination})
-        self._raise_on_path_error(resp, path)
 
-    @staticmethod
-    def _raise_on_path_error(resp, path):
-        result = resp['result'] or []  # in case it's null instead of []
-        paths = {item['path']: item for item in result}
-        if path not in paths:
-            raise ProtocolError('path not found in response metadata: {}'.format(resp))
-        error = paths[path].get('error')
-        if error:
-            raise PathError(error['kind'], error['message'])
-
-    @classmethod
-    def _parse_read_multipart(cls, response: http.client.HTTPResponse,
-                              destinations: typing.Dict[str, typing.BinaryIO]) -> typing.Dict:
-        """Parse a multipart HTTP response from the read-files API.
-
-        Return "response" metadata field decoded from JSON, and write content
-        to file-like object in destinations dictionary (keyed by path).
-        Currently the content is entirely loaded into memory, but the goal is
-        to stream that in future (the signature of read_file won't change).
-        """
-        options = cls._ensure_content_type(response.headers, 'multipart/form-data')
+        options = self._ensure_content_type(response.headers, 'multipart/form-data')
         boundary = options.get('boundary', '')
         if not boundary:
             raise ProtocolError('invalid boundary {!r}'.format(boundary))
@@ -925,50 +913,86 @@ class Client:
             parser.feed(chunk)
         message = parser.close()
 
+        # Walk over the multipart parts and read content and metadata.
         resp = None
+        content = None
         for part in message.walk():
             name = part.get_param('name', header='Content-Disposition')
             if name == 'response':
                 resp = _json_loads(part.get_payload())
             elif name == 'files':
+                filename = part.get_filename()
+                if filename != path:
+                    raise ProtocolError('path not expected: {}'.format(filename))
                 # decode=True, ironically, avoids decoding bytes to str
                 content = part.get_payload(decode=True)
-                filename = part.get_filename()
-                if filename not in destinations:
-                    raise ProtocolError('path not expected: {}'.format(filename))
-                destinations[filename].write(content)
 
         if resp is None:
             raise ProtocolError('no "response" field in multipart body')
+        self._raise_on_path_error(resp, path)
 
-        return resp
+        if content is None:
+            raise ProtocolError('no file content in multipart response')
+        if encoding is not None:
+            content = content.decode(encoding)
+        return content
 
-    def write_file(
-            self, path: str, source: typing.BinaryIO, make_dirs: bool = False,
-            permissions: int = None, user: typing.Union[str, int] = None,
+    @staticmethod
+    def _raise_on_path_error(resp, path):
+        result = resp['result'] or []  # in case it's null instead of []
+        paths = {item['path']: item for item in result}
+        if path not in paths:
+            raise ProtocolError('path not found in response metadata: {}'.format(resp))
+        error = paths[path].get('error')
+        if error:
+            raise PathError(error['kind'], error['message'])
+
+    def write_content(
+            self, path: str, content: typing.Union[bytes, str], encoding: str = 'utf-8',
+            make_dirs: bool = False, permissions: int = None, user: typing.Union[str, int] = None,
             group: typing.Union[str, int] = None):
-        """Write data from source to given file path on remote system.
+        """Write content to a given file path on the remote system.
 
-        If make_dirs is True, create parent directories if they don't exist.
-        Set file's mode, user, and group to those provided. User and group may
-        be either name strings or UID/GID integers.
+        Args:
+            path: Path of the file to write to on the remote system.
+            content: Content to write (str or bytes).
+            encoding: Encoding to use for encoding content str to bytes.
+                Ignored if content is bytes.
+            make_dirs: If True, create parent directories if they don't exist.
+            permissions: Permissions (mode) to create file with (Pebble default
+                is 0o644).
+            user: UID or username for file.
+            group: GID or group name for file.
         """
         info = self._make_auth_dict(permissions, user, group)
         info['path'] = path
         if make_dirs:
             info['make-dirs'] = True
-
         metadata = {
             'action': 'write',
             'files': [info],
         }
-        body, content_type = self._encode_multipart(metadata, {path: source})
 
+        multipart = MIMEMultipart('form-data')
+
+        part = MIMEBase('application', 'json')
+        part.add_header('Content-Disposition', 'form-data', name='request')
+        part.set_payload(json.dumps(metadata))
+        multipart.attach(part)
+
+        part = MIMEBase('application', 'octet-stream')
+        part.add_header('Content-Disposition', 'form-data', name='files', filename=path)
+        if isinstance(content, str):
+            content = content.encode(encoding)
+        part.set_payload(content)
+        multipart.attach(part)
+
+        data = multipart.as_bytes()  # must be called before accessing multipart['Content-Type']
         headers = {
             'Accept': 'application/json',
-            'Content-Type': content_type,
+            'Content-Type': multipart['Content-Type'],
         }
-        response = self._request_raw('POST', '/v1/files', None, headers, body)
+        response = self._request_raw('POST', '/v1/files', None, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
         resp = _json_loads(response.read())
         self._raise_on_path_error(resp, path)
@@ -994,35 +1018,18 @@ class Client:
                 raise TypeError('group must be int GID or string group name')
         return d
 
-    @staticmethod
-    def _encode_multipart(
-        metadata: typing.Dict, sources: typing.Dict[str, typing.BinaryIO],
-    ) -> typing.Tuple[bytes, str]:
-        multipart = MIMEMultipart('form-data')
-
-        part = MIMEBase('application', 'json')
-        part.add_header('Content-Disposition', 'form-data', name='request')
-        part.set_payload(json.dumps(metadata))
-        multipart.attach(part)
-
-        for path, source in sources.items():
-            part = MIMEBase('application', 'octet-stream')
-            part.add_header('Content-Disposition', 'form-data', name='files', filename=path)
-            part.set_payload(source.read())
-            multipart.attach(part)
-
-        return (multipart.as_bytes(), multipart['Content-Type'])
-
     def list_files(
         self, path: str, pattern: str = None, itself: bool = False,
     ) -> typing.List[FileInfo]:
         """Return list of file information from given path on remote system.
 
-        If path is a directory (and "itself" is False), return a list of all
-        entries in that directory. If path is a file (or if "itself" is True),
-        return a one-element list with information about just that file. If
-        pattern is specified, filter the list to just the files that match,
-        for example "*.txt".
+        Args:
+            path: Path of the directory to list, or path of the file to return
+                information about.
+            pattern: If specified, filter the list to just the files that match,
+                for example "*.txt".
+            itself: If path refers to a directory, return information about the
+                directory itself, rather than its contents.
         """
         query = {
             'action': 'list',
@@ -1041,9 +1048,13 @@ class Client:
             user: typing.Union[str, int] = None, group: typing.Union[str, int] = None):
         """Create a directory on the remote system with the given attributes.
 
-        If make_parents is True, create parent directories if they don't exist.
-        Set directory's mode, user, and group to those provided. User and group
-        may be either name strings or UID/GID integers.
+        Args:
+            path: Path of the directory to create on the remote system.
+            make_parents: If True, create parent directories if they don't exist.
+            permissions: Permissions (mode) to create directory with (Pebble
+                default is 0o755).
+            user: UID or username for directory.
+            group: GID or group name for directory.
         """
         info = self._make_auth_dict(permissions, user, group)
         info['path'] = path
@@ -1059,7 +1070,9 @@ class Client:
     def remove_path(self, path: str, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
-        If "recursive" is True, recursively delete path and everything under it.
+        Args:
+            path: Path of the file or directory to delete from the remote system.
+            recursive: If True, recursively delete path and everything under it.
         """
         info = {'path': path}
         if recursive:
