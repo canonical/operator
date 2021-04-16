@@ -885,22 +885,24 @@ containers:
         self.pebble.responses.append(two_services)
         services = self.container.get_services()
         self.assertEqual(len(services), 2)
-        self.assertEqual(services[0].name, 's1')
-        self.assertEqual(services[0].startup, ops.pebble.ServiceStartup.ENABLED)
-        self.assertEqual(services[0].current, ops.pebble.ServiceStatus.ACTIVE)
-        self.assertEqual(services[1].name, 's2')
-        self.assertEqual(services[1].startup, ops.pebble.ServiceStartup.DISABLED)
-        self.assertEqual(services[1].current, ops.pebble.ServiceStatus.INACTIVE)
+        self.assertEqual(set(services), {'s1', 's2'})
+        self.assertEqual(services['s1'].name, 's1')
+        self.assertEqual(services['s1'].startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services['s1'].current, ops.pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(services['s2'].name, 's2')
+        self.assertEqual(services['s2'].startup, ops.pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
 
         self.pebble.responses.append(two_services)
         services = self.container.get_services('s1', 's2')
         self.assertEqual(len(services), 2)
-        self.assertEqual(services[0].name, 's1')
-        self.assertEqual(services[0].startup, ops.pebble.ServiceStartup.ENABLED)
-        self.assertEqual(services[0].current, ops.pebble.ServiceStatus.ACTIVE)
-        self.assertEqual(services[1].name, 's2')
-        self.assertEqual(services[1].startup, ops.pebble.ServiceStartup.DISABLED)
-        self.assertEqual(services[1].current, ops.pebble.ServiceStatus.INACTIVE)
+        self.assertEqual(set(services), {'s1', 's2'})
+        self.assertEqual(services['s1'].name, 's1')
+        self.assertEqual(services['s1'].startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services['s1'].current, ops.pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(services['s2'].name, 's2')
+        self.assertEqual(services['s2'].startup, ops.pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
 
         self.assertEqual(self.pebble.requests, [
             ('get_services', ()),
@@ -1153,6 +1155,14 @@ class TestModelBindings(unittest.TestCase):
 
     def test_empty_bind_addresses(self):
         network_data = json.dumps({'bind-addresses': [{}]})
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(binding.network.interfaces, [])
+
+    def test_no_bind_addresses(self):
+        network_data = json.dumps({'bind-addresses': [{'addresses': None}]})
         fake_script(self, 'network-get',
                     '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
         binding_name = 'db0'

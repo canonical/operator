@@ -347,16 +347,19 @@ class TestJujuStateBackend(BaseTestCase):
 
     def test_set_encodes_args(self):
         t = tempfile.NamedTemporaryFile()
-        fake_script(self, 'state-set', dedent("""
-            cat >> {}
-            """).format(pathlib.Path(t.name).as_posix()))
-        backend = storage._JujuStorageBackend()
-        backend.set('key', {'foo': 2})
-        self.assertEqual(fake_script_calls(self, clear=True), [
-            ['state-set', '--file', '-'],
-        ])
-        t.seek(0)
-        content = t.read()
+        try:
+            fake_script(self, 'state-set', dedent("""
+                cat >> {}
+                """).format(pathlib.Path(t.name).as_posix()))
+            backend = storage._JujuStorageBackend()
+            backend.set('key', {'foo': 2})
+            self.assertEqual(fake_script_calls(self, clear=True), [
+                ['state-set', '--file', '-'],
+            ])
+            t.seek(0)
+            content = t.read()
+        finally:
+            t.close()
         self.assertEqual(content.decode('utf-8'), dedent("""\
             "key": |
               {foo: 2}
@@ -375,24 +378,27 @@ class TestJujuStateBackend(BaseTestCase):
 
     def test_set_and_get_complex_value(self):
         t = tempfile.NamedTemporaryFile()
-        fake_script(self, 'state-set', dedent("""
-            cat >> {}
-            """).format(pathlib.Path(t.name).as_posix()))
-        backend = storage._JujuStorageBackend()
-        complex_val = {
-            'foo': 2,
-            3: [1, 2, '3'],
-            'four': {2, 3},
-            'five': {'a': 2, 'b': 3.0},
-            'six': ('a', 'b'),
-            'seven': b'1234',
-        }
-        backend.set('Class[foo]/_stored', complex_val)
-        self.assertEqual(fake_script_calls(self, clear=True), [
-            ['state-set', '--file', '-'],
-        ])
-        t.seek(0)
-        content = t.read()
+        try:
+            fake_script(self, 'state-set', dedent("""
+                cat >> {}
+                """).format(pathlib.Path(t.name).as_posix()))
+            backend = storage._JujuStorageBackend()
+            complex_val = {
+                'foo': 2,
+                3: [1, 2, '3'],
+                'four': {2, 3},
+                'five': {'a': 2, 'b': 3.0},
+                'six': ('a', 'b'),
+                'seven': b'1234',
+            }
+            backend.set('Class[foo]/_stored', complex_val)
+            self.assertEqual(fake_script_calls(self, clear=True), [
+                ['state-set', '--file', '-'],
+            ])
+            t.seek(0)
+            content = t.read()
+        finally:
+            t.close()
         outer = yaml.safe_load(content)
         key = 'Class[foo]/_stored'
         self.assertEqual(list(outer.keys()), [key])
