@@ -584,7 +584,9 @@ class FileInfo:
         permissions: int,
         last_modified: datetime.datetime,
         user_id: Optional[int],
+        user: Optional[str],
         group_id: Optional[int],
+        group: Optional[str],
     ):
         self.path = path
         self.name = name
@@ -593,7 +595,9 @@ class FileInfo:
         self.permissions = permissions
         self.last_modified = last_modified
         self.user_id = user_id
+        self.user = user
         self.group_id = group_id
+        self.group = group
 
     @classmethod
     def from_dict(cls, d: Dict) -> 'FileInfo':
@@ -610,7 +614,9 @@ class FileInfo:
             permissions=int(d['permissions'], 8),
             last_modified=_parse_timestamp(d['last-modified']),
             user_id=d.get('user-id'),
+            user=d.get('user'),
             group_id=d.get('group-id'),
+            group=d.get('group'),
         )
 
     def __repr__(self):
@@ -622,7 +628,9 @@ class FileInfo:
                 'permissions=0o{self.permissions:o}, '
                 'last_modified={self.last_modified!r}, '
                 'user_id={self.user_id}, '
-                'group_id={self.group_id})'
+                'user={self.user!r}, '
+                'group_id={self.group_id}, '
+                'group={self.group!r})'
                 ).format(self=self)
 
 

@@ -373,7 +373,8 @@ class TestTypes(unittest.TestCase):
 
     def test_file_info_init(self):
         info = pebble.FileInfo('/etc/hosts', 'hosts', pebble.FileType.FILE, 123, 0o644,
-                               datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518), 12, 34)
+                               datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518),
+                               12, 'bob', 34, 'staff')
         self.assertEqual(info.path, '/etc/hosts')
         self.assertEqual(info.name, 'hosts')
         self.assertEqual(info.type, pebble.FileType.FILE)
@@ -381,7 +382,9 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(info.permissions, 0o644)
         self.assertEqual(info.last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(info.user_id, 12)
+        self.assertEqual(info.user, 'bob')
         self.assertEqual(info.group_id, 34)
+        self.assertEqual(info.group, 'staff')
 
     def test_file_info_from_dict(self):
         d = {
@@ -398,17 +401,23 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(info.permissions, 0o644)
         self.assertEqual(info.last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
         self.assertIs(info.user_id, None)
+        self.assertIs(info.user, None)
         self.assertIs(info.group_id, None)
+        self.assertIs(info.group, None)
 
         d['type'] = 'foobar'
         d['size'] = 123
         d['user-id'] = 12
+        d['user'] = 'bob'
         d['group-id'] = 34
+        d['group'] = 'staff'
         info = pebble.FileInfo.from_dict(d)
         self.assertEqual(info.type, 'foobar')
         self.assertEqual(info.size, 123)
         self.assertEqual(info.user_id, 12)
+        self.assertEqual(info.user, 'bob')
         self.assertEqual(info.group_id, 34)
+        self.assertEqual(info.group, 'staff')
 
 
 class TestPlan(unittest.TestCase):
@@ -1404,7 +1413,9 @@ bad path
                     'permissions': '644',
                     'last-modified': '2021-01-28T14:37:04.291517768+13:00',
                     'user-id': 12,
+                    'user': 'bob',
                     'group-id': 34,
+                    'group': 'staff',
                 },
                 {
                     'path': '/etc/nginx',
@@ -1428,7 +1439,9 @@ bad path
         self.assertEqual(infos[0].permissions, 0o644)
         self.assertEqual(infos[0].last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(infos[0].user_id, 12)
+        self.assertEqual(infos[0].user, 'bob')
         self.assertEqual(infos[0].group_id, 34)
+        self.assertEqual(infos[0].group, 'staff')
         self.assertEqual(infos[1].path, '/etc/nginx')
         self.assertEqual(infos[1].name, 'nginx')
         self.assertEqual(infos[1].type, pebble.FileType.DIRECTORY)
@@ -1436,7 +1449,9 @@ bad path
         self.assertEqual(infos[1].permissions, 0o755)
         self.assertEqual(infos[1].last_modified, datetime_nzdt(2020, 1, 1, 1, 1, 1, 0))
         self.assertIs(infos[1].user_id, None)
+        self.assertIs(infos[1].user, None)
         self.assertIs(infos[1].group_id, None)
+        self.assertIs(infos[1].group, None)
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/files', {'action': 'list', 'path': '/etc'}, None),
