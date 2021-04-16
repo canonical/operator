@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-The Charmed Operator Framework.
+"""The Charmed Operator Framework
 
 The Charmed Operator Framework allows the development of operators in a simple
 and straightforward way, using standard Python structures to allow for clean, 
