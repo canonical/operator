@@ -828,8 +828,7 @@ class Client:
             'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
 
     def add_layer(
-        self, label: str, layer: typing.Union[str, dict, Layer], *, combine: bool = False,
-    ):
+            self, label: str, layer: typing.Union[str, dict, Layer], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is False (the default), append the new layer as the top
@@ -945,9 +944,9 @@ class Client:
         return resp
 
     def write_file(
-        self, path: str, source: typing.BinaryIO, make_dirs: bool = False, permissions: int = None,
-        user: typing.Union[str, int] = None, group: typing.Union[str, int] = None,
-    ):
+            self, path: str, source: typing.BinaryIO, make_dirs: bool = False,
+            permissions: int = None, user: typing.Union[str, int] = None,
+            group: typing.Union[str, int] = None):
         """Write data from source to given file path on remote system.
 
         If make_dirs is True, create parent directories if they don't exist.
@@ -1038,9 +1037,8 @@ class Client:
         return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(
-        self, path: str, make_parents: bool = False, permissions: int = None,
-        user: typing.Union[str, int] = None, group: typing.Union[str, int] = None,
-    ):
+            self, path: str, make_parents: bool = False, permissions: int = None,
+            user: typing.Union[str, int] = None, group: typing.Union[str, int] = None):
         """Create a directory on the remote system with the given attributes.
 
         If make_parents is True, create parent directories if they don't exist.
