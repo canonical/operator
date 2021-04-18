@@ -875,7 +875,7 @@ class Client:
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
-    def read_content(self, path: str, encoding: str = 'utf-8') -> typing.Union[bytes, str]:
+    def read_content(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[bytes, str]:
         """Read a file's content from the remote system to a string.
 
         Args:
@@ -948,7 +948,7 @@ class Client:
             raise PathError(error['kind'], error['message'])
 
     def write_content(
-            self, path: str, content: typing.Union[bytes, str], encoding: str = 'utf-8',
+            self, path: str, content: typing.Union[bytes, str], *, encoding: str = 'utf-8',
             make_dirs: bool = False, permissions: int = None, user: typing.Union[str, int] = None,
             group: typing.Union[str, int] = None):
         """Write content to a given file path on the remote system.
@@ -1019,7 +1019,7 @@ class Client:
         return d
 
     def list_files(
-        self, path: str, pattern: str = None, itself: bool = False,
+        self, path: str, *, pattern: str = None, itself: bool = False,
     ) -> typing.List[FileInfo]:
         """Return list of file information from given path on remote system.
 
@@ -1044,7 +1044,7 @@ class Client:
         return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(
-            self, path: str, make_parents: bool = False, permissions: int = None,
+            self, path: str, *, make_parents: bool = False, permissions: int = None,
             user: typing.Union[str, int] = None, group: typing.Union[str, int] = None):
         """Create a directory on the remote system with the given attributes.
 
@@ -1067,7 +1067,7 @@ class Client:
         resp = self._request('POST', '/v1/files', None, body)
         self._raise_on_path_error(resp, path)
 
-    def remove_path(self, path: str, recursive: bool = False):
+    def remove_path(self, path: str, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         Args:
