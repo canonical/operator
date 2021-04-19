@@ -1107,8 +1107,8 @@ class Container:
 
     def write_content(
             self, path: str, content: typing.Union[bytes, str], *, encoding: str = 'utf-8',
-            make_dirs: bool = False, permissions: int = None, user: typing.Union[str, int] = None,
-            group: typing.Union[str, int] = None):
+            make_dirs: bool = False, permissions: int = None, user_id: int = None,
+            user: str = None, group_id: int = None, group: str = None):
         """Write content to a given file path on the remote system.
 
         Args:
@@ -1119,11 +1119,14 @@ class Container:
             make_dirs: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
-            user: UID or username for file.
-            group: GID or group name for file.
+            user_id: UID for file.
+            user: Username for file (user_id takes precedence).
+            group_id: GID for file.
+            group: Group name for file (group_id takes precedence).
         """
         self._pebble.write_content(path, content, encoding=encoding, make_dirs=make_dirs,
-                                   permissions=permissions, user=user, group=group)
+                                   permissions=permissions, user_id=user_id, user=user,
+                                   group_id=group_id, group=group)
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List['pebble.FileInfo']:
@@ -1141,7 +1144,7 @@ class Container:
 
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: int = None,
-            user: typing.Union[str, int] = None, group: typing.Union[str, int] = None):
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -1149,11 +1152,13 @@ class Container:
             make_parents: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create directory with (Pebble
                 default is 0o755).
-            user: UID or username for directory.
-            group: GID or group name for directory.
+            user_id: UID for directory.
+            user: Username for directory (user_id takes precedence).
+            group_id: GID for directory.
+            group: Group name for directory (group_id takes precedence).
         """
         self._pebble.make_dir(path, make_parents=make_parents, permissions=permissions,
-                              user=user, group=group)
+                              user_id=user_id, user=user, group_id=group_id, group=group)
 
     def remove_path(self, path: str, *, recursive: bool = False):
         """Remove a file or directory on the remote system.

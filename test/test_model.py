@@ -951,14 +951,16 @@ containers:
     def test_write_content(self):
         self.container.write_content('/path/1', 'content1')
         self.assertEqual(self.pebble.requests, [
-            ('write_content', '/path/1', 'content1', 'utf-8', False, None, None, None),
+            ('write_content', '/path/1', 'content1', 'utf-8', False, None,
+             None, None, None, None),
         ])
         self.pebble.requests = []
 
         self.container.write_content('/path/2', b'content2', encoding=None, make_dirs=True,
-                                     permissions=0o600, user='USER', group='GROUP')
+                                     permissions=0o600, user_id=12, user='bob', group_id=34,
+                                     group='staff')
         self.assertEqual(self.pebble.requests, [
-            ('write_content', '/path/2', b'content2', None, True, 0o600, 'USER', 'GROUP'),
+            ('write_content', '/path/2', b'content2', None, True, 0o600, 12, 'bob', 34, 'staff'),
         ])
 
     def test_list_files(self):
@@ -980,14 +982,14 @@ containers:
     def test_make_dir(self):
         self.container.make_dir('/path/1')
         self.assertEqual(self.pebble.requests, [
-            ('make_dir', '/path/1', False, None, None, None),
+            ('make_dir', '/path/1', False, None, None, None, None, None),
         ])
         self.pebble.requests = []
 
-        self.container.make_dir('/path/2', make_parents=True, permissions=0o700, user='USER',
-                                group='GROUP')
+        self.container.make_dir('/path/2', make_parents=True, permissions=0o700,
+                                user_id=12, user='bob', group_id=34, group='staff')
         self.assertEqual(self.pebble.requests, [
-            ('make_dir', '/path/2', True, 0o700, 'USER', 'GROUP'),
+            ('make_dir', '/path/2', True, 0o700, 12, 'bob', 34, 'staff'),
         ])
 
     def test_remove_path(self):
@@ -1043,16 +1045,18 @@ class MockPebbleClient:
         return self.responses.pop(0)
 
     def write_content(self, path, content, *, encoding='utf-8', make_dirs=False, permissions=None,
-                      user=None, group=None):
+                      user_id=None, user=None, group_id=None, group=None):
         self.requests.append(('write_content', path, content, encoding, make_dirs, permissions,
-                              user, group))
+                              user_id, user, group_id, group))
 
     def list_files(self, path, *, pattern=None, itself=False):
         self.requests.append(('list_files', path, pattern, itself))
         return self.responses.pop(0)
 
-    def make_dir(self, path, *, make_parents=False, permissions=None, user=None, group=None):
-        self.requests.append(('make_dir', path, make_parents, permissions, user, group))
+    def make_dir(self, path, *, make_parents=False, permissions=None, user_id=None, user=None,
+                 group_id=None, group=None):
+        self.requests.append(('make_dir', path, make_parents, permissions, user_id, user,
+                              group_id, group))
 
     def remove_path(self, path, *, recursive=False):
         self.requests.append(('remove_path', path, recursive))

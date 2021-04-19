@@ -1377,7 +1377,7 @@ bad path
         ))
 
         self.client.write_content('/foo/bar', 'content', make_dirs=True, permissions=0o600,
-                                  user='bob', group='staff')
+                                  user_id=12, user='bob', group_id=34, group='staff')
 
         self.assertEqual(len(self.client.requests), 1)
         request = self.client.requests[0]
@@ -1394,7 +1394,9 @@ bad path
                 'path': '/foo/bar',
                 'make-dirs': True,
                 'permissions': '600',
+                'user-id': 12,
                 'user': 'bob',
+                'group-id': 34,
                 'group': 'staff',
             }],
         })
@@ -1414,7 +1416,7 @@ bad path
 """,
         ))
 
-        self.client.write_content('/foo/bar', 'content', user=12, group=34)
+        self.client.write_content('/foo/bar', 'content', user_id=12, group_id=34)
 
         self.assertEqual(len(self.client.requests), 1)
         request = self.client.requests[0]
@@ -1594,7 +1596,7 @@ bad path
             ('POST', '/v1/files', None, req),
         ])
 
-    def test_make_dir_full(self):
+    def test_make_dir_all_options(self):
         self.client.responses.append({
             "result": [{'path': '/foo/bar'}],
             'status': 'OK',
@@ -1602,14 +1604,16 @@ bad path
             'type': 'sync',
         })
         self.client.make_dir('/foo/bar', make_parents=True, permissions=0o600,
-                             user=12, group=34)
+                             user_id=12, user='bob', group_id=34, group='staff')
 
         req = {'action': 'make-dirs', 'dirs': [{
             'path': '/foo/bar',
             'make-parents': True,
             'permissions': '600',
             'user-id': 12,
+            'user': 'bob',
             'group-id': 34,
+            'group': 'staff',
         }]}
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/files', None, req),
