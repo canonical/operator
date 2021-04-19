@@ -147,19 +147,21 @@ def main():
         elif args.command == 'plan':
             result = client.get_plan().to_yaml()
         elif args.command == 'pull':
+            content = client.read_content(args.remote_path, encoding=None)
             if args.local_path != '-':
                 with open(args.local_path, 'wb') as f:
-                    client.read_file(args.remote_path, f)
+                    f.write(content)
                 result = 'wrote remote file {} to {}'.format(args.remote_path, args.local_path)
             else:
-                client.read_file(args.remote_path, sys.stdout.buffer)
+                sys.stdout.buffer.write(content)
                 return
         elif args.command == 'push':
             with open(args.local_path, 'rb') as f:
-                client.write_file(
-                    args.remote_path, f, make_dirs=args.dirs,
-                    permissions=int(args.mode, 8) if args.mode is not None else None,
-                    user=args.user, group=args.group)
+                content = f.read()
+            client.write_content(
+                args.remote_path, content, make_dirs=args.dirs,
+                permissions=int(args.mode, 8) if args.mode is not None else None,
+                user=args.user, group=args.group)
             result = 'wrote {} to remote file {}'.format(args.local_path, args.remote_path)
         elif args.command == 'rm':
             client.remove_path(args.path, recursive=bool(args.recursive))
