@@ -1833,6 +1833,9 @@ services:
     summary: Foo
     command: '/bin/echo foo'
 ''')
+        # TODO: jam 2021-04-19 Pebble currently raises a HTTP Error 500 Internal Service Error
+        #  if you don't supply an override directive. That needs to be fixed and this test
+        #  should be updated. https://github.com/canonical/operator/issues/514
         with self.assertRaises(RuntimeError):
             client.add_layer('foo', '''\
 summary: foo
@@ -1840,4 +1843,79 @@ services:
   foo:
     summary: Foo
     command: '/bin/echo foo'
+''', combine=True)
+
+    def test_add_layer_combine_override_replace(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''')
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    command: '/bin/echo foo new'
+    override: replace
+''', combine=True)
+        self.assertEqual('''\
+services:
+  bar:
+    command: /bin/echo bar
+    summary: Bar
+  foo:
+    command: /bin/echo foo new
+    override: replace
+''', client.get_plan().to_yaml())
+
+    def test_add_layer_combine_override_merge(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''')
+        # TODO: jam 2021-04-19 override: merge should eventually be supported, but if it isn't
+        #  supported by the framework, we should fail rather than do the wrong thing
+        with self.assertRaises(RuntimeError):
+            client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    command: '/bin/echo foob'
+    override: merge
+''', combine=True)
+
+    def test_add_layer_combine_override_unknown(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''')
+        with self.assertRaises(RuntimeError):
+            client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    command: '/bin/echo foob'
+    override: blah
 ''', combine=True)

@@ -975,14 +975,25 @@ class _TestingPebbleClient:
             raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
                 type(layer).__name__))
         if label in self._layers:
+            # TODO: jam 2021-04-19 These should not be RuntimeErrors but should be proper error
+            #  types. https://github.com/canonical/operator/issues/514
             if not combine:
                 raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+            layer = self._layers[label]
             for name, service in layer_obj.services.items():
                 if not service.override:
-                    raise RuntimeError('500 Internal Server Error: layer "{}" must define'
-                                       + "'override' for service \"{}\"")
-
-        self._layers[label] = layer_obj
+                    raise RuntimeError("500 Internal Server Error: layer \"{}\" must define"
+                                       "'override' for service \"{}\"".format(label, name))
+                if service.override not in ('merge', 'replace'):
+                    raise RuntimeError("500 Internal Server Error: layer \"{}\" has invalid "
+                                       "'override' value on service \"{}\"".format(label, name))
+                if service.override != 'replace':
+                    raise RuntimeError(
+                        'override: "{}" unsupported for layer "{}" service "{}"'.format(
+                            service.override, label, name))
+                layer.services[name] = service
+        else:
+            self._layers[label] = layer_obj
 
     def _render_services(self):
         services = {}
