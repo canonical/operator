@@ -932,6 +932,78 @@ containers:
         with self.assertRaises(RuntimeError):
             self.container.get_service('s1')
 
+    def test_read_content(self):
+        self.pebble.responses.append('content1')
+        got = self.container.read_content('/path/1')
+        self.assertEqual(got, 'content1')
+        self.assertEqual(self.pebble.requests, [
+            ('read_content', '/path/1', 'utf-8'),
+        ])
+        self.pebble.requests = []
+
+        self.pebble.responses.append(b'content2')
+        got = self.container.read_content('/path/2', encoding=None)
+        self.assertEqual(got, b'content2')
+        self.assertEqual(self.pebble.requests, [
+            ('read_content', '/path/2', None),
+        ])
+
+    def test_write_content(self):
+        self.container.write_content('/path/1', 'content1')
+        self.assertEqual(self.pebble.requests, [
+            ('write_content', '/path/1', 'content1', 'utf-8', False, None,
+             None, None, None, None),
+        ])
+        self.pebble.requests = []
+
+        self.container.write_content('/path/2', b'content2', encoding=None, make_dirs=True,
+                                     permissions=0o600, user_id=12, user='bob', group_id=34,
+                                     group='staff')
+        self.assertEqual(self.pebble.requests, [
+            ('write_content', '/path/2', b'content2', None, True, 0o600, 12, 'bob', 34, 'staff'),
+        ])
+
+    def test_list_files(self):
+        self.pebble.responses.append('dummy1')
+        ret = self.container.list_files('/path/1')
+        self.assertEqual(ret, 'dummy1')
+        self.assertEqual(self.pebble.requests, [
+            ('list_files', '/path/1', None, False),
+        ])
+        self.pebble.requests = []
+
+        self.pebble.responses.append('dummy2')
+        ret = self.container.list_files('/path/2', pattern='*.txt', itself=True)
+        self.assertEqual(ret, 'dummy2')
+        self.assertEqual(self.pebble.requests, [
+            ('list_files', '/path/2', '*.txt', True),
+        ])
+
+    def test_make_dir(self):
+        self.container.make_dir('/path/1')
+        self.assertEqual(self.pebble.requests, [
+            ('make_dir', '/path/1', False, None, None, None, None, None),
+        ])
+        self.pebble.requests = []
+
+        self.container.make_dir('/path/2', make_parents=True, permissions=0o700,
+                                user_id=12, user='bob', group_id=34, group='staff')
+        self.assertEqual(self.pebble.requests, [
+            ('make_dir', '/path/2', True, 0o700, 12, 'bob', 34, 'staff'),
+        ])
+
+    def test_remove_path(self):
+        self.container.remove_path('/path/1')
+        self.assertEqual(self.pebble.requests, [
+            ('remove_path', '/path/1', False),
+        ])
+        self.pebble.requests = []
+
+        self.container.remove_path('/path/2', recursive=True)
+        self.assertEqual(self.pebble.requests, [
+            ('remove_path', '/path/2', True),
+        ])
+
 
 class MockPebbleBackend(ops.model._ModelBackend):
     def get_pebble(self, socket_path):
@@ -967,6 +1039,27 @@ class MockPebbleClient:
     def get_services(self, names=None):
         self.requests.append(('get_services', names))
         return self.responses.pop(0)
+
+    def read_content(self, path, *, encoding='utf-8'):
+        self.requests.append(('read_content', path, encoding))
+        return self.responses.pop(0)
+
+    def write_content(self, path, content, *, encoding='utf-8', make_dirs=False, permissions=None,
+                      user_id=None, user=None, group_id=None, group=None):
+        self.requests.append(('write_content', path, content, encoding, make_dirs, permissions,
+                              user_id, user, group_id, group))
+
+    def list_files(self, path, *, pattern=None, itself=False):
+        self.requests.append(('list_files', path, pattern, itself))
+        return self.responses.pop(0)
+
+    def make_dir(self, path, *, make_parents=False, permissions=None, user_id=None, user=None,
+                 group_id=None, group=None):
+        self.requests.append(('make_dir', path, make_parents, permissions, user_id, user,
+                              group_id, group))
+
+    def remove_path(self, path, *, recursive=False):
+        self.requests.append(('remove_path', path, recursive))
 
 
 class TestModelBindings(unittest.TestCase):
