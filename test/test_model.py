@@ -932,35 +932,34 @@ containers:
         with self.assertRaises(RuntimeError):
             self.container.get_service('s1')
 
-    def test_read_content(self):
-        self.pebble.responses.append('content1')
-        got = self.container.read_content('/path/1')
-        self.assertEqual(got, 'content1')
+    def test_pull(self):
+        self.pebble.responses.append('dummy1')
+        got = self.container.pull('/path/1')
+        self.assertEqual(got, 'dummy1')
         self.assertEqual(self.pebble.requests, [
-            ('read_content', '/path/1', 'utf-8'),
+            ('pull', '/path/1', 'utf-8'),
         ])
         self.pebble.requests = []
 
-        self.pebble.responses.append(b'content2')
-        got = self.container.read_content('/path/2', encoding=None)
-        self.assertEqual(got, b'content2')
+        self.pebble.responses.append(b'dummy2')
+        got = self.container.pull('/path/2', encoding=None)
+        self.assertEqual(got, b'dummy2')
         self.assertEqual(self.pebble.requests, [
-            ('read_content', '/path/2', None),
+            ('pull', '/path/2', None),
         ])
 
-    def test_write_content(self):
-        self.container.write_content('/path/1', 'content1')
+    def test_push(self):
+        self.container.push('/path/1', 'content1')
         self.assertEqual(self.pebble.requests, [
-            ('write_content', '/path/1', 'content1', 'utf-8', False, None,
+            ('push', '/path/1', 'content1', 'utf-8', False, None,
              None, None, None, None),
         ])
         self.pebble.requests = []
 
-        self.container.write_content('/path/2', b'content2', encoding=None, make_dirs=True,
-                                     permissions=0o600, user_id=12, user='bob', group_id=34,
-                                     group='staff')
+        self.container.push('/path/2', b'content2', encoding=None, make_dirs=True,
+                            permissions=0o600, user_id=12, user='bob', group_id=34, group='staff')
         self.assertEqual(self.pebble.requests, [
-            ('write_content', '/path/2', b'content2', None, True, 0o600, 12, 'bob', 34, 'staff'),
+            ('push', '/path/2', b'content2', None, True, 0o600, 12, 'bob', 34, 'staff'),
         ])
 
     def test_list_files(self):
@@ -1040,13 +1039,13 @@ class MockPebbleClient:
         self.requests.append(('get_services', names))
         return self.responses.pop(0)
 
-    def read_content(self, path, *, encoding='utf-8'):
-        self.requests.append(('read_content', path, encoding))
+    def pull(self, path, *, encoding='utf-8'):
+        self.requests.append(('pull', path, encoding))
         return self.responses.pop(0)
 
-    def write_content(self, path, content, *, encoding='utf-8', make_dirs=False, permissions=None,
-                      user_id=None, user=None, group_id=None, group=None):
-        self.requests.append(('write_content', path, content, encoding, make_dirs, permissions,
+    def push(self, path, source, *, encoding='utf-8', make_dirs=False, permissions=None,
+             user_id=None, user=None, group_id=None, group=None):
+        self.requests.append(('push', path, source, encoding, make_dirs, permissions,
                               user_id, user, group_id, group))
 
     def list_files(self, path, *, pattern=None, itself=False):

@@ -1170,7 +1170,7 @@ services:
             ('GET', '/v1/services', {'names': 'svc2'}, None),
         ])
 
-    def test_read_content_str(self):
+    def test_pull_text(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""
@@ -1191,7 +1191,7 @@ Content-Disposition: form-data; name="response"
 """,
         ))
 
-        content = self.client.read_content('/etc/hosts')
+        content = self.client.pull('/etc/hosts').read()
         self.assertEqual(content, '127.0.0.1 localhost  # 😀')
 
         self.assertEqual(self.client.requests, [
@@ -1199,7 +1199,7 @@ Content-Disposition: form-data; name="response"
                 {'Accept': 'multipart/form-data'}, None),
         ])
 
-    def test_read_content_bytes(self):
+    def test_pull_binary(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""
@@ -1220,7 +1220,7 @@ Content-Disposition: form-data; name="response"
 """,
         ))
 
-        content = self.client.read_content('/etc/hosts', encoding=None)
+        content = self.client.pull('/etc/hosts', encoding=None).read()
         self.assertEqual(content, b'127.0.0.1 localhost  # \xf0\x9f\x98\x80')
 
         self.assertEqual(self.client.requests, [
@@ -1228,7 +1228,7 @@ Content-Disposition: form-data; name="response"
                 {'Accept': 'multipart/form-data'}, None),
         ])
 
-    def test_read_content_path_error(self):
+    def test_pull_path_error(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""
@@ -1248,7 +1248,7 @@ Content-Disposition: form-data; name="response"
         ))
 
         with self.assertRaises(pebble.PathError) as cm:
-            self.client.read_content('/etc/hosts')
+            self.client.pull('/etc/hosts')
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(cm.exception.kind, 'not-found')
         self.assertEqual(cm.exception.message, 'not found')
@@ -1258,17 +1258,17 @@ Content-Disposition: form-data; name="response"
                 {'Accept': 'multipart/form-data'}, None),
         ])
 
-    def test_read_content_protocol_errors(self):
+    def test_pull_protocol_errors(self):
         self.client.responses.append(({'Content-Type': 'ct'}, b''))
         with self.assertRaises(pebble.ProtocolError) as cm:
-            self.client.read_content('/etc/hosts')
+            self.client.pull('/etc/hosts')
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(str(cm.exception),
                          "expected Content-Type 'multipart/form-data', got 'ct'")
 
         self.client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
         with self.assertRaises(pebble.ProtocolError) as cm:
-            self.client.read_content('/etc/hosts')
+            self.client.pull('/etc/hosts')
         self.assertEqual(str(cm.exception), "invalid boundary ''")
 
         self.client.responses.append((
@@ -1282,7 +1282,7 @@ bad path
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
-            self.client.read_content('/etc/hosts')
+            self.client.pull('/etc/hosts')
         self.assertEqual(str(cm.exception), "path not expected: /bad")
 
         self.client.responses.append((
@@ -1296,10 +1296,16 @@ bad path
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
-            self.client.read_content('/etc/hosts')
+            self.client.pull('/etc/hosts')
         self.assertEqual(str(cm.exception), 'no "response" field in multipart body')
 
-    def test_write_content_str(self):
+    def test_push_str(self):
+        self._test_push_str('content 😀')
+
+    def test_push_text(self):
+        self._test_push_str(io.StringIO('content 😀'))
+
+    def _test_push_str(self, source):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -1314,7 +1320,7 @@ bad path
 """,
         ))
 
-        self.client.write_content('/foo/bar', 'content 😀')
+        self.client.push('/foo/bar', source)
 
         self.assertEqual(len(self.client.requests), 1)
         request = self.client.requests[0]
@@ -1330,7 +1336,13 @@ bad path
             'files': [{'path': '/foo/bar'}],
         })
 
-    def test_write_content_bytes(self):
+    def test_push_bytes(self):
+        self._test_push_bytes(b'content \xf0\x9f\x98\x80')
+
+    def test_push_binary(self):
+        self._test_push_bytes(io.BytesIO(b'content \xf0\x9f\x98\x80'))
+
+    def _test_push_bytes(self, source):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -1345,7 +1357,7 @@ bad path
 """,
         ))
 
-        self.client.write_content('/foo/bar', b'content \xf0\x9f\x98\x80')
+        self.client.push('/foo/bar', source)
 
         self.assertEqual(len(self.client.requests), 1)
         request = self.client.requests[0]
@@ -1361,7 +1373,7 @@ bad path
             'files': [{'path': '/foo/bar'}],
         })
 
-    def test_write_content_all_options(self):
+    def test_push_all_options(self):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -1376,8 +1388,8 @@ bad path
 """,
         ))
 
-        self.client.write_content('/foo/bar', 'content', make_dirs=True, permissions=0o600,
-                                  user_id=12, user='bob', group_id=34, group='staff')
+        self.client.push('/foo/bar', 'content', make_dirs=True, permissions=0o600,
+                         user_id=12, user='bob', group_id=34, group='staff')
 
         self.assertEqual(len(self.client.requests), 1)
         request = self.client.requests[0]
@@ -1401,7 +1413,7 @@ bad path
             }],
         })
 
-    def test_write_content_uid_gid(self):
+    def test_push_uid_gid(self):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -1416,7 +1428,7 @@ bad path
 """,
         ))
 
-        self.client.write_content('/foo/bar', 'content', user_id=12, group_id=34)
+        self.client.push('/foo/bar', 'content', user_id=12, group_id=34)
 
         self.assertEqual(len(self.client.requests), 1)
         request = self.client.requests[0]
@@ -1436,7 +1448,7 @@ bad path
             }],
         })
 
-    def test_write_content_path_error(self):
+    def test_push_path_error(self):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -1452,7 +1464,7 @@ bad path
         ))
 
         with self.assertRaises(pebble.PathError) as cm:
-            self.client.write_content('/foo/bar', 'content')
+            self.client.push('/foo/bar', 'content')
         self.assertEqual(cm.exception.kind, 'not-found')
         self.assertEqual(cm.exception.message, 'not found')
 
