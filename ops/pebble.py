@@ -1018,9 +1018,8 @@ class Client:
                 raise TypeError('group must be int GID or string group name')
         return d
 
-    def list_files(
-        self, path: str, *, pattern: str = None, itself: bool = False,
-    ) -> typing.List[FileInfo]:
+    def list_files(self, path: str, *, pattern: str = None,
+                   itself: bool = False) -> typing.List[FileInfo]:
         """Return list of file information from given path on remote system.
 
         Args:

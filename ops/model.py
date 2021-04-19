@@ -1125,9 +1125,8 @@ class Container:
         self._pebble.write_content(path, content, encoding=encoding, make_dirs=make_dirs,
                                    permissions=permissions, user=user, group=group)
 
-    def list_files(
-        self, path: str, *, pattern: str = None, itself: bool = False,
-    ) -> typing.List['pebble.FileInfo']:
+    def list_files(self, path: str, *, pattern: str = None,
+                   itself: bool = False) -> typing.List['pebble.FileInfo']:
         """Return list of file information from given path on remote system.
 
         Args:
