@@ -500,8 +500,9 @@ class Harness:
         socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
         client = self._backend._pebble_clients.get(socket_path)
         if client is None:
+            # TODO: jam 2021-04-19 Should this actually be a raise KeyError?
             return None
-        return client.get_plan().to_yaml()
+        return client.get_plan()
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -973,8 +974,14 @@ class _TestingPebbleClient:
         else:
             raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
                 type(layer).__name__))
-        if label in self._layers and not combine:
-            raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+        if label in self._layers:
+            if not combine:
+                raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+            for name, service in layer_obj.services.items():
+                if not service.override:
+                    raise RuntimeError('500 Internal Server Error: layer "{}" must define'
+                                       + "'override' for service \"{}\"")
+
         self._layers[label] = layer_obj
 
     def _render_services(self):

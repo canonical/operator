@@ -1381,6 +1381,48 @@ class TestHarness(unittest.TestCase):
             b_first = [a_first[2], a_first[3], a_first[0], a_first[1]]
             self.assertEqual(changes, b_first)
 
+    def test_get_pebble_container_plan(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        initial_plan = harness.get_container_pebble_plan('foo')
+        self.assertEqual(initial_plan.to_yaml(), '{}\n')
+        # this may become a different error
+        self.assertIsNone(harness.get_container_pebble_plan('unknown'))
+        container = harness.model.unit.get_container('foo')
+        container.pebble.add_layer('test-ab', '''\
+summary: test-layer
+description: a layer that we can use for testing
+services:
+  a:
+    command: /bin/echo hello from a
+  b:
+    command: /bin/echo hello from b
+''')
+        container.pebble.add_layer('test-c', '''\
+summary: test-for-c
+services:
+  c:
+    command: /bin/echo hello from c
+''')
+        plan = container.pebble.get_plan()
+        self.assertEqual(plan.to_yaml(), '''\
+services:
+  a:
+    command: /bin/echo hello from a
+  b:
+    command: /bin/echo hello from b
+  c:
+    command: /bin/echo hello from c
+''')
+        harness_plan = harness.get_container_pebble_plan('foo')
+        self.assertEqual(harness_plan.to_yaml(), plan.to_yaml())
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -1688,3 +1730,114 @@ services:
       KEY: VALUE
 '''))
         plan = client.get_plan()
+        # The YAML should be normalized
+        self.assertEqual('''\
+services:
+  serv:
+    command: /bin/echo hello
+    description: 'A description about Serv the amazing service.
+
+      '
+    environment:
+      KEY: VALUE
+    override: replace
+    startup: enabled
+    summary: Serv
+''', plan.to_yaml())
+
+    def test_add_layer_not_combined(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        self.assertIsInstance(plan, pebble.Plan)
+        self.assertEqual('{}\n', plan.to_yaml())
+        service = '''\
+summary: Foo
+description: |
+  A longer description about Foo
+services:
+  serv:
+    summary: Serv
+    description: |
+      A description about Serv the amazing service.
+    startup: enabled
+    override: replace
+    command: '/bin/echo hello'
+    environment:
+      KEY: VALUE
+'''
+        client.add_layer('foo', pebble.Layer(service))
+        # TODO: jam 2021-04-19 We should have a clearer error type for this case. The actual
+        #  pebble raises an HTTP exception. See https://github.com/canonical/operator/issues/514
+        #  that this should be cleaned up into a clearer error type, however, they should get an
+        #  error
+        with self.assertRaises(RuntimeError):
+            client.add_layer('foo', pebble.Layer(service))
+
+    def test_add_layer_three_services(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    override: replace
+    command: '/bin/echo foo'
+''')
+        client.add_layer('bar', '''\
+summary: bar
+services:
+  bar:
+    summary: The Great Bar
+    startup: enabled
+    override: replace
+    command: '/bin/echo bar'
+''')
+        client.add_layer('baz', '''\
+summary: baz
+services:
+  baz:
+    summary: Not Bar, but Baz
+    startup: enabled
+    override: replace
+    command: '/bin/echo baz'
+''')
+        plan = client.get_plan()
+        self.maxDiff = 1000
+        # Alphabetical services, and the YAML should be normalized
+        self.assertEqual('''\
+services:
+  bar:
+    command: /bin/echo bar
+    override: replace
+    startup: enabled
+    summary: The Great Bar
+  baz:
+    command: /bin/echo baz
+    override: replace
+    startup: enabled
+    summary: Not Bar, but Baz
+  foo:
+    command: /bin/echo foo
+    override: replace
+    startup: enabled
+    summary: Foo
+''', plan.to_yaml())
+
+    def test_add_layer_combine_no_override(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''')
+        with self.assertRaises(RuntimeError):
+            client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''', combine=True)

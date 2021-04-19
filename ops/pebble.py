@@ -17,7 +17,7 @@
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Mapping, Optional, Union
 import datetime
 import enum
 import http.client
@@ -426,7 +426,16 @@ class Layer:
 
     The format of this is not documented, but is captured in code here:
     https://github.com/canonical/pebble/blob/master/internal/plan/plan.go
+
+    Attributes:
+        summary: A summary of the purpose of this layer
+        description: A long form description of this layer
+        services: A mapping of name: :class:`Service` defined by this layer
     """
+
+    summary: str
+    description: str
+    services: Mapping[str, 'Service']
 
     def __init__(self, raw: Union[str, Dict] = None):
         if isinstance(raw, str):
