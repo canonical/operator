@@ -1091,31 +1091,35 @@ class Container:
             raise RuntimeError('expected 1 service, got {}'.format(len(services)))
         return services[service_name]
 
-    def read_content(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[bytes, str]:
-        """Read a file's content from the remote system to a string.
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
+                                                                          typing.TextIO]:
+        """Read a file's content from the remote system.
 
         Args:
             path: Path of the file to read from the remote system.
-            encoding: Encoding to use for decoding file's bytes to a text string
-                (or None to return raw bytes).
+            encoding: Encoding to use for decoding the file's bytes to str,
+                or None to specify no decoding.
 
         Returns:
-            File's content, decoded and returned as str if encoding is not None,
-            or returned as raw bytes if encoding is None.
+            A readable file-like object, whose read() method will return str
+            objects decoded according to the specified encoding, or bytes if
+            encoding is None.
         """
-        return self._pebble.read_content(path, encoding=encoding)
+        return self._pebble.pull(path, encoding=encoding)
 
-    def write_content(
-            self, path: str, content: typing.Union[bytes, str], *, encoding: str = 'utf-8',
-            make_dirs: bool = False, permissions: int = None, user_id: int = None,
-            user: str = None, group_id: int = None, group: str = None):
+    def push(
+            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
         """Write content to a given file path on the remote system.
 
         Args:
             path: Path of the file to write to on the remote system.
-            content: Content to write (str or bytes).
-            encoding: Encoding to use for encoding content str to bytes.
-                Ignored if content is bytes.
+            source: Source of data to write. This is either a concrete str or
+                bytes instance, or a readable file-like object.
+            encoding: Encoding to use for encoding source str to bytes, or
+                strings read from source if it is a TextIO type. Ignored if
+                source is bytes or BinaryIO.
             make_dirs: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
@@ -1124,9 +1128,9 @@ class Container:
             group_id: GID for file.
             group: Group name for file (group_id takes precedence).
         """
-        self._pebble.write_content(path, content, encoding=encoding, make_dirs=make_dirs,
-                                   permissions=permissions, user_id=user_id, user=user,
-                                   group_id=group_id, group=group)
+        self._pebble.push(path, source, encoding=encoding, make_dirs=make_dirs,
+                          permissions=permissions, user_id=user_id, user=user,
+                          group_id=group_id, group=group)
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List['pebble.FileInfo']:

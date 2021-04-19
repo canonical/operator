@@ -23,6 +23,7 @@ import datetime
 import email.parser
 import enum
 import http.client
+import io
 import json
 import re
 import socket
@@ -875,17 +876,19 @@ class Client:
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
-    def read_content(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[bytes, str]:
-        """Read a file's content from the remote system to a string.
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
+                                                                          typing.TextIO]:
+        """Read a file's content from the remote system.
 
         Args:
             path: Path of the file to read from the remote system.
-            encoding: Encoding to use for decoding file's bytes to a text string
-                (or None to return raw bytes).
+            encoding: Encoding to use for decoding the file's bytes to str,
+                or None to specify no decoding.
 
         Returns:
-            File's content, decoded and returned as str if encoding is not None,
-            or returned as raw bytes if encoding is None.
+            A readable file-like object, whose read() method will return str
+            objects decoded according to the specified encoding, or bytes if
+            encoding is None.
         """
         query = {
             'action': 'read',
@@ -934,8 +937,10 @@ class Client:
         if content is None:
             raise ProtocolError('no file content in multipart response')
         if encoding is not None:
-            content = content.decode(encoding)
-        return content
+            reader = io.StringIO(content.decode(encoding))
+        else:
+            reader = io.BytesIO(content)
+        return reader
 
     @staticmethod
     def _raise_on_path_error(resp, path):
@@ -947,17 +952,19 @@ class Client:
         if error:
             raise PathError(error['kind'], error['message'])
 
-    def write_content(
-            self, path: str, content: typing.Union[bytes, str], *, encoding: str = 'utf-8',
-            make_dirs: bool = False, permissions: int = None, user_id: int = None,
-            user: str = None, group_id: int = None, group: str = None):
+    def push(
+            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
         """Write content to a given file path on the remote system.
 
         Args:
             path: Path of the file to write to on the remote system.
-            content: Content to write (str or bytes).
-            encoding: Encoding to use for encoding content str to bytes.
-                Ignored if content is bytes.
+            source: Source of data to write. This is either a concrete str or
+                bytes instance, or a readable file-like object.
+            encoding: Encoding to use for encoding source str to bytes, or
+                strings read from source if it is a TextIO type. Ignored if
+                source is bytes or BinaryIO.
             make_dirs: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
@@ -984,6 +991,10 @@ class Client:
 
         part = MIMEBase('application', 'octet-stream')
         part.add_header('Content-Disposition', 'form-data', name='files', filename=path)
+        if hasattr(source, 'read'):
+            content = source.read()
+        else:
+            content = source
         if isinstance(content, str):
             content = content.encode(encoding)
         part.set_payload(content)
