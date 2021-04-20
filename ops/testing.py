@@ -488,14 +488,15 @@ class Harness:
 
     def get_container_pebble_plan(
             self, container_name: str
-    ) -> str:
+    ) -> typing.Optional[pebble.Plan]:
         """Return the current Plan that pebble is executing for the given container.
 
         Args:
             container_name: The simple name of the associated container
         Return:
-            A list of service descriptions for the container.
-            Will return None if no pebble client exists for that container name.
+            The pebble.Plan for this container. You can use :meth:`pebble.Plan.to_yaml` to get
+            a string form for the content. Will return None if no pebble client exists for that
+            container name.
         """
         socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
         client = self._backend._pebble_clients.get(socket_path)
@@ -730,7 +731,7 @@ class _TestingModelBackend:
         self._resource_dir = None
         # {socket_path : _TestingPebbleClient}
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
-        self._pebble_clients = {}
+        self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -891,16 +892,10 @@ class _TestingPebbleClient:
     ) -> typing.List['pebble.Warning']:
         """Get list of warnings in given state (pending or all)."""
         raise NotImplementedError(self.get_warnings)
-        query = {'select': select.value}
-        result = self._request('GET', '/v1/warnings', query)
-        return [Warning.from_dict(w) for w in result['result']]
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
         """Acknowledge warnings up to given timestamp, return number acknowledged."""
         raise NotImplementedError(self.ack_warnings)
-        body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
-        result = self._request('POST', '/v1/warnings', body=body)
-        return result['result']
 
     def get_changes(
             self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS, service: str = None,
@@ -910,7 +905,7 @@ class _TestingPebbleClient:
 
     def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
         """Get single change by ID."""
-        raise NotImplementedError(self.get_changes)
+        raise NotImplementedError(self.get_change)
 
     def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
         """Abort change with given ID."""

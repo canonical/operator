@@ -426,11 +426,9 @@ class Plan:
         """
         return self._services
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this plan to its dict representation."""
-        as_dicts = {}
-        for name, service in self._services.items():
-            as_dicts[name] = service.to_dict()
+        as_dicts = {name: service.to_dict() for name, service in self._services.items()}
         if not as_dicts:
             return {}
         return {
@@ -475,7 +473,7 @@ class Layer:
         """Convert this layer to its YAML representation."""
         return yaml.safe_dump(self.to_dict())
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
