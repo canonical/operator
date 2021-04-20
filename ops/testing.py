@@ -1043,12 +1043,14 @@ ChangeError: cannot perform the following tasks:
                 raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
             layer = self._layers[label]
             for name, service in layer_obj.services.items():
+                # 'override' is actually single quoted in the real error, but
+                # it shouldn't be, hopefully that gets cleaned up.
                 if not service.override:
-                    raise RuntimeError("500 Internal Server Error: layer \"{}\" must define"
-                                       "'override' for service \"{}\"".format(label, name))
+                    raise RuntimeError('500 Internal Server Error: layer "{}" must define'
+                                       '"override" for service "{}"'.format(label, name))
                 if service.override not in ('merge', 'replace'):
-                    raise RuntimeError("500 Internal Server Error: layer \"{}\" has invalid "
-                                       "'override' value on service \"{}\"".format(label, name))
+                    raise RuntimeError('500 Internal Server Error: layer "{}" has invalid '
+                                       '"override" value on service "{}"'.format(label, name))
                 if service.override != 'replace':
                     raise RuntimeError(
                         'override: "{}" unsupported for layer "{}" service "{}"'.format(
