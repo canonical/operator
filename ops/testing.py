@@ -879,6 +879,8 @@ class _TestingPebbleClient:
     def __init__(self, backend: _TestingModelBackend):
         self._backend = _TestingModelBackend
         self._layers = {}
+        # Has a service been started/stopped?
+        self._service_status = {}
 
     def get_system_info(self) -> pebble.SystemInfo:
         """Get system info."""
@@ -921,7 +923,16 @@ class _TestingPebbleClient:
         timeout is 0, submit the action but don't wait; just return the change
         ID immediately.
         """
-        raise NotImplementedError(self.autostart_services)
+        for name, service in self._render_services().items():
+            # TODO: jam 2021-04-20 This feels awkward that Service.startup might be a string or
+            #  might be an enum. Probably should make Service.startup a property rather than an
+            #  attribute.
+            if service.startup == '':
+                startup = pebble.ServiceStartup.DISABLED
+            else:
+                startup = pebble.ServiceStartup(service.startup)
+            if startup == pebble.ServiceStartup.ENABLED:
+                self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def start_services(
             self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
@@ -932,7 +943,35 @@ class _TestingPebbleClient:
         timeout is 0, submit the action but don't wait; just return the change
         ID immediately.
         """
-        raise NotImplementedError(self.start_services)
+        # A common mistake is to pass just the name of a service, rather than a list of services,
+        # so trap that so it is caught quickly.
+        if isinstance(services, str):
+            raise TypeError('start_services should take a list of names, not just "{}"'.format(
+                services))
+
+        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
+        # Container.start() which currently ignores the return value
+        known_services = self._render_services()
+        # Names appear to be validated before any are activated, so do two passes
+        for name in services:
+            if name not in known_services:
+                # TODO: jam 2021-04-20 This needs a better error type
+                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if current == pebble.ServiceStatus.ACTIVE:
+                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
+                #  can be started before starting any, and gives a list of things that couldn't
+                #  be done, but this is good enough for now
+                raise pebble.ChangeError('''\
+cannot perform the following tasks:
+- Start service "{}" (service "{}" was previously started)
+'''.format(name, name), change=1234)  # the change id is not respected
+        for name in services:
+            # If you try to start a service which is started, you get a ChangeError:
+            # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
+            # ChangeError: cannot perform the following tasks:
+            # - Start service "serv" (service "serv" was previously started)
+            self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def stop_services(
             self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
@@ -943,7 +982,30 @@ class _TestingPebbleClient:
         timeout is 0, submit the action but don't wait; just return the change
         ID immediately.
         """
-        raise NotImplementedError(self.stop_services)
+        # handle a common mistake of passing just a name rather than a list of names
+        if isinstance(services, str):
+            raise TypeError('stop_services should take a list of names, not just "{}"'.format(
+                services))
+        # TODO: handle invalid names
+        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
+        # Container.stop() which currently ignores the return value
+        known_services = self._render_services()
+        for name in services:
+            if name not in known_services:
+                # TODO: jam 2021-04-20 This needs a better error type
+                #  400 Bad Request: service "bal" does not exist
+                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if current != pebble.ServiceStatus.ACTIVE:
+                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
+                #  can be started before starting any, and gives a list of things that couldn't
+                #  be done, but this is good enough for now
+                raise pebble.ChangeError('''\
+ChangeError: cannot perform the following tasks:
+- Stop service "{}" (service "{}" is not active)
+'''.format(name, name), change=1234)  # the change id is not respected
+        for name in services:
+            self._service_status[name] = pebble.ServiceStatus.INACTIVE
 
     def wait_change(
             self, change_id: pebble.ChangeID, timeout: float = 30.0, delay: float = 0.1,
@@ -962,7 +1024,7 @@ class _TestingPebbleClient:
         exists, the two layers are combined into a single one considering the
         layer override rules; if the layer doesn't exist, it is added as usual.
         """
-        # I wish we could combine some of this helpful object coraling with the actual backend,
+        # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
         if not isinstance(label, str):
             raise TypeError('label must be a str, not {}'.format(type(label).__name__))
@@ -995,7 +1057,7 @@ class _TestingPebbleClient:
         else:
             self._layers[label] = layer_obj
 
-    def _render_services(self):
+    def _render_services(self) -> typing.Mapping[str, pebble.Service]:
         services = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
@@ -1020,4 +1082,19 @@ class _TestingPebbleClient:
         If names is specified, only fetch the service status for the services
         named.
         """
-        raise NotImplementedError(self.get_services)
+        if names is not None:
+            raise NotImplementedError("passing a list of names to get_services not implemented")
+        services = self._render_services()
+        infos = []
+        for name in sorted(services.keys()):
+            service = services[name]
+            status = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if service.startup == '':
+                startup = pebble.ServiceStartup.DISABLED
+            else:
+                startup = pebble.ServiceStartup(service.startup)
+            info = pebble.ServiceInfo(name,
+                                      startup=startup,
+                                      current=pebble.ServiceStatus(status))
+            infos.append(info)
+        return infos

@@ -1831,7 +1831,7 @@ summary: foo
 services:
   foo:
     summary: Foo
-    command: '/bin/echo foo'
+command: '/bin/echo foo'
 ''')
         # TODO: jam 2021-04-19 Pebble currently raises a HTTP Error 500 Internal Service Error
         #  if you don't supply an override directive. That needs to be fixed and this test
@@ -1919,3 +1919,228 @@ services:
     command: '/bin/echo foob'
     override: blah
 ''', combine=True)
+
+    def test_get_services_none(self):
+        client = self.get_testing_client()
+        serviceInfo = client.get_services()
+        self.assertEqual([], serviceInfo)
+
+    def test_get_services_none(self):
+        client = self.get_testing_client()
+        service_info = client.get_services()
+        self.assertEqual([], service_info)
+
+    def test_get_services_not_started(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Default when not specified is DISABLED
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
+
+    def test_get_services_autostart(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        client.autostart_services()
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Default when not specified is DISABLED
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+
+    def test_get_services_start_stop(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        client.start_services(['bar'])
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Even though bar defaults to DISABLED, we explicitly started it
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, bar_info.current)
+        # foo would be started by autostart, but we only called start_services
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
+        client.stop_services(['bar'])
+        infos = client.get_services()
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+
+    def test_invalid_start_service(self):
+        client = self.get_testing_client()
+        # TODO: jam 2021-04-20 This should become a better error
+        with self.assertRaises(RuntimeError):
+            client.start_services(['unknown'])
+
+    def test_start_service_str(self):
+        # Start service takes a list of names, but it is really easy to accidentally pass just a
+        # name
+        client = self.get_testing_client()
+        with self.assertRaises(TypeError):
+            client.start_services('unknown')
+
+    def test_stop_service_str(self):
+        # Start service takes a list of names, but it is really easy to accidentally pass just a
+        # name
+        client = self.get_testing_client()
+        with self.assertRaises(TypeError):
+            client.stop_services('unknown')
+
+    def test_mixed_start_service(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+''')
+        # TODO: jam 2021-04-20 better error type
+        with self.assertRaises(RuntimeError):
+            client.start_services(['foo', 'unknown'])
+        # foo should not be started
+        infos = client.get_services()
+        self.assertEqual(len(infos), 1)
+        foo_info = infos[0]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
+
+    def test_stop_services_unknown(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+''')
+        client.autostart_services()
+        # TODO: jam 2021-04-20 better error type
+        with self.assertRaises(RuntimeError):
+            client.stop_services(['foo', 'unknown'])
+        # foo should still be running
+        infos = client.get_services()
+        self.assertEqual(len(infos), 1)
+        foo_info = infos[0]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+
+    def test_start_started_service(self):
+        # If you try to start a service which is started, you get a ChangeError:
+        # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
+        # ChangeError: cannot perform the following tasks:
+        # - Start service "serv" (service "serv" was previously started)
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        client.autostart_services()
+        # Foo is now started, but Bar is not
+        with self.assertRaises(pebble.ChangeError):
+            client.start_services(['bar', 'foo'])
+        # bar could have been started, but won't be, because foo did not validate
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Default when not specified is DISABLED
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+
+    def test_stop_stopped_service(self):
+        # If you try to stop a service which is stop, you get a ChangeError:
+        # $ PYTHONPATH=. python3 ./test/pebble_cli.py stop other serv
+        # ChangeError: cannot perform the following tasks:
+        # - Stop service "other" (service "other" is not active)
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        client.autostart_services()
+        # Foo is now started, but Bar is not
+        with self.assertRaises(pebble.ChangeError):
+            client.stop_services(['foo', 'bar'])
+        # foo could have been stopped, but won't be, because bar did not validate
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Default when not specified is DISABLED
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
