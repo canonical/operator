@@ -1084,11 +1084,14 @@ ChangeError: cannot perform the following tasks:
         If names is specified, only fetch the service status for the services
         named.
         """
-        if names is not None:
-            raise NotImplementedError("passing a list of names to get_services not implemented")
+        if isinstance(names, str):
+            raise TypeError('start_services should take a list of names, not just "{}"'.format(
+                names))
         services = self._render_services()
         infos = []
-        for name in sorted(services.keys()):
+        if names is None:
+            names = sorted(services.keys())
+        for name in sorted(names):
             service = services[name]
             status = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
             if service.startup == '':

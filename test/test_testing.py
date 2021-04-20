@@ -1423,6 +1423,17 @@ services:
         harness_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(harness_plan.to_yaml(), plan.to_yaml())
 
+    def test_container_service_is_running(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        container = harness.model.unit.get_container('foo')
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -2008,6 +2019,44 @@ services:
         self.assertEqual('bar', bar_info.name)
         self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
         self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+
+    def test_get_services_bad_request(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        # It is a common mistake to pass just a name vs a list of names, so catch it with a
+        # TypeError
+        with self.assertRaises(TypeError):
+            infos = client.get_services('foo')
+
+    def test_get_services_subset(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        infos = client.get_services(['foo'])
+        self.assertEqual(len(infos), 1)
+        foo_info = infos[0]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
 
     def test_invalid_start_service(self):
         client = self.get_testing_client()
