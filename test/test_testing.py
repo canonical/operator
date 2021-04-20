@@ -1392,8 +1392,6 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         initial_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(initial_plan.to_yaml(), '{}\n')
-        # this may become a different error
-        self.assertIsNone(harness.get_container_pebble_plan('unknown'))
         container = harness.model.unit.get_container('foo')
         container.pebble.add_layer('test-ab', '''\
 summary: test-layer
@@ -1422,6 +1420,20 @@ services:
 ''')
         harness_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(harness_plan.to_yaml(), plan.to_yaml())
+
+    def test_get_pebble_container_plan_unknown(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        with self.assertRaises(KeyError):
+            harness.get_container_pebble_plan('unknown')
+        plan = harness.get_container_pebble_plan('foo')
+        self.assertEqual(plan.to_yaml(), "{}\n")
 
 
 class DBRelationChangedHelper(Object):

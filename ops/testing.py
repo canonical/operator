@@ -488,21 +488,21 @@ class Harness:
 
     def get_container_pebble_plan(
             self, container_name: str
-    ) -> typing.Optional[pebble.Plan]:
+    ) -> pebble.Plan:
         """Return the current Plan that pebble is executing for the given container.
 
         Args:
             container_name: The simple name of the associated container
         Return:
             The pebble.Plan for this container. You can use :meth:`pebble.Plan.to_yaml` to get
-            a string form for the content. Will return None if no pebble client exists for that
-            container name.
+            a string form for the content. Will raise KeyError if no pebble client exists
+            for that container name. (should only happen if container is not present in
+            metadata.yaml)
         """
         socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
         client = self._backend._pebble_clients.get(socket_path)
         if client is None:
-            # TODO: jam 2021-04-19 Should this actually be a raise KeyError?
-            return None
+            raise KeyError('no known pebble client for container "{}"'.format(container_name))
         return client.get_plan()
 
     def get_workload_version(self) -> str:
@@ -692,6 +692,27 @@ def _record_calls(cls):
     return cls
 
 
+def _copy_docstrings(source_cls):
+    """Copy the docstrings from source_cls to target_cls.
+
+    Use this as:
+      @_copy_docstrings(source_class)
+      class TargetClass:
+
+    And for any public method that exists on both classes, it will copy the
+    __doc__ for that method.
+    """
+    def decorator(target_cls):
+        for meth_name, orig_method in target_cls.__dict__.items():
+            if meth_name.startswith('_'):
+                continue
+            source_method = source_cls.__dict__.get(meth_name)
+            if source_method is not None and source_method.__doc__:
+                target_cls.__dict__[meth_name].__doc__ = source_method.__doc__
+        return target_cls
+    return decorator
+
+
 class _ResourceEntry:
     """Tracks the contents of a Resource."""
 
@@ -699,6 +720,7 @@ class _ResourceEntry:
         self.name = resource_name
 
 
+@_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
@@ -869,6 +891,7 @@ class _TestingModelBackend:
         return client
 
 
+@_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:
     """This conforms to the interface for pebble.Client but provides canned data.
 
@@ -884,40 +907,28 @@ class _TestingPebbleClient:
         self._service_status = {}
 
     def get_system_info(self) -> pebble.SystemInfo:
-        """Get system info."""
         raise NotImplementedError(self.get_system_info)
 
     def get_warnings(
             self, select: pebble.WarningState = pebble.WarningState.PENDING,
     ) -> typing.List['pebble.Warning']:
-        """Get list of warnings in given state (pending or all)."""
         raise NotImplementedError(self.get_warnings)
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
-        """Acknowledge warnings up to given timestamp, return number acknowledged."""
         raise NotImplementedError(self.ack_warnings)
 
     def get_changes(
             self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS, service: str = None,
     ) -> typing.List[pebble.Change]:
-        """Get list of changes in given state, filter by service name if given."""
         raise NotImplementedError(self.get_changes)
 
     def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
-        """Get single change by ID."""
         raise NotImplementedError(self.get_change)
 
     def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
-        """Abort change with given ID."""
         raise NotImplementedError(self.abort_change)
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
-        """Start the startup-enabled services and wait (poll) for them to be started.
-
-        Raises ChangeError if one or more of the services didn't start. If
-        timeout is 0, submit the action but don't wait; just return the change
-        ID immediately.
-        """
         for name, service in self._render_services().items():
             # TODO: jam 2021-04-20 This feels awkward that Service.startup might be a string or
             #  might be an enum. Probably should make Service.startup a property rather than an
@@ -932,12 +943,6 @@ class _TestingPebbleClient:
     def start_services(
             self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> pebble.ChangeID:
-        """Start services by name and wait (poll) for them to be started.
-
-        Raises ChangeError if one or more of the services didn't start. If
-        timeout is 0, submit the action but don't wait; just return the change
-        ID immediately.
-        """
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
@@ -971,12 +976,6 @@ cannot perform the following tasks:
     def stop_services(
             self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> pebble.ChangeID:
-        """Stop services by name and wait (poll) for them to be started.
-
-        Raises ChangeError if one or more of the services didn't stop. If
-        timeout is 0, submit the action but don't wait; just return the change
-        ID immediately.
-        """
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
             raise TypeError('stop_services should take a list of names, not just "{}"'.format(
@@ -1005,19 +1004,11 @@ ChangeError: cannot perform the following tasks:
     def wait_change(
             self, change_id: pebble.ChangeID, timeout: float = 30.0, delay: float = 0.1,
     ) -> pebble.Change:
-        """Poll change every delay seconds (up to timeout) for it to be ready."""
         raise NotImplementedError(self.wait_change)
 
     def add_layer(
             self, label: str, layer: typing.Union[str, dict, pebble.Layer], *,
             combine: bool = False):
-        """Dynamically add a new layer onto the Pebble configuration layers.
-
-        If combine is False (the default), append the new layer as the top
-        layer with the given label. If combine is True and the label already
-        exists, the two layers are combined into a single one considering the
-        layer override rules; if the layer doesn't exist, it is added as usual.
-        """
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
         if not isinstance(label, str):
@@ -1063,7 +1054,6 @@ ChangeError: cannot perform the following tasks:
         return services
 
     def get_plan(self) -> pebble.Plan:
-        """Get the Pebble plan (currently contains only combined services)."""
         plan = pebble.Plan('{}')
         services = self._render_services()
         if not services:
@@ -1073,11 +1063,6 @@ ChangeError: cannot perform the following tasks:
         return plan
 
     def get_services(self, names: typing.List[str] = None) -> typing.List[pebble.ServiceInfo]:
-        """Get the service status for the configured services.
-
-        If names is specified, only fetch the service status for the services
-        named.
-        """
         if isinstance(names, str):
             raise TypeError('start_services should take a list of names, not just "{}"'.format(
                 names))
@@ -1105,79 +1090,22 @@ ChangeError: cannot perform the following tasks:
 
     def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
                                                                           typing.TextIO]:
-        """Read a file's content from the remote system.
-
-        Args:
-            path: Path of the file to read from the remote system.
-            encoding: Encoding to use for decoding the file's bytes to str,
-                or None to specify no decoding.
-
-        Returns:
-            A readable file-like object, whose read() method will return str
-            objects decoded according to the specified encoding, or bytes if
-            encoding is None.
-        """
         raise NotImplementedError(self.pull)
 
     def push(
             self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
-        """Write content to a given file path on the remote system.
-
-        Args:
-            path: Path of the file to write to on the remote system.
-            source: Source of data to write. This is either a concrete str or
-                bytes instance, or a readable file-like object.
-            encoding: Encoding to use for encoding source str to bytes, or
-                strings read from source if it is a TextIO type. Ignored if
-                source is bytes or BinaryIO.
-            make_dirs: If True, create parent directories if they don't exist.
-            permissions: Permissions (mode) to create file with (Pebble default
-                is 0o644).
-            user_id: UID for file.
-            user: Username for file (user_id takes precedence).
-            group_id: GID for file.
-            group: Group name for file (group_id takes precedence).
-        """
         raise NotImplementedError(self.push)
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
-        """Return list of file information from given path on remote system.
-
-        Args:
-            path: Path of the directory to list, or path of the file to return
-                information about.
-            pattern: If specified, filter the list to just the files that match,
-                for example "*.txt".
-            itself: If path refers to a directory, return information about the
-                directory itself, rather than its contents.
-        """
         raise NotImplementedError(self.list_files)
 
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
-        """Create a directory on the remote system with the given attributes.
-
-        Args:
-            path: Path of the directory to create on the remote system.
-            make_parents: If True, create parent directories if they don't exist.
-            permissions: Permissions (mode) to create directory with (Pebble
-                default is 0o755).
-            user_id: UID for directory.
-            user: Username for directory (user_id takes precedence).
-            group_id: GID for directory.
-            group: Group name for directory (group_id takes precedence).
-        """
         raise NotImplementedError(self.make_dir)
 
     def remove_path(self, path: str, *, recursive: bool = False):
-        """Remove a file or directory on the remote system.
-
-        Args:
-            path: Path of the file or directory to delete from the remote system.
-            recursive: If True, recursively delete path and everything under it.
-        """
         raise NotImplementedError(self.remove_path)
