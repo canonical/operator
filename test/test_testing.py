@@ -1423,17 +1423,6 @@ services:
         harness_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(harness_plan.to_yaml(), plan.to_yaml())
 
-    def test_container_service_is_running(self):
-        harness = Harness(CharmBase, meta='''
-            name: test-app
-            containers:
-              foo:
-                resource: foo-image
-            ''')
-        self.addCleanup(harness.cleanup)
-        harness.begin()
-        container = harness.model.unit.get_container('foo')
-
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -2036,7 +2025,7 @@ services:
         # It is a common mistake to pass just a name vs a list of names, so catch it with a
         # TypeError
         with self.assertRaises(TypeError):
-            infos = client.get_services('foo')
+            client.get_services('foo')
 
     def test_get_services_subset(self):
         client = self.get_testing_client()
