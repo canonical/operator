@@ -1945,10 +1945,12 @@ services:
         # Default when not specified is DISABLED
         self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
         self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        self.assertFalse(bar_info.is_running())
         foo_info = infos[1]
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
+        self.assertFalse(foo_info.is_running())
 
     def test_get_services_autostart(self):
         client = self.get_testing_client()
@@ -1971,10 +1973,12 @@ services:
         # Default when not specified is DISABLED
         self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
         self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        self.assertFalse(bar_info.is_running())
         foo_info = infos[1]
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+        self.assertTrue(foo_info.is_running())
 
     def test_get_services_start_stop(self):
         client = self.get_testing_client()
