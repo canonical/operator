@@ -2051,6 +2051,25 @@ services:
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
 
+    def test_get_services_unknown(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        # This doesn't seem to be an error at the moment.
+        # pebble_cli.py service just returns an empty list
+        # pebble service unknown says "No matching services" (but exits 0)
+        infos = client.get_services(['unknown'])
+        self.assertEqual(infos, [])
+
     def test_invalid_start_service(self):
         client = self.get_testing_client()
         # TODO: jam 2021-04-20 This should become a better error
