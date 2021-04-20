@@ -456,9 +456,10 @@ class Layer:
         services: A mapping of name: :class:`Service` defined by this layer
     """
 
-    summary: str
-    description: str
-    services: typing.Mapping[str, 'Service']
+    # This is how you do type annotations, but it is not supported by Python 3.5
+    # summary: str
+    # description: str
+    # services: typing.Mapping[str, 'Service']
 
     def __init__(self, raw: typing.Union[str, typing.Dict] = None):
         if isinstance(raw, str):
