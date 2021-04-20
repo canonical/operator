@@ -1015,8 +1015,7 @@ ChangeError: cannot perform the following tasks:
 
     def add_layer(
             self, label: str, layer: typing.Union[str, dict, pebble.Layer], *,
-            combine: bool = False,
-    ):
+            combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is False (the default), append the new layer as the top
