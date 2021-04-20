@@ -1092,7 +1092,12 @@ ChangeError: cannot perform the following tasks:
         if names is None:
             names = sorted(services.keys())
         for name in sorted(names):
-            service = services[name]
+            try:
+                service = services[name]
+            except KeyError:
+                # in pebble, it just returns "nothing matched" if there are 0 matches,
+                # but it ignores services it doesn't recognize
+                continue
             status = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
             if service.startup == '':
                 startup = pebble.ServiceStartup.DISABLED
