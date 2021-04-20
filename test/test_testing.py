@@ -1922,11 +1922,6 @@ services:
 
     def test_get_services_none(self):
         client = self.get_testing_client()
-        serviceInfo = client.get_services()
-        self.assertEqual([], serviceInfo)
-
-    def test_get_services_none(self):
-        client = self.get_testing_client()
         service_info = client.get_services()
         self.assertEqual([], service_info)
 
