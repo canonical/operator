@@ -26,6 +26,7 @@ from ops import pebble
 from ops.charm import (
     CharmBase,
     RelationEvent,
+    PebbleReadyEvent,
 )
 from ops.framework import (
     Object,
@@ -1435,6 +1436,28 @@ services:
         plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(plan.to_yaml(), "{}\n")
 
+    def test_container_pebble_ready(self):
+        harness = Harness(ContainerEventCharm, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+        ''')
+        self.addCleanup(harness.cleanup)
+        # This is a no-op if it is called before begin(), but it isn't an error
+        harness.container_pebble_ready('foo')
+        harness.begin()
+        harness.charm.observe_container_events('foo')
+        harness.container_pebble_ready('foo')
+        self.assertEqual(
+            harness.charm.changes,
+            [
+                {'name': 'pebble-ready',
+                 'container': 'foo',
+                 },
+            ]
+        )
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -1554,6 +1577,26 @@ class RelationEventCharm(RecordingCharm):
         self.changes.append(
             dict(name=event_name, relation=event.relation.name,
                  data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id)))
+
+
+class ContainerEventCharm(RecordingCharm):
+    """Record events related to container lifecycles."""
+
+    def __init__(self, framework):
+        super().__init__(framework)
+
+    def observe_container_events(self, container_name):
+        self.framework.observe(self.on[container_name].pebble_ready, self._on_pebble_ready)
+
+    def _on_pebble_ready(self, event):
+        self._observe_container_event('pebble-ready', event)
+
+    def _observe_container_event(self, event_name, event: PebbleReadyEvent):
+        container_name = None
+        if event.workload is not None:
+            container_name = event.workload.name
+        self.changes.append(
+            dict(name=event_name, container=container_name))
 
 
 def get_public_methods(obj):
