@@ -182,7 +182,7 @@ $ juju deploy ./my-charm.charm
 
 Happy charming!
 
-# Testing your charmed operatorss
+# Testing your charmed operators
 
 The operator framework provides a testing harness, so you can check your
 charmed operator does the right thing in different scenarios, without having to create
