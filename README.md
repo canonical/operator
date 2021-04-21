@@ -1,4 +1,4 @@
-# The Operator Framework
+# The Charmed Operator Framework
 
 This Charmed Operator Framework simplifies [Kubernetes
 operator](https://charmhub.io/about) development for 
@@ -12,11 +12,11 @@ reusable app domain knowledge from experts in a software component that
 can be shared.
 
 This project extends the operator pattern to enable 
-[charmed operator](https://juju.is/universal-operators), not just
+[charmed operators](https://juju.is/universal-operators), not just
 for Kubernetes but also operators for traditional Linux or Windows
 application management.
 
-Operators use an [Charmed Operator Lifecycle Manager
+Operators use a [Charmed Operator Lifecycle Manager
 (Charmed OLM)](https://juju.is/operator-lifecycle-manager) to coordinate their
 work in a cluster. The system uses Golang for concurrent event
 processing under the hood, but enables the operators to be written in
@@ -91,7 +91,7 @@ driven through the OLM.
 
 # Getting started
 
-A package of operator code is called a charmed operator. You will use `charmcraft`
+A package of operator code is called a charmed operator or “charm. You will use `charmcraft`
 to register your operator name, and publish it when you are ready.
 
 ```
