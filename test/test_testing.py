@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import importlib
+import inspect
 import pathlib
 import shutil
 import sys
@@ -21,6 +22,7 @@ import textwrap
 import unittest
 import yaml
 
+from ops import pebble
 from ops.charm import (
     CharmBase,
     RelationEvent,
@@ -34,8 +36,12 @@ from ops.model import (
     UnknownStatus,
     ModelError,
     RelationNotFoundError,
+    _ModelBackend,
 )
-from ops.testing import Harness
+from ops.testing import (
+    Harness,
+    _TestingPebbleClient,
+)
 
 
 class TestHarness(unittest.TestCase):
@@ -1375,6 +1381,60 @@ class TestHarness(unittest.TestCase):
             b_first = [a_first[2], a_first[3], a_first[0], a_first[1]]
             self.assertEqual(changes, b_first)
 
+    def test_get_pebble_container_plan(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        initial_plan = harness.get_container_pebble_plan('foo')
+        self.assertEqual(initial_plan.to_yaml(), '{}\n')
+        container = harness.model.unit.get_container('foo')
+        container.pebble.add_layer('test-ab', '''\
+summary: test-layer
+description: a layer that we can use for testing
+services:
+  a:
+    command: /bin/echo hello from a
+  b:
+    command: /bin/echo hello from b
+''')
+        container.pebble.add_layer('test-c', '''\
+summary: test-for-c
+services:
+  c:
+    command: /bin/echo hello from c
+''')
+        plan = container.pebble.get_plan()
+        self.assertEqual(plan.to_yaml(), '''\
+services:
+  a:
+    command: /bin/echo hello from a
+  b:
+    command: /bin/echo hello from b
+  c:
+    command: /bin/echo hello from c
+''')
+        harness_plan = harness.get_container_pebble_plan('foo')
+        self.assertEqual(harness_plan.to_yaml(), plan.to_yaml())
+
+    def test_get_pebble_container_plan_unknown(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        with self.assertRaises(KeyError):
+            harness.get_container_pebble_plan('unknown')
+        plan = harness.get_container_pebble_plan('foo')
+        self.assertEqual(plan.to_yaml(), "{}\n")
+
 
 class DBRelationChangedHelper(Object):
     def __init__(self, parent, key):
@@ -1496,7 +1556,29 @@ class RelationEventCharm(RecordingCharm):
                  data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id)))
 
 
+def get_public_methods(obj):
+    """Get the public attributes of obj to compare to another object."""
+    public = set()
+    members = inspect.getmembers(obj)
+    for name, member in members:
+        if name.startswith('_'):
+            continue
+        if inspect.isfunction(member) or inspect.ismethod(member):
+            public.add(name)
+    return public
+
+
 class TestTestingModelBackend(unittest.TestCase):
+
+    def test_conforms_to_model_backend(self):
+        harness = Harness(CharmBase, meta='''
+            name: app
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        mb_methods = get_public_methods(_ModelBackend)
+        backend_methods = get_public_methods(backend)
+        self.assertEqual(mb_methods, backend_methods)
 
     def test_status_set_get_unit(self):
         harness = Harness(CharmBase, meta='''
@@ -1609,3 +1691,524 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertEqual(backend.relation_remote_app_name(rel_id), 'postgresql')
 
         self.assertIs(backend.relation_remote_app_name(7), None)
+
+    def test_get_pebble_methods(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+
+        client = backend.get_pebble('/custom/socket/path')
+        self.assertIsInstance(client, _TestingPebbleClient)
+
+
+class TestTestingPebbleClient(unittest.TestCase):
+
+    def get_testing_client(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+
+        return backend.get_pebble('/custom/socket/path')
+
+    def test_methods_match_pebble_client(self):
+        client = self.get_testing_client()
+        self.assertIsNotNone(client)
+        pebble_client_methods = get_public_methods(pebble.Client)
+        testing_client_methods = get_public_methods(client)
+        self.assertEqual(pebble_client_methods, testing_client_methods)
+
+    def test_add_layer(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        self.assertIsInstance(plan, pebble.Plan)
+        self.assertEqual('{}\n', plan.to_yaml())
+        client.add_layer('foo', pebble.Layer('''\
+summary: Foo
+description: |
+  A longer description about Foo
+services:
+  serv:
+    summary: Serv
+    description: |
+      A description about Serv the amazing service.
+    startup: enabled
+    override: replace
+    command: '/bin/echo hello'
+    environment:
+      KEY: VALUE
+'''))
+        plan = client.get_plan()
+        # The YAML should be normalized
+        self.assertEqual('''\
+services:
+  serv:
+    command: /bin/echo hello
+    description: 'A description about Serv the amazing service.
+
+      '
+    environment:
+      KEY: VALUE
+    override: replace
+    startup: enabled
+    summary: Serv
+''', plan.to_yaml())
+
+    def test_add_layer_not_combined(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        self.assertIsInstance(plan, pebble.Plan)
+        self.assertEqual('{}\n', plan.to_yaml())
+        service = '''\
+summary: Foo
+description: |
+  A longer description about Foo
+services:
+  serv:
+    summary: Serv
+    description: |
+      A description about Serv the amazing service.
+    startup: enabled
+    override: replace
+    command: '/bin/echo hello'
+    environment:
+      KEY: VALUE
+'''
+        client.add_layer('foo', pebble.Layer(service))
+        # TODO: jam 2021-04-19 We should have a clearer error type for this case. The actual
+        #  pebble raises an HTTP exception. See https://github.com/canonical/operator/issues/514
+        #  that this should be cleaned up into a clearer error type, however, they should get an
+        #  error
+        with self.assertRaises(RuntimeError):
+            client.add_layer('foo', pebble.Layer(service))
+
+    def test_add_layer_three_services(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    override: replace
+    command: '/bin/echo foo'
+''')
+        client.add_layer('bar', '''\
+summary: bar
+services:
+  bar:
+    summary: The Great Bar
+    startup: enabled
+    override: replace
+    command: '/bin/echo bar'
+''')
+        client.add_layer('baz', '''\
+summary: baz
+services:
+  baz:
+    summary: Not Bar, but Baz
+    startup: enabled
+    override: replace
+    command: '/bin/echo baz'
+''')
+        plan = client.get_plan()
+        self.maxDiff = 1000
+        # Alphabetical services, and the YAML should be normalized
+        self.assertEqual('''\
+services:
+  bar:
+    command: /bin/echo bar
+    override: replace
+    startup: enabled
+    summary: The Great Bar
+  baz:
+    command: /bin/echo baz
+    override: replace
+    startup: enabled
+    summary: Not Bar, but Baz
+  foo:
+    command: /bin/echo foo
+    override: replace
+    startup: enabled
+    summary: Foo
+''', plan.to_yaml())
+
+    def test_add_layer_combine_no_override(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+command: '/bin/echo foo'
+''')
+        # TODO: jam 2021-04-19 Pebble currently raises a HTTP Error 500 Internal Service Error
+        #  if you don't supply an override directive. That needs to be fixed and this test
+        #  should be updated. https://github.com/canonical/operator/issues/514
+        with self.assertRaises(RuntimeError):
+            client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''', combine=True)
+
+    def test_add_layer_combine_override_replace(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''')
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    command: '/bin/echo foo new'
+    override: replace
+''', combine=True)
+        self.assertEqual('''\
+services:
+  bar:
+    command: /bin/echo bar
+    summary: Bar
+  foo:
+    command: /bin/echo foo new
+    override: replace
+''', client.get_plan().to_yaml())
+
+    def test_add_layer_combine_override_merge(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''')
+        # TODO: jam 2021-04-19 override: merge should eventually be supported, but if it isn't
+        #  supported by the framework, we should fail rather than do the wrong thing
+        with self.assertRaises(RuntimeError):
+            client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    command: '/bin/echo foob'
+    override: merge
+''', combine=True)
+
+    def test_add_layer_combine_override_unknown(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+  foo:
+    summary: Foo
+    command: '/bin/echo foo'
+''')
+        with self.assertRaises(RuntimeError):
+            client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    command: '/bin/echo foob'
+    override: blah
+''', combine=True)
+
+    def test_get_services_none(self):
+        client = self.get_testing_client()
+        service_info = client.get_services()
+        self.assertEqual([], service_info)
+
+    def test_get_services_not_started(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Default when not specified is DISABLED
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        self.assertFalse(bar_info.is_running())
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
+        self.assertFalse(foo_info.is_running())
+
+    def test_get_services_autostart(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        client.autostart_services()
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Default when not specified is DISABLED
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        self.assertFalse(bar_info.is_running())
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+        self.assertTrue(foo_info.is_running())
+
+    def test_get_services_start_stop(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        client.start_services(['bar'])
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Even though bar defaults to DISABLED, we explicitly started it
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, bar_info.current)
+        # foo would be started by autostart, but we only called start_services
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
+        client.stop_services(['bar'])
+        infos = client.get_services()
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+
+    def test_get_services_bad_request(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        # It is a common mistake to pass just a name vs a list of names, so catch it with a
+        # TypeError
+        with self.assertRaises(TypeError):
+            client.get_services('foo')
+
+    def test_get_services_subset(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        infos = client.get_services(['foo'])
+        self.assertEqual(len(infos), 1)
+        foo_info = infos[0]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
+
+    def test_get_services_unknown(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        # This doesn't seem to be an error at the moment.
+        # pebble_cli.py service just returns an empty list
+        # pebble service unknown says "No matching services" (but exits 0)
+        infos = client.get_services(['unknown'])
+        self.assertEqual(infos, [])
+
+    def test_invalid_start_service(self):
+        client = self.get_testing_client()
+        # TODO: jam 2021-04-20 This should become a better error
+        with self.assertRaises(RuntimeError):
+            client.start_services(['unknown'])
+
+    def test_start_service_str(self):
+        # Start service takes a list of names, but it is really easy to accidentally pass just a
+        # name
+        client = self.get_testing_client()
+        with self.assertRaises(TypeError):
+            client.start_services('unknown')
+
+    def test_stop_service_str(self):
+        # Start service takes a list of names, but it is really easy to accidentally pass just a
+        # name
+        client = self.get_testing_client()
+        with self.assertRaises(TypeError):
+            client.stop_services('unknown')
+
+    def test_mixed_start_service(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+''')
+        # TODO: jam 2021-04-20 better error type
+        with self.assertRaises(RuntimeError):
+            client.start_services(['foo', 'unknown'])
+        # foo should not be started
+        infos = client.get_services()
+        self.assertEqual(len(infos), 1)
+        foo_info = infos[0]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
+
+    def test_stop_services_unknown(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+''')
+        client.autostart_services()
+        # TODO: jam 2021-04-20 better error type
+        with self.assertRaises(RuntimeError):
+            client.stop_services(['foo', 'unknown'])
+        # foo should still be running
+        infos = client.get_services()
+        self.assertEqual(len(infos), 1)
+        foo_info = infos[0]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+
+    def test_start_started_service(self):
+        # If you try to start a service which is started, you get a ChangeError:
+        # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
+        # ChangeError: cannot perform the following tasks:
+        # - Start service "serv" (service "serv" was previously started)
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        client.autostart_services()
+        # Foo is now started, but Bar is not
+        with self.assertRaises(pebble.ChangeError):
+            client.start_services(['bar', 'foo'])
+        # bar could have been started, but won't be, because foo did not validate
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Default when not specified is DISABLED
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+
+    def test_stop_stopped_service(self):
+        # If you try to stop a service which is stop, you get a ChangeError:
+        # $ PYTHONPATH=. python3 ./test/pebble_cli.py stop other serv
+        # ChangeError: cannot perform the following tasks:
+        # - Stop service "other" (service "other" is not active)
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+summary: foo
+services:
+  foo:
+    summary: Foo
+    startup: enabled
+    command: '/bin/echo foo'
+  bar:
+    summary: Bar
+    command: '/bin/echo bar'
+''')
+        client.autostart_services()
+        # Foo is now started, but Bar is not
+        with self.assertRaises(pebble.ChangeError):
+            client.stop_services(['foo', 'bar'])
+        # foo could have been stopped, but won't be, because bar did not validate
+        infos = client.get_services()
+        self.assertEqual(len(infos), 2)
+        bar_info = infos[0]
+        self.assertEqual('bar', bar_info.name)
+        # Default when not specified is DISABLED
+        self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        foo_info = infos[1]
+        self.assertEqual('foo', foo_info.name)
+        self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)

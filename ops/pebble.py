@@ -426,9 +426,18 @@ class Plan:
         """
         return self._services
 
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
+        """Convert this plan to its dict representation."""
+        as_dicts = {name: service.to_dict() for name, service in self._services.items()}
+        if not as_dicts:
+            return {}
+        return {
+            'services': as_dicts,
+        }
+
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
-        return self._raw
+        return yaml.safe_dump(self.to_dict())
 
     __str__ = to_yaml
 
@@ -438,7 +447,17 @@ class Layer:
 
     The format of this is not documented, but is captured in code here:
     https://github.com/canonical/pebble/blob/master/internal/plan/plan.go
+
+    Attributes:
+        summary: A summary of the purpose of this layer
+        description: A long form description of this layer
+        services: A mapping of name: :class:`Service` defined by this layer
     """
+
+    # This is how you do type annotations, but it is not supported by Python 3.5
+    # summary: str
+    # description: str
+    # services: typing.Mapping[str, 'Service']
 
     def __init__(self, raw: typing.Union[str, typing.Dict] = None):
         if isinstance(raw, str):
@@ -454,7 +473,7 @@ class Layer:
         """Convert this layer to its YAML representation."""
         return yaml.safe_dump(self.to_dict())
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
