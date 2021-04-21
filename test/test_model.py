@@ -27,6 +27,8 @@ import ops.pebble
 import ops.testing
 from ops.charm import RelationMeta, RelationRole
 
+from ops._private import yaml
+
 from test.test_helpers import fake_script, fake_script_calls
 
 
@@ -870,7 +872,7 @@ containers:
         plan = self.container.get_plan()
         self.assertEqual(self.pebble.requests, [('get_plan',)])
         self.assertIsInstance(plan, ops.pebble.Plan)
-        self.assertEqual(plan.to_yaml(), plan_yaml)
+        self.assertEqual(plan.to_yaml(), yaml.safe_dump(yaml.safe_load(plan_yaml)))
 
     @staticmethod
     def _make_service(name, startup, current):
@@ -1211,7 +1213,7 @@ class TestModelBindings(unittest.TestCase):
                     'interface-name': '',
                     'addresses': [
                         {
-                            'hostname':  '',
+                            'hostname': '',
                             'value': '10.1.89.35',
                             'cidr': ''
                         }

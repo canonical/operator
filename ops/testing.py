@@ -1,4 +1,4 @@
-# Copyright 2020 Canonical Ltd.
+# Copyright 2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 """Infrastructure to build unittests for Charms using the Operator Framework."""
 
+import datetime
 import inspect
 import pathlib
 import random
@@ -26,6 +27,7 @@ from ops import (
     charm,
     framework,
     model,
+    pebble,
     storage,
 )
 from ops._private import yaml
@@ -469,7 +471,7 @@ class Harness:
             relation_id: The relation whose content we want to look at.
             app_or_unit: The name of the application or unit whose data we want to read
         Return:
-            a dict containing the relation data for `app_or_unit` or None.
+            A dict containing the relation data for `app_or_unit` or None.
 
         Raises:
             KeyError: if relation_id doesn't exist
@@ -483,6 +485,25 @@ class Harness:
         See the signature of Model.pod.set_spec
         """
         return self._backend._pod_spec
+
+    def get_container_pebble_plan(
+            self, container_name: str
+    ) -> pebble.Plan:
+        """Return the current Plan that pebble is executing for the given container.
+
+        Args:
+            container_name: The simple name of the associated container
+        Return:
+            The pebble.Plan for this container. You can use :meth:`pebble.Plan.to_yaml` to get
+            a string form for the content. Will raise KeyError if no pebble client exists
+            for that container name. (should only happen if container is not present in
+            metadata.yaml)
+        """
+        socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
+        client = self._backend._pebble_clients.get(socket_path)
+        if client is None:
+            raise KeyError('no known pebble client for container "{}"'.format(container_name))
+        return client.get_plan()
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -671,6 +692,27 @@ def _record_calls(cls):
     return cls
 
 
+def _copy_docstrings(source_cls):
+    """Copy the docstrings from source_cls to target_cls.
+
+    Use this as:
+      @_copy_docstrings(source_class)
+      class TargetClass:
+
+    And for any public method that exists on both classes, it will copy the
+    __doc__ for that method.
+    """
+    def decorator(target_cls):
+        for meth_name, orig_method in target_cls.__dict__.items():
+            if meth_name.startswith('_'):
+                continue
+            source_method = source_cls.__dict__.get(meth_name)
+            if source_method is not None and source_method.__doc__:
+                target_cls.__dict__[meth_name].__doc__ = source_method.__doc__
+        return target_cls
+    return decorator
+
+
 class _ResourceEntry:
     """Tracks the contents of a Resource."""
 
@@ -678,6 +720,7 @@ class _ResourceEntry:
         self.name = resource_name
 
 
+@_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
@@ -708,6 +751,9 @@ class _TestingModelBackend:
         self._unit_status = {'status': 'maintenance', 'message': ''}
         self._workload_version = None
         self._resource_dir = None
+        # {socket_path : _TestingPebbleClient}
+        # socket_path = '/charm/containers/{container_name}/pebble.socket'
+        self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -834,5 +880,232 @@ class _TestingModelBackend:
     def add_metrics(self, metrics, labels=None):
         raise NotImplementedError(self.add_metrics)
 
-    def get_pebble(self, container_name):
-        raise NotImplementedError(self.get_pebble)
+    def juju_log(self, level, msg):
+        raise NotImplementedError(self.juju_log)
+
+    def get_pebble(self, socket_path: str):
+        client = self._pebble_clients.get(socket_path, None)
+        if client is None:
+            client = _TestingPebbleClient(self)
+            self._pebble_clients[socket_path] = client
+        return client
+
+
+@_copy_docstrings(pebble.Client)
+class _TestingPebbleClient:
+    """This conforms to the interface for pebble.Client but provides canned data.
+
+    DO NOT use this class directly, it is used by `Harness`_ to run interactions with Pebble.
+    `Harness`_ is responsible for maintaining the internal consistency of the values here,
+    as the only public methods of this type are for implementing Client.
+    """
+
+    def __init__(self, backend: _TestingModelBackend):
+        self._backend = _TestingModelBackend
+        self._layers = {}
+        # Has a service been started/stopped?
+        self._service_status = {}
+
+    def get_system_info(self) -> pebble.SystemInfo:
+        raise NotImplementedError(self.get_system_info)
+
+    def get_warnings(
+            self, select: pebble.WarningState = pebble.WarningState.PENDING,
+    ) -> typing.List['pebble.Warning']:
+        raise NotImplementedError(self.get_warnings)
+
+    def ack_warnings(self, timestamp: datetime.datetime) -> int:
+        raise NotImplementedError(self.ack_warnings)
+
+    def get_changes(
+            self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS, service: str = None,
+    ) -> typing.List[pebble.Change]:
+        raise NotImplementedError(self.get_changes)
+
+    def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
+        raise NotImplementedError(self.get_change)
+
+    def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
+        raise NotImplementedError(self.abort_change)
+
+    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+        for name, service in self._render_services().items():
+            # TODO: jam 2021-04-20 This feels awkward that Service.startup might be a string or
+            #  might be an enum. Probably should make Service.startup a property rather than an
+            #  attribute.
+            if service.startup == '':
+                startup = pebble.ServiceStartup.DISABLED
+            else:
+                startup = pebble.ServiceStartup(service.startup)
+            if startup == pebble.ServiceStartup.ENABLED:
+                self._service_status[name] = pebble.ServiceStatus.ACTIVE
+
+    def start_services(
+            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.ChangeID:
+        # A common mistake is to pass just the name of a service, rather than a list of services,
+        # so trap that so it is caught quickly.
+        if isinstance(services, str):
+            raise TypeError('start_services should take a list of names, not just "{}"'.format(
+                services))
+
+        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
+        # Container.start() which currently ignores the return value
+        known_services = self._render_services()
+        # Names appear to be validated before any are activated, so do two passes
+        for name in services:
+            if name not in known_services:
+                # TODO: jam 2021-04-20 This needs a better error type
+                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if current == pebble.ServiceStatus.ACTIVE:
+                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
+                #  can be started before starting any, and gives a list of things that couldn't
+                #  be done, but this is good enough for now
+                raise pebble.ChangeError('''\
+cannot perform the following tasks:
+- Start service "{}" (service "{}" was previously started)
+'''.format(name, name), change=1234)  # the change id is not respected
+        for name in services:
+            # If you try to start a service which is started, you get a ChangeError:
+            # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
+            # ChangeError: cannot perform the following tasks:
+            # - Start service "serv" (service "serv" was previously started)
+            self._service_status[name] = pebble.ServiceStatus.ACTIVE
+
+    def stop_services(
+            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.ChangeID:
+        # handle a common mistake of passing just a name rather than a list of names
+        if isinstance(services, str):
+            raise TypeError('stop_services should take a list of names, not just "{}"'.format(
+                services))
+        # TODO: handle invalid names
+        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
+        # Container.stop() which currently ignores the return value
+        known_services = self._render_services()
+        for name in services:
+            if name not in known_services:
+                # TODO: jam 2021-04-20 This needs a better error type
+                #  400 Bad Request: service "bal" does not exist
+                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if current != pebble.ServiceStatus.ACTIVE:
+                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
+                #  can be started before starting any, and gives a list of things that couldn't
+                #  be done, but this is good enough for now
+                raise pebble.ChangeError('''\
+ChangeError: cannot perform the following tasks:
+- Stop service "{}" (service "{}" is not active)
+'''.format(name, name), change=1234)  # the change id is not respected
+        for name in services:
+            self._service_status[name] = pebble.ServiceStatus.INACTIVE
+
+    def wait_change(
+            self, change_id: pebble.ChangeID, timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.Change:
+        raise NotImplementedError(self.wait_change)
+
+    def add_layer(
+            self, label: str, layer: typing.Union[str, dict, pebble.Layer], *,
+            combine: bool = False):
+        # I wish we could combine some of this helpful object corralling with the actual backend,
+        # rather than having to re-implement it. Maybe we could subclass
+        if not isinstance(label, str):
+            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+
+        if isinstance(layer, (str, dict)):
+            layer_obj = pebble.Layer(layer)
+        elif isinstance(layer, pebble.Layer):
+            layer_obj = layer
+        else:
+            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
+                type(layer).__name__))
+        if label in self._layers:
+            # TODO: jam 2021-04-19 These should not be RuntimeErrors but should be proper error
+            #  types. https://github.com/canonical/operator/issues/514
+            if not combine:
+                raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+            layer = self._layers[label]
+            for name, service in layer_obj.services.items():
+                # 'override' is actually single quoted in the real error, but
+                # it shouldn't be, hopefully that gets cleaned up.
+                if not service.override:
+                    raise RuntimeError('500 Internal Server Error: layer "{}" must define'
+                                       '"override" for service "{}"'.format(label, name))
+                if service.override not in ('merge', 'replace'):
+                    raise RuntimeError('500 Internal Server Error: layer "{}" has invalid '
+                                       '"override" value on service "{}"'.format(label, name))
+                if service.override != 'replace':
+                    raise RuntimeError(
+                        'override: "{}" unsupported for layer "{}" service "{}"'.format(
+                            service.override, label, name))
+                layer.services[name] = service
+        else:
+            self._layers[label] = layer_obj
+
+    def _render_services(self) -> typing.Mapping[str, pebble.Service]:
+        services = {}
+        for key in sorted(self._layers.keys()):
+            layer = self._layers[key]
+            for name, service in layer.services.items():
+                # TODO: (jam) 2021-04-07 have a way to merge existing services
+                services[name] = service
+        return services
+
+    def get_plan(self) -> pebble.Plan:
+        plan = pebble.Plan('{}')
+        services = self._render_services()
+        if not services:
+            return plan
+        for name in sorted(services.keys()):
+            plan.services[name] = services[name]
+        return plan
+
+    def get_services(self, names: typing.List[str] = None) -> typing.List[pebble.ServiceInfo]:
+        if isinstance(names, str):
+            raise TypeError('start_services should take a list of names, not just "{}"'.format(
+                names))
+        services = self._render_services()
+        infos = []
+        if names is None:
+            names = sorted(services.keys())
+        for name in sorted(names):
+            try:
+                service = services[name]
+            except KeyError:
+                # in pebble, it just returns "nothing matched" if there are 0 matches,
+                # but it ignores services it doesn't recognize
+                continue
+            status = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if service.startup == '':
+                startup = pebble.ServiceStartup.DISABLED
+            else:
+                startup = pebble.ServiceStartup(service.startup)
+            info = pebble.ServiceInfo(name,
+                                      startup=startup,
+                                      current=pebble.ServiceStatus(status))
+            infos.append(info)
+        return infos
+
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
+                                                                          typing.TextIO]:
+        raise NotImplementedError(self.pull)
+
+    def push(
+            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        raise NotImplementedError(self.push)
+
+    def list_files(self, path: str, *, pattern: str = None,
+                   itself: bool = False) -> typing.List[pebble.FileInfo]:
+        raise NotImplementedError(self.list_files)
+
+    def make_dir(
+            self, path: str, *, make_parents: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        raise NotImplementedError(self.make_dir)
+
+    def remove_path(self, path: str, *, recursive: bool = False):
+        raise NotImplementedError(self.remove_path)
