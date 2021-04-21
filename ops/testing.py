@@ -492,7 +492,7 @@ class Harness:
         """Return the current Plan that pebble is executing for the given container.
 
         Args:
-            container_name: The simple name of t/he associated container
+            container_name: The simple name of the associated container
         Return:
             The pebble.Plan for this container. You can use :meth:`pebble.Plan.to_yaml` to get
             a string form for the content. Will raise KeyError if no pebble client exists
