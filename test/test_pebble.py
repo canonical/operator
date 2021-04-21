@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import cgi
 import datetime
+import email.parser
+import io
+import json
 import unittest
 import unittest.mock
 import unittest.util
@@ -98,6 +102,18 @@ class TestTypes(unittest.TestCase):
         error = pebble.ConnectionError('connerr!')
         self.assertIsInstance(error, pebble.Error)
         self.assertEqual(str(error), 'connerr!')
+
+    def test_protocol_error(self):
+        error = pebble.ProtocolError('protoerr!')
+        self.assertIsInstance(error, pebble.Error)
+        self.assertEqual(str(error), 'protoerr!')
+
+    def test_path_error(self):
+        error = pebble.PathError('not-found', 'thing not found')
+        self.assertIsInstance(error, pebble.Error)
+        self.assertEqual(error.kind, 'not-found')
+        self.assertEqual(error.message, 'thing not found')
+        self.assertEqual(str(error), 'not-found - thing not found')
 
     def test_api_error(self):
         body = {
@@ -337,6 +353,72 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.ready_time, datetime_utc(2021, 1, 28, 14, 37, 4, 291518))
         self.assertEqual(change.spawn_time, datetime_utc(2021, 1, 28, 14, 37, 2, 247202))
 
+    def test_file_type(self):
+        self.assertEqual(list(pebble.FileType), [
+            pebble.FileType.FILE,
+            pebble.FileType.DIRECTORY,
+            pebble.FileType.SYMLINK,
+            pebble.FileType.SOCKET,
+            pebble.FileType.NAMED_PIPE,
+            pebble.FileType.DEVICE,
+            pebble.FileType.UNKNOWN,
+        ])
+        self.assertEqual(pebble.FileType.FILE.value, 'file')
+        self.assertEqual(pebble.FileType.DIRECTORY.value, 'directory')
+        self.assertEqual(pebble.FileType.SYMLINK.value, 'symlink')
+        self.assertEqual(pebble.FileType.SOCKET.value, 'socket')
+        self.assertEqual(pebble.FileType.NAMED_PIPE.value, 'named-pipe')
+        self.assertEqual(pebble.FileType.DEVICE.value, 'device')
+        self.assertEqual(pebble.FileType.UNKNOWN.value, 'unknown')
+
+    def test_file_info_init(self):
+        info = pebble.FileInfo('/etc/hosts', 'hosts', pebble.FileType.FILE, 123, 0o644,
+                               datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518),
+                               12, 'bob', 34, 'staff')
+        self.assertEqual(info.path, '/etc/hosts')
+        self.assertEqual(info.name, 'hosts')
+        self.assertEqual(info.type, pebble.FileType.FILE)
+        self.assertEqual(info.size, 123)
+        self.assertEqual(info.permissions, 0o644)
+        self.assertEqual(info.last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+        self.assertEqual(info.user_id, 12)
+        self.assertEqual(info.user, 'bob')
+        self.assertEqual(info.group_id, 34)
+        self.assertEqual(info.group, 'staff')
+
+    def test_file_info_from_dict(self):
+        d = {
+            'path': '/etc',
+            'name': 'etc',
+            'type': 'directory',
+            'permissions': '644',
+            'last-modified': '2021-01-28T14:37:04.291517768+13:00',
+        }
+        info = pebble.FileInfo.from_dict(d)
+        self.assertEqual(info.path, '/etc')
+        self.assertEqual(info.name, 'etc')
+        self.assertEqual(info.type, pebble.FileType.DIRECTORY)
+        self.assertEqual(info.permissions, 0o644)
+        self.assertEqual(info.last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+        self.assertIs(info.user_id, None)
+        self.assertIs(info.user, None)
+        self.assertIs(info.group_id, None)
+        self.assertIs(info.group, None)
+
+        d['type'] = 'foobar'
+        d['size'] = 123
+        d['user-id'] = 12
+        d['user'] = 'bob'
+        d['group-id'] = 34
+        d['group'] = 'staff'
+        info = pebble.FileInfo.from_dict(d)
+        self.assertEqual(info.type, 'foobar')
+        self.assertEqual(info.size, 123)
+        self.assertEqual(info.user_id, 12)
+        self.assertEqual(info.user, 'bob')
+        self.assertEqual(info.group_id, 34)
+        self.assertEqual(info.group, 'staff')
+
 
 class TestPlan(unittest.TestCase):
     def test_no_args(self):
@@ -565,6 +647,18 @@ class MockClient(pebble.Client):
     def _request(self, method, path, query=None, body=None):
         self.requests.append((method, path, query, body))
         return self.responses.pop(0)
+
+    def _request_raw(self, method, path, query=None, headers=None, data=None):
+        self.requests.append((method, path, query, headers, data))
+        headers, body = self.responses.pop(0)
+        return MockHTTPResponse(headers, body)
+
+
+class MockHTTPResponse:
+    def __init__(self, headers, body):
+        self.headers = headers
+        reader = io.BytesIO(body)
+        self.read = reader.read
 
 
 class MockTime:
@@ -1075,6 +1169,537 @@ services:
             ('GET', '/v1/services', {'names': 'svc1,svc2'}, None),
             ('GET', '/v1/services', {'names': 'svc2'}, None),
         ])
+
+    def test_pull_text(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"
+
+127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80' + b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="response"
+
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+--01234567890123456789012345678901--
+""",
+        ))
+
+        content = self.client.pull('/etc/hosts').read()
+        self.assertEqual(content, '127.0.0.1 localhost  # 😀')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
+    def test_pull_binary(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"
+
+127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80' + b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="response"
+
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+--01234567890123456789012345678901--
+""",
+        ))
+
+        content = self.client.pull('/etc/hosts', encoding=None).read()
+        self.assertEqual(content, b'127.0.0.1 localhost  # \xf0\x9f\x98\x80')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
+    def test_pull_path_error(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="response"
+
+{
+    "result": [
+        {"path": "/etc/hosts", "error": {"kind": "not-found", "message": "not found"}}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+--01234567890123456789012345678901--
+""",
+        ))
+
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.pull('/etc/hosts')
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertEqual(cm.exception.kind, 'not-found')
+        self.assertEqual(cm.exception.message, 'not found')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
+    def test_pull_protocol_errors(self):
+        self.client.responses.append(({'Content-Type': 'ct'}, b''))
+        with self.assertRaises(pebble.ProtocolError) as cm:
+            self.client.pull('/etc/hosts')
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertEqual(str(cm.exception),
+                         "expected Content-Type 'multipart/form-data', got 'ct'")
+
+        self.client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
+        with self.assertRaises(pebble.ProtocolError) as cm:
+            self.client.pull('/etc/hosts')
+        self.assertEqual(str(cm.exception), "invalid boundary ''")
+
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="files"; filename="/bad"
+
+bad path
+--01234567890123456789012345678901--
+""",
+        ))
+        with self.assertRaises(pebble.ProtocolError) as cm:
+            self.client.pull('/etc/hosts')
+        self.assertEqual(str(cm.exception), "path not expected: /bad")
+
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""
+--01234567890123456789012345678901
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"
+
+bad path
+--01234567890123456789012345678901--
+""",
+        ))
+        with self.assertRaises(pebble.ProtocolError) as cm:
+            self.client.pull('/etc/hosts')
+        self.assertEqual(str(cm.exception), 'no "response" field in multipart body')
+
+    def test_push_str(self):
+        self._test_push_str('content 😀')
+
+    def test_push_text(self):
+        self._test_push_str(io.StringIO('content 😀'))
+
+    def _test_push_str(self, source):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar"}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        self.client.push('/foo/bar', source)
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content \xf0\x9f\x98\x80')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{'path': '/foo/bar'}],
+        })
+
+    def test_push_bytes(self):
+        self._test_push_bytes(b'content \xf0\x9f\x98\x80')
+
+    def test_push_binary(self):
+        self._test_push_bytes(io.BytesIO(b'content \xf0\x9f\x98\x80'))
+
+    def _test_push_bytes(self, source):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar"}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        self.client.push('/foo/bar', source)
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content \xf0\x9f\x98\x80')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{'path': '/foo/bar'}],
+        })
+
+    def test_push_all_options(self):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar"}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        self.client.push('/foo/bar', 'content', make_dirs=True, permissions=0o600,
+                         user_id=12, user='bob', group_id=34, group='staff')
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{
+                'path': '/foo/bar',
+                'make-dirs': True,
+                'permissions': '600',
+                'user-id': 12,
+                'user': 'bob',
+                'group-id': 34,
+                'group': 'staff',
+            }],
+        })
+
+    def test_push_uid_gid(self):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar"}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        self.client.push('/foo/bar', 'content', user_id=12, group_id=34)
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{
+                'path': '/foo/bar',
+                'user-id': 12,
+                'group-id': 34,
+            }],
+        })
+
+    def test_push_path_error(self):
+        self.client.responses.append((
+            {'Content-Type': 'application/json'},
+            b"""
+{
+    "result": [
+        {"path": "/foo/bar", "error": {"kind": "not-found", "message": "not found"}}
+    ],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}
+""",
+        ))
+
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.push('/foo/bar', 'content')
+        self.assertEqual(cm.exception.kind, 'not-found')
+        self.assertEqual(cm.exception.message, 'not found')
+
+        self.assertEqual(len(self.client.requests), 1)
+        request = self.client.requests[0]
+        self.assertEqual(request[:3], ('POST', '/v1/files', None))
+
+        headers, body = request[3:]
+        content_type = headers['Content-Type']
+        req, filename, content = self._parse_write_multipart(content_type, body)
+        self.assertEqual(filename, '/foo/bar')
+        self.assertEqual(content, b'content')
+        self.assertEqual(req, {
+            'action': 'write',
+            'files': [{'path': '/foo/bar'}],
+        })
+
+    def _parse_write_multipart(self, content_type, body):
+        ctype, options = cgi.parse_header(content_type)
+        self.assertEqual(ctype, 'multipart/form-data')
+        boundary = options['boundary']
+
+        # We have to manually write the Content-Type with boundary, because
+        # email.parser expects the entire multipart message with headers.
+        parser = email.parser.BytesFeedParser()
+        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
+                    boundary.encode('utf-8') + b'\r\n\r\n')
+        parser.feed(body)
+        message = parser.close()
+
+        req = None
+        filename = None
+        content = None
+        for part in message.walk():
+            name = part.get_param('name', header='Content-Disposition')
+            if name == 'request':
+                req = json.loads(part.get_payload())
+            elif name == 'files':
+                # decode=True, ironically, avoids decoding bytes to str
+                content = part.get_payload(decode=True)
+                filename = part.get_filename()
+        return (req, filename, content)
+
+    def test_list_files_path(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    'path': '/etc/hosts',
+                    'name': 'hosts',
+                    'type': 'file',
+                    'size': 123,
+                    'permissions': '644',
+                    'last-modified': '2021-01-28T14:37:04.291517768+13:00',
+                    'user-id': 12,
+                    'user': 'bob',
+                    'group-id': 34,
+                    'group': 'staff',
+                },
+                {
+                    'path': '/etc/nginx',
+                    'name': 'nginx',
+                    'type': 'directory',
+                    'permissions': '755',
+                    'last-modified': '2020-01-01T01:01:01.000000+13:00',
+                },
+            ],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        infos = self.client.list_files('/etc')
+
+        self.assertEqual(len(infos), 2)
+        self.assertEqual(infos[0].path, '/etc/hosts')
+        self.assertEqual(infos[0].name, 'hosts')
+        self.assertEqual(infos[0].type, pebble.FileType.FILE)
+        self.assertEqual(infos[0].size, 123)
+        self.assertEqual(infos[0].permissions, 0o644)
+        self.assertEqual(infos[0].last_modified, datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518))
+        self.assertEqual(infos[0].user_id, 12)
+        self.assertEqual(infos[0].user, 'bob')
+        self.assertEqual(infos[0].group_id, 34)
+        self.assertEqual(infos[0].group, 'staff')
+        self.assertEqual(infos[1].path, '/etc/nginx')
+        self.assertEqual(infos[1].name, 'nginx')
+        self.assertEqual(infos[1].type, pebble.FileType.DIRECTORY)
+        self.assertEqual(infos[1].size, None)
+        self.assertEqual(infos[1].permissions, 0o755)
+        self.assertEqual(infos[1].last_modified, datetime_nzdt(2020, 1, 1, 1, 1, 1, 0))
+        self.assertIs(infos[1].user_id, None)
+        self.assertIs(infos[1].user, None)
+        self.assertIs(infos[1].group_id, None)
+        self.assertIs(infos[1].group, None)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'list', 'path': '/etc'}, None),
+        ])
+
+    def test_list_files_pattern(self):
+        self.client.responses.append({
+            "result": [],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        infos = self.client.list_files('/etc', pattern='*.conf')
+
+        self.assertEqual(len(infos), 0)
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'list', 'path': '/etc', 'pattern': '*.conf'}, None),
+        ])
+
+    def test_list_files_itself(self):
+        self.client.responses.append({
+            "result": [],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        infos = self.client.list_files('/etc', itself=True)
+
+        self.assertEqual(len(infos), 0)
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'list', 'path': '/etc', 'itself': 'true'}, None),
+        ])
+
+    def test_make_dir_basic(self):
+        self.client.responses.append({
+            "result": [{'path': '/foo/bar'}],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        self.client.make_dir('/foo/bar')
+        req = {'action': 'make-dirs', 'dirs': [{
+            'path': '/foo/bar',
+        }]}
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/files', None, req),
+        ])
+
+    def test_make_dir_all_options(self):
+        self.client.responses.append({
+            "result": [{'path': '/foo/bar'}],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        self.client.make_dir('/foo/bar', make_parents=True, permissions=0o600,
+                             user_id=12, user='bob', group_id=34, group='staff')
+
+        req = {'action': 'make-dirs', 'dirs': [{
+            'path': '/foo/bar',
+            'make-parents': True,
+            'permissions': '600',
+            'user-id': 12,
+            'user': 'bob',
+            'group-id': 34,
+            'group': 'staff',
+        }]}
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/files', None, req),
+        ])
+
+    def test_make_dir_error(self):
+        self.client.responses.append({
+            "result": [{
+                'path': '/foo/bar',
+                'error': {
+                    'kind': 'permission-denied',
+                    'message': 'permission denied',
+                },
+            }],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.make_dir('/foo/bar')
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertEqual(cm.exception.kind, 'permission-denied')
+        self.assertEqual(cm.exception.message, 'permission denied')
+
+    def test_remove_path_basic(self):
+        self.client.responses.append({
+            "result": [{'path': '/boo/far'}],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        self.client.remove_path('/boo/far')
+        req = {'action': 'remove', 'paths': [{
+            'path': '/boo/far',
+        }]}
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/files', None, req),
+        ])
+
+    def test_remove_path_recursive(self):
+        self.client.responses.append({
+            "result": [{'path': '/boo/far'}],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        self.client.remove_path('/boo/far', recursive=True)
+
+        req = {'action': 'remove', 'paths': [{
+            'path': '/boo/far',
+            'recursive': True,
+        }]}
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/files', None, req),
+        ])
+
+    def test_remove_path_error(self):
+        self.client.responses.append({
+            "result": [{
+                'path': '/boo/far',
+                'error': {
+                    'kind': 'generic-file-error',
+                    'message': 'some other error',
+                },
+            }],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.remove_path('/boo/far')
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
+        self.assertEqual(cm.exception.message, 'some other error')
 
 
 class TestSocketClient(unittest.TestCase):

@@ -559,8 +559,10 @@ class Network:
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
             interface_name = interface_info.get('interface-name')
-            for address_info in interface_info.get('addresses', []):
-                self.interfaces.append(NetworkInterface(interface_name, address_info))
+            addrs = interface_info.get('addresses')
+            if addrs is not None:
+                for address_info in addrs:
+                    self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
         for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(ipaddress.ip_address(address))
@@ -1088,6 +1090,88 @@ class Container:
         if len(services) > 1:
             raise RuntimeError('expected 1 service, got {}'.format(len(services)))
         return services[service_name]
+
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
+                                                                          typing.TextIO]:
+        """Read a file's content from the remote system.
+
+        Args:
+            path: Path of the file to read from the remote system.
+            encoding: Encoding to use for decoding the file's bytes to str,
+                or None to specify no decoding.
+
+        Returns:
+            A readable file-like object, whose read() method will return str
+            objects decoded according to the specified encoding, or bytes if
+            encoding is None.
+        """
+        return self._pebble.pull(path, encoding=encoding)
+
+    def push(
+            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        """Write content to a given file path on the remote system.
+
+        Args:
+            path: Path of the file to write to on the remote system.
+            source: Source of data to write. This is either a concrete str or
+                bytes instance, or a readable file-like object.
+            encoding: Encoding to use for encoding source str to bytes, or
+                strings read from source if it is a TextIO type. Ignored if
+                source is bytes or BinaryIO.
+            make_dirs: If True, create parent directories if they don't exist.
+            permissions: Permissions (mode) to create file with (Pebble default
+                is 0o644).
+            user_id: UID for file.
+            user: Username for file (user_id takes precedence).
+            group_id: GID for file.
+            group: Group name for file (group_id takes precedence).
+        """
+        self._pebble.push(path, source, encoding=encoding, make_dirs=make_dirs,
+                          permissions=permissions, user_id=user_id, user=user,
+                          group_id=group_id, group=group)
+
+    def list_files(self, path: str, *, pattern: str = None,
+                   itself: bool = False) -> typing.List['pebble.FileInfo']:
+        """Return list of file information from given path on remote system.
+
+        Args:
+            path: Path of the directory to list, or path of the file to return
+                information about.
+            pattern: If specified, filter the list to just the files that match,
+                for example "*.txt".
+            itself: If path refers to a directory, return information about the
+                directory itself, rather than its contents.
+        """
+        return self._pebble.list_files(path, pattern=pattern, itself=itself)
+
+    def make_dir(
+            self, path: str, *, make_parents: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        """Create a directory on the remote system with the given attributes.
+
+        Args:
+            path: Path of the directory to create on the remote system.
+            make_parents: If True, create parent directories if they don't exist.
+            permissions: Permissions (mode) to create directory with (Pebble
+                default is 0o755).
+            user_id: UID for directory.
+            user: Username for directory (user_id takes precedence).
+            group_id: GID for directory.
+            group: Group name for directory (group_id takes precedence).
+        """
+        self._pebble.make_dir(path, make_parents=make_parents, permissions=permissions,
+                              user_id=user_id, user=user, group_id=group_id, group=group)
+
+    def remove_path(self, path: str, *, recursive: bool = False):
+        """Remove a file or directory on the remote system.
+
+        Args:
+            path: Path of the file or directory to delete from the remote system.
+            recursive: If True, recursively delete path and everything under it.
+        """
+        self._pebble.remove_path(path, recursive=recursive)
 
 
 class ContainerMapping(Mapping):
