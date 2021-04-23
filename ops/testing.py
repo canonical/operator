@@ -505,6 +505,16 @@ class Harness:
             raise KeyError('no known pebble client for container "{}"'.format(container_name))
         return client.get_plan()
 
+    def container_pebble_ready(self, container_name: str):
+        """Fire the pebble_ready hook for the associated container.
+
+        This will do nothing if the begin() has not been called.
+        """
+        if self.charm is None:
+            return
+        container = self.model.unit.get_container(container_name)
+        self.charm.on[container_name].pebble_ready.emit(container)
+
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
