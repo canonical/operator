@@ -218,12 +218,27 @@ class ProviderBroken(EventBase):
     pass
 
 
+class TooManyProviders(EventBase):
+    """Event raised when more than one provider is related in single mode.
+
+    A consumer charm may allow relations with a single or multiple
+    providers, for a specific relation name. This choice is specified
+    by the `multi` argument of the :class:`ConsumerBase` constructor. In
+    "single" mode if more than one provider charm is related to the
+    consumer, this event is raised. In particular, the events are
+    raised in response to a relation joined event for each additional
+    unit of the same or any additional provider.
+    """
+    pass
+
+
 class ConsumerEvents(CharmEvents):
     """Descriptor for consumer charm events."""
     available = EventSource(ProviderAvailable)
     invalid = EventSource(ProviderInvalid)
     unready = EventSource(ProviderUnready)
     broken = EventSource(ProviderBroken)
+    too_many_providers = EventSource(TooManyProviders)
 
 
 class ConsumerBase(Object):
@@ -250,6 +265,7 @@ class ConsumerBase(Object):
     - :class:`ProviderInvalid`
     - :class:`ProviderUnready`
     - :class:`ProviderBroken`
+    - :class:`TooManyProviders`
 
     Note that these events may be raised multiple times during the
     lifetime of a charm. In particular every time there is a change to
@@ -293,9 +309,26 @@ class ConsumerBase(Object):
         self._stored.set_default(relation_id=None)
 
         events = charm.on[name]
+        self.framework.observe(events.relation_joined, self._on_provider_joined)
         self.framework.observe(events.relation_changed, self._on_provider_changed)
         self.framework.observe(events.relation_broken, self._on_provider_broken)
         self.framework.observe(charm.on.upgrade_charm, self._validate_provider)
+
+    def _on_provider_joined(self, event):
+        """Check if a new or additional provider is acceptable.
+
+        Consumer charms may choose to allow only one or multplie
+        relations with a provider, for a specific relation name. This
+        choice is made using the `multi` argument of the
+        :class:`ConsumerBase`. On every relation joined event with a
+        provider a check is done to see if the new or additional
+        provider relation is acceptable. In single mode more than one
+        provider is not acceptable and in this case a
+        :class:`TooManyProviders` event is emitted.
+        """
+        rel_id = event.relation.id
+        if not self._provider_acceptable(rel_id):
+            self.on.too_many_providers.emit()
 
     def _on_provider_changed(self, event):
         """Validate provider on relation changed event.
@@ -309,6 +342,7 @@ class ConsumerBase(Object):
         - :class:`ProviderAvailable`
         - :class:`ProviderInvalid`
         - :class:`ProviderUnready`
+        - :class:`TooManyProviders`
 
         Note that these events may be raised multiple times during the
         lifetime of a charm.
@@ -318,6 +352,11 @@ class ConsumerBase(Object):
                 contains a key `provider_data` whose value is all the data
                 forwarded by the :class:`ProviderBase` object.
         """
+        rel_id = event.relation.id
+        if not self._provider_acceptable(rel_id):
+            self.on.too_many_providers.emit()
+            return
+
         rdata = event.relation.data[event.app]
         logger.debug("Got data from provider : %s", rdata)
         provider_data = rdata.get('provider_data')
@@ -343,13 +382,7 @@ class ConsumerBase(Object):
             self.on.unready.emit()
             return
 
-        stored_id = self._stored.relation_id
-        rel_id = event.relation.id
-        check_single = ((stored_id is None) or (stored_id == rel_id))
-        if self.multi_mode or check_single:
-            requirements_met = self._meets_requirements(provides, consumed)
-        else:
-            return
+        requirements_met = self._meets_requirements(provides, consumed)
 
         if requirements_met:
             logger.debug('Got compatible provider : %s', provider_data)
@@ -390,7 +423,11 @@ class ConsumerBase(Object):
         consumed = self.consumes
 
         for relation in self.framework.model.relations[self.name]:
-            data = self._provider_data(relation.id)
+            rel_id = relation.id
+            if not self._provider_acceptable(rel_id):
+                continue
+
+            data = self._provider_data(rel_id)
             if data:
                 try:
                     provides = data['provides']
@@ -552,3 +589,22 @@ class ConsumerBase(Object):
 
         data = json.loads(rel.data[rel.app]['provider_data'])
         return data
+
+    def _provider_acceptable(self, rel_id):
+        """Is a new or an additional provider acceptable.
+
+        Args:
+            rel_id : integer ID of provider relation
+
+        Returns:
+            True if provider is acceptable else false.
+        """
+        # only accept a provider if any of the following is true
+        # 1) in multi mode
+        # 2) seeing the first provider in single mode
+        # 3) seeing the same provider again in single mode
+        stored_id = self._stored.relation_id
+        check_single = ((stored_id is None) or (stored_id == rel_id))
+        if self.multi_mode or check_single:
+            return True
+        return False
