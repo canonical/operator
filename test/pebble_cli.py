@@ -178,10 +178,10 @@ def main():
         else:
             raise AssertionError("shouldn't happen")
     except pebble.APIError as e:
-        print('{} {}: {}'.format(e.code, e.status, e.message), file=sys.stderr)
+        print('APIError: {} {}: {}'.format(e.code, e.status, e.message), file=sys.stderr)
         sys.exit(1)
     except pebble.ConnectionError as e:
-        print('cannot connect to socket {!r}: {}'.format(socket_path, e),
+        print('ConnectionError: cannot connect to socket {!r}: {}'.format(socket_path, e),
               file=sys.stderr)
         sys.exit(1)
     except pebble.ChangeError as e:
