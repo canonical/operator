@@ -123,9 +123,10 @@ class TestLibFinder(TestCase):
 
         _mklib(tmpcwd, "foo", "bar").write_text("")
 
+        paths = _flatten(ops.lib._find_all_specs(dirs))
         self.assertEqual(
-            _flatten(ops.lib._find_all_specs(dirs)),
-            [os.path.join('.', 'foo', 'opslib', 'bar')])
+            [os.path.relpath(p) for p in paths],
+            [os.path.join('foo', 'opslib', 'bar')])
 
     def test_bogus_topdir(self):
         """Check that having one bogus dir in sys.path doesn't cause the finder to abort."""
