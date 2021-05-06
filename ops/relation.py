@@ -314,6 +314,18 @@ class ConsumerBase(Object):
         self.framework.observe(events.relation_broken, self._on_provider_broken)
         self.framework.observe(charm.on.upgrade_charm, self._validate_provider)
 
+    @property
+    def relation_id(self):
+        """Identifier for relation with producer.
+
+        Returns:
+           an integer identifier of relation with :class:`ProviderBase`
+           if :class:`ConsumerBase` was instantiated in single
+           mode (`multi=False`) and a valid relation exists. If either
+           of these two conditions is false `None` is returned.
+        """
+        return self._stored.relation_id if self._stored.relation_id else None
+
     def _on_provider_joined(self, event):
         """Check if a new or additional provider is acceptable.
 
