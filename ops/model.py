@@ -1142,7 +1142,7 @@ class Container:
             path: Path of the directory to list, or path of the file to return
                 information about.
             pattern: If specified, filter the list to just the files that match,
-                for example "*.txt".
+                for example ``*.txt``.
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
         """
