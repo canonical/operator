@@ -987,10 +987,12 @@ class Client:
             make_dirs: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
-            user_id: UID for file.
-            user: Username for file (user_id takes precedence).
-            group_id: GID for file.
-            group: Group name for file (group_id takes precedence).
+            user_id: User ID (UID) for file.
+            user: Username for file. User's UID must match user_id if both are
+                specified.
+            group_id: Group ID (GID) for file.
+            group: Group name for file. Group's GID must match group_id if
+                both are specified.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -1078,10 +1080,12 @@ class Client:
             make_parents: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create directory with (Pebble
                 default is 0o755).
-            user_id: UID for directory.
-            user: Username for directory (user_id takes precedence).
-            group_id: GID for directory.
-            group: Group name for directory (group_id takes precedence).
+            user_id: User ID (UID) for directory.
+            user: Username for directory. User's UID must match user_id if
+                both are specified.
+            group_id: Group ID (GID) for directory.
+            group: Group name for directory. Group's GID must match group_id
+                if both are specified.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
