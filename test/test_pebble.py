@@ -512,7 +512,11 @@ services:
     environment:
       ENV1: value1
       ENV2: value2
+    group: staff
+    group-id: 2000
     summary: Bar
+    user: bob
+    user-id: 1000
   foo:
     command: echo foo
     summary: Foo
@@ -529,6 +533,10 @@ summary: Sum Mary
         self.assertEqual(s.services['bar'].command, 'echo bar')
         self.assertEqual(s.services['bar'].environment,
                          {'ENV1': 'value1', 'ENV2': 'value2'})
+        self.assertEqual(s.services['bar'].user, 'bob')
+        self.assertEqual(s.services['bar'].user_id, 1000)
+        self.assertEqual(s.services['bar'].group, 'staff')
+        self.assertEqual(s.services['bar'].group_id, 2000)
 
         self.assertEqual(s.to_yaml(), yaml)
         self.assertEqual(str(s), yaml)
@@ -546,6 +554,10 @@ class TestService(unittest.TestCase):
         self.assertEqual(service.before, [])
         self.assertEqual(service.requires, [])
         self.assertEqual(service.environment, {})
+        self.assertEqual(service.user, '')
+        self.assertIs(service.user_id, None)
+        self.assertEqual(service.group, '')
+        self.assertIs(service.group_id, None)
         self.assertEqual(service.to_dict(), {})
 
     def test_name_only(self):
@@ -566,6 +578,10 @@ class TestService(unittest.TestCase):
             'before': ['b1', 'b2'],
             'requires': ['r1', 'r2'],
             'environment': {'k1': 'v1', 'k2': 'v2'},
+            'user': 'bob',
+            'user-id': 1000,
+            'group': 'staff',
+            'group-id': 2000,
         }
         s = pebble.Service('Name 2', d)
         self.assertEqual(s.name, 'Name 2')
@@ -577,6 +593,10 @@ class TestService(unittest.TestCase):
         self.assertEqual(s.before, ['b1', 'b2'])
         self.assertEqual(s.requires, ['r1', 'r2'])
         self.assertEqual(s.environment, {'k1': 'v1', 'k2': 'v2'})
+        self.assertEqual(s.user, 'bob')
+        self.assertEqual(s.user_id, 1000)
+        self.assertEqual(s.group, 'staff')
+        self.assertEqual(s.group_id, 2000)
 
         self.assertEqual(s.to_dict(), d)
 
