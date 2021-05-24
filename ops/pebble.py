@@ -503,6 +503,10 @@ class Service:
         self.before = list(raw.get('before', []))
         self.requires = list(raw.get('requires', []))
         self.environment = dict(raw.get('environment', {}))
+        self.user = raw.get('user', '')
+        self.user_id = raw.get('user-id')
+        self.group = raw.get('group', '')
+        self.group_id = raw.get('group-id')
 
     def to_dict(self) -> typing.Dict:
         """Convert this service object to its dict representation."""
@@ -516,6 +520,10 @@ class Service:
             ('before', self.before),
             ('requires', self.requires),
             ('environment', self.environment),
+            ('user', self.user),
+            ('user-id', self.user_id),
+            ('group', self.group),
+            ('group-id', self.group_id),
         ]
         return {name: value for name, value in fields if value}
 
