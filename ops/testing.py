@@ -407,26 +407,30 @@ class Harness:
         self._emit_relation_created(relation_name, rel_id, remote_app)
         return rel_id
 
-    def remove_relation(self, relation_name: str, remote_app: str) -> None:
+    def remove_relation(self, relation_id: int) -> None:
         """Remove a relation.
 
         Args:
-            relation_name: The relation on Charm that is being related to
-            remote_app: The name of the application that is being related to
+            relation_id: The relation ID for the relation to be removed.
 
         Raises:
-            ValueError: if relation_name is invalid
-            RelationNotFoundError: if valid relation id for relation_name is not found
+            RelationNotFoundError: if relation id is not valid
         """
-        rel_id = self._backend._relation_ids_map[relation_name][0]
-        for unit_name in self._backend._relation_list_map[rel_id]:
-            self.remove_relation_unit(rel_id, unit_name)
-        self._emit_relation_broken(relation_name, rel_id, remote_app)
-        self._backend._relation_app_and_units.pop(rel_id)
-        self._backend._relation_data.pop(rel_id)
-        self._backend._relation_list_map.pop(rel_id)
-        self._backend._relation_ids_map.pop(relation_name)
-        self._backend._relation_names.pop(rel_id)
+        try:
+            relation_name = self._backend._relation_names[relation_id]
+            remote_app = self._backend.relation_remote_app_name(relation_id)
+        except KeyError as e:
+            raise model.RelationNotFoundError from e
+
+        for unit_name in self._backend._relation_list_map[relation_id]:
+            self.remove_relation_unit(relation_id, unit_name)
+
+        self._emit_relation_broken(relation_name, relation_id, remote_app)
+        self._backend._relation_app_and_units.pop(relation_id)
+        self._backend._relation_data.pop(relation_id)
+        self._backend._relation_list_map.pop(relation_id)
+        self._backend._relation_ids_map[relation_name].remove(relation_id)
+        self._backend._relation_names.pop(relation_id)
 
     def _emit_relation_created(self, relation_name: str, relation_id: int,
                                remote_app: str) -> None:

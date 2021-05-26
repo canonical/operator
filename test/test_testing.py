@@ -223,7 +223,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
         harness.charm.get_changes(reset=True)  # created event ignored
         # Now remove relation
-        harness.remove_relation('db', 'postgresql')
+        harness.remove_relation(rel_id)
         # Check relation no longer exists
         self.assertEqual(backend.relation_ids('db'), [])
         self.assertRaises(RelationNotFoundError, backend.relation_list, rel_id)
@@ -241,6 +241,82 @@ class TestHarness(unittest.TestCase):
                           'data': {'app': 'postgresql',
                                    'unit': None,
                                    'relation_id': rel_id}})
+
+    def test_remove_specific_relation_id(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+
+        # Create the first relation
+        rel_id_1 = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id_1, int)
+        harness.add_relation_unit(rel_id_1, 'postgresql/0')
+        backend = harness._backend
+        # Check relation was created
+        self.assertIn(rel_id_1, backend.relation_ids('db'))
+        self.assertEqual(backend.relation_list(rel_id_1), ['postgresql/0'])
+        harness.charm.get_changes(reset=True)  # created event ignored
+
+        # Create the second relation
+        rel_id_2 = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id_2, int)
+        harness.add_relation_unit(rel_id_2, 'postgresql/1')
+        backend = harness._backend
+        # Check relation was created and both relations exist
+        self.assertIn(rel_id_1, backend.relation_ids('db'))
+        self.assertIn(rel_id_2, backend.relation_ids('db'))
+        self.assertEqual(backend.relation_list(rel_id_2), ['postgresql/1'])
+        harness.charm.get_changes(reset=True)  # created event ignored
+
+        # Now remove second relation
+        harness.remove_relation(rel_id_2)
+        # Check second relation no longer exists but first does
+        self.assertEqual(backend.relation_ids('db'), [rel_id_1])
+        self.assertRaises(RelationNotFoundError, backend.relation_list, rel_id_2)
+
+        # Check relation broken event is raised with correct data
+        changes = harness.charm.get_changes()
+        self.assertEqual(changes[0],
+                         {'name': 'relation-departed',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': 'postgresql/1',
+                                   'relation_id': rel_id_2}})
+        self.assertEqual(changes[1],
+                         {'name': 'relation-broken',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': None,
+                                   'relation_id': rel_id_2}})
+
+    def test_removing_invalid_relation_id_raises_exception(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # First create a relation
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id, int)
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        backend = harness._backend
+        # Check relation was created
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
+        harness.charm.get_changes(reset=True)  # created event ignored
+        # Check exception is raised if relation id is invalid
+        with self.assertRaises(RelationNotFoundError):
+            harness.remove_relation(rel_id+1)
 
     def test_remove_relation_unit(self):
         harness = Harness(RelationEventCharm, meta='''
@@ -295,7 +371,7 @@ class TestHarness(unittest.TestCase):
         backend = harness._backend
         self.assertEqual(backend.relation_ids('db'), [rel_id])
         self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_app, is_app=True))
-        harness.remove_relation('db', 'postgresql')
+        harness.remove_relation(rel_id)
         # Check relation and app data are removed
         self.assertEqual(backend.relation_ids('db'), [])
         self.assertRaises(RelationNotFoundError, backend.relation_get,
