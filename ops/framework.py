@@ -29,10 +29,7 @@ import types
 import weakref
 
 from ops import charm
-from ops.storage import (
-    NoSnapshotError,
-    SQLiteStorage,
-)
+from ops.storage import NoSnapshotError, SQLiteStorage
 
 logger = logging.getLogger(__name__)
 
@@ -267,6 +264,13 @@ class BoundEvent:
         self.event_type = event_type
         self.event_kind = event_kind
 
+    def __call__(self, *args, **kwargs):
+        # TODO: this way is not so good.
+        define_event = getattr(self.event_type, 'define_event')
+        if not callable(define_event):
+            raise NotImplementedError()
+        return define_event(self.emitter, *args, **kwargs)
+
     def emit(self, *args, **kwargs):
         """Emit event to all registered observers.
 
@@ -399,6 +403,7 @@ class ObjectEvents(Object):
         event_descriptor = EventSource(event_type)
         event_descriptor._set_name(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
+        return event_descriptor
 
     def _event_kinds(self):
         event_kinds = []

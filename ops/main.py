@@ -30,9 +30,8 @@ import ops.charm
 import ops.framework
 import ops.model
 import ops.storage
-
-from ops.log import setup_root_logging
 from ops.jujuversion import JujuVersion
+from ops.log import setup_root_logging
 
 CHARM_STATE_FILE = '.unit-state.db'
 
@@ -148,6 +147,9 @@ def _get_event_args(charm, bound_event):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
         return [container], {}
+    elif issubclass(event_type, ops.charm.CloudEventReceivedEventProxy):
+        cloud_event_id = os.environ['JUJU_CLOUD_EVENT_ID']
+        return [cloud_event_id], {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
