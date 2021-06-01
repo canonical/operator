@@ -21,8 +21,13 @@ import typing
 
 from ops import model
 from ops._private import yaml
-from ops.framework import (EventBase, EventSource, Framework, Object,
-                           ObjectEvents)
+from ops.framework import (
+    EventBase,
+    EventSource,
+    Framework,
+    Object,
+    ObjectEvents,
+)
 
 
 class HookEvent(EventBase):
@@ -526,11 +531,11 @@ class CloudEventIDMissingError(Exception):
 
 
 def _get_unregistered_cloud_events(emitter):
-    try:
-        return emitter.framework._stored.unregistered_cloud_events
-    except AttributeError:
-        emitter.framework._stored.set_default(unregistered_cloud_events=[])
-    return emitter.framework._stored.unregistered_cloud_events
+    return emitter.framework._stored['unregistered_cloud_events'] or []
+
+
+def _set_unregistered_cloud_events(emitter, items):
+    emitter.framework._stored['unregistered_cloud_events'] = items
 
 
 def _register_cloud_event(emitter, event_suffix, cloud_event_id):
@@ -545,17 +550,19 @@ def _register_cloud_event(emitter, event_suffix, cloud_event_id):
     if cloud_event_id in unregistered:
         return
 
-    # TODO: call register-cloud-event command with `emitter.cloud_event_id` as the arg
-    return emitter.on.define_event(f'{cloud_event_id}-{event_suffix}', CloudEventReceivedEvent)
+    emitter.framework.model._backend.register_cloud_event(cloud_event_id)
+    event_kind = f'{cloud_event_id.replace("/", "_")}_{event_suffix}'
+    emitter.define_event(event_kind, CloudEventReceivedEvent)
+    return getattr(emitter, event_kind)
 
 
 class CloudEventReceivedEventProxy(HookEvent):
-    """A proxy for event triggered when a cloud event was received for a specific cloud resource.
-    """
+    """Proxy for cloud_event_received hook."""
 
     event_suffix = 'cloud_event_received'
 
     def __new__(cls, handle, cloud_event_id):
+        """Ensure to create CloudEventReceivedEvent instance."""
         return super().__new__(CloudEventReceivedEvent, handle, cloud_event_id)
 
     def __init__(self, handle, cloud_event_id):
@@ -586,16 +593,15 @@ class CloudEventReceivedEventProxy(HookEvent):
         if not cloud_event_id:
             raise CloudEventIDMissingError
 
-        unregistered = self.framework._stored.unregistered_cloud_events
-        if self.cloud_event_id not in unregistered:
-            # TODO: call unregister-cloud-event command with `self.cloud_event_id` as the arg
-            unregistered.append(self.cloud_event_id)
-            self.framework._stored.unregistered_cloud_events = unregistered
+        unregistered = _get_unregistered_cloud_events(self)
+        if cloud_event_id not in unregistered:
+            self.framework.model._backend.unregister_cloud_event(cloud_event_id)
+            unregistered.append(cloud_event_id)
+            _set_unregistered_cloud_events(self, unregistered)
 
 
 class CloudEventReceivedEvent(CloudEventReceivedEventProxy):
-    """Event triggered when a cloud event was received for a specific cloud resource.
-    """
+    """Event triggered when a cloud event was received for a specific cloud resource."""
 
     def snapshot(self) -> dict:
         """Used by the framework to serialize the event to disk.
@@ -613,9 +619,8 @@ class CloudEventReceivedEvent(CloudEventReceivedEventProxy):
 
     @property
     def events(self):
-        # TODO: run $ cloud-event-get ${cloud_event_id}
-        # return self.framework.model._backend.cloud_event_get(self.cloud_event_id)
-        return []
+        """Call cloud-event-get command to fetch cloud events for the cloud_event_id."""
+        return self.framework.model._backend.cloud_event_get(self.cloud_event_id)
 
 
 class CharmEvents(ObjectEvents):

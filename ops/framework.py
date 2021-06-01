@@ -31,6 +31,7 @@ import weakref
 from ops import charm
 from ops.storage import NoSnapshotError, SQLiteStorage
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -265,6 +266,12 @@ class BoundEvent:
         self.event_kind = event_kind
 
     def __call__(self, *args, **kwargs):
+        """Hook into event_type.define_event.
+
+        Raises:
+            NotImplementedError: if the event_type does not have
+            define_event staticmethod defined.
+        """
         # TODO: this way is not so good.
         define_event = getattr(self.event_type, 'define_event')
         if not callable(define_event):
@@ -403,7 +410,6 @@ class ObjectEvents(Object):
         event_descriptor = EventSource(event_type)
         event_descriptor._set_name(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
-        return event_descriptor
 
     def _event_kinds(self):
         event_kinds = []

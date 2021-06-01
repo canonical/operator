@@ -33,6 +33,7 @@ import ops.storage
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
 
+
 CHARM_STATE_FILE = '.unit-state.db'
 
 
