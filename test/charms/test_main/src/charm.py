@@ -13,15 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import sys
-import logging
+
 
 sys.path.append('lib')
 
-from ops.charm import CharmBase  # noqa: E402 (module-level import after non-import code)
+from ops.charm import (  # noqa: E402 (module-level import after non-import code)
+    CharmBase,
+    CloudEventReceivedEvent,
+)
 from ops.framework import StoredState  # noqa: E402
-from ops.main import main        # noqa: E402 (ditto)
+from ops.main import main  # noqa: E402 (ditto)
+
 
 logger = logging.getLogger()
 
@@ -50,6 +55,7 @@ class Charm(CharmBase):
             _on_get_model_name_action=[],
             on_collect_metrics=[],
             on_test_pebble_ready=[],
+            on_cloud_event_received_configmap_foo=[],
 
             on_log_critical_action=[],
             on_log_error_action=[],
@@ -74,6 +80,10 @@ class Charm(CharmBase):
         self.framework.observe(self.on.mon_relation_departed, self._on_mon_relation_departed)
         self.framework.observe(self.on.ha_relation_broken, self._on_ha_relation_broken)
         self.framework.observe(self.on.test_pebble_ready, self._on_test_pebble_ready)
+        self.framework.observe(
+            self.on.cloud_event_received('configmap/foo'),
+            self._on_cloud_event_received_configmap_foo,
+        )
 
         actions = self.charm_dir / 'actions.yaml'
         if actions.exists() and actions.read_bytes():
@@ -153,6 +163,17 @@ class Charm(CharmBase):
         self._stored.on_test_pebble_ready.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.test_pebble_ready_data = event.snapshot()
+
+    def _on_cloud_event_received_configmap_foo(self, event):
+        assert isinstance(event, CloudEventReceivedEvent), (
+            'cloud event received events must have a reference to cloud event id')
+        assert event.cloud_event_id == 'configmap/foo', (
+            'cloud event received events must have a reference to cloud event id')
+        self._stored.on_cloud_event_received_configmap_foo.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
+        self._stored.cloud_event_received_configmap_foo_data = event.snapshot()
+        assert len(event.events) > 0, 'cloud event received events property must not be empty'
+        event.unregister_cloud_event()
 
     def _on_start_action(self, event):
         assert event.handle.kind == 'start_action', (

@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import abc
+import importlib.util
 import io
 import logging
-import logassert
 import os
 import platform
 import shutil
@@ -23,40 +23,43 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import importlib.util
 import warnings
-import yaml
 from pathlib import Path
 from unittest.mock import patch
 
+import logassert
+import yaml
+
 from ops.charm import (
+    ActionEvent,
     CharmBase,
     CharmEvents,
     CharmMeta,
+    CloudEventReceivedEvent,
+    CollectMetricsEvent,
+    ConfigChangedEvent,
     HookEvent,
     InstallEvent,
-    StartEvent,
-    ConfigChangedEvent,
-    UpgradeCharmEvent,
-    UpdateStatusEvent,
     LeaderSettingsChangedEvent,
-    RelationJoinedEvent,
+    PebbleReadyEvent,
+    RelationBrokenEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
-    RelationBrokenEvent,
     RelationEvent,
+    RelationJoinedEvent,
+    StartEvent,
     StorageAttachedEvent,
-    ActionEvent,
-    CollectMetricsEvent,
+    UpdateStatusEvent,
+    UpgradeCharmEvent,
     WorkloadEvent,
-    PebbleReadyEvent,
 )
 from ops.framework import Framework, StoredStateData
-from ops.main import main, CHARM_STATE_FILE, _should_use_controller_storage
+from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
 from ops.storage import SQLiteStorage
 from ops.version import version
 
 from .test_helpers import fake_script, fake_script_calls
+
 
 is_windows = platform.system() == 'Windows'
 
@@ -83,7 +86,7 @@ class SymlinkTargetError(Exception):
 class EventSpec:
     def __init__(self, event_type, event_name, env_var=None,
                  relation_id=None, remote_app=None, remote_unit=None,
-                 model_name=None, set_in_env=None, workload_name=None):
+                 model_name=None, set_in_env=None, workload_name=None, cloud_event_id=None):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -93,6 +96,7 @@ class EventSpec:
         self.model_name = model_name
         self.set_in_env = set_in_env
         self.workload_name = workload_name
+        self.cloud_event_id = cloud_event_id
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
@@ -392,6 +396,10 @@ class _TestMain(abc.ABC):
             env.update({
                 'JUJU_WORKLOAD_NAME': event_spec.workload_name,
             })
+        if issubclass(event_spec.event_type, CloudEventReceivedEvent):
+            env.update({
+                'JUJU_CLOUD_EVENT_ID': event_spec.cloud_event_id,
+            })
         if issubclass(event_spec.event_type, ActionEvent):
             event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
             env.update({
@@ -532,6 +540,10 @@ class _TestMain(abc.ABC):
             EventSpec(PebbleReadyEvent, 'test_pebble_ready',
                       workload_name='test'),
             {'container_name': 'test'},
+        ), (
+            EventSpec(CloudEventReceivedEvent, 'configmap_foo_cloud_event_received',
+                      cloud_event_id='configmap/foo'),
+            {'cloud_event_id': 'configmap/foo'},
         )]
 
         logger.debug('Expected events %s', events_under_test)
@@ -634,14 +646,17 @@ class _TestMain(abc.ABC):
 
     @unittest.skipIf(is_windows, 'TODO windows multiline args are hard')
     def test_excepthook(self):
+        fake_script(self, 'register-cloud-event', "echo '{}'")
         with self.assertRaises(subprocess.CalledProcessError):
-            self._simulate_event(EventSpec(InstallEvent, 'install',
-                                           set_in_env={'TRY_EXCEPTHOOK': '1'}))
+            self._simulate_event(
+                EventSpec(
+                    InstallEvent, 'install', set_in_env={'TRY_EXCEPTHOOK': '1'},
+                ),
+            )
 
         calls = [' '.join(i) for i in fake_script_calls(self)]
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
-
         if self.has_dispatch:
             self.assertEqual(
                 calls.pop(0),
@@ -652,6 +667,7 @@ class _TestMain(abc.ABC):
             self.assertEqual(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
 
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
+        self.assertEqual(calls.pop(0), 'register-cloud-event configmap/foo')
 
         self.maxDiff = None
         self.assertRegex(

@@ -23,13 +23,7 @@ import typing
 from contextlib import contextmanager
 from textwrap import dedent
 
-from ops import (
-    charm,
-    framework,
-    model,
-    pebble,
-    storage,
-)
+from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 
 
@@ -892,6 +886,15 @@ class _TestingModelBackend:
 
     def juju_log(self, level, msg):
         raise NotImplementedError(self.juju_log)
+
+    def unregister_cloud_event(self, cloud_event_id):
+        raise NotImplementedError(self.unregister_cloud_event)
+
+    def register_cloud_event(self, cloud_event_id):
+        raise NotImplementedError(self.register_cloud_event)
+
+    def cloud_event_get(self, cloud_event_id):
+        raise NotImplementedError(self.cloud_event_get)
 
     def get_pebble(self, socket_path: str):
         client = self._pebble_clients.get(socket_path, None)
