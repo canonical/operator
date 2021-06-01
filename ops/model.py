@@ -25,16 +25,15 @@ import tempfile
 import time
 import typing
 import weakref
-
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from subprocess import run, PIPE, CalledProcessError
+from subprocess import PIPE, CalledProcessError, run
 
-from ops._private import yaml
-from ops.jujuversion import JujuVersion
 import ops
 import ops.pebble as pebble
+from ops._private import yaml
+from ops.jujuversion import JujuVersion
 
 
 class Model:
@@ -1534,6 +1533,15 @@ class _ModelBackend:
             metric_args.append('{}={}'.format(k, metric_value))
         cmd.extend(metric_args)
         self._run(*cmd)
+
+    def unregister_cloud_event(self, cloud_event_id):
+        self._run('unregister-cloud-event', cloud_event_id)
+
+    def register_cloud_event(self, cloud_event_id):
+        self._run('register-cloud-event', cloud_event_id)
+
+    def cloud_event_get(self, cloud_event_id):
+        return self._run('cloud-event-get', cloud_event_id, return_output=True, use_json=True)
 
     def get_pebble(self, socket_path: str) -> 'pebble.Client':
         """Create a pebble.Client instance from given socket path."""
