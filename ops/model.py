@@ -1537,8 +1537,12 @@ class _ModelBackend:
     def unregister_cloud_event(self, cloud_event_id):
         self._run('unregister-cloud-event', cloud_event_id)
 
-    def register_cloud_event(self, cloud_event_id):
-        self._run('register-cloud-event', cloud_event_id)
+    def register_cloud_event(self, cloud_event_id, resource_type, resource_name):
+        self._run(
+            'register-cloud-event', cloud_event_id,
+            '--resource_type', resource_type,
+            '--resource_name', resource_name,
+        )
 
     def cloud_event_get(self, cloud_event_id):
         return self._run('cloud-event-get', cloud_event_id, return_output=True, use_json=True)

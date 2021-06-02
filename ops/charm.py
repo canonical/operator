@@ -21,6 +21,11 @@ import typing
 
 from ops import model
 from ops._private import yaml
+from ops.cloudevents import (
+    _cache_registered,
+    register_cloud_event,
+    unregister_cloud_event,
+)
 from ops.framework import (
     EventBase,
     EventSource,
@@ -124,7 +129,7 @@ class InstallEvent(HookEvent):
 
 
 class StartEvent(HookEvent):
-    """Event triggered immediately after first configuation change.
+    """Event triggered immediately after first configuration change.
 
     This event is triggered immediately after the first
     :class:`ConfigChangedEvent`. Callback methods bound to the event should be
@@ -523,39 +528,6 @@ class PebbleReadyEvent(WorkloadEvent):
     """
 
 
-class CloudEventIDMissingError(Exception):
-    """Raised when cloud event ID is missing."""
-
-    def __str__(self):
-        return "cloud_event_id is required(format: resource_name/resource_type)"
-
-
-def _get_unregistered_cloud_events(emitter):
-    return emitter.framework._stored['unregistered_cloud_events'] or []
-
-
-def _set_unregistered_cloud_events(emitter, items):
-    emitter.framework._stored['unregistered_cloud_events'] = items
-
-
-def _register_cloud_event(emitter, event_suffix, cloud_event_id):
-    """Used by the framework to register the cloud resource to watch for cloud events.
-
-    Not meant to be called by charm code.
-    """
-    if not cloud_event_id:
-        raise CloudEventIDMissingError
-
-    unregistered = _get_unregistered_cloud_events(emitter)
-    if cloud_event_id in unregistered:
-        return
-
-    emitter.framework.model._backend.register_cloud_event(cloud_event_id)
-    event_kind = f'{cloud_event_id.replace("/", "_")}_{event_suffix}'
-    emitter.define_event(event_kind, CloudEventReceivedEvent)
-    return getattr(emitter, event_kind)
-
-
 class CloudEventReceivedEventProxy(HookEvent):
     """Proxy for cloud_event_received hook."""
 
@@ -571,33 +543,19 @@ class CloudEventReceivedEventProxy(HookEvent):
         self.cloud_event_id = cloud_event_id
 
     @staticmethod
-    def define_event(emitter, cloud_event_id):
+    def define_event(emitter, cloud_event_id, resource_type, resource_name):
         """Define an event on type CloudEventReceivedEvent at runtime.
 
         Not meant to be called by charm code.
         """
-        if not cloud_event_id:
-            raise CloudEventIDMissingError
+        register_cloud_event(emitter, cloud_event_id, resource_type, resource_name)
+        event_kind = f'{cloud_event_id}_{CloudEventReceivedEventProxy.event_suffix}'
+        emitter.define_event(event_kind, CloudEventReceivedEvent)
+        return getattr(emitter, event_kind)
 
-        return _register_cloud_event(
-            emitter, CloudEventReceivedEventProxy.event_suffix, cloud_event_id,
-        )
-
-    def unregister_cloud_event(self, cloud_event_id=None):
-        """Unregister the watched cloud resource.
-
-        Args:
-            cloud_event_id: The cloud resource id(format: resource_type/resource_name).
-        """
-        cloud_event_id = cloud_event_id or self.cloud_event_id
-        if not cloud_event_id:
-            raise CloudEventIDMissingError
-
-        unregistered = _get_unregistered_cloud_events(self)
-        if cloud_event_id not in unregistered:
-            self.framework.model._backend.unregister_cloud_event(cloud_event_id)
-            unregistered.append(cloud_event_id)
-            _set_unregistered_cloud_events(self, unregistered)
+    def unregister_cloud_event(self):
+        """Unregister the watched cloud resource."""
+        unregister_cloud_event(self, self.cloud_event_id)
 
 
 class CloudEventReceivedEvent(CloudEventReceivedEventProxy):
@@ -758,6 +716,13 @@ class CharmBase(Object):
     def config(self) -> model.ConfigData:
         """A mapping containing the charm's config and current values."""
         return self.model.config
+
+    unregister_cloud_event = unregister_cloud_event
+
+    def register_cloud_event(self, cloud_event_id, resource_type, resource_name):
+        """Register the watched cloud resource."""
+        _cache_registered(self, cloud_event_id)
+        register_cloud_event(self, cloud_event_id, resource_type, resource_name, force=True)
 
 
 class CharmMeta:
