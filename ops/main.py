@@ -137,6 +137,7 @@ def _emit_charm_event(charm, event_name):
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
         logger.debug('Emitting Juju event %s.', event_name)
+        print('Emitting Juju event', event_name, *args, **kwargs)
         event_to_emit.emit(*args, **kwargs)
 
 
@@ -148,9 +149,12 @@ def _get_event_args(charm, bound_event):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
         return [container], {}
-    elif issubclass(event_type, ops.charm.CloudEventReceivedEventProxy):
+    elif issubclass(event_type, ops.charm.CloudEventReceivedEvent):
         cloud_event_id = os.environ['JUJU_CLOUD_EVENT_ID']
         return [cloud_event_id], {}
+    elif issubclass(event_type, ops.charm.CloudEventReceivedEventPrefixed):
+        raise RuntimeError(
+            'internal {} should never be fired'.format(bound_event))
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])

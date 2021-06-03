@@ -55,16 +55,6 @@ class Handle:
         self._parent = parent
         self._kind = kind
         self._key = key
-        if parent:
-            if key:
-                self._path = "{}/{}[{}]".format(parent, kind, key)
-            else:
-                self._path = "{}/{}".format(parent, kind)
-        else:
-            if key:
-                self._path = "{}[{}]".format(kind, key)
-            else:
-                self._path = "{}".format(kind)
 
     def nest(self, kind, key):
         """Create a new handle as child of the current one."""
@@ -97,7 +87,18 @@ class Handle:
     @property
     def path(self):
         """Return the handle's path."""
-        return self._path
+        _path = None
+        if self.parent:
+            if self.key:
+                _path = "{}/{}[{}]".format(self.parent, self.kind, self.key)
+            else:
+                _path = "{}/{}".format(self.parent, self.kind)
+        else:
+            if self.key:
+                _path = "{}[{}]".format(self.kind, self.key)
+            else:
+                _path = "{}".format(self.kind)
+        return _path
 
     @classmethod
     def from_path(cls, path):

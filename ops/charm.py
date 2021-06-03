@@ -30,6 +30,7 @@ from ops.framework import (
     EventBase,
     EventSource,
     Framework,
+    Handle,
     Object,
     ObjectEvents,
 )
@@ -528,38 +529,55 @@ class PebbleReadyEvent(WorkloadEvent):
     """
 
 
-class CloudEventReceivedEventProxy(HookEvent):
+class CloudEventReceivedEventBase(HookEvent):
+    """Base class representing cloud event related events.
+
+    Attributes:
+        cloud_event_id: The cloud event identifier.
+    """
+
+    event_kind = 'cloud_event_received'
+
+    def __init__(self, handle: Handle, cloud_event_id):
+        super().__init__(handle)
+        self.cloud_event_id = cloud_event_id
+
+    @classmethod
+    def _get_prefixed_event_kind(cls, cloud_event_id):
+        if cloud_event_id is None:
+            raise RuntimeError("cloud_event_id is missing")
+        return f'{cloud_event_id}_{cls.event_kind}'
+
+
+class CloudEventReceivedEvent(CloudEventReceivedEventBase):
     """Proxy for cloud_event_received hook."""
 
-    event_suffix = 'cloud_event_received'
-
-    def __new__(cls, handle, cloud_event_id):
-        """Ensure to create CloudEventReceivedEvent instance."""
-        return super().__new__(CloudEventReceivedEvent, handle, cloud_event_id)
-
-    def __init__(self, handle, cloud_event_id):
-        super().__init__(handle)
-
-        self.cloud_event_id = cloud_event_id
+    def __new__(cls, handle: Handle, cloud_event_id):
+        """Ensure to create CloudEventReceivedEventPrefixed instance."""
+        instance = super().__new__(CloudEventReceivedEventPrefixed)
+        # We are not returning a instance of `cls`, so call __init__ explicitly.
+        instance.__init__(handle, cloud_event_id)
+        return instance
 
     @staticmethod
     def define_event(emitter, cloud_event_id, resource_type, resource_name):
-        """Define an event on type CloudEventReceivedEvent at runtime.
+        """Define an event on type CloudEventReceivedEventPrefixed at runtime.
 
         Not meant to be called by charm code.
         """
         register_cloud_event(emitter, cloud_event_id, resource_type, resource_name)
-        event_kind = f'{cloud_event_id}_{CloudEventReceivedEventProxy.event_suffix}'
-        emitter.define_event(event_kind, CloudEventReceivedEvent)
+        event_kind = CloudEventReceivedEventBase._get_prefixed_event_kind(cloud_event_id)
+        emitter.define_event(event_kind, CloudEventReceivedEventPrefixed)
         return getattr(emitter, event_kind)
 
-    def unregister_cloud_event(self):
-        """Unregister the watched cloud resource."""
-        unregister_cloud_event(self, self.cloud_event_id)
 
-
-class CloudEventReceivedEvent(CloudEventReceivedEventProxy):
+class CloudEventReceivedEventPrefixed(CloudEventReceivedEventBase):
     """Event triggered when a cloud event was received for a specific cloud resource."""
+
+    def __init__(self, handle: Handle, cloud_event_id):
+        super().__init__(handle, cloud_event_id)
+        # refresh handle.
+        self.handle._kind = self._get_prefixed_event_kind(self.cloud_event_id)
 
     def snapshot(self) -> dict:
         """Used by the framework to serialize the event to disk.
@@ -579,6 +597,10 @@ class CloudEventReceivedEvent(CloudEventReceivedEventProxy):
     def events(self):
         """Call cloud-event-get command to fetch cloud events for the cloud_event_id."""
         return self.framework.model._backend.cloud_event_get(self.cloud_event_id)
+
+    def unregister_cloud_event(self):
+        """Unregister the watched cloud resource."""
+        unregister_cloud_event(self, self.cloud_event_id)
 
 
 class CharmEvents(ObjectEvents):
@@ -621,7 +643,7 @@ class CharmEvents(ObjectEvents):
     leader_elected = EventSource(LeaderElectedEvent)
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
     collect_metrics = EventSource(CollectMetricsEvent)
-    cloud_event_received = EventSource(CloudEventReceivedEventProxy)
+    cloud_event_received = EventSource(CloudEventReceivedEvent)
 
 
 class CharmBase(Object):

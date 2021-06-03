@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 # prevents ops calls register_cloud_event more than once during each hook runs.
 _KEY_REGISTERED = "registered_cloud_events"
-# prevents ops calls register_cloud_event again after the charm has called event.unregister_cloud_event.
+# prevents ops calls register_cloud_event again after the charm has called
+# event.unregister_cloud_event.
 _KEY_UNREGISTERED = "unregistered_cloud_events"
 
 CloudEventIds = List[str]
@@ -90,7 +91,19 @@ def _uncache_unregistered(emitter, cloud_event_id: str, unregistered: CloudEvent
         pass
 
 
-def register_cloud_event(emitter, cloud_event_id, resource_type, resource_name, force=False):
+def register_cloud_event(
+    emitter, cloud_event_id: str,
+    resource_type: str, resource_name: str,
+    force: bool = False,
+):
+    """Register a resource to watch for cloud events.
+
+    emitter -- A instance of CharmBase or HookEvent which has Framework accessible.
+    cloud_event_id -- The cloud event identifier.
+    resource_type -- The resource type.
+    resource_name -- The resource name.
+    force -- Always call 'register-cloud-event' command if force is True.
+    """
     if cloud_event_id in _get_registered(emitter):
         logger.debug('cloud event %s has already been registered', cloud_event_id)
         return
@@ -108,6 +121,10 @@ def register_cloud_event(emitter, cloud_event_id, resource_type, resource_name, 
 
 
 def unregister_cloud_event(emitter, cloud_event_id):
+    """Unregister a watching resource.
+
+    cloud_event_id -- The cloud event identifier.
+    """
     if cloud_event_id in _get_unregistered(emitter):
         logger.debug('cloud event %s has already been unregistered', cloud_event_id)
         return
