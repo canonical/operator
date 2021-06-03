@@ -22,7 +22,7 @@ sys.path.append('lib')
 
 from ops.charm import (  # noqa: E402 (module-level import after non-import code)
     CharmBase,
-    CloudEventReceivedEvent,
+    CloudEventReceivedEventPrefixed,
 )
 from ops.framework import StoredState  # noqa: E402
 from ops.main import main  # noqa: E402 (ditto)
@@ -55,7 +55,7 @@ class Charm(CharmBase):
             _on_get_model_name_action=[],
             on_collect_metrics=[],
             on_test_pebble_ready=[],
-            on_cloud_event_received_configmap_foo=[],
+            on_certificate_cloud_event_received=[],
 
             on_log_critical_action=[],
             on_log_error_action=[],
@@ -81,8 +81,10 @@ class Charm(CharmBase):
         self.framework.observe(self.on.ha_relation_broken, self._on_ha_relation_broken)
         self.framework.observe(self.on.test_pebble_ready, self._on_test_pebble_ready)
         self.framework.observe(
-            self.on.cloud_event_received('configmap/foo'),
-            self._on_cloud_event_received_configmap_foo,
+            self.on.cloud_event_received(
+                'certificate', resource_type='configmap', resource_name='foo',
+            ),
+            self._on_certificate_cloud_event_received,
         )
 
         actions = self.charm_dir / 'actions.yaml'
@@ -164,14 +166,14 @@ class Charm(CharmBase):
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.test_pebble_ready_data = event.snapshot()
 
-    def _on_cloud_event_received_configmap_foo(self, event):
-        assert isinstance(event, CloudEventReceivedEvent), (
+    def _on_certificate_cloud_event_received(self, event):
+        assert isinstance(event, CloudEventReceivedEventPrefixed), (
+            'cloud event received events must be an instance of CloudEventReceivedEvent')
+        assert event.cloud_event_id == 'certificate', (
             'cloud event received events must have a reference to cloud event id')
-        assert event.cloud_event_id == 'configmap/foo', (
-            'cloud event received events must have a reference to cloud event id')
-        self._stored.on_cloud_event_received_configmap_foo.append(type(event).__name__)
+        self._stored.on_certificate_cloud_event_received.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
-        self._stored.cloud_event_received_configmap_foo_data = event.snapshot()
+        self._stored.certificate_cloud_event_received = event.snapshot()
         assert len(event.events) > 0, 'cloud event received events property must not be empty'
         event.unregister_cloud_event()
 

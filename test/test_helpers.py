@@ -14,14 +14,14 @@
 
 import os
 import pathlib
-import subprocess
 import shutil
+import subprocess
 import tempfile
 import unittest
 
+from ops.charm import CharmMeta
 from ops.framework import Framework
 from ops.model import Model, _ModelBackend
-from ops.charm import CharmMeta
 from ops.storage import SQLiteStorage
 
 

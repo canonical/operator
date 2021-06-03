@@ -21,11 +21,7 @@ import typing
 
 from ops import model
 from ops._private import yaml
-from ops.cloudevents import (
-    _cache_registered,
-    register_cloud_event,
-    unregister_cloud_event,
-)
+from ops.cloudevents import register_cloud_event, unregister_cloud_event
 from ops.framework import (
     EventBase,
     EventSource,
@@ -546,7 +542,7 @@ class CloudEventReceivedEventBase(HookEvent):
     def _get_prefixed_event_kind(cls, cloud_event_id):
         if cloud_event_id is None:
             raise RuntimeError("cloud_event_id is missing")
-        return f'{cloud_event_id}_{cls.event_kind}'
+        return '{}_{}'.format(cloud_event_id, cls.event_kind)
 
 
 class CloudEventReceivedEvent(CloudEventReceivedEventBase):
@@ -743,7 +739,6 @@ class CharmBase(Object):
 
     def register_cloud_event(self, cloud_event_id, resource_type, resource_name):
         """Register the watched cloud resource."""
-        _cache_registered(self, cloud_event_id)
         register_cloud_event(self, cloud_event_id, resource_type, resource_name, force=True)
 
 

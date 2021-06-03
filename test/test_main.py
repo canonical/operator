@@ -15,6 +15,7 @@
 import abc
 import importlib.util
 import io
+import json
 import logging
 import os
 import platform
@@ -24,6 +25,7 @@ import sys
 import tempfile
 import unittest
 import warnings
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -36,6 +38,7 @@ from ops.charm import (
     CharmEvents,
     CharmMeta,
     CloudEventReceivedEvent,
+    CloudEventReceivedEventPrefixed,
     CollectMetricsEvent,
     ConfigChangedEvent,
     HookEvent,
@@ -55,6 +58,7 @@ from ops.charm import (
 )
 from ops.framework import Framework, StoredStateData
 from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
+from ops.model import Model, _ModelBackend
 from ops.storage import SQLiteStorage
 from ops.version import version
 
@@ -79,14 +83,30 @@ SLOW_YAML_LOGLINE = [
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
+def scoped_environ(new_environ=None):
+    old_environ = dict(os.environ)
+    try:
+        if new_environ is not None:
+            os.environ.clear()
+            os.environ.update(new_environ)
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(old_environ)
+
+
 class SymlinkTargetError(Exception):
     pass
 
 
 class EventSpec:
-    def __init__(self, event_type, event_name, env_var=None,
-                 relation_id=None, remote_app=None, remote_unit=None,
-                 model_name=None, set_in_env=None, workload_name=None, cloud_event_id=None):
+    def __init__(
+        self, event_type, event_name, env_var=None,
+        relation_id=None, remote_app=None, remote_unit=None,
+        model_name=None, set_in_env=None, workload_name=None,
+        cloud_event_id=None,
+    ):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -97,6 +117,10 @@ class EventSpec:
         self.set_in_env = set_in_env
         self.workload_name = workload_name
         self.cloud_event_id = cloud_event_id
+        self.state_key = 'on_{}'.format(event_name)
+        if self.event_type is CloudEventReceivedEvent:
+            event_name = CloudEventReceivedEvent._get_prefixed_event_kind(self.cloud_event_id)
+            self.state_key = 'on_{}'.format(event_name)
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
@@ -293,6 +317,9 @@ class _TestMain(abc.ABC):
         self.addCleanup(cleanup)
 
         fake_script(self, 'juju-log', "exit 0")
+        fake_script(self, 'register-cloud-event', "exit 0")
+        fake_script(self, 'cloud-event-get', 'echo {}'.format(json.dumps([{}])))
+        fake_script(self, 'unregister-cloud-event', "exit 0")
 
         # set to something other than None for tests that care
         self.stdout = None
@@ -339,7 +366,9 @@ class _TestMain(abc.ABC):
                         meta = CharmMeta.from_yaml(m, a)
                 else:
                     meta = CharmMeta.from_yaml(m)
-            framework = Framework(storage, self.JUJU_CHARM_DIR, meta, None)
+            model_backend = _ModelBackend()
+            model = Model(meta, model_backend)
+            framework = Framework(storage, self.JUJU_CHARM_DIR, meta, model)
 
             class ThisCharmEvents(CharmEvents):
                 pass
@@ -416,7 +445,8 @@ class _TestMain(abc.ABC):
             env['JUJU_MODEL_NAME'] = event_spec.model_name
 
         self._call_event(Path(event_dir, event_filename), env)
-        return self._read_and_clear_state()
+        with scoped_environ(env):
+            return self._read_and_clear_state()
 
     def test_event_reemitted(self):
         # First run "install" to make sure all hooks are set up.
@@ -541,9 +571,11 @@ class _TestMain(abc.ABC):
                       workload_name='test'),
             {'container_name': 'test'},
         ), (
-            EventSpec(CloudEventReceivedEvent, 'configmap_foo_cloud_event_received',
-                      cloud_event_id='configmap/foo'),
-            {'cloud_event_id': 'configmap/foo'},
+            EventSpec(
+                CloudEventReceivedEvent, 'cloud_event_received',
+                cloud_event_id='certificate',
+            ),
+            {'cloud_event_id': 'certificate'},
         )]
 
         logger.debug('Expected events %s', events_under_test)
@@ -554,17 +586,24 @@ class _TestMain(abc.ABC):
         # Simulate hook executions for every event.
         for event_spec, expected_event_data in events_under_test:
             state = self._simulate_event(event_spec)
-
-            state_key = 'on_' + event_spec.event_name
-            handled_events = getattr(state, state_key, [])
+            handled_events = getattr(state, event_spec.state_key, [])
 
             # Make sure that a handler for that event was called once.
             self.assertEqual(len(handled_events), 1)
             # Make sure the event handled by the Charm has the right type.
             handled_event_type = handled_events[0]
-            self.assertEqual(handled_event_type, event_spec.event_type.__name__)
-
-            self.assertEqual(list(state.observed_event_types), [event_spec.event_type.__name__])
+            if event_spec.event_type is CloudEventReceivedEvent:
+                self.assertEqual(handled_event_type, CloudEventReceivedEventPrefixed.__name__)
+                self.assertEqual(
+                    list(state.observed_event_types),
+                    [CloudEventReceivedEventPrefixed.__name__],
+                )
+            else:
+                self.assertEqual(handled_event_type, event_spec.event_type.__name__)
+                self.assertEqual(
+                    list(state.observed_event_types),
+                    [event_spec.event_type.__name__],
+                )
 
             if event_spec.event_name in expected_event_data:
                 self.assertEqual(state[event_spec.event_name + '_data'],
@@ -603,6 +642,8 @@ class _TestMain(abc.ABC):
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: {} already exists'.format(self.CHARM_STATE_FILE)],
+            ['juju-log', '--log-level', 'DEBUG', '--',
+                'cloud event certificate has already been registered'],
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
         ]
@@ -614,7 +655,6 @@ class _TestMain(abc.ABC):
             expected.insert(1, [
                 'juju-log', '--log-level', 'DEBUG', '--',
                 'Legacy {} does not exist.'.format(Path('hooks/collect-metrics'))])
-
         self.assertEqual(calls, expected)
 
     def test_logger(self):
@@ -646,7 +686,6 @@ class _TestMain(abc.ABC):
 
     @unittest.skipIf(is_windows, 'TODO windows multiline args are hard')
     def test_excepthook(self):
-        fake_script(self, 'register-cloud-event', "echo '{}'")
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(
                 EventSpec(
@@ -667,7 +706,10 @@ class _TestMain(abc.ABC):
             self.assertEqual(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
 
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
-        self.assertEqual(calls.pop(0), 'register-cloud-event configmap/foo')
+        self.assertEqual(
+            calls.pop(0),
+            'register-cloud-event certificate --resource_type configmap --resource_name foo',
+        )
 
         self.maxDiff = None
         self.assertRegex(
@@ -731,8 +773,28 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events."""
-        all_event_hooks = ['hooks/' + e.replace("_", "-")
-                           for e in self.charm_module.Charm.on.events().keys()]
+        all_event_hooks = [
+            'hooks/' + e.replace("_", "-")
+            for e in self.charm_module.Charm.on.events().keys()
+        ]
+        self.assertCountEqual(
+            all_event_hooks,
+            [
+                'hooks/cloud-event-received',
+                'hooks/collect-metrics',
+                'hooks/config-changed',
+                'hooks/install',
+                'hooks/leader-elected',
+                'hooks/leader-settings-changed',
+                'hooks/post-series-upgrade',
+                'hooks/pre-series-upgrade',
+                'hooks/remove',
+                'hooks/start',
+                'hooks/stop',
+                'hooks/update-status',
+                'hooks/upgrade-charm',
+            ],
+        )
         initial_events = {
             EventSpec(InstallEvent, 'install'),
             EventSpec(StorageAttachedEvent, 'disks-storage-attached'),
@@ -805,6 +867,24 @@ class _TestMainWithDispatch(_TestMain):
         """
         all_event_hooks = ['hooks/' + e.replace("_", "-")
                            for e in self.charm_module.Charm.on.events().keys()]
+        self.assertEqual(
+            all_event_hooks,
+            [
+                'hooks/cloud-event-received',
+                'hooks/collect-metrics',
+                'hooks/config-changed',
+                'hooks/install',
+                'hooks/leader-elected',
+                'hooks/leader-settings-changed',
+                'hooks/post-series-upgrade',
+                'hooks/pre-series-upgrade',
+                'hooks/remove',
+                'hooks/start',
+                'hooks/stop',
+                'hooks/update-status',
+                'hooks/upgrade-charm',
+            ],
+        )
         initial_events = {
             EventSpec(InstallEvent, 'install'),
             EventSpec(StorageAttachedEvent, 'disks-storage-attached'),
@@ -844,6 +924,8 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
+            ['register-cloud-event', 'certificate', '--resource_type',
+                'configmap', '--resource_name', 'foo'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -864,6 +946,8 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy hooks/install exists but is not executable.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
+            ['register-cloud-event', 'certificate', '--resource_type',
+                'configmap', '--resource_name', 'foo'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -951,6 +1035,8 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
+            ['register-cloud-event', 'certificate', '--resource_type',
+                'configmap', '--resource_name', 'foo'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]

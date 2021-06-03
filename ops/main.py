@@ -137,7 +137,6 @@ def _emit_charm_event(charm, event_name):
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
         logger.debug('Emitting Juju event %s.', event_name)
-        print('Emitting Juju event', event_name, *args, **kwargs)
         event_to_emit.emit(*args, **kwargs)
 
 
