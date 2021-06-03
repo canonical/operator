@@ -276,7 +276,7 @@ class BoundEvent:
         # TODO: this way is not so good.
         define_event = getattr(self.event_type, 'define_event')
         if not callable(define_event):
-            raise NotImplementedError()
+            raise NotImplementedError('{}.define_event method'.format(self.event_type.__name__))
         return define_event(self.emitter, *args, **kwargs)
 
     def emit(self, *args, **kwargs):

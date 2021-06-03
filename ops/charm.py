@@ -594,7 +594,7 @@ class CloudEventReceivedEventPrefixed(CloudEventReceivedEventBase):
         """Call cloud-event-get command to fetch cloud events for the cloud_event_id."""
         return self.framework.model._backend.cloud_event_get(self.cloud_event_id)
 
-    def unregister_cloud_event(self):
+    def stop_watch_cloud_event(self):
         """Unregister the watched cloud resource."""
         unregister_cloud_event(self, self.cloud_event_id)
 
@@ -735,9 +735,9 @@ class CharmBase(Object):
         """A mapping containing the charm's config and current values."""
         return self.model.config
 
-    unregister_cloud_event = unregister_cloud_event
+    stop_watch_cloud_event = unregister_cloud_event
 
-    def register_cloud_event(self, cloud_event_id, resource_type, resource_name):
+    def start_watch_cloud_event(self, cloud_event_id, resource_type, resource_name):
         """Register the watched cloud resource."""
         register_cloud_event(self, cloud_event_id, resource_type, resource_name, force=True)
 

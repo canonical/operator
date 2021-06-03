@@ -867,7 +867,7 @@ class _TestMainWithDispatch(_TestMain):
         """
         all_event_hooks = ['hooks/' + e.replace("_", "-")
                            for e in self.charm_module.Charm.on.events().keys()]
-        self.assertEqual(
+        self.assertCountEqual(
             all_event_hooks,
             [
                 'hooks/cloud-event-received',

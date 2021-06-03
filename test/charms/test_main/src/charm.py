@@ -175,7 +175,7 @@ class Charm(CharmBase):
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.certificate_cloud_event_received = event.snapshot()
         assert len(event.events) > 0, 'cloud event received events property must not be empty'
-        event.unregister_cloud_event()
+        event.stop_watch_cloud_event()
 
     def _on_start_action(self, event):
         assert event.handle.kind == 'start_action', (
