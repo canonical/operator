@@ -112,3 +112,7 @@ class JujuVersion:
     def has_controller_storage(self) -> bool:
         """Determine whether this juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
+
+    def has_cloud_event(self) -> bool:
+        """Determine whether this juju version supports cloud event system."""
+        return (self.major, self.minor, self.patch) >= (3, 0, 0)

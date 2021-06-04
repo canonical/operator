@@ -27,7 +27,7 @@ import unittest
 import warnings
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import logassert
 import yaml
@@ -57,8 +57,20 @@ from ops.charm import (
     WorkloadEvent,
 )
 from ops.framework import Framework, StoredStateData
-from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
-from ops.model import Model, _ModelBackend
+from ops.main import (
+    CHARM_STATE_FILE,
+    _get_event_args,
+    _should_use_controller_storage,
+    main,
+)
+from ops.model import (
+    Application,
+    Container,
+    Model,
+    Relation,
+    Unit,
+    _ModelBackend,
+)
 from ops.storage import SQLiteStorage
 from ops.version import version
 
@@ -117,10 +129,9 @@ class EventSpec:
         self.set_in_env = set_in_env
         self.workload_name = workload_name
         self.cloud_event_id = cloud_event_id
-        self.state_key = 'on_{}'.format(event_name)
         if self.event_type is CloudEventReceivedEvent:
             event_name = CloudEventReceivedEvent._get_prefixed_event_kind(self.cloud_event_id)
-            self.state_key = 'on_{}'.format(event_name)
+        self.state_key = 'on_{}'.format(event_name)
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
@@ -1120,3 +1131,106 @@ class TestStorageHeuristics(unittest.TestCase):
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}), tempfile.NamedTemporaryFile() as fd:
             self.assertFalse(_should_use_controller_storage(Path(fd.name), meta))
             self.assertLogged('Using local storage: {} already exists'.format(fd.name))
+
+
+class TestGetEventArgs(unittest.TestCase):
+
+    def test_workload_events(self):
+        redis_container = Container('redis', None, 'fakeclient')
+        mocked_charm = Mock()
+        mocked_charm.framework.model.unit.get_container.return_value = redis_container
+        mocked_bound_event = Mock()
+        mocked_bound_event.event_type = PebbleReadyEvent
+        with scoped_environ({
+            'JUJU_WORKLOAD_NAME': 'redis',
+        }):
+            args, _ = _get_event_args(mocked_charm, mocked_bound_event)
+            self.assertEqual(args, [redis_container])
+            mocked_charm.framework.model.unit.get_container.assert_called_with('redis')
+
+    def test_cloud_event_received_events(self):
+        mocked_charm = Mock()
+        mocked_bound_event = Mock()
+        mocked_bound_event.event_type = CloudEventReceivedEvent
+        with scoped_environ({
+            'JUJU_CLOUD_EVENT_ID': 'certificate',
+        }):
+            args, _ = _get_event_args(mocked_charm, mocked_bound_event)
+            self.assertEqual(args, ['certificate'])
+
+        mocked_bound_event.event_type = CloudEventReceivedEventPrefixed
+        with self.assertRaisesRegex(RuntimeError, 'internal .* should never be fired'):
+            _get_event_args(mocked_charm, mocked_bound_event)
+
+    def test_relation_events(self):
+        backend = Mock()
+        backend.relation_list.return_value = []
+        backend.relation_remote_app_name.return_value = ''
+        unit = Mock()
+        unit.app = ''
+        relation = Relation('relation_name', 0, False, unit, backend, {})
+        mocked_charm = Mock()
+        mocked_charm.framework.model.get_relation.return_value = relation
+        mocked_bound_event = Mock()
+        mocked_bound_event.event_type = RelationEvent
+
+        # No remote.
+        with scoped_environ({
+            'JUJU_RELATION': 'relation_name',
+            'JUJU_RELATION_ID': 'db:0',
+        }):
+            args, _ = _get_event_args(mocked_charm, mocked_bound_event)
+            self.assertEqual(args, [relation])
+            mocked_charm.framework.model.get_relation.assert_called_with(
+                'relation_name', 0,
+            )
+
+        backend.app_name = 'redis'
+        app = Application('redis', _, backend, {})
+        meta = Mock()
+        meta.containers = []
+        unit = Unit('redis/0', meta, backend, {})
+        # No JUJU_REMOTE_APP
+        with scoped_environ({
+            'JUJU_RELATION': 'relation_name',
+            'JUJU_RELATION_ID': 'db:0',
+            'JUJU_REMOTE_UNIT': 'redis/0',
+        }):
+            mocked_charm.framework.model.get_app.return_value = app
+            mocked_charm.framework.model.get_unit.return_value = unit
+            args, _ = _get_event_args(mocked_charm, mocked_bound_event)
+            self.assertEqual(args, [relation, app, unit])
+            mocked_charm.framework.model.get_relation.assert_called_with(
+                'relation_name', 0,
+            )
+            mocked_charm.framework.model.get_app.assert_called_with('redis')
+            mocked_charm.framework.model.get_unit.assert_called_with('redis/0')
+
+        # No JUJU_REMOTE_APP, bad remote unit.
+        with scoped_environ({
+            'JUJU_RELATION': 'relation_name',
+            'JUJU_RELATION_ID': 'db:0',
+            'JUJU_REMOTE_UNIT': 'bad-unit',
+        }):
+            with self.assertRaisesRegex(RuntimeError, 'invalid remote unit name: bad-unit'):
+                _get_event_args(mocked_charm, mocked_bound_event)
+            mocked_charm.framework.model.get_relation.assert_called_with(
+                'relation_name', 0,
+            )
+
+        # JUJU_REMOTE_APP and JUJU_REMOTE_UNIT all provided.
+        with scoped_environ({
+            'JUJU_RELATION': 'relation_name',
+            'JUJU_RELATION_ID': 'db:0',
+            'JUJU_REMOTE_UNIT': 'redis/0',
+            'JUJU_REMOTE_APP': 'redis',
+        }):
+            mocked_charm.framework.model.get_app.return_value = app
+            mocked_charm.framework.model.get_unit.return_value = unit
+            args, _ = _get_event_args(mocked_charm, mocked_bound_event)
+            self.assertEqual(args, [relation, app, unit])
+            mocked_charm.framework.model.get_relation.assert_called_with(
+                'relation_name', 0,
+            )
+            mocked_charm.framework.model.get_app.assert_called_with('redis')
+            mocked_charm.framework.model.get_unit.assert_called_with('redis/0')

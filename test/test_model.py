@@ -13,23 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import OrderedDict
-import json
 import ipaddress
+import json
 import os
 import pathlib
-from textwrap import dedent
 import unittest
+from collections import OrderedDict
+from datetime import datetime
+from test.test_helpers import fake_script, fake_script_calls
+from textwrap import dedent
 
-import ops.model
 import ops.charm
+import ops.model
 import ops.pebble
 import ops.testing
-from ops.charm import RelationMeta, RelationRole
-
 from ops._private import yaml
-
-from test.test_helpers import fake_script, fake_script_calls
+from ops.charm import RelationMeta, RelationRole
 
 
 class TestModel(unittest.TestCase):
@@ -1671,6 +1670,76 @@ class TestModelBackend(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.backend.application_version_set()
         self.assertEqual(fake_script_calls(self), [])
+
+    def test_register_cloud_event(self):
+        fake_script(self, 'register-cloud-event', 'exit 0')
+
+        self.backend.register_cloud_event('certificate', 'configmap', 'foo')
+        self.assertEqual(
+            fake_script_calls(self, clear=True),
+            [['register-cloud-event', 'certificate', '--resource_type',
+                'configmap', '--resource_name', 'foo']],
+        )
+        with self.assertRaises(TypeError):
+            self.backend.register_cloud_event()
+        self.assertEqual(fake_script_calls(self, clear=True), [])
+
+        fake_script(self, 'register-cloud-event', 'exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.register_cloud_event('certificate', 'configmap', 'foo')
+        self.assertEqual(
+            fake_script_calls(self, clear=True),
+            [['register-cloud-event', 'certificate', '--resource_type',
+                'configmap', '--resource_name', 'foo']],
+        )
+
+    def test_unregister_cloud_event(self):
+        fake_script(self, 'unregister-cloud-event', 'exit 0')
+
+        self.backend.unregister_cloud_event('certificate')
+        self.assertEqual(
+            fake_script_calls(self, clear=True),
+            [['unregister-cloud-event', 'certificate']],
+        )
+        with self.assertRaises(TypeError):
+            self.backend.unregister_cloud_event()
+        self.assertEqual(fake_script_calls(self, clear=True), [])
+
+        fake_script(self, 'unregister-cloud-event', 'exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.unregister_cloud_event('certificate')
+        self.assertEqual(
+            fake_script_calls(self, clear=True),
+            [['unregister-cloud-event', 'certificate']],
+        )
+
+    def test_cloud_event_get(self):
+        expected = [
+            dict(
+                type='CREATED',
+                message='The resource has been created successfully.',
+                event_time=datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            ),
+        ]
+        fake_script(self, 'cloud-event-get', "echo '{}'".format(json.dumps(expected)))
+
+        events = self.backend.cloud_event_get('certificate')
+        self.assertEqual(events, expected)
+        self.assertEqual(
+            fake_script_calls(self, clear=True),
+            [['cloud-event-get', 'certificate', '--format=json']],
+        )
+        with self.assertRaises(TypeError):
+            self.backend.cloud_event_get()
+        self.assertEqual(fake_script_calls(self, clear=True), [])
+
+        fake_script(self, 'cloud-event-get', 'exit 1')
+        with self.assertRaises(ops.model.ModelError):
+            self.backend.cloud_event_get('certificate')
+        self.assertEqual(
+            fake_script_calls(self, clear=True),
+            [['cloud-event-get', 'certificate', '--format=json']],
+        )
 
     def test_juju_log(self):
         fake_script(self, 'juju-log', 'exit 0')

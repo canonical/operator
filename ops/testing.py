@@ -472,7 +472,7 @@ class Harness:
         """
         return self._backend._relation_data[relation_id].get(app_or_unit, None)
 
-    def get_pod_spec(self) -> (typing.Mapping, typing.Mapping):
+    def get_pod_spec(self) -> typing.Tuple[typing.Mapping, typing.Mapping]:
         """Return the content of the pod spec as last set by the charm.
 
         This returns both the pod spec and any k8s_resources that were supplied.
@@ -890,7 +890,7 @@ class _TestingModelBackend:
     def unregister_cloud_event(self, cloud_event_id):
         raise NotImplementedError(self.unregister_cloud_event)
 
-    def register_cloud_event(self, cloud_event_id):
+    def register_cloud_event(self, cloud_event_id, resource_type, resource_name):
         raise NotImplementedError(self.register_cloud_event)
 
     def cloud_event_get(self, cloud_event_id):

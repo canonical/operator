@@ -1534,15 +1534,20 @@ class _ModelBackend:
         cmd.extend(metric_args)
         self._run(*cmd)
 
-    def unregister_cloud_event(self, cloud_event_id):
-        self._run('unregister-cloud-event', cloud_event_id)
-
     def register_cloud_event(self, cloud_event_id, resource_type, resource_name):
+        # TODO: inject JUJU_VERSION in related tests.
+        # version = JujuVersion.from_environ()
+        # if not version.has_cloud_event():
+        #     raise RuntimeError(
+        #         'cloud event system is not supported on Juju version {}'.format(version))
         self._run(
             'register-cloud-event', cloud_event_id,
             '--resource_type', resource_type,
             '--resource_name', resource_name,
         )
+
+    def unregister_cloud_event(self, cloud_event_id):
+        self._run('unregister-cloud-event', cloud_event_id)
 
     def cloud_event_get(self, cloud_event_id):
         return self._run('cloud-event-get', cloud_event_id, return_output=True, use_json=True)
