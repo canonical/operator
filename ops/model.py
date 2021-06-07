@@ -1535,6 +1535,11 @@ class _ModelBackend:
         self._run(*cmd)
 
     def register_cloud_event(self, cloud_event_id, resource_type, resource_name):
+        if not self.is_leader():
+            # no ops for non leader unites.
+            # we don't want to fail non leader units' __init__.
+            return
+
         # TODO: inject JUJU_VERSION in related tests.
         # version = JujuVersion.from_environ()
         # if not version.has_cloud_event():
@@ -1547,6 +1552,8 @@ class _ModelBackend:
         )
 
     def unregister_cloud_event(self, cloud_event_id):
+        if not self.is_leader():
+            raise ModelError('cannot unregister watched cloud event as this unit is not a leader')
         self._run('unregister-cloud-event', cloud_event_id)
 
     def cloud_event_get(self, cloud_event_id):

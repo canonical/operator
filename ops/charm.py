@@ -722,11 +722,23 @@ class CharmBase(Object):
         """A mapping containing the charm's config and current values."""
         return self.model.config
 
-    stop_watch_cloud_event = unregister_cloud_event
-
     def start_watch_cloud_event(self, cloud_event_id, resource_type, resource_name):
-        """Register the watched cloud resource."""
+        """Start to watch events for a cloud resource.
+
+        Args:
+            cloud_event_id: The cloud event identifier.
+            resource_type: The resource type.
+            resource_name: The resource name.
+        """
         register_cloud_event(self, cloud_event_id, resource_type, resource_name, force=True)
+
+    def stop_watch_cloud_event(self, cloud_event_id):
+        """Stop to watch events for a cloud resource.
+
+        Args:
+            cloud_event_id: The cloud event identifier.
+        """
+        unregister_cloud_event(self, cloud_event_id)
 
 
 class CharmMeta:

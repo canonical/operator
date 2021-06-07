@@ -1673,12 +1673,16 @@ class TestModelBackend(unittest.TestCase):
 
     def test_register_cloud_event(self):
         fake_script(self, 'register-cloud-event', 'exit 0')
+        fake_script(self, 'is-leader', 'echo true')
 
         self.backend.register_cloud_event('certificate', 'configmap', 'foo')
         self.assertEqual(
             fake_script_calls(self, clear=True),
-            [['register-cloud-event', 'certificate', '--resource_type',
-                'configmap', '--resource_name', 'foo']],
+            [
+                ['is-leader', '--format=json'],
+                ['register-cloud-event', 'certificate', '--resource_type',
+                    'configmap', '--resource_name', 'foo'],
+            ],
         )
         with self.assertRaises(TypeError):
             self.backend.register_cloud_event()
@@ -1689,17 +1693,31 @@ class TestModelBackend(unittest.TestCase):
             self.backend.register_cloud_event('certificate', 'configmap', 'foo')
         self.assertEqual(
             fake_script_calls(self, clear=True),
-            [['register-cloud-event', 'certificate', '--resource_type',
-                'configmap', '--resource_name', 'foo']],
+            [
+                ['register-cloud-event', 'certificate', '--resource_type',
+                    'configmap', '--resource_name', 'foo'],
+                ],
         )
+
+        # no ops for non leaders.
+        fake_script(self, 'is-leader', 'echo false')
+        self._backend._is_leader = None
+        self.backend.register_cloud_event('certificate', 'configmap', 'foo')
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['is-leader', '--format=json'],
+        ])
 
     def test_unregister_cloud_event(self):
         fake_script(self, 'unregister-cloud-event', 'exit 0')
+        fake_script(self, 'is-leader', 'echo true')
 
         self.backend.unregister_cloud_event('certificate')
         self.assertEqual(
             fake_script_calls(self, clear=True),
-            [['unregister-cloud-event', 'certificate']],
+            [
+                ['is-leader', '--format=json'],
+                ['unregister-cloud-event', 'certificate'],
+            ],
         )
         with self.assertRaises(TypeError):
             self.backend.unregister_cloud_event()
@@ -1710,8 +1728,21 @@ class TestModelBackend(unittest.TestCase):
             self.backend.unregister_cloud_event('certificate')
         self.assertEqual(
             fake_script_calls(self, clear=True),
-            [['unregister-cloud-event', 'certificate']],
+            [
+                ['unregister-cloud-event', 'certificate'],
+            ],
         )
+
+        with self.assertRaisesRegex(
+            ops.model.ModelError,
+            'cannot unregister watched cloud event as this unit is not a leader',
+        ):
+            fake_script(self, 'is-leader', 'echo false')
+            self._backend._is_leader = None
+            self.backend.unregister_cloud_event('certificate')
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['is-leader', '--format=json'],
+        ])
 
     def test_cloud_event_get(self):
         expected = [

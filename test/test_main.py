@@ -328,6 +328,7 @@ class _TestMain(abc.ABC):
         fake_script(self, 'register-cloud-event', "exit 0")
         fake_script(self, 'cloud-event-get', 'echo {}'.format(json.dumps([{}])))
         fake_script(self, 'unregister-cloud-event', "exit 0")
+        fake_script(self, 'is-leader', 'echo true')
 
         # set to something other than None for tests that care
         self.stdout = None
@@ -695,7 +696,6 @@ class _TestMain(abc.ABC):
             )
 
         calls = [' '.join(i) for i in fake_script_calls(self)]
-
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
         if self.has_dispatch:
             self.assertEqual(
@@ -707,6 +707,7 @@ class _TestMain(abc.ABC):
             self.assertEqual(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
 
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
+        self.assertRegex(calls.pop(0), 'is-leader --format=json')
         self.assertEqual(
             calls.pop(0),
             'register-cloud-event certificate --resource_type configmap --resource_name foo',
@@ -923,6 +924,7 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
+            ['is-leader', '--format=json'],
             ['register-cloud-event', 'certificate', '--resource_type',
                 'configmap', '--resource_name', 'foo'],
             ['juju-log', '--log-level', 'DEBUG', '--',
@@ -945,6 +947,7 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy hooks/install exists but is not executable.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
+            ['is-leader', '--format=json'],
             ['register-cloud-event', 'certificate', '--resource_type',
                 'configmap', '--resource_name', 'foo'],
             ['juju-log', '--log-level', 'DEBUG', '--',
@@ -1034,6 +1037,7 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
+            ['is-leader', '--format=json'],
             ['register-cloud-event', 'certificate', '--resource_type',
                 'configmap', '--resource_name', 'foo'],
             ['juju-log', '--log-level', 'DEBUG', '--',

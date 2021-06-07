@@ -28,7 +28,7 @@ from ops.charm import (
     ContainerMeta,
 )
 from ops.framework import EventBase, EventSource, Framework
-from ops.model import Model, _ModelBackend
+from ops.model import Model, ModelError, _ModelBackend
 from ops.storage import SQLiteStorage
 
 from .test_helpers import fake_script, fake_script_calls
@@ -339,6 +339,7 @@ start:
 
         fake_script(self, 'register-cloud-event', 'exit 0')
         fake_script(self, 'unregister-cloud-event', 'exit 0')
+        fake_script(self, 'is-leader', 'echo true')
         expected_events = [
             dict(
                 type='CREATED',
@@ -364,11 +365,21 @@ start:
             'CloudEventReceivedEvent'
         ])
 
+        # all good for leader.
         charm.start_watch_cloud_event('foo', 'configmap', 'cm-foo')
         charm.stop_watch_cloud_event('foo')
+
+        fake_script(self, 'is-leader', 'echo false')
+        charm.framework.model._backend._is_leader = None
+        charm.start_watch_cloud_event('foo', 'configmap', 'cm-foo')  # no ops for non leader.
+        with self.assertRaisesRegex(
+            ModelError, 'cannot unregister watched cloud event as this unit is not a leader',
+        ):
+            charm.stop_watch_cloud_event('foo')
         self.assertEqual(
             fake_script_calls(self, clear=True),
             [
+                ['is-leader', '--format=json'],
                 ['register-cloud-event', 'foo', '--resource_type',
                     'configmap', '--resource_name', 'cm-foo'],
                 ['register-cloud-event', 'bar', '--resource_type',
@@ -380,6 +391,7 @@ start:
                 ['register-cloud-event', 'foo', '--resource_type',
                     'configmap', '--resource_name', 'cm-foo'],  # charm.start_watch_cloud_event
                 ['unregister-cloud-event', 'foo'],  # charm.stop_watch_cloud_event
+                ['is-leader', '--format=json'],
             ],
         )
 
