@@ -38,7 +38,6 @@ from ops.charm import (
     CharmEvents,
     CharmMeta,
     CloudEventReceivedEvent,
-    CloudEventReceivedEventPrefixed,
     CollectMetricsEvent,
     ConfigChangedEvent,
     HookEvent,
@@ -129,8 +128,6 @@ class EventSpec:
         self.set_in_env = set_in_env
         self.workload_name = workload_name
         self.cloud_event_id = cloud_event_id
-        if self.event_type is CloudEventReceivedEvent:
-            event_name = CloudEventReceivedEvent._get_prefixed_event_kind(self.cloud_event_id)
         self.state_key = 'on_{}'.format(event_name)
 
 
@@ -583,7 +580,7 @@ class _TestMain(abc.ABC):
             {'container_name': 'test'},
         ), (
             EventSpec(
-                CloudEventReceivedEvent, 'cloud_event_received',
+                CloudEventReceivedEvent, 'certificate_cloud_event_received',
                 cloud_event_id='certificate',
             ),
             {'cloud_event_id': 'certificate'},
@@ -603,18 +600,11 @@ class _TestMain(abc.ABC):
             self.assertEqual(len(handled_events), 1)
             # Make sure the event handled by the Charm has the right type.
             handled_event_type = handled_events[0]
-            if event_spec.event_type is CloudEventReceivedEvent:
-                self.assertEqual(handled_event_type, CloudEventReceivedEventPrefixed.__name__)
-                self.assertEqual(
-                    list(state.observed_event_types),
-                    [CloudEventReceivedEventPrefixed.__name__],
-                )
-            else:
-                self.assertEqual(handled_event_type, event_spec.event_type.__name__)
-                self.assertEqual(
-                    list(state.observed_event_types),
-                    [event_spec.event_type.__name__],
-                )
+            self.assertEqual(handled_event_type, event_spec.event_type.__name__)
+            self.assertEqual(
+                list(state.observed_event_types),
+                [event_spec.event_type.__name__],
+            )
 
             if event_spec.event_name in expected_event_data:
                 self.assertEqual(state[event_spec.event_name + '_data'],
@@ -791,7 +781,6 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         self.assertCountEqual(
             all_event_hooks,
             [
-                'hooks/cloud-event-received',
                 'hooks/collect-metrics',
                 'hooks/config-changed',
                 'hooks/install',
@@ -881,7 +870,6 @@ class _TestMainWithDispatch(_TestMain):
         self.assertCountEqual(
             all_event_hooks,
             [
-                'hooks/cloud-event-received',
                 'hooks/collect-metrics',
                 'hooks/config-changed',
                 'hooks/install',
@@ -1152,15 +1140,22 @@ class TestGetEventArgs(unittest.TestCase):
         mocked_charm = Mock()
         mocked_bound_event = Mock()
         mocked_bound_event.event_type = CloudEventReceivedEvent
+        mocked_bound_event.event_kind = 'certificate_cloud_event_received'
         with scoped_environ({
             'JUJU_CLOUD_EVENT_ID': 'certificate',
         }):
             args, _ = _get_event_args(mocked_charm, mocked_bound_event)
             self.assertEqual(args, ['certificate'])
 
-        mocked_bound_event.event_type = CloudEventReceivedEventPrefixed
-        with self.assertRaisesRegex(RuntimeError, 'internal .* should never be fired'):
-            _get_event_args(mocked_charm, mocked_bound_event)
+        mocked_bound_event.event_kind = 'certificate_cloud_event_received'
+        with scoped_environ({
+            'JUJU_CLOUD_EVENT_ID': 'bad-id',
+        }):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                'event_kind certificate_cloud_event_received with wrong cloud event id bad-id',
+            ):
+                _get_event_args(mocked_charm, mocked_bound_event)
 
     def test_relation_events(self):
         backend = Mock()

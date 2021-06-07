@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # prevents ops calls register_cloud_event more than once during each hook runs.
 _KEY_REGISTERED = "registered_cloud_events"
+
 # prevents ops calls register_cloud_event again after the charm has called
 # event.unregister_cloud_event.
 _KEY_UNREGISTERED = "unregistered_cloud_events"

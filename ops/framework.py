@@ -266,19 +266,6 @@ class BoundEvent:
         self.event_type = event_type
         self.event_kind = event_kind
 
-    def __call__(self, *args, **kwargs):
-        """Hook into event_type.define_event.
-
-        Raises:
-            NotImplementedError: if the event_type does not have
-            define_event staticmethod defined.
-        """
-        # TODO: this way is not so good.
-        define_event = getattr(self.event_type, 'define_event')
-        if not callable(define_event):
-            raise NotImplementedError('{}.define_event method'.format(self.event_type.__name__))
-        return define_event(self.emitter, *args, **kwargs)
-
     def emit(self, *args, **kwargs):
         """Emit event to all registered observers.
 

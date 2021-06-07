@@ -142,6 +142,7 @@ def _emit_charm_event(charm, event_name):
 
 def _get_event_args(charm, bound_event):
     event_type = bound_event.event_type
+    event_kind = bound_event.event_kind
     model = charm.framework.model
 
     if issubclass(event_type, ops.charm.WorkloadEvent):
@@ -150,10 +151,11 @@ def _get_event_args(charm, bound_event):
         return [container], {}
     elif issubclass(event_type, ops.charm.CloudEventReceivedEvent):
         cloud_event_id = os.environ['JUJU_CLOUD_EVENT_ID']
+        if not event_kind.startswith(cloud_event_id):
+            raise RuntimeError(
+                'event_kind {} with wrong cloud event id {}'.format(event_kind, cloud_event_id)
+            )
         return [cloud_event_id], {}
-    elif issubclass(event_type, ops.charm.CloudEventReceivedEventPrefixed):
-        raise RuntimeError(
-            'internal {} should never be fired'.format(bound_event))
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])

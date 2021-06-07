@@ -12,20 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
-import unittest
-import tempfile
 import shutil
-
+import tempfile
+import unittest
+from datetime import datetime
 from pathlib import Path
 
 from ops.charm import (
     CharmBase,
-    CharmMeta,
     CharmEvents,
+    CharmMeta,
+    CloudEventReceivedEvent,
     ContainerMeta,
 )
-from ops.framework import Framework, EventSource, EventBase
+from ops.framework import EventBase, EventSource, Framework
 from ops.model import Model, _ModelBackend
 from ops.storage import SQLiteStorage
 
@@ -298,6 +300,88 @@ foo-bar:
 start:
   description: "Start the unit."
 ''')
+
+    def test_cloud_event_events(self):
+        class MyCharm(CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.event_types = []
+                self.count = 0
+
+                self.framework.observe(
+                    self.on.cloud_event_received(
+                        'foo', resource_type='configmap', resource_name='cm-foo',
+                    ),
+                    self._on_foo_cloud_event_received,
+                )
+                self.framework.observe(
+                    self.on.cloud_event_received(
+                        'bar', resource_type='configmap', resource_name='cm-bar',
+                    ),
+                    self._on_bar_cloud_event_received,
+                )
+
+            def _on_foo_cloud_event_received(self, event):
+                assert isinstance(event, CloudEventReceivedEvent)
+                assert event.cloud_event_id == 'foo'
+                self.event_types.append(type(event).__name__)
+                self.count += 1
+                assert event.events == expected_events
+                event.stop_watch()
+
+            def _on_bar_cloud_event_received(self, event):
+                assert isinstance(event, CloudEventReceivedEvent)
+                assert event.cloud_event_id == 'bar'
+                self.event_types.append(type(event).__name__)
+                self.count += 1
+                assert event.events == expected_events
+                event.stop_watch()
+
+        fake_script(self, 'register-cloud-event', 'exit 0')
+        fake_script(self, 'unregister-cloud-event', 'exit 0')
+        expected_events = [
+            dict(
+                type='CREATED',
+                message='The resource has been created successfully.',
+                event_time=datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            ),
+        ]
+        fake_script(self, 'cloud-event-get', "echo '{}'".format(json.dumps(expected_events)))
+
+        charm = MyCharm(self.create_framework())
+        self.assertEqual(charm.count, 0)
+
+        self.assertIn('foo_cloud_event_received', repr(charm.on))
+        self.assertIn('bar_cloud_event_received', repr(charm.on))
+
+        charm.on.foo_cloud_event_received.emit('foo')
+        self.assertEqual(charm.count, 1)
+        charm.on.bar_cloud_event_received.emit('bar')
+        self.assertEqual(charm.count, 2)
+
+        self.assertEqual(charm.event_types, [
+            'CloudEventReceivedEvent',
+            'CloudEventReceivedEvent'
+        ])
+
+        charm.start_watch_cloud_event('foo', 'configmap', 'cm-foo')
+        charm.stop_watch_cloud_event('foo')
+        self.assertEqual(
+            fake_script_calls(self, clear=True),
+            [
+                ['register-cloud-event', 'foo', '--resource_type',
+                    'configmap', '--resource_name', 'cm-foo'],
+                ['register-cloud-event', 'bar', '--resource_type',
+                    'configmap', '--resource_name', 'cm-bar'],
+                ['cloud-event-get', 'foo', '--format=json'],
+                ['unregister-cloud-event', 'foo'],  # event.stop_watch()
+                ['cloud-event-get', 'bar', '--format=json'],
+                ['unregister-cloud-event', 'bar'],  # event.stop_watch()
+                ['register-cloud-event', 'foo', '--resource_type',
+                    'configmap', '--resource_name', 'cm-foo'],  # charm.start_watch_cloud_event
+                ['unregister-cloud-event', 'foo'],  # charm.stop_watch_cloud_event
+            ],
+        )
 
     def _test_action_events(self, cmd_type):
 

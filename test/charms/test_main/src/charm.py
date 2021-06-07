@@ -22,7 +22,7 @@ sys.path.append('lib')
 
 from ops.charm import (  # noqa: E402 (module-level import after non-import code)
     CharmBase,
-    CloudEventReceivedEventPrefixed,
+    CloudEventReceivedEvent,
 )
 from ops.framework import StoredState  # noqa: E402
 from ops.main import main  # noqa: E402 (ditto)
@@ -167,15 +167,15 @@ class Charm(CharmBase):
         self._stored.test_pebble_ready_data = event.snapshot()
 
     def _on_certificate_cloud_event_received(self, event):
-        assert isinstance(event, CloudEventReceivedEventPrefixed), (
+        assert isinstance(event, CloudEventReceivedEvent), (
             'cloud event received events must be an instance of CloudEventReceivedEvent')
         assert event.cloud_event_id == 'certificate', (
             'cloud event received events must have a reference to cloud event id')
         self._stored.on_certificate_cloud_event_received.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
-        self._stored.certificate_cloud_event_received = event.snapshot()
+        self._stored.certificate_cloud_event_received_data = event.snapshot()
         assert len(event.events) > 0, 'cloud event received events property must not be empty'
-        event.stop_watch_cloud_event()
+        event.stop_watch()
 
     def _on_start_action(self, event):
         assert event.handle.kind == 'start_action', (
