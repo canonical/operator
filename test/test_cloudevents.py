@@ -20,11 +20,8 @@ from unittest.mock import Mock, patch
 
 from ops.charm import CharmMeta
 from ops.cloudevents import (
-    _cache_registered,
-    _cache_unregistered,
-    _uncache_registered,
-    _uncache_unregistered,
-    _validate_cloud_event_id,
+    _set_registered,
+    _set_unregistered,
     register_cloud_event,
     unregister_cloud_event,
 )
@@ -44,109 +41,61 @@ class TestCloudEvents(unittest.TestCase):
         self.emitter.framework = Framework(SQLiteStorage(':memory:'), None, None, model)
         self.emitter.framework._stored = StoredStateData(self.emitter, '_stored')
 
-    def test_validate_cloud_event_id(self):
-        self.emitter.framework._stored['registered_cloud_events'] = ['certificate']
-        self.emitter.framework._stored['unregistered_cloud_events'] = ['certificate']
-        with self.assertRaisesRegex(RuntimeError, 'stale state for certificate'):
-            _validate_cloud_event_id(self.emitter, 'certificate')
-
-    def test_cache_registered(self):
+    def test_set_registered(self):
         self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
-        _cache_registered(self.emitter, 'foo')
-        self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
+        _set_registered(self.emitter, 'foo')
+        self.assertTrue(self.emitter.framework._stored['registered_cloud_events']['foo'])
 
-        # register foo, will removes foo from unregistered.
-        self.emitter.framework._stored['registered_cloud_events'] = None
-        self.emitter.framework._stored['unregistered_cloud_events'] = ['foo']
+    def test_set_unregistered(self):
         self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
-        _cache_registered(self.emitter, 'foo')
-        self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], [])
-
-    def test_cache_unregistered(self):
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
-        _cache_unregistered(self.emitter, 'foo')
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
+        _set_unregistered(self.emitter, 'foo')
+        self.assertFalse(self.emitter.framework._stored['registered_cloud_events']['foo'])
 
         # unregister foo, will removes foo from registered.
-        self.emitter.framework._stored['unregistered_cloud_events'] = None
-        self.emitter.framework._stored['registered_cloud_events'] = ['foo']
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
-        self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
-        _cache_unregistered(self.emitter, 'foo')
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
-        self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], [])
-
-    def test_uncache_registered(self):
-        self.emitter.framework._stored['registered_cloud_events'] = ['foo']
-        self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
-        _uncache_registered(
-            self.emitter, 'foo', self.emitter.framework._stored['registered_cloud_events']
-        )
-        self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], [])
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
-
-    def test_uncache_unregistered(self):
-        self.emitter.framework._stored['unregistered_cloud_events'] = ['foo']
-        self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
-        _uncache_unregistered(
-            self.emitter, 'foo', self.emitter.framework._stored['unregistered_cloud_events']
-        )
-        self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], [])
-        self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
+        self.emitter.framework._stored['registered_cloud_events'] = {'foo': True}
+        self.assertTrue(self.emitter.framework._stored['registered_cloud_events']['foo'])
+        _set_unregistered(self.emitter, 'foo')
+        self.assertFalse(self.emitter.framework._stored['registered_cloud_events']['foo'])
 
     def test_register_cloud_event_no_ops_if_already_in_registered(self):
         with patch('ops.model._ModelBackend.register_cloud_event') as mock_register_cloud_event:
-            self.emitter.framework._stored['registered_cloud_events'] = ['foo']
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
+            self.emitter.framework._stored['registered_cloud_events'] = {'foo': True}
+            self.assertTrue(self.emitter.framework._stored['registered_cloud_events']['foo'])
             register_cloud_event(self.emitter, 'foo', 'configmap', 'configmap1', False)
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
+            self.assertTrue(self.emitter.framework._stored['registered_cloud_events']['foo'])
             self.assertFalse(mock_register_cloud_event.called)
 
     def test_register_cloud_event_no_ops_if_already_in_unregistered_without_force(self):
         with patch('ops.model._ModelBackend.register_cloud_event') as mock_register_cloud_event:
-            self.emitter.framework._stored['unregistered_cloud_events'] = ['foo']
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
+            self.emitter.framework._stored['registered_cloud_events'] = {'foo': False}
+            self.assertFalse(self.emitter.framework._stored['registered_cloud_events']['foo'])
             register_cloud_event(self.emitter, 'foo', 'configmap', 'configmap1', False)
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
+            self.assertFalse(self.emitter.framework._stored['registered_cloud_events']['foo'])
             self.assertFalse(mock_register_cloud_event.called)
 
     def test_register_cloud_event_already_in_unregistered_with_force(self):
         with patch('ops.model._ModelBackend.register_cloud_event') as mock_register_cloud_event:
-            self.emitter.framework._stored['unregistered_cloud_events'] = ['foo']
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
+            self.emitter.framework._stored['registered_cloud_events'] = {'foo': False}
+            self.assertFalse(self.emitter.framework._stored['registered_cloud_events']['foo'])
             register_cloud_event(self.emitter, 'foo', 'configmap', 'configmap1', True)
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], [])
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
+            self.assertTrue(self.emitter.framework._stored['registered_cloud_events']['foo'])
             mock_register_cloud_event.assert_called_once_with('foo', 'configmap', 'configmap1')
 
     def test_register_cloud_event_first_time(self):
         with patch('ops.model._ModelBackend.register_cloud_event') as mock_register_cloud_event:
             self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
             register_cloud_event(self.emitter, 'foo', 'configmap', 'configmap1', False)
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
+            self.assertTrue(self.emitter.framework._stored['registered_cloud_events']['foo'])
             mock_register_cloud_event.assert_called_once_with('foo', 'configmap', 'configmap1')
 
     def test_unregister_cloud_event_first_time_foo_in_registered(self):
         with patch(
             'ops.model._ModelBackend.unregister_cloud_event',
         ) as mock_unregister_cloud_event:
-            self.emitter.framework._stored['registered_cloud_events'] = ['foo']
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], ['foo'])
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
+            self.emitter.framework._stored['registered_cloud_events'] = {'foo': True}
+            self.assertTrue(self.emitter.framework._stored['registered_cloud_events']['foo'])
             unregister_cloud_event(self.emitter, 'foo')
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], [])
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
+            self.assertFalse(self.emitter.framework._stored['registered_cloud_events']['foo'])
             mock_unregister_cloud_event.assert_called_once_with('foo')
 
     def test_unregister_cloud_event_first_time_foo_not_in_registered(self):
@@ -154,20 +103,16 @@ class TestCloudEvents(unittest.TestCase):
             'ops.model._ModelBackend.unregister_cloud_event',
         ) as mock_unregister_cloud_event:
             self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], None)
             unregister_cloud_event(self.emitter, 'foo')
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
-            mock_unregister_cloud_event.assert_called_once_with('foo')
+            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], {})
+            self.assertFalse(mock_unregister_cloud_event.called)
 
     def test_unregister_cloud_event_no_ops_if_already_in_unregistered(self):
         with patch(
             'ops.model._ModelBackend.unregister_cloud_event',
         ) as mock_unregister_cloud_event:
-            self.emitter.framework._stored['unregistered_cloud_events'] = ['foo']
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
+            self.emitter.framework._stored['registered_cloud_events'] = {'foo': False}
+            self.assertFalse(self.emitter.framework._stored['registered_cloud_events']['foo'])
             unregister_cloud_event(self.emitter, 'foo')
-            self.assertEqual(self.emitter.framework._stored['registered_cloud_events'], None)
-            self.assertEqual(self.emitter.framework._stored['unregistered_cloud_events'], ['foo'])
+            self.assertFalse(self.emitter.framework._stored['registered_cloud_events']['foo'])
             self.assertFalse(mock_unregister_cloud_event.called)

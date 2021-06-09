@@ -1535,16 +1535,11 @@ class _ModelBackend:
         self._run(*cmd)
 
     def register_cloud_event(self, cloud_event_id, resource_type, resource_name):
+        _check_cloud_event_supported()
         if not self.is_leader():
             # no ops for non leader unites.
-            # we don't want to fail non leader units' __init__.
+            # we don't want to fail non leader units' Charm.__init__.
             return
-
-        # TODO: inject JUJU_VERSION in related tests.
-        # version = JujuVersion.from_environ()
-        # if not version.has_cloud_event():
-        #     raise RuntimeError(
-        #         'cloud event system is not supported on Juju version {}'.format(version))
         self._run(
             'register-cloud-event', cloud_event_id,
             '--resource_type', resource_type,
@@ -1552,16 +1547,25 @@ class _ModelBackend:
         )
 
     def unregister_cloud_event(self, cloud_event_id):
+        _check_cloud_event_supported()
         if not self.is_leader():
-            raise ModelError('cannot unregister watched cloud event as this unit is not a leader')
+            raise ModelError('cannot unregister watched cloud event as the unit is not a leader')
         self._run('unregister-cloud-event', cloud_event_id)
 
     def cloud_event_get(self, cloud_event_id):
+        _check_cloud_event_supported()
         return self._run('cloud-event-get', cloud_event_id, return_output=True, use_json=True)
 
     def get_pebble(self, socket_path: str) -> 'pebble.Client':
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
+
+
+def _check_cloud_event_supported():
+    version = JujuVersion.from_environ()
+    if not version.has_cloud_event():
+        raise RuntimeError(
+            'cloud event system is not supported on Juju version {}'.format(version))
 
 
 class _ModelBackendValidator:

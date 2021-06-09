@@ -31,7 +31,7 @@ from ops.framework import EventBase, EventSource, Framework
 from ops.model import Model, ModelError, _ModelBackend
 from ops.storage import SQLiteStorage
 
-from .test_helpers import fake_script, fake_script_calls
+from .test_helpers import fake_script, fake_script_calls, scoped_environ
 
 
 class TestCharm(unittest.TestCase):
@@ -302,6 +302,9 @@ start:
 ''')
 
     def test_cloud_event_events(self):
+        self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
+        os.environ['JUJU_VERSION'] = '3.0.0'
+
         class MyCharm(CharmBase):
             def __init__(self, *args):
                 super().__init__(*args)
@@ -349,6 +352,15 @@ start:
         ]
         fake_script(self, 'cloud-event-get', "echo '{}'".format(json.dumps(expected_events)))
 
+        with scoped_environ({
+            'JUJU_VERSION': '2.8.0',
+        }):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                'cloud event system is not supported on Juju version 2.8.0',
+            ):
+                MyCharm(self.create_framework())
+
         charm = MyCharm(self.create_framework())
         self.assertEqual(charm.count, 0)
 
@@ -366,16 +378,16 @@ start:
         ])
 
         # all good for leader.
-        charm.start_watch_cloud_event('foo', 'configmap', 'cm-foo')
-        charm.stop_watch_cloud_event('foo')
+        charm.start_watching_cloud_event('foo', 'configmap', 'cm-foo')
+        charm.stop_watching_cloud_event('foo')
 
         fake_script(self, 'is-leader', 'echo false')
         charm.framework.model._backend._is_leader = None
-        charm.start_watch_cloud_event('foo', 'configmap', 'cm-foo')  # no ops for non leader.
+        charm.start_watching_cloud_event('foo', 'configmap', 'cm-foo')  # no ops for non leader.
         with self.assertRaisesRegex(
-            ModelError, 'cannot unregister watched cloud event as this unit is not a leader',
+            ModelError, 'cannot unregister watched cloud event as the unit is not a leader',
         ):
-            charm.stop_watch_cloud_event('foo')
+            charm.stop_watching_cloud_event('foo')
         self.assertEqual(
             fake_script_calls(self, clear=True),
             [
@@ -389,8 +401,8 @@ start:
                 ['cloud-event-get', 'bar', '--format=json'],
                 ['unregister-cloud-event', 'bar'],  # event.stop_watch()
                 ['register-cloud-event', 'foo', '--resource_type',
-                    'configmap', '--resource_name', 'cm-foo'],  # charm.start_watch_cloud_event
-                ['unregister-cloud-event', 'foo'],  # charm.stop_watch_cloud_event
+                    'configmap', '--resource_name', 'cm-foo'],  # charm.start_watching_cloud_event
+                ['unregister-cloud-event', 'foo'],  # charm.stop_watching_cloud_event
                 ['is-leader', '--format=json'],
             ],
         )

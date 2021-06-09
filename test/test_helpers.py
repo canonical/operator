@@ -18,11 +18,25 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from contextlib import contextmanager
 
 from ops.charm import CharmMeta
 from ops.framework import Framework
 from ops.model import Model, _ModelBackend
 from ops.storage import SQLiteStorage
+
+
+@contextmanager
+def scoped_environ(new_environ=None):
+    old_environ = dict(os.environ)
+    try:
+        if new_environ is not None:
+            os.environ.clear()
+            os.environ.update(new_environ)
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(old_environ)
 
 
 def fake_script(test_case, name, content):

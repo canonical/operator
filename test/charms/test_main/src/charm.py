@@ -17,6 +17,8 @@ import logging
 import os
 import sys
 
+from ops.jujuversion import JujuVersion
+
 
 sys.path.append('lib')
 
@@ -29,6 +31,7 @@ from ops.main import main  # noqa: E402 (ditto)
 
 
 logger = logging.getLogger()
+version = JujuVersion.from_environ()
 
 
 class Charm(CharmBase):
@@ -80,12 +83,13 @@ class Charm(CharmBase):
         self.framework.observe(self.on.mon_relation_departed, self._on_mon_relation_departed)
         self.framework.observe(self.on.ha_relation_broken, self._on_ha_relation_broken)
         self.framework.observe(self.on.test_pebble_ready, self._on_test_pebble_ready)
-        self.framework.observe(
-            self.on.cloud_event_received(
-                'certificate', resource_type='configmap', resource_name='foo',
-            ),
-            self._on_certificate_cloud_event_received,
-        )
+        if version.has_cloud_event():
+            self.framework.observe(
+                self.on.cloud_event_received(
+                    'certificate', resource_type='configmap', resource_name='foo',
+                ),
+                self._on_certificate_cloud_event_received,
+            )
 
         actions = self.charm_dir / 'actions.yaml'
         if actions.exists() and actions.read_bytes():

@@ -616,7 +616,7 @@ class CharmEvents(ObjectEvents):
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
     collect_metrics = EventSource(CollectMetricsEvent)
 
-    def cloud_event_received(self, cloud_event_id, resource_type, resource_name):
+    def cloud_event_received(self, cloud_event_id: str, resource_type: str, resource_name: str):
         """Define an event on type CloudEventReceivedEvent at runtime.
 
         Args:
@@ -722,8 +722,10 @@ class CharmBase(Object):
         """A mapping containing the charm's config and current values."""
         return self.model.config
 
-    def start_watch_cloud_event(self, cloud_event_id, resource_type, resource_name):
-        """Start to watch events for a cloud resource.
+    def start_watching_cloud_event(
+        self, cloud_event_id: str, resource_type: str, resource_name: str,
+    ):
+        """Start to watch cloud events for a resource.
 
         Args:
             cloud_event_id: The cloud event identifier.
@@ -732,8 +734,8 @@ class CharmBase(Object):
         """
         register_cloud_event(self, cloud_event_id, resource_type, resource_name, force=True)
 
-    def stop_watch_cloud_event(self, cloud_event_id):
-        """Stop to watch events for a cloud resource.
+    def stop_watching_cloud_event(self, cloud_event_id: str,):
+        """Stop to watch cloud events for a resource.
 
         Args:
             cloud_event_id: The cloud event identifier.

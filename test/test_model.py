@@ -30,6 +30,8 @@ import ops.testing
 from ops._private import yaml
 from ops.charm import RelationMeta, RelationRole
 
+from .test_helpers import scoped_environ
+
 
 class TestModel(unittest.TestCase):
 
@@ -1672,6 +1674,18 @@ class TestModelBackend(unittest.TestCase):
         self.assertEqual(fake_script_calls(self), [])
 
     def test_register_cloud_event(self):
+        self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
+        os.environ['JUJU_VERSION'] = '3.0.0'
+
+        with scoped_environ({
+            'JUJU_VERSION': '2.8.0',
+        }):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                'cloud event system is not supported on Juju version 2.8.0',
+            ):
+                self.backend.unregister_cloud_event('certificate')
+
         fake_script(self, 'register-cloud-event', 'exit 0')
         fake_script(self, 'is-leader', 'echo true')
 
@@ -1708,6 +1722,18 @@ class TestModelBackend(unittest.TestCase):
         ])
 
     def test_unregister_cloud_event(self):
+        self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
+        os.environ['JUJU_VERSION'] = '3.0.0'
+
+        with scoped_environ({
+            'JUJU_VERSION': '2.8.0',
+        }):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                'cloud event system is not supported on Juju version 2.8.0',
+            ):
+                self.backend.unregister_cloud_event('certificate')
+
         fake_script(self, 'unregister-cloud-event', 'exit 0')
         fake_script(self, 'is-leader', 'echo true')
 
@@ -1735,7 +1761,7 @@ class TestModelBackend(unittest.TestCase):
 
         with self.assertRaisesRegex(
             ops.model.ModelError,
-            'cannot unregister watched cloud event as this unit is not a leader',
+            'cannot unregister watched cloud event as the unit is not a leader',
         ):
             fake_script(self, 'is-leader', 'echo false')
             self._backend._is_leader = None
@@ -1745,6 +1771,18 @@ class TestModelBackend(unittest.TestCase):
         ])
 
     def test_cloud_event_get(self):
+        self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
+        os.environ['JUJU_VERSION'] = '3.0.0'
+
+        with scoped_environ({
+            'JUJU_VERSION': '2.8.0',
+        }):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                'cloud event system is not supported on Juju version 2.8.0',
+            ):
+                self.backend.unregister_cloud_event('certificate')
+
         expected = [
             dict(
                 type='CREATED',

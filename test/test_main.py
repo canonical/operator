@@ -25,7 +25,6 @@ import sys
 import tempfile
 import unittest
 import warnings
-from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -73,7 +72,7 @@ from ops.model import (
 from ops.storage import SQLiteStorage
 from ops.version import version
 
-from .test_helpers import fake_script, fake_script_calls
+from .test_helpers import fake_script, fake_script_calls, scoped_environ
 
 
 is_windows = platform.system() == 'Windows'
@@ -92,19 +91,6 @@ SLOW_YAML_LOGLINE = [
 ]
 
 logger = logging.getLogger(__name__)
-
-
-@contextmanager
-def scoped_environ(new_environ=None):
-    old_environ = dict(os.environ)
-    try:
-        if new_environ is not None:
-            os.environ.clear()
-            os.environ.update(new_environ)
-        yield
-    finally:
-        os.environ.clear()
-        os.environ.update(old_environ)
 
 
 class SymlinkTargetError(Exception):
@@ -287,6 +273,9 @@ class TestDispatch(unittest.TestCase):
 
 class _TestMain(abc.ABC):
 
+    has_cloud_event = False
+    juju_version = None
+
     @abc.abstractmethod
     def _setup_entry_point(self, directory, entry_point):
         """Set up the given entry point in the given directory.
@@ -325,10 +314,11 @@ class _TestMain(abc.ABC):
         self.addCleanup(cleanup)
 
         fake_script(self, 'juju-log', "exit 0")
-        fake_script(self, 'register-cloud-event', "exit 0")
-        fake_script(self, 'cloud-event-get', 'echo {}'.format(json.dumps([{}])))
-        fake_script(self, 'unregister-cloud-event', "exit 0")
-        fake_script(self, 'is-leader', 'echo true')
+        if self.has_cloud_event:
+            fake_script(self, 'register-cloud-event', "exit 0")
+            fake_script(self, 'cloud-event-get', 'echo {}'.format(json.dumps([{}])))
+            fake_script(self, 'unregister-cloud-event', "exit 0")
+            fake_script(self, 'is-leader', 'echo true')
 
         # set to something other than None for tests that care
         self.stdout = None
@@ -434,7 +424,7 @@ class _TestMain(abc.ABC):
             env.update({
                 'JUJU_WORKLOAD_NAME': event_spec.workload_name,
             })
-        if issubclass(event_spec.event_type, CloudEventReceivedEvent):
+        if self.has_cloud_event and issubclass(event_spec.event_type, CloudEventReceivedEvent):
             env.update({
                 'JUJU_CLOUD_EVENT_ID': event_spec.cloud_event_id,
             })
@@ -579,13 +569,17 @@ class _TestMain(abc.ABC):
             EventSpec(PebbleReadyEvent, 'test_pebble_ready',
                       workload_name='test'),
             {'container_name': 'test'},
-        ), (
-            EventSpec(
-                CloudEventReceivedEvent, 'certificate_cloud_event_received',
-                cloud_event_id='certificate',
-            ),
-            {'cloud_event_id': 'certificate'},
         )]
+        if self.has_cloud_event:
+            events_under_test.append(
+                (
+                    EventSpec(
+                        CloudEventReceivedEvent, 'certificate_cloud_event_received',
+                        cloud_event_id='certificate',
+                    ),
+                    {'cloud_event_id': 'certificate1'},
+                ),
+            )
 
         logger.debug('Expected events %s', events_under_test)
 
@@ -640,23 +634,29 @@ class _TestMain(abc.ABC):
         fake_script_calls(self, clear=True)
         self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics'))
 
-        expected = [
-            VERSION_LOGLINE,
+        expected = [VERSION_LOGLINE]
+        if self.has_dispatch:
+            expected.append(
+                [
+                    'juju-log', '--log-level', 'DEBUG', '--',
+                    'Legacy {} does not exist.'.format(Path('hooks/collect-metrics'))],
+            )
+        if not yaml.__with_libyaml__:
+            expected.append(SLOW_YAML_LOGLINE)
+        expected.append(
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: {} already exists'.format(self.CHARM_STATE_FILE)],
-            ['juju-log', '--log-level', 'DEBUG', '--',
-                'cloud event certificate has already been registered'],
+        )
+        if self.has_cloud_event:
+            expected.append(
+                ['juju-log', '--log-level', 'DEBUG', '--',
+                    'cloud event certificate has already been watched'],
+            )
+        expected += [
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
         ]
-        if not yaml.__with_libyaml__:
-            expected.insert(1, SLOW_YAML_LOGLINE)
         calls = fake_script_calls(self)
-
-        if self.has_dispatch:
-            expected.insert(1, [
-                'juju-log', '--log-level', 'DEBUG', '--',
-                'Legacy {} does not exist.'.format(Path('hooks/collect-metrics'))])
         self.assertEqual(calls, expected)
 
     def test_logger(self):
@@ -707,11 +707,16 @@ class _TestMain(abc.ABC):
             self.assertEqual(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
 
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
-        self.assertRegex(calls.pop(0), 'is-leader --format=json')
-        self.assertEqual(
-            calls.pop(0),
-            'register-cloud-event certificate --resource_type configmap --resource_name foo',
-        )
+        if self.has_cloud_event:
+            self.assertRegex(
+                calls.pop(0),
+                'juju-log --log-level DEBUG -- cloud event certificate is being watched now',
+            )
+            self.assertRegex(calls.pop(0), 'is-leader --format=json')
+            self.assertEqual(
+                calls.pop(0),
+                'register-cloud-event certificate --resource_type configmap --resource_name foo',
+            )
 
         self.maxDiff = None
         self.assertRegex(
@@ -759,13 +764,14 @@ class _TestMain(abc.ABC):
 class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
     has_dispatch = False
     hooks_are_symlinks = True
+    juju_version = '2.7.0'
 
     def _setup_entry_point(self, directory, entry_point):
         path = directory / entry_point
         path.symlink_to(self.charm_exec_path)
 
     def _call_event(self, rel_path, env):
-        env['JUJU_VERSION'] = '2.7.0'
+        env['JUJU_VERSION'] = self.juju_version
         event_file = self.JUJU_CHARM_DIR / rel_path
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
@@ -839,9 +845,10 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
 
 class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
+    juju_version = '2.8.0'
+
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
-        env['JUJU_VERSION'] = '2.8.0'
         super()._call_event(rel_path, env)
 
 
@@ -924,12 +931,19 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
-            ['is-leader', '--format=json'],
-            ['register-cloud-event', 'certificate', '--resource_type',
-                'configmap', '--resource_name', 'foo'],
+        ]
+        if self.has_cloud_event:
+            expected += [
+                ['juju-log', '--log-level', 'DEBUG', '--',
+                 'cloud event certificate is being watched now'],
+                ['is-leader', '--format=json'],
+                ['register-cloud-event', 'certificate', '--resource_type',
+                 'configmap', '--resource_name', 'foo'],
+            ]
+        expected.append(
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
-        ]
+        )
         if not yaml.__with_libyaml__:
             expected.insert(3, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
@@ -947,12 +961,19 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy hooks/install exists but is not executable.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
-            ['is-leader', '--format=json'],
-            ['register-cloud-event', 'certificate', '--resource_type',
-                'configmap', '--resource_name', 'foo'],
+        ]
+        if self.has_cloud_event:
+            expected += [
+                ['juju-log', '--log-level', 'DEBUG', '--',
+                 'cloud event certificate is being watched now'],
+                ['is-leader', '--format=json'],
+                ['register-cloud-event', 'certificate', '--resource_type',
+                 'configmap', '--resource_name', 'foo'],
+            ]
+        expected.append(
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
-        ]
+        )
         if not yaml.__with_libyaml__:
             expected.insert(2, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
@@ -1037,12 +1058,19 @@ class _TestMainWithDispatch(_TestMain):
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
-            ['is-leader', '--format=json'],
-            ['register-cloud-event', 'certificate', '--resource_type',
-                'configmap', '--resource_name', 'foo'],
+        ]
+        if self.has_cloud_event:
+            expected += [
+                ['juju-log', '--log-level', 'DEBUG', '--',
+                 'cloud event certificate is being watched now'],
+                ['is-leader', '--format=json'],
+                ['register-cloud-event', 'certificate', '--resource_type',
+                 'configmap', '--resource_name', 'foo'],
+            ]
+        expected.append(
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
-        ]
+        )
         if not yaml.__with_libyaml__:
             expected.insert(5, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
@@ -1053,6 +1081,8 @@ class _TestMainWithDispatch(_TestMain):
 #  because Juju won't call python even if we rename dispatch to dispatch.py
 @unittest.skipIf(is_windows, "Juju on windows won't make this work (see note)")
 class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
+    juju_version = '2.8.0'
+
     def _setup_entry_point(self, directory, entry_point):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
@@ -1060,7 +1090,7 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
 
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
-        env['JUJU_VERSION'] = '2.8.0'
+        env['JUJU_VERSION'] = self.juju_version
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
         subprocess.run(
             [sys.executable, str(dispatch)],
@@ -1073,6 +1103,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
     """Here dispatch is a script that execs the charm.py instead of a symlink."""
 
     has_dispatch = True
+    juju_version = '2.8.0'
 
     if is_windows:
         suffix = '.BAT'
@@ -1091,9 +1122,61 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
 
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
-        env['JUJU_VERSION'] = '2.8.0'
+        env['JUJU_VERSION'] = self.juju_version
         dispatch = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
         subprocess.check_call([str(dispatch)], env=env, cwd=str(self.JUJU_CHARM_DIR))
+
+
+class TestMainWithDispatchAsScriptCloudEventReceived(TestMainWithDispatchAsScript):
+    """cloud event system enabled for Juju 3.0.0 or newer version"""
+
+    has_cloud_event = True
+    juju_version = '3.0.0'
+
+
+class TestMainWithNoDispatchButScriptsAreCopiesCloudEventReceived(
+    TestMainWithNoDispatchButScriptsAreCopies,
+):
+    """cloud event system enabled for Juju 3.0.0 or newer version"""
+
+    has_cloud_event = True
+    juju_version = '3.0.0'
+
+
+class TestMainWithNoDispatchButJujuIsDispatchAwareCloudEventReceived(
+    TestMainWithNoDispatchButJujuIsDispatchAware,
+):
+    """cloud event system enabled for Juju 3.0.0 or newer version"""
+
+    has_cloud_event = True
+    juju_version = '3.0.0'
+
+
+class TestMainWithNoDispatchButDispatchPathIsSetCloudEventReceived(
+    TestMainWithNoDispatchButDispatchPathIsSet,
+):
+    """cloud event system enabled for Juju 3.0.0 or newer version"""
+
+    has_cloud_event = True
+    juju_version = '3.0.0'
+
+
+class TestMainWithNoDispatchCloudEventReceived(
+    TestMainWithNoDispatch,
+):
+    """cloud event system enabled for Juju 3.0.0 or newer version"""
+
+    has_cloud_event = True
+    juju_version = '3.0.0'
+
+
+class TestMainWithDispatchCloudEventReceived(
+    TestMainWithDispatch,
+):
+    """cloud event system enabled for Juju 3.0.0 or newer version"""
+
+    has_cloud_event = True
+    juju_version = '3.0.0'
 
 
 class TestStorageHeuristics(unittest.TestCase):
