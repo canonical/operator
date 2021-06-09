@@ -37,9 +37,12 @@ from ops._private import yaml
 # pass in a file-like object or the string directly.
 OptionalYAML = typing.Optional[typing.Union[str, typing.TextIO]]
 
+# CharmType represents user charms that are derived from CharmBase.
+CharmType = typing.TypeVar('CharmType', bound=charm.CharmBase)
+
 
 # noinspection PyProtectedMember
-class Harness:
+class Harness(typing.Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
     The model that is created is from the viewpoint of the charm that you are testing.
@@ -69,10 +72,9 @@ class Harness:
             config.yaml. If not supplied, we will look for a 'config.yaml' file in the
             parent directory of the Charm.
     """
-
     def __init__(
             self,
-            charm_cls: typing.Type[charm.CharmBase],
+            charm_cls: typing.Type[CharmType],
             *,
             meta: OptionalYAML = None,
             actions: OptionalYAML = None,
@@ -94,7 +96,7 @@ class Harness:
         self._update_config(key_values=self._load_config_defaults(config))
 
     @property
-    def charm(self) -> charm.CharmBase:
+    def charm(self) -> CharmType:
         """Return the instance of the charm class that was passed to __init__.
 
         Note that the Charm is not instantiated until you have called
