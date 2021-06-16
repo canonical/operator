@@ -297,7 +297,30 @@ requires:
 
         self.assertEqual(self.meta.requires['metrics'].interface_name, 'prometheus-scraping')
         self.assertIsNone(self.meta.requires['metrics'].limit)
-        self.assertIsNone(self.meta.requires['metrics'].scope)  # Default value
+        self.assertEqual(self.meta.requires['metrics'].scope, 'global')  # Default value
+
+    def test_relations_meta_limit_type_validation(self):
+        with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
+            # language=YAML
+            self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    limit: foobar
+''')
+
+    def test_relations_meta_scope_type_validation(self):
+        with self.assertRaisesRegex(TypeError,
+                                    "scope should be one of 'global', 'container'; not 'foobar'"):
+            # language=YAML
+            self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    scope: foobar
+''')
 
     @classmethod
     def _get_action_test_meta(cls):

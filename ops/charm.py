@@ -796,8 +796,11 @@ class RelationMeta:
         relation_name: Name of this relation from metadata.yaml
         interface_name: Optional definition of the interface protocol.
         limit: Optional definition of maximum number of connections to this relation endpoint.
-        scope: "global" or "container" scope based on how the relation should be used.
+        scope: "global" (default) or "container" scope based on how the relation should be used.
     """
+
+    VALID_SCOPES = ['global', 'container']
+    DEFAULT_SCOPE = VALID_SCOPES[0]
 
     def __init__(self, role: RelationRole, relation_name: str, raw: dict):
         if not isinstance(role, RelationRole):
@@ -815,7 +818,12 @@ class RelationMeta:
         else:
             self.limit = None
 
-        self.scope = raw.get('scope')
+        scope = raw.get('scope')
+        if scope is not None and scope not in RelationMeta.VALID_SCOPES:
+            valid_scopes = "'" + "', '".join(RelationMeta.VALID_SCOPES) + "'"
+            raise TypeError("scope should be one of {}; not '{}'".format(valid_scopes, scope))
+
+        self.scope = scope or RelationMeta.DEFAULT_SCOPE
 
 
 class StorageMeta:
