@@ -800,30 +800,23 @@ class RelationMeta:
     """
 
     VALID_SCOPES = ['global', 'container']
-    DEFAULT_SCOPE = VALID_SCOPES[0]
 
     def __init__(self, role: RelationRole, relation_name: str, raw: dict):
         if not isinstance(role, RelationRole):
             raise TypeError("role should be a Role, not {!r}".format(role))
+        self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
         self.interface_name = raw['interface']
 
-        limit = raw.get('limit')
-        if limit is not None:
-            if type(limit) is not int:
-                raise TypeError("limit should be an int, not {}".format(type(limit)))
+        self.limit = raw.get('limit')
+        if self.limit and type(self.limit) is not int:
+            raise TypeError("limit should be an int, not {}".format(type(self.limit)))
 
-            self.limit = int(limit)
-        else:
-            self.limit = None
-
-        scope = raw.get('scope')
-        if scope is not None and scope not in RelationMeta.VALID_SCOPES:
-            valid_scopes = "'" + "', '".join(RelationMeta.VALID_SCOPES) + "'"
-            raise TypeError("scope should be one of {}; not '{}'".format(valid_scopes, scope))
-
-        self.scope = scope or RelationMeta.DEFAULT_SCOPE
+        self.scope = raw.get('scope') or self._default_scope
+        if self.scope not in self.VALID_SCOPES:
+            raise TypeError("scope should be one of {}; not '{}'".format(
+                ', '.join("'{}'".format(s) for s in self.VALID_SCOPES), self.scope))
 
 
 class StorageMeta:
