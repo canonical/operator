@@ -795,6 +795,7 @@ class RelationMeta:
         role: This is :class:`RelationRole`; one of peer/requires/provides
         relation_name: Name of this relation from metadata.yaml
         interface_name: Optional definition of the interface protocol.
+        limit: Optional definition of maximum number of connections to this relation endpoint.
         scope: "global" or "container" scope based on how the relation should be used.
     """
 
@@ -804,6 +805,16 @@ class RelationMeta:
         self.role = role
         self.relation_name = relation_name
         self.interface_name = raw['interface']
+
+        limit = raw.get('limit')
+        if limit is not None:
+            if type(limit) is not int:
+                raise TypeError("limit should be an int, not {}".format(type(limit)))
+
+            self.limit = int(limit)
+        else:
+            self.limit = None
+
         self.scope = raw.get('scope')
 
 

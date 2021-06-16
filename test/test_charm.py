@@ -277,6 +277,28 @@ containers:
         ])
         self.assertEqual(charm.count, 2)
 
+    def test_relations_meta(self):
+
+        # language=YAML
+        self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    limit: 1
+    scope: container
+  metrics:
+    interface: prometheus-scraping
+''')
+
+        self.assertEqual(self.meta.requires['database'].interface_name, 'mongodb')
+        self.assertEqual(self.meta.requires['database'].limit, 1)
+        self.assertEqual(self.meta.requires['database'].scope, 'container')
+
+        self.assertEqual(self.meta.requires['metrics'].interface_name, 'prometheus-scraping')
+        self.assertIsNone(self.meta.requires['metrics'].limit)
+        self.assertEqual(self.meta.requires['metrics'].scope, 'global')  # Default value
+
     @classmethod
     def _get_action_test_meta(cls):
         # language=YAML
