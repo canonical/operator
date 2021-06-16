@@ -344,17 +344,6 @@ start:
   description: "Start the unit."
 ''')
 
-    def test_relations_meta_limit_type_validation(self):
-        with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
-            # language=YAML
-            self.meta = CharmMeta.from_yaml('''
-name: my-charm
-requires:
-  database:
-    interface: mongodb
-    limit: foobar
-''')
-
     def _test_action_events(self, cmd_type):
 
         class MyCharm(CharmBase):
