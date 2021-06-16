@@ -64,9 +64,10 @@ def _get_charm_dir():
 def _create_event_link(charm, bound_event, link_to):
     """Create a symlink for a particular event.
 
-    charm -- A charm object.
-    bound_event -- An event for which to create a symlink.
-    link_to -- What the event link should point to
+    Args:
+        charm: A charm object.
+        bound_event: An event for which to create a symlink.
+        link_to: What the event link should point to
     """
     if issubclass(bound_event.event_type, ops.charm.HookEvent):
         event_dir = charm.framework.charm_dir / 'hooks'
@@ -104,8 +105,9 @@ def _setup_event_links(charm_dir, charm):
     which is determined by inspecting symlinks provided by the charm
     author at hooks/install or hooks/start.
 
-    charm_dir -- A root directory of the charm.
-    charm -- An instance of the Charm class.
+    Args:
+        charm_dir: A root directory of the charm.
+        charm: An instance of the Charm class.
 
     """
     # XXX: on windows this function does not accomplish what it wants to:
@@ -123,8 +125,9 @@ def _setup_event_links(charm_dir, charm):
 def _emit_charm_event(charm, event_name):
     """Emits a charm event based on a Juju event name.
 
-    charm -- A charm instance to emit an event from.
-    event_name -- A Juju event name to emit on a charm.
+    Args:
+        charm: A charm instance to emit an event from.
+        event_name: A Juju event name to emit on a charm.
     """
     event_to_emit = None
     try:
