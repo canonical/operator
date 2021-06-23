@@ -1043,10 +1043,14 @@ class Container:
 
     def start(self, *service_names: str):
         """Start given service(s) by name."""
+        if not service_names:
+            raise TypeError('start expected at least 1 argument, got 0')
         self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
+        if not service_names:
+            raise TypeError('stop expected at least 1 argument, got 0')
         self._pebble.stop_services(service_names)
 
     # TODO(benhoyt) - should be: layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
