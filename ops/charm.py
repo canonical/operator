@@ -810,7 +810,7 @@ class RelationMeta:
         self.interface_name = raw['interface']
 
         self.limit = raw.get('limit')
-        if self.limit and type(self.limit) is not int:
+        if self.limit and not isinstance(self.limit, int):
             raise TypeError("limit should be an int, not {}".format(type(self.limit)))
 
         self.scope = raw.get('scope') or self._default_scope
