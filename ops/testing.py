@@ -157,6 +157,8 @@ class Harness(typing.Generic[CharmType]):
 
             harness = Harness(MyCharm)
             # Do initial setup here
+            # Add storage if needed before begin routine
+            storage_id = harness.add_storage('data', location='/dev/data')
             relation_id = harness.add_relation('db', 'postgresql')
             harness.add_relation_unit(relation_id, 'postgresql/0')
             harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
@@ -169,8 +171,14 @@ class Harness(typing.Generic[CharmType]):
             # To be fired.
         """
         self.begin()
-        # TODO: jam 2020-08-03 This should also handle storage-attached hooks once we have support
-        #  for dealing with storage.
+        # Checking if disks have been added
+        # storage-attached events happen before install
+        for storage_name in self._meta.storages:
+            if len(self._backend.storage_list(storage_name)) > 0:
+                # Storage device(s) detected, emit storage-attached event
+                storage_name = storage_name.replace('-', '_')
+                self._charm.on[storage_name].storage_attached.emit()
+        # Storage done, emit install event
         self._charm.on.install.emit()
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
@@ -379,6 +387,18 @@ class Harness(typing.Generic[CharmType]):
         rel_id = self._relation_id_counter
         self._relation_id_counter += 1
         return rel_id
+
+    def add_storage(self, storage_name: str, location: str = None) -> int:
+        """Declare a new storage device attached to this unit.
+
+        Args:
+            storage_name: The storage backend name on the Charm
+            location: Either folder or device path
+
+        Return:
+            The storage_id created
+        """
+        return self._backend.storage_add(storage_name, location)
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
@@ -874,6 +894,14 @@ class _TestingModelBackend:
         self._unit_status = {'status': 'maintenance', 'message': ''}
         self._workload_version = None
         self._resource_dir = None
+        # Format:
+        # <ID1>: dict which each key for given storage_name is a device id
+        # { "storage_name": {"<ID1>": { <other-properties> }, ... }
+        self._storage_list = \
+            {k: {} for k, v in self._meta.storages.items()}
+        # Every new storage device gets an id from the counter and is mapped here:
+        self._storage_ids_map = {}
+        self._storage_id_counter = 0
         # {socket_path : _TestingPebbleClient}
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
@@ -977,13 +1005,24 @@ class _TestingModelBackend:
             self._unit_status = {'status': status, 'message': message}
 
     def storage_list(self, name):
-        raise NotImplementedError(self.storage_list)
+        result = []
+        for id, props in self._storage_list[name].items():
+            result.append(id)
+        return result
 
     def storage_get(self, storage_name_id, attribute):
-        raise NotImplementedError(self.storage_get)
+        name = self._storage_ids_map[storage_name_id]
+        id = storage_name_id.split("/")[1]
+        return self._storage_list[name][id][attribute]
 
-    def storage_add(self, name, count=1):
-        raise NotImplementedError(self.storage_add)
+    def storage_add(self, name, location=None):
+        storage_id = self._storage_id_counter
+        self._storage_id_counter += 1
+        self._storage_list[name][str(storage_id)] = {
+            "location": location
+        }
+        self._storage_ids_map['{}/{}'.format(name, storage_id)] = name
+        return storage_id
 
     def action_get(self):
         raise NotImplementedError(self.action_get)
