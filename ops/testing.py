@@ -531,6 +531,16 @@ class Harness(typing.Generic[CharmType]):
             raise RuntimeError('cannot set the Model name after begin()')
         self._backend.model_name = name
 
+    def set_model_uuid(self, uuid: str) -> None:
+        """Set the uuid of the Model that this is representing.
+
+        This cannot be called once begin() has been called. But it lets you set the value that
+        will be returned by Model.uuid.
+        """
+        if self._charm is not None:
+            raise RuntimeError('cannot set the Model uuid after begin()')
+        self._backend.model_uuid = uuid
+
     def update_relation_data(
             self,
             relation_id: int,
@@ -746,6 +756,7 @@ class _TestingModelBackend:
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
+        self.model_uuid = None
         self._calls = []
         self._meta = meta
         self._is_leader = None
