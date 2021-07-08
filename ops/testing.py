@@ -521,6 +521,18 @@ class Harness(typing.Generic[CharmType]):
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
 
+    def set_model_info(self, name: str = None, uuid: str = None) -> None:
+        """Set the name and uuid of the Model that this is representing.
+
+        This cannot be called once begin() has been called. But it lets you set the value that
+        will be returned by Model.name and Model.uuid.
+
+        This is a convenience method to invoke both Harness.set_model_name
+        and Harness.set_model_uuid at once.
+        """
+        self.set_model_name(name)
+        self.set_model_uuid(uuid)
+
     def set_model_name(self, name: str) -> None:
         """Set the name of the Model that this is representing.
 
@@ -756,7 +768,7 @@ class _TestingModelBackend:
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
-        self.model_uuid = None
+        self.model_uuid = 'f2c1b2a6-e006-11eb-ba80-0242ac130004'
         self._calls = []
         self._meta = meta
         self._is_leader = None
