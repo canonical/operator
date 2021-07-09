@@ -758,7 +758,9 @@ class Framework(Object):
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    if (event_is_from_juju or event_is_action) and 'hook' in self._juju_debug_at:
+                    if (event_is_from_juju or event_is_action) and any(
+                        x in self._juju_debug_at for x in ["all", "hook"]
+                    ):
                         # Present the welcome message and run under PDB.
                         self._show_debug_code_message()
                         pdb.runcall(custom_handler, event)

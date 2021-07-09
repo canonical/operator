@@ -1743,6 +1743,27 @@ class DebugHookTests(BaseTestCase):
         # Verify proper message was given to the user.
         self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
+    def test_interruption_enabled_with_all(self):
+        test_model = self.create_model()
+        framework = self.create_framework(model=test_model)
+        framework._juju_debug_at = ['all']
+
+        class CustomEvents(ObjectEvents):
+            foobar_action = EventSource(charm.ActionEvent)
+
+        publisher = CustomEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.foobar_action, observer.callback_method)
+        fake_script(self, 'action-get', "echo {}")
+
+        with patch('sys.stderr', new_callable=io.StringIO):
+            with patch('pdb.runcall') as mock:
+                with patch.dict(os.environ, {'JUJU_ACTION_NAME': 'foobar'}):
+                    publisher.foobar_action.emit()
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertFalse(observer.called)
+
     def test_actions_are_interrupted(self):
         test_model = self.create_model()
         framework = self.create_framework(model=test_model)
