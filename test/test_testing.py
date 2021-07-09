@@ -690,6 +690,12 @@ class TestHarness(unittest.TestCase):
         harness.set_model_info('foo', '96957e90-e006-11eb-ba80-0242ac130004')
         harness.begin()
         with self.assertRaises(RuntimeError):
+            harness.set_model_info('bar', 'af0479ea-e006-11eb-ba80-0242ac130004')
+        with self.assertRaises(RuntimeError):
+            harness.set_model_info('bar')
+        with self.assertRaises(RuntimeError):
+            harness.set_model_info(uuid='af0479ea-e006-11eb-ba80-0242ac130004')
+        with self.assertRaises(RuntimeError):
             harness.set_model_name('bar')
         with self.assertRaises(RuntimeError):
             harness.set_model_uuid('af0479ea-e006-11eb-ba80-0242ac130004')
