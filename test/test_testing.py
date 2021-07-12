@@ -670,6 +670,38 @@ class TestHarness(unittest.TestCase):
             harness.set_model_name('foo')
         self.assertEqual(harness.model.name, 'bar')
 
+    def test_set_model_uuid_after_begin(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+        ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_model_name('bar')
+        harness.set_model_uuid('96957e90-e006-11eb-ba80-0242ac130004')
+        harness.begin()
+        with self.assertRaises(RuntimeError):
+            harness.set_model_uuid('af0479ea-e006-11eb-ba80-0242ac130004')
+        self.assertEqual(harness.model.uuid, '96957e90-e006-11eb-ba80-0242ac130004')
+
+    def test_set_model_info_after_begin(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+        ''')
+        self.addCleanup(harness.cleanup)
+        harness.set_model_info('foo', '96957e90-e006-11eb-ba80-0242ac130004')
+        harness.begin()
+        with self.assertRaises(RuntimeError):
+            harness.set_model_info('bar', 'af0479ea-e006-11eb-ba80-0242ac130004')
+        with self.assertRaises(RuntimeError):
+            harness.set_model_info('bar')
+        with self.assertRaises(RuntimeError):
+            harness.set_model_info(uuid='af0479ea-e006-11eb-ba80-0242ac130004')
+        with self.assertRaises(RuntimeError):
+            harness.set_model_name('bar')
+        with self.assertRaises(RuntimeError):
+            harness.set_model_uuid('af0479ea-e006-11eb-ba80-0242ac130004')
+        self.assertEqual(harness.model.name, 'foo')
+        self.assertEqual(harness.model.uuid, '96957e90-e006-11eb-ba80-0242ac130004')
+
     def test_actions_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(tmp))
