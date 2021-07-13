@@ -390,12 +390,6 @@ class RelationDepartedEvent(RelationEvent):
     removed, the relation is being removed). It is fired once for each unit that
     is going away.
 
-    When the remote unit is known to be leaving the relation, this will result
-    in the :class:`RelationChangedEvent` firing at least once, after which the
-    :class:`RelationDepartedEvent` will fire. The :class:`RelationDepartedEvent`
-    will fire once only. Once the :class:`RelationDepartedEvent` has fired no
-    further :class:`RelationChangedEvent` will fire.
-
     Callback methods bound to this event may be used to remove all
     references to the departing remote unit, because there’s no
     guarantee that it’s still part of the system; it’s perfectly
