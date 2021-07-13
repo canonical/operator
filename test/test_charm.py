@@ -246,10 +246,10 @@ storage:
                 for workload in ('container-a', 'containerb'):
                     # Hook up relation events to generic handler.
                     self.framework.observe(
-                        self.on[workload].workload_ready,
-                        self.on_any_workload_ready)
+                        self.on[workload].pebble_ready,
+                        self.on_any_pebble_ready)
 
-            def on_any_workload_ready(self, event):
+            def on_any_pebble_ready(self, event):
                 self.seen.append(type(event).__name__)
                 self.count += 1
 
@@ -263,19 +263,64 @@ containers:
 
         charm = MyCharm(self.create_framework())
 
-        self.assertIn('container_a_workload_ready', repr(charm.on))
-        self.assertIn('containerb_workload_ready', repr(charm.on))
+        self.assertIn('container_a_pebble_ready', repr(charm.on))
+        self.assertIn('containerb_pebble_ready', repr(charm.on))
 
-        charm.on['container-a'].workload_ready.emit(
+        charm.on['container-a'].pebble_ready.emit(
             charm.framework.model.unit.get_container('container-a'))
-        charm.on['containerb'].workload_ready.emit(
+        charm.on['containerb'].pebble_ready.emit(
             charm.framework.model.unit.get_container('containerb'))
 
         self.assertEqual(charm.seen, [
-            'WorkloadReadyEvent',
-            'WorkloadReadyEvent'
+            'PebbleReadyEvent',
+            'PebbleReadyEvent'
         ])
         self.assertEqual(charm.count, 2)
+
+    def test_relations_meta(self):
+
+        # language=YAML
+        self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    limit: 1
+    scope: container
+  metrics:
+    interface: prometheus-scraping
+''')
+
+        self.assertEqual(self.meta.requires['database'].interface_name, 'mongodb')
+        self.assertEqual(self.meta.requires['database'].limit, 1)
+        self.assertEqual(self.meta.requires['database'].scope, 'container')
+
+        self.assertEqual(self.meta.requires['metrics'].interface_name, 'prometheus-scraping')
+        self.assertIsNone(self.meta.requires['metrics'].limit)
+        self.assertEqual(self.meta.requires['metrics'].scope, 'global')  # Default value
+
+    def test_relations_meta_limit_type_validation(self):
+        with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
+            # language=YAML
+            self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    limit: foobar
+''')
+
+    def test_relations_meta_scope_type_validation(self):
+        with self.assertRaisesRegex(TypeError,
+                                    "scope should be one of 'global', 'container'; not 'foobar'"):
+            # language=YAML
+            self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    scope: foobar
+''')
 
     @classmethod
     def _get_action_test_meta(cls):

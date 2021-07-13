@@ -118,6 +118,14 @@ class Model:
         """
         return self._backend.model_name
 
+    @property
+    def uuid(self) -> str:
+        """Return the identifier of the Model that this unit is running in.
+
+        This is read from the environment variable ``JUJU_MODEL_UUID``.
+        """
+        return self._backend.model_uuid
+
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
@@ -358,8 +366,8 @@ class Unit:
         self._backend.application_version_set(version)
 
     @property
-    def containers(self) -> typing.Dict[str, 'Container']:
-        """Return a dict of containers indexed by name."""
+    def containers(self) -> 'ContainerMapping':
+        """Return a mapping of containers indexed by name."""
         if not self._is_our_unit:
             raise RuntimeError('cannot get container for a remote unit {}'.format(self))
         return self._containers
@@ -571,8 +579,10 @@ class Network:
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
             interface_name = interface_info.get('interface-name')
-            for address_info in interface_info.get('addresses', []):
-                self.interfaces.append(NetworkInterface(interface_name, address_info))
+            addrs = interface_info.get('addresses')
+            if addrs is not None:
+                for address_info in addrs:
+                    self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
         for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(ipaddress.ip_address(address))
@@ -1044,36 +1054,154 @@ class Container:
 
     @property
     def pebble(self) -> 'pebble.Client':
-        """Return the low-level Pebble client instance for this container."""
+        """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
     def autostart(self):
-        """Autostart all default services."""
+        """Autostart all services marked as startup: enabled."""
         self._pebble.autostart_services()
 
     def start(self, *service_names: str):
         """Start given service(s) by name."""
+        if not service_names:
+            raise TypeError('start expected at least 1 argument, got 0')
         self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
+        if not service_names:
+            raise TypeError('stop expected at least 1 argument, got 0')
         self._pebble.stop_services(service_names)
 
-    def add_layer(self, layer: typing.Union[str, typing.Dict, 'pebble.Layer']):
-        """Dynamically add a setup layer.
+    # TODO(benhoyt) - should be: layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
+    # but this breaks on Python 3.5.2 (the default on Xenial). See:
+    # https://github.com/canonical/operator/issues/517
+    def add_layer(self, label: str, layer, *, combine: bool = False):
+        """Dynamically add a new layer onto the Pebble configuration layers.
 
         Args:
-            layer: A YAML string, setup layer dict, or pebble.Layer object
-                containing the Pebble layer to add.
+            label: Label for new layer (and label of layer to merge with if
+                combining).
+            layer: A YAML string, configuration layer dict, or pebble.Layer
+                object containing the Pebble layer to add.
+            combine: If combine is False (the default), append the new layer
+                as the top layer with the given label (must be unique). If
+                combine is True and the label already exists, the two layers
+                are combined into a single one considering the layer override
+                rules; if the layer doesn't exist, it is added as usual.
         """
-        if isinstance(layer, dict):
-            layer = pebble.Layer(layer)
-        self._pebble.add_layer(layer)
+        self._pebble.add_layer(label, layer, combine=combine)
 
-    def get_layer(self) -> 'pebble.Layer':
-        """Fetch the flattened setup layers as a pebble.Layer object."""
-        setup_yaml = self._pebble.get_layer()
-        return pebble.Layer(setup_yaml)
+    def get_plan(self) -> 'pebble.Plan':
+        """Get the current effective pebble configuration."""
+        return self._pebble.get_plan()
+
+    def get_services(self, *service_names: str) -> 'ServiceInfoMapping':
+        """Fetch and return a mapping of status information indexed by service name.
+
+        If no service names are specified, return status information for all
+        services, otherwise return information for only the given services.
+        """
+        services = self._pebble.get_services(service_names)
+        return ServiceInfoMapping(services)
+
+    def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
+        """Get status information for a single named service.
+
+        Raises model error if service_name is not found.
+        """
+        services = self.get_services(service_name)
+        if not services:
+            raise ModelError('service {!r} not found'.format(service_name))
+        if len(services) > 1:
+            raise RuntimeError('expected 1 service, got {}'.format(len(services)))
+        return services[service_name]
+
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
+                                                                          typing.TextIO]:
+        """Read a file's content from the remote system.
+
+        Args:
+            path: Path of the file to read from the remote system.
+            encoding: Encoding to use for decoding the file's bytes to str,
+                or None to specify no decoding.
+
+        Returns:
+            A readable file-like object, whose read() method will return str
+            objects decoded according to the specified encoding, or bytes if
+            encoding is None.
+        """
+        return self._pebble.pull(path, encoding=encoding)
+
+    def push(
+            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        """Write content to a given file path on the remote system.
+
+        Args:
+            path: Path of the file to write to on the remote system.
+            source: Source of data to write. This is either a concrete str or
+                bytes instance, or a readable file-like object.
+            encoding: Encoding to use for encoding source str to bytes, or
+                strings read from source if it is a TextIO type. Ignored if
+                source is bytes or BinaryIO.
+            make_dirs: If True, create parent directories if they don't exist.
+            permissions: Permissions (mode) to create file with (Pebble default
+                is 0o644).
+            user_id: User ID (UID) for file.
+            user: Username for file. User's UID must match user_id if both are
+                specified.
+            group_id: Group ID (GID) for file.
+            group: Group name for file. Group's GID must match group_id if
+                both are specified.
+        """
+        self._pebble.push(path, source, encoding=encoding, make_dirs=make_dirs,
+                          permissions=permissions, user_id=user_id, user=user,
+                          group_id=group_id, group=group)
+
+    def list_files(self, path: str, *, pattern: str = None,
+                   itself: bool = False) -> typing.List['pebble.FileInfo']:
+        """Return list of file information from given path on remote system.
+
+        Args:
+            path: Path of the directory to list, or path of the file to return
+                information about.
+            pattern: If specified, filter the list to just the files that match,
+                for example ``*.txt``.
+            itself: If path refers to a directory, return information about the
+                directory itself, rather than its contents.
+        """
+        return self._pebble.list_files(path, pattern=pattern, itself=itself)
+
+    def make_dir(
+            self, path: str, *, make_parents: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        """Create a directory on the remote system with the given attributes.
+
+        Args:
+            path: Path of the directory to create on the remote system.
+            make_parents: If True, create parent directories if they don't exist.
+            permissions: Permissions (mode) to create directory with (Pebble
+                default is 0o755).
+            user_id: User ID (UID) for directory.
+            user: Username for directory. User's UID must match user_id if
+                both are specified.
+            group_id: Group ID (GID) for directory.
+            group: Group name for directory. Group's GID must match group_id
+                if both are specified.
+        """
+        self._pebble.make_dir(path, make_parents=make_parents, permissions=permissions,
+                              user_id=user_id, user=user, group_id=group_id, group=group)
+
+    def remove_path(self, path: str, *, recursive: bool = False):
+        """Remove a file or directory on the remote system.
+
+        Args:
+            path: Path of the file or directory to delete from the remote system.
+            recursive: If True, recursively delete path and everything under it.
+        """
+        self._pebble.remove_path(path, recursive=recursive)
 
 
 class ContainerMapping(Mapping):
@@ -1140,6 +1268,29 @@ class LeadershipSettings(LazyMapping, MutableMapping):
         # string will remove the key entirely from the leadership settings data.
         self.__setitem__(key, '')
 
+        
+class ServiceInfoMapping(Mapping):
+    """Map of service names to pebble.ServiceInfo objects.
+
+    This is done as a mapping object rather than a plain dictionary so that we
+    can extend it later, and so it's not mutable.
+    """
+
+    def __init__(self, services: typing.Iterable['pebble.ServiceInfo']):
+        self._services = {s.name: s for s in services}
+
+    def __getitem__(self, key: str):
+        return self._services[key]
+
+    def __iter__(self):
+        return iter(self._services)
+
+    def __len__(self):
+        return len(self._services)
+
+    def __repr__(self):
+        return repr(self._services)
+
 
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
@@ -1191,14 +1342,17 @@ class _ModelBackend:
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
 
-    def __init__(self, unit_name=None, model_name=None):
+    def __init__(self, unit_name=None, model_name=None, model_uuid=None):
         if unit_name is None:
             self.unit_name = os.environ['JUJU_UNIT_NAME']
         else:
             self.unit_name = unit_name
         if model_name is None:
             model_name = os.environ.get('JUJU_MODEL_NAME')
+        if model_uuid is None:
+            model_uuid = os.environ.get('JUJU_MODEL_UUID')
         self.model_name = model_name
+        self.model_uuid = model_uuid
         self.app_name = self.unit_name.split('/')[0]
 
         self._is_leader = None

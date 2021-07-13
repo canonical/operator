@@ -1,4 +1,4 @@
-# Copyright 2020-2021 Canonical Ltd.
+# Copyright 2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 """Infrastructure to build unittests for Charms using the Operator Framework."""
 
+import datetime
 import inspect
 import pathlib
 import random
@@ -26,6 +27,7 @@ from ops import (
     charm,
     framework,
     model,
+    pebble,
     storage,
 )
 from ops._private import yaml
@@ -35,9 +37,12 @@ from ops._private import yaml
 # pass in a file-like object or the string directly.
 OptionalYAML = typing.Optional[typing.Union[str, typing.TextIO]]
 
+# CharmType represents user charms that are derived from CharmBase.
+CharmType = typing.TypeVar('CharmType', bound=charm.CharmBase)
+
 
 # noinspection PyProtectedMember
-class Harness:
+class Harness(typing.Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
     The model that is created is from the viewpoint of the charm that you are testing.
@@ -67,10 +72,9 @@ class Harness:
             config.yaml. If not supplied, we will look for a 'config.yaml' file in the
             parent directory of the Charm.
     """
-
     def __init__(
             self,
-            charm_cls: typing.Type[charm.CharmBase],
+            charm_cls: typing.Type[CharmType],
             *,
             meta: OptionalYAML = None,
             actions: OptionalYAML = None,
@@ -92,7 +96,7 @@ class Harness:
         self._update_config(key_values=self._load_config_defaults(config))
 
     @property
-    def charm(self) -> charm.CharmBase:
+    def charm(self) -> CharmType:
         """Return the instance of the charm class that was passed to __init__.
 
         Note that the Charm is not instantiated until you have called
@@ -405,16 +409,49 @@ class Harness:
         self._emit_relation_created(relation_name, rel_id, remote_app)
         return rel_id
 
+    def remove_relation(self, relation_id: int) -> None:
+        """Remove a relation.
+
+        Args:
+            relation_id: The relation ID for the relation to be removed.
+
+        Raises:
+            RelationNotFoundError: if relation id is not valid
+        """
+        try:
+            relation_name = self._backend._relation_names[relation_id]
+            remote_app = self._backend.relation_remote_app_name(relation_id)
+        except KeyError as e:
+            raise model.RelationNotFoundError from e
+
+        for unit_name in self._backend._relation_list_map[relation_id]:
+            self.remove_relation_unit(relation_id, unit_name)
+
+        self._emit_relation_broken(relation_name, relation_id, remote_app)
+        self._backend._relation_app_and_units.pop(relation_id)
+        self._backend._relation_data.pop(relation_id)
+        self._backend._relation_list_map.pop(relation_id)
+        self._backend._relation_ids_map[relation_name].remove(relation_id)
+        self._backend._relation_names.pop(relation_id)
+
     def _emit_relation_created(self, relation_name: str, relation_id: int,
                                remote_app: str) -> None:
         """Trigger relation-created for a given relation with a given remote application."""
         if self._charm is None or not self._hooks_enabled:
             return
+        relation = self._model.get_relation(relation_name, relation_id)
+        app = self._model.get_app(remote_app)
+        self._charm.on[relation_name].relation_created.emit(
+            relation, app)
+
+    def _emit_relation_broken(self, relation_name: str, relation_id: int,
+                              remote_app: str) -> None:
+        """Trigger relation-broken for a given relation with a given remote application."""
         if self._charm is None or not self._hooks_enabled:
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_created.emit(
+        self._charm.on[relation_name].relation_broken.emit(
             relation, app)
 
     def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
@@ -446,17 +483,73 @@ class Harness:
         relation_name = self._backend._relation_names[relation_id]
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
-        if self._model is not None:
-            remote_unit = self._model.get_unit(remote_unit_name)
-            relation = self._model.get_relation(relation_name, relation_id)
-            unit_cache = relation.data.get(remote_unit, None)
-            if unit_cache is not None:
-                unit_cache._invalidate()
-            self._model.relations._invalidate(relation_name)
+        remote_unit = self._model.get_unit(remote_unit_name)
+        relation = self._model.get_relation(relation_name, relation_id)
+        unit_cache = relation.data.get(remote_unit, None)
+        if unit_cache is not None:
+            unit_cache._invalidate()
+        self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return
         self._charm.on[relation_name].relation_joined.emit(
             relation, remote_unit.app, remote_unit)
+
+    def remove_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
+        """Remove a unit from a relation.
+
+        Example::
+
+          rel_id = harness.add_relation('db', 'postgresql')
+          harness.add_relation_unit(rel_id, 'postgresql/0')
+          ...
+          harness.remove_relation_unit(rel_id, 'postgresql/0')
+
+        This will trigger a `relation_departed` event. This would
+        normally be followed by a `relation_changed` event triggered
+        by Juju. However when using the test harness a
+        `relation_changed` event must be triggererd using
+        :meth:`.update_relation_data`. This deviation from normal Juju
+        behaviour, facilitates testing by making each step in the
+        charm life cycle explicit.
+
+        Args:
+            relation_id: The integer relation identifier (as returned by add_relation).
+            remote_unit_name: A string representing the remote unit that is being added.
+
+        Raises:
+            KeyError: if relation_id or remote_unit_name is not valid
+            ValueError: if remote_unit_name is not valid
+        """
+        relation_name = self._backend._relation_names[relation_id]
+
+        # gather data to invalidate cache later
+        remote_unit = self._model.get_unit(remote_unit_name)
+        relation = self._model.get_relation(relation_name, relation_id)
+        unit_cache = relation.data.get(remote_unit, None)
+
+        # statements which could access cache
+        self._emit_relation_departed(relation_id, remote_unit_name)
+        self._backend._relation_data[relation_id].pop(remote_unit_name)
+        self._backend._relation_app_and_units[relation_id][
+            "units"].remove(remote_unit_name)
+        self._backend._relation_list_map[relation_id].remove(remote_unit_name)
+
+        if unit_cache is not None:
+            unit_cache._invalidate()
+
+    def _emit_relation_departed(self, relation_id, unit_name):
+        """Trigger relation-departed event for a given relation id and unit."""
+        if self._charm is None or not self._hooks_enabled:
+            return
+        rel_name = self._backend._relation_names[relation_id]
+        relation = self.model.get_relation(rel_name, relation_id)
+        if '/' in unit_name:
+            app_name = unit_name.split('/')[0]
+            app = self.model.get_app(app_name)
+            unit = self.model.get_unit(unit_name)
+        else:
+            raise ValueError('Invalid Unit Name')
+        self._charm.on[rel_name].relation_departed.emit(relation, app, unit)
 
     def get_relation_data(self, relation_id: int, app_or_unit: str) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
@@ -469,7 +562,7 @@ class Harness:
             relation_id: The relation whose content we want to look at.
             app_or_unit: The name of the application or unit whose data we want to read
         Return:
-            a dict containing the relation data for `app_or_unit` or None.
+            A dict containing the relation data for `app_or_unit` or None.
 
         Raises:
             KeyError: if relation_id doesn't exist
@@ -484,9 +577,50 @@ class Harness:
         """
         return self._backend._pod_spec
 
+    def get_container_pebble_plan(
+            self, container_name: str
+    ) -> pebble.Plan:
+        """Return the current Plan that pebble is executing for the given container.
+
+        Args:
+            container_name: The simple name of the associated container
+        Return:
+            The pebble.Plan for this container. You can use :meth:`ops.pebble.Plan.to_yaml` to get
+            a string form for the content. Will raise KeyError if no pebble client exists
+            for that container name. (should only happen if container is not present in
+            metadata.yaml)
+        """
+        socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
+        client = self._backend._pebble_clients.get(socket_path)
+        if client is None:
+            raise KeyError('no known pebble client for container "{}"'.format(container_name))
+        return client.get_plan()
+
+    def container_pebble_ready(self, container_name: str):
+        """Fire the pebble_ready hook for the associated container.
+
+        This will do nothing if the begin() has not been called.
+        """
+        if self.charm is None:
+            return
+        container = self.model.unit.get_container(container_name)
+        self.charm.on[container_name].pebble_ready.emit(container)
+
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
+
+    def set_model_info(self, name: str = None, uuid: str = None) -> None:
+        """Set the name and uuid of the Model that this is representing.
+
+        This cannot be called once begin() has been called. But it lets you set the value that
+        will be returned by Model.name and Model.uuid.
+
+        This is a convenience method to invoke both Harness.set_model_name
+        and Harness.set_model_uuid at once.
+        """
+        self.set_model_name(name)
+        self.set_model_uuid(uuid)
 
     def set_model_name(self, name: str) -> None:
         """Set the name of the Model that this is representing.
@@ -497,6 +631,16 @@ class Harness:
         if self._charm is not None:
             raise RuntimeError('cannot set the Model name after begin()')
         self._backend.model_name = name
+
+    def set_model_uuid(self, uuid: str) -> None:
+        """Set the uuid of the Model that this is representing.
+
+        This cannot be called once begin() has been called. But it lets you set the value that
+        will be returned by Model.uuid.
+        """
+        if self._charm is not None:
+            raise RuntimeError('cannot set the Model uuid after begin()')
+        self._backend.model_uuid = uuid
 
     def update_relation_data(
             self,
@@ -671,6 +815,27 @@ def _record_calls(cls):
     return cls
 
 
+def _copy_docstrings(source_cls):
+    """Copy the docstrings from source_cls to target_cls.
+
+    Use this as:
+      @_copy_docstrings(source_class)
+      class TargetClass:
+
+    And for any public method that exists on both classes, it will copy the
+    __doc__ for that method.
+    """
+    def decorator(target_cls):
+        for meth_name, orig_method in target_cls.__dict__.items():
+            if meth_name.startswith('_'):
+                continue
+            source_method = source_cls.__dict__.get(meth_name)
+            if source_method is not None and source_method.__doc__:
+                target_cls.__dict__[meth_name].__doc__ = source_method.__doc__
+        return target_cls
+    return decorator
+
+
 class _ResourceEntry:
     """Tracks the contents of a Resource."""
 
@@ -678,6 +843,7 @@ class _ResourceEntry:
         self.name = resource_name
 
 
+@_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
@@ -691,9 +857,9 @@ class _TestingModelBackend:
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
+        self.model_uuid = 'f2c1b2a6-e006-11eb-ba80-0242ac130004'
         self._calls = []
         self._meta = meta
-        self._is_leader = None
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
         self._relation_names = {}  # reverse map from relation_id to relation_name
         self._relation_list_map = {}  # relation_id: [unit_name,...]
@@ -709,6 +875,9 @@ class _TestingModelBackend:
         self._workload_version = None
         self._resource_dir = None
         self._leader_data = {}
+        # {socket_path : _TestingPebbleClient}
+        # socket_path = '/charm/containers/{container_name}/pebble.socket'
+        self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -844,5 +1013,232 @@ class _TestingModelBackend:
     def add_metrics(self, metrics, labels=None):
         raise NotImplementedError(self.add_metrics)
 
-    def get_pebble(self, container_name):
-        raise NotImplementedError(self.get_pebble)
+    def juju_log(self, level, msg):
+        raise NotImplementedError(self.juju_log)
+
+    def get_pebble(self, socket_path: str):
+        client = self._pebble_clients.get(socket_path, None)
+        if client is None:
+            client = _TestingPebbleClient(self)
+            self._pebble_clients[socket_path] = client
+        return client
+
+
+@_copy_docstrings(pebble.Client)
+class _TestingPebbleClient:
+    """This conforms to the interface for pebble.Client but provides canned data.
+
+    DO NOT use this class directly, it is used by `Harness`_ to run interactions with Pebble.
+    `Harness`_ is responsible for maintaining the internal consistency of the values here,
+    as the only public methods of this type are for implementing Client.
+    """
+
+    def __init__(self, backend: _TestingModelBackend):
+        self._backend = _TestingModelBackend
+        self._layers = {}
+        # Has a service been started/stopped?
+        self._service_status = {}
+
+    def get_system_info(self) -> pebble.SystemInfo:
+        raise NotImplementedError(self.get_system_info)
+
+    def get_warnings(
+            self, select: pebble.WarningState = pebble.WarningState.PENDING,
+    ) -> typing.List['pebble.Warning']:
+        raise NotImplementedError(self.get_warnings)
+
+    def ack_warnings(self, timestamp: datetime.datetime) -> int:
+        raise NotImplementedError(self.ack_warnings)
+
+    def get_changes(
+            self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS, service: str = None,
+    ) -> typing.List[pebble.Change]:
+        raise NotImplementedError(self.get_changes)
+
+    def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
+        raise NotImplementedError(self.get_change)
+
+    def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
+        raise NotImplementedError(self.abort_change)
+
+    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+        for name, service in self._render_services().items():
+            # TODO: jam 2021-04-20 This feels awkward that Service.startup might be a string or
+            #  might be an enum. Probably should make Service.startup a property rather than an
+            #  attribute.
+            if service.startup == '':
+                startup = pebble.ServiceStartup.DISABLED
+            else:
+                startup = pebble.ServiceStartup(service.startup)
+            if startup == pebble.ServiceStartup.ENABLED:
+                self._service_status[name] = pebble.ServiceStatus.ACTIVE
+
+    def start_services(
+            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.ChangeID:
+        # A common mistake is to pass just the name of a service, rather than a list of services,
+        # so trap that so it is caught quickly.
+        if isinstance(services, str):
+            raise TypeError('start_services should take a list of names, not just "{}"'.format(
+                services))
+
+        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
+        # Container.start() which currently ignores the return value
+        known_services = self._render_services()
+        # Names appear to be validated before any are activated, so do two passes
+        for name in services:
+            if name not in known_services:
+                # TODO: jam 2021-04-20 This needs a better error type
+                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if current == pebble.ServiceStatus.ACTIVE:
+                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
+                #  can be started before starting any, and gives a list of things that couldn't
+                #  be done, but this is good enough for now
+                raise pebble.ChangeError('''\
+cannot perform the following tasks:
+- Start service "{}" (service "{}" was previously started)
+'''.format(name, name), change=1234)  # the change id is not respected
+        for name in services:
+            # If you try to start a service which is started, you get a ChangeError:
+            # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
+            # ChangeError: cannot perform the following tasks:
+            # - Start service "serv" (service "serv" was previously started)
+            self._service_status[name] = pebble.ServiceStatus.ACTIVE
+
+    def stop_services(
+            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.ChangeID:
+        # handle a common mistake of passing just a name rather than a list of names
+        if isinstance(services, str):
+            raise TypeError('stop_services should take a list of names, not just "{}"'.format(
+                services))
+        # TODO: handle invalid names
+        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
+        # Container.stop() which currently ignores the return value
+        known_services = self._render_services()
+        for name in services:
+            if name not in known_services:
+                # TODO: jam 2021-04-20 This needs a better error type
+                #  400 Bad Request: service "bal" does not exist
+                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if current != pebble.ServiceStatus.ACTIVE:
+                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
+                #  can be started before starting any, and gives a list of things that couldn't
+                #  be done, but this is good enough for now
+                raise pebble.ChangeError('''\
+ChangeError: cannot perform the following tasks:
+- Stop service "{}" (service "{}" is not active)
+'''.format(name, name), change=1234)  # the change id is not respected
+        for name in services:
+            self._service_status[name] = pebble.ServiceStatus.INACTIVE
+
+    def wait_change(
+            self, change_id: pebble.ChangeID, timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.Change:
+        raise NotImplementedError(self.wait_change)
+
+    def add_layer(
+            self, label: str, layer: typing.Union[str, dict, pebble.Layer], *,
+            combine: bool = False):
+        # I wish we could combine some of this helpful object corralling with the actual backend,
+        # rather than having to re-implement it. Maybe we could subclass
+        if not isinstance(label, str):
+            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+
+        if isinstance(layer, (str, dict)):
+            layer_obj = pebble.Layer(layer)
+        elif isinstance(layer, pebble.Layer):
+            layer_obj = layer
+        else:
+            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
+                type(layer).__name__))
+        if label in self._layers:
+            # TODO: jam 2021-04-19 These should not be RuntimeErrors but should be proper error
+            #  types. https://github.com/canonical/operator/issues/514
+            if not combine:
+                raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+            layer = self._layers[label]
+            for name, service in layer_obj.services.items():
+                # 'override' is actually single quoted in the real error, but
+                # it shouldn't be, hopefully that gets cleaned up.
+                if not service.override:
+                    raise RuntimeError('500 Internal Server Error: layer "{}" must define'
+                                       '"override" for service "{}"'.format(label, name))
+                if service.override not in ('merge', 'replace'):
+                    raise RuntimeError('500 Internal Server Error: layer "{}" has invalid '
+                                       '"override" value on service "{}"'.format(label, name))
+                if service.override != 'replace':
+                    raise RuntimeError(
+                        'override: "{}" unsupported for layer "{}" service "{}"'.format(
+                            service.override, label, name))
+                layer.services[name] = service
+        else:
+            self._layers[label] = layer_obj
+
+    def _render_services(self) -> typing.Mapping[str, pebble.Service]:
+        services = {}
+        for key in sorted(self._layers.keys()):
+            layer = self._layers[key]
+            for name, service in layer.services.items():
+                # TODO: (jam) 2021-04-07 have a way to merge existing services
+                services[name] = service
+        return services
+
+    def get_plan(self) -> pebble.Plan:
+        plan = pebble.Plan('{}')
+        services = self._render_services()
+        if not services:
+            return plan
+        for name in sorted(services.keys()):
+            plan.services[name] = services[name]
+        return plan
+
+    def get_services(self, names: typing.List[str] = None) -> typing.List[pebble.ServiceInfo]:
+        if isinstance(names, str):
+            raise TypeError('start_services should take a list of names, not just "{}"'.format(
+                names))
+        services = self._render_services()
+        infos = []
+        if names is None:
+            names = sorted(services.keys())
+        for name in sorted(names):
+            try:
+                service = services[name]
+            except KeyError:
+                # in pebble, it just returns "nothing matched" if there are 0 matches,
+                # but it ignores services it doesn't recognize
+                continue
+            status = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if service.startup == '':
+                startup = pebble.ServiceStartup.DISABLED
+            else:
+                startup = pebble.ServiceStartup(service.startup)
+            info = pebble.ServiceInfo(name,
+                                      startup=startup,
+                                      current=pebble.ServiceStatus(status))
+            infos.append(info)
+        return infos
+
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
+                                                                          typing.TextIO]:
+        raise NotImplementedError(self.pull)
+
+    def push(
+            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        raise NotImplementedError(self.push)
+
+    def list_files(self, path: str, *, pattern: str = None,
+                   itself: bool = False) -> typing.List[pebble.FileInfo]:
+        raise NotImplementedError(self.list_files)
+
+    def make_dir(
+            self, path: str, *, make_parents: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        raise NotImplementedError(self.make_dir)
+
+    def remove_path(self, path: str, *, recursive: bool = False):
+        raise NotImplementedError(self.remove_path)

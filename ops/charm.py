@@ -468,7 +468,7 @@ class WorkloadEvent(HookEvent):
 
     Workload events are generated for all containers that the charm
     expects in metadata. Workload containers currently only trigger
-    a WorkloadReadyEvent.
+    a PebbleReadyEvent.
 
     Attributes:
         workload: The :class:`~ops.model.Container` involved in this event.
@@ -504,8 +504,8 @@ class WorkloadEvent(HookEvent):
             self.workload = None
 
 
-class WorkloadReadyEvent(WorkloadEvent):
-    """Event triggered when a workload/container is ready.
+class PebbleReadyEvent(WorkloadEvent):
+    """Event triggered when pebble is ready for a workload.
 
     This event is triggered when the Pebble process for a workload/container
     starts up, allowing the charm to configure how services should be launched.
@@ -625,7 +625,7 @@ class CharmBase(Object):
 
         for container_name in self.framework.meta.containers:
             container_name = container_name.replace('-', '_')
-            self.on.define_event(container_name + '_workload_ready', WorkloadReadyEvent)
+            self.on.define_event(container_name + '_pebble_ready', PebbleReadyEvent)
 
     @property
     def app(self) -> model.Application:
@@ -795,16 +795,28 @@ class RelationMeta:
         role: This is :class:`RelationRole`; one of peer/requires/provides
         relation_name: Name of this relation from metadata.yaml
         interface_name: Optional definition of the interface protocol.
-        scope: "global" or "container" scope based on how the relation should be used.
+        limit: Optional definition of maximum number of connections to this relation endpoint.
+        scope: "global" (default) or "container" scope based on how the relation should be used.
     """
+
+    VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: dict):
         if not isinstance(role, RelationRole):
             raise TypeError("role should be a Role, not {!r}".format(role))
+        self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
         self.interface_name = raw['interface']
-        self.scope = raw.get('scope')
+
+        self.limit = raw.get('limit')
+        if self.limit and not isinstance(self.limit, int):
+            raise TypeError("limit should be an int, not {}".format(type(self.limit)))
+
+        self.scope = raw.get('scope') or self._default_scope
+        if self.scope not in self.VALID_SCOPES:
+            raise TypeError("scope should be one of {}; not '{}'".format(
+                ', '.join("'{}'".format(s) for s in self.VALID_SCOPES), self.scope))
 
 
 class StorageMeta:

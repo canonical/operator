@@ -1,6 +1,6 @@
-# The Operator Framework
+# The Charmed Operator Framework
 
-This Operator Framework simplifies [Kubernetes
+This Charmed Operator Framework simplifies [Kubernetes
 operator](https://charmhub.io/about) development for 
 [model-driven application
 management](https://juju.is/model-driven-operations).
@@ -12,12 +12,12 @@ reusable app domain knowledge from experts in a software component that
 can be shared.
 
 This project extends the operator pattern to enable 
-[universal operators](https://juju.is/universal-operators), not just
+[charmed operators](https://juju.is/universal-operators), not just
 for Kubernetes but also operators for traditional Linux or Windows
 application management.
 
-Operators use an [Operator Lifecycle Manager
-(OLM)](https://juju.is/operator-lifecycle-manager) to coordinate their
+Operators use a [Charmed Operator Lifecycle Manager
+(Charmed OLM)](https://juju.is/operator-lifecycle-manager) to coordinate their
 work in a cluster. The system uses Golang for concurrent event
 processing under the hood, but enables the operators to be written in
 Python.
@@ -64,7 +64,7 @@ high quality operator engineering.
 
 Distributed systems can be hard! So this framework exists to make it much
 simpler to reason about operator behaviour, especially in complex deployments.
-The OLM provides [operator services](https://juju.is/operator-services) such
+The Charmed OLM provides [operator services](https://juju.is/operator-services) such
 as provisioning, event delivery, leader election and model management.
 
 Coordination between operators is provided by a cluster-wide event
@@ -78,7 +78,7 @@ A key goal of the project is to improve the user experience for admins
 working with multiple different operators.
 
 We embrace [model-driven operations](https://juju.is/model-driven-operations)
-in the Operator Lifecycle Manager. The model encompasses capacity,
+in the Charmed Operator Lifecycle Manager. The model encompasses capacity,
 storage, networking, the application graph and administrative access.
 
 Admins describe the application graph of integrated microservices, and
@@ -91,7 +91,7 @@ driven through the OLM.
 
 # Getting started
 
-A package of operator code is called a charm. You will use `charmcraft`
+A package of operator code is called a charmed operator or “charm. You will use `charmcraft`
 to register your operator name, and publish it when you are ready.
 
 ```
@@ -99,7 +99,7 @@ $ sudo snap install charmcraft --beta
 charmcraft (beta) 0.6.0 from John Lenton (chipaca) installed
 ```
 
-Charms written using the operator framework are just Python code. The goal
+Charmed operators written using the Charmed Operator Framework are just Python code. The goal
 is to feel natural for somebody used to coding in Python, and reasonably
 easy to learn for somebody who is not a pythonista.
 
@@ -109,7 +109,7 @@ default in Ubuntu's cloud images from 16.04 on).
 
 # A quick introduction
 
-Make an empty directory `my-charm` and cd into it. Then start a new charm
+Make an empty directory `my-charm` and cd into it. Then start a new charmed operator
 with:
 
 ```
@@ -123,12 +123,12 @@ These are marked with ‘TODO:’, as is customary. Namely:
   metadata.yaml: fill out the charm's summary
 ```
 
-Charmed operators are just Python code. The entry point to your charm can
+Charmed operators are just Python code. The entry point to your charmed operator can
 be any filename, by default this is `src/charm.py` which must be executable
 (and probably have `#!/usr/bin/env python3` on the first line).
 
-You need a `metadata.yaml` to describe your charm, and if you will support
-configuration of your charm then `config.yaml` files is required too. The
+You need a `metadata.yaml` to describe your charmed operator, and if you will support
+configuration of your charmed operator then `config.yaml` files is required too. The
 `requirements.txt` specifies any Python dependencies.
 
 ```
@@ -182,10 +182,10 @@ $ juju deploy ./my-charm.charm
 
 Happy charming!
 
-# Testing your charms
+# Testing your charmed operators
 
 The operator framework provides a testing harness, so you can check your
-charm does the right thing in different scenarios, without having to create
+charmed operator does the right thing in different scenarios, without having to create
 a full deployment. `pydoc3 ops.testing` has the details, including this
 example:
 
