@@ -824,6 +824,10 @@ containers:
             ('start', ('foo', 'bar')),
         ])
 
+    def test_start_no_arguments(self):
+        with self.assertRaises(TypeError):
+            self.container.start()
+
     def test_stop(self):
         self.container.stop('foo')
         self.container.stop('foo', 'bar')
@@ -831,6 +835,10 @@ containers:
             ('stop', ('foo',)),
             ('stop', ('foo', 'bar')),
         ])
+
+    def test_stop_no_arguments(self):
+        with self.assertRaises(TypeError):
+            self.container.stop()
 
     def test_type_errors(self):
         meta = ops.charm.CharmMeta.from_yaml("""

@@ -37,9 +37,12 @@ from ops._private import yaml
 # pass in a file-like object or the string directly.
 OptionalYAML = typing.Optional[typing.Union[str, typing.TextIO]]
 
+# CharmType represents user charms that are derived from CharmBase.
+CharmType = typing.TypeVar('CharmType', bound=charm.CharmBase)
+
 
 # noinspection PyProtectedMember
-class Harness:
+class Harness(typing.Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
     The model that is created is from the viewpoint of the charm that you are testing.
@@ -69,10 +72,9 @@ class Harness:
             config.yaml. If not supplied, we will look for a 'config.yaml' file in the
             parent directory of the Charm.
     """
-
     def __init__(
             self,
-            charm_cls: typing.Type[charm.CharmBase],
+            charm_cls: typing.Type[CharmType],
             *,
             meta: OptionalYAML = None,
             actions: OptionalYAML = None,
@@ -94,7 +96,7 @@ class Harness:
         self._update_config(key_values=self._load_config_defaults(config))
 
     @property
-    def charm(self) -> charm.CharmBase:
+    def charm(self) -> CharmType:
         """Return the instance of the charm class that was passed to __init__.
 
         Note that the Charm is not instantiated until you have called
@@ -608,6 +610,18 @@ class Harness:
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
 
+    def set_model_info(self, name: str = None, uuid: str = None) -> None:
+        """Set the name and uuid of the Model that this is representing.
+
+        This cannot be called once begin() has been called. But it lets you set the value that
+        will be returned by Model.name and Model.uuid.
+
+        This is a convenience method to invoke both Harness.set_model_name
+        and Harness.set_model_uuid at once.
+        """
+        self.set_model_name(name)
+        self.set_model_uuid(uuid)
+
     def set_model_name(self, name: str) -> None:
         """Set the name of the Model that this is representing.
 
@@ -617,6 +631,16 @@ class Harness:
         if self._charm is not None:
             raise RuntimeError('cannot set the Model name after begin()')
         self._backend.model_name = name
+
+    def set_model_uuid(self, uuid: str) -> None:
+        """Set the uuid of the Model that this is representing.
+
+        This cannot be called once begin() has been called. But it lets you set the value that
+        will be returned by Model.uuid.
+        """
+        if self._charm is not None:
+            raise RuntimeError('cannot set the Model uuid after begin()')
+        self._backend.model_uuid = uuid
 
     def update_relation_data(
             self,
@@ -833,6 +857,7 @@ class _TestingModelBackend:
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
+        self.model_uuid = 'f2c1b2a6-e006-11eb-ba80-0242ac130004'
         self._calls = []
         self._meta = meta
         self._relation_ids_map = {}  # relation name to [relation_ids,...]

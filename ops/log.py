@@ -42,8 +42,9 @@ def setup_root_logging(model_backend, debug=False):
 
       logging.getLogger().setLevel(logging.INFO)
 
-    model_backend -- a ModelBackend to use for juju-log
-    debug -- if True, write logs to stderr as well as to juju-log.
+    Args:
+        model_backend: a ModelBackend to use for juju-log
+        debug: if True, write logs to stderr as well as to juju-log.
     """
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)

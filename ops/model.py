@@ -106,6 +106,14 @@ class Model:
         """
         return self._backend.model_name
 
+    @property
+    def uuid(self) -> str:
+        """Return the identifier of the Model that this unit is running in.
+
+        This is read from the environment variable ``JUJU_MODEL_UUID``.
+        """
+        return self._backend.model_uuid
+
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
@@ -1043,10 +1051,14 @@ class Container:
 
     def start(self, *service_names: str):
         """Start given service(s) by name."""
+        if not service_names:
+            raise TypeError('start expected at least 1 argument, got 0')
         self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
+        if not service_names:
+            raise TypeError('stop expected at least 1 argument, got 0')
         self._pebble.stop_services(service_names)
 
     # TODO(benhoyt) - should be: layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
@@ -1268,14 +1280,17 @@ class _ModelBackend:
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
 
-    def __init__(self, unit_name=None, model_name=None):
+    def __init__(self, unit_name=None, model_name=None, model_uuid=None):
         if unit_name is None:
             self.unit_name = os.environ['JUJU_UNIT_NAME']
         else:
             self.unit_name = unit_name
         if model_name is None:
             model_name = os.environ.get('JUJU_MODEL_NAME')
+        if model_uuid is None:
+            model_uuid = os.environ.get('JUJU_MODEL_UUID')
         self.model_name = model_name
+        self.model_uuid = model_uuid
         self.app_name = self.unit_name.split('/')[0]
 
         self._is_leader = None
