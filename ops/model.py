@@ -18,6 +18,7 @@ import datetime
 import decimal
 import ipaddress
 import json
+import logging
 import os
 import re
 import shutil
@@ -35,6 +36,9 @@ from ops._private import yaml
 from ops.jujuversion import JujuVersion
 import ops
 import ops.pebble as pebble
+
+
+logger = logging.getLogger(__name__)
 
 
 class Model:
@@ -1051,7 +1055,7 @@ class Container:
         try:
             # We don't<F12> care at all whether not the services are up in
             # this case, jsut whether Pebble throws an error
-            services = self._pebble.get_services()
+            self._pebble.get_services()
             return True
         except pebble.ConnectionError:
             return False
@@ -1064,12 +1068,34 @@ class Container:
         """Start given service(s) by name."""
         if not service_names:
             raise TypeError('start expected at least 1 argument, got 0')
+
+        if not self.ready:
+            logger.info(f"Cannot start {service_names}. Pebble is not ready yet")
+            return
+
+        self._pebble.start_services(service_names)
+
+    def restart(self, *service_names: str):
+        """Restart the given service(s) by name."""
+        if not service_names:
+            raise TypeError('start expected at least 1 argument, got 0')
+
+        if not self.ready:
+            logger.info(f"Cannot start {service_names}. Pebble is not ready")
+            return
+
+        self._pebble.stop_services(service_names)
         self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
         if not service_names:
             raise TypeError('stop expected at least 1 argument, got 0')
+
+        if not self.ready:
+            logger.info(f"Cannot stop {service_names}. Pebble is not ready")
+            return
+
         self._pebble.stop_services(service_names)
 
     # TODO(benhoyt) - should be: layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
@@ -1109,6 +1135,10 @@ class Container:
 
         Raises model error if service_name is not found.
         """
+        if not self.ready:
+            logger.info(f"Cannot get service(s) {service_name}. Pebble is not ready")
+            return
+
         services = self.get_services(service_name)
         if not services:
             raise ModelError('service {!r} not found'.format(service_name))
@@ -1131,6 +1161,7 @@ class Container:
             encoding is None.
         """
         if not self.ready:
+            logger.info(f"Cannot pull files from {self.name}. Pebble is not ready")
             return
 
         return self._pebble.pull(path, encoding=encoding)
@@ -1159,6 +1190,7 @@ class Container:
                 both are specified.
         """
         if not self.ready:
+            logger.info(f"Cannot push files to {self.name}. Pebble is not ready")
             return
 
         self._pebble.push(path, source, encoding=encoding, make_dirs=make_dirs,
@@ -1178,6 +1210,7 @@ class Container:
                 directory itself, rather than its contents.
         """
         if not self.ready:
+            logger.info(f"Cannot list files from {self.name}. Pebble is not ready")
             return
 
         return self._pebble.list_files(path, pattern=pattern, itself=itself)
@@ -1199,6 +1232,9 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
+        if not self.ready:
+            logger.info(f"Cannot make_dir on {self.name}. Pebble is not ready")
+            return
         self._pebble.make_dir(path, make_parents=make_parents, permissions=permissions,
                               user_id=user_id, user=user, group_id=group_id, group=group)
 
@@ -1210,6 +1246,7 @@ class Container:
             recursive: If True, recursively delete path and everything under it.
         """
         if not self.ready:
+            logger.info(f"Cannot remove path from {self.name}. Pebble is not ready")
             return
 
         self._pebble.remove_path(path, recursive=recursive)
@@ -1264,6 +1301,12 @@ class ServiceInfoMapping(Mapping):
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
     pass
+
+
+class UnknownServiceError(Exception):
+    """Raised by :meth:`Container.start`, :meth:`Container.stop` or
+    meth:`Container.restart` if the service cannot be found, typically due to
+    asking for the service before :meth:`Container.add_layer` has been called."""
 
 
 class TooManyRelatedAppsError(ModelError):
