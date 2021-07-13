@@ -1045,6 +1045,17 @@ class Container:
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
+    @property
+    def ready(self) -> bool:
+        """Check whether or not Pebble is ready as a simple property"""
+        try:
+            # We don't<F12> care at all whether not the services are up in
+            # this case, jsut whether Pebble throws an error
+            services = self._pebble.get_services()
+            return True
+        except pebble.ConnectionError:
+            return False
+
     def autostart(self):
         """Autostart all services marked as startup: enabled."""
         self._pebble.autostart_services()
@@ -1119,6 +1130,9 @@ class Container:
             objects decoded according to the specified encoding, or bytes if
             encoding is None.
         """
+        if not self.ready:
+            return
+
         return self._pebble.pull(path, encoding=encoding)
 
     def push(
@@ -1144,6 +1158,9 @@ class Container:
             group: Group name for file. Group's GID must match group_id if
                 both are specified.
         """
+        if not self.ready:
+            return
+
         self._pebble.push(path, source, encoding=encoding, make_dirs=make_dirs,
                           permissions=permissions, user_id=user_id, user=user,
                           group_id=group_id, group=group)
@@ -1160,6 +1177,9 @@ class Container:
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
         """
+        if not self.ready:
+            return
+
         return self._pebble.list_files(path, pattern=pattern, itself=itself)
 
     def make_dir(
@@ -1189,6 +1209,9 @@ class Container:
             path: Path of the file or directory to delete from the remote system.
             recursive: If True, recursively delete path and everything under it.
         """
+        if not self.ready:
+            return
+
         self._pebble.remove_path(path, recursive=recursive)
 
 
