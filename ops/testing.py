@@ -157,7 +157,7 @@ class Harness(typing.Generic[CharmType]):
 
             harness = Harness(MyCharm)
             # Do initial setup here
-            # Add storage if needed before begin routine
+            # Add storage if needed before begin_with_initial_hooks() is called
             storage_id = harness.add_storage('data', location='/dev/data')
             relation_id = harness.add_relation('db', 'postgresql')
             harness.add_relation_unit(relation_id, 'postgresql/0')
@@ -388,17 +388,21 @@ class Harness(typing.Generic[CharmType]):
         self._relation_id_counter += 1
         return rel_id
 
-    def add_storage(self, storage_name: str, location: str = None) -> int:
+    def add_storage(self, storage_name: str, count: int = 1) -> int:
         """Declare a new storage device attached to this unit.
+
+        To have repeatable tests, each device will be initialized with
+        location set to /<storage_name>N, where N is the counter and
+        will be a number from [0,total_num_disks-1]
 
         Args:
             storage_name: The storage backend name on the Charm
-            location: Either folder or device path
+            count: Number of disks being added
 
         Return:
             The storage_id created
         """
-        return self._backend.storage_add(storage_name, location)
+        return self._backend.storage_add(storage_name, count)
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
@@ -895,11 +899,13 @@ class _TestingModelBackend:
         self._workload_version = None
         self._resource_dir = None
         # Format:
-        # <ID1>: dict which each key for given storage_name is a device id
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
+        # <ID1>: device id that is key for given storage_name
+        # Initialize the _storage_list with values present on metadata.yaml
         self._storage_list = \
             {k: {} for k, v in self._meta.storages.items()}
-        # Every new storage device gets an id from the counter and is mapped here:
+        # Every new storage device gets an id from the _storage_id_counter.
+        # That id is mapped back to the storage name on _storage_ids_map
         self._storage_ids_map = {}
         self._storage_id_counter = 0
         # {socket_path : _TestingPebbleClient}
@@ -1005,23 +1011,21 @@ class _TestingModelBackend:
             self._unit_status = {'status': status, 'message': message}
 
     def storage_list(self, name):
-        result = []
-        for id, props in self._storage_list[name].items():
-            result.append(id)
-        return result
+        return [id for id, props in self._storage_list[name].items()]
 
     def storage_get(self, storage_name_id, attribute):
         name = self._storage_ids_map[storage_name_id]
         id = storage_name_id.split("/")[1]
         return self._storage_list[name][id][attribute]
 
-    def storage_add(self, name, location=None):
-        storage_id = self._storage_id_counter
-        self._storage_id_counter += 1
-        self._storage_list[name][str(storage_id)] = {
-            "location": location
-        }
-        self._storage_ids_map['{}/{}'.format(name, storage_id)] = name
+    def storage_add(self, name, count=1):
+        for i in range(0, count):
+            storage_id = self._storage_id_counter
+            self._storage_id_counter += 1
+            self._storage_list[name][str(storage_id)] = {
+                "location": "/{}{}".format(name, i)
+            }
+            self._storage_ids_map['{}/{}'.format(name, storage_id)] = name
         return storage_id
 
     def action_get(self):
