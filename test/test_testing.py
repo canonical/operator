@@ -203,6 +203,266 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(len(harness.charm.observed_events), 1)
         self.assertIsInstance(harness.charm.observed_events[0], RelationEvent)
 
+    def test_remove_relation(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # First create a relation
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id, int)
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        backend = harness._backend
+        # Check relation was created
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
+        harness.charm.get_changes(reset=True)  # created event ignored
+        # Now remove relation
+        harness.remove_relation(rel_id)
+        # Check relation no longer exists
+        self.assertEqual(backend.relation_ids('db'), [])
+        self.assertRaises(RelationNotFoundError, backend.relation_list, rel_id)
+        # Check relation broken event is raised with correct data
+        changes = harness.charm.get_changes()
+        self.assertEqual(changes[0],
+                         {'name': 'relation-departed',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': 'postgresql/0',
+                                   'relation_id': 0}})
+        self.assertEqual(changes[1],
+                         {'name': 'relation-broken',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': None,
+                                   'relation_id': rel_id}})
+
+    def test_remove_specific_relation_id(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+
+        # Create the first relation
+        rel_id_1 = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id_1, int)
+        harness.add_relation_unit(rel_id_1, 'postgresql/0')
+        backend = harness._backend
+        # Check relation was created
+        self.assertIn(rel_id_1, backend.relation_ids('db'))
+        self.assertEqual(backend.relation_list(rel_id_1), ['postgresql/0'])
+        harness.charm.get_changes(reset=True)  # created event ignored
+
+        # Create the second relation
+        rel_id_2 = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id_2, int)
+        harness.add_relation_unit(rel_id_2, 'postgresql/1')
+        backend = harness._backend
+        # Check relation was created and both relations exist
+        self.assertIn(rel_id_1, backend.relation_ids('db'))
+        self.assertIn(rel_id_2, backend.relation_ids('db'))
+        self.assertEqual(backend.relation_list(rel_id_2), ['postgresql/1'])
+        harness.charm.get_changes(reset=True)  # created event ignored
+
+        # Now remove second relation
+        harness.remove_relation(rel_id_2)
+        # Check second relation no longer exists but first does
+        self.assertEqual(backend.relation_ids('db'), [rel_id_1])
+        self.assertRaises(RelationNotFoundError, backend.relation_list, rel_id_2)
+
+        # Check relation broken event is raised with correct data
+        changes = harness.charm.get_changes()
+        self.assertEqual(changes[0],
+                         {'name': 'relation-departed',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': 'postgresql/1',
+                                   'relation_id': rel_id_2}})
+        self.assertEqual(changes[1],
+                         {'name': 'relation-broken',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': None,
+                                   'relation_id': rel_id_2}})
+
+    def test_removing_invalid_relation_id_raises_exception(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # First create a relation
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id, int)
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        backend = harness._backend
+        # Check relation was created
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
+        harness.charm.get_changes(reset=True)  # created event ignored
+        # Check exception is raised if relation id is invalid
+        with self.assertRaises(RelationNotFoundError):
+            harness.remove_relation(rel_id+1)
+
+    def test_remove_relation_unit(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # First add a relation and unit
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id, int)
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        # Check relation and unit were created
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
+        harness.charm.get_changes(reset=True)  # ignore relation created events
+        # Now remove unit
+        harness.remove_relation_unit(rel_id, 'postgresql/0')
+        # Check relation still exists
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        # Check removed unit does not exist
+        self.assertEqual(backend.relation_list(rel_id), [])
+        # Check relation departed was raised with correct data
+        self.assertEqual(harness.charm.get_changes()[0],
+                         {'name': 'relation-departed',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': 'postgresql/0',
+                                   'relation_id': rel_id}})
+
+    def test_removing_relation_removes_remote_app_data(self):
+        # language=YAML
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # Add a relation and update app data
+        remote_app = 'postgresql'
+        rel_id = harness.add_relation('db', remote_app)
+        harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
+        self.assertIsInstance(rel_id, int)
+        # Check relation app data exists
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_app, is_app=True))
+        harness.remove_relation(rel_id)
+        # Check relation and app data are removed
+        self.assertEqual(backend.relation_ids('db'), [])
+        self.assertRaises(RelationNotFoundError, backend.relation_get,
+                          rel_id, remote_app, is_app=True)
+
+    def test_removing_relation_unit_removes_data_also(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # Add a relation and unit with data
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id, int)
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
+        # Check relation, unit and data exist
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
+        self.assertEqual(
+            backend.relation_get(rel_id, 'postgresql/0', is_app=False),
+            {'foo': 'bar'})
+        harness.charm.get_changes(reset=True)  # ignore relation created events
+        # Remove unit but not relation
+        harness.remove_relation_unit(rel_id, 'postgresql/0')
+        # Check relation exists but unit and data are removed
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), [])
+        self.assertRaises(KeyError,
+                          backend.relation_get,
+                          rel_id,
+                          'postgresql/0',
+                          is_app=False)
+        # Check relation departed was raised with correct data
+        self.assertEqual(harness.charm.get_changes()[0],
+                         {'name': 'relation-departed',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': 'postgresql/0',
+                                   'relation_id': rel_id}})
+
+    def test_removing_relation_unit_does_not_remove_other_unit_and_data(self):
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # Add a relation with two units with data
+        rel_id = harness.add_relation('db', 'postgresql')
+        self.assertIsInstance(rel_id, int)
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.add_relation_unit(rel_id, 'postgresql/1')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'foo0': 'bar0'})
+        harness.update_relation_data(rel_id, 'postgresql/1', {'foo1': 'bar1'})
+        # Check both unit and data are present
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id),
+                         ['postgresql/0', 'postgresql/1'])
+        self.assertEqual(
+            backend.relation_get(rel_id, 'postgresql/0', is_app=False),
+            {'foo0': 'bar0'})
+        self.assertEqual(
+            backend.relation_get(rel_id, 'postgresql/1', is_app=False),
+            {'foo1': 'bar1'})
+        harness.charm.get_changes(reset=True)  # ignore relation created events
+        # Remove only one unit
+        harness.remove_relation_unit(rel_id, 'postgresql/1')
+        # Check other unit and data still exists
+        self.assertEqual(backend.relation_list(rel_id),
+                         ['postgresql/0'])
+        self.assertEqual(
+            backend.relation_get(rel_id, 'postgresql/0', is_app=False),
+            {'foo0': 'bar0'})
+        # Check relation departed was raised with correct data
+        self.assertEqual(harness.charm.get_changes()[0],
+                         {'name': 'relation-departed',
+                          'relation': 'db',
+                          'data': {'app': 'postgresql',
+                                   'unit': 'postgresql/1',
+                                   'relation_id': rel_id}})
+
     def test_relation_events(self):
         harness = Harness(RelationEventCharm, meta='''
             name: test-app
