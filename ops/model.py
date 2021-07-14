@@ -1051,9 +1051,9 @@ class Container:
 
     @property
     def ready(self) -> bool:
-        """Check whether or not Pebble is ready as a simple property"""
+        """Check whether or not Pebble is ready as a simple property."""
         try:
-            # We don't<F12> care at all whether not the services are up in
+            # We don't care at all whether not the services are up in
             # this case, jsut whether Pebble throws an error
             self._pebble.get_services()
             return True
@@ -1070,22 +1070,32 @@ class Container:
             raise TypeError('start expected at least 1 argument, got 0')
 
         if not self.ready:
-            logger.info(f"Cannot start {service_names}. Pebble is not ready yet")
-            return
+            raise PebbleNotReadyError(f"Cannot start {service_names}. Pebble is not ready")
 
-        self._pebble.start_services(service_names)
+        try:
+            self._pebble.start_services(service_names)
+        except (pebble.APIError, RuntimeError):
+            raise UnknownServiceError(
+                "service(s) {!r} not found. This may be caused by "
+                'querying a service before "add_layer"'.format(service_names)
+            )
 
     def restart(self, *service_names: str):
         """Restart the given service(s) by name."""
         if not service_names:
-            raise TypeError('start expected at least 1 argument, got 0')
+            raise TypeError('restart expected at least 1 argument, got 0')
 
         if not self.ready:
-            logger.info(f"Cannot start {service_names}. Pebble is not ready")
-            return
+            raise PebbleNotReadyError(f"Cannot restart {service_names}. Pebble is not ready")
 
-        self._pebble.stop_services(service_names)
-        self._pebble.start_services(service_names)
+        try:
+            self._pebble.stop_services(service_names)
+            self._pebble.start_services(service_names)
+        except (pebble.APIError, RuntimeError):
+            raise UnknownServiceError(
+                "service(s) {!r} not found. This may be caused by "
+                'querying a service before "add_layer"'.format(service_names)
+            )
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
@@ -1093,10 +1103,15 @@ class Container:
             raise TypeError('stop expected at least 1 argument, got 0')
 
         if not self.ready:
-            logger.info(f"Cannot stop {service_names}. Pebble is not ready")
-            return
+            raise PebbleNotReadyError(f"Cannot stop {service_names}. Pebble is not ready")
 
-        self._pebble.stop_services(service_names)
+        try:
+            self._pebble.stop_services(service_names)
+        except (pebble.APIError, RuntimeError):
+            raise UnknownServiceError(
+                "service(s) {!r} not found. This may be caused by "
+                'querying a service before "add_layer"'.format(service_names)
+            )
 
     # TODO(benhoyt) - should be: layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
     # but this breaks on Python 3.5.2 (the default on Xenial). See:
@@ -1127,7 +1142,18 @@ class Container:
         If no service names are specified, return status information for all
         services, otherwise return information for only the given services.
         """
-        services = self._pebble.get_services(service_names)
+        if not self.ready:
+            raise PebbleNotReadyError(
+                f"Cannot get service(s) {service_names}. Pebble is not ready"
+            )
+
+        try:
+            services = self._pebble.get_services(service_names)
+        except (pebble.APIError, RuntimeError):
+            raise UnknownServiceError(
+                "service(s) {!r} not found. This may be caused by "
+                'querying a service before "add_layer"'.format(service_names)
+            )
         return ServiceInfoMapping(services)
 
     def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
@@ -1136,12 +1162,16 @@ class Container:
         Raises model error if service_name is not found.
         """
         if not self.ready:
-            logger.info(f"Cannot get service(s) {service_name}. Pebble is not ready")
-            return
+            raise PebbleNotReadyError(
+                f"Cannot get service {service_name}. Pebble is not ready"
+            )
 
         services = self.get_services(service_name)
         if not services:
-            raise ModelError('service {!r} not found'.format(service_name))
+            raise UnknownServiceError(
+                "service {!r} not found. This may be caused by "
+                'querying a service before "add_layer"'.format(service_name)
+            )
         if len(services) > 1:
             raise RuntimeError('expected 1 service, got {}'.format(len(services)))
         return services[service_name]
@@ -1161,8 +1191,7 @@ class Container:
             encoding is None.
         """
         if not self.ready:
-            logger.info(f"Cannot pull files from {self.name}. Pebble is not ready")
-            return
+            raise PebbleNotReadyError(f"Cannot pull files from {self.name} " "Pebble is not ready")
 
         return self._pebble.pull(path, encoding=encoding)
 
@@ -1190,8 +1219,7 @@ class Container:
                 both are specified.
         """
         if not self.ready:
-            logger.info(f"Cannot push files to {self.name}. Pebble is not ready")
-            return
+            raise PebbleNotReadyError(f"Cannot push files to {self.name}. Pebble is not ready")
 
         self._pebble.push(path, source, encoding=encoding, make_dirs=make_dirs,
                           permissions=permissions, user_id=user_id, user=user,
@@ -1210,8 +1238,7 @@ class Container:
                 directory itself, rather than its contents.
         """
         if not self.ready:
-            logger.info(f"Cannot list files from {self.name}. Pebble is not ready")
-            return
+            raise PebbleNotReadyError(f"Cannot list files from {self.name}. Pebble is not ready")
 
         return self._pebble.list_files(path, pattern=pattern, itself=itself)
 
@@ -1233,8 +1260,8 @@ class Container:
                 if both are specified.
         """
         if not self.ready:
-            logger.info(f"Cannot make_dir on {self.name}. Pebble is not ready")
-            return
+            raise PebbleNotReadyError(f"Cannot make_dir on {self.name}. Pebble is not ready")
+
         self._pebble.make_dir(path, make_parents=make_parents, permissions=permissions,
                               user_id=user_id, user=user, group_id=group_id, group=group)
 
@@ -1246,8 +1273,7 @@ class Container:
             recursive: If True, recursively delete path and everything under it.
         """
         if not self.ready:
-            logger.info(f"Cannot remove path from {self.name}. Pebble is not ready")
-            return
+            raise PebbleNotReadyError(f"Cannot remove path from {self.name}. Pebble is not ready")
 
         self._pebble.remove_path(path, recursive=recursive)
 
@@ -1304,9 +1330,16 @@ class ModelError(Exception):
 
 
 class UnknownServiceError(Exception):
-    """Raised by :meth:`Container.start`, :meth:`Container.stop` or
-    meth:`Container.restart` if the service cannot be found, typically due to
-    asking for the service before :meth:`Container.add_layer` has been called."""
+    """Raised by :class:`Container` objects when Pebble cannot find a service.
+
+    This is done so authors can have a single catch-all exception if the service
+    cannot be found, typically due to asking for the service before
+    :meth:`Container.add_layer` has been called.
+    """
+
+
+class PebbleNotReadyError(Exception):
+    """Raised by :class:`Container` methods if the underlying Pebble socket returns an error."""
 
 
 class TooManyRelatedAppsError(ModelError):
