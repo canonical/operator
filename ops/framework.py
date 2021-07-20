@@ -515,7 +515,7 @@ class Framework(Object):
 
         # Parse the env var once, which may be used multiple times later
         debug_at = os.environ.get('JUJU_DEBUG_AT')
-        self._juju_debug_at = debug_at.split(',') if debug_at else ()
+        self._juju_debug_at = set(x.strip() for x in debug_at.split(',')) if debug_at else set()
 
     def set_breakpointhook(self):
         """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
@@ -758,7 +758,9 @@ class Framework(Object):
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    if (event_is_from_juju or event_is_action) and 'hook' in self._juju_debug_at:
+                    if (
+                        event_is_from_juju or event_is_action
+                    ) and self._juju_debug_at.intersection({'all', 'hook'}):
                         # Present the welcome message and run under PDB.
                         self._show_debug_code_message()
                         pdb.runcall(custom_handler, event)
