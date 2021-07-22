@@ -12,21 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# autopep8 hates monkeypatching
+# autopep8: off
+# flake8: noqa
+
 """Internal YAML helpers."""
 
-import yaml
+import yaml as pyyaml
 
 
 # Use C speedups if available
-_safe_loader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
-_safe_dumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
+_safe_loader = getattr(pyyaml, "CSafeLoader", pyyaml.SafeLoader)
+_safe_dumper = getattr(pyyaml, "CSafeDumper", pyyaml.SafeDumper)
 
 
 def safe_load(stream):
     """Same as yaml.safe_load, but use fast C loader if available."""
-    return yaml.load(stream, Loader=_safe_loader)
+    return pyyaml.load(stream, Loader=_safe_loader)
 
 
 def safe_dump(data, stream=None, **kwargs):
     """Same as yaml.safe_dump, but use fast C dumper if available."""
-    return yaml.dump(data, stream=stream, Dumper=_safe_dumper, **kwargs)
+    return pyyaml.dump(data, stream=stream, Dumper=_safe_dumper, **kwargs)
+
+
+pyyaml.safe_load = safe_load
+pyyaml.safe_dump = safe_dump
+
+del safe_load, safe_dump
+from yaml import *

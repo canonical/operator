@@ -29,6 +29,8 @@ import types
 import weakref
 
 from ops import charm
+from ops._private import json
+from ops._private import yaml
 from ops.storage import (
     NoSnapshotError,
     SQLiteStorage,
@@ -1051,10 +1053,25 @@ class StoredDict(collections.abc.MutableMapping):
             return self._under == other._under
         elif isinstance(other, collections.abc.Mapping):
             return self._under == other
+        elif isinstance(other, dict):
+            return dict(self._under) == other
         else:
             return NotImplemented
 
+    def to_json(self) -> str:
+        """Return a JSON representation of the underlying object."""
+        return json.dumps(dict(self._under))
+
     __repr__ = _wrapped_repr
+
+
+def _stored_dict_representer(dumper, data):
+    return dumper.represent_dict(
+        data._under
+    )
+
+
+yaml.add_representer(StoredDict, _stored_dict_representer)
 
 
 class StoredList(collections.abc.MutableSequence):
@@ -1093,6 +1110,8 @@ class StoredList(collections.abc.MutableSequence):
             return self._under == other._under
         elif isinstance(other, collections.abc.Sequence):
             return self._under == other
+        elif isinstance(other, list):
+            return list(self._under) == other
         else:
             return NotImplemented
 
@@ -1101,6 +1120,8 @@ class StoredList(collections.abc.MutableSequence):
             return self._under < other._under
         elif isinstance(other, collections.abc.Sequence):
             return self._under < other
+        elif isinstance(other, list):
+            return list(self._under) < other
         else:
             return NotImplemented
 
@@ -1109,6 +1130,8 @@ class StoredList(collections.abc.MutableSequence):
             return self._under <= other._under
         elif isinstance(other, collections.abc.Sequence):
             return self._under <= other
+        elif isinstance(other, list):
+            return list(self._under) <= other
         else:
             return NotImplemented
 
@@ -1117,6 +1140,8 @@ class StoredList(collections.abc.MutableSequence):
             return self._under > other._under
         elif isinstance(other, collections.abc.Sequence):
             return self._under > other
+        elif isinstance(other, list):
+            return list(self._under) > other
         else:
             return NotImplemented
 
@@ -1125,10 +1150,25 @@ class StoredList(collections.abc.MutableSequence):
             return self._under >= other._under
         elif isinstance(other, collections.abc.Sequence):
             return self._under >= other
+        elif isinstance(other, list):
+            return list(self._under) >= other
         else:
             return NotImplemented
 
+    def to_json(self) -> str:
+        """Return a JSON representation of the underlying object."""
+        return json.dumps(list(self._under))
+
     __repr__ = _wrapped_repr
+
+
+def _stored_list_representer(dumper, data):
+    return dumper.represent_list(
+        data._under
+    )
+
+
+yaml.add_representer(StoredList, _stored_list_representer)
 
 
 class StoredSet(collections.abc.MutableSet):
@@ -1179,6 +1219,8 @@ class StoredSet(collections.abc.MutableSet):
             return self._under <= other._under
         elif isinstance(other, collections.abc.Set):
             return self._under <= other
+        elif isinstance(other, set):
+            return self._under <= other
         else:
             return NotImplemented
 
@@ -1187,6 +1229,8 @@ class StoredSet(collections.abc.MutableSet):
             return self._under >= other._under
         elif isinstance(other, collections.abc.Set):
             return self._under >= other
+        elif isinstance(other, set):
+            return self._under >= other
         else:
             return NotImplemented
 
@@ -1194,6 +1238,8 @@ class StoredSet(collections.abc.MutableSet):
         if isinstance(other, StoredSet):
             return self._under == other._under
         elif isinstance(other, collections.abc.Set):
+            return self._under == other
+        elif isinstance(other, set):
             return self._under == other
         else:
             return NotImplemented

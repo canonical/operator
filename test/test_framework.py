@@ -25,6 +25,9 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
+import json as stdlib_json
+import yaml as stdlib_yaml
+
 import logassert
 
 from ops import charm
@@ -46,6 +49,7 @@ from ops.framework import (
     StoredState,
     StoredStateData,
 )
+from ops._private import yaml
 from ops.storage import NoSnapshotError, SQLiteStorage
 from test.test_helpers import fake_script, BaseTestCase
 
@@ -894,9 +898,36 @@ class TestStoredState(BaseTestCase):
         self.assertEqual(repr(StoredDict(None, {})), "ops.framework.StoredDict()")
         self.assertEqual(repr(StoredDict(None, {"a": 1})), "ops.framework.StoredDict({'a': 1})")
 
+    def test_stored_dict_equality(self):
+        self.assertEqual(StoredDict(None, {}), {})
+        self.assertEqual(StoredDict(None, {"a": 1}), {"a": 1})
+
+    def test_stored_dict_yaml(self):
+        self.assertEqual(stdlib_yaml.dump(StoredDict(None, {})), '{}\n')
+        self.assertEqual(stdlib_yaml.dump(StoredDict(None, {"a": 1, "b": 2})), 'a: 1\nb: 2\n')
+
+    def test_stored_dict_json(self):
+        self.assertEqual(stdlib_json.dumps(StoredDict(None, {})), '"{}"')
+        self.assertEqual(stdlib_json.dumps(
+            StoredDict(None, {"a": 1, "b": 2})),
+            '"{\\"a\\": 1, \\"b\\": 2}"' # NOQA
+        )
+
     def test_stored_list_repr(self):
         self.assertEqual(repr(StoredList(None, [])), "ops.framework.StoredList()")
         self.assertEqual(repr(StoredList(None, [1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
+
+    def test_stored_list_equality(self):
+        self.assertEqual(StoredList(None, []), [])
+        self.assertEqual(StoredList(None, [1, 2, 3]), [1, 2, 3])
+
+    def test_stored_list_yaml(self):
+        self.assertEqual(stdlib_yaml.dump(StoredList(None, [])), '[]\n')
+        self.assertEqual(stdlib_yaml.dump(StoredList(None, [1, 2, 3])), '- 1\n- 2\n- 3\n')
+
+    def test_stored_list_json(self):
+        self.assertEqual(stdlib_json.dumps(StoredList(None, [])), '"[]"')
+        self.assertEqual(stdlib_json.dumps(StoredList(None, [1, 2, 3])), '"[1, 2, 3]"')
 
     def test_stored_set_repr(self):
         self.assertEqual(repr(StoredSet(None, set())), 'ops.framework.StoredSet()')
