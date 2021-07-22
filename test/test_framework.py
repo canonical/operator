@@ -909,7 +909,7 @@ class TestStoredState(BaseTestCase):
     def test_stored_dict_json(self):
         self.assertEqual(stdlib_json.dumps(StoredDict(None, {})), '"{}"')
         self.assertEqual(stdlib_json.dumps(
-            StoredDict(None, {"a": 1, "b": 2})),
+            StoredDict(None, {"a": 1, "b": 2}), sort_keys=True),
             '"{\\"a\\": 1, \\"b\\": 2}"' # NOQA
         )
 
