@@ -1055,7 +1055,21 @@ class Container:
 
     @contextmanager
     def is_ready(self) -> None:
-        """Check whether or not Pebble is ready as a simple property."""
+        """Check whether or not Pebble is ready as a simple property.
+
+        :meth:`is_ready` implements a `contextmanager` which can be used in charms
+        to wrap :class:`Container` operations which depend on the Pebble backend
+        being available. When `is_ready` is used, exceptions from the underlying
+        Pebble operations will log error messages rather than raising exceptions.
+
+        Example:
+            container = self.unit.get_container("example")
+
+            with container.is_ready():
+                container.pull('/does/not/exist')
+                # This will result in an `ERROR` log from PathError, but not a backtrace
+
+        """
         try:
             # We don't care at all whether not the services are up in
             # this case, jsut whether Pebble throws an error. If it doesn't,
