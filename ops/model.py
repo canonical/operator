@@ -1051,11 +1051,17 @@ class Container:
             socket_path = '/charm/containers/{}/pebble.socket'.format(name)
             pebble_client = backend.get_pebble(socket_path)
         self._pebble = pebble_client
+        self._completed = None
 
     @property
     def pebble(self) -> 'pebble.Client':
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
+
+    @property
+    def completed(self) -> bool:
+        """Whether or not a :meth:`is_ready` context finished successfully."""
+        return self._completed
 
     def is_ready(self) -> '_ContainerReady':
         """Check whether or not Pebble is ready as a simple property.
@@ -1263,7 +1269,6 @@ class _ContainerReady:
 
     def __init__(self, container: Container):
         self.container = container
-        self.completed = True
 
     def __bool__(self) -> bool:
         try:
@@ -1278,18 +1283,19 @@ class _ContainerReady:
         return True
 
     def __enter__(self) -> 'Container':
+        self.container._completed = True
         return self.container
 
     def __exit__(self, exc_type, e, exc_tb):
         if exc_type in ErrorsWithMessage:
             logger.error("(%s) was raised due to: %s", e.name, e.message)
-            self.container.completed = False
+            self.container._completed = False
             return True
 
         if exc_type is pebble.ChangeError:
             logger.error("Pebble could not apply the requested change (%s) "
                          "due to %s", e.change, e.err)
-            self.container.completed = False
+            self.container._completed = False
             return True
 
 
