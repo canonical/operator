@@ -29,6 +29,7 @@ import weakref
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
+from contextlib import contextmanager
 from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
@@ -39,6 +40,9 @@ import ops.pebble as pebble
 
 
 logger = logging.getLogger(__name__)
+
+ErrorsWithMessage = (pebble.TimeoutError, pebble.ConnectionError, pebble.ProtocolError,
+                     pebble.PathError, pebble.APIError)
 
 
 class Model:
@@ -1049,16 +1053,30 @@ class Container:
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
-    @property
-    def ready(self) -> bool:
+    @contextmanager
+    def is_ready(self) -> None:
         """Check whether or not Pebble is ready as a simple property."""
         try:
             # We don't care at all whether not the services are up in
-            # this case, jsut whether Pebble throws an error
+            # this case, jsut whether Pebble throws an error. If it doesn't,
+            # carry on with the contextmanager
             self._pebble.get_services()
-            return True
-        except pebble.ConnectionError:
-            return False
+        except ErrorsWithMessage as e:
+            logger.error("Pebble is not ready! (%s) was raised due to: %s",
+                         e.name, e.message)
+            raise
+
+        # Give up control and log exceptions only
+        try:
+            yield
+        except ErrorsWithMessage as e:
+            logger.error("(%s) was raised due to: %s", e.name, e.message)
+        except pebble.ChangeError as e:
+            logger.error("Pebble could not apply the requested change (%s) "
+                         "due to %s", e.change, e.err)
+        finally:
+            # We don't have to do anything but return here
+            pass
 
     def autostart(self):
         """Autostart all services marked as startup: enabled."""
@@ -1069,49 +1087,22 @@ class Container:
         if not service_names:
             raise TypeError('start expected at least 1 argument, got 0')
 
-        if not self.ready:
-            raise PebbleNotReadyError(f"Cannot start {service_names}. Pebble is not ready")
-
-        try:
-            self._pebble.start_services(service_names)
-        except (pebble.APIError, RuntimeError):
-            raise UnknownServiceError(
-                "service(s) {!r} not found. This may be caused by "
-                'querying a service before "add_layer"'.format(service_names)
-            )
+        self._pebble.start_services(service_names)
 
     def restart(self, *service_names: str):
         """Restart the given service(s) by name."""
         if not service_names:
             raise TypeError('restart expected at least 1 argument, got 0')
 
-        if not self.ready:
-            raise PebbleNotReadyError(f"Cannot restart {service_names}. Pebble is not ready")
-
-        try:
-            self._pebble.stop_services(service_names)
-            self._pebble.start_services(service_names)
-        except (pebble.APIError, RuntimeError):
-            raise UnknownServiceError(
-                "service(s) {!r} not found. This may be caused by "
-                'querying a service before "add_layer"'.format(service_names)
-            )
+        self._pebble.stop_services(service_names)
+        self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
         if not service_names:
             raise TypeError('stop expected at least 1 argument, got 0')
 
-        if not self.ready:
-            raise PebbleNotReadyError(f"Cannot stop {service_names}. Pebble is not ready")
-
-        try:
-            self._pebble.stop_services(service_names)
-        except (pebble.APIError, RuntimeError):
-            raise UnknownServiceError(
-                "service(s) {!r} not found. This may be caused by "
-                'querying a service before "add_layer"'.format(service_names)
-            )
+        self._pebble.stop_services(service_names)
 
     # TODO(benhoyt) - should be: layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
     # but this breaks on Python 3.5.2 (the default on Xenial). See:
@@ -1142,18 +1133,7 @@ class Container:
         If no service names are specified, return status information for all
         services, otherwise return information for only the given services.
         """
-        if not self.ready:
-            raise PebbleNotReadyError(
-                f"Cannot get service(s) {service_names}. Pebble is not ready"
-            )
-
-        try:
-            services = self._pebble.get_services(service_names)
-        except (pebble.APIError, RuntimeError):
-            raise UnknownServiceError(
-                "service(s) {!r} not found. This may be caused by "
-                'querying a service before "add_layer"'.format(service_names)
-            )
+        services = self._pebble.get_services(service_names)
         return ServiceInfoMapping(services)
 
     def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
@@ -1161,17 +1141,9 @@ class Container:
 
         Raises model error if service_name is not found.
         """
-        if not self.ready:
-            raise PebbleNotReadyError(
-                f"Cannot get service {service_name}. Pebble is not ready"
-            )
-
         services = self.get_services(service_name)
         if not services:
-            raise UnknownServiceError(
-                "service {!r} not found. This may be caused by "
-                'querying a service before "add_layer"'.format(service_name)
-            )
+            raise ModelError('service {!r} not found'.format(service_name))
         if len(services) > 1:
             raise RuntimeError('expected 1 service, got {}'.format(len(services)))
         return services[service_name]
@@ -1190,9 +1162,6 @@ class Container:
             objects decoded according to the specified encoding, or bytes if
             encoding is None.
         """
-        if not self.ready:
-            raise PebbleNotReadyError(f"Cannot pull files from {self.name} " "Pebble is not ready")
-
         return self._pebble.pull(path, encoding=encoding)
 
     def push(
@@ -1218,9 +1187,6 @@ class Container:
             group: Group name for file. Group's GID must match group_id if
                 both are specified.
         """
-        if not self.ready:
-            raise PebbleNotReadyError(f"Cannot push files to {self.name}. Pebble is not ready")
-
         self._pebble.push(path, source, encoding=encoding, make_dirs=make_dirs,
                           permissions=permissions, user_id=user_id, user=user,
                           group_id=group_id, group=group)
@@ -1237,9 +1203,6 @@ class Container:
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
         """
-        if not self.ready:
-            raise PebbleNotReadyError(f"Cannot list files from {self.name}. Pebble is not ready")
-
         return self._pebble.list_files(path, pattern=pattern, itself=itself)
 
     def make_dir(
@@ -1259,9 +1222,6 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        if not self.ready:
-            raise PebbleNotReadyError(f"Cannot make_dir on {self.name}. Pebble is not ready")
-
         self._pebble.make_dir(path, make_parents=make_parents, permissions=permissions,
                               user_id=user_id, user=user, group_id=group_id, group=group)
 
@@ -1272,9 +1232,6 @@ class Container:
             path: Path of the file or directory to delete from the remote system.
             recursive: If True, recursively delete path and everything under it.
         """
-        if not self.ready:
-            raise PebbleNotReadyError(f"Cannot remove path from {self.name}. Pebble is not ready")
-
         self._pebble.remove_path(path, recursive=recursive)
 
 

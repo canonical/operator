@@ -20,7 +20,6 @@ import os
 import pathlib
 from textwrap import dedent
 import unittest
-from unittest.mock import patch
 
 import ops.model
 import ops.charm
@@ -28,18 +27,9 @@ import ops.pebble
 import ops.testing
 from ops.charm import RelationMeta, RelationRole
 
-
 from ops._private import yaml
 
 from test.test_helpers import fake_script, fake_script_calls
-
-
-def service_builder():
-    return [ops.pebble.ServiceInfo.from_dict({
-        'name': "test",
-        'startup': "enabled",
-        'current': ops.pebble.ServiceStatus.ACTIVE
-    })]
 
 
 class TestModel(unittest.TestCase):
@@ -827,43 +817,24 @@ containers:
         self.assertEqual(self.pebble.requests, [('autostart',)])
 
     def test_start(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=service_builder
-                   ):
-            self.container.start('foo')
-            self.container.start('foo', 'bar')
-            self.assertEqual(self.pebble.requests, [
-                ('start', ('foo',)),
-                ('start', ('foo', 'bar')),
-            ])
+        self.container.start('foo')
+        self.container.start('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('start', ('foo',)),
+            ('start', ('foo', 'bar')),
+        ])
 
     def test_start_no_arguments(self):
         with self.assertRaises(TypeError):
             self.container.start()
 
     def test_stop(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=service_builder
-                   ):
-            self.container.stop('foo')
-            self.container.stop('foo', 'bar')
-            self.assertEqual(self.pebble.requests, [
-                ('stop', ('foo',)),
-                ('stop', ('foo', 'bar')),
-            ])
-
-    def test_restart(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=service_builder
-                   ):
-            self.container.restart('foo')
-            self.container.restart('foo', 'bar')
-            self.assertEqual(self.pebble.requests, [
-                ('stop', ('foo',)),
-                ('start', ('foo',)),
-                ('stop', ('foo', 'bar')),
-                ('start', ('foo', 'bar')),
-            ])
+        self.container.stop('foo')
+        self.container.stop('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('stop', ('foo',)),
+            ('stop', ('foo', 'bar')),
+        ])
 
     def test_stop_no_arguments(self):
         with self.assertRaises(TypeError):
@@ -881,17 +852,11 @@ containers:
         model = ops.model.Model(meta, backend)
         container = model.unit.containers['c1']
 
-        with patch('ops.model.Container.ready',
-                   side_effect=True
-                   ):
-            with self.assertRaises(TypeError):
-                container.start(['foo'])
+        with self.assertRaises(TypeError):
+            container.start(['foo'])
 
-        with patch('ops.model.Container.ready',
-                   side_effect=True
-                   ):
-            with self.assertRaises(TypeError):
-                container.stop(['foo'])
+        with self.assertRaises(TypeError):
+            container.stop(['foo'])
 
     def test_add_layer(self):
         self.container.add_layer('a', 'summary: str\n')
@@ -923,160 +888,141 @@ containers:
             {'name': name, 'startup': startup, 'current': current})
 
     def test_get_services(self):
-        with patch('ops.model.Container.ready',
-                   side_effect=True
-                   ):
-            two_services = [
-                self._make_service('s1', 'enabled', 'active'),
-                self._make_service('s2', 'disabled', 'inactive'),
-            ]
-            self.pebble.responses.append(two_services)
-            services = self.container.get_services()
-            self.assertEqual(len(services), 2)
-            self.assertEqual(set(services), {'s1', 's2'})
-            self.assertEqual(services['s1'].name, 's1')
-            self.assertEqual(services['s1'].startup, ops.pebble.ServiceStartup.ENABLED)
-            self.assertEqual(services['s1'].current, ops.pebble.ServiceStatus.ACTIVE)
-            self.assertEqual(services['s2'].name, 's2')
-            self.assertEqual(services['s2'].startup, ops.pebble.ServiceStartup.DISABLED)
-            self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
+        two_services = [
+            self._make_service('s1', 'enabled', 'active'),
+            self._make_service('s2', 'disabled', 'inactive'),
+        ]
+        self.pebble.responses.append(two_services)
+        services = self.container.get_services()
+        self.assertEqual(len(services), 2)
+        self.assertEqual(set(services), {'s1', 's2'})
+        self.assertEqual(services['s1'].name, 's1')
+        self.assertEqual(services['s1'].startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services['s1'].current, ops.pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(services['s2'].name, 's2')
+        self.assertEqual(services['s2'].startup, ops.pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
 
-            self.pebble.responses.append(two_services)
-            services = self.container.get_services('s1', 's2')
-            self.assertEqual(len(services), 2)
-            self.assertEqual(set(services), {'s1', 's2'})
-            self.assertEqual(services['s1'].name, 's1')
-            self.assertEqual(services['s1'].startup, ops.pebble.ServiceStartup.ENABLED)
-            self.assertEqual(services['s1'].current, ops.pebble.ServiceStatus.ACTIVE)
-            self.assertEqual(services['s2'].name, 's2')
-            self.assertEqual(services['s2'].startup, ops.pebble.ServiceStartup.DISABLED)
-            self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
+        self.pebble.responses.append(two_services)
+        services = self.container.get_services('s1', 's2')
+        self.assertEqual(len(services), 2)
+        self.assertEqual(set(services), {'s1', 's2'})
+        self.assertEqual(services['s1'].name, 's1')
+        self.assertEqual(services['s1'].startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services['s1'].current, ops.pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(services['s2'].name, 's2')
+        self.assertEqual(services['s2'].startup, ops.pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
 
-            self.assertEqual(self.pebble.requests, [
-                ('get_services', ()),
-                ('get_services', ('s1', 's2')),
-            ])
+        self.assertEqual(self.pebble.requests, [
+            ('get_services', ()),
+            ('get_services', ('s1', 's2')),
+        ])
 
     def test_get_service(self):
-        with patch('ops.model.Container.ready',
-                   side_effect=True
-                   ):
-            # Single service returned successfully
-            self.pebble.responses.append([self._make_service('s1', 'enabled', 'active')])
-            s = self.container.get_service('s1')
-            self.assertEqual(self.pebble.requests, [('get_services', ('s1', ))])
-            self.assertEqual(s.name, 's1')
-            self.assertEqual(s.startup, ops.pebble.ServiceStartup.ENABLED)
-            self.assertEqual(s.current, ops.pebble.ServiceStatus.ACTIVE)
+        # Single service returned successfully
+        self.pebble.responses.append([self._make_service('s1', 'enabled', 'active')])
+        s = self.container.get_service('s1')
+        self.assertEqual(self.pebble.requests, [('get_services', ('s1', ))])
+        self.assertEqual(s.name, 's1')
+        self.assertEqual(s.startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(s.current, ops.pebble.ServiceStatus.ACTIVE)
 
-            # If Pebble returns no services, should be a ModelError
-            self.pebble.responses.append([])
-            with self.assertRaises(ops.model.UnknownServiceError) as cm:
-                self.container.get_service('s2')
-            self.assertIn("service 's2' not found", str(cm.exception))
+        # If Pebble returns no services, should be a ModelError
+        self.pebble.responses.append([])
+        with self.assertRaises(ops.model.ModelError) as cm:
+            self.container.get_service('s2')
+        self.assertEqual(str(cm.exception), "service 's2' not found")
 
-            # If Pebble returns more than one service, RuntimeError is raised
-            self.pebble.responses.append([
-                self._make_service('s1', 'enabled', 'active'),
-                self._make_service('s2', 'disabled', 'inactive'),
-            ])
-            with self.assertRaises(RuntimeError):
-                self.container.get_service('s1')
-
-    def test_container_not_ready_if_pebble_is_down(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=ops.pebble.ConnectionError("Pebble is dead")
-                   ):
-            # with unittest.mock.patch('')
-            # If the service is not running, the container is not ready yet
-            self.assertEqual(self.container.ready, False)
+        # If Pebble returns more than one service, RuntimeError is raised
+        self.pebble.responses.append([
+            self._make_service('s1', 'enabled', 'active'),
+            self._make_service('s2', 'disabled', 'inactive'),
+        ])
+        with self.assertRaises(RuntimeError):
+            self.container.get_service('s1')
 
     def test_pull(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=service_builder
-                   ):
-            self.pebble.responses.append('dummy1')
-            got = self.container.pull('/path/1')
-            self.assertEqual(got, 'dummy1')
-            self.assertEqual(self.pebble.requests, [
-                ('pull', '/path/1', 'utf-8'),
-            ])
-            self.pebble.requests = []
+        self.pebble.responses.append('dummy1')
+        got = self.container.pull('/path/1')
+        self.assertEqual(got, 'dummy1')
+        self.assertEqual(self.pebble.requests, [
+            ('pull', '/path/1', 'utf-8'),
+        ])
+        self.pebble.requests = []
 
-            self.pebble.responses.append(b'dummy2')
-            got = self.container.pull('/path/2', encoding=None)
-            self.assertEqual(got, b'dummy2')
-            self.assertEqual(self.pebble.requests, [
-                ('pull', '/path/2', None),
-            ])
+        self.pebble.responses.append(b'dummy2')
+        got = self.container.pull('/path/2', encoding=None)
+        self.assertEqual(got, b'dummy2')
+        self.assertEqual(self.pebble.requests, [
+            ('pull', '/path/2', None),
+        ])
 
     def test_push(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=service_builder
-                   ):
-            self.container.push('/path/1', 'content1')
-            self.assertEqual(self.pebble.requests, [
-                ('push', '/path/1', 'content1', 'utf-8', False, None,
-                 None, None, None, None),
-            ])
-            self.pebble.requests = []
+        self.container.push('/path/1', 'content1')
+        self.assertEqual(self.pebble.requests, [
+            ('push', '/path/1', 'content1', 'utf-8', False, None,
+             None, None, None, None),
+        ])
+        self.pebble.requests = []
 
-            self.container.push('/path/2', b'content2', encoding=None, make_dirs=True,
-                                permissions=0o600, user_id=12, user='bob', group_id=34,
-                                group='staff')
-            self.assertEqual(self.pebble.requests, [
-                ('push', '/path/2', b'content2', None, True, 0o600, 12, 'bob', 34, 'staff'),
-            ])
+        self.container.push('/path/2', b'content2', encoding=None, make_dirs=True,
+                            permissions=0o600, user_id=12, user='bob', group_id=34, group='staff')
+        self.assertEqual(self.pebble.requests, [
+            ('push', '/path/2', b'content2', None, True, 0o600, 12, 'bob', 34, 'staff'),
+        ])
 
     def test_list_files(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=service_builder
-                   ):
-            self.pebble.responses.append('dummy1')
-            ret = self.container.list_files('/path/1')
-            self.assertEqual(ret, 'dummy1')
-            self.assertEqual(self.pebble.requests, [
-                ('list_files', '/path/1', None, False),
-            ])
-            self.pebble.requests = []
+        self.pebble.responses.append('dummy1')
+        ret = self.container.list_files('/path/1')
+        self.assertEqual(ret, 'dummy1')
+        self.assertEqual(self.pebble.requests, [
+            ('list_files', '/path/1', None, False),
+        ])
+        self.pebble.requests = []
 
-            self.pebble.responses.append('dummy2')
-            ret = self.container.list_files('/path/2', pattern='*.txt', itself=True)
-            self.assertEqual(ret, 'dummy2')
-            self.assertEqual(self.pebble.requests, [
-                ('list_files', '/path/2', '*.txt', True),
-            ])
+        self.pebble.responses.append('dummy2')
+        ret = self.container.list_files('/path/2', pattern='*.txt', itself=True)
+        self.assertEqual(ret, 'dummy2')
+        self.assertEqual(self.pebble.requests, [
+            ('list_files', '/path/2', '*.txt', True),
+        ])
 
     def test_make_dir(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=service_builder
-                   ):
-            self.container.make_dir('/path/1')
-            self.assertEqual(self.pebble.requests, [
-                ('make_dir', '/path/1', False, None, None, None, None, None),
-            ])
-            self.pebble.requests = []
+        self.container.make_dir('/path/1')
+        self.assertEqual(self.pebble.requests, [
+            ('make_dir', '/path/1', False, None, None, None, None, None),
+        ])
+        self.pebble.requests = []
 
-            self.container.make_dir('/path/2', make_parents=True, permissions=0o700,
-                                    user_id=12, user='bob', group_id=34, group='staff')
-            self.assertEqual(self.pebble.requests, [
-                ('make_dir', '/path/2', True, 0o700, 12, 'bob', 34, 'staff'),
-            ])
+        self.container.make_dir('/path/2', make_parents=True, permissions=0o700,
+                                user_id=12, user='bob', group_id=34, group='staff')
+        self.assertEqual(self.pebble.requests, [
+            ('make_dir', '/path/2', True, 0o700, 12, 'bob', 34, 'staff'),
+        ])
 
     def test_remove_path(self):
-        with patch('test.test_model.MockPebbleClient.get_services',
-                   side_effect=service_builder
-                   ):
-            self.container.remove_path('/path/1')
-            self.assertEqual(self.pebble.requests, [
-                ('remove_path', '/path/1', False),
-            ])
-            self.pebble.requests = []
+        self.container.remove_path('/path/1')
+        self.assertEqual(self.pebble.requests, [
+            ('remove_path', '/path/1', False),
+        ])
+        self.pebble.requests = []
 
-            self.container.remove_path('/path/2', recursive=True)
-            self.assertEqual(self.pebble.requests, [
-                ('remove_path', '/path/2', True),
-            ])
+        self.container.remove_path('/path/2', recursive=True)
+        self.assertEqual(self.pebble.requests, [
+            ('remove_path', '/path/2', True),
+        ])
+
+    def test_no_exception_with_contextmanager(self):
+        with self.assertLogs() as logs:
+            self.pebble.responses.append('dummy')
+            with self.container.is_ready():
+                raise ops.pebble.ConnectionError("Some dummy message")
+        self.assertIn("was raised due to", logs.records[0].getMessage())
+
+    def test_exception_without_contextmanager(self):
+        with self.assertRaises(ops.pebble.ConnectionError):
+            raise ops.pebble.ConnectionError("Some dummy message")
 
 
 class MockPebbleBackend(ops.model._ModelBackend):
