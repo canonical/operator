@@ -1016,13 +1016,18 @@ containers:
     def test_no_exception_with_contextmanager(self):
         with self.assertLogs() as logs:
             self.pebble.responses.append('dummy')
-            with self.container.is_ready():
+            with self.container.is_ready() as c:
                 raise ops.pebble.ConnectionError("Some dummy message")
         self.assertIn("was raised due to", logs.records[0].getMessage())
+        self.assertEqual(c.completed, False)
 
     def test_exception_without_contextmanager(self):
         with self.assertRaises(ops.pebble.ConnectionError):
             raise ops.pebble.ConnectionError("Some dummy message")
+
+    def test_bare_is_ready_call(self):
+        self.pebble.responses.append('dummy')
+        self.assertTrue(self.container.is_ready())
 
 
 class MockPebbleBackend(ops.model._ModelBackend):

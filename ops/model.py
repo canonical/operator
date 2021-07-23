@@ -29,7 +29,6 @@ import weakref
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
-from contextlib import contextmanager
 from pathlib import Path
 from subprocess import run, PIPE, CalledProcessError
 
@@ -41,8 +40,13 @@ import ops.pebble as pebble
 
 logger = logging.getLogger(__name__)
 
-ErrorsWithMessage = (pebble.TimeoutError, pebble.ConnectionError, pebble.ProtocolError,
-                     pebble.PathError, pebble.APIError)
+ErrorsWithMessage = (
+    pebble.APIError,
+    pebble.ConnectionError,
+    pebble.PathError,
+    pebble.ProtocolError,
+    pebble.TimeoutError,
+)
 
 
 class Model:
@@ -1053,44 +1057,43 @@ class Container:
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
-    @contextmanager
-    def is_ready(self) -> None:
+    def is_ready(self) -> '_ContainerReady':
         """Check whether or not Pebble is ready as a simple property.
 
-        :meth:`is_ready` implements a `contextmanager` which can be used in charms
-        to wrap :class:`Container` operations which depend on the Pebble backend
-        being available. When `is_ready` is used, exceptions from the underlying
-        Pebble operations will log error messages rather than raising exceptions.
+        :meth:`is_ready` returns a :class:_ContainerReady `contextmanager` which
+         can be used in charms to wrap :class:`Container` operations which depend
+         on the Pebble backend being available. When `is_ready` is used, exceptions
+         from the underlying Pebble operations will log error messages rather than
+         raising exceptions.
 
         Example:
+            ```
             container = self.unit.get_container("example")
+            with container.is_ready() as c:
+                c.pull('/does/not/exist')
 
-            with container.is_ready():
-                container.pull('/does/not/exist')
-                # This will result in an `ERROR` log from PathError, but not a backtrace
+                # This point of execution will not be reached if an exception
+                # was caught earlier
+                c.get_service("foo")
+            c.completed # False
+            ```
 
+            This will result in an `ERROR` log from PathError, but not a
+            traceback. In addition, the block running inside the contextmanager
+            will exit and return to the previous point of execution. Whether
+            or not the block completed successfully is available as a property
+
+        :meth:`is_ready` can also be used as a bare function, which will log an
+        error if the container is not ready.
+
+        Example:
+            ```
+            if container.is_ready():
+                do_something()
+            else:
+                do_something_else()
         """
-        try:
-            # We don't care at all whether not the services are up in
-            # this case, jsut whether Pebble throws an error. If it doesn't,
-            # carry on with the contextmanager
-            self._pebble.get_services()
-        except ErrorsWithMessage as e:
-            logger.error("Pebble is not ready! (%s) was raised due to: %s",
-                         e.name, e.message)
-            raise
-
-        # Give up control and log exceptions only
-        try:
-            yield
-        except ErrorsWithMessage as e:
-            logger.error("(%s) was raised due to: %s", e.name, e.message)
-        except pebble.ChangeError as e:
-            logger.error("Pebble could not apply the requested change (%s) "
-                         "due to %s", e.change, e.err)
-        finally:
-            # We don't have to do anything but return here
-            pass
+        return _ContainerReady(self)
 
     def autostart(self):
         """Autostart all services marked as startup: enabled."""
@@ -1247,6 +1250,47 @@ class Container:
             recursive: If True, recursively delete path and everything under it.
         """
         self._pebble.remove_path(path, recursive=recursive)
+
+
+class _ContainerReady:
+    """Represents whether or not a container is ready as a Context Manager.
+
+    This class should not be instantiated directly, instead use :meth:`Container.is_ready`
+
+    Attributes:
+        container: A :class:`Container` object
+    """
+
+    def __init__(self, container: Container):
+        self.container = container
+        self.completed = True
+
+    def __bool__(self) -> bool:
+        try:
+            # We don't care at all whether not the services are up in
+            # this case, just whether Pebble throws an error. If it doesn't,
+            # carry on with the contextmanager.
+            self.container._pebble.get_services()
+        except ErrorsWithMessage as e:
+            logger.error("Pebble is not ready! (%s) was raised due to: %s",
+                         e.name, e.message)
+            return False
+        return True
+
+    def __enter__(self) -> 'Container':
+        return self.container
+
+    def __exit__(self, exc_type, e, exc_tb):
+        if exc_type in ErrorsWithMessage:
+            logger.error("(%s) was raised due to: %s", e.name, e.message)
+            self.container.completed = False
+            return True
+
+        if exc_type is pebble.ChangeError:
+            logger.error("Pebble could not apply the requested change (%s) "
+                         "due to %s", e.change, e.err)
+            self.container.completed = False
+            return True
 
 
 class ContainerMapping(Mapping):
