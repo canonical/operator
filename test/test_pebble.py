@@ -1206,7 +1206,7 @@ services:
 --01234567890123456789012345678901
 Content-Disposition: form-data; name="files"; filename="/etc/hosts"
 
-127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80' + b"""
+127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80\nfoo\r\nbar' + b"""
 --01234567890123456789012345678901
 Content-Disposition: form-data; name="response"
 
@@ -1221,7 +1221,7 @@ Content-Disposition: form-data; name="response"
         ))
 
         content = self.client.pull('/etc/hosts').read()
-        self.assertEqual(content, '127.0.0.1 localhost  # 😀')
+        self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
@@ -1235,7 +1235,7 @@ Content-Disposition: form-data; name="response"
 --01234567890123456789012345678901
 Content-Disposition: form-data; name="files"; filename="/etc/hosts"
 
-127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80' + b"""
+127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80\nfoo\r\nbar' + b"""
 --01234567890123456789012345678901
 Content-Disposition: form-data; name="response"
 
@@ -1250,7 +1250,7 @@ Content-Disposition: form-data; name="response"
         ))
 
         content = self.client.pull('/etc/hosts', encoding=None).read()
-        self.assertEqual(content, b'127.0.0.1 localhost  # \xf0\x9f\x98\x80')
+        self.assertEqual(content, b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar')
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
@@ -1329,10 +1329,10 @@ bad path
         self.assertEqual(str(cm.exception), 'no "response" field in multipart body')
 
     def test_push_str(self):
-        self._test_push_str('content 😀')
+        self._test_push_str('content 😀\nfoo\r\nbar')
 
     def test_push_text(self):
-        self._test_push_str(io.StringIO('content 😀'))
+        self._test_push_str(io.StringIO('content 😀\nfoo\r\nbar'))
 
     def _test_push_str(self, source):
         self.client.responses.append((
@@ -1359,17 +1359,17 @@ bad path
         content_type = headers['Content-Type']
         req, filename, content = self._parse_write_multipart(content_type, body)
         self.assertEqual(filename, '/foo/bar')
-        self.assertEqual(content, b'content \xf0\x9f\x98\x80')
+        self.assertEqual(content, b'content \xf0\x9f\x98\x80\nfoo\r\nbar')
         self.assertEqual(req, {
             'action': 'write',
             'files': [{'path': '/foo/bar'}],
         })
 
     def test_push_bytes(self):
-        self._test_push_bytes(b'content \xf0\x9f\x98\x80')
+        self._test_push_bytes(b'content \xf0\x9f\x98\x80\nfoo\r\nbar')
 
     def test_push_binary(self):
-        self._test_push_bytes(io.BytesIO(b'content \xf0\x9f\x98\x80'))
+        self._test_push_bytes(io.BytesIO(b'content \xf0\x9f\x98\x80\nfoo\r\nbar'))
 
     def _test_push_bytes(self, source):
         self.client.responses.append((
@@ -1396,7 +1396,7 @@ bad path
         content_type = headers['Content-Type']
         req, filename, content = self._parse_write_multipart(content_type, body)
         self.assertEqual(filename, '/foo/bar')
-        self.assertEqual(content, b'content \xf0\x9f\x98\x80')
+        self.assertEqual(content, b'content \xf0\x9f\x98\x80\nfoo\r\nbar')
         self.assertEqual(req, {
             'action': 'write',
             'files': [{'path': '/foo/bar'}],

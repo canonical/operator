@@ -17,7 +17,7 @@
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
-from email.mime.multipart import MIMEBase, MIMEMultipart
+import binascii
 import cgi
 import datetime
 import email.parser
@@ -25,6 +25,7 @@ import enum
 import http.client
 import io
 import json
+import os
 import re
 import socket
 import sys
@@ -1022,28 +1023,18 @@ class Client:
             'files': [info],
         }
 
-        multipart = MIMEMultipart('form-data')
-
-        part = MIMEBase('application', 'json')
-        part.add_header('Content-Disposition', 'form-data', name='request')
-        part.set_payload(json.dumps(metadata))
-        multipart.attach(part)
-
-        part = MIMEBase('application', 'octet-stream')
-        part.add_header('Content-Disposition', 'form-data', name='files', filename=path)
         if hasattr(source, 'read'):
             content = source.read()
         else:
             content = source
         if isinstance(content, str):
             content = content.encode(encoding)
-        part.set_payload(content)
-        multipart.attach(part)
 
-        data = multipart.as_bytes()  # must be called before accessing multipart['Content-Type']
+        data, content_type = self._encode_multipart(metadata, path, content)
+
         headers = {
             'Accept': 'application/json',
-            'Content-Type': multipart['Content-Type'],
+            'Content-Type': content_type,
         }
         response = self._request_raw('POST', '/v1/files', None, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
@@ -1064,6 +1055,29 @@ class Client:
         if group is not None:
             d['group'] = group
         return d
+
+    @staticmethod
+    def _encode_multipart(metadata, path, content):
+        # Python's stdlib mime/multipart handling is screwy and doesn't handle
+        # binary properly, so roll our own.
+        boundary = binascii.hexlify(os.urandom(16))
+        path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
+        parts = []
+        parts.extend([
+            b'--', boundary, b'\r\n',
+            b'Content-Type: application/json\r\n',
+            b'Content-Disposition: form-data; name="request"\r\n',
+            b'\r\n',
+            json.dumps(metadata).encode('utf-8'), b'\r\n',
+            b'--', boundary, b'\r\n',
+            b'Content-Type: application/octet-stream\r\n',
+            b'Content-Disposition: form-data; name="files"; filename="', path_escaped, b'"\r\n',
+            b'\r\n',
+            content, b'\r\n',
+            b'--', boundary, b'--\r\n',
+        ])
+        content_type = 'multipart/form-data; boundary="' + boundary.decode('utf-8') + '"'
+        return b''.join(parts), content_type
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[FileInfo]:

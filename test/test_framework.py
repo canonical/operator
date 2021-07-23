@@ -1674,14 +1674,14 @@ class BreakpointTests(BaseTestCase):
         self.check_trace_set('some-breakpoint', None, 0)
         self.assertLoggedWarning(
             "Breakpoint None skipped",
-            "not found in the requested breakpoints: ['some-breakpoint']")
+            "not found in the requested breakpoints: {'some-breakpoint'}")
 
     def test_named_indicated_somethingelse(self, fake_stderr):
         # Some breakpoint was indicated, but the framework call was with a different name
         self.check_trace_set('some-breakpoint', 'other-name', 0)
         self.assertLoggedWarning(
             "Breakpoint 'other-name' skipped",
-            "not found in the requested breakpoints: ['some-breakpoint']")
+            "not found in the requested breakpoints: {'some-breakpoint'}")
 
     def test_named_indicated_ingroup(self, fake_stderr):
         # A multiple breakpoint was indicated, and the framework call used a name among those.
@@ -1702,26 +1702,26 @@ class DebugHookTests(BaseTestCase):
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
             framework = self.create_framework()
-        self.assertEqual(framework._juju_debug_at, ())
+        self.assertEqual(framework._juju_debug_at, set())
 
     def test_envvar_parsing_empty(self):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': ''}):
             framework = self.create_framework()
-        self.assertEqual(framework._juju_debug_at, ())
+        self.assertEqual(framework._juju_debug_at, set())
 
     def test_envvar_parsing_simple(self):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
             framework = self.create_framework()
-        self.assertEqual(framework._juju_debug_at, ['hook'])
+        self.assertEqual(framework._juju_debug_at, {'hook'})
 
     def test_envvar_parsing_multiple(self):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'foo,bar,all'}):
             framework = self.create_framework()
-        self.assertEqual(framework._juju_debug_at, ['foo', 'bar', 'all'])
+        self.assertEqual(framework._juju_debug_at, {'foo', 'bar', 'all'})
 
     def test_basic_interruption_enabled(self):
         framework = self.create_framework()
-        framework._juju_debug_at = ['hook']
+        framework._juju_debug_at = {'hook'}
 
         publisher = charm.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
@@ -1743,10 +1743,31 @@ class DebugHookTests(BaseTestCase):
         # Verify proper message was given to the user.
         self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
+    def test_interruption_enabled_with_all(self):
+        test_model = self.create_model()
+        framework = self.create_framework(model=test_model)
+        framework._juju_debug_at = {'all'}
+
+        class CustomEvents(ObjectEvents):
+            foobar_action = EventSource(charm.ActionEvent)
+
+        publisher = CustomEvents(framework, "1")
+        observer = GenericObserver(framework, "1")
+        framework.observe(publisher.foobar_action, observer.callback_method)
+        fake_script(self, 'action-get', "echo {}")
+
+        with patch('sys.stderr', new_callable=io.StringIO):
+            with patch('pdb.runcall') as mock:
+                with patch.dict(os.environ, {'JUJU_ACTION_NAME': 'foobar'}):
+                    publisher.foobar_action.emit()
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertFalse(observer.called)
+
     def test_actions_are_interrupted(self):
         test_model = self.create_model()
         framework = self.create_framework(model=test_model)
-        framework._juju_debug_at = ['hook']
+        framework._juju_debug_at = {'hook'}
 
         class CustomEvents(ObjectEvents):
             foobar_action = EventSource(charm.ActionEvent)
@@ -1770,7 +1791,7 @@ class DebugHookTests(BaseTestCase):
             bar = EventSource(EventBase)
 
         framework = self.create_framework()
-        framework._juju_debug_at = ['hook']
+        framework._juju_debug_at = {'hook'}
 
         publisher = MyNotifier(framework, "1")
         observer = GenericObserver(framework, "1")
@@ -1784,7 +1805,7 @@ class DebugHookTests(BaseTestCase):
 
     def test_envvar_mixed(self):
         framework = self.create_framework()
-        framework._juju_debug_at = ['foo', 'hook', 'all', 'whatever']
+        framework._juju_debug_at = {'foo', 'hook', 'all', 'whatever'}
 
         publisher = charm.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
@@ -1799,7 +1820,7 @@ class DebugHookTests(BaseTestCase):
 
     def test_no_registered_method(self):
         framework = self.create_framework()
-        framework._juju_debug_at = ['hook']
+        framework._juju_debug_at = {'hook'}
 
         publisher = charm.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
@@ -1812,7 +1833,7 @@ class DebugHookTests(BaseTestCase):
 
     def test_envvar_nohook(self):
         framework = self.create_framework()
-        framework._juju_debug_at = ['something-else']
+        framework._juju_debug_at = {'something-else'}
 
         publisher = charm.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
@@ -1827,7 +1848,7 @@ class DebugHookTests(BaseTestCase):
 
     def test_envvar_missing(self):
         framework = self.create_framework()
-        framework._juju_debug_at = ()
+        framework._juju_debug_at = set()
 
         publisher = charm.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
@@ -1841,7 +1862,7 @@ class DebugHookTests(BaseTestCase):
 
     def test_welcome_message_not_multiple(self):
         framework = self.create_framework()
-        framework._juju_debug_at = ['hook']
+        framework._juju_debug_at = {'hook'}
 
         publisher = charm.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
