@@ -20,11 +20,16 @@
 
 from json import JSONEncoder
 
+# Explicitly import to avoid circular ImportErrors
+import ops.framework
+
 # Monkeypatch so Stored[Dict|List|Set] can be serialized
 
 
 def _storedstate_workaround(self, obj):
-    return getattr(obj.__class__, "to_json", _storedstate_workaround.default)(obj)
+    if isinstance(obj, (ops.framework.StoredDict, ops.framework.StoredList)):
+        return getattr(obj.__class__, "to_json")(obj)
+    return _storedstate_workaround.default(obj)
 
 
 _storedstate_workaround.default = JSONEncoder().default
