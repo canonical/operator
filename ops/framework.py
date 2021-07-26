@@ -1060,7 +1060,7 @@ class StoredDict(collections.abc.MutableMapping):
 
     def to_json(self) -> str:
         """Return a JSON representation of the underlying object."""
-        return json.dumps(dict(self._under))
+        return json.dumps(dict(self._under), sort_keys=True)
 
     __repr__ = _wrapped_repr
 
@@ -1157,7 +1157,7 @@ class StoredList(collections.abc.MutableSequence):
 
     def to_json(self) -> str:
         """Return a JSON representation of the underlying object."""
-        return json.dumps(list(self._under))
+        return json.dumps(list(self._under), sort_keys=True)
 
     __repr__ = _wrapped_repr
 
