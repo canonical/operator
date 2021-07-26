@@ -28,7 +28,7 @@ import ops.framework
 
 def _storedstate_workaround(self, obj):
     if isinstance(obj, (ops.framework.StoredDict, ops.framework.StoredList)):
-        return getattr(obj.__class__, "to_json")(obj)
+        return obj.to_json()
     return _storedstate_workaround.default(obj)
 
 
