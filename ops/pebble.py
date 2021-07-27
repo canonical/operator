@@ -126,6 +126,17 @@ def _json_loads(s: typing.Union[str, bytes]) -> typing.Dict:
 class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
 
+    def __repr__(self):
+        return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.args)
+
+    def name(self):
+        """Return a string representation of the model plus class."""
+        return '<{}.{}>'.format(type(self).__module__, type(self).__name__)
+
+    def message(self):
+        """Return the message passed as an argument."""
+        return self.args[0]
+
 
 class TimeoutError(TimeoutError, Error):
     """Raised when a polling timeout occurs."""
