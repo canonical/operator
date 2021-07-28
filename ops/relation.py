@@ -434,6 +434,12 @@ class ConsumerBase(Object):
         logger.debug("Validating provider(s) : %s", event)
         consumed = self.consumes
 
+        if self.name not in self.framework.model.relations:
+            logger.error("No %s relation established, cannot validate "
+                         "provider", self.name)
+            event.defer()
+            return
+
         for relation in self.framework.model.relations[self.name]:
             rel_id = relation.id
             if not self._provider_acceptable(rel_id):
