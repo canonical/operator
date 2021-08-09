@@ -816,6 +816,10 @@ containers:
         self.container.autostart()
         self.assertEqual(self.pebble.requests, [('autostart',)])
 
+    def test_replan(self):
+        self.container.replan()
+        self.assertEqual(self.pebble.requests, [('replan',)])
+
     def test_start(self):
         self.container.start('foo')
         self.container.start('foo', 'bar')
@@ -839,6 +843,18 @@ containers:
     def test_stop_no_arguments(self):
         with self.assertRaises(TypeError):
             self.container.stop()
+
+    def test_restart(self):
+        self.container.restart('foo')
+        self.container.restart('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('restart', ('foo',)),
+            ('restart', ('foo', 'bar')),
+        ])
+
+    def test_restart_no_arguments(self):
+        with self.assertRaises(TypeError):
+            self.container.restart()
 
     def test_type_errors(self):
         meta = ops.charm.CharmMeta.from_yaml("""
@@ -1044,11 +1060,17 @@ class MockPebbleClient:
     def autostart_services(self):
         self.requests.append(('autostart',))
 
+    def replan_services(self):
+        self.requests.append(('replan',))
+
     def start_services(self, service_names):
         self.requests.append(('start', service_names))
 
     def stop_services(self, service_names):
         self.requests.append(('stop', service_names))
+
+    def restart_services(self, service_names):
+        self.requests.append(('restart', service_names))
 
     def add_layer(self, label, layer, combine=False):
         if isinstance(layer, dict):
