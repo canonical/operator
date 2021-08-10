@@ -428,6 +428,9 @@ class Harness(typing.Generic[CharmType]):
             self.remove_relation_unit(relation_id, unit_name)
 
         self._emit_relation_broken(relation_name, relation_id, remote_app)
+        if self._model is not None:
+            self._model.relations._invalidate(relation_name)
+
         self._backend._relation_app_and_units.pop(relation_id)
         self._backend._relation_data.pop(relation_id)
         self._backend._relation_list_map.pop(relation_id)
