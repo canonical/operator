@@ -424,7 +424,7 @@ class Harness(typing.Generic[CharmType]):
         except KeyError as e:
             raise model.RelationNotFoundError from e
 
-        for unit_name in self._backend._relation_list_map[relation_id]:
+        for unit_name in sorted(self._backend._relation_list_map[relation_id], reverse=True):
             self.remove_relation_unit(relation_id, unit_name)
 
         self._emit_relation_broken(relation_name, relation_id, remote_app)
