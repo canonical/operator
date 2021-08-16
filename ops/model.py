@@ -151,6 +151,10 @@ class Model:
         relation is established only once or None if it is not established. If this
         same relation is established multiple times the error TooManyRelatedAppsError is raised.
 
+        Note that a None would be returned if called before 'relation-created' event.
+        For example, during 'install' the relation doesn't exist as exposed to the charm yet.
+        This applies to both regular relations and peer relations.
+
         Args:
             relation_name: The name of the endpoint for this charm
             relation_id: An identifier for a specific relation. Used to disambiguate when a
