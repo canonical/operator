@@ -377,6 +377,38 @@ class TestHarness(unittest.TestCase):
         self.assertRaises(RelationNotFoundError, backend.relation_get,
                           rel_id, remote_app, is_app=True)
 
+    def test_removing_relation_refreshes_charm_model(self):
+        # language=YAML
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # Add a relation and update app data
+        remote_app = 'postgresql'
+        rel_id = harness.add_relation('db', remote_app)
+        harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
+        self.assertIsInstance(rel_id, int)
+        self.assertIsNotNone(self._find_relation_in_model_by_id(harness, rel_id))
+
+        # Check relation app data exists
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_app, is_app=True))
+        harness.remove_relation(rel_id)
+        self.assertIsNone(self._find_relation_in_model_by_id(harness, rel_id))
+
+    def _find_relation_in_model_by_id(self, harness, rel_id):
+        for relations in harness.charm.model.relations.values():
+            for relation in relations:
+                if rel_id == relation.id:
+                    return relation
+        return None
+
     def test_removing_relation_unit_removes_data_also(self):
         harness = Harness(RelationEventCharm, meta='''
             name: test-app
