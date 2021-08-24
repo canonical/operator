@@ -827,7 +827,7 @@ containers:
     def test_start_no_arguments(self):
         with self.assertRaises(TypeError):
             self.container.start()
-    
+
     def test_restart(self):
         two_services = [
             self._make_service('foo', 'enabled', 'active'),
@@ -841,9 +841,9 @@ containers:
             ('get_services', ('foo',)),
             ('stop', 'foo'),
             ('start', ('foo',)),
-            ('get_services', ('foo','bar')),
+            ('get_services', ('foo', 'bar')),
             ('stop', 'foo'),
-            ('start', ('foo','bar',)),
+            ('start', ('foo', 'bar',)),
         ])
 
     def test_stop(self):
