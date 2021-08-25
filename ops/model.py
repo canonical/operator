@@ -1120,7 +1120,7 @@ class Container:
 
         for svc in self.get_services(*service_names).values():
             if svc.is_running():
-                self._pebble.stop_services(svc.name)
+                self._pebble.stop_services((*[svc.name],))
         self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
