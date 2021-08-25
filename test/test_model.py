@@ -839,10 +839,10 @@ containers:
         self.container.restart('foo', 'bar')
         self.assertEqual(self.pebble.requests, [
             ('get_services', ('foo',)),
-            ('stop', 'foo'),
+            ('stop', ('foo',)),
             ('start', ('foo',)),
             ('get_services', ('foo', 'bar')),
-            ('stop', 'foo'),
+            ('stop', ('foo',)),
             ('start', ('foo', 'bar',)),
         ])
 
