@@ -553,7 +553,7 @@ class Service:
             return self.to_dict() == other.to_dict()
         else:
             raise ValueError(
-                f"Cannot compare pebble.Service to {type(other)}"
+                "Cannot compare pebble.Service to {}".format(type(other))
             )
 
 
