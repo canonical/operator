@@ -471,17 +471,7 @@ services:
                                           "command": "echo foo"
                                          })
         old_services = {"foo": old_service}
-
         self.assertEqual(plan.services, old_services)
-
-        self.assertEqual(len(plan.services), 1)
-        self.assertEqual(plan.services['foo'].name, 'foo')
-        self.assertEqual(plan.services['foo'].override, 'replace')
-        self.assertEqual(plan.services['foo'].command, 'echo foo')
-
-        # Should be read-only ("can't set attribute")
-        with self.assertRaises(AttributeError):
-            plan.services = {}
 
 
 class TestLayer(unittest.TestCase):
