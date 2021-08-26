@@ -542,6 +542,10 @@ class Service:
     def __repr__(self) -> str:
         return 'Service({!r})'.format(self.to_dict())
 
+    def __eq__(self, other: 'Service') -> bool:
+        """Compare this service description to another."""
+        return self.to_dict() == other.to_dict()
+
 
 class ServiceStartup(enum.Enum):
     """Enum of service startup options."""

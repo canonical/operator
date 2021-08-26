@@ -541,6 +541,29 @@ summary: Sum Mary
         self.assertEqual(s.to_yaml(), yaml)
         self.assertEqual(str(s), yaml)
 
+    def test_layer_service_equality(self):
+        s = pebble.Layer({})
+        self._assert_empty(s)
+
+        d = {
+            'summary': 'Sum Mary',
+            'description': 'The quick brown fox!',
+            'services': {
+                'foo': {
+                    'summary': 'Foo',
+                    'command': 'echo foo',
+                },
+                'bar': {
+                    'summary': 'Bar',
+                    'command': 'echo bar',
+                },
+            }
+        }
+        s = pebble.Layer(d)
+        t = pebble.Layer(d)
+
+        self.assertEqual(s.services, t.services)
+
 
 class TestService(unittest.TestCase):
     def _assert_empty(self, service, name):
@@ -613,6 +636,26 @@ class TestService(unittest.TestCase):
         self.assertEqual(d['before'], ['b1', 'b2'])
         self.assertEqual(d['requires'], ['r1', 'r2'])
         self.assertEqual(d['environment'], {'k1': 'v1', 'k2': 'v2'})
+
+    def test_equality(self):
+        d = {
+            'summary': 'Sum Mary',
+            'description': 'The lazy quick brown',
+            'startup': 'Start Up',
+            'override': 'override',
+            'command': 'echo sum mary',
+            'after': ['a1', 'a2'],
+            'before': ['b1', 'b2'],
+            'requires': ['r1', 'r2'],
+            'environment': {'k1': 'v1', 'k2': 'v2'},
+            'user': 'bob',
+            'user-id': 1000,
+            'group': 'staff',
+            'group-id': 2000,
+        }
+        one = pebble.Service("Name 1", d)
+        two = pebble.Service("Name 1", d)
+        self.assertEqual(one, two)
 
 
 class TestServiceInfo(unittest.TestCase):
