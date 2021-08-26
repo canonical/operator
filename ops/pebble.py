@@ -542,6 +542,17 @@ class Service:
     def __repr__(self) -> str:
         return 'Service({!r})'.format(self.to_dict())
 
+    def __eq__(self, other: typing.Union[typing.Dict, 'Service']) -> bool:
+        """Compare this service description to another."""
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Service):
+            return self.to_dict() == other.to_dict()
+        else:
+            raise ValueError(
+                "Cannot compare pebble.Service to {}".format(type(other))
+            )
+
 
 class ServiceStartup(enum.Enum):
     """Enum of service startup options."""
