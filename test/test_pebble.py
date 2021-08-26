@@ -459,6 +459,30 @@ services:
         self.assertEqual(plan.to_yaml(), reformed)
         self.assertEqual(str(plan), reformed)
 
+    def test_service_equality(self):
+        plan = pebble.Plan('')
+        self.assertEqual(plan.services, {})
+
+        plan = pebble.Plan('services:\n foo:\n  override: replace\n  command: echo foo')
+
+        old_service = pebble.Service(name="foo",
+                                     raw={
+                                          "override": "replace",
+                                          "command": "echo foo"
+                                         })
+        old_services = {"foo": old_service}
+
+        self.assertEqual(plan.services, old_services)
+
+        self.assertEqual(len(plan.services), 1)
+        self.assertEqual(plan.services['foo'].name, 'foo')
+        self.assertEqual(plan.services['foo'].override, 'replace')
+        self.assertEqual(plan.services['foo'].command, 'echo foo')
+
+        # Should be read-only ("can't set attribute")
+        with self.assertRaises(AttributeError):
+            plan.services = {}
+
 
 class TestLayer(unittest.TestCase):
     def _assert_empty(self, layer):
