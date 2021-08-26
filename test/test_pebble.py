@@ -473,6 +473,11 @@ services:
         old_services = {"foo": old_service}
         self.assertEqual(plan.services, old_services)
 
+        services_as_dict = {
+            "foo": {"override": "replace", "command": "echo foo"}
+            }
+        self.assertEqual(plan.services, services_as_dict)
+
 
 class TestLayer(unittest.TestCase):
     def _assert_empty(self, layer):
@@ -670,6 +675,23 @@ class TestService(unittest.TestCase):
         one = pebble.Service("Name 1", d)
         two = pebble.Service("Name 1", d)
         self.assertEqual(one, two)
+
+        as_dict = {
+            'summary': 'Sum Mary',
+            'description': 'The lazy quick brown',
+            'startup': 'Start Up',
+            'override': 'override',
+            'command': 'echo sum mary',
+            'after': ['a1', 'a2'],
+            'before': ['b1', 'b2'],
+            'requires': ['r1', 'r2'],
+            'environment': {'k1': 'v1', 'k2': 'v2'},
+            'user': 'bob',
+            'user-id': 1000,
+            'group': 'staff',
+            'group-id': 2000,
+        }
+        self.assertEqual(one, as_dict)
 
 
 class TestServiceInfo(unittest.TestCase):

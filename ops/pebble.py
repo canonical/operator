@@ -542,9 +542,19 @@ class Service:
     def __repr__(self) -> str:
         return 'Service({!r})'.format(self.to_dict())
 
-    def __eq__(self, other: 'Service') -> bool:
+    def __hash__(self):
+        return hash(self.to_dict().items())
+
+    def __eq__(self, other: typing.Union[typing.Dict, 'Service']) -> bool:
         """Compare this service description to another."""
-        return self.to_dict() == other.to_dict()
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Service):
+            return self.to_dict() == other.to_dict()
+        else:
+            raise ValueError(
+                f"Cannot compare pebble.Service to {type(other)}"
+            )
 
 
 class ServiceStartup(enum.Enum):
