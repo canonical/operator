@@ -145,7 +145,7 @@ def main():
         elif args.command == 'exec':
             # TODO
             process = client.exec(args.exec_command)
-            process.wait()
+            result = process.wait()
         elif args.command == 'ls':
             result = client.list_files(args.path, pattern=args.pattern, itself=args.directory)
         elif args.command == 'mkdir':

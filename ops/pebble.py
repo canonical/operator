@@ -29,6 +29,7 @@ import os
 import re
 import socket
 import sys
+import threading
 import time
 import typing
 import urllib.error
@@ -778,7 +779,7 @@ class ExecProcess:
         else:
             # A bit more than the command timeout to ensure that happens first
             timeout += 1
-        change = self._client.wait_change(self.change_id, timeout=timeout)
+        change = self._client.wait_change(self.change_id, timeout=timeout, delay=1) # TODO: add interval
         if change.err:
             raise ChangeError(change.err, change)
         exit_code = change.data.get('return')
@@ -829,6 +830,7 @@ class Client:
         self.opener = opener
         self.base_url = base_url
         self.timeout = timeout
+        self._socket_path = socket_path # TODO: need this for websockets?
 
     @classmethod
     def _get_default_opener(cls, socket_path):
@@ -1349,7 +1351,32 @@ class Client:
         websocket_ids = resp['result']['websocket-ids']
 
         # TODO: handle stdin, encoding
-        # TODO: handle websocket_ids and stuff
+
+        import websocket
+
+        io_url = self._websocket_url(change_id, websocket_ids['io'])
+        def io_loop():
+            ws = websocket.WebSocket()
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(self._socket_path)
+            ws.connect(io_url, socket=sock)
+            msg = ws.recv()
+            print('TODO io_loop msg:', msg)
+            print('TODO io_loop done')
+        io_thread = threading.Thread(target=io_loop)
+        io_thread.start()
+
+        stderr_url = self._websocket_url(change_id, websocket_ids['stderr'])
+        def stderr_loop():
+            ws = websocket.WebSocket()
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(self._socket_path)
+            ws.connect(stderr_url, socket=sock)
+            msg = ws.recv()
+            print('TODO stderr_loop msg:', msg)
+            print('TODO stderr_loop done')
+        stderr_thread = threading.Thread(target=stderr_loop)
+        stderr_thread.start()
 
         process = ExecProcess(
             client=self,
@@ -1359,3 +1386,9 @@ class Client:
             change_id=change_id,
         )
         return process
+
+    def _websocket_url(self, change_id: str, websocket_id: str) -> str:
+        query = {'id': websocket_id}
+        base_url = self.base_url.replace('http://', 'ws://')
+        return '{}/v1/changes/{}/websocket?{}'.format(
+            base_url, change_id, urllib.parse.urlencode(query))
