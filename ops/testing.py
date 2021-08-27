@@ -1016,6 +1016,10 @@ class _TestingModelBackend:
             self._pebble_clients[socket_path] = client
         return client
 
+    def planned_unit_count(self):
+        items = list(self._meta.relations.items())
+        count = len([relname for relname, _ in items if self._meta.relations[relname].role.is_peer()])
+        return count + 1 # Account for this unit.
 
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:

@@ -176,6 +176,18 @@ class Model:
         """
         return self._bindings.get(binding_key)
 
+    def get_planned_unit_count(self) -> int:
+        """Get the number of units that Juju has "planned" for this application.
+
+        E.g., if an operator ran "juju deploy foo", then "juju add-unit -n 2 foo", the
+        planned unit count for foo would be 3.
+
+        We deliberately do not attempt to inspect whether these units are actually running
+        or not. That is a task left up to the future, when goal state is more mature.
+
+        """
+        return self._backend.planned_unit_count()
+
 
 class _ModelCache:
 
@@ -1676,6 +1688,22 @@ class _ModelBackend:
     def get_pebble(self, socket_path: str) -> 'pebble.Client':
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
+
+    def planned_unit_count(self) -> int:
+        """Count of "planned" units that will run this application.
+
+        We use goal-state here, in the simplest possible way. When we implement goal state
+        more completely, this should turn into a wrapper around the more complete call to
+        goal state.
+
+        Includes the current unit in the count.
+
+        """
+        goal_state = self._run('goal-state', return_output=True, use_json=True)
+        # Goal state should never be less than one, but we let a len 0 return, so that we
+        # don't fail in the future case where we have a unit-less charm that still wants
+        # to run goal state for whatever reason.
+        return len(goal_state.get('units', []))
 
 
 class _ModelBackendValidator:

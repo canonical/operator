@@ -742,6 +742,12 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.model.storages = {}
 
+    def test_planned_unit_count(self):
+        model = self.harness.model
+
+        # By default, we generate a model with one peer, so our total count should be 2.
+        self.assertEqual(model.get_planned_unit_count(), 2)
+
     def resetBackendCalls(self):
         self.harness._get_backend_calls(reset=True)
 
