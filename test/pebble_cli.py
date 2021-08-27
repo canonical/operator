@@ -57,6 +57,9 @@ def main():
                    choices=[s.value for s in pebble.ChangeState], default='all')
     p.add_argument('--service', help='optional service name to filter on')
 
+    p = subparsers.add_parser('exec', help='execute a command')
+    p.add_argument('exec_command', help='command and arguments', nargs='+', metavar='command')
+
     p = subparsers.add_parser('ls', help='list files')
     p.add_argument('-d', '--directory', action='store_true',
                    help='list directories themselves, not their contents')
@@ -139,6 +142,10 @@ def main():
         elif args.command == 'changes':
             result = client.get_changes(select=pebble.ChangeState(args.select),
                                         service=args.service)
+        elif args.command == 'exec':
+            # TODO
+            process = client.exec(args.exec_command)
+            process.wait()
         elif args.command == 'ls':
             result = client.list_files(args.path, pattern=args.pattern, itself=args.directory)
         elif args.command == 'mkdir':

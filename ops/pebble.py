@@ -201,6 +201,50 @@ class ChangeError(Error):
         return 'ChangeError({!r}, {!r})'.format(self.err, self.change)
 
 
+class ExecError(Error):
+    """Raised by exec when a command returns a non-zero exit code.
+
+    Attributes:
+        command: Command line of command being executed.
+        exit_code: The process's exit code. This will always be non-zero.
+        stdout: A string with the process's captured stdout (and stderr if
+            combined_stderr was True). This is a str if encoding was set,
+            bytes if encoding was None.
+        stderr: A string with the process's captured stderr (or None if
+            combined_stderr was True). This is a str if encoding was set,
+            bytes if encoding was None.
+    """
+
+    def __init__(
+        self,
+        command: typing.List[str],
+        exit_code: int,
+        stdout: typing.AnyStr,
+        stderr: typing.AnyStr,
+    ):
+        self.command = command
+        self.exit_code = exit_code
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def __str__(self):
+        message = 'non-zero exit code {} executing {!r}'.format(
+            self.exit_code, ' '.join(self.command))
+
+        stdout = self.stdout
+        if len(stdout) > 1024:
+            stdout = stdout + '...'
+
+        if self.stderr is not None:
+            stderr = self.stderr
+            if len(stderr) > 1024:
+                stderr = stderr + '...'
+            return '{}\n  stdout: {!r}\n  stderr: {!r}'.format(
+                message, stdout, stderr)
+        else:
+            return '{}\n  output: {!r}'.format(message, stdout)
+
+
 class WarningState(enum.Enum):
     """Enum of states for get_warnings() select parameter."""
 
@@ -381,6 +425,7 @@ class Change:
         err: typing.Optional[str],
         spawn_time: datetime.datetime,
         ready_time: typing.Optional[datetime.datetime],
+        data: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ):
         self.id = id
         self.kind = kind
@@ -391,6 +436,7 @@ class Change:
         self.err = err
         self.spawn_time = spawn_time
         self.ready_time = ready_time
+        self.data = data or {}
 
     @classmethod
     def from_dict(cls, d: typing.Dict) -> 'Change':
@@ -405,6 +451,7 @@ class Change:
             err=d.get('err'),
             spawn_time=_parse_timestamp(d['spawn-time']),
             ready_time=_parse_timestamp(d['ready-time']) if d.get('ready-time') else None,
+            data=d.get('data') or {},
         )
 
     def __repr__(self):
@@ -417,7 +464,8 @@ class Change:
                 'ready={self.ready!r}, '
                 'err={self.err!r}, '
                 'spawn_time={self.spawn_time!r}, '
-                'ready_time={self.ready_time!r})'
+                'ready_time={self.ready_time!r}, '
+                'data={self.data!r})'
                 ).format(self=self)
 
 
@@ -685,9 +733,89 @@ class FileInfo:
                 ).format(self=self)
 
 
+class ExecProcess:
+    """Represents a process started by Pebble.exec().
+
+    Attributes:
+        stdout: A readable file-like object used to read data from the
+            process's standard output (combined with standard error if
+            combined_stderr was True). This reads str objects if encoding was
+            set, bytes if encoding was None.
+        stdout: A readable file-like object used to read data from the
+            process's standard error, or None if combined_stderr was True.
+            This reads str objects if encoding was set, bytes if encoding was
+            None.
+        change_id: The Pebble change ID of the "change" representing the
+            executing process. Can be used with Pebble.wait_change().
+    """
+    def __init__(
+        self,
+        client: 'Client',
+        timeout: float,
+        stdout: typing.Union[typing.TextIO, typing.BinaryIO],
+        stderr: typing.Optional[typing.Union[typing.TextIO, typing.BinaryIO]],
+        change_id: ChangeID,
+    ):
+        self._client = client
+        self._timeout = timeout
+        self.stdout = stdout
+        self.stderr = stderr
+        self.change_id = change_id
+
+    def wait(self):
+        """Wait for the process to finish.
+
+        If a timeout was specified to the Pebble.exec() call, this waits at
+        most that duration.
+
+        Raises:
+            ExecError: if the process exits with a non-zero exit code.
+        """
+        timeout = self._timeout
+        if timeout is None:
+            # No timeout specified, use a far-future time
+            timeout = 365*24*60*60
+        else:
+            # A bit more than the command timeout to ensure that happens first
+            timeout += 1
+        change = self._client.wait_change(self.change_id, timeout=timeout)
+        if change.err:
+            raise ChangeError(change.err, change)
+        exit_code = change.data.get('return')
+        if exit_code != 0:
+            stdout = self.stdout.read()
+            stderr = self.stderr.read() if self.stderr is not None else None
+            raise ExecError(stdout, stderr, exit_code)
+
+    def wait_output(self) -> typing.Tuple[typing.AnyStr, typing.AnyStr]:
+        """Wait for the process to finish and return tuple of (stdout, stderr).
+
+        If a timeout was specified to the Pebble.exec() call, this waits at
+        most that duration. If combine_stderr was True, stdout will include
+        the process's standard error, and stderr will be None.
+
+        Raises:
+            ExecError: if the process exits with a non-zero exit code.
+        """
+        self.wait()
+        stdout = self.stdout.read()
+        stderr = self.stderr.read() if self.stderr is not None else None
+        return (stdout, stderr)
+
+    def send_signal(self, signal: typing.Union[str, int]):
+        """Send the given signal to the running process.
+
+        Args:
+            signal: Name or number of signal to send, e.g., 'SIGHUP' or 1.
+        """
+        # TODO: implement via control websocket
+        raise NotImplementedError
+
+
 class Client:
     """Pebble API client."""
 
+    # TODO: be careful of timeout=5.0 for waiting for exec changes!
     def __init__(self, socket_path=None, opener=None, base_url='http://localhost', timeout=5.0):
         """Initialize a client instance.
 
@@ -730,7 +858,10 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        return _json_loads(response.read())
+        x = _json_loads(response.read()) # TODO
+        print('TODO response:')
+        print(json.dumps(x, sort_keys=True, indent=4))
+        return x
 
     @staticmethod
     def _ensure_content_type(headers, expected):
@@ -755,6 +886,8 @@ class Client:
         if headers is None:
             headers = {}
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
+        print('TODO request:\n  {} {}\n  headers: {}\n  data: {}'.format(
+            method, url, headers, data.decode('utf-8') if data else None))
 
         try:
             response = self.opener.open(request, timeout=self.timeout)
@@ -1158,3 +1291,71 @@ class Client:
         }
         resp = self._request('POST', '/v1/files', None, body)
         self._raise_on_path_error(resp, path)
+
+    def exec(
+        self,
+        command: typing.List[str],
+        *,
+        environment: typing.Dict[str, str] = None,
+        working_dir: str = None,
+        timeout: float = None,
+        user_id: int = None,
+        user: str = None,
+        group_id: int = None,
+        group: str = None,
+        stdin: typing.Union[str, bytes, typing.TextIO, typing.BinaryIO] = None,
+        encoding: str = 'utf-8',
+        combine_stderr: bool = False,
+    ) -> ExecProcess:
+        """Execute the given command (with arguments) on the remote system.
+
+        Args:
+            command: Command to execute: the first item is the name (or path)
+                of the executable, the rest of the list is the arguments.
+            environment: Environment variables to pass to the process.
+            working_dir: Working directory to run the command in. If not set,
+                Pebble uses the target user's $HOME directory.
+            timeout: Timeout in seconds for the command execution, after which
+                the process will be terminated. If not specified, no timeout
+                applies.
+            TODO: other args
+
+        Returns:
+            A Process object representing the state of the running process.
+            Call process.wait() or process.wait_output() to wait for the
+            command to finish.
+        """
+        if isinstance(command, (bytes, str)):
+            raise TypeError('command must be a list of str, not {}'.format(
+                type(command).__name__))
+        if len(command) < 1:
+            raise ValueError('command must contain at least one item')
+        if combine_stderr:
+            raise ValueError('combine_stderr currently not supported')
+
+        body = {
+            'command': command,
+            'stderr': True,
+            'environment': environment or {},
+            'working-dir': working_dir,
+            'timeout': '{:.3f}s'.format(timeout) if timeout is not None else None,
+            'user-id': user_id,
+            'user': user,
+            'group-id': group_id,
+            'group': group,
+        }
+        resp = self._request('POST', '/v1/exec', body=body)
+        change_id = ChangeID(resp['change'])
+        websocket_ids = resp['result']['websocket-ids']
+
+        # TODO: handle stdin, encoding
+        # TODO: handle websocket_ids and stuff
+
+        process = ExecProcess(
+            client=self,
+            timeout=timeout,
+            stdout='TODO',
+            stderr='TODO',
+            change_id=change_id,
+        )
+        return process
