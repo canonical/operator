@@ -36,6 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from ops._private import websocket
 from ops._private import yaml
 
 
@@ -229,17 +230,16 @@ class ExecError(Error):
         self.stderr = stderr
 
     def __str__(self):
-        message = 'non-zero exit code {} executing {!r}'.format(
-            self.exit_code, ' '.join(self.command))
+        message = 'non-zero exit code {} executing {!r}'.format(self.exit_code, self.command)
 
         stdout = self.stdout
         if len(stdout) > 1024:
-            stdout = stdout + '...'
+            stdout = stdout[:1024] # TODO + '...'
 
         if self.stderr is not None:
             stderr = self.stderr
             if len(stderr) > 1024:
-                stderr = stderr + '...'
+                stderr = stderr[:1024] # TODO + '...'
             return '{}\n  stdout: {!r}\n  stderr: {!r}'.format(
                 message, stdout, stderr)
         else:
@@ -753,12 +753,16 @@ class ExecProcess:
         self,
         client: 'Client',
         timeout: float,
+        control_ws: websocket.WebSocket,
+        command: typing.List[str],
         stdout: typing.Union[typing.TextIO, typing.BinaryIO],
         stderr: typing.Optional[typing.Union[typing.TextIO, typing.BinaryIO]],
         change_id: ChangeID,
     ):
         self._client = client
         self._timeout = timeout
+        self._control_ws = control_ws
+        self._command = command
         self.stdout = stdout
         self.stderr = stderr
         self.change_id = change_id
@@ -773,20 +777,20 @@ class ExecProcess:
             ExecError: if the process exits with a non-zero exit code.
         """
         timeout = self._timeout
-        if timeout is None:
-            # No timeout specified, use a far-future time
-            timeout = 365*24*60*60
-        else:
+        if timeout is not None:
             # A bit more than the command timeout to ensure that happens first
             timeout += 1
-        change = self._client.wait_change(self.change_id, timeout=timeout, delay=1) # TODO: add interval
+        change = self._client.wait_change(self.change_id, timeout=timeout)
         if change.err:
             raise ChangeError(change.err, change)
         exit_code = change.data.get('return')
         if exit_code != 0:
-            stdout = self.stdout.read()
-            stderr = self.stderr.read() if self.stderr is not None else None
-            raise ExecError(stdout, stderr, exit_code)
+            stdout = self.stdout.getvalue()
+            stderr = self.stderr.getvalue() if self.stderr is not None else None
+            # TODO
+            # stdout = self.stdout.read()
+            # stderr = self.stderr.read() if self.stderr is not None else None
+            raise ExecError(self._command, exit_code, stdout, stderr)
 
     def wait_output(self) -> typing.Tuple[typing.AnyStr, typing.AnyStr]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
@@ -799,18 +803,24 @@ class ExecProcess:
             ExecError: if the process exits with a non-zero exit code.
         """
         self.wait()
-        stdout = self.stdout.read()
-        stderr = self.stderr.read() if self.stderr is not None else None
+        stdout = self.stdout.getvalue()
+        stderr = self.stderr.getvalue() if self.stderr is not None else None
+        # TODO
+        # stdout = self.stdout.read()
+        # stderr = self.stderr.read() if self.stderr is not None else None
         return (stdout, stderr)
 
-    def send_signal(self, signal: typing.Union[str, int]):
+    def send_signal(self, signum: int):
         """Send the given signal to the running process.
 
         Args:
-            signal: Name or number of signal to send, e.g., 'SIGHUP' or 1.
+            signum: Number of signal to send, e.g., 1 or signal.SIGHUP.
         """
-        # TODO: implement via control websocket
-        raise NotImplementedError
+        msg = json.dumps({
+            'command': 'signal',
+            'signal': signum,
+        })
+        self._control_ws.send(msg)
 
 
 class Client:
@@ -827,10 +837,10 @@ class Client:
             if socket_path is None:
                 raise ValueError('no socket path provided')
             opener = self._get_default_opener(socket_path)
+        self.socket_path = socket_path
         self.opener = opener
         self.base_url = base_url
         self.timeout = timeout
-        self._socket_path = socket_path # TODO: need this for websockets?
 
     @classmethod
     def _get_default_opener(cls, socket_path):
@@ -861,8 +871,8 @@ class Client:
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
         x = _json_loads(response.read()) # TODO
-        print('TODO response:')
-        print(json.dumps(x, sort_keys=True, indent=4))
+        # print(datetime.datetime.now().isoformat(), 'TODO response:')
+        # print(json.dumps(x, sort_keys=True, indent=4))
         return x
 
     @staticmethod
@@ -888,8 +898,8 @@ class Client:
         if headers is None:
             headers = {}
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
-        print('TODO request:\n  {} {}\n  headers: {}\n  data: {}'.format(
-            method, url, headers, data.decode('utf-8') if data else None))
+        # print(datetime.datetime.now().isoformat(), 'TODO request:\n  {} {}\n  headers: {}\n  data: {}'.format(
+        #     method, url, headers, data.decode('utf-8') if data else None))
 
         try:
             response = self.opener.open(request, timeout=self.timeout)
@@ -1001,6 +1011,15 @@ class Client:
         self, change_id: ChangeID, timeout: float = 30.0, delay: float = 0.1,
     ) -> Change:
         """Poll change every delay seconds (up to timeout) for it to be ready."""
+
+        # TODO: hacked in for the moment -- need proper handling of this new endpoint not found, poll interval, etc
+        query = {}
+        if timeout is not None:
+            query['timeout'] = '{:.3f}s'.format(timeout)
+        resp = self._request('GET', '/v1/changes/{}/wait'.format(change_id), query)
+        return Change.from_dict(resp['result'])
+        # TODO: end hack
+
         deadline = time.time() + timeout
 
         while time.time() < deadline:
@@ -1306,10 +1325,12 @@ class Client:
         group_id: int = None,
         group: str = None,
         stdin: typing.Union[str, bytes, typing.TextIO, typing.BinaryIO] = None,
+        stdout: typing.Union[typing.TextIO, typing.BinaryIO] = None,
+        stderr: typing.Union[typing.TextIO, typing.BinaryIO] = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False,
     ) -> ExecProcess:
-        """Execute the given command (with arguments) on the remote system.
+        """Execute the given command on the remote system.
 
         Args:
             command: Command to execute: the first item is the name (or path)
@@ -1333,7 +1354,7 @@ class Client:
         if len(command) < 1:
             raise ValueError('command must contain at least one item')
         if combine_stderr:
-            raise ValueError('combine_stderr currently not supported')
+            raise NotImplementedError('combine_stderr currently not supported')
 
         body = {
             'command': command,
@@ -1350,45 +1371,94 @@ class Client:
         change_id = ChangeID(resp['change'])
         websocket_ids = resp['result']['websocket-ids']
 
-        # TODO: handle stdin, encoding
+        # TODO: handle encoding
 
-        import websocket
+        io_ws = self._connect_websocket(change_id, websocket_ids['io'])
+        stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
+        control_ws = self._connect_websocket(change_id, websocket_ids['control'])
 
-        io_url = self._websocket_url(change_id, websocket_ids['io'])
-        def io_loop():
-            ws = websocket.WebSocket()
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.connect(self._socket_path)
-            ws.connect(io_url, socket=sock)
-            msg = ws.recv()
-            print('TODO io_loop msg:', msg)
-            print('TODO io_loop done')
-        io_thread = threading.Thread(target=io_loop)
-        io_thread.start()
+        if stdin is not None:
+            if isinstance(stdin, bytes):
+                stdin = io.BytesIO(stdin)
+            elif isinstance(stdin, str):
+                stdin = io.StringIO(stdin)
 
-        stderr_url = self._websocket_url(change_id, websocket_ids['stderr'])
-        def stderr_loop():
-            ws = websocket.WebSocket()
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.connect(self._socket_path)
-            ws.connect(stderr_url, socket=sock)
-            msg = ws.recv()
-            print('TODO stderr_loop msg:', msg)
-            print('TODO stderr_loop done')
-        stderr_thread = threading.Thread(target=stderr_loop)
-        stderr_thread.start()
+            def stdin_thread():
+                while True:
+                    b = stdin.read(1*1024)
+                    if not b:
+                        break
+                    # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread:', repr(b))
+                    io_ws.send(b, opcode=websocket.ABNF.OPCODE_BINARY)
+                    # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread sent')
+
+                io_ws.send('')  # Send message barrier to signal EOF
+                # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread done')
+            threading.Thread(target=stdin_thread).start()
+
+        if stdout is None:
+            stdout = io.BytesIO()
+        def stdout_thread():
+            while True:
+                b = io_ws.recv()
+                if not b:
+                    break
+                # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread:', repr(b))
+                stdout.write(b)
+            # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread done')
+        threading.Thread(target=stdout_thread).start()
+
+        if stderr is None:
+            stderr = io.BytesIO()
+        def stderr_thread():
+            while True:
+                b = stderr_ws.recv()
+                if not b:
+                    break
+                # print(datetime.datetime.now().isoformat(), 'TODO stderr_thread:', repr(b))
+                stderr.write(b)
+        threading.Thread(target=stderr_thread).start()
 
         process = ExecProcess(
             client=self,
             timeout=timeout,
-            stdout='TODO',
-            stderr='TODO',
+            control_ws=control_ws,
+            command=command,
+            stdout=stdout,
+            stderr=stderr,
             change_id=change_id,
         )
         return process
+
+    def _connect_websocket(self, change_id: str, websocket_id: str) -> websocket.WebSocket:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(self.socket_path)
+        # TODO: need to do anything with sock.settimeout() here?
+
+        url = self._websocket_url(change_id, websocket_id)
+        ws = websocket.WebSocket(skip_utf8_validation=True)
+        ws.connect(url, socket=sock)
+        return ws
 
     def _websocket_url(self, change_id: str, websocket_id: str) -> str:
         query = {'id': websocket_id}
         base_url = self.base_url.replace('http://', 'ws://')
         return '{}/v1/changes/{}/websocket?{}'.format(
             base_url, change_id, urllib.parse.urlencode(query))
+
+
+# TODO: totally hacky WIP right now:
+
+import queue
+
+class QueueReader:
+    def __init__(self):
+        self._queue = queue.Queue(maxsize=100)  # TODO: need some way of limiting max byte size
+
+    def write(self, b):
+        self._queue.put(b)
+
+    def read(self, n=None):
+        if n is not None:
+            raise NotImplementedError # TODO
+        return self._queue.get()
