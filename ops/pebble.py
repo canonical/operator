@@ -883,50 +883,38 @@ class Client:
         Raises:
             TimeoutError: If the maximum timeout is reached.
         """
-        deadline = time.time() + timeout if timeout is not None else None
         try:
-            # Hit the wait endpoint API every Client.timeout-1 seconds to
-            # avoid very long requests.
-            while True:
-                this_timeout = max(self.timeout - 1, 1)
-                if timeout is not None:
-                    time_remaining = deadline - time.time()
-                    if time_remaining <= 0:
-                        break
-                    this_timeout = min(time_remaining, this_timeout)
-
-                try:
-                    return self._wait_change(change_id, this_timeout)
-                except TimeoutError:
-                    pass
-
+            return self._wait_change_using_wait(change_id, timeout)
         except NotImplementedError:
             # Pebble server doesn't support wait endpoint, fall back to polling
-            while timeout is None or time.time() < deadline:
-                change = self.get_change(change_id)
-                if change.ready:
-                    return change
-                time.sleep(delay)
+            return self._wait_change_using_polling(change_id, timeout, delay)
+
+    def _wait_change_using_wait(self, change_id, timeout):
+        """Internal: wait for a change to be ready using the wait-change API."""
+        deadline = time.time() + timeout if timeout is not None else None
+
+        # Hit the wait endpoint every Client.timeout-1 seconds to avoid long
+        # requests (the -1 is to ensure it wakes up before the socket timeout)
+        while True:
+            this_timeout = max(self.timeout - 1, 1)  # minimum of 1 second
+            if timeout is not None:
+                time_remaining = deadline - time.time()
+                if time_remaining <= 0:
+                    break
+                # Wait the lesser of the time remaining and Client.timeout-1
+                this_timeout = min(time_remaining, this_timeout)
+
+            try:
+                return self._wait_change(change_id, this_timeout)
+            except TimeoutError:
+                # Catch timeout from wait endpoint and loop to check deadline
+                pass
 
         raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
             change_id, timeout))
 
     def _wait_change(self, change_id: ChangeID, timeout: float = None) -> Change:
-        """Internal: wait for a change using the wait-change API endpoint directly.
-
-        Args:
-            change_id: Change ID of change to wait for.
-            timeout: Maximum time in seconds to wait for the change to be
-                ready. May be None, in which case wait_change never times out.
-
-        Returns:
-            The Change object being waited on.
-
-        Raises:
-            NotImplementedError: If the Pebble server doesn't implement this
-                endpoint.
-            TimeoutError: If the maximum timeout is reached.
-        """
+        """Call the wait-change API endpoint directly."""
         query = {}
         if timeout is not None:
             query['timeout'] = '{:.3f}s'.format(timeout)
@@ -942,6 +930,20 @@ class Client:
             raise
 
         return Change.from_dict(resp['result'])
+
+    def _wait_change_using_polling(self, change_id, timeout, delay):
+        """Internal: wait for a change to be ready by polling the get-change API."""
+        deadline = time.time() + timeout if timeout is not None else None
+
+        while timeout is None or time.time() < deadline:
+            change = self.get_change(change_id)
+            if change.ready:
+                return change
+
+            time.sleep(delay)
+
+        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
+            change_id, timeout))
 
     def add_layer(
             self, label: str, layer: typing.Union[str, dict, Layer], *, combine: bool = False):
