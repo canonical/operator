@@ -908,7 +908,7 @@ class Client:
             change_id, timeout))
 
     def _wait_change(self, change_id: ChangeID, timeout: float = None) -> Change:
-        """Wait for given change by calling the wait-change API endpoint directly.
+        """Internal: wait for a change using the wait-change API endpoint directly.
 
         Args:
             change_id: Change ID of change to wait for.
