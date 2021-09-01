@@ -114,6 +114,11 @@ def _parse_timestamp(s):
                              microsecond=microsecond, tzinfo=tz)
 
 
+def _format_timeout(timeout: float):
+    """Format timeout as a formatted Go time.Duration value."""
+    return '{:.3f}s'.format(timeout)
+
+
 def _json_loads(s: typing.Union[str, bytes]) -> typing.Dict:
     """Like json.loads(), but handle str or bytes.
 
@@ -1062,7 +1067,7 @@ class Client:
         """Call the wait-change API endpoint directly."""
         query = {}
         if timeout is not None:
-            query['timeout'] = '{:.3f}s'.format(timeout)
+            query['timeout'] = _format_timeout(timeout)
 
         try:
             resp = self._request('GET', '/v1/changes/{}/wait'.format(change_id), query)
@@ -1412,14 +1417,14 @@ class Client:
         if len(command) < 1:
             raise ValueError('command must contain at least one item')
         if combine_stderr:
-            raise NotImplementedError('combine_stderr currently not supported')
+            raise NotImplementedError('combine_stderr not currently supported')
 
         body = {
             'command': command,
             'stderr': True,
             'environment': environment or {},
             'working-dir': working_dir,
-            'timeout': '{:.3f}s'.format(timeout) if timeout is not None else None,
+            'timeout': _format_timeout(timeout) if timeout is not None else None,
             'user-id': user_id,
             'user': user,
             'group-id': group_id,
@@ -1441,41 +1446,22 @@ class Client:
             elif isinstance(stdin, str):
                 stdin = io.StringIO(stdin)
 
-            def stdin_thread():
-                while True:
-                    b = stdin.read(1*1024)
-                    if not b:
-                        break
-                    # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread:', repr(b))
-                    io_ws.send(b, opcode=websocket.ABNF.OPCODE_BINARY)
-                    # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread sent')
-
-                io_ws.send('')  # Send message barrier to signal EOF
-                # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread done')
-            threading.Thread(target=stdin_thread).start()
+            t = threading.Thread(target=self._send_to_websocket, args=(stdin, io_ws, 128*1024))
+            t.start()
+        else:
+            # TODO: need to create some kind of Writer here that will forwar to io_ws
+            # TODO: similar but for stdout/stderr, except in reverse
+            pass
 
         if stdout is None:
             stdout = io.BytesIO()
-        def stdout_thread():
-            while True:
-                b = io_ws.recv()
-                if not b:
-                    break
-                # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread:', repr(b))
-                stdout.write(b)
-            # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread done')
-        threading.Thread(target=stdout_thread).start()
+        t = threading.Thread(target=self._receive_from_websocket, args=(io_ws, stdout, 'stdout_thread'))
+        t.start()
 
         if stderr is None:
             stderr = io.BytesIO()
-        def stderr_thread():
-            while True:
-                b = stderr_ws.recv()
-                if not b:
-                    break
-                # print(datetime.datetime.now().isoformat(), 'TODO stderr_thread:', repr(b))
-                stderr.write(b)
-        threading.Thread(target=stderr_thread).start()
+        t = threading.Thread(target=self._receive_from_websocket, args=(stderr_ws, stderr, 'stderr_thread'))
+        t.start()
 
         process = ExecProcess(
             client=self,
@@ -1503,6 +1489,28 @@ class Client:
         base_url = self.base_url.replace('http://', 'ws://')
         return '{}/v1/changes/{}/websocket?{}'.format(
             base_url, change_id, urllib.parse.urlencode(query))
+
+    @staticmethod
+    def _send_to_websocket(reader, ws, bufsize):
+        while True:
+            chunk = reader.read(bufsize)
+            if not chunk:
+                break
+            # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread:', repr(chunk))
+            ws.send_binary(chunk)
+            # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread sent')
+        ws.send('')  # Send message barrier to signal EOF
+        print(datetime.datetime.now().isoformat(), 'TODO stdin_thread done')
+
+    @staticmethod
+    def _receive_from_websocket(ws, writer, name='TODO'):
+        while True:
+            chunk = ws.recv()
+            if not chunk:
+                break
+            # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread:', repr(chunk))
+            writer.write(chunk)
+        print(datetime.datetime.now().isoformat(), 'TODO', name, 'done')
 
 
 # TODO: totally hacky WIP right now:
