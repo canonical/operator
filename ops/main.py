@@ -308,7 +308,7 @@ def _should_use_controller_storage(db_path: Path, meta: ops.charm.CharmMeta) -> 
         return False
 
     # if you're not in k8s you don't need controller storage
-    if 'kubernetes' not in meta.series:
+    if 'kubernetes' not in meta.cloud:
         logger.debug("Using local storage: not a kubernetes charm")
         return False
 

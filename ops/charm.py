@@ -710,7 +710,7 @@ class CharmMeta:
             self.maintainers.extend(raw['maintainers'])
         self.tags = raw.get('tags', [])
         self.terms = raw.get('terms', [])
-        self.series = raw.get('series', [])
+        self.series = raw.get('series', None)
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
@@ -736,6 +736,21 @@ class CharmMeta:
         # https://discourse.charmhub.io/t/charm-metadata-v2/3674
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw.get('containers', {}).items()}
+
+        # Hack to determine whether we are in k8s.
+        #
+        # This is a temporary measure to enable us to auto-detect whether or not we can
+        # use local storage, by flagging a charm as running on kubernetes, or not. There
+        # is a lot of design work needed to properly implement this logic. The below
+        # measure is a stopgap that should be sufficient, and is meant to be reasonably
+        # compatible with future plans.
+        self.cloud = 'unknown'
+        if self.series is None:  # This is a metadata v2 charm.
+            self.series = []  # Backwards compat
+            if self.containers:
+                self.cloud = 'kubernetes'
+        elif 'kubernetes' in self.series:  # This is a metadata v1 charm.
+            self.cloud = 'kubernetes'
 
     @classmethod
     def from_yaml(

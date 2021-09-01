@@ -236,6 +236,51 @@ storage:
             'StorageAttachedEvent',
         ])
 
+    def test_cloud_detection(self):
+        '''Test our cloud detection hack.
+
+        Currently, the hack works *only* for detecting kubernetes. For metadata v2 charms,
+        we rely on there being a populated containers object. This is a hack, but it
+        mirrors the one used in Juju core.
+
+        '''
+        # Case 1: metadata v1, k8s
+        meta = CharmMeta.from_yaml('''
+name: my-charm
+series: ['kubernetes']
+''')
+        self.assertTrue('kubernetes' in meta.cloud)
+
+        # Case 2: metadata v1, vm
+        meta = CharmMeta.from_yaml('''
+name: my-charm
+series: ['focal']
+''')
+        self.assertFalse('kubernetes' in meta.cloud)
+
+        # Case 3: metadata v1 vm charm that has containers for whatever reason.
+        meta = CharmMeta.from_yaml('''
+name: my-charm
+series: ['focal']
+containers:
+        test:\n''')
+        self.assertFalse('kubernetes' in meta.cloud)
+
+        # Case 4: properly specced metadata v2 k8s charm
+        meta = CharmMeta.from_yaml('''
+name: my-charm
+containers:
+        test:
+''')
+        self.assertTrue('kubernetes' in meta.cloud)
+
+        # Case 5: properly specced metadata v2 vm charm
+        meta = CharmMeta.from_yaml('''
+name: my-charm
+containers: {}
+''')
+        self.assertFalse('kubernetes' in meta.cloud)
+
     def test_workload_events(self):
 
         class MyCharm(CharmBase):
