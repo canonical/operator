@@ -101,6 +101,10 @@ def main():
 
     p = subparsers.add_parser('system-info', help='show Pebble system information')
 
+    p = subparsers.add_parser('wait', help='wait for a change by ID')
+    p.add_argument('-t', '--timeout', type=float, help='timeout in seconds')
+    p.add_argument('change_id', help='ID of change to wait for')
+
     p = subparsers.add_parser('warnings', help='show (filtered) warnings')
     p.add_argument('--select', help='warning state to filter on, default %(default)s',
                    choices=[s.value for s in pebble.WarningState], default='all')
@@ -183,6 +187,8 @@ def main():
             result = client.stop_services(args.service)
         elif args.command == 'system-info':
             result = client.get_system_info()
+        elif args.command == 'wait':
+            result = client.wait_change(args.change_id, timeout=args.timeout)
         elif args.command == 'warnings':
             result = client.get_warnings(select=pebble.WarningState(args.select))
         else:
