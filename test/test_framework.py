@@ -894,6 +894,9 @@ class TestStoredState(BaseTestCase):
         self.assertEqual(repr(StoredDict(None, {})), "ops.framework.StoredDict()")
         self.assertEqual(repr(StoredDict(None, {"a": 1})), "ops.framework.StoredDict({'a': 1})")
 
+    def test_stored_dict_copy(self):
+        self.assertEqual(StoredDict(None, {"a": 1}).copy(), {"a": 1})
+
     def test_stored_list_repr(self):
         self.assertEqual(repr(StoredList(None, [])), "ops.framework.StoredList()")
         self.assertEqual(repr(StoredList(None, [1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')

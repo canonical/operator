@@ -26,6 +26,7 @@ import pdb
 import re
 import sys
 import types
+import typing
 import weakref
 
 from ops import charm
@@ -1053,6 +1054,10 @@ class StoredDict(collections.abc.MutableMapping):
             return self._under == other
         else:
             return NotImplemented
+
+    def copy(self) -> typing.Dict:
+        """Return a copy of the backing data as a dict."""
+        return dict(self._under)
 
     __repr__ = _wrapped_repr
 
