@@ -148,11 +148,22 @@ def main():
                                         service=args.service)
         elif args.command == 'exec':
             # TODO
-            process = client.exec(args.exec_command, stdin=sys.stdin)
-            result, stderr = process.wait_output()
-            if stderr:
-                print('TODO error:', repr(stderr))
-            result = result.decode('utf-8')
+            process = client.exec(args.exec_command, stdin=sys.stdin,
+                stdout=sys.stdout.buffer, stderr=sys.stderr.buffer)
+
+            # process.stdin.write(b'foo\n')
+            # process.stdin.write(b'bar\n')
+            # process.stdin.close()
+            # for line in process.stdout:
+            #     print('LINE:', repr(line))
+
+            result = process.wait()
+
+            # result, stderr = process.wait_output()
+            # if stderr:
+            #     print('TODO error:', repr(stderr))
+
+#            result = result.decode('utf-8')
         elif args.command == 'ls':
             result = client.list_files(args.path, pattern=args.pattern, itself=args.directory)
         elif args.command == 'mkdir':

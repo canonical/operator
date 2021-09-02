@@ -27,6 +27,7 @@ import io
 import json
 import os
 import re
+import shutil
 import socket
 import sys
 import threading
@@ -130,6 +131,13 @@ def _json_loads(s: typing.Union[str, bytes]) -> typing.Dict:
     return json.loads(s)
 
 
+def _start_thread(target, *args, **kwargs):
+    """Helper to simplify starting a thread."""
+    thread = threading.Thread(target=target, args=args, kwargs=kwargs)
+    thread.start()
+    return thread
+
+
 class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
 
@@ -214,12 +222,8 @@ class ExecError(Error):
     Attributes:
         command: Command line of command being executed.
         exit_code: The process's exit code. This will always be non-zero.
-        stdout: A string with the process's captured stdout (and stderr if
-            combined_stderr was True). This is a str if encoding was set,
-            bytes if encoding was None.
-        stderr: A string with the process's captured stderr (or None if
-            combined_stderr was True). This is a str if encoding was set,
-            bytes if encoding was None.
+        stdout: TODO
+        stderr: TODO
     """
 
     def __init__(
@@ -743,16 +747,11 @@ class ExecProcess:
     """Represents a process started by Pebble.exec().
 
     Attributes:
-        stdout: A readable file-like object used to read data from the
-            process's standard output (combined with standard error if
-            combined_stderr was True). This reads str objects if encoding was
-            set, bytes if encoding was None.
-        stdout: A readable file-like object used to read data from the
-            process's standard error, or None if combined_stderr was True.
-            This reads str objects if encoding was set, bytes if encoding was
-            None.
         change_id: The Pebble change ID of the "change" representing the
             executing process. Can be used with Pebble.wait_change().
+        stdin: TODO
+        stdout: TODO
+        stdout: TODO
     """
     def __init__(
         self,
@@ -760,17 +759,19 @@ class ExecProcess:
         timeout: float,
         control_ws: websocket.WebSocket,
         command: typing.List[str],
+        change_id: ChangeID,
+        stdin: typing.Union[typing.TextIO, typing.BinaryIO],
         stdout: typing.Union[typing.TextIO, typing.BinaryIO],
         stderr: typing.Optional[typing.Union[typing.TextIO, typing.BinaryIO]],
-        change_id: ChangeID,
     ):
         self._client = client
         self._timeout = timeout
         self._control_ws = control_ws
         self._command = command
+        self.change_id = change_id
+        self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
-        self.change_id = change_id
 
     def wait(self):
         """Wait for the process to finish.
@@ -781,6 +782,11 @@ class ExecProcess:
         Raises:
             ExecError: if the process exits with a non-zero exit code.
         """
+        exit_code = self._wait()
+        if exit_code != 0:
+            raise ExecError(self._command, exit_code, None, None)
+
+    def _wait(self):
         timeout = self._timeout
         if timeout is not None:
             # A bit more than the command timeout to ensure that happens first
@@ -789,13 +795,7 @@ class ExecProcess:
         if change.err:
             raise ChangeError(change.err, change)
         exit_code = change.data.get('return')
-        if exit_code != 0:
-            stdout = self.stdout.getvalue()
-            stderr = self.stderr.getvalue() if self.stderr is not None else None
-            # TODO
-            # stdout = self.stdout.read()
-            # stderr = self.stderr.read() if self.stderr is not None else None
-            raise ExecError(self._command, exit_code, stdout, stderr)
+        return exit_code
 
     def wait_output(self) -> typing.Tuple[typing.AnyStr, typing.AnyStr]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
@@ -807,13 +807,20 @@ class ExecProcess:
         Raises:
             ExecError: if the process exits with a non-zero exit code.
         """
-        self.wait()
-        stdout = self.stdout.getvalue()
-        stderr = self.stderr.getvalue() if self.stderr is not None else None
-        # TODO
-        # stdout = self.stdout.read()
-        # stderr = self.stderr.read() if self.stderr is not None else None
-        return (stdout, stderr)
+        out = io.BytesIO()
+        _start_thread(shutil.copyfileobj, self.stdout, out)
+
+        err = io.BytesIO()
+        _start_thread(shutil.copyfileobj, self.stderr, err)
+
+        exit_code = self._wait()
+
+        outstr = out.getvalue()
+        errstr = err.getvalue()
+        if exit_code != 0:
+            raise ExecError(self._command, exit_code, outstr, errstr)
+
+        return (outstr, errstr)
 
     def send_signal(self, signum: int):
         """Send the given signal to the running process.
@@ -826,6 +833,41 @@ class ExecProcess:
             'signal': signum,
         })
         self._control_ws.send(msg)
+
+
+class WebsocketWriter(io.BufferedIOBase):
+    def __init__(self, ws):
+        self.ws = ws
+
+    def writable(self):
+        return True
+
+    def write(self, chunk):
+        self.ws.send_binary(chunk)
+        return len(chunk)
+
+    def close(self):
+        self.ws.send('')  # Send message barrier to signal EOF
+
+
+class WebsocketReader(io.BufferedIOBase):
+    def __init__(self, ws):
+        self.ws = ws
+        self.buf = b''
+
+    def readable(self):
+        return True
+
+    def read(self, n=-1):
+        if not self.buf:
+            self.buf = self.ws.recv()
+            if isinstance(self.buf, str):
+                self.buf = self.buf.encode('utf-8')
+        if n < 0:
+            n = len(self.buf)
+        ret = self.buf[:n]
+        self.buf = self.buf[n:]
+        return ret
 
 
 class Client:
@@ -1391,33 +1433,113 @@ class Client:
         stdout: typing.Union[typing.TextIO, typing.BinaryIO] = None,
         stderr: typing.Union[typing.TextIO, typing.BinaryIO] = None,
         encoding: str = 'utf-8',
-        combine_stderr: bool = False,
     ) -> ExecProcess:
         """Execute the given command on the remote system.
 
+        Most of the arguments are self-explanatory, however, input/output
+        handling is a bit more complex. Some examples are shown below:
+
+        # Simple command with no output; just check exit code
+        >>> process = client.exec(['send-emails'])
+        >>> process.wait()
+
+        # Fetch output as string
+        >>> process = client.exec(['python3', '--version'])
+        >>> version, _ = process.wait_output()
+        >>> print(version)
+        Python 3.8.10
+
+        # Fetch both stdout and stderr as strings
+        >>> process = client.exec(['pg_dump', '-s', ...])
+        >>> schema, logs = process.wait_output()
+
+        # Stream input from a string and write output to files
+        >>> in = 'foo\nbar\n'
+        >>> with open('out.txt', 'w') as out, open('err.txt', 'w') as err:
+        ...     process = client.exec(['awk', '{ print toupper($0) }'],
+        ...                           stdin=in, stdout=out, stderr=err)
+        ...     process.wait()
+        >>> open('out.txt').read()
+        'FOO\nBAR\n'
+        >>> open('err.txt').read()
+        ''
+
+        # Real-time streaming using ExecProcess.stdin and ExecProcess.stdout
+        >>> process = client.exec(['cat'])
+        >>> def stdin_thread():
+        ...     for line in ['one\n', '2\n', 'THREE\n']:
+        ...         process.stdin.write(line)
+        ...         process.stdin.flush()
+        ...         time.sleep(1)
+        ...     process.stdin.close()
+        ...
+        >>> threading.Thread(target=stdin_thread).start()
+        >>> for line in process.stdout:
+        ...     print(datetime.datetime.now().strftime('%H:%M:%S'), repr(line))
+        ...
+        16:20:26 'one\n'
+        16:20:27 '2\n'
+        16:20:28 'THREE\n'
+        >>> process.wait()  # will return immediately as stdin was closed
+
+        # Show exception raised for non-zero return code
+        >>> process = client.exec(['ls', 'notexist'])
+        >>> out, err = process.wait_output()
+        Traceback (most recent call last):
+          ...
+        ExecError: "ls" returned exit code 2
+        >>> exc = sys.last_value
+        >>> exc.exit_code
+        2
+        >>> exc.stdout
+        ''
+        >>> exc.stderr
+        'ls: cannot access 'notfound': No such file or directory\n'
+
         Args:
             command: Command to execute: the first item is the name (or path)
-                of the executable, the rest of the list is the arguments.
+                of the executable, the rest of the items are the arguments.
             environment: Environment variables to pass to the process.
             working_dir: Working directory to run the command in. If not set,
                 Pebble uses the target user's $HOME directory.
             timeout: Timeout in seconds for the command execution, after which
-                the process will be terminated. If not specified, no timeout
-                applies.
-            TODO: other args
+                the process will be terminated. If not specified, the
+                execution never times out.
+            user_id: User ID (UID) to run the process as.
+            user: Username to run the process as. User's UID must match
+                user_id if both are specified.
+            group_id: Group ID (GID) to run the process as.
+            group: Group name to run the process as. Group's GID must match
+                group_id if both are specified.
+            stdin: A string or readable file-like object that is sent to the
+                process's standard input. If not set, the caller can write
+                input to ExecProcess.stdin to stream input to the process.
+            stdout: A writable file-like object that the process's standard
+                output is written to. If not set, the caller can use
+                ExecProcess.wait_output() to capture output as a string, or
+                read from ExecProcess.stdout to stream output from the
+                process.
+            stderr: A writable file-like object that the process's standard
+                error is written to. If not set, the caller can use
+                ExecProcess.wait_output() to capture error output as a string,
+                or read from ExecProcess.stderr to stream error output from
+                the process.
+            encoding: If encoding is set (the default is UTF-8), the types
+                read or written to stdin/stdout/stderr are str, and encoding
+                is used to encode them to bytes. If encoding is None, the
+                types read or written are raw bytes.
 
         Returns:
             A Process object representing the state of the running process.
-            Call process.wait() or process.wait_output() to wait for the
-            command to finish.
+            To wait for the command to finish, the caller will typically call
+            process.wait() if stdout/stderr were provided as args to exec(),
+            or process.wait_output() if not.
         """
         if isinstance(command, (bytes, str)):
             raise TypeError('command must be a list of str, not {}'.format(
                 type(command).__name__))
         if len(command) < 1:
             raise ValueError('command must contain at least one item')
-        if combine_stderr:
-            raise NotImplementedError('combine_stderr not currently supported')
 
         body = {
             'command': command,
@@ -1434,43 +1556,44 @@ class Client:
         change_id = ChangeID(resp['change'])
         websocket_ids = resp['result']['websocket-ids']
 
-        # TODO: handle encoding
-
         io_ws = self._connect_websocket(change_id, websocket_ids['io'])
         stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
         control_ws = self._connect_websocket(change_id, websocket_ids['control'])
+
+        # TODO: should we t.join() the threads when the process is done?
+        # TODO: handle encoding
 
         if stdin is not None:
             if isinstance(stdin, bytes):
                 stdin = io.BytesIO(stdin)
             elif isinstance(stdin, str):
                 stdin = io.StringIO(stdin)
-
-            t = threading.Thread(target=self._send_to_websocket, args=(stdin, io_ws, 128*1024))
-            t.start()
+            _start_thread(self._send_to_websocket, stdin, io_ws, 128*1024)
+            process_stdin = None
         else:
-            # TODO: need to create some kind of Writer here that will forwar to io_ws
-            # TODO: similar but for stdout/stderr, except in reverse
-            pass
+            process_stdin = WebsocketWriter(io_ws)
 
-        if stdout is None:
-            stdout = io.BytesIO()
-        t = threading.Thread(target=self._receive_from_websocket, args=(io_ws, stdout, 'stdout_thread'))
-        t.start()
+        if stdout is not None:
+            _start_thread(self._receive_from_websocket, io_ws, stdout)
+            process_stdout = None
+        else:
+            process_stdout = WebsocketReader(io_ws)
 
-        if stderr is None:
-            stderr = io.BytesIO()
-        t = threading.Thread(target=self._receive_from_websocket, args=(stderr_ws, stderr, 'stderr_thread'))
-        t.start()
+        if stderr is not None:
+            _start_thread(self._receive_from_websocket, stderr_ws, stderr)
+            process_stderr = None
+        else:
+            process_stderr = WebsocketReader(stderr_ws)
 
         process = ExecProcess(
             client=self,
             timeout=timeout,
             control_ws=control_ws,
             command=command,
-            stdout=stdout,
-            stderr=stderr,
             change_id=change_id,
+            stdin=process_stdin,
+            stdout=process_stdout,
+            stderr=process_stderr,
         )
         return process
 
@@ -1500,31 +1623,14 @@ class Client:
             ws.send_binary(chunk)
             # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread sent')
         ws.send('')  # Send message barrier to signal EOF
-        print(datetime.datetime.now().isoformat(), 'TODO stdin_thread done')
+#        print(datetime.datetime.now().isoformat(), 'TODO stdin_thread done')
 
     @staticmethod
-    def _receive_from_websocket(ws, writer, name='TODO'):
+    def _receive_from_websocket(ws, writer):
         while True:
             chunk = ws.recv()
             if not chunk:
                 break
             # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread:', repr(chunk))
             writer.write(chunk)
-        print(datetime.datetime.now().isoformat(), 'TODO', name, 'done')
-
-
-# TODO: totally hacky WIP right now:
-
-import queue
-
-class QueueReader:
-    def __init__(self):
-        self._queue = queue.Queue(maxsize=100)  # TODO: need some way of limiting max byte size
-
-    def write(self, b):
-        self._queue.put(b)
-
-    def read(self, n=None):
-        if n is not None:
-            raise NotImplementedError # TODO
-        return self._queue.get()
+#        print(datetime.datetime.now().isoformat(), 'TODO out thread done')
