@@ -908,7 +908,7 @@ class TestStoredState(BaseTestCase):
 
         self.assertEqual(copy["a"], 1)
         self.assertNotIn("b", copy)
-        
+
         copy["b"] = 456
         self.assertNotEqual(sd["b"], copy["b"])
 
