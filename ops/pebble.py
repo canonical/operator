@@ -1040,7 +1040,7 @@ class Client:
             return self._wait_change_using_polling(change_id, timeout, delay)
 
     def _wait_change_using_wait(self, change_id, timeout):
-        """Internal: wait for a change to be ready using the wait-change API."""
+        """Wait for a change to be ready using the wait-change API."""
         deadline = time.time() + timeout if timeout is not None else None
 
         # Hit the wait endpoint every Client.timeout-1 seconds to avoid long
@@ -1082,7 +1082,7 @@ class Client:
         return Change.from_dict(resp['result'])
 
     def _wait_change_using_polling(self, change_id, timeout, delay):
-        """Internal: wait for a change to be ready by polling the get-change API."""
+        """Wait for a change to be ready by polling the get-change API."""
         deadline = time.time() + timeout if timeout is not None else None
 
         while timeout is None or time.time() < deadline:
