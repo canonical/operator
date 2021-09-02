@@ -897,6 +897,21 @@ class TestStoredState(BaseTestCase):
     def test_stored_dict_copy(self):
         self.assertEqual(StoredDict(None, {"a": 1}).copy(), {"a": 1})
 
+    def test_stored_dict_copy_does_not_reference_original(self):
+        class TempStorage(object):
+            dirty = False
+        sd = StoredDict(TempStorage(), {"a": 1})
+        copy = sd.copy()
+
+        sd["a"] = 2
+        sd["b"] = 123
+
+        self.assertEqual(copy["a"], 1)
+        self.assertNotIn("b", copy)
+        
+        copy["b"] = 456
+        self.assertNotEqual(sd["b"], copy["b"])
+
     def test_stored_list_repr(self):
         self.assertEqual(repr(StoredList(None, [])), "ops.framework.StoredList()")
         self.assertEqual(repr(StoredList(None, [1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
