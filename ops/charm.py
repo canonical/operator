@@ -893,7 +893,68 @@ class ContainerMeta:
 
     Attributes:
         name: Name of container (key in the YAML)
+        mounts: :class:`ContainerStorageMeta` mounts available to the container
     """
-
     def __init__(self, name, raw):
         self.name = name
+        self._mounts = {}
+
+        # This is not guaranteed to be populated/is not enforced yet
+        if raw:
+            self._populate_mounts(raw.get('mounts', []))
+
+    @property
+    def mounts(self) -> typing.Dict:
+        """An accessor for the mounts in a container."""
+        return self._mounts
+
+    def _populate_mounts(self, mounts: typing.List):
+        """Populate a list of container mountpoints.
+
+        Since Charm Metadata v2 specifies the mounts as a List, do a little data manipulation
+        to convert the values to "friendly" names which contain a list of mountpoints
+        under each key.
+        """
+        for mount in mounts:
+            storage = mount.get("storage", "")
+            mount = mount.get("location", "")
+
+            if storage in self._mounts:
+                self._mounts[storage].add_location(mount)
+            else:
+                self._mounts[storage] = ContainerStorageMeta(storage, mount)
+
+
+class ContainerStorageMeta:
+    """Metadata about storage for an individual container.
+
+    Attributes:
+        name: a :class:`StorageMeta` key to mount
+        location: the location `storage` is mounted at
+    """
+    def __init__(self, storage, location):
+        self.storage = storage
+        self._locations = [location]
+
+    def add_location(self, location):
+        """Add an additional mountpoint to a known storage."""
+        self._locations.append(location)
+
+    @property
+    def locations(self) -> typing.List:
+        """An accessor for the list of locations for a mount."""
+        return self._locations
+
+    def __getattr__(self, name):
+        if name == "location":
+            if len(self._locations) == 1:
+                return self._locations[0]
+            else:
+                raise RuntimeError(
+                    "container has more than one mountpoint with the same backing storage. "
+                    "Request .locations to see a list"
+                )
+        else:
+            raise AttributeError(
+                "{.__class__.__name__} has no such attribute: {}!".format(self, name)
+            )

@@ -24,6 +24,7 @@ from ops.charm import (
     CharmMeta,
     CharmEvents,
     ContainerMeta,
+    ContainerStorageMeta,
 )
 from ops.framework import Framework, EventSource, EventBase
 from ops.model import Model, _ModelBackend
@@ -430,3 +431,49 @@ containers:
         self.assertIsInstance(meta.containers['test2'], ContainerMeta)
         self.assertEqual(meta.containers['test1'].name, 'test1')
         self.assertEqual(meta.containers['test2'].name, 'test2')
+
+    def test_containers_storage(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+storage:
+  data:
+    type: filesystem
+    location: /test/storage
+  other:
+    type: filesystem
+    location: /test/other
+containers:
+  test1:
+    mounts:
+      - storage: data
+        location: /test/storage
+      - storage: other
+        location: /test/other
+""")
+        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
+        self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storage')
+        self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/other')
+
+    def test_containers_storage_multiple_mounts(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+storage:
+  data:
+    type: filesystem
+    location: /test/storage
+containers:
+  test1:
+    mounts:
+      - storage: data
+        location: /test/storage
+      - storage: data
+        location: /test/other
+""")
+        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
+        self.assertEqual(meta.containers['test1'].mounts["data"].locations[0], '/test/storage')
+        self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/other')
+
+        with self.assertRaises(RuntimeError):
+            meta.containers["test1"].mounts["data"].location
