@@ -1055,9 +1055,13 @@ class StoredDict(collections.abc.MutableMapping):
         else:
             return NotImplemented
 
-    def copy(self) -> typing.Dict:
+    def as_dict(self) -> typing.Dict:
         """Return a copy of the backing data as a dict."""
         return dict(self._under)
+
+    def copy(self) -> 'StoredDict':
+        """Returns a copy of the object."""
+        return StoredDict(self._stored_data, self._under.copy())
 
     __repr__ = _wrapped_repr
 
