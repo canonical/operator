@@ -1463,7 +1463,7 @@ class Client:
         stdin: typing.Union[str, bytes, typing.TextIO, typing.BinaryIO] = None,
         stdout: typing.Union[typing.TextIO, typing.BinaryIO] = None,
         stderr: typing.Union[typing.TextIO, typing.BinaryIO] = None,
-        encoding: str = 'utf-8',
+        encoding: str = 'utf-8'
     ) -> ExecProcess:
         r"""Execute the given command on the remote system.
 
