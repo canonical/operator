@@ -898,7 +898,7 @@ class TestStoredState(BaseTestCase):
         sd = StoredDict(None, {"a": 1})
         self.assertEqual(sd.copy(), sd)
 
-    def test_stored_dict_copyreferences_original(self):
+    def test_stored_dict_copy_references_original(self):
         class TempStorage(object):
             dirty = False
 
