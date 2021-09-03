@@ -767,7 +767,6 @@ class TestApplication(unittest.TestCase):
               foo: {type: file, filename: foo.txt}
               bar: {type: file, filename: bar.txt}
         ''')
-        self.addCleanup(self.harness.cleanup)
         self.peer_rel_id = self.harness.add_relation('db2', 'db2')
         self.app = self.harness.model.app
 
