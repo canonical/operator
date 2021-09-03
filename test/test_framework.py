@@ -935,9 +935,38 @@ class TestStoredState(BaseTestCase):
         self.assertEqual(repr(StoredList(None, [])), "ops.framework.StoredList()")
         self.assertEqual(repr(StoredList(None, [1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
 
+    def test_stored_list_copy(self):
+        sl = StoredList(None, [1, "a"])
+        self.assertEqual(sl.copy(), sl)
+
+    def test_stored_list_copy_references_original(self):
+        class TempStorage(object):
+            dirty = False
+
+        sl = StoredList(TempStorage, [1, 2, [3, 4]])
+        copy = sl.copy()
+
+        sl[0] = 2
+        copy[0] = 3
+        self.assertEqual(2, sl[0])
+        self.assertEqual(3, copy[0])
+
+        sl[2][0] = 5
+        self.assertEqual(5, copy[2][0])
+
+    def test_stored_list_as_list(self):
+        self.assertEqual(StoredList(None, [1]).as_list(), [1])
+
     def test_stored_set_repr(self):
         self.assertEqual(repr(StoredSet(None, set())), 'ops.framework.StoredSet()')
         self.assertEqual(repr(StoredSet(None, {1})), 'ops.framework.StoredSet({1})')
+
+    def test_stored_set_copy(self):
+        ss = StoredSet(None, {1})
+        self.assertEqual(ss.copy(), {1})
+
+    def test_stored_list_as_set(self):
+        self.assertEqual(StoredSet(None, {1}).as_set(), {1})
 
     def test_basic_state_storage(self):
         class SomeObject(Object):
