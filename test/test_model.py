@@ -768,14 +768,28 @@ class TestApplication(unittest.TestCase):
               bar: {type: file, filename: bar.txt}
         ''')
         self.addCleanup(self.harness.cleanup)
-        self.relation_id_db0 = self.harness.add_relation('db0', 'db')
-        self.model = self.harness.model
+        self.peer_rel_id = self.harness.add_relation('db2', 'db2')
+        self.app = self.harness.model.app
 
     def test_planned_units(self):
-        app = self.harness.model.app
+        rel_id = self.peer_rel_id
 
-        # By default, we generate a model with one peer, so our total count should be 2.
-        self.assertEqual(app.planned_units(), 2)
+        # Test that we always count ourself.
+        self.assertEqual(self.app.planned_units(), 1)
+
+        # Add some units, and verify count.
+        self.harness.add_relation_unit(rel_id, 'myapp/1')
+        self.harness.add_relation_unit(rel_id, 'myapp/2')
+
+        self.assertEqual(self.app.planned_units(), 3)
+
+        self.harness.add_relation_unit(rel_id, 'myapp/3')
+        self.assertEqual(self.app.planned_units(), 4)
+
+        # And remove a unit
+        self.harness.remove_relation_unit(rel_id, 'myapp/2')
+
+        self.assertEqual(self.app.planned_units(), 3)
 
 
 class TestContainers(unittest.TestCase):

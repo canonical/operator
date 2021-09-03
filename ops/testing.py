@@ -1017,10 +1017,16 @@ class _TestingModelBackend:
         return client
 
     def planned_units(self):
-        import pdb; pdb.set_trace()
-        items = list(self._meta.relations.items())
-        count = len([relname for relname, _ in items if
-                     self._meta.relations[relname].role.is_peer()])
+        units = []
+        peer_names = set(self._meta.peers.keys())
+        for peer_id, peer_name in self._relation_names.items():
+            if peer_name not in peer_names:
+                continue
+            peer_units = self._relation_list_map[peer_id]
+            units += peer_units
+
+        count = len(list(set(units)))  # de-dupe and get length.
+
         return count + 1  # Account for this unit.
 
 
