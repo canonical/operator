@@ -742,17 +742,40 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.model.storages = {}
 
-    def test_planned_unit_count(self):
-        model = self.harness.model
-
-        # By default, we generate a model with one peer, so our total count should be 2.
-        self.assertEqual(model.get_planned_unit_count(), 2)
-
     def resetBackendCalls(self):
         self.harness._get_backend_calls(reset=True)
 
     def assertBackendCalls(self, expected, *, reset=True):
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
+
+
+class TestApplication(unittest.TestCase):
+
+    def setUp(self):
+        self.harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
+            name: myapp
+            provides:
+              db0:
+                interface: db0
+            requires:
+              db1:
+                interface: db1
+            peers:
+              db2:
+                interface: db2
+            resources:
+              foo: {type: file, filename: foo.txt}
+              bar: {type: file, filename: bar.txt}
+        ''')
+        self.addCleanup(self.harness.cleanup)
+        self.relation_id_db0 = self.harness.add_relation('db0', 'db')
+        self.model = self.harness.model
+
+    def test_planned_units(self):
+        app = self.harness.model.app
+
+        # By default, we generate a model with one peer, so our total count should be 2.
+        self.assertEqual(app.planned_units(), 2)
 
 
 class TestContainers(unittest.TestCase):
