@@ -37,8 +37,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from ops._private import websocket
 from ops._private import yaml
+from ops._vendor import websocket  # TODO: need to get this working on Python 3.5
 
 
 _not_provided = object()
