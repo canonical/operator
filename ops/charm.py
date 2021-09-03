@@ -905,7 +905,22 @@ class ContainerMeta:
 
     @property
     def mounts(self) -> typing.Dict:
-        """An accessor for the mounts in a container."""
+        """An accessor for the mounts in a container.
+
+        Dict keys match key name in :class:`StorageMeta`
+
+        Example::
+
+            storage:
+              FOO:
+                type: filesystem
+                location: /test
+            containers:
+              bar:
+                mounts:
+                  - storage: FOO
+                  - location: /test/mount
+        """
         return self._mounts
 
     def _populate_mounts(self, mounts: typing.List):
@@ -919,6 +934,9 @@ class ContainerMeta:
             storage = mount.get("storage", "")
             mount = mount.get("location", "")
 
+            if not mount:
+                continue
+
             if storage in self._mounts:
                 self._mounts[storage].add_location(mount)
             else:
@@ -929,8 +947,14 @@ class ContainerStorageMeta:
     """Metadata about storage for an individual container.
 
     Attributes:
-        name: a :class:`StorageMeta` key to mount
+        storage: a name for the mountpoint, which should exist the keys for :class:`StorageMeta`
+                 for the charm
         location: the location `storage` is mounted at
+        locations: a list of mountpoints for th ekey
+
+    If multiple locations are specified for the same storage, such as Kubernetes subPath mounts,
+    `location` will not be an accessible attribute, as it would not be possible to determine
+    which mount point was desired, and `locations` should be iterated over.
     """
     def __init__(self, storage, location):
         self.storage = storage
