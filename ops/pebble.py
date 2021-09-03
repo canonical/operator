@@ -860,7 +860,7 @@ def _reader_to_websocket(reader, ws, encoding, bufsize=128*1024):
 
 
 def _websocket_to_writer(ws, writer, encoding):
-    """Receive messages from websocket (until end signal) and write to writer.""" 
+    """Receive messages from websocket (until end signal) and write to writer."""
     while True:
         chunk = ws.recv()
         if not chunk:
