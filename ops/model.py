@@ -1074,6 +1074,7 @@ class Container:
          raising exceptions.
 
         Example::
+
             container = self.unit.get_container("example")
             with container.is_ready() as c:
                 c.pull('/does/not/exist')
@@ -1092,6 +1093,7 @@ class Container:
         error if the container is not ready.
 
         Example::
+
             if container.is_ready():
                 do_something()
             else:
