@@ -850,7 +850,33 @@ class ExecProcess:
         self._control_ws.send(msg)
 
 
-class WebsocketWriter(io.BufferedIOBase):
+def _reader_to_websocket(reader, ws, encoding, bufsize=128*1024):
+    while True:
+        chunk = reader.read(bufsize)
+        if not chunk:
+            break
+        if isinstance(chunk, str):
+            chunk = chunk.encode(encoding)
+        # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread:', repr(chunk))
+        ws.send_binary(chunk)
+        # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread sent')
+    ws.send('')  # Send message barrier to signal EOF
+#        print(datetime.datetime.now().isoformat(), 'TODO stdin_thread done')
+
+
+def _websocket_to_writer(ws, writer, encoding):
+    while True:
+        chunk = ws.recv()
+        if not chunk:
+            break
+        if encoding is not None:
+            chunk = chunk.decode(encoding)
+        # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread:', repr(chunk))
+        writer.write(chunk)
+#        print(datetime.datetime.now().isoformat(), 'TODO out thread done')
+
+
+class _WebsocketWriter(io.BufferedIOBase):
     """A writable file-like object that sends what's written to it to a websocket."""
 
     def __init__(self, ws, encoding):
@@ -877,7 +903,7 @@ class WebsocketWriter(io.BufferedIOBase):
         self.ws.send('')
 
 
-class WebsocketReader(io.BufferedIOBase):
+class _WebsocketReader(io.BufferedIOBase):
     """A readable file-like object whose reads come from a websocket."""
 
     def __init__(self, ws, encoding):
@@ -1605,22 +1631,22 @@ class Client:
             elif not hasattr(stdin, 'read'):
                 raise TypeError('stdin must be str, bytes, or a readable file-like object')
 
-            _start_thread(self._send_to_websocket, stdin, io_ws, encoding)
+            _start_thread(_reader_to_websocket, stdin, io_ws, encoding)
             process_stdin = None
         else:
-            process_stdin = WebsocketWriter(io_ws, encoding)
+            process_stdin = _WebsocketWriter(io_ws, encoding)
 
         if stdout is not None:
-            _start_thread(self._receive_from_websocket, io_ws, stdout, encoding)
+            _start_thread(_websocket_to_writer, io_ws, stdout, encoding)
             process_stdout = None
         else:
-            process_stdout = WebsocketReader(io_ws, encoding)
+            process_stdout = _WebsocketReader(io_ws, encoding)
 
         if stderr is not None:
-            _start_thread(self._receive_from_websocket, stderr_ws, stderr, encoding)
+            _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
             process_stderr = None
         else:
-            process_stderr = WebsocketReader(stderr_ws, encoding)
+            process_stderr = _WebsocketReader(stderr_ws, encoding)
 
         process = ExecProcess(
             stdin=process_stdin,
@@ -1638,8 +1664,6 @@ class Client:
     def _connect_websocket(self, change_id: str, websocket_id: str) -> websocket.WebSocket:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(self.socket_path)
-        # TODO: need to do anything with sock.settimeout() here?
-
         url = self._websocket_url(change_id, websocket_id)
         ws = websocket.WebSocket(skip_utf8_validation=True)
         ws.connect(url, socket=sock)
@@ -1650,29 +1674,3 @@ class Client:
         base_url = self.base_url.replace('http://', 'ws://')
         return '{}/v1/changes/{}/websocket?{}'.format(
             base_url, change_id, urllib.parse.urlencode(query))
-
-    @staticmethod
-    def _send_to_websocket(reader, ws, encoding, bufsize=128*1024):
-        while True:
-            chunk = reader.read(bufsize)
-            if not chunk:
-                break
-            if isinstance(chunk, str):
-                chunk = chunk.encode(encoding)
-            # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread:', repr(chunk))
-            ws.send_binary(chunk)
-            # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread sent')
-        ws.send('')  # Send message barrier to signal EOF
-#        print(datetime.datetime.now().isoformat(), 'TODO stdin_thread done')
-
-    @staticmethod
-    def _receive_from_websocket(ws, writer, encoding):
-        while True:
-            chunk = ws.recv()
-            if not chunk:
-                break
-            if encoding is not None:
-                chunk = chunk.decode(encoding)
-            # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread:', repr(chunk))
-            writer.write(chunk)
-#        print(datetime.datetime.now().isoformat(), 'TODO out thread done')
