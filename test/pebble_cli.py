@@ -148,7 +148,8 @@ def main():
                                         service=args.service)
         elif args.command == 'exec':
             # TODO
-            process = client.exec(args.exec_command, stdin=sys.stdin,
+            process = client.exec(
+                args.exec_command, stdin=sys.stdin,
                 stdout=sys.stdout.buffer, stderr=sys.stderr.buffer)
 
             # process.stdin.write(b'foo\n')
