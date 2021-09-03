@@ -251,11 +251,8 @@ class ExecError(Error):
         for name, out in [('stdout', self.stdout), ('stderr', self.stderr)]:
             if out is None:
                 continue
-            if len(out) > self._max_output:
-                out = out[:self._max_output]
-                truncated = ' [truncated]'
-            else:
-                truncated = ''
+            truncated = ' [truncated]' if len(out) > self._max_output else ''
+            out = out[:self._max_output]
             message = '{}, {}={!r}{}'.format(message, name, out, truncated)
 
         return message
@@ -851,29 +848,26 @@ class ExecProcess:
 
 
 def _reader_to_websocket(reader, ws, encoding, bufsize=128*1024):
+    """Read reader through to EOF and send each chunk read to the websocket."""
     while True:
         chunk = reader.read(bufsize)
         if not chunk:
             break
         if isinstance(chunk, str):
             chunk = chunk.encode(encoding)
-        # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread:', repr(chunk))
         ws.send_binary(chunk)
-        # print(datetime.datetime.now().isoformat(), 'TODO stdin_thread sent')
     ws.send('')  # Send message barrier to signal EOF
-#        print(datetime.datetime.now().isoformat(), 'TODO stdin_thread done')
 
 
 def _websocket_to_writer(ws, writer, encoding):
+    """Receive messages from websocket (until end signal) and write to writer.""" 
     while True:
         chunk = ws.recv()
         if not chunk:
             break
         if encoding is not None:
             chunk = chunk.decode(encoding)
-        # print(datetime.datetime.now().isoformat(), 'TODO stdout_thread:', repr(chunk))
         writer.write(chunk)
-#        print(datetime.datetime.now().isoformat(), 'TODO out thread done')
 
 
 class _WebsocketWriter(io.BufferedIOBase):
@@ -1616,8 +1610,6 @@ class Client:
         io_ws = self._connect_websocket(change_id, websocket_ids['io'])
         stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
         control_ws = self._connect_websocket(change_id, websocket_ids['control'])
-
-        # TODO: should we t.join() the threads when the process is done?
 
         if stdin is not None:
             if isinstance(stdin, str):
