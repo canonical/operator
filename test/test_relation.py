@@ -110,7 +110,6 @@ class ConsumerCharm(CharmBase):
         self.framework.observe(self.provider.on.invalid, self.on_invalid)
         self.framework.observe(self.provider.on.broken, self.on_broken)
         self.framework.observe(self.provider.on.available, self.on_available)
-        self.framework.observe(self.provider.on.too_many_providers, self.on_too_many_providers)
 
     @property
     def consumes(self):
@@ -120,16 +119,13 @@ class ConsumerCharm(CharmBase):
         }
 
     def on_invalid(self, event):
-        self._stored.events.append({'Invalid': {}})
+        self._stored.events.append({"relation": event.relation, 'Invalid': {}})
 
     def on_broken(self, event):
-        self._stored.events.append({'Broken': {}})
+        self._stored.events.append({"relation": event.relation, 'Broken': {}})
 
     def on_available(self, event):
-        self._stored.events.append({'Available': event.data})
-
-    def on_too_many_providers(self, event):
-        self._stored.events.append({'Too Many': {}})
+        self._stored.events.append({"relation": event.relation, 'Available': event.data})
 
 
 class TestRelation(unittest.TestCase):
@@ -163,6 +159,7 @@ class TestRelation(unittest.TestCase):
         received_events = harness.charm._stored.events
         self.assertEqual(len(received_events), 1)
         event = received_events.pop(0)
+        self.assertEqual(rel_id, event["relation"].id)
         self.assertTrue('Available' in event)
         data = event['Available']
         self.assertTrue('config' in data)
@@ -186,6 +183,7 @@ class TestRelation(unittest.TestCase):
         received_events = harness.charm._stored.events
         self.assertEqual(len(received_events), 1)
         event = received_events.pop(0)
+        self.assertEqual(rel_id, event["relation"].id)
         self.assertTrue('Invalid' in event)
 
     def test_consumer_revalidates_provider_on_upgrade(self):
@@ -200,13 +198,15 @@ class TestRelation(unittest.TestCase):
         harness.add_relation_unit(rel_id, 'aservice/0')
         harness.update_relation_data(rel_id, 'aservice', provider_data)
         self.assertEqual(len(harness.charm._stored.events), 1)
-        events = harness.charm._stored.events.pop()
-        self.assertTrue('Available' in events)
+        event = harness.charm._stored.events.pop()
+        self.assertEqual(rel_id, event["relation"].id)
+        self.assertTrue('Available' in event)
         self.assertEqual(len(harness.charm._stored.events), 0)
         harness.charm.on.upgrade_charm.emit()
         self.assertEqual(len(harness.charm._stored.events), 1)
-        events = harness.charm._stored.events.pop()
-        self.assertTrue('Available' in events)
+        event = harness.charm._stored.events.pop()
+        self.assertEqual(rel_id, event["relation"].id)
+        self.assertTrue('Available' in event)
 
     def test_provider_notifies_consumer_on_upgrade(self):
         harness, meta, config = self.default_setup('provider')
@@ -244,33 +244,7 @@ class TestRelation(unittest.TestCase):
         provider_data = json.loads(data.get('provider_data'))
         self.assertFalse(provider_data['ready'])
 
-    def test_too_many_providers_are_detected_in_single_mode(self):
-        harness, meta, config = self.default_setup('consumer')
-        harness.set_leader(True)
-
-        provides = {'provides': {config['service_type']: config['service_version']},
-                    'ready': True,
-                    'config': 'provider_config'}
-        provider_data = {'provider_data': json.dumps(provides)}
-        rel_id_1 = harness.add_relation(meta['relation_name'], 'first_application')
-        harness.add_relation_unit(rel_id_1, 'first_application/0')
-        harness.update_relation_data(rel_id_1, 'first_application', provider_data)
-        received_events = harness.charm._stored.events
-        self.assertEqual(len(received_events), 1)
-        self.assertIn('Available', received_events[0])
-        harness.charm._stored.events.clear()
-        received_events = harness.charm._stored.events
-        self.assertEqual(len(received_events), 0)
-
-        rel_id_2 = harness.add_relation(meta['relation_name'], 'second_application')
-        harness.add_relation_unit(rel_id_2, 'second_application/0')
-        harness.update_relation_data(rel_id_2, 'second_application', provider_data)
-        received_events = harness.charm._stored.events
-        self.assertEqual(len(received_events), 2)
-        self.assertIn('Too Many', received_events[0])
-        self.assertIn('Too Many', received_events[1])
-
-    def test_multiple_providers_are_allowed_in_multi_mode(self):
+    def test_multiple_providers_are_allowed(self):
         config = CONFIG.copy()
         config["multi"] = True
         harness, meta, config = self.default_setup('consumer', config)
@@ -296,6 +270,41 @@ class TestRelation(unittest.TestCase):
         received_events = harness.charm._stored.events
         self.assertEqual(len(received_events), 1)
         self.assertIn('Available', received_events[0])
+
+    def test_multiple_consumers_are_allowed(self):
+        config = CONFIG.copy()
+        config["multi"] = True
+
+        first_harness, first_meta, first_config = self.default_setup('consumer', config)
+        first_harness.set_leader(True)
+        second_harness, second_meta, second_config = self.default_setup('consumer', config)
+        second_harness.set_leader(True)
+
+        provides = {'provides': {config['service_type']: config['service_version']},
+                    'ready': True,
+                    'config': 'provider_config'}
+        provider_data = {'provider_data': json.dumps(provides)}
+
+        first_rel_id = first_harness.add_relation(first_meta['relation_name'], 'first_application')
+        first_harness.add_relation_unit(first_rel_id, 'first_application/0')
+        first_harness.update_relation_data(first_rel_id, 'first_application', provider_data)
+        received_events = first_harness.charm._stored.events
+        self.assertEqual(len(received_events), 1)
+        event = received_events.pop()
+        self.assertIn('Available', event)
+        self.assertEqual(first_rel_id, event["relation"].id)
+        received_events.clear()
+
+        second_rel_id = second_harness.add_relation(
+            second_meta['relation_name'], 'first_application'
+        )
+        second_harness.add_relation_unit(first_rel_id, 'first_application/0')
+        second_harness.update_relation_data(first_rel_id, 'first_application', provider_data)
+        received_events = second_harness.charm._stored.events
+        self.assertEqual(len(received_events), 1)
+        event = received_events.pop()
+        self.assertIn('Available', event)
+        self.assertEqual(second_rel_id, event["relation"].id)
 
     def default_setup(self, setup, config=None):
         """Utility to instantiate test harness

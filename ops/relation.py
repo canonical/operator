@@ -17,11 +17,16 @@
 import json
 import logging
 import semantic_version as semver
+import typing
 
-from ops.charm import CharmEvents
-from ops.framework import (
-    Object, EventSource, EventBase, StoredState
+from ops.charm import (
+    CharmBase, CharmEvents, RelationBrokenEvent, RelationChangedEvent,
+    RelationJoinedEvent, UpgradeCharmEvent
 )
+from ops.framework import (
+    EventSource, EventBase, Handle, Object, StoredState
+)
+from ops.model import Relation
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +86,8 @@ class ProviderBase(Object):
     """
     _stored = StoredState()
 
-    def __init__(self, charm, name, service, version=None):
+    def __init__(self, charm: CharmBase, name: str,
+                 service: str, version: typing.Optional[str] = None):
         super().__init__(charm, name)
 
         self._stored.set_default(ready=False)
@@ -92,7 +98,7 @@ class ProviderBase(Object):
         self.framework.observe(events.relation_joined, self._on_consumer_joined)
         self.framework.observe(charm.on.upgrade_charm, self._on_upgrade)
 
-    def _on_consumer_joined(self, event):
+    def _on_consumer_joined(self, event: RelationJoinedEvent) -> None:
         """Handle consumer joined event.
 
         Args:
@@ -104,7 +110,7 @@ class ProviderBase(Object):
             logger.debug("Providing for joined consumer : %s", data)
             event.relation.data[self.model.app]['provider_data'] = json.dumps(data)
 
-    def _on_upgrade(self, event):
+    def _on_upgrade(self, event: UpgradeCharmEvent) -> None:
         """Handle a provider upgrade event.
 
         Args:
@@ -112,7 +118,7 @@ class ProviderBase(Object):
         """
         self._notify_consumers()
 
-    def _notify_consumers(self):
+    def _notify_consumers(self) -> None:
         """Resend provider data to consumers."""
         data = self._provider_data()
         if self.model.unit.is_leader():
@@ -120,20 +126,20 @@ class ProviderBase(Object):
             for rel in self.framework.model.relations[self.name]:
                 rel.data[self.model.app]['provider_data'] = json.dumps(data)
 
-    def ready(self):
+    def ready(self) -> None:
         """Set provider state to ready."""
         if not self.is_ready:
             logger.debug("Provider is ready")
             self._stored.ready = True
             self._notify_consumers()
 
-    def unready(self):
+    def unready(self) -> None:
         """Set provider state to unready."""
         logger.debug("Provider is not ready")
         self._stored.ready = False
         self._notify_consumers()
 
-    def _provider_data(self):
+    def _provider_data(self) -> typing.Dict:
         """Construct relation data packet for consumer."""
         data = dict()
         data['provides'] = self.provides.copy()
@@ -141,12 +147,41 @@ class ProviderBase(Object):
         return data
 
     @property
-    def is_ready(self):
+    def is_ready(self) -> bool:
         """Query state of provider."""
         return self._stored.ready
 
 
-class ProviderAvailable(EventBase):
+class ProviderEvent(EventBase):
+    """A base class for Provider events.
+
+    Args:
+        handle: a :class:`ops.framework.Handle` to reference the event
+        data: an optional dict containing data
+    """
+    def __init__(self, handle: Handle, relation: Relation,
+                 data: typing.Optional[typing.Dict] = None):
+        super().__init__(handle)
+        self.relation = relation
+        self.data = data
+
+    def snapshot(self) -> typing.Dict:
+        """Save event data."""
+        return {
+            "rel_name": self.relation.name,
+            "rel_id": self.relation.id,
+            "data": self.data
+        }
+
+    def restore(self, snapshot: typing.Dict) -> None:
+        """Restore event data."""
+        self.relation = self.framework.model.get_relation(
+            snapshot["rel_name"], snapshot["rel_id"]
+        )
+        self.data = snapshot["data"]
+
+
+class ProviderAvailable(ProviderEvent):
     """Event triggered when a valid provider is found.
 
     When a consumer charm forms a relation with a provider charm,
@@ -156,20 +191,9 @@ class ProviderAvailable(EventBase):
     :class:`ProviderAvailable` event to inform the consumer charm, that
     a relation with the provider charm has been successful.
     """
-    def __init__(self, handle, data=None):
-        super().__init__(handle)
-        self.data = data
-
-    def snapshot(self):
-        """Save relation data."""
-        return {"data": self.data}
-
-    def restore(self, snapshot):
-        """Restore relation data."""
-        self.data = snapshot["data"]
 
 
-class ProviderInvalid(EventBase):
+class ProviderInvalid(ProviderEvent):
     """Event triggered when a provider is not compatible.
 
     When a consumer charm forms a relation with a provider charm,
@@ -179,20 +203,9 @@ class ProviderInvalid(EventBase):
     :class:`ProviderInvalid` event to inform the consumer charm, that
     a relation with the provider charm has *not* been successful.
     """
-    def __init__(self, handle, data=None):
-        super().__init__(handle)
-        self.data = data
-
-    def snapshot(self):
-        """Save relation data."""
-        return {"data": self.data}
-
-    def restore(self, snapshot):
-        """Restore relation data."""
-        self.data = snapshot["data"]
 
 
-class ProviderUnready(EventBase):
+class ProviderUnready(ProviderEvent):
     """Event triggered when a provider is not ready.
 
     If a provider charm is not ready to service requests, when a
@@ -206,30 +219,14 @@ class ProviderUnready(EventBase):
     done only if the provider charm is ready to service requests. This
     event may be raised multiple times during the lifecycle of a charm.
     """
-    pass
 
 
-class ProviderBroken(EventBase):
+class ProviderBroken(ProviderEvent):
     """Event raised when provider consumer relation is dissolved.
 
     If the relation between a provider and consumer charm is removed,
     then a :class:`ProviderBroken` relation is raised.
     """
-    pass
-
-
-class TooManyProviders(EventBase):
-    """Event raised when more than one provider is related in single mode.
-
-    A consumer charm may allow relations with a single or multiple
-    providers, for a specific relation name. This choice is specified
-    by the `multi` argument of the :class:`ConsumerBase` constructor. In
-    "single" mode if more than one provider charm is related to the
-    consumer, this event is raised. In particular, the events are
-    raised in response to a relation joined event for each additional
-    unit of the same or any additional provider.
-    """
-    pass
 
 
 class ConsumerEvents(CharmEvents):
@@ -238,7 +235,6 @@ class ConsumerEvents(CharmEvents):
     invalid = EventSource(ProviderInvalid)
     unready = EventSource(ProviderUnready)
     broken = EventSource(ProviderBroken)
-    too_many_providers = EventSource(TooManyProviders)
 
 
 class ConsumerBase(Object):
@@ -265,7 +261,6 @@ class ConsumerBase(Object):
     - :class:`ProviderInvalid`
     - :class:`ProviderUnready`
     - :class:`ProviderBroken`
-    - :class:`TooManyProviders`
 
     Note that these events may be raised multiple times during the
     lifetime of a charm. In particular every time there is a change to
@@ -295,54 +290,29 @@ class ConsumerBase(Object):
 
         multi: a Boolean flag that indicates if the :class:`ConsumerBase` derived
             object supports multiple relations with the same relation name. By
-            default this is `False`.
+            default this is `False`. This is not used, but kept (for now) so we don't
+            completey break all libraries which try to instantiate a
+            :class:`ConsumerBase` object.
     """
     on = ConsumerEvents()
     _stored = StoredState()
 
-    def __init__(self, charm, name, consumes, multi=False):
+    def __init__(self, charm: CharmBase, name: str,
+                 consumes: typing.Dict, multi: typing.Optional[bool] = False):
         super().__init__(charm, name)
 
         self.name = name
         self.consumes = consumes
-        self.multi_mode = multi
-        self._stored.set_default(relation_id=None)
+        self._stored.set_default(
+            ready=False
+        )
 
         events = charm.on[name]
-        self.framework.observe(events.relation_joined, self._on_provider_joined)
         self.framework.observe(events.relation_changed, self._on_provider_changed)
         self.framework.observe(events.relation_broken, self._on_provider_broken)
         self.framework.observe(charm.on.upgrade_charm, self._validate_provider)
 
-    @property
-    def relation_id(self):
-        """Identifier for relation with producer.
-
-        Returns:
-           an integer identifier of relation with :class:`ProviderBase`
-           if :class:`ConsumerBase` was instantiated in single
-           mode (`multi=False`) and a valid relation exists. If either
-           of these two conditions is false `None` is returned.
-        """
-        return self._stored.relation_id if self._stored.relation_id else None
-
-    def _on_provider_joined(self, event):
-        """Check if a new or additional provider is acceptable.
-
-        Consumer charms may choose to allow only one or multplie
-        relations with a provider, for a specific relation name. This
-        choice is made using the `multi` argument of the
-        :class:`ConsumerBase`. On every relation joined event with a
-        provider a check is done to see if the new or additional
-        provider relation is acceptable. In single mode more than one
-        provider is not acceptable and in this case a
-        :class:`TooManyProviders` event is emitted.
-        """
-        rel_id = event.relation.id
-        if not self._provider_acceptable(rel_id):
-            self.on.too_many_providers.emit()
-
-    def _on_provider_changed(self, event):
+    def _on_provider_changed(self, event: RelationChangedEvent) -> None:
         """Validate provider on relation changed event.
 
         This method checks the provider for compatibility with the
@@ -364,11 +334,6 @@ class ConsumerBase(Object):
                 contains a key `provider_data` whose value is all the data
                 forwarded by the :class:`ProviderBase` object.
         """
-        rel_id = event.relation.id
-        if not self._provider_acceptable(rel_id):
-            self.on.too_many_providers.emit()
-            return
-
         rdata = event.relation.data[event.app]
         logger.debug("Got data from provider : %s", rdata)
         provider_data = rdata.get('provider_data')
@@ -391,23 +356,20 @@ class ConsumerBase(Object):
 
         ready = data.get('ready')
         if not ready:
-            self.on.unready.emit()
+            self.on.unready.emit(event.relation)
             return
 
         requirements_met = self._meets_requirements(provides, consumed)
 
         if requirements_met:
             logger.debug('Got compatible provider : %s', provider_data)
-            if not self.multi_mode and not self._stored.relation_id:
-                self._stored.relation_id = rel_id
-                logger.debug('Saved relation id : %s', rel_id)
-            self.on.available.emit(data)
+            self.on.available.emit(event.relation, data)
         else:
             logger.error('Incompatible provider : Need %s, Got %s',
                          consumed, provider_data)
-            self.on.invalid.emit(provides)
+            self.on.invalid.emit(event.relation, provides)
 
-    def _on_provider_broken(self, event):
+    def _on_provider_broken(self, event: RelationBrokenEvent):
         """Inform consumer charm that provider relation no longer exists.
 
         This method raises a :class:`ProviderBroken` event in response to
@@ -417,11 +379,9 @@ class ConsumerBase(Object):
             event: an event object
         """
         logger.debug("Provider Broken : %s", event)
-        if not self.multi_mode:
-            self._stored.relation_id = None
-        self.on.broken.emit()
+        self.on.broken.emit(event.relation)
 
-    def _validate_provider(self, event):
+    def _validate_provider(self, event: UpgradeCharmEvent):
         """Check provider and consumer compatibility.
 
         This method validates provider consumer compatibility using
@@ -436,8 +396,6 @@ class ConsumerBase(Object):
 
         for relation in self.framework.model.relations[self.name]:
             rel_id = relation.id
-            if not self._provider_acceptable(rel_id):
-                continue
 
             data = self._provider_data(rel_id)
             if data:
@@ -448,13 +406,13 @@ class ConsumerBase(Object):
 
             requirements_met = self._meets_requirements(provides, consumed)
             if requirements_met:
-                self.on.available.emit(data)
+                self.on.available.emit(relation, data)
             else:
                 logger.error('Provider no longer compatible, Need %s, have %s',
                              consumed, data)
-                self.on.invalid.emit(data)
+                self.on.invalid.emit(relation, data)
 
-    def _meets_requirements(self, provides, consumes):
+    def _meets_requirements(self, provides: typing.Dict, consumes: typing.Dict) -> bool:
         """Check if provider and consumer are compatible.
 
         Args:
@@ -479,7 +437,7 @@ class ConsumerBase(Object):
                 return True
         return False
 
-    def _is_compatible(self, has, needs):
+    def _is_compatible(self, has: typing.Tuple[str, str], needs: typing.Tuple[str, str]) -> bool:
         """Is a provider and consumer specification compatible.
 
         Args:
@@ -538,7 +496,7 @@ class ConsumerBase(Object):
 
         return spec.match(got)
 
-    def _has_version(self, constraint):
+    def _has_version(self, constraint: typing.Tuple[str, str]) -> bool:
         """Does the constraint have a version qualification.
 
         Args:
@@ -552,7 +510,7 @@ class ConsumerBase(Object):
             return True
         return False
 
-    def _normalized_version(self, constraint):
+    def _normalized_version(self, constraint: typing.Tuple[str, str]) -> str:
         """Remove spaces from version strings.
 
         Args:
@@ -567,7 +525,7 @@ class ConsumerBase(Object):
         version = constraint[1]
         return "".join(version.split()) if ' ' in version else version
 
-    def _normalized_type(self, constraint):
+    def _normalized_type(self, constraint: typing.Tuple[str, str]) -> str:
         """Extract and lowercase type from specification.
 
         Args:
@@ -580,43 +538,48 @@ class ConsumerBase(Object):
         """
         return constraint[0].lower()
 
-    def _provider_data(self, rel_id=None):
+    def _provider_data(self, rel_id: int) -> typing.Dict:
         """Get provider relation data.
 
         Args:
-            rel_id: integer identity of relation for which data is
-                required. If the :class:`ConsumerBase` object was instantiated using
-                `multi=True` then `rel_id` is a required argument, otherwise
-                it is optional (and not used)
+            rel_id: integer identity of relation for which data is required.
 
         Returns:
             dict: containing provider application relation relation data.
         """
-        if self.multi_mode:
-            assert(rel_id is not None)
-            rel = self.framework.model.get_relation(self.name, rel_id)
-        else:
-            assert(len(self.framework.model.relations[self.name]) == 1)
-            rel = self.framework.model.get_relation(self.name)
+        rel = self.framework.model.get_relation(self.name)
 
         data = json.loads(rel.data[rel.app]['provider_data'])
         return data
 
-    def _provider_acceptable(self, rel_id):
-        """Is a new or an additional provider acceptable.
+    def ready(self) -> None:
+        """Set consumer state to ready."""
+        if not self.is_ready:
+            logger.debug("Consumer is ready")
+            self._stored.ready = True
+            self._notify_providers()
 
-        Args:
-            rel_id : integer ID of provider relation
+    def unready(self) -> None:
+        """Set consumer state to unready."""
+        logger.debug("Consumer is not ready")
+        self._stored.ready = False
+        self._notify_providers()
 
-        Returns:
-            True if provider is acceptable else false.
-        """
-        # only accept a provider if any of the following is true
-        # 1) in multi mode
-        # 2) seeing the first provider in single mode
-        # 3) seeing the same provider again in single mode
-        stored_id = self._stored.relation_id
-        check_single = ((stored_id is None) or (stored_id == rel_id))
-        if self.multi_mode or check_single:
-            return True
-        return False
+    @property
+    def is_ready(self) -> bool:
+        """Query state of provider."""
+        return self._stored.ready
+
+    def _notify_providers(self) -> None:
+        """Resend consumers data to providers."""
+        data = self._consumer_data()
+        logger.debug("Notifying Provider : %s", data)
+        for rel in self.framework.model.relations[self.name]:
+            rel.data[self.model.app]['consumer_data'] = json.dumps(data)
+
+    def _consumer_data(self) -> typing.Dict:
+        """Construct relation data packet for a provider."""
+        data = dict()
+        data['consumes'] = self.consumes.copy()
+        data['ready'] = self._stored.ready
+        return data
