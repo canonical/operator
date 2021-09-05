@@ -773,7 +773,7 @@ class ExecProcess:
         stdout: typing.Union[typing.TextIO, typing.BinaryIO],
         stderr: typing.Optional[typing.Union[typing.TextIO, typing.BinaryIO]],
         client: 'Client',
-        timeout: float,
+        timeout: typing.Optional[float],
         control_ws: websocket.WebSocket,
         command: typing.List[str],
         encoding: typing.Optional[str],
@@ -820,7 +820,7 @@ class ExecProcess:
         exit_code = change.data.get('return')
         return exit_code
 
-    def wait_output(self) -> (typing.AnyStr, typing.AnyStr):
+    def wait_output(self) -> typing.Tuple[typing.AnyStr, typing.AnyStr]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
         If a timeout was specified to the Pebble.exec() call, this waits at
