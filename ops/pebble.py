@@ -778,7 +778,7 @@ class ExecProcess:
         command: typing.List[str],
         encoding: typing.Optional[str],
         change_id: ChangeID,
-        stop_w,
+        cancel_stdin: typing.Callable,
     ):
         self.stdin = stdin
         self.stdout = stdout
@@ -789,7 +789,7 @@ class ExecProcess:
         self._command = command
         self._encoding = encoding
         self._change_id = change_id
-        self._stop_w = stop_w
+        self._cancel_stdin = cancel_stdin
 
     def wait(self):
         """Wait for the process to finish.
@@ -811,10 +811,9 @@ class ExecProcess:
             timeout += 1
         change = self._client.wait_change(self._change_id, timeout=timeout)
 
-        if self._stop_w is not None:
-            print('TODO Writing x to stop_w')
-            os.write(self._stop_w, b'x')
-            os.close(self._stop_w)
+        # If stdin reader thread is running, stop it
+        if self._cancel_stdin is not None:
+            self._cancel_stdin()
 
         if change.err:
             raise ChangeError(change.err, change)
@@ -867,27 +866,23 @@ def _has_fileno(f):
         return False
 
 
-def _reader_to_websocket(reader, ws, encoding, stop_reader=None, bufsize=128*1024):
+def _reader_to_websocket(reader, ws, encoding, cancel_reader=None, bufsize=128*1024):
     """Read reader through to EOF and send each chunk read to the websocket."""
-    print('TODO stdin thread started')
     while True:
-        if stop_reader is not None:
-            print('TODO stdin thread selecting')
-            # TODO: this won't work on Windows as select only works on sockets
-            result = select.select([stop_reader, reader], [], [])
-            if stop_reader in result[0]:
-                os.close(stop_reader)
+        if cancel_reader is not None:
+            result = select.select([cancel_reader, reader], [], [])
+            if cancel_reader in result[0]:
+                os.close(cancel_reader)
                 break
 
-        print('TODO stdin thread reading')
         chunk = reader.read(bufsize)
         if not chunk:
             break
         if isinstance(chunk, str):
             chunk = chunk.encode(encoding)
         ws.send_binary(chunk)
+
     ws.send('')  # Send message barrier to signal EOF
-    print('TODO stdin thread done')
 
 
 def _websocket_to_writer(ws, writer, encoding):
@@ -1642,7 +1637,7 @@ class Client:
         stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
         control_ws = self._connect_websocket(change_id, websocket_ids['control'])
 
-        stop_w = None
+        cancel_stdin = None
         if stdin is not None:
             if isinstance(stdin, str):
                 if encoding is None:
@@ -1655,11 +1650,15 @@ class Client:
             elif not hasattr(stdin, 'read'):
                 raise TypeError('stdin must be str, bytes, or a readable file-like object')
 
+            cancel_reader = None
             if _has_fileno(stdin):
-                stop_r, stop_w = os.pipe()
-            else:
-                stop_r, stop_w = None, None
-            _start_thread(_reader_to_websocket, stdin, io_ws, encoding, stop_r)
+                cancel_reader, w = os.pipe()
+
+                def cancel_stdin():
+                    os.write(w, b'x')  # doesn't matter what we write
+                    os.close(w)
+
+            _start_thread(_reader_to_websocket, stdin, io_ws, encoding, cancel_reader)
             process_stdin = None
         else:
             process_stdin = _WebsocketWriter(io_ws, encoding)
@@ -1686,7 +1685,7 @@ class Client:
             command=command,
             encoding=encoding,
             change_id=change_id,
-            stop_w=stop_w,
+            cancel_stdin=cancel_stdin,
         )
         return process
 
