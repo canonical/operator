@@ -817,7 +817,7 @@ class ExecProcess:
 
         if change.err:
             raise ChangeError(change.err, change)
-        exit_code = change.data.get('return')
+        exit_code = change.data.get('exit-code', -1)
         return exit_code
 
     def wait_output(self) -> typing.Tuple[typing.AnyStr, typing.AnyStr]:
