@@ -941,7 +941,7 @@ class _WebsocketReader(io.BufferedIOBase):
             recv = self.ws.recv()
             if not recv:
                 # Message barrier received, signal EOF
-                return b'' if self.encoding is not None else ''
+                return '' if self.encoding is not None else b''
             if self.encoding is not None:
                 recv = recv.decode(self.encoding)
             self.remaining = recv
@@ -1618,26 +1618,6 @@ class Client:
         if len(command) < 1:
             raise ValueError('command must contain at least one item')
 
-        body = {
-            'command': command,
-            'stderr': True,
-            'environment': environment or {},
-            'working-dir': working_dir,
-            'timeout': _format_timeout(timeout) if timeout is not None else None,
-            'user-id': user_id,
-            'user': user,
-            'group-id': group_id,
-            'group': group,
-        }
-        resp = self._request('POST', '/v1/exec', body=body)
-        change_id = ChangeID(resp['change'])
-        websocket_ids = resp['result']['websocket-ids']
-
-        io_ws = self._connect_websocket(change_id, websocket_ids['io'])
-        stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
-        control_ws = self._connect_websocket(change_id, websocket_ids['control'])
-
-        cancel_stdin = None
         if stdin is not None:
             if isinstance(stdin, str):
                 if encoding is None:
@@ -1650,8 +1630,32 @@ class Client:
             elif not hasattr(stdin, 'read'):
                 raise TypeError('stdin must be str, bytes, or a readable file-like object')
 
+        body = {
+            'command': command,
+            'stderr': True,
+            'environment': environment or {},
+            'working-dir': working_dir,
+            'timeout': _format_timeout(timeout) if timeout is not None else None,
+            'user-id': user_id,
+            'user': user,
+            'group-id': group_id,
+            'group': group,
+        }
+        resp = self._request('POST', '/v1/exec', body=body)
+        change_id = resp['change']
+        websocket_ids = resp['result']['websocket-ids']
+
+        io_ws = self._connect_websocket(change_id, websocket_ids['io'])
+        stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
+        control_ws = self._connect_websocket(change_id, websocket_ids['control'])
+
+        cancel_stdin = None
+        if stdin is not None:
             cancel_reader = None
             if _has_fileno(stdin):
+                if sys.platform == 'win32':
+                    raise NotImplementedError('file-based stdin not supported on Windows')
+
                 cancel_reader, w = os.pipe()
 
                 def cancel_stdin():
@@ -1684,7 +1688,7 @@ class Client:
             control_ws=control_ws,
             command=command,
             encoding=encoding,
-            change_id=change_id,
+            change_id=ChangeID(change_id),
             cancel_stdin=cancel_stdin,
         )
         return process
@@ -1700,5 +1704,6 @@ class Client:
     def _websocket_url(self, change_id: str, websocket_id: str) -> str:
         query = {'id': websocket_id}
         base_url = self.base_url.replace('http://', 'ws://')
-        return '{}/v1/changes/{}/websocket?{}'.format(
+        url = '{}/v1/changes/{}/websocket?{}'.format(
             base_url, change_id, urllib.parse.urlencode(query))
+        return url
