@@ -779,6 +779,7 @@ class ExecProcess:
         encoding: typing.Optional[str],
         change_id: ChangeID,
         cancel_stdin: typing.Callable,
+        threads: typing.List[threading.Thread],
     ):
         self.stdin = stdin
         self.stdout = stdout
@@ -790,6 +791,7 @@ class ExecProcess:
         self._encoding = encoding
         self._change_id = change_id
         self._cancel_stdin = cancel_stdin
+        self._threads = threads
 
     def wait(self):
         """Wait for the process to finish.
@@ -815,6 +817,10 @@ class ExecProcess:
         if self._cancel_stdin is not None:
             self._cancel_stdin()
 
+        # Wait for all threads to finish (e.g., message barrier sent)
+        for thread in self._threads:
+            thread.join()
+
         if change.err:
             raise ChangeError(change.err, change)
         exit_code = change.data.get('exit-code', -1)
@@ -836,8 +842,11 @@ class ExecProcess:
         else:
             out = io.BytesIO()
             err = io.BytesIO()
-        _start_thread(shutil.copyfileobj, self.stdout, out)
-        _start_thread(shutil.copyfileobj, self.stderr, err)
+
+        t = _start_thread(shutil.copyfileobj, self.stdout, out)
+        self._threads.append(t)
+        t = _start_thread(shutil.copyfileobj, self.stderr, err)
+        self._threads.append(t)
 
         exit_code = self._wait()
         if exit_code != 0:
@@ -1650,6 +1659,8 @@ class Client:
         control_ws = self._connect_websocket(change_id, websocket_ids['control'])
 
         cancel_stdin = None
+        threads = []
+
         if stdin is not None:
             cancel_reader = None
             if _has_fileno(stdin):
@@ -1662,19 +1673,22 @@ class Client:
                     os.write(w, b'x')  # doesn't matter what we write
                     os.close(w)
 
-            _start_thread(_reader_to_websocket, stdin, io_ws, encoding, cancel_reader)
+            t = _start_thread(_reader_to_websocket, stdin, io_ws, encoding, cancel_reader)
+            threads.append(t)
             process_stdin = None
         else:
             process_stdin = _WebsocketWriter(io_ws, encoding)
 
         if stdout is not None:
-            _start_thread(_websocket_to_writer, io_ws, stdout, encoding)
+            t = _start_thread(_websocket_to_writer, io_ws, stdout, encoding)
+            threads.append(t)
             process_stdout = None
         else:
             process_stdout = _WebsocketReader(io_ws, encoding)
 
         if stderr is not None:
-            _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
+            t = _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
+            threads.append(t)
             process_stderr = None
         else:
             process_stderr = _WebsocketReader(stderr_ws, encoding)
@@ -1690,6 +1704,7 @@ class Client:
             encoding=encoding,
             change_id=ChangeID(change_id),
             cancel_stdin=cancel_stdin,
+            threads=threads,
         )
         return process
 
