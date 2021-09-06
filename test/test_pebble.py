@@ -21,7 +21,6 @@ import json
 import unittest
 import unittest.mock
 import unittest.util
-import signal
 import sys
 import tempfile
 
