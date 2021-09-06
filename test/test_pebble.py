@@ -2140,7 +2140,7 @@ class TestExec(unittest.TestCase):
         _, _, control = self.add_responses('123', 0)
 
         process = self.client.exec(['server'])
-        process.send_signal(signal.SIGUSR1)
+        process.send_signal(10)
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['server'])),
