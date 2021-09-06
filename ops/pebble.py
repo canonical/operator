@@ -218,17 +218,18 @@ class ChangeError(Error):
 
 
 class ExecError(Error):
-    """Raised when an exec'd command returns a non-zero exit code.
+    """Raised when a command started with :meth:`Client.exec` returns a
+    non-zero exit code.
 
     Attributes:
         command: Command line of command being executed.
         exit_code: The process's exit code. This will always be non-zero.
-        stdout: If ExecProcess.wait_output() was being called, this is the
-            captured stdout as a str (or bytes if encoding was None). If
-            ExecProcess.wait() was being called, this is None.
-        stderr: If ExecProcess.wait_output() was being called, this is the
-            captured stderr as a str (or bytes if encoding was None). If
-            ExecProcess.wait() was being called, this is None.
+        stdout: If :meth:`ExecProcess.wait_output` was being called, this is
+            the captured stdout as a str (or bytes if encoding was None). If
+            :meth:`ExecProcess.wait` was being called, this is None.
+        stderr: If :meth:`ExecProcess.wait_output` was being called, this is
+            the captured stderr as a str (or bytes if encoding was None). If
+            :meth:`ExecProcess.wait` was being called, this is None.
     """
 
     def __init__(
@@ -748,24 +749,29 @@ class FileInfo:
 
 
 class ExecProcess:
-    """Represents a process started by Client.exec().
+    """Represents a process started by :meth:`Client.exec`.
 
-    To avoid deadlocks, most users should use wait_output() instead of reading
-    and writing this object's stdin and stdout/stderr attributes directly.
-    Alternatively, users can pass stdin/stdout/stderr to exec().
+    To avoid deadlocks, most users should use :meth:`wait_output` instead of
+    reading and writing the :attr:`stdin`, :attr:`stdout`, and :attr:`stderr`
+    attributes directly. Alternatively, users can pass stdin/stdout/stderr to
+    :meth:`Client.exec`.
 
-    This class should not be instantiated directly, only via exec().
+    This class should not be instantiated directly, only via
+    :meth:`Client.exec`.
 
     Attributes:
-        stdin: If the stdin argument was not passed to exec(), this is a
-            writable file-like object the caller can use to stream input to
-            the process. It is None if stdin was passed to exec().
-        stdout: If the stdout argument was not passed to exec(), this is a
-            readable file-like object the caller can use to stream output from
-            the process. It is None if stdout was passed to exec().
-        stderr: If the stderr argument was not passed to exec(), this is a
-            readable file-like object the caller can use to stream error output
-            from the process. It is None if stderr was passed to exec().
+        stdin: If the stdin argument was not passed to :meth:`Client.exec`,
+            this is a writable file-like object the caller can use to stream
+            input to the process. It is None if stdin was passed to
+            :meth:`Client.exec`.
+        stdout: If the stdout argument was not passed to :meth:`Client.exec`,
+            this is a readable file-like object the caller can use to stream
+            output from the process. It is None if stdout was passed to
+            :meth:`Client.exec`.
+        stderr: If the stderr argument was not passed to :meth:`Client.exec`,
+            this is a readable file-like object the caller can use to stream
+            error output from the process. It is None if stderr was passed to
+            :meth:`Client.exec`.
     """
     def __init__(
         self,
@@ -796,8 +802,8 @@ class ExecProcess:
     def wait(self):
         """Wait for the process to finish.
 
-        If a timeout was specified to the Pebble.exec() call, this waits at
-        most that duration.
+        If a timeout was specified to the :meth:`Client.exec` call, this waits
+        at most that duration.
 
         Raises:
             ExecError: if the process exits with a non-zero exit code.
@@ -829,8 +835,8 @@ class ExecProcess:
     def wait_output(self) -> typing.Tuple[typing.AnyStr, typing.AnyStr]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
-        If a timeout was specified to the Pebble.exec() call, this waits at
-        most that duration. If combine_stderr was True, stdout will include
+        If a timeout was specified to the :meth:`Client.exec` call, this waits
+        at most that duration. If combine_stderr was True, stdout will include
         the process's standard error, and stderr will be None.
 
         Raises:
@@ -855,10 +861,10 @@ class ExecProcess:
         return (out.getvalue(), err.getvalue())
 
     def send_signal(self, signum: int):
-        """Send the given signal to the running process.
+        """Send the given signal number to the running process.
 
         Args:
-            signum: Number of signal to send, e.g., 1 or signal.SIGHUP.
+            signum: Number of signal to send, e.g., 1 or :data:`signal.SIGHUP`.
         """
         msg = json.dumps({'command': 'signal', 'signal': signum}, sort_keys=True)
         self._control_ws.send(msg)
@@ -1522,65 +1528,66 @@ class Client:
     ) -> ExecProcess:
         r"""Execute the given command on the remote system.
 
-        Most of the arguments are self-explanatory, however, input/output
-        handling is a bit more complex. Some examples are shown below:
+        Most of the parameters are explained in the "Parameters" section
+        below, however, input/output handling is a bit more complex. Some
+        examples are shown below::
 
-        # Simple command with no output; just check exit code
-        >>> process = client.exec(['send-emails'])
-        >>> process.wait()
+            # Simple command with no output; just check exit code
+            >>> process = client.exec(['send-emails'])
+            >>> process.wait()
 
-        # Fetch output as string
-        >>> process = client.exec(['python3', '--version'])
-        >>> version, _ = process.wait_output()
-        >>> print(version)
-        Python 3.8.10
+            # Fetch output as string
+            >>> process = client.exec(['python3', '--version'])
+            >>> version, _ = process.wait_output()
+            >>> print(version)
+            Python 3.8.10
 
-        # Fetch both stdout and stderr as strings
-        >>> process = client.exec(['pg_dump', '-s', ...])
-        >>> schema, logs = process.wait_output()
+            # Fetch both stdout and stderr as strings
+            >>> process = client.exec(['pg_dump', '-s', ...])
+            >>> schema, logs = process.wait_output()
 
-        # Stream input from a string and write output to files
-        >>> in = 'foo\nbar\n'
-        >>> with open('out.txt', 'w') as out, open('err.txt', 'w') as err:
-        ...     process = client.exec(['awk', '{ print toupper($0) }'],
-        ...                           stdin=in, stdout=out, stderr=err)
-        ...     process.wait()
-        >>> open('out.txt').read()
-        'FOO\nBAR\n'
-        >>> open('err.txt').read()
-        ''
+            # Stream input from a string and write output to files
+            >>> in = 'foo\nbar\n'
+            >>> with open('out.txt', 'w') as out, open('err.txt', 'w') as err:
+            ...     process = client.exec(['awk', '{ print toupper($0) }'],
+            ...                           stdin=in, stdout=out, stderr=err)
+            ...     process.wait()
+            >>> open('out.txt').read()
+            'FOO\nBAR\n'
+            >>> open('err.txt').read()
+            ''
 
-        # Real-time streaming using ExecProcess.stdin and ExecProcess.stdout
-        >>> process = client.exec(['cat'])
-        >>> def stdin_thread():
-        ...     for line in ['one\n', '2\n', 'THREE\n']:
-        ...         process.stdin.write(line)
-        ...         process.stdin.flush()
-        ...         time.sleep(1)
-        ...     process.stdin.close()
-        ...
-        >>> threading.Thread(target=stdin_thread).start()
-        >>> for line in process.stdout:
-        ...     print(datetime.datetime.now().strftime('%H:%M:%S'), repr(line))
-        ...
-        16:20:26 'one\n'
-        16:20:27 '2\n'
-        16:20:28 'THREE\n'
-        >>> process.wait()  # will return immediately as stdin was closed
+            # Real-time streaming using ExecProcess.stdin and ExecProcess.stdout
+            >>> process = client.exec(['cat'])
+            >>> def stdin_thread():
+            ...     for line in ['one\n', '2\n', 'THREE\n']:
+            ...         process.stdin.write(line)
+            ...         process.stdin.flush()
+            ...         time.sleep(1)
+            ...     process.stdin.close()
+            ...
+            >>> threading.Thread(target=stdin_thread).start()
+            >>> for line in process.stdout:
+            ...     print(datetime.datetime.now().strftime('%H:%M:%S'), repr(line))
+            ...
+            16:20:26 'one\n'
+            16:20:27 '2\n'
+            16:20:28 'THREE\n'
+            >>> process.wait()  # will return immediately as stdin was closed
 
-        # Show exception raised for non-zero return code
-        >>> process = client.exec(['ls', 'notexist'])
-        >>> out, err = process.wait_output()
-        Traceback (most recent call last):
-          ...
-        ExecError: "ls" returned exit code 2
-        >>> exc = sys.last_value
-        >>> exc.exit_code
-        2
-        >>> exc.stdout
-        ''
-        >>> exc.stderr
-        'ls: cannot access 'notfound': No such file or directory\n'
+            # Show exception raised for non-zero return code
+            >>> process = client.exec(['ls', 'notexist'])
+            >>> out, err = process.wait_output()
+            Traceback (most recent call last):
+              ...
+            ExecError: "ls" returned exit code 2
+            >>> exc = sys.last_value
+            >>> exc.exit_code
+            2
+            >>> exc.stdout
+            ''
+            >>> exc.stderr
+            'ls: cannot access 'notfound': No such file or directory\n'
 
         Args:
             command: Command to execute: the first item is the name (or path)
@@ -1599,17 +1606,18 @@ class Client:
                 group_id if both are specified.
             stdin: A string or readable file-like object that is sent to the
                 process's standard input. If not set, the caller can write
-                input to ExecProcess.stdin to stream input to the process.
+                input to :attr:`ExecProcess.stdin` to stream input to the
+                process.
             stdout: A writable file-like object that the process's standard
                 output is written to. If not set, the caller can use
-                ExecProcess.wait_output() to capture output as a string, or
-                read from ExecProcess.stdout to stream output from the
-                process.
+                :meth:`ExecProcess.wait_output` to capture output as a string,
+                or read from :meth:`ExecProcess.stdout` to stream output from
+                the process.
             stderr: A writable file-like object that the process's standard
                 error is written to. If not set, the caller can use
-                ExecProcess.wait_output() to capture error output as a string,
-                or read from ExecProcess.stderr to stream error output from
-                the process.
+                :meth:`ExecProcess.wait_output` to capture error output as a
+                string, or read from :meth:`ExecProcess.stderr` to stream error
+                output from the process.
             encoding: If encoding is set (the default is UTF-8), the types
                 read or written to stdin/stdout/stderr are str, and encoding
                 is used to encode them to bytes. If encoding is None, the
@@ -1618,8 +1626,9 @@ class Client:
         Returns:
             A Process object representing the state of the running process.
             To wait for the command to finish, the caller will typically call
-            process.wait() if stdout/stderr were provided as args to exec(),
-            or process.wait_output() if not.
+            :meth:`ExecProcess.wait` if stdout/stderr were provided as
+            arguments to :meth:`exec`, or :meth:`ExecProcess.wait_output` if
+            not.
         """
         if isinstance(command, (bytes, str)):
             raise TypeError('command must be a list of str, not {}'.format(
