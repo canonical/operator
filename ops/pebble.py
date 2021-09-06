@@ -218,8 +218,7 @@ class ChangeError(Error):
 
 
 class ExecError(Error):
-    """Raised when a command started with :meth:`Client.exec` returns a
-    non-zero exit code.
+    """Raised when a :meth:`Client.exec` command returns a non-zero exit code.
 
     Attributes:
         command: Command line of command being executed.
