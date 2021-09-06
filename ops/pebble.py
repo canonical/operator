@@ -856,13 +856,13 @@ class ExecProcess:
 
 
 def _has_fileno(f):
-    if not hasattr(f, 'fileno'):
-        return False
+    """Return True if the file-like object has a valid fileno() method."""
     try:
         f.fileno()
         return True
     except Exception:
-        # Should be io.UnsupportedOperation, but catching all won't hurt
+        # Should be AttributeError or io.UnsupportedOperation, but catching
+        # all exceptions here won't hurt
         return False
 
 
