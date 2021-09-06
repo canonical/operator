@@ -860,7 +860,7 @@ class ExecProcess:
         Args:
             signum: Number of signal to send, e.g., 1 or signal.SIGHUP.
         """
-        msg = json.dumps({'command': 'signal', 'signal': signum})
+        msg = json.dumps({'command': 'signal', 'signal': signum}, sort_keys=True)
         self._control_ws.send(msg)
 
 
