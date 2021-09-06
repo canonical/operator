@@ -2145,9 +2145,10 @@ class TestExec(unittest.TestCase):
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['server'])),
         ])
-        self.assertEqual(control.sends, [
-            ('TXT', '{"command": "signal", "signal": 10}'),
-        ])
+        self.assertEqual(len(control.sends), 1)
+        self.assertEqual(control.sends[0][0], 'TXT')
+        self.assertEqual(json.loads(control.sends[0][1]),
+                         {'command': 'signal', 'signal': 10})
 
     def test_wait_output(self):
         io, stderr, _ = self.add_responses('123', 0)
