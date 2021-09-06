@@ -1586,7 +1586,7 @@ class Client:
             >>> exc.stdout
             ''
             >>> exc.stderr
-            'ls: cannot access 'notfound': No such file or directory\n'
+            "ls: cannot access 'notfound': No such file or directory\n"
 
         Args:
             command: Command to execute: the first item is the name (or path)
