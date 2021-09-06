@@ -173,10 +173,16 @@ def main():
                     stdout = sys.stdout.buffer
                     stderr = sys.stderr.buffer
             else:
-                if encoding is not None:
-                    stdin = sys.stdin.read()
+                if sys.stdin.isatty():
+                    if encoding is not None:
+                        stdin = sys.stdin
+                    else:
+                        stdin = sys.stdin.buffer
                 else:
-                    stdin = sys.stdin.buffer.read()
+                    if encoding is not None:
+                        stdin = sys.stdin.read()
+                    else:
+                        stdin = sys.stdin.buffer.read()
                 stdout = None
                 stderr = None
 
@@ -198,7 +204,7 @@ def main():
                     process.wait()
                 else:
                     stdout, stderr = process.wait_output()
-                    print(repr(stdout), end='')
+                    print(repr(stdout))
                     if stderr:
                         print(repr(stderr), end='', file=sys.stderr)
                 sys.exit(0)
