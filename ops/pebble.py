@@ -1599,7 +1599,8 @@ class Client:
                 of the executable, the rest of the items are the arguments.
             environment: Environment variables to pass to the process.
             working_dir: Working directory to run the command in. If not set,
-                Pebble uses the target user's $HOME directory.
+                Pebble uses the target user's $HOME directory (and if the user
+                argument is not set, $HOME of the user Pebble is running as).
             timeout: Timeout in seconds for the command execution, after which
                 the process will be terminated. If not specified, the
                 execution never times out.
