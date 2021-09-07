@@ -905,8 +905,7 @@ class _TestingModelBackend:
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
-        self._storage_list = \
-            {k: {} for k, v in self._meta.storages.items()}
+        self._storage_list = {k for k in self._meta.storages}
         # Every new storage device gets an id from the _storage_id_counter.
         # That id is mapped back to the storage name on _storage_ids_map
         self._storage_ids_map = {}
@@ -1014,7 +1013,7 @@ class _TestingModelBackend:
             self._unit_status = {'status': status, 'message': message}
 
     def storage_list(self, name):
-        return [id for id, props in self._storage_list[name].items()]
+        return list(self._storage_list[name])
 
     def storage_get(self, storage_name_id, attribute):
         name = self._storage_ids_map[storage_name_id]
@@ -1022,7 +1021,7 @@ class _TestingModelBackend:
         return self._storage_list[name][id][attribute]
 
     def storage_add(self, name, count=1):
-        for i in range(0, count):
+        for i in range(count):
             storage_id = self._storage_id_counter
             self._storage_id_counter += 1
             self._storage_list[name][str(storage_id)] = {
