@@ -1059,9 +1059,9 @@ class StoredDict(collections.abc.MutableMapping):
         """Return a copy of the backing data as a dict."""
         return dict(self._under)
 
-    def copy(self) -> 'StoredDict':
-        """Returns a copy of the object."""
-        return StoredDict(self._stored_data, self._under.copy())
+    def copy(self) -> typing.Dict:
+        """Returns a copy of the backing `dict` as a deep copy dict."""
+        return dict(self._under)
 
     __repr__ = _wrapped_repr
 
@@ -1106,9 +1106,14 @@ class StoredList(collections.abc.MutableSequence):
         """
         return list(self._under)
 
-    def copy(self) -> 'StoredList':
-        """Returns a copy of the object."""
-        return StoredList(self._stored_data, self._under.copy())
+    def copy(self) -> typing.List:
+        """Returns a copy of the backing `list` as a deep copy.
+
+        Any list copy in Python other than copy.deepcopy() still references the
+        original, including .copy(), some_list[:], list(some_list), and so on. `as_list`
+        matches this behavior.
+        """
+        return list(self._under)
 
     def __eq__(self, other):
         if isinstance(other, StoredList):
@@ -1181,8 +1186,8 @@ class StoredSet(collections.abc.MutableSet):
         return set(self._under)
 
     def copy(self) -> 'StoredSet':
-        """Returns a copy of the object."""
-        return StoredSet(self._stored_data, self._under.copy())
+        """Returns a copy of the backing `set`."""
+        return set(self._under)
 
     def __contains__(self, key):
         return key in self._under

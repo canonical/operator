@@ -898,20 +898,20 @@ class TestStoredState(BaseTestCase):
         sd = StoredDict(None, {"a": 1})
         self.assertEqual(sd.copy(), sd)
 
-    def test_stored_dict_copy_references_original(self):
+    def test_stored_dict_copy_does_not_reference_original(self):
         class TempStorage(object):
             dirty = False
-
-        sd = StoredDict(TempStorage, {"a": 1, "b": {"c": 2}})
-        copy = sd.copy()
+        sd = StoredDict(TempStorage(), {"a": 1})
+        copy = sd.as_dict()
 
         sd["a"] = 2
-        copy["a"] = 3
-        self.assertEqual(2, sd["a"])
-        self.assertEqual(3, copy["a"])
+        sd["b"] = 123
 
-        sd["b"]["c"] = 4
-        self.assertEqual(4, copy["b"]["c"])
+        self.assertEqual(copy["a"], 1)
+        self.assertNotIn("b", copy)
+
+        copy["b"] = 456
+        self.assertNotEqual(sd["b"], copy["b"])
 
     def test_stored_dict_as_dict(self):
         self.assertEqual(StoredDict(None, {"a": 1}).as_dict(), {"a": 1})
