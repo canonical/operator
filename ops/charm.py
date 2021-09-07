@@ -950,7 +950,7 @@ class ContainerStorageMeta:
         storage: a name for the mountpoint, which should exist the keys for :class:`StorageMeta`
                  for the charm
         location: the location `storage` is mounted at
-        locations: a list of mountpoints for th ekey
+        locations: a list of mountpoints for the key
 
     If multiple locations are specified for the same storage, such as Kubernetes subPath mounts,
     `location` will not be an accessible attribute, as it would not be possible to determine
