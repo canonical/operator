@@ -784,6 +784,7 @@ class ExecProcess:
         encoding: typing.Optional[str],
         change_id: ChangeID,
         cancel_stdin: typing.Callable,
+        cancel_reader: typing.Optional[int],
         threads: typing.List[threading.Thread],
     ):
         self.stdin = stdin
@@ -796,6 +797,7 @@ class ExecProcess:
         self._encoding = encoding
         self._change_id = change_id
         self._cancel_stdin = cancel_stdin
+        self._cancel_reader = cancel_reader
         self._threads = threads
 
     def wait(self):
@@ -825,6 +827,11 @@ class ExecProcess:
         # Wait for all threads to finish (e.g., message barrier sent)
         for thread in self._threads:
             thread.join()
+
+        # If we opened a cancel_reader pipe, close the read side now (write
+        # side was already closed by _cancel_stdin().
+        if self._cancel_reader is not None:
+            os.close(self._cancel_reader)
 
         if change.err:
             raise ChangeError(change.err, change)
@@ -886,7 +893,6 @@ def _reader_to_websocket(reader, ws, encoding, cancel_reader=None, bufsize=128*1
         if cancel_reader is not None:
             result = select.select([cancel_reader, reader], [], [])
             if cancel_reader in result[0]:
-                os.close(cancel_reader)
                 break
 
         chunk = reader.read(bufsize)
@@ -1675,10 +1681,10 @@ class Client:
             raise ConnectionError('unexpected error connecting to websockets: {}'.format(e))
 
         cancel_stdin = None
+        cancel_reader = None
         threads = []
 
         if stdin is not None:
-            cancel_reader = None
             if _has_fileno(stdin):
                 if sys.platform == 'win32':
                     raise NotImplementedError('file-based stdin not supported on Windows')
@@ -1720,6 +1726,7 @@ class Client:
             encoding=encoding,
             change_id=ChangeID(change_id),
             cancel_stdin=cancel_stdin,
+            cancel_reader=cancel_reader,
             threads=threads,
         )
         return process
