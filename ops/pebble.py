@@ -39,7 +39,7 @@ import urllib.parse
 import urllib.request
 
 from ops._private import yaml
-from ops._vendor import websocket  # TODO: need to get this working on Python 3.5
+from ops._vendor import websocket
 
 
 _not_provided = object()
@@ -1662,9 +1662,17 @@ class Client:
         change_id = resp['change']
         websocket_ids = resp['result']['websocket-ids']
 
-        io_ws = self._connect_websocket(change_id, websocket_ids['io'])
-        stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
-        control_ws = self._connect_websocket(change_id, websocket_ids['control'])
+        try:
+            io_ws = self._connect_websocket(change_id, websocket_ids['io'])
+            stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
+            control_ws = self._connect_websocket(change_id, websocket_ids['control'])
+        except websocket.WebSocketException as e:
+            # Error connecting to websockets, probably due to the exec/change
+            # finishing early with an error. Call wait_change to pick that up.
+            change = self.wait_change(ChangeID(change_id))
+            if change.err:
+                raise ChangeError(change.err, change)
+            raise ConnectionError('unexpected error connecting to websockets: {}'.format(e))
 
         cancel_stdin = None
         threads = []

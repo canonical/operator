@@ -27,6 +27,7 @@ import tempfile
 import ops.pebble as pebble
 import test.fake_pebble as fake_pebble
 from ops._private import yaml
+from ops._vendor import websocket
 
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
@@ -2368,3 +2369,20 @@ class TestExec(unittest.TestCase):
             ('BIN', b'bazz\n'),
             ('TXT', ''),
         ])
+
+    def test_connect_websocket_error(self):
+        class Client(MockClient):
+            def _connect_websocket(self, change_id, websocket_id):
+                raise websocket.WebSocketException('conn!')
+
+        self.client = Client()
+        self.add_responses('123', 0, change_err='change error!')
+        with self.assertRaises(pebble.ChangeError) as cm:
+            self.client.exec(['foo'])
+        self.assertEqual(str(cm.exception), 'change error!')
+
+        self.client = Client()
+        self.add_responses('123', 0)
+        with self.assertRaises(pebble.ConnectionError) as cm:
+            self.client.exec(['foo'])
+        self.assertIn(str(cm.exception), 'unexpected error connecting to websockets: conn!')
