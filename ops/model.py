@@ -274,7 +274,6 @@ class Application:
         This only works for this charm's application -- the unit agent isn't able to get
         planned units for other applications in the model.
         """
-
         if not self._is_our_app:
             raise RuntimeError(
                 'cannot get planned units for a remote application {}.'.format(self))
