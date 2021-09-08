@@ -1025,7 +1025,7 @@ class _TestingModelBackend:
             peer_units = self._relation_list_map[peer_id]
             units += peer_units
 
-        count = len(list(set(units)))  # de-dupe and get length.
+        count = len(set(units))  # de-dupe and get length.
 
         return count + 1  # Account for this unit.
 
