@@ -1091,8 +1091,8 @@ class Container:
          from the underlying Pebble operations will log error messages rather than
          raising exceptions.
 
-        Example:
-            ```
+        Example::
+
             container = self.unit.get_container("example")
             with container.is_ready() as c:
                 c.pull('/does/not/exist')
@@ -1101,7 +1101,6 @@ class Container:
                 # was caught earlier
                 c.get_service("foo")
             c.completed # False
-            ```
 
             This will result in an `ERROR` log from PathError, but not a
             traceback. In addition, the block running inside the contextmanager
@@ -1111,8 +1110,8 @@ class Container:
         :meth:`is_ready` can also be used as a bare function, which will log an
         error if the container is not ready.
 
-        Example:
-            ```
+        Example::
+
             if container.is_ready():
                 do_something()
             else:
