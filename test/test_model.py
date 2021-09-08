@@ -828,6 +828,24 @@ containers:
         with self.assertRaises(TypeError):
             self.container.start()
 
+    def test_restart(self):
+        two_services = [
+            self._make_service('foo', 'enabled', 'active'),
+            self._make_service('bar', 'disabled', 'inactive'),
+        ]
+        self.pebble.responses.append(two_services)
+        self.container.restart('foo')
+        self.pebble.responses.append(two_services)
+        self.container.restart('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('get_services', ('foo',)),
+            ('stop', ('foo',)),
+            ('start', ('foo',)),
+            ('get_services', ('foo', 'bar')),
+            ('stop', ('foo',)),
+            ('start', ('foo', 'bar',)),
+        ])
+
     def test_stop(self):
         self.container.stop('foo')
         self.container.stop('foo', 'bar')

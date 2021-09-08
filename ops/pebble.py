@@ -542,6 +542,17 @@ class Service:
     def __repr__(self) -> str:
         return 'Service({!r})'.format(self.to_dict())
 
+    def __eq__(self, other: typing.Union[typing.Dict, 'Service']) -> bool:
+        """Compare this service description to another."""
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Service):
+            return self.to_dict() == other.to_dict()
+        else:
+            raise ValueError(
+                "Cannot compare pebble.Service to {}".format(type(other))
+            )
+
 
 class ServiceStartup(enum.Enum):
     """Enum of service startup options."""
@@ -854,18 +865,85 @@ class Client:
     def wait_change(
         self, change_id: ChangeID, timeout: float = 30.0, delay: float = 0.1,
     ) -> Change:
-        """Poll change every delay seconds (up to timeout) for it to be ready."""
-        deadline = time.time() + timeout
+        """Wait for the given change to be ready.
 
-        while time.time() < deadline:
+        If the Pebble server supports the /v1/changes/{id}/wait API endpoint,
+        use that to avoid polling, otherwise poll /v1/changes/{id} every delay
+        seconds.
+
+        Args:
+            change_id: Change ID of change to wait for.
+            timeout: Maximum time in seconds to wait for the change to be
+                ready. May be None, in which case wait_change never times out.
+            delay: If polling, this is the delay in seconds between attempts.
+
+        Returns:
+            The Change object being waited on.
+
+        Raises:
+            TimeoutError: If the maximum timeout is reached.
+        """
+        try:
+            return self._wait_change_using_wait(change_id, timeout)
+        except NotImplementedError:
+            # Pebble server doesn't support wait endpoint, fall back to polling
+            return self._wait_change_using_polling(change_id, timeout, delay)
+
+    def _wait_change_using_wait(self, change_id, timeout):
+        """Wait for a change to be ready using the wait-change API."""
+        deadline = time.time() + timeout if timeout is not None else None
+
+        # Hit the wait endpoint every Client.timeout-1 seconds to avoid long
+        # requests (the -1 is to ensure it wakes up before the socket timeout)
+        while True:
+            this_timeout = max(self.timeout - 1, 1)  # minimum of 1 second
+            if timeout is not None:
+                time_remaining = deadline - time.time()
+                if time_remaining <= 0:
+                    break
+                # Wait the lesser of the time remaining and Client.timeout-1
+                this_timeout = min(time_remaining, this_timeout)
+
+            try:
+                return self._wait_change(change_id, this_timeout)
+            except TimeoutError:
+                # Catch timeout from wait endpoint and loop to check deadline
+                pass
+
+        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
+            change_id, timeout))
+
+    def _wait_change(self, change_id: ChangeID, timeout: float = None) -> Change:
+        """Call the wait-change API endpoint directly."""
+        query = {}
+        if timeout is not None:
+            query['timeout'] = '{:.3f}s'.format(timeout)
+
+        try:
+            resp = self._request('GET', '/v1/changes/{}/wait'.format(change_id), query)
+        except APIError as e:
+            if e.code == 404:
+                raise NotImplementedError('server does not implement wait-change endpoint')
+            if e.code == 504:
+                raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
+                    change_id, timeout))
+            raise
+
+        return Change.from_dict(resp['result'])
+
+    def _wait_change_using_polling(self, change_id, timeout, delay):
+        """Wait for a change to be ready by polling the get-change API."""
+        deadline = time.time() + timeout if timeout is not None else None
+
+        while timeout is None or time.time() < deadline:
             change = self.get_change(change_id)
             if change.ready:
                 return change
 
             time.sleep(delay)
 
-        raise TimeoutError(
-            'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
+        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
+            change_id, timeout))
 
     def add_layer(
             self, label: str, layer: typing.Union[str, dict, Layer], *, combine: bool = False):

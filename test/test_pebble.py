@@ -459,6 +459,25 @@ services:
         self.assertEqual(plan.to_yaml(), reformed)
         self.assertEqual(str(plan), reformed)
 
+    def test_service_equality(self):
+        plan = pebble.Plan('')
+        self.assertEqual(plan.services, {})
+
+        plan = pebble.Plan('services:\n foo:\n  override: replace\n  command: echo foo')
+
+        old_service = pebble.Service(name="foo",
+                                     raw={
+                                          "override": "replace",
+                                          "command": "echo foo"
+                                         })
+        old_services = {"foo": old_service}
+        self.assertEqual(plan.services, old_services)
+
+        services_as_dict = {
+            "foo": {"override": "replace", "command": "echo foo"}
+            }
+        self.assertEqual(plan.services, services_as_dict)
+
 
 class TestLayer(unittest.TestCase):
     def _assert_empty(self, layer):
@@ -541,6 +560,29 @@ summary: Sum Mary
         self.assertEqual(s.to_yaml(), yaml)
         self.assertEqual(str(s), yaml)
 
+    def test_layer_service_equality(self):
+        s = pebble.Layer({})
+        self._assert_empty(s)
+
+        d = {
+            'summary': 'Sum Mary',
+            'description': 'The quick brown fox!',
+            'services': {
+                'foo': {
+                    'summary': 'Foo',
+                    'command': 'echo foo',
+                },
+                'bar': {
+                    'summary': 'Bar',
+                    'command': 'echo bar',
+                },
+            }
+        }
+        s = pebble.Layer(d)
+        t = pebble.Layer(d)
+
+        self.assertEqual(s.services, t.services)
+
 
 class TestService(unittest.TestCase):
     def _assert_empty(self, service, name):
@@ -614,6 +656,43 @@ class TestService(unittest.TestCase):
         self.assertEqual(d['requires'], ['r1', 'r2'])
         self.assertEqual(d['environment'], {'k1': 'v1', 'k2': 'v2'})
 
+    def test_equality(self):
+        d = {
+            'summary': 'Sum Mary',
+            'description': 'The lazy quick brown',
+            'startup': 'Start Up',
+            'override': 'override',
+            'command': 'echo sum mary',
+            'after': ['a1', 'a2'],
+            'before': ['b1', 'b2'],
+            'requires': ['r1', 'r2'],
+            'environment': {'k1': 'v1', 'k2': 'v2'},
+            'user': 'bob',
+            'user-id': 1000,
+            'group': 'staff',
+            'group-id': 2000,
+        }
+        one = pebble.Service("Name 1", d)
+        two = pebble.Service("Name 1", d)
+        self.assertEqual(one, two)
+
+        as_dict = {
+            'summary': 'Sum Mary',
+            'description': 'The lazy quick brown',
+            'startup': 'Start Up',
+            'override': 'override',
+            'command': 'echo sum mary',
+            'after': ['a1', 'a2'],
+            'before': ['b1', 'b2'],
+            'requires': ['r1', 'r2'],
+            'environment': {'k1': 'v1', 'k2': 'v2'},
+            'user': 'bob',
+            'user-id': 1000,
+            'group': 'staff',
+            'group-id': 2000,
+        }
+        self.assertEqual(one, as_dict)
+
 
 class TestServiceInfo(unittest.TestCase):
     def test_service_startup(self):
@@ -672,10 +751,16 @@ class MockClient(pebble.Client):
     def __init__(self):
         self.requests = []
         self.responses = []
+        self.timeout = 5
 
     def _request(self, method, path, query=None, body=None):
         self.requests.append((method, path, query, body))
-        return self.responses.pop(0)
+        resp = self.responses.pop(0)
+        if isinstance(resp, Exception):
+            raise resp
+        if callable(resp):
+            resp = resp()
+        return resp
 
     def _request_raw(self, method, path, query=None, headers=None, data=None):
         self.requests.append((method, path, query, headers, data))
@@ -894,14 +979,6 @@ class TestClient(unittest.TestCase):
             "type": "async"
         })
         change = self.build_mock_change_dict()
-        change['ready'] = False
-        self.client.responses.append({
-            "result": change,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
-        })
-        change = self.build_mock_change_dict()
         change['ready'] = True
         self.client.responses.append({
             "result": change,
@@ -913,8 +990,7 @@ class TestClient(unittest.TestCase):
         self.assertEqual(change_id, '70')
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/services', None, {'action': action, 'services': services}),
-            ('GET', '/v1/changes/70', None, None),
-            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ])
 
     def _services_action_async_helper(self, action, api_func, services):
@@ -1000,11 +1076,115 @@ class TestClient(unittest.TestCase):
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/services', None, {'action': 'autostart', 'services': []}),
-            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ])
 
+    def test_wait_change_success(self, timeout=30.0):
+        change = self.build_mock_change_dict()
+        self.client.responses.append({
+            "result": change,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+
+        response = self.client.wait_change('70', timeout=timeout)
+        self.assertEqual(response.id, '70')
+        self.assertTrue(response.ready)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+        ])
+
+    def test_wait_change_success_timeout_none(self):
+        self.test_wait_change_success(timeout=None)
+
+    def test_wait_change_success_multiple_calls(self):
+        mock_time = MockTime()
+        with unittest.mock.patch('ops.pebble.time', mock_time):
+            def timeout_response(n):
+                mock_time.sleep(n)  # simulate passing of time due to wait_change call
+                raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
+            self.client.responses.append(lambda: timeout_response(4))
+
+            change = self.build_mock_change_dict()
+            self.client.responses.append({
+                "result": change,
+                "status": "OK",
+                "status-code": 200,
+                "type": "sync"
+            })
+
+            response = self.client.wait_change('70')
+            self.assertEqual(response.id, '70')
+            self.assertTrue(response.ready)
+
+            self.assertEqual(self.client.requests, [
+                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+            ])
+
+        self.assertEqual(mock_time.time(), 4)
+
+    def test_wait_change_success_polled(self, timeout=30.0):
+        mock_time = MockTime()
+        with unittest.mock.patch('ops.pebble.time', mock_time):
+            # Trigger polled mode
+            self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+
+            for i in range(3):
+                change = self.build_mock_change_dict()
+                change['ready'] = i == 2
+                self.client.responses.append({
+                    "result": change,
+                    "status": "OK",
+                    "status-code": 200,
+                    "type": "sync"
+                })
+
+            response = self.client.wait_change('70', timeout=timeout, delay=1)
+            self.assertEqual(response.id, '70')
+            self.assertTrue(response.ready)
+
+            self.assertEqual(self.client.requests, [
+                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+                ('GET', '/v1/changes/70', None, None),
+                ('GET', '/v1/changes/70', None, None),
+                ('GET', '/v1/changes/70', None, None),
+            ])
+
+        self.assertEqual(mock_time.time(), 2)
+
+    def test_wait_change_success_polled_timeout_none(self):
+        self.test_wait_change_success_polled(timeout=None)
+
     def test_wait_change_timeout(self):
-        with unittest.mock.patch('ops.pebble.time', MockTime()):
+        mock_time = MockTime()
+        with unittest.mock.patch('ops.pebble.time', mock_time):
+            def timeout_response(n):
+                mock_time.sleep(n)  # simulate passing of time due to wait_change call
+                raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
+            self.client.responses.append(lambda: timeout_response(4))
+            self.client.responses.append(lambda: timeout_response(2))
+
+            with self.assertRaises(pebble.TimeoutError) as cm:
+                self.client.wait_change('70', timeout=6)
+            self.assertIsInstance(cm.exception, pebble.Error)
+            self.assertIsInstance(cm.exception, TimeoutError)
+
+            self.assertEqual(self.client.requests, [
+                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+                ('GET', '/v1/changes/70/wait', {'timeout': '2.000s'}, None),
+            ])
+
+        self.assertEqual(mock_time.time(), 6)
+
+    def test_wait_change_timeout_polled(self):
+        mock_time = MockTime()
+        with unittest.mock.patch('ops.pebble.time', mock_time):
+            # Trigger polled mode
+            self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+
             change = self.build_mock_change_dict()
             change['ready'] = False
             for _ in range(3):
@@ -1021,10 +1201,13 @@ class TestClient(unittest.TestCase):
             self.assertIsInstance(cm.exception, TimeoutError)
 
             self.assertEqual(self.client.requests, [
+                ('GET', '/v1/changes/70/wait', {'timeout': '3.000s'}, None),
                 ('GET', '/v1/changes/70', None, None),
                 ('GET', '/v1/changes/70', None, None),
                 ('GET', '/v1/changes/70', None, None),
             ])
+
+        self.assertEqual(mock_time.time(), 3)
 
     def test_wait_change_error(self):
         change = self.build_mock_change_dict()
@@ -1041,7 +1224,7 @@ class TestClient(unittest.TestCase):
         self.assertEqual(response.err, 'Some kind of service error')
 
         self.assertEqual(self.client.requests, [
-            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ])
 
     def test_add_layer(self):
