@@ -1061,7 +1061,10 @@ class Container:
 
             container = self.unit.get_container("example")
             if container.can_connect():
-                c.pull('/does/not/exist')
+                try:
+                    c.pull('/does/not/exist')
+                except ProtocolError, PathError:
+                    # handle it
             else:
                 event.defer()
         """
