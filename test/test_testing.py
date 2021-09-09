@@ -994,6 +994,21 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.model.name, 'foo')
         self.assertEqual(harness.model.uuid, '96957e90-e006-11eb-ba80-0242ac130004')
 
+    def test_storage_add(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        stor_id = harness.add_storage("test")
+        self.assertIsNotNone(stor_id)
+
+        self.assertIn(str(stor_id), harness._backend.storage_list("test"))
+        self.assertEqual("/test0", harness._backend.storage_get("test/0", "location"))
+
     def test_actions_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(tmp))
