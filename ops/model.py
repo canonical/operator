@@ -38,14 +38,6 @@ from ops.jujuversion import JujuVersion
 
 logger = logging.getLogger(__name__)
 
-ErrorsWithMessage = (
-    pebble.APIError,
-    pebble.ConnectionError,
-    pebble.PathError,
-    pebble.ProtocolError,
-    pebble.TimeoutError,
-)
-
 
 class Model:
     """Represents the Juju Model as seen from this unit.
@@ -1062,8 +1054,8 @@ class Container:
         time the method is called. It does not guard against the Pebble API becoming unavailable,
         and should be treated as a 'point in time' status only.
 
-        If the Pebble API later fails, serious consideration should be given as to the reasoning
-        for this.
+        If the Pebble API later fails, serious consideration should be given as to the reason for
+        this.
 
         Example::
 
@@ -1076,13 +1068,15 @@ class Container:
         try:
             # TODO: This call to `get_system_info` should be replaced with a call to a more
             # appropriate endpoint that has stronger connotations of what constitutes a Pebble
-            # instance that is in fact 'ready'
+            # instance that is in fact 'ready'.
             self._pebble.get_system_info()
         except pebble.ConnectionError as e:
-            logger.error("Could not connect to Pebble API: %s", e.message)
+            logger.error("Could not connect to Pebble API: %s", e.message())
             return False
-        except pebble.TimeoutError as e:
-            logger.error("Timeout when connecting to Pebble API: %s", e.message)
+        except pebble.APIError as e:
+            # An API error is only raised when the Pebble API returns invalid JSON, or the response
+            # cannot be read. Both of these are a likely indicator that something is wrong.
+            logger.error("Got an unexpected response from the Pebble API: %s", str(e))
             return False
         return True
 
