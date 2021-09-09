@@ -1,7 +1,7 @@
 # The Charmed Operator Framework
 
 This Charmed Operator Framework simplifies [Kubernetes
-operator](https://charmhub.io/about) development for
+operator](https://charmhub.io/about) development for 
 [model-driven application
 management](https://juju.is/model-driven-operations).
 
@@ -11,7 +11,7 @@ Operators simplify software management and operations. They capture
 reusable app domain knowledge from experts in a software component that
 can be shared.
 
-This project extends the operator pattern to enable
+This project extends the operator pattern to enable 
 [charmed operators](https://juju.is/universal-operators), not just
 for Kubernetes but also operators for traditional Linux or Windows
 application management.
@@ -25,7 +25,7 @@ Python.
 ## Simple, composable operators
 
 Operators should 'do one thing and do it well'. Each operator drives a
-single microservice and can be [composed with other
+single microservice and can be [composed with other 
 operators](https://juju.is/integration) to deliver a complex application.
 
 It is better to have small, reusable operators that each drive a single
