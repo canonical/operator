@@ -124,13 +124,11 @@ class InfrastructureTests(unittest.TestCase):
             self.fail("Please add copyright headers to the following files:\n" + "\n".join(issues))
 
     def _run_setup(self, *args):
-        # from 3.6 we could just use encoding="utf8" here, but 3.5
-        # doesn't expose that and instead defaults to the wrong thing
         proc = subprocess.run(
             (sys.executable, 'setup.py') + args,
             stdout=subprocess.PIPE,
-            check=True)
-        out = proc.stdout.strip().decode("utf8")
+            check=True, encoding="utf8")
+        out = proc.stdout.strip()
         if os.linesep != '\n':
             out = out.replace(os.linesep, '\n')
         return out

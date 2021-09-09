@@ -1129,10 +1129,8 @@ class Container:
 
         self._pebble.stop_services(service_names)
 
-    # TODO(benhoyt) - should be: layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
-    # but this breaks on Python 3.5.2 (the default on Xenial). See:
-    # https://github.com/canonical/operator/issues/517
-    def add_layer(self, label: str, layer, *, combine: bool = False):
+    def add_layer(self, label: str,
+                  layer: typing.Union[str, typing.Dict, 'pebble.Layer'], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         Args:
