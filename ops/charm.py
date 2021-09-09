@@ -912,13 +912,13 @@ class ContainerMeta:
         Example::
 
             storage:
-              FOO:
+              foo:
                 type: filesystem
                 location: /test
             containers:
               bar:
                 mounts:
-                  - storage: FOO
+                  - storage: foo
                   - location: /test/mount
         """
         return self._mounts
