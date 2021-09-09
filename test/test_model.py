@@ -816,6 +816,10 @@ containers:
         self.container.autostart()
         self.assertEqual(self.pebble.requests, [('autostart',)])
 
+    def test_get_system_info(self):
+        self.container.is_ready()
+        self.assertEqual(self.pebble.requests, [('get_system_info',)])
+
     def test_start(self):
         self.container.start('foo')
         self.container.start('foo', 'bar')
@@ -1031,18 +1035,6 @@ containers:
             ('remove_path', '/path/2', True),
         ])
 
-    def test_no_exception_with_contextmanager(self):
-        with self.assertLogs() as logs:
-            self.pebble.responses.append('dummy')
-            with self.container.is_ready() as c:
-                raise ops.pebble.ConnectionError("Some dummy message")
-        self.assertIn("was raised due to", logs.records[0].getMessage())
-        self.assertEqual(c.completed, False)
-
-    def test_exception_without_contextmanager(self):
-        with self.assertRaises(ops.pebble.ConnectionError):
-            raise ops.pebble.ConnectionError("Some dummy message")
-
     def test_bare_is_ready_call(self):
         self.pebble.responses.append('dummy')
         self.assertTrue(self.container.is_ready())
@@ -1061,6 +1053,9 @@ class MockPebbleClient:
 
     def autostart_services(self):
         self.requests.append(('autostart',))
+
+    def get_system_info(self):
+        self.requests.append(('get_system_info',))
 
     def start_services(self, service_names):
         self.requests.append(('start', service_names))
