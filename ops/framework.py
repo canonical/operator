@@ -226,7 +226,7 @@ class EventSource:
         self.event_kind = None
         self.emitter_type = None
 
-    def _set_name(self, emitter_type, event_kind):
+    def __set_name__(self, emitter_type, event_kind):
         if self.event_kind is not None:
             raise RuntimeError(
                 'EventSource({}) reused as {}.{} and {}.{}'.format(
@@ -235,7 +235,7 @@ class EventSource:
                     self.event_kind,
                     emitter_type.__name__,
                     event_kind,
-                ))
+                )) from None
         self.event_kind = event_kind
         self.emitter_type = emitter_type
 
@@ -292,39 +292,7 @@ class HandleKind:
         return obj_type.__name__
 
 
-class _Metaclass(type):
-    """Helper class to ensure proper instantiation of Object-derived classes.
-
-    This class currently has a single purpose: events derived from EventSource
-    that are class attributes of Object-derived classes need to be told what
-    their name is in that class. For example, in
-
-        class SomeObject(Object):
-            something_happened = EventSource(SomethingHappened)
-
-    the instance of EventSource needs to know it's called 'something_happened'.
-
-    Starting from python 3.6 we could use __set_name__ on EventSource for this,
-    but until then this (meta)class does the equivalent work.
-
-    TODO: when we drop support for 3.5 drop this class, and rename _set_name in
-          EventSource to __set_name__; everything should continue to work.
-
-    """
-
-    def __new__(typ, *a, **kw):
-        k = super().__new__(typ, *a, **kw)
-        # k is now the Object-derived class; loop over its class attributes
-        for n, v in vars(k).items():
-            # we could do duck typing here if we want to support
-            # non-EventSource-derived shenanigans. We don't.
-            if isinstance(v, EventSource):
-                # this is what 3.6+ does automatically for us:
-                v._set_name(k, n)
-        return k
-
-
-class Object(metaclass=_Metaclass):
+class Object:
     """Base class of all the charm-related objects."""
 
     handle_kind = HandleKind()
@@ -397,7 +365,7 @@ class ObjectEvents(Object):
             pass
 
         event_descriptor = EventSource(event_type)
-        event_descriptor._set_name(cls, event_kind)
+        event_descriptor.__set_name__(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
 
     def _event_kinds(self):

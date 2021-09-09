@@ -546,8 +546,11 @@ class TestFramework(BaseTestCase):
         with self.assertRaises(RuntimeError) as cm:
             class OtherEvents(ObjectEvents):
                 foo = event
+
+        # __setname__ has a hardcoded exception string, though the full stack is
+        # shown to end-users. Suss out __cause__ for the tests
         self.assertEqual(
-            str(cm.exception),
+            str(cm.exception.__cause__),
             "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
         with self.assertRaises(RuntimeError) as cm:
@@ -555,7 +558,7 @@ class TestFramework(BaseTestCase):
                 on = MyEvents()
                 bar = event
         self.assertEqual(
-            str(cm.exception),
+            str(cm.exception.__cause__),
             "EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
 
     def test_reemit_ignores_unknown_event_type(self):
