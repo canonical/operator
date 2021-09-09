@@ -1047,12 +1047,12 @@ class Container:
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
-    def is_ready(self) -> bool:
+    def can_connect(self) -> bool:
         """Check whether or not Pebble is ready as a simple property.
 
-        :meth:`is_ready` returns a bool that indicates whether the Pebble API is available at the
-        time the method is called. It does not guard against the Pebble API becoming unavailable,
-        and should be treated as a 'point in time' status only.
+        :meth:`can_connect` returns a bool that indicates whether the Pebble API is available at
+        the time the method is called. It does not guard against the Pebble API becoming
+        unavailable, and should be treated as a 'point in time' status only.
 
         If the Pebble API later fails, serious consideration should be given as to the reason for
         this.
@@ -1060,7 +1060,7 @@ class Container:
         Example::
 
             container = self.unit.get_container("example")
-            if container.is_ready():
+            if container.can_connect():
                 c.pull('/does/not/exist')
             else:
                 event.defer()

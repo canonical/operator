@@ -13,23 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import OrderedDict
-import json
 import ipaddress
+import json
 import os
 import pathlib
-from textwrap import dedent
 import unittest
+from collections import OrderedDict
+from test.test_helpers import fake_script, fake_script_calls
+from textwrap import dedent
 
-import ops.model
 import ops.charm
+import ops.model
 import ops.pebble
 import ops.testing
-from ops.charm import RelationMeta, RelationRole
-
 from ops._private import yaml
-
-from test.test_helpers import fake_script, fake_script_calls
+from ops.charm import RelationMeta, RelationRole
 
 
 class TestModel(unittest.TestCase):
@@ -817,7 +815,7 @@ containers:
         self.assertEqual(self.pebble.requests, [('autostart',)])
 
     def test_get_system_info(self):
-        self.container.is_ready()
+        self.container.can_connect()
         self.assertEqual(self.pebble.requests, [('get_system_info',)])
 
     def test_start(self):
@@ -1035,9 +1033,9 @@ containers:
             ('remove_path', '/path/2', True),
         ])
 
-    def test_bare_is_ready_call(self):
+    def test_bare_can_connect_call(self):
         self.pebble.responses.append('dummy')
-        self.assertTrue(self.container.is_ready())
+        self.assertTrue(self.container.can_connect())
 
 
 class MockPebbleBackend(ops.model._ModelBackend):
