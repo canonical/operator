@@ -1078,6 +1078,11 @@ class Container:
             # cannot be read. Both of these are a likely indicator that something is wrong.
             logger.error("Got an unexpected response from the Pebble API: %s", str(e))
             return False
+        except FileNotFoundError as e:
+            # In some cases, charm authors can attempt to hit the Pebble API before it has had the
+            # chance to create the UNIX socket in the shared volume.
+            logger.error("Could not connect to Pebble API: UNIX socket not found", str(e))
+            return False
         return True
 
     def autostart(self):
