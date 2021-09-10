@@ -1060,6 +1060,19 @@ class _TestingModelBackend:
             self._pebble_clients[socket_path] = client
         return client
 
+    def planned_units(self):
+        units = []
+        peer_names = set(self._meta.peers.keys())
+        for peer_id, peer_name in self._relation_names.items():
+            if peer_name not in peer_names:
+                continue
+            peer_units = self._relation_list_map[peer_id]
+            units += peer_units
+
+        count = len(set(units))  # de-dupe and get length.
+
+        return count + 1  # Account for this unit.
+
 
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:

@@ -749,6 +749,48 @@ class TestModel(unittest.TestCase):
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
 
+class TestApplication(unittest.TestCase):
+
+    def setUp(self):
+        self.harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
+            name: myapp
+            provides:
+              db0:
+                interface: db0
+            requires:
+              db1:
+                interface: db1
+            peers:
+              db2:
+                interface: db2
+            resources:
+              foo: {type: file, filename: foo.txt}
+              bar: {type: file, filename: bar.txt}
+        ''')
+        self.peer_rel_id = self.harness.add_relation('db2', 'db2')
+        self.app = self.harness.model.app
+
+    def test_planned_units(self):
+        rel_id = self.peer_rel_id
+
+        # Test that we always count ourself.
+        self.assertEqual(self.app.planned_units(), 1)
+
+        # Add some units, and verify count.
+        self.harness.add_relation_unit(rel_id, 'myapp/1')
+        self.harness.add_relation_unit(rel_id, 'myapp/2')
+
+        self.assertEqual(self.app.planned_units(), 3)
+
+        self.harness.add_relation_unit(rel_id, 'myapp/3')
+        self.assertEqual(self.app.planned_units(), 4)
+
+        # And remove a unit
+        self.harness.remove_relation_unit(rel_id, 'myapp/2')
+
+        self.assertEqual(self.app.planned_units(), 3)
+
+
 class TestContainers(unittest.TestCase):
     def setUp(self):
         meta = ops.charm.CharmMeta.from_yaml("""

@@ -262,6 +262,24 @@ class Application:
         self._backend.status_set(value.name, value.message, is_app=True)
         self._status = value
 
+    def planned_units(self) -> int:
+        """Get the number of units that Juju has "planned" for this application.
+
+        E.g., if an operator ran "juju deploy foo", then "juju add-unit -n 2 foo", the
+        planned unit count for foo would be 3.
+
+        We deliberately do not attempt to inspect whether these units are actually running
+        or not at present.
+
+        This only works for this charm's application -- the unit agent isn't able to get
+        planned units for other applications in the model.
+        """
+        if not self._is_our_app:
+            raise RuntimeError(
+                'cannot get planned units for a remote application {}.'.format(self))
+
+        return self._backend.planned_units()
+
     def __repr__(self):
         return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
 
@@ -1675,6 +1693,19 @@ class _ModelBackend:
     def get_pebble(self, socket_path: str) -> 'pebble.Client':
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
+
+    def planned_units(self) -> int:
+        """Count of "planned" units that will run this application.
+
+        Includes the current unit in the count.
+
+        """
+        # The goal-state tool will return the information that we need. Goal state as a general
+        # concept is being deprecated, however, in favor of approaches such as the one that we use
+        # here.
+        app_state = self._run('goal-state', return_output=True, use_json=True)
+        # Planned units can be zero. We don't need to do error checking here.
+        return len(app_state.get('units', []))
 
 
 class _ModelBackendValidator:
