@@ -17,7 +17,7 @@
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
-from email.mime.multipart import MIMEBase, MIMEMultipart
+import binascii
 import cgi
 import datetime
 import email.parser
@@ -25,6 +25,7 @@ import enum
 import http.client
 import io
 import json
+import os
 import re
 import socket
 import sys
@@ -124,6 +125,17 @@ def _json_loads(s: typing.Union[str, bytes]) -> typing.Dict:
 
 class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
+
+    def __repr__(self):
+        return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.args)
+
+    def name(self):
+        """Return a string representation of the model plus class."""
+        return '<{}.{}>'.format(type(self).__module__, type(self).__name__)
+
+    def message(self):
+        """Return the message passed as an argument."""
+        return self.args[0]
 
 
 class TimeoutError(TimeoutError, Error):
@@ -530,6 +542,17 @@ class Service:
     def __repr__(self) -> str:
         return 'Service({!r})'.format(self.to_dict())
 
+    def __eq__(self, other: typing.Union[typing.Dict, 'Service']) -> bool:
+        """Compare this service description to another."""
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Service):
+            return self.to_dict() == other.to_dict()
+        else:
+            raise ValueError(
+                "Cannot compare pebble.Service to {}".format(type(other))
+            )
+
 
 class ServiceStartup(enum.Enum):
     """Enum of service startup options."""
@@ -842,18 +865,85 @@ class Client:
     def wait_change(
         self, change_id: ChangeID, timeout: float = 30.0, delay: float = 0.1,
     ) -> Change:
-        """Poll change every delay seconds (up to timeout) for it to be ready."""
-        deadline = time.time() + timeout
+        """Wait for the given change to be ready.
 
-        while time.time() < deadline:
+        If the Pebble server supports the /v1/changes/{id}/wait API endpoint,
+        use that to avoid polling, otherwise poll /v1/changes/{id} every delay
+        seconds.
+
+        Args:
+            change_id: Change ID of change to wait for.
+            timeout: Maximum time in seconds to wait for the change to be
+                ready. May be None, in which case wait_change never times out.
+            delay: If polling, this is the delay in seconds between attempts.
+
+        Returns:
+            The Change object being waited on.
+
+        Raises:
+            TimeoutError: If the maximum timeout is reached.
+        """
+        try:
+            return self._wait_change_using_wait(change_id, timeout)
+        except NotImplementedError:
+            # Pebble server doesn't support wait endpoint, fall back to polling
+            return self._wait_change_using_polling(change_id, timeout, delay)
+
+    def _wait_change_using_wait(self, change_id, timeout):
+        """Wait for a change to be ready using the wait-change API."""
+        deadline = time.time() + timeout if timeout is not None else None
+
+        # Hit the wait endpoint every Client.timeout-1 seconds to avoid long
+        # requests (the -1 is to ensure it wakes up before the socket timeout)
+        while True:
+            this_timeout = max(self.timeout - 1, 1)  # minimum of 1 second
+            if timeout is not None:
+                time_remaining = deadline - time.time()
+                if time_remaining <= 0:
+                    break
+                # Wait the lesser of the time remaining and Client.timeout-1
+                this_timeout = min(time_remaining, this_timeout)
+
+            try:
+                return self._wait_change(change_id, this_timeout)
+            except TimeoutError:
+                # Catch timeout from wait endpoint and loop to check deadline
+                pass
+
+        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
+            change_id, timeout))
+
+    def _wait_change(self, change_id: ChangeID, timeout: float = None) -> Change:
+        """Call the wait-change API endpoint directly."""
+        query = {}
+        if timeout is not None:
+            query['timeout'] = '{:.3f}s'.format(timeout)
+
+        try:
+            resp = self._request('GET', '/v1/changes/{}/wait'.format(change_id), query)
+        except APIError as e:
+            if e.code == 404:
+                raise NotImplementedError('server does not implement wait-change endpoint')
+            if e.code == 504:
+                raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
+                    change_id, timeout))
+            raise
+
+        return Change.from_dict(resp['result'])
+
+    def _wait_change_using_polling(self, change_id, timeout, delay):
+        """Wait for a change to be ready by polling the get-change API."""
+        deadline = time.time() + timeout if timeout is not None else None
+
+        while timeout is None or time.time() < deadline:
             change = self.get_change(change_id)
             if change.ready:
                 return change
 
             time.sleep(delay)
 
-        raise TimeoutError(
-            'timed out waiting for change {} ({} seconds)'.format(change_id, timeout))
+        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
+            change_id, timeout))
 
     def add_layer(
             self, label: str, layer: typing.Union[str, dict, Layer], *, combine: bool = False):
@@ -1011,28 +1101,18 @@ class Client:
             'files': [info],
         }
 
-        multipart = MIMEMultipart('form-data')
-
-        part = MIMEBase('application', 'json')
-        part.add_header('Content-Disposition', 'form-data', name='request')
-        part.set_payload(json.dumps(metadata))
-        multipart.attach(part)
-
-        part = MIMEBase('application', 'octet-stream')
-        part.add_header('Content-Disposition', 'form-data', name='files', filename=path)
         if hasattr(source, 'read'):
             content = source.read()
         else:
             content = source
         if isinstance(content, str):
             content = content.encode(encoding)
-        part.set_payload(content)
-        multipart.attach(part)
 
-        data = multipart.as_bytes()  # must be called before accessing multipart['Content-Type']
+        data, content_type = self._encode_multipart(metadata, path, content)
+
         headers = {
             'Accept': 'application/json',
-            'Content-Type': multipart['Content-Type'],
+            'Content-Type': content_type,
         }
         response = self._request_raw('POST', '/v1/files', None, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
@@ -1053,6 +1133,29 @@ class Client:
         if group is not None:
             d['group'] = group
         return d
+
+    @staticmethod
+    def _encode_multipart(metadata, path, content):
+        # Python's stdlib mime/multipart handling is screwy and doesn't handle
+        # binary properly, so roll our own.
+        boundary = binascii.hexlify(os.urandom(16))
+        path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
+        parts = []
+        parts.extend([
+            b'--', boundary, b'\r\n',
+            b'Content-Type: application/json\r\n',
+            b'Content-Disposition: form-data; name="request"\r\n',
+            b'\r\n',
+            json.dumps(metadata).encode('utf-8'), b'\r\n',
+            b'--', boundary, b'\r\n',
+            b'Content-Type: application/octet-stream\r\n',
+            b'Content-Disposition: form-data; name="files"; filename="', path_escaped, b'"\r\n',
+            b'\r\n',
+            content, b'\r\n',
+            b'--', boundary, b'--\r\n',
+        ])
+        content_type = 'multipart/form-data; boundary="' + boundary.decode('utf-8') + '"'
+        return b''.join(parts), content_type
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[FileInfo]:

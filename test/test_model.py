@@ -828,6 +828,24 @@ containers:
         with self.assertRaises(TypeError):
             self.container.start()
 
+    def test_restart(self):
+        two_services = [
+            self._make_service('foo', 'enabled', 'active'),
+            self._make_service('bar', 'disabled', 'inactive'),
+        ]
+        self.pebble.responses.append(two_services)
+        self.container.restart('foo')
+        self.pebble.responses.append(two_services)
+        self.container.restart('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('get_services', ('foo',)),
+            ('stop', ('foo',)),
+            ('start', ('foo',)),
+            ('get_services', ('foo', 'bar')),
+            ('stop', ('foo',)),
+            ('start', ('foo', 'bar',)),
+        ])
+
     def test_stop(self):
         self.container.stop('foo')
         self.container.stop('foo', 'bar')
@@ -1012,6 +1030,22 @@ containers:
         self.assertEqual(self.pebble.requests, [
             ('remove_path', '/path/2', True),
         ])
+
+    def test_no_exception_with_contextmanager(self):
+        with self.assertLogs() as logs:
+            self.pebble.responses.append('dummy')
+            with self.container.is_ready() as c:
+                raise ops.pebble.ConnectionError("Some dummy message")
+        self.assertIn("was raised due to", logs.records[0].getMessage())
+        self.assertEqual(c.completed, False)
+
+    def test_exception_without_contextmanager(self):
+        with self.assertRaises(ops.pebble.ConnectionError):
+            raise ops.pebble.ConnectionError("Some dummy message")
+
+    def test_bare_is_ready_call(self):
+        self.pebble.responses.append('dummy')
+        self.assertTrue(self.container.is_ready())
 
 
 class MockPebbleBackend(ops.model._ModelBackend):
