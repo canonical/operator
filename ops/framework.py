@@ -1055,10 +1055,6 @@ class StoredDict(collections.abc.MutableMapping):
         else:
             return NotImplemented
 
-    def as_dict(self) -> typing.Dict:
-        """Return a copy of the backing data as a dict."""
-        return dict(self._under)
-
     def copy(self) -> typing.Dict:
         """Returns a copy of the backing `dict` as a deep copy dict."""
         return dict(self._under)
@@ -1097,17 +1093,8 @@ class StoredList(collections.abc.MutableSequence):
         self._under.append(value)
         self._stored_data.dirty = True
 
-    def as_list(self) -> typing.List:
-        """Return a copy of the backing data as a list.
-
-        Any list copy in Python other than copy.deepcopy() still references the
-        original, including .copy(), some_list[:], list(some_list), and so on. `as_list`
-        matches this behavior.
-        """
-        return list(self._under)
-
     def copy(self) -> typing.List:
-        """Returns a copy of the backing `list` as a deep copy.
+        """Returns a copy of the backing `list`.
 
         Any list copy in Python other than copy.deepcopy() still references the
         original, including .copy(), some_list[:], list(some_list), and so on. `as_list`
@@ -1180,10 +1167,6 @@ class StoredSet(collections.abc.MutableSet):
         """
         self._under.discard(key)
         self._stored_data.dirty = True
-
-    def as_set(self) -> typing.Set:
-        """Return a copy of the backing data as a set."""
-        return set(self._under)
 
     def copy(self) -> 'StoredSet':
         """Returns a copy of the backing `set`."""

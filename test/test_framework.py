@@ -902,25 +902,7 @@ class TestStoredState(BaseTestCase):
         class TempStorage(object):
             dirty = False
         sd = StoredDict(TempStorage(), {"a": 1})
-        copy = sd.as_dict()
-
-        sd["a"] = 2
-        sd["b"] = 123
-
-        self.assertEqual(copy["a"], 1)
-        self.assertNotIn("b", copy)
-
-        copy["b"] = 456
-        self.assertNotEqual(sd["b"], copy["b"])
-
-    def test_stored_dict_as_dict(self):
-        self.assertEqual(StoredDict(None, {"a": 1}).as_dict(), {"a": 1})
-
-    def test_stored_dict_as_dict_does_not_reference_original(self):
-        class TempStorage(object):
-            dirty = False
-        sd = StoredDict(TempStorage(), {"a": 1})
-        copy = sd.as_dict()
+        copy = sd.copy()
 
         sd["a"] = 2
         sd["b"] = 123
@@ -954,9 +936,6 @@ class TestStoredState(BaseTestCase):
         sl[2][0] = 5
         self.assertEqual(5, copy[2][0])
 
-    def test_stored_list_as_list(self):
-        self.assertEqual(StoredList(None, [1]).as_list(), [1])
-
     def test_stored_set_repr(self):
         self.assertEqual(repr(StoredSet(None, set())), 'ops.framework.StoredSet()')
         self.assertEqual(repr(StoredSet(None, {1})), 'ops.framework.StoredSet({1})')
@@ -964,9 +943,6 @@ class TestStoredState(BaseTestCase):
     def test_stored_set_copy(self):
         ss = StoredSet(None, {1})
         self.assertEqual(ss.copy(), {1})
-
-    def test_stored_list_as_set(self):
-        self.assertEqual(StoredSet(None, {1}).as_set(), {1})
 
     def test_basic_state_storage(self):
         class SomeObject(Object):
