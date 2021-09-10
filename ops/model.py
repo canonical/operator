@@ -269,7 +269,7 @@ class Application:
         planned unit count for foo would be 3.
 
         We deliberately do not attempt to inspect whether these units are actually running
-        or not. That is a task left up to the future, when goal state is more mature.
+        or not at present.
 
         This only works for this charm's application -- the unit agent isn't able to get
         planned units for other applications in the model.
@@ -1697,16 +1697,15 @@ class _ModelBackend:
     def planned_units(self) -> int:
         """Count of "planned" units that will run this application.
 
-        We use goal-state here, in the simplest possible way. When we implement goal state
-        more completely, this should turn into a wrapper around the more complete call to
-        goal state.
-
         Includes the current unit in the count.
 
         """
-        goal_state = self._run('goal-state', return_output=True, use_json=True)
+        # The goal-state tool will return the information that we need. Goal state as a general
+        # concept is being deprecated, however, in favor of approaches such as the one that we use
+        # here.
+        app_state = self._run('goal-state', return_output=True, use_json=True)
         # Planned units can be zero. We don't need to do error checking here.
-        return len(goal_state.get('units', []))
+        return len(app_state.get('units', []))
 
 
 class _ModelBackendValidator:
