@@ -1048,7 +1048,7 @@ class Container:
         return self._pebble
 
     def can_connect(self) -> bool:
-        """Check whether or not Pebble is ready as a simple property.
+        """Report whether the Pebble API is reachable in the container.
 
         :meth:`can_connect` returns a bool that indicates whether the Pebble API is available at
         the time the method is called. It does not guard against the Pebble API becoming
