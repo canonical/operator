@@ -1090,7 +1090,7 @@ class _TestingPebbleClient:
         self._service_status = {}
 
     def get_system_info(self) -> pebble.SystemInfo:
-        raise NotImplementedError(self.get_system_info)
+        return pebble.SystemInfo(version="1.0.0")
 
     def get_warnings(
             self, select: pebble.WarningState = pebble.WarningState.PENDING,
