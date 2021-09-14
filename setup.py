@@ -73,8 +73,8 @@ version = {!r}
             # include Windows once we're running tests there also
             # "Operating System :: Microsoft :: Windows",
         ],
-        python_requires='>=3.6',
-        install_requires=["PyYAML", "semantic_version"],
+        python_requires='>=3.5',
+        install_requires=["PyYAML"],
     )
 
 finally:
