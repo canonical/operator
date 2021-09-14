@@ -132,10 +132,9 @@ def main():
                 with open(args.layer_path, encoding='utf-8') as f:
                     layer_yaml = f.read()
             except IOError as e:
-                parser.error('cannot read layer YAML: {}'.format(e))
+                parser.error(f'cannot read layer YAML: {e}')
             client.add_layer(args.label, layer_yaml, combine=bool(args.combine))
-            result = 'Layer {!r} added successfully from {!r}'.format(
-                args.label, args.layer_path)
+            result = f'Layer {args.label!r} added successfully from {args.layer_path!r}'
         elif args.command == 'autostart':
             result = client.autostart_services()
         elif args.command == 'change':
@@ -147,7 +146,7 @@ def main():
             result = client.list_files(args.path, pattern=args.pattern, itself=args.directory)
         elif args.command == 'mkdir':
             client.make_dir(args.path, make_parents=bool(args.parents))
-            result = 'created remote directory {}'.format(args.path)
+            result = f'created remote directory {args.path}'
         elif args.command == 'plan':
             result = client.get_plan().to_yaml()
         elif args.command == 'pull':
@@ -155,7 +154,7 @@ def main():
             if args.local_path != '-':
                 with open(args.local_path, 'wb') as f:
                     f.write(content)
-                result = 'wrote remote file {} to {}'.format(args.remote_path, args.local_path)
+                result = f'wrote remote file {args.remote_path} to {args.local_path}'
             else:
                 sys.stdout.buffer.write(content)
                 return
@@ -165,10 +164,10 @@ def main():
                     args.remote_path, f, make_dirs=args.dirs,
                     permissions=int(args.mode, 8) if args.mode is not None else None,
                     user=args.user, group=args.group)
-            result = 'wrote {} to remote file {}'.format(args.local_path, args.remote_path)
+            result = f'wrote {args.local_path} to remote file {args.remote_path}'
         elif args.command == 'rm':
             client.remove_path(args.path, recursive=bool(args.recursive))
-            result = 'removed remote path {}'.format(args.path)
+            result = f'removed remote path {args.path}'
         elif args.command == 'services':
             result = client.get_services(args.service)
         elif args.command == 'start':
@@ -184,10 +183,10 @@ def main():
         else:
             raise AssertionError("shouldn't happen")
     except pebble.APIError as e:
-        print('APIError: {} {}: {}'.format(e.code, e.status, e.message), file=sys.stderr)
+        print(f'APIError: {e.code} {e.status}: {e.message}', file=sys.stderr)
         sys.exit(1)
     except pebble.ConnectionError as e:
-        print('ConnectionError: cannot connect to socket {!r}: {}'.format(socket_path, e),
+        print(f'ConnectionError: cannot connect to socket {socket_path!r}: {e}',
               file=sys.stderr)
         sys.exit(1)
     except pebble.ChangeError as e:

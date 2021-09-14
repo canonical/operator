@@ -308,9 +308,9 @@ class Harness(typing.Generic[CharmType]):
                         'password': 'password',
                         }
         if resource_name not in self._meta.resources.keys():
-            raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not a defined resources')
         if self._meta.resources[resource_name].type != "oci-image":
-            raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not an OCI Image')
 
         as_yaml = yaml.safe_dump(contents)
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
@@ -327,11 +327,11 @@ class Harness(typing.Generic[CharmType]):
                 returned by resource-get. If contents is a string, it will be encoded in utf-8
         """
         if resource_name not in self._meta.resources.keys():
-            raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not a defined resources')
         record = self._meta.resources[resource_name]
         if record.type != "file":
             raise RuntimeError(
-                'Resource {} is not a file, but actually {}'.format(resource_name, record.type))
+                f'Resource {resource_name} is not a file, but actually {record.type}')
         filename = record.filename
         if filename is None:
             filename = resource_name
@@ -617,10 +617,10 @@ class Harness(typing.Generic[CharmType]):
             for that container name. (should only happen if container is not present in
             metadata.yaml)
         """
-        socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
+        socket_path = f'/charm/containers/{container_name}/pebble.socket'
         client = self._backend._pebble_clients.get(socket_path)
         if client is None:
-            raise KeyError('no known pebble client for container "{}"'.format(container_name))
+            raise KeyError(f'no known pebble client for container "{container_name}"')
         return client.get_plan()
 
     def container_pebble_ready(self, container_name: str):
@@ -932,7 +932,7 @@ class _TestingModelBackend:
             return self._relation_ids_map[relation_name]
         except KeyError as e:
             if relation_name not in self._meta.relations:
-                raise model.ModelError('{} is not a known relation'.format(relation_name)) from e
+                raise model.ModelError(f'{relation_name} is not a known relation') from e
             return []
 
     def relation_list(self, relation_id):
@@ -981,9 +981,9 @@ class _TestingModelBackend:
         if resource_name not in self._resources_map:
             raise model.ModelError(
                 "ERROR could not download resource: HTTP request failed: "
-                "Get https://.../units/unit-{}/resources/{}: resource#{}/{} not found".format(
-                    self.unit_name.replace('/', '-'), resource_name, self.app_name, resource_name
-                ))
+                f"Get https://.../units/unit-{self.unit_name.replace('/', '-')}"
+                f"/resources/{resource_name}: "
+                f"resource#{self.app_name}/{resource_name} not found")
         filename, contents = self._resources_map[resource_name]
         resource_dir = self._get_resource_dir()
         resource_filename = resource_dir / resource_name / filename
@@ -1027,9 +1027,9 @@ class _TestingModelBackend:
             storage_id = self._storage_id_counter
             self._storage_id_counter += 1
             self._storage_list[name][str(storage_id)] = {
-                "location": "/{}{}".format(name, i)
+                "location": f"/{name}{i}"
             }
-            self._storage_ids_map['{}/{}'.format(name, storage_id)] = name
+            self._storage_ids_map[f'{name}/{storage_id}'] = name
         return storage_id
 
     def action_get(self):
@@ -1129,8 +1129,7 @@ class _TestingPebbleClient:
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
-            raise TypeError('start_services should take a list of names, not just "{}"'.format(
-                services))
+            raise TypeError(f'start_services should take a list of names, not just "{services}"')
 
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.start() which currently ignores the return value
@@ -1139,7 +1138,7 @@ class _TestingPebbleClient:
         for name in services:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
-                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
             current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
             if current == pebble.ServiceStatus.ACTIVE:
                 # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
@@ -1161,8 +1160,7 @@ cannot perform the following tasks:
     ) -> pebble.ChangeID:
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
-            raise TypeError('stop_services should take a list of names, not just "{}"'.format(
-                services))
+            raise TypeError(f'stop_services should take a list of names, not just "{services}"')
         # TODO: handle invalid names
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.stop() which currently ignores the return value
@@ -1171,7 +1169,7 @@ cannot perform the following tasks:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
                 #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
             current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
             if current != pebble.ServiceStatus.ACTIVE:
                 # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
@@ -1195,30 +1193,30 @@ ChangeError: cannot perform the following tasks:
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
         if not isinstance(label, str):
-            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+            raise TypeError(f'label must be a str, not {type(label).__name__}')
 
         if isinstance(layer, (str, dict)):
             layer_obj = pebble.Layer(layer)
         elif isinstance(layer, pebble.Layer):
             layer_obj = layer
         else:
-            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
-                type(layer).__name__))
+            raise TypeError(
+                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}')
         if label in self._layers:
             # TODO: jam 2021-04-19 These should not be RuntimeErrors but should be proper error
             #  types. https://github.com/canonical/operator/issues/514
             if not combine:
-                raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+                raise RuntimeError(f'400 Bad Request: layer "{label}" already exists')
             layer = self._layers[label]
             for name, service in layer_obj.services.items():
                 # 'override' is actually single quoted in the real error, but
                 # it shouldn't be, hopefully that gets cleaned up.
                 if not service.override:
-                    raise RuntimeError('500 Internal Server Error: layer "{}" must define'
-                                       '"override" for service "{}"'.format(label, name))
+                    raise RuntimeError(f'500 Internal Server Error: layer "{label}" must define'
+                                       f'"override" for service "{name}"')
                 if service.override not in ('merge', 'replace'):
-                    raise RuntimeError('500 Internal Server Error: layer "{}" has invalid '
-                                       '"override" value on service "{}"'.format(label, name))
+                    raise RuntimeError(f'500 Internal Server Error: layer "{label}" has invalid '
+                                       f'"override" value on service "{name}"')
                 if service.override != 'replace':
                     raise RuntimeError(
                         'override: "{}" unsupported for layer "{}" service "{}"'.format(
@@ -1247,8 +1245,8 @@ ChangeError: cannot perform the following tasks:
 
     def get_services(self, names: typing.List[str] = None) -> typing.List[pebble.ServiceInfo]:
         if isinstance(names, str):
-            raise TypeError('start_services should take a list of names, not just "{}"'.format(
-                names))
+            raise TypeError(
+                f'start_services should take a list of names, not just "{names}"')
         services = self._render_services()
         infos = []
         if names is None:

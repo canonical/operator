@@ -59,14 +59,14 @@ class Handle:
         self._key = key
         if parent:
             if key:
-                self._path = "{}/{}[{}]".format(parent, kind, key)
+                self._path = f"{parent}/{kind}[{key}]"
             else:
-                self._path = "{}/{}".format(parent, kind)
+                self._path = f"{parent}/{kind}"
         else:
             if key:
-                self._path = "{}[{}]".format(kind, key)
+                self._path = f"{kind}[{key}]"
             else:
-                self._path = "{}".format(kind)
+                self._path = f"{kind}"
 
     def nest(self, kind, key):
         """Create a new handle as child of the current one."""
@@ -117,7 +117,7 @@ class Handle:
                     key = key[:-1]
                     good = True
             if not good:
-                raise RuntimeError("attempted to restore invalid handle path {}".format(path))
+                raise RuntimeError(f"attempted to restore invalid handle path {path}")
             handle = Handle(handle, kind, key)
         return handle
 
@@ -221,7 +221,7 @@ class EventSource:
     def __init__(self, event_type):
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
             raise RuntimeError(
-                'Event requires a subclass of EventBase as an argument, got {}'.format(event_type))
+                f'Event requires a subclass of EventBase as an argument, got {event_type}')
         self.event_type = event_type
         self.event_kind = None
         self.emitter_type = None
@@ -360,7 +360,7 @@ class ObjectEvents(Object):
         try:
             getattr(cls, event_kind)
             raise RuntimeError(
-                prefix + 'overlaps with an existing type {} attribute: {}'.format(cls, event_kind))
+                prefix + f'overlaps with an existing type {cls} attribute: {event_kind}')
         except AttributeError:
             pass
 
@@ -389,7 +389,7 @@ class ObjectEvents(Object):
     def __repr__(self):
         k = type(self)
         event_kinds = ', '.join(sorted(self._event_kinds()))
-        return '<{}.{}: {}>'.format(k.__module__, k.__qualname__, event_kinds)
+        return f'<{k.__module__}.{k.__qualname__}: {event_kinds}>'
 
 
 class PrefixedEvents:
@@ -424,7 +424,7 @@ class NoTypeError(Exception):
         self.handle_path = handle_path
 
     def __str__(self):
-        return "cannot restore {} since no class was registered for it".format(self.handle_path)
+        return f"cannot restore {self.handle_path} since no class was registered for it"
 
 
 # the message to show to the user when a pdb breakpoint goes active
@@ -517,7 +517,7 @@ class Framework(Object):
             return
         if obj.handle.path in self.framework._objects:
             raise RuntimeError(
-                'two objects claiming to be {} have been created'.format(obj.handle.path))
+                f'two objects claiming to be {obj.handle.path} have been created')
         self._objects[obj.handle.path] = obj
 
     def _forget(self, obj):
@@ -559,7 +559,7 @@ class Framework(Object):
         """
         if type(value) not in self._type_known:
             raise RuntimeError(
-                'cannot save {} values before registering that type'.format(type(value).__name__))
+                f'cannot save {type(value).__name__} values before registering that type')
         data = value.snapshot()
 
         # Use marshal as a validator, enforcing the use of simple types, as we later the
@@ -613,8 +613,7 @@ class Framework(Object):
         """
         if not isinstance(bound_event, BoundEvent):
             raise RuntimeError(
-                'Framework.observe requires a BoundEvent as second parameter, got {}'.format(
-                    bound_event))
+                f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}')
         if not isinstance(observer, types.MethodType):
             # help users of older versions of the framework
             if isinstance(observer, charm.CharmBase):
@@ -624,7 +623,7 @@ class Framework(Object):
                     ' with e.g. observe(self.on.{0}, self._on_{0})'.format(
                         bound_event.event_kind))
             raise RuntimeError(
-                'Framework.observe requires a method as third parameter, got {}'.format(observer))
+                f'Framework.observe requires a method as third parameter, got {observer}')
 
         event_type = bound_event.event_type
         event_kind = bound_event.event_kind
@@ -636,7 +635,7 @@ class Framework(Object):
             emitter_path = emitter.handle.path
         else:
             raise RuntimeError(
-                'event emitter {} must have a "handle" attribute'.format(type(emitter).__name__))
+                f'event emitter {type(emitter).__name__} must have a "handle" attribute')
 
         # Validate that the method has an acceptable call signature.
         sig = inspect.signature(observer)
@@ -647,12 +646,12 @@ class Framework(Object):
         observer = observer.__self__
         if not sig.parameters:
             raise TypeError(
-                '{}.{} must accept event parameter'.format(type(observer).__name__, method_name))
+                f'{type(observer).__name__}.{method_name} must accept event parameter')
         elif any(param.default is inspect.Parameter.empty for param in extra_params):
             # Allow for additional optional params, since there's no reason to exclude them, but
             # required params will break.
             raise TypeError(
-                '{}.{} has extra required parameter'.format(type(observer).__name__, method_name))
+                f'{type(observer).__name__}.{method_name} has extra required parameter')
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
@@ -866,7 +865,7 @@ class BoundStoredState:
         if key == "on":
             return self._data.on
         if key not in self._data:
-            raise AttributeError("attribute '{}' is not stored".format(key))
+            raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])
 
     def __setattr__(self, key, value):
@@ -877,8 +876,8 @@ class BoundStoredState:
 
         if not isinstance(value, (type(None), int, float, str, bytes, list, dict, set)):
             raise AttributeError(
-                'attribute {!r} cannot be a {}: must be int/float/dict/list/etc'.format(
-                    key, type(value).__name__))
+                f'attribute {key!r} cannot be a {type(value).__name__}: must '
+                'be int/float/dict/list/etc')
 
         self._data[key] = _unwrap_stored(self._data, value)
 
@@ -923,8 +922,7 @@ class StoredState:
             # the StoredState instance is being shared between two unrelated classes
             # -> unclear what is exepcted of us -> bail out
             raise RuntimeError(
-                'StoredState shared by {} and {}'.format(
-                    self.parent_type.__name__, parent_type.__name__))
+                f'StoredState shared by {self.parent_type.__name__} and {parent_type.__name__}')
 
         if parent is None:
             # accessing via the class directly (e.g. MyClass.stored)
@@ -960,8 +958,7 @@ class StoredState:
             return bound
 
         raise AttributeError(
-            'cannot find {} attribute in type {}'.format(
-                self.__class__.__name__, parent_type.__name__))
+            f'cannot find {self.__class__.__name__} attribute in type {parent_type.__name__}')
 
 
 def _wrap_stored(parent_data, value):
@@ -985,9 +982,9 @@ def _unwrap_stored(parent_data, value):
 def _wrapped_repr(obj):
     t = type(obj)
     if obj._under:
-        return "{}.{}({!r})".format(t.__module__, t.__name__, obj._under)
+        return f"{t.__module__}.{t.__name__}({obj._under!r})"
     else:
-        return "{}.{}()".format(t.__module__, t.__name__)
+        return f"{t.__module__}.{t.__name__}()"
 
 
 class StoredDict(collections.abc.MutableMapping):

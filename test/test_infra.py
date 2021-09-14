@@ -90,7 +90,7 @@ class InfrastructureTests(unittest.TestCase):
         if not errors:
             return
 
-        report = ["Please fix files as suggested by pydocstyle ({:d} issues):".format(len(errors))]
+        report = [f"Please fix files as suggested by pydocstyle ({len(errors):d} issues):"]
         report.extend(str(e) for e in errors)
         self.fail("\n".join(report))
 

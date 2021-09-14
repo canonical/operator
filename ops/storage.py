@@ -371,4 +371,4 @@ class NoSnapshotError(Exception):
         self.handle_path = handle_path
 
     def __str__(self):
-        return 'no snapshot data found for {} object'.format(self.handle_path)
+        return f'no snapshot data found for {self.handle_path} object'

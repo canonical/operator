@@ -298,7 +298,7 @@ class RelationEvent(HookEvent):
 
         if unit is not None and unit.app != app:
             raise RuntimeError(
-                'cannot create RelationEvent with application {} and unit {}'.format(app, unit))
+                f'cannot create RelationEvent with application {app} and unit {unit}')
 
         self.relation = relation
         self.app = app
@@ -797,7 +797,7 @@ class RelationMeta:
 
     def __init__(self, role: RelationRole, relation_name: str, raw: dict):
         if not isinstance(role, RelationRole):
-            raise TypeError("role should be a Role, not {!r}".format(role))
+            raise TypeError(f"role should be a Role, not {role!r}")
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
@@ -805,12 +805,12 @@ class RelationMeta:
 
         self.limit = raw.get('limit')
         if self.limit and not isinstance(self.limit, int):
-            raise TypeError("limit should be an int, not {}".format(type(self.limit)))
+            raise TypeError(f"limit should be an int, not {type(self.limit)}")
 
         self.scope = raw.get('scope') or self._default_scope
         if self.scope not in self.VALID_SCOPES:
             raise TypeError("scope should be one of {}; not '{}'".format(
-                ', '.join("'{}'".format(s) for s in self.VALID_SCOPES), self.scope))
+                ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope))
 
 
 class StorageMeta:

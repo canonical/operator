@@ -107,7 +107,7 @@ class TestModel(unittest.TestCase):
 
         with self.assertRaises(ops.model.ModelError):
             # You have to specify it by just the integer ID
-            self.model.get_relation('db1', 'db1:{}'.format(relation_id_db1))
+            self.model.get_relation('db1', f'db1:{relation_id_db1}')
         rel_db1 = self.model.get_relation('db1', relation_id_db1)
         self.assertIsInstance(rel_db1, ops.model.Relation)
         self.assertBackendCalls([
@@ -1260,7 +1260,7 @@ class TestModelBindings(unittest.TestCase):
 
     def test_binding_by_relation_name(self):
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
+                    f'''[ "$1" = db0 ] && echo '{self.network_get_out}' || exit 1''')
         binding_name = 'db0'
         expected_calls = [['network-get', 'db0', '--format=json']]
 
@@ -1270,7 +1270,7 @@ class TestModelBindings(unittest.TestCase):
 
     def test_binding_by_relation(self):
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(self.network_get_out))
+                    f'''[ "$1" = db0 ] && echo '{self.network_get_out}' || exit 1''')
         binding_name = 'db0'
         expected_calls = [
             ['relation-ids', 'db0', '--format=json'],
@@ -1306,7 +1306,7 @@ class TestModelBindings(unittest.TestCase):
         }
         network_get_out = json.dumps(network_get_out_obj)
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_get_out))
+                    f'''[ "$1" = db0 ] && echo '{network_get_out}' || exit 1''')
         binding_name = 'db0'
         expected_calls = [['network-get', 'db0', '--format=json']]
 
@@ -1319,7 +1319,7 @@ class TestModelBindings(unittest.TestCase):
     def test_missing_bind_addresses(self):
         network_data = json.dumps({})
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+                    f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
         binding = self.model.get_binding(self.model.get_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
@@ -1327,7 +1327,7 @@ class TestModelBindings(unittest.TestCase):
     def test_empty_bind_addresses(self):
         network_data = json.dumps({'bind-addresses': [{}]})
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+                    f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
         binding = self.model.get_binding(self.model.get_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
@@ -1335,7 +1335,7 @@ class TestModelBindings(unittest.TestCase):
     def test_no_bind_addresses(self):
         network_data = json.dumps({'bind-addresses': [{'addresses': None}]})
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+                    f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
         binding = self.model.get_binding(self.model.get_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
@@ -1348,7 +1348,7 @@ class TestModelBindings(unittest.TestCase):
             }],
         })
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+                    f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
         binding = self.model.get_binding(self.model.get_relation(binding_name))
         self.assertEqual(len(binding.network.interfaces), 1)
@@ -1361,7 +1361,7 @@ class TestModelBindings(unittest.TestCase):
             'bind-addresses': [],
         })
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+                    f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
         binding = self.model.get_binding(self.model.get_relation(binding_name))
         self.assertEqual(binding.network.ingress_addresses, [])
@@ -1373,7 +1373,7 @@ class TestModelBindings(unittest.TestCase):
             'ingress-addresses': [],
         })
         fake_script(self, 'network-get',
-                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+                    f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
         binding = self.model.get_binding(self.model.get_relation(binding_name))
         self.assertEqual(binding.network.egress_subnets, [])
@@ -1438,7 +1438,7 @@ class TestModelBackend(unittest.TestCase):
             ops.model.ModelError,
             [['relation-list', '-r', '3', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-list', 'echo {} >&2 ; exit 2'.format(err_msg)),
+            lambda: fake_script(self, 'relation-list', f'echo {err_msg} >&2 ; exit 2'),
             lambda: self.backend.relation_list(3),
             ops.model.RelationNotFoundError,
             [['relation-list', '-r', '3', '--format=json']],
@@ -1448,7 +1448,7 @@ class TestModelBackend(unittest.TestCase):
             ops.model.ModelError,
             [['relation-set', '-r', '3', 'foo=bar']],
         ), (
-            lambda: fake_script(self, 'relation-set', 'echo {} >&2 ; exit 2'.format(err_msg)),
+            lambda: fake_script(self, 'relation-set', f'echo {err_msg} >&2 ; exit 2'),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-set', '-r', '3', 'foo=bar']],
@@ -1463,7 +1463,7 @@ class TestModelBackend(unittest.TestCase):
             ops.model.ModelError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
         ), (
-            lambda: fake_script(self, 'relation-get', 'echo {} >&2 ; exit 2'.format(err_msg)),
+            lambda: fake_script(self, 'relation-get', f'echo {err_msg} >&2 ; exit 2'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
             ops.model.RelationNotFoundError,
             [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
@@ -1523,7 +1523,7 @@ class TestModelBackend(unittest.TestCase):
     def test_status_get(self):
         # taken from actual Juju output
         content = '{"message": "", "status": "unknown", "status-data": {}}'
-        fake_script(self, 'status-get', "echo '{}'".format(content))
+        fake_script(self, 'status-get', f"echo '{content}'")
         s = self.backend.status_get(is_app=False)
         self.assertEqual(s['status'], "unknown")
         self.assertEqual(s['message'], "")
@@ -1544,7 +1544,7 @@ class TestModelBackend(unittest.TestCase):
                 }
             }
             """)
-        fake_script(self, 'status-get', "echo '{}'".format(content))
+        fake_script(self, 'status-get', f"echo '{content}'")
         s = self.backend.status_get(is_app=True)
         self.assertEqual(s['status'], "maintenance")
         self.assertEqual(s['message'], "installing")
@@ -1654,7 +1654,7 @@ class TestModelBackend(unittest.TestCase):
   ]
 }'''
         fake_script(self, 'network-get',
-                    '''[ "$1" = deadbeef ] && echo '{}' || exit 1'''.format(network_get_out))
+                    f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
         network_info = self.backend.network_get('deadbeef')
         self.assertEqual(network_info, json.loads(network_get_out))
         self.assertEqual(fake_script_calls(self, clear=True),
@@ -1671,12 +1671,12 @@ class TestModelBackend(unittest.TestCase):
 
         test_cases = [(
             lambda: fake_script(self, 'network-get',
-                                'echo {} >&2 ; exit 1'.format(err_no_endpoint)),
+                                f'echo {err_no_endpoint} >&2 ; exit 1'),
             lambda: self.backend.network_get("deadbeef"),
             ops.model.ModelError,
             [['network-get', 'deadbeef', '--format=json']],
         ), (
-            lambda: fake_script(self, 'network-get', 'echo {} >&2 ; exit 2'.format(err_no_rel)),
+            lambda: fake_script(self, 'network-get', f'echo {err_no_rel} >&2 ; exit 2'),
             lambda: self.backend.network_get("deadbeef", 3),
             ops.model.RelationNotFoundError,
             [['network-get', 'deadbeef', '-r', '3', '--format=json']],

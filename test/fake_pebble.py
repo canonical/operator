@@ -80,7 +80,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def internal_server_error(self, msg):
         d = {
             "result": {
-                "message": "internal server error: {}".format(msg),
+                "message": f"internal server error: {msg}",
             },
             "status": "Internal Server Error",
             "status-code": 500,
@@ -152,7 +152,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if action == 'start':
             for service in services:
                 if service not in self._services:
-                    self.bad_request('service "{}" does not exist'.format(service))
+                    self.bad_request(f'service "{service}" does not exist')
                     return
             self.respond({
                 "change": "1234",
@@ -162,7 +162,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "type": "async"
             })
         else:
-            self.bad_request('action "{}" not implemented'.format(action))
+            self.bad_request(f'action "{action}" not implemented')
 
 
 def start_server():

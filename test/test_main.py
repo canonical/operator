@@ -66,7 +66,7 @@ TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
 
 VERSION_LOGLINE = [
     'juju-log', '--log-level', 'DEBUG', '--',
-    'Operator Framework {} up and running.'.format(version),
+    f'Operator Framework {version} up and running.',
 ]
 SLOW_YAML_LOGLINE = [
     'juju-log', '--log-level', 'DEBUG', '--',
@@ -590,7 +590,7 @@ class _TestMain(abc.ABC):
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: {} already exists'.format(self.CHARM_STATE_FILE)],
+             f'Using local storage: {self.CHARM_STATE_FILE} already exists'],
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
         ]
@@ -601,7 +601,7 @@ class _TestMain(abc.ABC):
         if self.has_dispatch:
             expected.insert(1, [
                 'juju-log', '--log-level', 'DEBUG', '--',
-                'Legacy {} does not exist.'.format(Path('hooks/collect-metrics'))])
+                f"Legacy {Path('hooks/collect-metrics')} does not exist."])
 
         self.assertEqual(calls, expected)
 
@@ -645,8 +645,7 @@ class _TestMain(abc.ABC):
         if self.has_dispatch:
             self.assertEqual(
                 calls.pop(0),
-                'juju-log --log-level DEBUG -- Legacy {} does not exist.'.format(
-                    Path("hooks/install")))
+                f'juju-log --log-level DEBUG -- Legacy {Path("hooks/install")} does not exist.')
 
         if not yaml.__with_libyaml__:
             self.assertEqual(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
@@ -662,7 +661,7 @@ class _TestMain(abc.ABC):
             '    raise RuntimeError."failing as requested".\n'
             'RuntimeError: failing as requested'
         )
-        self.assertEqual(len(calls), 1, "expected 1 call, but got extra: {}".format(calls[1:]))
+        self.assertEqual(len(calls), 1, f"expected 1 call, but got extra: {calls[1:]}")
 
     def test_sets_model_name(self):
         self._prepare_actions()
@@ -823,9 +822,9 @@ class _TestMainWithDispatch(_TestMain):
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', '--',
-             'Running legacy {}.'.format(hook)],
+             f'Running legacy {hook}.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Legacy {} exited with status 0.'.format(hook)],
+             f'Legacy {hook} exited with status 0.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
@@ -873,9 +872,9 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', '--', 'Running legacy {}.'.format(hook)],
+            ['juju-log', '--log-level', 'INFO', '--', f'Running legacy {hook}.'],
             ['juju-log', '--log-level', 'WARNING', '--',
-             'Legacy {} exited with status 42.'.format(hook)],
+             f'Legacy {hook} exited with status 42.'],
         ]
         self.assertEqual(calls, expected)
 
@@ -927,12 +926,12 @@ class _TestMainWithDispatch(_TestMain):
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', '--',
-             'Running legacy {}.'.format(hook)],
+             f'Running legacy {hook}.'],
             VERSION_LOGLINE,    # because it called itself
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Charm called itself via {}.'.format(hook)],
+             f'Charm called itself via {hook}.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Legacy {} exited with status 0.'.format(hook)],
+             f'Legacy {hook} exited with status 0.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a kubernetes charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
@@ -1017,4 +1016,4 @@ class TestStorageHeuristics(unittest.TestCase):
         meta = CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}), tempfile.NamedTemporaryFile() as fd:
             self.assertFalse(_should_use_controller_storage(Path(fd.name), meta))
-            self.assertLogged('Using local storage: {} already exists'.format(fd.name))
+            self.assertLogged(f'Using local storage: {fd.name} already exists')

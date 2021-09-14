@@ -55,7 +55,7 @@ def _get_charm_dir():
     charm_dir = os.environ.get("JUJU_CHARM_DIR")
     if charm_dir is None:
         # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = Path('{}/../../..'.format(__file__)).resolve()
+        charm_dir = Path(f'{__file__}/../../..').resolve()
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
@@ -75,13 +75,13 @@ def _create_event_link(charm, bound_event, link_to):
     elif issubclass(bound_event.event_type, ops.charm.ActionEvent):
         if not bound_event.event_kind.endswith("_action"):
             raise RuntimeError(
-                'action event name {} needs _action suffix'.format(bound_event.event_kind))
+                f'action event name {bound_event.event_kind} needs _action suffix')
         event_dir = charm.framework.charm_dir / 'actions'
         # The event_kind is suffixed with "_action" while the executable is not.
         event_path = event_dir / bound_event.event_kind[:-len('_action')].replace('_', '-')
     else:
         raise RuntimeError(
-            'cannot create a symlink: unsupported event type {}'.format(bound_event.event_type))
+            f'cannot create a symlink: unsupported event type {bound_event.event_type}')
 
     event_dir.mkdir(exist_ok=True)
     if not event_path.exists():
@@ -163,7 +163,7 @@ def _get_event_args(charm, bound_event):
     if remote_app_name or remote_unit_name:
         if not remote_app_name:
             if '/' not in remote_unit_name:
-                raise RuntimeError('invalid remote unit name: {}'.format(remote_unit_name))
+                raise RuntimeError(f'invalid remote unit name: {remote_unit_name}')
             remote_app_name = remote_unit_name.split('/')[0]
         args = [relation, model.get_app(remote_app_name)]
         if remote_unit_name:
@@ -259,7 +259,7 @@ class _Dispatcher:
         """Sets the name attribute to that which can be inferred from the given path."""
         name = path.name.replace('-', '_')
         if path.parent.name == 'actions':
-            name = '{}_action'.format(name)
+            name = f'{name}_action'
         self.event_name = name
 
     def _init_legacy(self):

@@ -469,8 +469,7 @@ class TestLibFunctional(TestCase):
                     # everything-is-the-same :-)
                     continue
                 for patch_a in [38, 42]:
-                    desc = "A: {}/{}/{}; B: {}/{}/{}".format(
-                        pkg_a, lib_a, patch_a, pkg_b, lib_b, patch_b)
+                    desc = f"A: {pkg_a}/{lib_a}/{patch_a}; B: {pkg_b}/{lib_b}/{patch_b}"
                     with self.subTest(desc):
                         tmpdir = self._mkdtemp()
                         sys.path = [tmpdir]
@@ -508,8 +507,7 @@ class TestLibFunctional(TestCase):
         for pkg_a in ["foo", "fooA"]:
             for lib_a in ["bar", "barA"]:
                 for patch_a in [38, 42]:
-                    desc = "A: {}/{}/{}; B: {}/{}/{}".format(
-                        pkg_a, lib_a, patch_a, pkg_b, lib_b, patch_b)
+                    desc = f"A: {pkg_a}/{lib_a}/{patch_a}; B: {pkg_b}/{lib_b}/{patch_b}"
                     with self.subTest(desc):
                         tmpdirA = self._mkdtemp()
                         tmpdirB = self._mkdtemp()

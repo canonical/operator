@@ -2039,7 +2039,7 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertIsNotNone(backend._resource_dir)
         self.assertTrue(
             str(path).startswith(str(backend._resource_dir.name)),
-            msg='expected {} to be a subdirectory of {}'.format(path, backend._resource_dir.name))
+            msg=f'expected {path} to be a subdirectory of {backend._resource_dir.name}')
 
     def test_resource_get_no_resource(self):
         harness = Harness(CharmBase, meta='''

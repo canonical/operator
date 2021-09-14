@@ -54,7 +54,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
     def connect(self):
         """Override connect to use Unix socket (instead of TCP socket)."""
         if not hasattr(socket, 'AF_UNIX'):
-            raise NotImplementedError('Unix sockets not supported on {}'.format(sys.platform))
+            raise NotImplementedError(f'Unix sockets not supported on {sys.platform}')
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
         if self.timeout is not _not_provided:
@@ -93,7 +93,7 @@ def _parse_timestamp(s):
     """
     match = _TIMESTAMP_RE.match(s)
     if not match:
-        raise ValueError('invalid timestamp {!r}'.format(s))
+        raise ValueError(f'invalid timestamp {s!r}')
     y, m, d, hh, mm, ss, sfrac, zone = match.groups()
 
     if zone in ('Z', 'z'):
@@ -101,7 +101,7 @@ def _parse_timestamp(s):
     else:
         match = _TIMEOFFSET_RE.match(zone)
         if not match:
-            raise ValueError('invalid timestamp {!r}'.format(s))
+            raise ValueError(f'invalid timestamp {s!r}')
         sign, zh, zm = match.groups()
         tz_delta = datetime.timedelta(hours=int(zh), minutes=int(zm))
         tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
@@ -127,11 +127,11 @@ class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
 
     def __repr__(self):
-        return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.args)
+        return f'<{type(self).__module__}.{type(self).__name__} {self.args}>'
 
     def name(self):
         """Return a string representation of the model plus class."""
-        return '<{}.{}>'.format(type(self).__module__, type(self).__name__)
+        return f'<{type(self).__module__}.{type(self).__name__}>'
 
     def message(self):
         """Return the message passed as an argument."""
@@ -159,10 +159,10 @@ class PathError(Error):
         self.message = message
 
     def __str__(self):
-        return '{} - {}'.format(self.kind, self.message)
+        return f'{self.kind} - {self.message}'
 
     def __repr__(self):
-        return 'PathError({!r}, {!r})'.format(self.kind, self.message)
+        return f'PathError({self.kind!r}, {self.message!r})'
 
 
 class APIError(Error):
@@ -177,8 +177,7 @@ class APIError(Error):
         self.message = message
 
     def __repr__(self):
-        return 'APIError({!r}, {!r}, {!r}, {!r})'.format(
-            self.body, self.code, self.status, self.message)
+        return f'APIError({self.body!r}, {self.code!r}, {self.status!r}, {self.message!r})'
 
 
 class ChangeError(Error):
@@ -198,7 +197,7 @@ class ChangeError(Error):
         self.change = change
 
     def __repr__(self):
-        return 'ChangeError({!r}, {!r})'.format(self.err, self.change)
+        return f'ChangeError({self.err!r}, {self.change!r})'
 
 
 class WarningState(enum.Enum):
@@ -228,7 +227,7 @@ class SystemInfo:
         return cls(version=d['version'])
 
     def __repr__(self):
-        return 'SystemInfo(version={self.version!r})'.format(self=self)
+        return f'SystemInfo(version={self.version!r})'
 
 
 class Warning:
@@ -264,13 +263,13 @@ class Warning:
 
     def __repr__(self):
         return ('Warning('
-                'message={self.message!r}, '
-                'first_added={self.first_added!r}, '
-                'last_added={self.last_added!r}, '
-                'last_shown={self.last_shown!r}, '
-                'expire_after={self.expire_after!r}, '
-                'repeat_after={self.repeat_after!r})'
-                ).format(self=self)
+                f'message={self.message!r}, '
+                f'first_added={self.first_added!r}, '
+                f'last_added={self.last_added!r}, '
+                f'last_shown={self.last_shown!r}, '
+                f'expire_after={self.expire_after!r}, '
+                f'repeat_after={self.repeat_after!r})'
+                )
 
 
 class TaskProgress:
@@ -297,17 +296,17 @@ class TaskProgress:
 
     def __repr__(self):
         return ('TaskProgress('
-                'label={self.label!r}, '
-                'done={self.done!r}, '
-                'total={self.total!r})'
-                ).format(self=self)
+                f'label={self.label!r}, '
+                f'done={self.done!r}, '
+                f'total={self.total!r})'
+                )
 
 
 class TaskID(str):
     """Task ID (a more strongly-typed string)."""
 
     def __repr__(self):
-        return 'TaskID({!r})'.format(str(self))
+        return f'TaskID({str(self)!r})'
 
 
 class Task:
@@ -349,22 +348,22 @@ class Task:
 
     def __repr__(self):
         return ('Task('
-                'id={self.id!r}, '
-                'kind={self.kind!r}, '
-                'summary={self.summary!r}, '
-                'status={self.status!r}, '
-                'log={self.log!r}, '
-                'progress={self.progress!r}, '
-                'spawn_time={self.spawn_time!r}, '
-                'ready_time={self.ready_time!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'kind={self.kind!r}, '
+                f'summary={self.summary!r}, '
+                f'status={self.status!r}, '
+                f'log={self.log!r}, '
+                f'progress={self.progress!r}, '
+                f'spawn_time={self.spawn_time!r}, '
+                f'ready_time={self.ready_time!r})'
+                )
 
 
 class ChangeID(str):
     """Change ID (a more strongly-typed string)."""
 
     def __repr__(self):
-        return 'ChangeID({!r})'.format(str(self))
+        return f'ChangeID({str(self)!r})'
 
 
 class Change:
@@ -409,16 +408,16 @@ class Change:
 
     def __repr__(self):
         return ('Change('
-                'id={self.id!r}, '
-                'kind={self.kind!r}, '
-                'summary={self.summary!r}, '
-                'status={self.status!r}, '
-                'tasks={self.tasks!r}, '
-                'ready={self.ready!r}, '
-                'err={self.err!r}, '
-                'spawn_time={self.spawn_time!r}, '
-                'ready_time={self.ready_time!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'kind={self.kind!r}, '
+                f'summary={self.summary!r}, '
+                f'status={self.status!r}, '
+                f'tasks={self.tasks!r}, '
+                f'ready={self.ready!r}, '
+                f'err={self.err!r}, '
+                f'spawn_time={self.spawn_time!r}, '
+                f'ready_time={self.ready_time!r})'
+                )
 
 
 class Plan:
@@ -495,7 +494,7 @@ class Layer:
         return {name: value for name, value in fields if value}
 
     def __repr__(self) -> str:
-        return 'Layer({!r})'.format(self.to_dict())
+        return f'Layer({self.to_dict()!r})'
 
     __str__ = to_yaml
 
@@ -540,7 +539,7 @@ class Service:
         return {name: value for name, value in fields if value}
 
     def __repr__(self) -> str:
-        return 'Service({!r})'.format(self.to_dict())
+        return f'Service({self.to_dict()!r})'
 
     def __eq__(self, other: typing.Union[typing.Dict, 'Service']) -> bool:
         """Compare this service description to another."""
@@ -550,7 +549,7 @@ class Service:
             return self.to_dict() == other.to_dict()
         else:
             raise ValueError(
-                "Cannot compare pebble.Service to {}".format(type(other))
+                f"Cannot compare pebble.Service to {type(other)}"
             )
 
 
@@ -605,10 +604,10 @@ class ServiceInfo:
 
     def __repr__(self):
         return ('ServiceInfo('
-                'name={self.name!r}, '
-                'startup={self.startup}, '
-                'current={self.current})'
-                ).format(self=self)
+                f'name={self.name!r}, '
+                f'startup={self.startup}, '
+                f'current={self.current})'
+                )
 
 
 class FileType(enum.Enum):
@@ -672,17 +671,17 @@ class FileInfo:
 
     def __repr__(self):
         return ('FileInfo('
-                'path={self.path!r}, '
-                'name={self.name!r}, '
-                'type={self.type}, '
-                'size={self.size}, '
-                'permissions=0o{self.permissions:o}, '
-                'last_modified={self.last_modified!r}, '
-                'user_id={self.user_id}, '
-                'user={self.user!r}, '
-                'group_id={self.group_id}, '
-                'group={self.group!r})'
-                ).format(self=self)
+                f'path={self.path!r}, '
+                f'name={self.name!r}, '
+                f'type={self.type}, '
+                f'size={self.size}, '
+                f'permissions=0o{self.permissions:o}, '
+                f'last_modified={self.last_modified!r}, '
+                f'user_id={self.user_id}, '
+                f'user={self.user!r}, '
+                f'group_id={self.group_id}, '
+                f'group={self.group!r})'
+                )
 
 
 class Client:
@@ -740,7 +739,7 @@ class Client:
         """
         ctype, options = cgi.parse_header(headers.get('Content-Type', ''))
         if ctype != expected:
-            raise ProtocolError('expected Content-Type {!r}, got {!r}'.format(expected, ctype))
+            raise ProtocolError(f'expected Content-Type {expected!r}, got {ctype!r}')
         return options
 
     def _request_raw(
@@ -767,7 +766,7 @@ class Client:
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
-                message = '{} - {}'.format(type(e2).__name__, e2)
+                message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message)
         except urllib.error.URLError as e:
             raise ConnectionError(e.reason)
@@ -803,13 +802,13 @@ class Client:
 
     def get_change(self, change_id: ChangeID) -> Change:
         """Get single change by ID."""
-        resp = self._request('GET', '/v1/changes/{}'.format(change_id))
+        resp = self._request('GET', f'/v1/changes/{change_id}')
         return Change.from_dict(resp['result'])
 
     def abort_change(self, change_id: ChangeID) -> Change:
         """Abort change with given ID."""
         body = {'action': 'abort'}
-        resp = self._request('POST', '/v1/changes/{}'.format(change_id), body=body)
+        resp = self._request('POST', f'/v1/changes/{change_id}', body=body)
         return Change.from_dict(resp['result'])
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
@@ -847,11 +846,12 @@ class Client:
         self, action: str, services: typing.Iterable[str], timeout: float, delay: float,
     ) -> ChangeID:
         if not isinstance(services, (list, tuple)):
-            raise TypeError('services must be a list of str, not {}'.format(
-                type(services).__name__))
+            raise TypeError(
+                f'services must be a list of str, not {type(services).__name__}')
         for s in services:
             if not isinstance(s, str):
-                raise TypeError('service names must be str, not {}'.format(type(s).__name__))
+                raise TypeError(
+                    f'service names must be str, not {type(s).__name__}')
 
         body = {'action': action, 'services': services}
         resp = self._request('POST', '/v1/services', body=body)
@@ -910,23 +910,23 @@ class Client:
                 # Catch timeout from wait endpoint and loop to check deadline
                 pass
 
-        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
-            change_id, timeout))
+        raise TimeoutError(
+            f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def _wait_change(self, change_id: ChangeID, timeout: float = None) -> Change:
         """Call the wait-change API endpoint directly."""
         query = {}
         if timeout is not None:
-            query['timeout'] = '{:.3f}s'.format(timeout)
+            query['timeout'] = f'{timeout:.3f}s'
 
         try:
-            resp = self._request('GET', '/v1/changes/{}/wait'.format(change_id), query)
+            resp = self._request('GET', f'/v1/changes/{change_id}/wait', query)
         except APIError as e:
             if e.code == 404:
                 raise NotImplementedError('server does not implement wait-change endpoint')
             if e.code == 504:
-                raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
-                    change_id, timeout))
+                raise TimeoutError(
+                    f'timed out waiting for change {change_id} ({timeout} seconds)')
             raise
 
         return Change.from_dict(resp['result'])
@@ -942,8 +942,8 @@ class Client:
 
             time.sleep(delay)
 
-        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
-            change_id, timeout))
+        raise TimeoutError(
+            f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def add_layer(
             self, label: str, layer: typing.Union[str, dict, Layer], *, combine: bool = False):
@@ -955,7 +955,7 @@ class Client:
         layer override rules; if the layer doesn't exist, it is added as usual.
         """
         if not isinstance(label, str):
-            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+            raise TypeError(f'label must be a str, not {type(label).__name__}')
 
         if isinstance(layer, str):
             layer_yaml = layer
@@ -964,8 +964,8 @@ class Client:
         elif isinstance(layer, Layer):
             layer_yaml = layer.to_yaml()
         else:
-            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
-                type(layer).__name__))
+            raise TypeError(
+                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}')
 
         body = {
             'action': 'add',
@@ -1017,7 +1017,7 @@ class Client:
         options = self._ensure_content_type(response.headers, 'multipart/form-data')
         boundary = options.get('boundary', '')
         if not boundary:
-            raise ProtocolError('invalid boundary {!r}'.format(boundary))
+            raise ProtocolError(f'invalid boundary {boundary!r}')
 
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
@@ -1043,7 +1043,7 @@ class Client:
             elif name == 'files':
                 filename = part.get_filename()
                 if filename != path:
-                    raise ProtocolError('path not expected: {}'.format(filename))
+                    raise ProtocolError(f'path not expected: {filename}')
                 # decode=True, ironically, avoids decoding bytes to str
                 content = part.get_payload(decode=True)
 
@@ -1064,7 +1064,7 @@ class Client:
         result = resp['result'] or []  # in case it's null instead of []
         paths = {item['path']: item for item in result}
         if path not in paths:
-            raise ProtocolError('path not found in response metadata: {}'.format(resp))
+            raise ProtocolError(f'path not found in response metadata: {resp}')
         error = paths[path].get('error')
         if error:
             raise PathError(error['kind'], error['message'])
