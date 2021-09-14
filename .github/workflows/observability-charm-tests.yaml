@@ -18,7 +18,7 @@ jobs:
 
       - name: Update 'ops' library dependency in test charm
         run: |
-          sed -i -e "/^ops[ >=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+          sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
           echo "git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
 
       - name: Install dependencies
