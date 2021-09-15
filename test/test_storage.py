@@ -404,20 +404,16 @@ class TestJujuStateBackend(BaseTestCase):
         self.assertEqual(list(outer.keys()), [key])
         inner = yaml.load(outer[key], Loader=storage._SimpleLoader)
         self.assertEqual(complex_val, inner)
-        if sys.version_info >= (3, 6):
-            # In Python 3.5 dicts are not ordered by default, and PyYAML only
-            # iterates the dict. So we read and assert the content is valid,
-            # but we don't assert the serialized form.
-            self.assertEqual(content.decode('utf-8'), dedent("""\
-                "Class[foo]/_stored": |
-                  foo: 2
-                  3: [1, 2, '3']
-                  four: !!set {2: null, 3: null}
-                  five: {a: 2, b: 3.0}
-                  six: !!python/tuple [a, b]
-                  seven: !!binary |
-                    MTIzNA==
-                """))
+        self.assertEqual(content.decode('utf-8'), dedent("""\
+            "Class[foo]/_stored": |
+              foo: 2
+              3: [1, 2, '3']
+              four: !!set {2: null, 3: null}
+              five: {a: 2, b: 3.0}
+              six: !!python/tuple [a, b]
+              seven: !!binary |
+                MTIzNA==
+            """))
         # Note that the content is yaml in a string, embedded inside YAML to declare the Key:
         # Value of where to store the entry.
         fake_script(self, 'state-get', dedent("""

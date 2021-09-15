@@ -105,7 +105,7 @@ easy to learn for somebody who is not a pythonista.
 
 The dependencies of the operator framework are kept as minimal as possible;
 currently that's Python 3.6 or greater, and `PyYAML` (both are included by
-default in Ubuntu's cloud images from 16.04 on).
+default in Ubuntu's cloud images from 18.04 on).
 
 # A quick introduction
 

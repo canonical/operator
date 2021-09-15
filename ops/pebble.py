@@ -112,17 +112,6 @@ def _parse_timestamp(s):
                              microsecond=microsecond, tzinfo=tz)
 
 
-def _json_loads(s: typing.Union[str, bytes]) -> typing.Dict:
-    """Like json.loads(), but handle str or bytes.
-
-    This is needed because an HTTP response's read() method returns bytes on
-    Python 3.5, and json.load doesn't handle bytes.
-    """
-    if isinstance(s, bytes):
-        s = s.decode('utf-8')
-    return json.loads(s)
-
-
 class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
 
@@ -465,7 +454,7 @@ class Layer:
         services: A mapping of name: :class:`Service` defined by this layer
     """
 
-    # This is how you do type annotations, but it is not supported by Python 3.5
+    # This is how you do type annotations
     # summary: str
     # description: str
     # services: typing.Mapping[str, 'Service']
@@ -729,7 +718,7 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        return _json_loads(response.read())
+        return json.loads(response.read())
 
     @staticmethod
     def _ensure_content_type(headers, expected):
@@ -761,7 +750,7 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                body = _json_loads(e.read())
+                body = json.loads(e.read())
                 message = body['result']['message']
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
@@ -1039,7 +1028,7 @@ class Client:
         for part in message.walk():
             name = part.get_param('name', header='Content-Disposition')
             if name == 'response':
-                resp = _json_loads(part.get_payload())
+                resp = json.loads(part.get_payload())
             elif name == 'files':
                 filename = part.get_filename()
                 if filename != path:
@@ -1116,7 +1105,7 @@ class Client:
         }
         response = self._request_raw('POST', '/v1/files', None, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        resp = _json_loads(response.read())
+        resp = json.loads(response.read())
         self._raise_on_path_error(resp, path)
 
     @staticmethod

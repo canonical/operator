@@ -238,9 +238,7 @@ class TestModel(unittest.TestCase):
         ])
 
         # this will fire more backend calls
-        # the CountEqual and weird (and brittle) splitting is to accommodate python 3.5
-        # TODO: switch to assertEqual when we drop 3.5
-        self.assertCountEqual(
+        self.assertEqual(
             repr(rel_db1.data)[1:-1].split(', '),
             ["<ops.model.Unit myapp/0>: {}",
              "<ops.model.Application myapp>: {}",
