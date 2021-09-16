@@ -66,7 +66,7 @@ class WebSocket(object):
         Values for socket.setsockopt.
         sockopt must be tuple and each element is argument of sock.setsockopt.
     sslopt: dict
-        Optional dict object for ssl socket options. See FAQ for details.
+        Optional dict object for ssl socket options.
     fire_cont_frame: bool
         Fire recv event for each cont frame. Default is False.
     enable_multithread: bool
@@ -84,7 +84,7 @@ class WebSocket(object):
         Parameters
         ----------
         sslopt: dict
-            Optional dict object for ssl socket options. See FAQ for details.
+            Optional dict object for ssl socket options.
         """
         self.sock_opt = sock_opt(sockopt, sslopt)
         self.handshake_response = None
@@ -314,14 +314,6 @@ class WebSocket(object):
         return length
 
     def send_binary(self, payload):
-        """
-        Send a binary message (OPCODE_BINARY).
-
-        Parameters
-        ----------
-        payload: bytes
-            payload of message to send.
-        """
         return self.send(payload, ABNF.OPCODE_BINARY)
 
     def ping(self, payload=""):
@@ -388,8 +380,6 @@ class WebSocket(object):
     def recv_data_frame(self, control_frame=False):
         """
         Receive data with operation code.
-
-        If a valid ping message is received, a pong response is sent.
 
         Parameters
         ----------
@@ -585,7 +575,7 @@ def create_connection(url, timeout=None, class_=WebSocket, **options):
         Values for socket.setsockopt.
         sockopt must be a tuple and each element is an argument of sock.setsockopt.
     sslopt: dict
-        Optional dict object for ssl socket options. See FAQ for details.
+        Optional dict object for ssl socket options.
     subprotocols: list
         List of available subprotocols. Default is None.
     skip_utf8_validation: bool
