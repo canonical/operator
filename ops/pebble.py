@@ -29,6 +29,7 @@ import os
 import re
 import select
 import shutil
+import signal
 import socket
 import sys
 import threading
@@ -866,13 +867,20 @@ class ExecProcess:
 
         return (out.getvalue(), err.getvalue())
 
-    def send_signal(self, signum: int):
-        """Send the given signal number to the running process.
+    def send_signal(self, sig: typing.Union[int, str]):
+        """Send the given signal to the running process.
 
         Args:
-            signum: Number of signal to send, e.g., 1 or :data:`signal.SIGHUP`.
+            sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
+                signal.SIGHUP.
         """
-        msg = json.dumps({'command': 'signal', 'signal': signum}, sort_keys=True)
+        if isinstance(sig, int):
+            sig = signal.Signals(sig).name
+        payload = {
+            'command': 'signal',
+            'signal': {'name': sig},
+        }
+        msg = json.dumps(payload, sort_keys=True)
         self._control_ws.send(msg)
 
 
@@ -1656,7 +1664,7 @@ class Client:
 
         body = {
             'command': command,
-            'stderr': True,
+            'separate-stderr': True,
             'environment': environment or {},
             'working-dir': working_dir,
             'timeout': _format_timeout(timeout) if timeout is not None else None,

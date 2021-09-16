@@ -21,6 +21,7 @@ import json
 import unittest
 import unittest.mock
 import unittest.util
+import signal
 import sys
 import tempfile
 
@@ -2033,7 +2034,7 @@ class TestExec(unittest.TestCase):
             user_id=None, user=None, group_id=None, group=None):
         return {
             'command': command,
-            'stderr': True,
+            'separate-stderr': True,
             'environment': environment or {},
             'working-dir': working_dir,
             'timeout': '{:.3f}s'.format(timeout) if timeout is not None else None,
@@ -2140,15 +2141,23 @@ class TestExec(unittest.TestCase):
         _, _, control = self.add_responses('123', 0)
 
         process = self.client.exec(['server'])
-        process.send_signal(10)
+        process.send_signal(1)
+        process.send_signal(signal.SIGHUP)
+        process.send_signal('SIGHUP')
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['server'])),
         ])
-        self.assertEqual(len(control.sends), 1)
+        self.assertEqual(len(control.sends), 3)
         self.assertEqual(control.sends[0][0], 'TXT')
         self.assertEqual(json.loads(control.sends[0][1]),
-                         {'command': 'signal', 'signal': 10})
+                         {'command': 'signal', 'signal': {'name': signal.Signals(1).name}})
+        self.assertEqual(control.sends[1][0], 'TXT')
+        self.assertEqual(json.loads(control.sends[1][1]),
+                         {'command': 'signal', 'signal': {'name': 'SIGHUP'}})
+        self.assertEqual(control.sends[2][0], 'TXT')
+        self.assertEqual(json.loads(control.sends[1][1]),
+                         {'command': 'signal', 'signal': {'name': 'SIGHUP'}})
 
     def test_wait_output(self):
         io, stderr, _ = self.add_responses('123', 0)
