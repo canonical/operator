@@ -2142,23 +2142,26 @@ class TestExec(unittest.TestCase):
 
         process = self.client.exec(['server'])
         process.send_signal('SIGHUP')
+        num_sends = 1
         if hasattr(signal, 'SIGHUP'):  # Skip this part on Windows
             process.send_signal(1)
             process.send_signal(signal.SIGHUP)
+            num_sends += 2
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['server'])),
         ])
-        self.assertEqual(len(control.sends), 3)
-        self.assertEqual(control.sends[2][0], 'TXT')
-        self.assertEqual(json.loads(control.sends[1][1]),
+
+        self.assertEqual(len(control.sends), num_sends)
+        self.assertEqual(control.sends[0][0], 'TXT')
+        self.assertEqual(json.loads(control.sends[0][1]),
                          {'command': 'signal', 'signal': {'name': 'SIGHUP'}})
         if hasattr(signal, 'SIGHUP'):
-            self.assertEqual(control.sends[0][0], 'TXT')
-            self.assertEqual(json.loads(control.sends[0][1]),
-                             {'command': 'signal', 'signal': {'name': signal.Signals(1).name}})
             self.assertEqual(control.sends[1][0], 'TXT')
             self.assertEqual(json.loads(control.sends[1][1]),
+                             {'command': 'signal', 'signal': {'name': signal.Signals(1).name}})
+            self.assertEqual(control.sends[2][0], 'TXT')
+            self.assertEqual(json.loads(control.sends[2][1]),
                              {'command': 'signal', 'signal': {'name': 'SIGHUP'}})
 
     def test_wait_output(self):
