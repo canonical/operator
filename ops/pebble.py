@@ -1664,7 +1664,6 @@ class Client:
 
         body = {
             'command': command,
-            'separate-stderr': True,
             'environment': environment or {},
             'working-dir': working_dir,
             'timeout': _format_timeout(timeout) if timeout is not None else None,

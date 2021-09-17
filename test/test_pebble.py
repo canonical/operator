@@ -2034,7 +2034,6 @@ class TestExec(unittest.TestCase):
             user_id=None, user=None, group_id=None, group=None):
         return {
             'command': command,
-            'separate-stderr': True,
             'environment': environment or {},
             'working-dir': working_dir,
             'timeout': '{:.3f}s'.format(timeout) if timeout is not None else None,
