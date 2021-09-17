@@ -158,7 +158,7 @@ class Harness(typing.Generic[CharmType]):
             harness = Harness(MyCharm)
             # Do initial setup here
             # Add storage if needed before begin_with_initial_hooks() is called
-            storage_id = harness.add_storage('data', location='/dev/data')
+            storage_id = harness.add_storage('data', count=1)
             relation_id = harness.add_relation('db', 'postgresql')
             harness.add_relation_unit(relation_id, 'postgresql/0')
             harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
@@ -905,7 +905,7 @@ class _TestingModelBackend:
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
-        self._storage_list = {k for k in self._meta.storages}
+        self._storage_list = {k: {} for k in self._meta.storages}
         # Every new storage device gets an id from the _storage_id_counter.
         # That id is mapped back to the storage name on _storage_ids_map
         self._storage_ids_map = {}
@@ -1021,6 +1021,8 @@ class _TestingModelBackend:
         return self._storage_list[name][id][attribute]
 
     def storage_add(self, name, count=1):
+        if name not in self._storage_list:
+            self._storage_list[name] = {}
         for i in range(count):
             storage_id = self._storage_id_counter
             self._storage_id_counter += 1
@@ -1058,6 +1060,19 @@ class _TestingModelBackend:
             self._pebble_clients[socket_path] = client
         return client
 
+    def planned_units(self):
+        units = []
+        peer_names = set(self._meta.peers.keys())
+        for peer_id, peer_name in self._relation_names.items():
+            if peer_name not in peer_names:
+                continue
+            peer_units = self._relation_list_map[peer_id]
+            units += peer_units
+
+        count = len(set(units))  # de-dupe and get length.
+
+        return count + 1  # Account for this unit.
+
 
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:
@@ -1075,7 +1090,7 @@ class _TestingPebbleClient:
         self._service_status = {}
 
     def get_system_info(self) -> pebble.SystemInfo:
-        raise NotImplementedError(self.get_system_info)
+        return pebble.SystemInfo(version="1.0.0")
 
     def get_warnings(
             self, select: pebble.WarningState = pebble.WarningState.PENDING,
