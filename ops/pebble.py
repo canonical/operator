@@ -624,7 +624,7 @@ class FileType(enum.Enum):
 
 
 class FileInfo:
-    """Stat-like information about a single file."""
+    """Stat-like information about a single file or directory."""
 
     def __init__(
         self,
@@ -1159,7 +1159,10 @@ class Client:
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[FileInfo]:
-        """Return list of file information from given path on remote system.
+        """Return list of directory entries from given path on remote system.
+
+        Despite the name, this method returns a list of files *and*
+        directories, similar to :func:`os.listdir` or :func:`os.scandir`.
 
         Args:
             path: Path of the directory to list, or path of the file to return
