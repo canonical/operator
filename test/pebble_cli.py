@@ -68,6 +68,7 @@ def main():
     p.add_argument('-g', '--group', help='group to run as')
     p.add_argument('--encoding', help="input/output encoding or 'none', default %(default)r",
                    default='utf-8')
+    p.add_argument('--combine-stderr', help='combine stderr into stdout', action='store_true')
     p.add_argument('exec_command', help='command and arguments', nargs='+', metavar='command')
 
     p = subparsers.add_parser('ls', help='list files')
@@ -167,11 +168,11 @@ def main():
                 if encoding is not None:
                     stdin = sys.stdin
                     stdout = sys.stdout
-                    stderr = sys.stderr
+                    stderr = sys.stderr if not args.combine_stderr else None
                 else:
                     stdin = sys.stdin.buffer
                     stdout = sys.stdout.buffer
-                    stderr = sys.stderr.buffer
+                    stderr = sys.stderr.buffer if not args.combine_stderr else None
             else:
                 if sys.stdin.isatty():
                     if encoding is not None:
@@ -197,6 +198,7 @@ def main():
                 stdout=stdout,
                 stderr=stderr,
                 encoding=encoding,
+                combine_stderr=args.combine_stderr,
             )
 
             try:

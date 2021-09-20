@@ -2033,7 +2033,7 @@ class TestExec(unittest.TestCase):
 
     def build_exec_data(
             self, command, environment=None, working_dir=None, timeout=None,
-            user_id=None, user=None, group_id=None, group=None):
+            user_id=None, user=None, group_id=None, group=None, combine_stderr=False):
         return {
             'command': command,
             'environment': environment or {},
@@ -2043,6 +2043,7 @@ class TestExec(unittest.TestCase):
             'user': user,
             'group-id': group_id,
             'group': group,
+            'combine-stderr': combine_stderr,
         }
 
     def test_arg_errors(self):
@@ -2056,6 +2057,9 @@ class TestExec(unittest.TestCase):
             self.client.exec(['foo'], stdin=b's')
         with self.assertRaises(TypeError):
             self.client.exec(['foo'], stdin=123)
+        with self.assertRaises(ValueError):
+            self.client.exec(['foo'], stdout=io.StringIO(), stderr=io.StringIO(),
+                             combine_stderr=True)
 
     def test_wait_exit_zero(self):
         self.add_responses('123', 0)
@@ -2182,6 +2186,24 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(io.sends, [])
 
+    def test_wait_output_combine_stderr(self):
+        io, _, _ = self.add_responses('123', 0)
+        io.receives.append(b'invalid time interval\n')
+        io.receives.append('')
+
+        process = self.client.exec(['sleep', 'x'], combine_stderr=True)
+        out, err = process.wait_output()
+        self.assertEqual(out, 'invalid time interval\n')
+        self.assertIsNone(err)
+        self.assertIsNone(process.stderr)
+
+        exec_data = self.build_exec_data(['sleep', 'x'], combine_stderr=True)
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, exec_data),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(io.sends, [])
+
     def test_wait_output_bytes(self):
         io, stderr, _ = self.add_responses('123', 0)
         io.receives.append(b'Python 3.8.10\n')
@@ -2212,6 +2234,23 @@ class TestExec(unittest.TestCase):
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['ls', 'x'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(io.sends, [])
+
+    def test_wait_output_exit_nonzero_combine_stderr(self):
+        io, _, _ = self.add_responses('123', 0)
+        io.receives.append(b'file not found: x\n')
+        io.receives.append('')
+
+        process = self.client.exec(['ls', 'x'], combine_stderr=True)
+        out, err = process.wait_output()
+        self.assertEqual(out, 'file not found: x\n')
+        self.assertIsNone(err)
+
+        exec_data = self.build_exec_data(['ls', 'x'], combine_stderr=True)
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, exec_data),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
         self.assertEqual(io.sends, [])
@@ -2273,6 +2312,25 @@ class TestExec(unittest.TestCase):
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(io_ws.sends, [])
+
+    def test_wait_passed_output_combine_stderr(self):
+        io_ws, _, _ = self.add_responses('123', 0)
+        io_ws.receives.append(b'foo\n')
+        io_ws.receives.append(b'some error\n')
+        io_ws.receives.append('')
+
+        out = io.StringIO()
+        process = self.client.exec(['echo', 'foo'], stdout=out, combine_stderr=True)
+        process.wait()
+        self.assertEqual(out.getvalue(), 'foo\nsome error\n')
+        self.assertIsNone(process.stderr)
+
+        exec_data = self.build_exec_data(['echo', 'foo'], combine_stderr=True)
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, exec_data),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
         self.assertEqual(io_ws.sends, [])

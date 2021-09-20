@@ -227,17 +227,18 @@ class ExecError(Error):
         stdout: If :meth:`ExecProcess.wait_output` was being called, this is
             the captured stdout as a str (or bytes if encoding was None). If
             :meth:`ExecProcess.wait` was being called, this is None.
-        stderr: If :meth:`ExecProcess.wait_output` was being called, this is
-            the captured stderr as a str (or bytes if encoding was None). If
-            :meth:`ExecProcess.wait` was being called, this is None.
+        stderr: If :meth:`ExecProcess.wait_output` was being called and
+            combine_stderr was False, this is the captured stderr as a str (or
+            bytes if encoding was None). If :meth:`ExecProcess.wait` was being
+            called or combine_stderr was True, this is None.
     """
 
     def __init__(
         self,
         command: typing.List[str],
         exit_code: int,
-        stdout: typing.AnyStr,
-        stderr: typing.AnyStr,
+        stdout: typing.Optional[typing.AnyStr],
+        stderr: typing.Optional[typing.AnyStr],
         max_output: int = 1024,
     ):
         self.command = command
@@ -768,15 +769,16 @@ class ExecProcess:
             this is a readable file-like object the caller can use to stream
             output from the process. It is None if stdout was passed to
             :meth:`Client.exec`.
-        stderr: If the stderr argument was not passed to :meth:`Client.exec`,
-            this is a readable file-like object the caller can use to stream
-            error output from the process. It is None if stderr was passed to
-            :meth:`Client.exec`.
+        stderr: If the stderr argument was not passed to :meth:`Client.exec`
+            and combine_stderr was False, this is a readable file-like object
+            the caller can use to stream error output from the process. It is
+            None if stderr was passed to :meth:`Client.exec` or combine_stderr
+            was True.
     """
     def __init__(
         self,
-        stdin: typing.Union[typing.TextIO, typing.BinaryIO],
-        stdout: typing.Union[typing.TextIO, typing.BinaryIO],
+        stdin: typing.Optional[typing.Union[typing.TextIO, typing.BinaryIO]],
+        stdout: typing.Optional[typing.Union[typing.TextIO, typing.BinaryIO]],
         stderr: typing.Optional[typing.Union[typing.TextIO, typing.BinaryIO]],
         client: 'Client',
         timeout: typing.Optional[float],
@@ -851,21 +853,26 @@ class ExecProcess:
         """
         if self._encoding is not None:
             out = io.StringIO()
-            err = io.StringIO()
+            err = io.StringIO() if self.stderr is not None else None
         else:
             out = io.BytesIO()
-            err = io.BytesIO()
+            err = io.BytesIO() if self.stderr is not None else None
 
         t = _start_thread(shutil.copyfileobj, self.stdout, out)
         self._threads.append(t)
-        t = _start_thread(shutil.copyfileobj, self.stderr, err)
-        self._threads.append(t)
+
+        if self.stderr is not None:
+            t = _start_thread(shutil.copyfileobj, self.stderr, err)
+            self._threads.append(t)
 
         exit_code = self._wait()
-        if exit_code != 0:
-            raise ExecError(self._command, exit_code, out.getvalue(), err.getvalue())
 
-        return (out.getvalue(), err.getvalue())
+        out_value = out.getvalue()
+        err_value = err.getvalue() if err is not None else None
+        if exit_code != 0:
+            raise ExecError(self._command, exit_code, out_value, err_value)
+
+        return (out_value, err_value)
 
     def send_signal(self, sig: typing.Union[int, str]):
         """Send the given signal to the running process.
@@ -1537,7 +1544,8 @@ class Client:
         stdin: typing.Union[str, bytes, typing.TextIO, typing.BinaryIO] = None,
         stdout: typing.Union[typing.TextIO, typing.BinaryIO] = None,
         stderr: typing.Union[typing.TextIO, typing.BinaryIO] = None,
-        encoding: str = 'utf-8'
+        encoding: str = 'utf-8',
+        combine_stderr: bool = False
     ) -> ExecProcess:
         r"""Execute the given command on the remote system.
 
@@ -1630,12 +1638,16 @@ class Client:
             stderr: A writable file-like object that the process's standard
                 error is written to. If not set, the caller can use
                 :meth:`ExecProcess.wait_output` to capture error output as a
-                string, or read from :meth:`ExecProcess.stderr` to stream error
-                output from the process.
+                string, or read from :meth:`ExecProcess.stderr` to stream
+                error output from the process. Must be None if combine_stderr
+                is True.
             encoding: If encoding is set (the default is UTF-8), the types
                 read or written to stdin/stdout/stderr are str, and encoding
                 is used to encode them to bytes. If encoding is None, the
                 types read or written are raw bytes.
+            combine_stderr: If True, process's stderr output is combined into
+                its stdout (the stderr argument must be None). If False,
+                separate streams are used for stdout and stderr.
 
         Returns:
             A Process object representing the state of the running process.
@@ -1662,6 +1674,9 @@ class Client:
             elif not hasattr(stdin, 'read'):
                 raise TypeError('stdin must be str, bytes, or a readable file-like object')
 
+        if combine_stderr and stderr is not None:
+            raise ValueError('stderr must be None if combine_stderr is True')
+
         body = {
             'command': command,
             'environment': environment or {},
@@ -1671,15 +1686,18 @@ class Client:
             'user': user,
             'group-id': group_id,
             'group': group,
+            'combine-stderr': combine_stderr,
         }
         resp = self._request('POST', '/v1/exec', body=body)
         change_id = resp['change']
         websocket_ids = resp['result']['websocket-ids']
 
+        stderr_ws = None
         try:
-            io_ws = self._connect_websocket(change_id, websocket_ids['io'])
-            stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
             control_ws = self._connect_websocket(change_id, websocket_ids['control'])
+            io_ws = self._connect_websocket(change_id, websocket_ids['io'])
+            if not combine_stderr:
+                stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
         except websocket.WebSocketException as e:
             # Error connecting to websockets, probably due to the exec/change
             # finishing early with an error. Call wait_change to pick that up.
@@ -1716,12 +1734,13 @@ class Client:
         else:
             process_stdout = _WebsocketReader(io_ws, encoding)
 
-        if stderr is not None:
-            t = _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
-            threads.append(t)
-            process_stderr = None
-        else:
-            process_stderr = _WebsocketReader(stderr_ws, encoding)
+        process_stderr = None
+        if not combine_stderr:
+            if stderr is not None:
+                t = _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
+                threads.append(t)
+            else:
+                process_stderr = _WebsocketReader(stderr_ws, encoding)
 
         process = ExecProcess(
             stdin=process_stdin,
