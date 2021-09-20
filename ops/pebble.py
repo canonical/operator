@@ -836,6 +836,8 @@ class ExecProcess:
         if self._cancel_reader is not None:
             os.close(self._cancel_reader)
 
+        self._control_ws.close()
+
         if change.err:
             raise ChangeError(change.err, change)
         exit_code = change.data.get('exit-code', -1)

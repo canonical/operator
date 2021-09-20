@@ -18,12 +18,15 @@ import datetime
 import email.parser
 import io
 import json
+import os
 import unittest
 import unittest.mock
 import unittest.util
 import signal
 import sys
 import tempfile
+import threading
+import time
 
 import ops.pebble as pebble
 import test.fake_pebble as fake_pebble
@@ -1992,6 +1995,9 @@ class MockWebsocket:
     def recv(self):
         return self.receives.pop(0)
 
+    def close(self):
+        pass
+
 
 class TestExec(unittest.TestCase):
     def setUp(self):
@@ -2459,3 +2465,109 @@ class TestExec(unittest.TestCase):
         with self.assertRaises(pebble.ConnectionError) as cm:
             self.client.exec(['foo'])
         self.assertIn(str(cm.exception), 'unexpected error connecting to websockets: conn!')
+
+
+# Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
+# against a real Pebble server. For example, in one terminal, run Pebble:
+#
+# $ PEBBLE=~/pebble pebble run
+# 2021-09-20T04:10:34.934Z [pebble] Started daemon
+#
+# In another terminal, run the tests:
+#
+# $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble \
+#     python -m unittest test/test_pebble.py -v -k RealPebble
+#
+@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
+class TestRealPebble(unittest.TestCase):
+    def setUp(self):
+        socket_path = os.getenv('PEBBLE_SOCKET')
+        if not socket_path and os.getenv('PEBBLE'):
+            socket_path = os.path.join(os.getenv('PEBBLE'), '.pebble.socket')
+        assert socket_path, 'PEBBLE or PEBBLE_SOCKET must be set if RUN_REAL_PEBBLE_TESTS set'
+
+        self.client = pebble.Client(socket_path=socket_path)
+
+    def test_exec_wait(self):
+        process = self.client.exec(['true'])
+        process.wait()
+
+        with self.assertRaises(pebble.ExecError) as cm:
+            process = self.client.exec(['/bin/sh', '-c', 'exit 42'])
+            process.wait()
+        self.assertEqual(cm.exception.exit_code, 42)
+
+    def test_exec_wait_output(self):
+        process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2'])
+        out, err = process.wait_output()
+        self.assertEqual(out, 'OUT\n')
+        self.assertEqual(err, 'ERR\n')
+
+        process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2'], encoding=None)
+        out, err = process.wait_output()
+        self.assertEqual(out, b'OUT\n')
+        self.assertEqual(err, b'ERR\n')
+
+        with self.assertRaises(pebble.ExecError) as cm:
+            process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2; exit 42'])
+            process.wait_output()
+        self.assertEqual(cm.exception.exit_code, 42)
+        self.assertEqual(cm.exception.stdout, 'OUT\n')
+        self.assertEqual(cm.exception.stderr, 'ERR\n')
+
+    def test_exec_send_stdin(self):
+        process = self.client.exec(['awk', '{ print toupper($0) }'], stdin='foo\nBar\n')
+        out, err = process.wait_output()
+        self.assertEqual(out, 'FOO\nBAR\n')
+        self.assertEqual(err, '')
+
+        process = self.client.exec(['awk', '{ print toupper($0) }'], stdin=b'foo\nBar\n',
+                                   encoding=None)
+        out, err = process.wait_output()
+        self.assertEqual(out, b'FOO\nBAR\n')
+        self.assertEqual(err, b'')
+
+    def test_exec_timeout(self):
+        process = self.client.exec(['sleep', '0.2'], timeout=0.1)
+        with self.assertRaises(pebble.ChangeError) as cm:
+            process.wait()
+        self.assertIn('timed out', cm.exception.err)
+
+    def test_exec_working_dir(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            process = self.client.exec(['pwd'], working_dir=temp_dir)
+            out, err = process.wait_output()
+            self.assertEqual(out, temp_dir + '\n')
+            self.assertEqual(err, '')
+
+    def test_exec_environment(self):
+        process = self.client.exec(['/bin/sh', '-c', 'echo $ONE.$TWO.$THREE'],
+                                   environment={'ONE': '1', 'TWO': '2'})
+        out, err = process.wait_output()
+        self.assertEqual(out, '1.2.\n')
+        self.assertEqual(err, '')
+
+    def test_exec_streaming(self):
+        process = self.client.exec(['cat'])
+
+        def stdin_thread():
+            for line in ['one\n', '2\n', 'THREE\n']:
+                process.stdin.write(line)
+                process.stdin.flush()
+                time.sleep(0.1)
+            process.stdin.close()
+
+        threading.Thread(target=stdin_thread).start()
+
+        # TODO: fix OSError with "for line in process.stdout: ...":
+        # OSError: read() should have returned a bytes object, not 'str'
+        reads = []
+        while True:
+            chunk = process.stdout.read()
+            if not chunk:
+                break
+            reads.append(chunk)
+
+        process.wait()
+
+        self.assertEqual(reads, ['one\n', '2\n', 'THREE\n'])
