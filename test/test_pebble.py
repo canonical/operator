@@ -833,6 +833,10 @@ class TestClient(unittest.TestCase):
 
     def setUp(self):
         self.client = MockClient()
+        self.time = MockTime()
+        time_patcher = unittest.mock.patch('ops.pebble.time', self.time)
+        time_patcher.start()
+        self.addCleanup(time_patcher.stop)
 
     def test_client_init(self):
         pebble.Client(socket_path='foo')  # test that constructor runs
@@ -1108,14 +1112,38 @@ class TestClient(unittest.TestCase):
         self.test_wait_change_success(timeout=None)
 
     def test_wait_change_success_multiple_calls(self):
-        mock_time = MockTime()
-        with unittest.mock.patch('ops.pebble.time', mock_time):
-            def timeout_response(n):
-                mock_time.sleep(n)  # simulate passing of time due to wait_change call
-                raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
-            self.client.responses.append(lambda: timeout_response(4))
+        def timeout_response(n):
+            self.time.sleep(n)  # simulate passing of time due to wait_change call
+            raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
+        self.client.responses.append(lambda: timeout_response(4))
+
+        change = build_mock_change_dict()
+        self.client.responses.append({
+            "result": change,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+
+        response = self.client.wait_change('70')
+        self.assertEqual(response.id, '70')
+        self.assertTrue(response.ready)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+        ])
+
+        self.assertEqual(self.time.time(), 4)
+
+    def test_wait_change_success_polled(self, timeout=30.0):
+        # Trigger polled mode
+        self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+
+        for i in range(3):
             change = build_mock_change_dict()
+            change['ready'] = i == 2
             self.client.responses.append({
                 "result": change,
                 "status": "OK",
@@ -1123,99 +1151,69 @@ class TestClient(unittest.TestCase):
                 "type": "sync"
             })
 
-            response = self.client.wait_change('70')
-            self.assertEqual(response.id, '70')
-            self.assertTrue(response.ready)
+        response = self.client.wait_change('70', timeout=timeout, delay=1)
+        self.assertEqual(response.id, '70')
+        self.assertTrue(response.ready)
 
-            self.assertEqual(self.client.requests, [
-                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
-                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
-            ])
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70', None, None),
+        ])
 
-        self.assertEqual(mock_time.time(), 4)
-
-    def test_wait_change_success_polled(self, timeout=30.0):
-        mock_time = MockTime()
-        with unittest.mock.patch('ops.pebble.time', mock_time):
-            # Trigger polled mode
-            self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
-
-            for i in range(3):
-                change = build_mock_change_dict()
-                change['ready'] = i == 2
-                self.client.responses.append({
-                    "result": change,
-                    "status": "OK",
-                    "status-code": 200,
-                    "type": "sync"
-                })
-
-            response = self.client.wait_change('70', timeout=timeout, delay=1)
-            self.assertEqual(response.id, '70')
-            self.assertTrue(response.ready)
-
-            self.assertEqual(self.client.requests, [
-                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
-                ('GET', '/v1/changes/70', None, None),
-                ('GET', '/v1/changes/70', None, None),
-                ('GET', '/v1/changes/70', None, None),
-            ])
-
-        self.assertEqual(mock_time.time(), 2)
+        self.assertEqual(self.time.time(), 2)
 
     def test_wait_change_success_polled_timeout_none(self):
         self.test_wait_change_success_polled(timeout=None)
 
     def test_wait_change_timeout(self):
-        mock_time = MockTime()
-        with unittest.mock.patch('ops.pebble.time', mock_time):
-            def timeout_response(n):
-                mock_time.sleep(n)  # simulate passing of time due to wait_change call
-                raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
-            self.client.responses.append(lambda: timeout_response(4))
-            self.client.responses.append(lambda: timeout_response(2))
+        def timeout_response(n):
+            self.time.sleep(n)  # simulate passing of time due to wait_change call
+            raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
-            with self.assertRaises(pebble.TimeoutError) as cm:
-                self.client.wait_change('70', timeout=6)
-            self.assertIsInstance(cm.exception, pebble.Error)
-            self.assertIsInstance(cm.exception, TimeoutError)
+        self.client.responses.append(lambda: timeout_response(4))
+        self.client.responses.append(lambda: timeout_response(2))
 
-            self.assertEqual(self.client.requests, [
-                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
-                ('GET', '/v1/changes/70/wait', {'timeout': '2.000s'}, None),
-            ])
+        with self.assertRaises(pebble.TimeoutError) as cm:
+            self.client.wait_change('70', timeout=6)
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertIsInstance(cm.exception, TimeoutError)
 
-        self.assertEqual(mock_time.time(), 6)
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+            ('GET', '/v1/changes/70/wait', {'timeout': '2.000s'}, None),
+        ])
+
+        self.assertEqual(self.time.time(), 6)
 
     def test_wait_change_timeout_polled(self):
-        mock_time = MockTime()
-        with unittest.mock.patch('ops.pebble.time', mock_time):
-            # Trigger polled mode
-            self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+        # Trigger polled mode
+        self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
 
-            change = build_mock_change_dict()
-            change['ready'] = False
-            for _ in range(3):
-                self.client.responses.append({
-                    "result": change,
-                    "status": "OK",
-                    "status-code": 200,
-                    "type": "sync"
-                })
+        change = build_mock_change_dict()
+        change['ready'] = False
+        for _ in range(3):
+            self.client.responses.append({
+                "result": change,
+                "status": "OK",
+                "status-code": 200,
+                "type": "sync"
+            })
 
-            with self.assertRaises(pebble.TimeoutError) as cm:
-                self.client.wait_change('70', timeout=3, delay=1)
-            self.assertIsInstance(cm.exception, pebble.Error)
-            self.assertIsInstance(cm.exception, TimeoutError)
+        with self.assertRaises(pebble.TimeoutError) as cm:
+            self.client.wait_change('70', timeout=3, delay=1)
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertIsInstance(cm.exception, TimeoutError)
 
-            self.assertEqual(self.client.requests, [
-                ('GET', '/v1/changes/70/wait', {'timeout': '3.000s'}, None),
-                ('GET', '/v1/changes/70', None, None),
-                ('GET', '/v1/changes/70', None, None),
-                ('GET', '/v1/changes/70', None, None),
-            ])
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '3.000s'}, None),
+            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70', None, None),
+        ])
 
-        self.assertEqual(mock_time.time(), 3)
+        self.assertEqual(self.time.time(), 3)
 
     def test_wait_change_error(self):
         change = build_mock_change_dict()
@@ -1998,6 +1996,10 @@ class MockWebsocket:
 class TestExec(unittest.TestCase):
     def setUp(self):
         self.client = MockClient()
+        self.time = MockTime()
+        time_patcher = unittest.mock.patch('ops.pebble.time', self.time)
+        time_patcher.start()
+        self.addCleanup(time_patcher.stop)
 
     def add_responses(self, change_id, exit_code, change_err=None):
         self.client.responses.append({
