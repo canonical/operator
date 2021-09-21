@@ -446,14 +446,14 @@ containers:
   test1:
     mounts:
       - storage: data
-        location: /test/storage
+        location: /test/storagemount
       - storage: other
-        location: /test/other
+        location: /test/otherdata
 """)
         self.assertIsInstance(meta.containers['test1'], ContainerMeta)
         self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
-        self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storage')
-        self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/other')
+        self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storagemount')
+        self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/otherdata')
 
     def test_containers_storage_multiple_mounts(self):
         meta = CharmMeta.from_yaml("""
@@ -466,14 +466,16 @@ containers:
   test1:
     mounts:
       - storage: data
-        location: /test/storage
+        location: /test/storagemount
       - storage: data
-        location: /test/other
+        location: /test/otherdata
 """)
         self.assertIsInstance(meta.containers['test1'], ContainerMeta)
         self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
-        self.assertEqual(meta.containers['test1'].mounts["data"].locations[0], '/test/storage')
-        self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/other')
+        self.assertEqual(
+                meta.containers['test1'].mounts["data"].locations[0],
+                '/test/storagemount')
+        self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/otherdata')
 
         with self.assertRaises(RuntimeError):
             meta.containers["test1"].mounts["data"].location
