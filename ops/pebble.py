@@ -1691,7 +1691,7 @@ class Client:
             'user': user,
             'group-id': group_id,
             'group': group,
-            'combine-stderr': combine_stderr,
+            'split-stderr': not combine_stderr,
         }
         resp = self._request('POST', '/v1/exec', body=body)
         change_id = resp['change']

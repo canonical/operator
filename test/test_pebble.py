@@ -2049,7 +2049,7 @@ class TestExec(unittest.TestCase):
             'user': user,
             'group-id': group_id,
             'group': group,
-            'combine-stderr': combine_stderr,
+            'split-stderr': not combine_stderr,
         }
 
     def test_arg_errors(self):
