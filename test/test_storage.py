@@ -19,19 +19,12 @@ import os
 import pathlib
 import sys
 import tempfile
+from test.test_helpers import BaseTestCase, fake_script, fake_script_calls
 from textwrap import dedent
 
 import yaml
 
-from ops import (
-    framework,
-    storage,
-)
-from test.test_helpers import (
-    BaseTestCase,
-    fake_script,
-    fake_script_calls,
-)
+from ops import framework, storage
 
 
 class StoragePermutations(abc.ABC):
@@ -313,7 +306,7 @@ class TestSimpleLoader(BaseTestCase):
         parsed = yaml.load(raw, Loader=storage._SimpleLoader)
         self.assertEqual(parsed, (1, 'tuple'))
 
-    def assertRefused(self, obj):
+    def assertRefused(self, obj): # noqa: N802
         # We shouldn't allow them to be written
         with self.assertRaises(yaml.representer.RepresenterError):
             yaml.dump(obj, Dumper=storage._SimpleDumper)

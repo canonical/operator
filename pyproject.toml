@@ -1,0 +1,28 @@
+# Testing tools configuration
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+# Formatting tools configuration
+[tool.black]
+line-length = 99
+target-version = ["py35"]
+
+[tool.isort]
+profile = "black"
+
+# Linting tools configuration
+[tool.flake8]
+max-line-length = 99
+max-doc-length = 99
+exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
+select = ["E", "W", "F", "C", "N", "R", "D", "H"]
+# Ignore W503, E501, E203 because using black creates errors with this
+# Ignore D107 Missing docstring in __init__
+# Ignore D105 Missing docstring in magic method
+ignore = ["W503", "E501", "D107", "D105", "E203"]
+# D100, D101, D102, D103, D104: Ignore missing docstrings in tests
+per-file-ignores = ["test/*:D100,D101,D102,D103,D104"]
+docstring-convention = "google"

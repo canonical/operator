@@ -743,7 +743,7 @@ class TestModel(unittest.TestCase):
     def resetBackendCalls(self):
         self.harness._get_backend_calls(reset=True)
 
-    def assertBackendCalls(self, expected, *, reset=True):
+    def assertBackendCalls(self, expected, *, reset=True): # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
 
