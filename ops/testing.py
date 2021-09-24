@@ -23,15 +23,8 @@ import typing
 from contextlib import contextmanager
 from textwrap import dedent
 
-from ops import (
-    charm,
-    framework,
-    model,
-    pebble,
-    storage,
-)
+from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
-
 
 # OptionalYAML is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.

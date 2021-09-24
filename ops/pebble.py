@@ -37,7 +37,6 @@ import urllib.request
 
 from ops._private import yaml
 
-
 _not_provided = object()
 
 

@@ -13,19 +13,13 @@
 # limitations under the License.
 
 import os
-import unittest
-import tempfile
 import shutil
-
+import tempfile
+import unittest
 from pathlib import Path
 
-from ops.charm import (
-    CharmBase,
-    CharmMeta,
-    CharmEvents,
-    ContainerMeta,
-)
-from ops.framework import Framework, EventSource, EventBase
+from ops.charm import CharmBase, CharmEvents, CharmMeta, ContainerMeta
+from ops.framework import EventBase, EventSource, Framework
 from ops.model import Model, _ModelBackend
 from ops.storage import SQLiteStorage
 

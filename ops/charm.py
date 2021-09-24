@@ -21,7 +21,7 @@ import typing
 
 from ops import model
 from ops._private import yaml
-from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
+from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 
 class HookEvent(EventBase):

@@ -18,15 +18,14 @@ import datetime
 import email.parser
 import io
 import json
+import sys
+import test.fake_pebble as fake_pebble
 import unittest
 import unittest.mock
 import unittest.util
-import sys
 
 import ops.pebble as pebble
-import test.fake_pebble as fake_pebble
 from ops._private import yaml
-
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000

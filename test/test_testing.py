@@ -20,29 +20,21 @@ import sys
 import tempfile
 import textwrap
 import unittest
+
 import yaml
 
 from ops import pebble
-from ops.charm import (
-    CharmBase,
-    RelationEvent,
-    PebbleReadyEvent,
-)
-from ops.framework import (
-    Object,
-)
+from ops.charm import CharmBase, PebbleReadyEvent, RelationEvent
+from ops.framework import Object
 from ops.model import (
     ActiveStatus,
     MaintenanceStatus,
-    UnknownStatus,
     ModelError,
     RelationNotFoundError,
+    UnknownStatus,
     _ModelBackend,
 )
-from ops.testing import (
-    Harness,
-    _TestingPebbleClient,
-)
+from ops.testing import Harness, _TestingPebbleClient
 
 
 class TestHarness(unittest.TestCase):

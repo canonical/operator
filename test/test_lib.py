@@ -14,15 +14,14 @@
 
 import os
 import sys
-
 from importlib.machinery import ModuleSpec
 from pathlib import Path
-from tempfile import mkdtemp, mkstemp
-from unittest import TestCase
-from unittest.mock import patch
 from random import shuffle
 from shutil import rmtree
+from tempfile import mkdtemp, mkstemp
 from textwrap import dedent
+from unittest import TestCase
+from unittest.mock import patch
 
 import logassert
 

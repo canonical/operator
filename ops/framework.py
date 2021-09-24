@@ -29,10 +29,7 @@ import types
 import weakref
 
 from ops import charm
-from ops.storage import (
-    NoSnapshotError,
-    SQLiteStorage,
-)
+from ops.storage import NoSnapshotError, SQLiteStorage
 
 logger = logging.getLogger(__name__)
 
