@@ -389,7 +389,7 @@ class Harness(typing.Generic[CharmType]):
         self._relation_id_counter += 1
         return rel_id
 
-    def add_storage(self, storage_name: str, count: int = 1) -> int:
+    def add_storage(self, storage_name: str, count: int = 1) -> typing.List[str]:
         """Declare a new storage device attached to this unit.
 
         To have repeatable tests, each device will be initialized with
@@ -1072,7 +1072,7 @@ class _TestingModelBackend:
             self._unit_status = {'status': status, 'message': message}
 
     def storage_list(self, name):
-        return list(id_ for id_ in self._storage_list[name]
+        return list(int(id_) for id_ in self._storage_list[name]
                     if id_ not in self._storage_detached[name])
 
     def storage_get(self, storage_name_id, attribute):
@@ -1089,20 +1089,21 @@ class _TestingModelBackend:
     def storage_add(self, name: str, count: int = 1):
         if name not in self._storage_list:
             self._storage_list[name] = {}
-        storage_id = None
+        result = []
         for i in range(count):
             storage_id = self._storage_id_counter
             self._storage_id_counter += 1
             self._storage_list[name][str(storage_id)] = {
                 "location": "/{}/{}".format(name, storage_id)
             }
-        return storage_id
+            result.append("{}/{}".format(name, storage_id))
+        return result
 
     def _storage_detach(self, storage_id: str):
         # NOTE: This is an extra function for _TestingModelBackend to simulate
         # detachment of a storage unit.  This is not present in ops.model._ModelBackend.
         name, id_ = storage_id.split('/', 1)
-        if id_ not in self._storage_detached[name]:
+        if id_ in self._storage_list[name] and id_ not in self._storage_detached[name]:
             self._storage_detached[name].add(id_)
             return True
         return False
@@ -1112,7 +1113,7 @@ class _TestingModelBackend:
         # re-attachment of a storage unit.  This is not present in
         # ops.model._ModelBackend.
         name, id_ = storage_id.split('/', 1)
-        if id_ in self._storage_detached[name]:
+        if id_ in self._storage_list[name] and id_ in self._storage_detached[name]:
             self._storage_detached[name].remove(id_)
             return True
         return False
