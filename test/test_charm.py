@@ -18,7 +18,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ops.charm import CharmBase, CharmEvents, CharmMeta, ContainerMeta
+from ops.charm import (
+    CharmBase,
+    CharmEvents,
+    CharmMeta,
+    ContainerMeta,
+    ContainerStorageMeta,
+)
 from ops.framework import EventBase, EventSource, Framework
 from ops.model import Model, _ModelBackend
 from ops.storage import SQLiteStorage
@@ -466,8 +472,8 @@ containers:
         self.assertIsInstance(meta.containers['test1'], ContainerMeta)
         self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
         self.assertEqual(
-                meta.containers['test1'].mounts["data"].locations[0],
-                '/test/storagemount')
+            meta.containers['test1'].mounts["data"].locations[0],
+            '/test/storagemount')
         self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/otherdata')
 
         with self.assertRaises(RuntimeError):
