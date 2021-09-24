@@ -1022,8 +1022,8 @@ class Client:
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
         parser = email.parser.BytesFeedParser()
-        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
-                    boundary.encode('utf-8') + b'\r\n\r\n')
+        parser.feed(b'Content-Type: multipart/form-data; boundary='
+                    + boundary.encode('utf-8') + b'\r\n\r\n')
 
         # Then read the rest of the response and feed it to the parser.
         while True:

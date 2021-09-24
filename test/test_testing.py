@@ -316,7 +316,7 @@ class TestHarness(unittest.TestCase):
         harness.charm.get_changes(reset=True)  # created event ignored
         # Check exception is raised if relation id is invalid
         with self.assertRaises(RelationNotFoundError):
-            harness.remove_relation(rel_id+1)
+            harness.remove_relation(rel_id + 1)
 
     def test_remove_relation_unit(self):
         harness = Harness(RelationEventCharm, meta='''

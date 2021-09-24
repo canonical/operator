@@ -785,7 +785,9 @@ class _TestMainWithDispatch(_TestMain):
     has_dispatch = True
 
     def test_setup_event_links(self):
-        """Test auto-creation of symlinks caused by initial events does _not_ happen when using dispatch.
+        """Test auto-creation of symlinks.
+
+        Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
         all_event_hooks = ['hooks/' + e.replace("_", "-")
                            for e in self.charm_module.Charm.on.events().keys()]

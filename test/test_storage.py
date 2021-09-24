@@ -30,13 +30,12 @@ from ops import framework, storage
 class StoragePermutations(abc.ABC):
 
     def create_framework(self) -> framework.Framework:
-        """Create a Framework that we can use to test the backend storage.
-        """
+        """Create a Framework that we can use to test the backend storage."""
         return framework.Framework(self.create_storage(), None, None, None)
 
     @abc.abstractmethod
     def create_storage(self) -> storage.SQLiteStorage:
-        """Create a Storage backend that we can interact with"""
+        """Create a Storage backend that we can interact with."""
         return NotImplemented
 
     def test_save_and_load_snapshot(self):
@@ -208,7 +207,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
 
 
 def setup_juju_backend(test_case, state_file):
-    """Create fake scripts for pretending to be state-set and state-get"""
+    """Create fake scripts for pretending to be state-set and state-get."""
     template_args = {
         'executable': str(pathlib.Path(sys.executable).as_posix()),
         'pthpth': repr(os.path.dirname(pathlib.__file__))[1:-1],
@@ -306,7 +305,7 @@ class TestSimpleLoader(BaseTestCase):
         parsed = yaml.load(raw, Loader=storage._SimpleLoader)
         self.assertEqual(parsed, (1, 'tuple'))
 
-    def assertRefused(self, obj): # noqa: N802
+    def assertRefused(self, obj):  # noqa: N802
         # We shouldn't allow them to be written
         with self.assertRaises(yaml.representer.RepresenterError):
             yaml.dump(obj, Dumper=storage._SimpleDumper)

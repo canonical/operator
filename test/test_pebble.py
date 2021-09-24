@@ -469,13 +469,13 @@ services:
                                      raw={
                                           "override": "replace",
                                           "command": "echo foo"
-                                         })
+                                     })
         old_services = {"foo": old_service}
         self.assertEqual(plan.services, old_services)
 
         services_as_dict = {
             "foo": {"override": "replace", "command": "echo foo"}
-            }
+        }
         self.assertEqual(plan.services, services_as_dict)
 
 
@@ -1702,8 +1702,8 @@ bad path
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
         parser = email.parser.BytesFeedParser()
-        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
-                    boundary.encode('utf-8') + b'\r\n\r\n')
+        parser.feed(b'Content-Type: multipart/form-data; boundary='
+                    + boundary.encode('utf-8') + b'\r\n\r\n')
         parser.feed(body)
         message = parser.close()
 

@@ -84,29 +84,29 @@ class TestLibFinder(TestCase):
         self.assertLoggedDebug("Found", "foo.opslib.bar")
 
     def test_multi(self):
-        tmpdirA = self._mkdtemp()
-        tmpdirB = self._mkdtemp()
+        tmp_dir_a = self._mkdtemp()
+        tmp_dir_b = self._mkdtemp()
 
-        if tmpdirA > tmpdirB:
+        if tmp_dir_a > tmp_dir_b:
             # keep sorting happy
-            tmpdirA, tmpdirB = tmpdirB, tmpdirA
+            tmp_dir_a, tmp_dir_b = tmp_dir_b, tmp_dir_a
 
-        dirs = [tmpdirA, tmpdirB]
+        dirs = [tmp_dir_a, tmp_dir_b]
 
-        for top in [tmpdirA, tmpdirB]:
+        for top in [tmp_dir_a, tmp_dir_b]:
             for pkg in ["bar", "baz"]:
                 for lib in ["meep", "quux"]:
                     _mklib(top, pkg, lib).write_text("")
 
         expected = [
-            os.path.join(tmpdirA, "bar", "opslib", "meep"),
-            os.path.join(tmpdirA, "bar", "opslib", "quux"),
-            os.path.join(tmpdirA, "baz", "opslib", "meep"),
-            os.path.join(tmpdirA, "baz", "opslib", "quux"),
-            os.path.join(tmpdirB, "bar", "opslib", "meep"),
-            os.path.join(tmpdirB, "bar", "opslib", "quux"),
-            os.path.join(tmpdirB, "baz", "opslib", "meep"),
-            os.path.join(tmpdirB, "baz", "opslib", "quux"),
+            os.path.join(tmp_dir_a, "bar", "opslib", "meep"),
+            os.path.join(tmp_dir_a, "bar", "opslib", "quux"),
+            os.path.join(tmp_dir_a, "baz", "opslib", "meep"),
+            os.path.join(tmp_dir_a, "baz", "opslib", "quux"),
+            os.path.join(tmp_dir_b, "bar", "opslib", "meep"),
+            os.path.join(tmp_dir_b, "bar", "opslib", "quux"),
+            os.path.join(tmp_dir_b, "baz", "opslib", "meep"),
+            os.path.join(tmp_dir_b, "baz", "opslib", "quux"),
         ]
 
         self.assertEqual(_flatten(ops.lib._find_all_specs(dirs)), expected)
@@ -144,7 +144,6 @@ class TestLibFinder(TestCase):
 
     def test_bogus_opsdir(self):
         """Check that having one bogus opslib doesn't cause the finder to abort."""
-
         tmpdir = self._mkdtemp()
 
         self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
@@ -184,7 +183,7 @@ class TestLibParser(TestCase):
         logassert.setup(self, 'ops.lib')
 
     def test_simple(self):
-        """Check that we can load a reasonably straightforward lib"""
+        """Check that we can load a reasonably straightforward lib."""
         m = self._mkmod('foo', '''
         LIBNAME = "foo"
         LIBEACH = float('-inf')
@@ -240,7 +239,7 @@ class TestLibParser(TestCase):
         self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
 
     def test_incomplete(self):
-        """Check that if anything is missing, nothing is returned"""
+        """Check that if anything is missing, nothing is returned."""
         m = self._mkmod('foo', '''
         LIBNAME = "foo"
         LIBAPI = 2
@@ -254,7 +253,7 @@ class TestLibParser(TestCase):
         self.assertNotLogged("Success")
 
     def test_too_long(self):
-        """Check that if the file is too long, nothing is returned"""
+        """Check that if the file is too long, nothing is returned."""
         m = self._mkmod('foo', '\n' * ops.lib._MAX_LIB_LINES + '''
         LIBNAME = "foo"
         LIBAPI = 2
@@ -269,19 +268,19 @@ class TestLibParser(TestCase):
         self.assertNotLogged("Success")
 
     def test_no_origin(self):
-        """Check that _parse_lib doesn't choke when given a spec with no origin"""
+        """Check that _parse_lib doesn't choke when given a spec with no origin."""
         # 'just don't crash'
         lib = ops.lib._parse_lib(ModuleSpec(name='hi', loader=None, origin=None))
         self.assertIsNone(lib)
 
     def test_bogus_origin(self):
-        """Check that if the origin is messed up, we don't crash"""
+        """Check that if the origin is messed up, we don't crash."""
         # 'just don't crash'
         lib = ops.lib._parse_lib(ModuleSpec(name='hi', loader=None, origin='/'))
         self.assertIsNone(lib)
 
     def test_bogus_lib(self):
-        """Check our behaviour when the lib is messed up"""
+        """Check our behaviour when the lib is messed up."""
         # note the syntax error (that is carefully chosen to pass the initial regexp)
         m = self._mkmod('foo', '''
         LIBNAME = "1'
@@ -295,7 +294,7 @@ class TestLibParser(TestCase):
         self.assertNotLogged("Success")
 
     def test_name_is_number(self):
-        """Check our behaviour when the name in the lib is a number"""
+        """Check our behaviour when the name in the lib is a number."""
         m = self._mkmod('foo', '''
         LIBNAME = 1
         LIBAPI = 2
@@ -308,7 +307,7 @@ class TestLibParser(TestCase):
         self.assertNotLogged("Success")
 
     def test_api_is_string(self):
-        """Check our behaviour when the api in the lib is a string"""
+        """Check our behaviour when the api in the lib is a string."""
         m = self._mkmod('foo', '''
         LIBNAME = 'foo'
         LIBAPI = '2'
@@ -321,7 +320,7 @@ class TestLibParser(TestCase):
         self.assertNotLogged("Success")
 
     def test_patch_is_string(self):
-        """Check our behaviour when the patch in the lib is a string"""
+        """Check our behaviour when the patch in the lib is a string."""
         m = self._mkmod('foo', '''
         LIBNAME = 'foo'
         LIBAPI = 2
@@ -334,7 +333,7 @@ class TestLibParser(TestCase):
         self.assertNotLogged("Success")
 
     def test_author_is_number(self):
-        """Check our behaviour when the author in the lib is a number"""
+        """Check our behaviour when the author in the lib is a number."""
         m = self._mkmod('foo', '''
         LIBNAME = 'foo'
         LIBAPI = 2
@@ -347,7 +346,7 @@ class TestLibParser(TestCase):
         self.assertNotLogged("Success")
 
     def test_other_encoding(self):
-        """Check that we don't crash when a library is not UTF-8"""
+        """Check that we don't crash when a library is not UTF-8."""
         m = self._mkmod('foo')
         with open(m.origin, 'wt', encoding='latin-1') as f:
             f.write(dedent('''
@@ -459,7 +458,6 @@ class TestLibFunctional(TestCase):
 
     def test_use_finds_best_same_toplevel(self):
         """Test that ops.lib.use("baz") works when there are two baz in the same toplevel."""
-
         pkg_b = "foo"
         lib_b = "bar"
         patch_b = 40
@@ -501,7 +499,6 @@ class TestLibFunctional(TestCase):
 
     def test_use_finds_best_diff_toplevel(self):
         """Test that ops.lib.use("baz") works when there are two baz in the different toplevels."""
-
         pkg_b = "foo"
         lib_b = "bar"
         patch_b = 40
@@ -511,18 +508,18 @@ class TestLibFunctional(TestCase):
                     desc = "A: {}/{}/{}; B: {}/{}/{}".format(
                         pkg_a, lib_a, patch_a, pkg_b, lib_b, patch_b)
                     with self.subTest(desc):
-                        tmpdirA = self._mkdtemp()
-                        tmpdirB = self._mkdtemp()
-                        sys.path = [tmpdirA, tmpdirB]
+                        tmp_dir_a = self._mkdtemp()
+                        tmp_dir_b = self._mkdtemp()
+                        sys.path = [tmp_dir_a, tmp_dir_b]
 
-                        _mklib(tmpdirA, pkg_a, lib_a).write_text(dedent("""
+                        _mklib(tmp_dir_a, pkg_a, lib_a).write_text(dedent("""
                         LIBNAME = "baz"
                         LIBAPI = 2
                         LIBPATCH = {}
                         LIBAUTHOR = "alice@example.com"
                         """).format(patch_a))
 
-                        _mklib(tmpdirB, pkg_b, lib_b).write_text(dedent("""
+                        _mklib(tmp_dir_b, pkg_b, lib_b).write_text(dedent("""
                         LIBNAME = "baz"
                         LIBAPI = 2
                         LIBPATCH = {}
