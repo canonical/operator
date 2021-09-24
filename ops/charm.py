@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ class InstallEvent(HookEvent):
 
 
 class StartEvent(HookEvent):
-    """Event triggered immediately after first configuation change.
+    """Event triggered immediately after first configuration change.
 
     This event is triggered immediately after the first
     :class:`ConfigChangedEvent`. Callback methods bound to the event should be
@@ -412,7 +412,7 @@ class RelationBrokenEvent(RelationEvent):
     the charm’s software must be configured as though the relation had never
     existed. It will only be called after every callback method bound to
     :class:`RelationDepartedEvent` has been run. If a callback method
-    bound to this event is being executed, it is gauranteed that no remote units
+    bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
 
