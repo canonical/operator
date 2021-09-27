@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1426,7 +1426,7 @@ class _ModelBackend:
                 return None
             if 'option provided but not defined: --app' in str(e):
                 # "--app" was introduced to relation-list in Juju 2.8.1, so
-                # handle previous verions of Juju gracefully
+                # handle previous versions of Juju gracefully
                 return None
             raise
 
