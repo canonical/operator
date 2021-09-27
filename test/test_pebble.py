@@ -469,13 +469,13 @@ services:
                                      raw={
                                           "override": "replace",
                                           "command": "echo foo"
-                                         })
+                                     })
         old_services = {"foo": old_service}
         self.assertEqual(plan.services, old_services)
 
         services_as_dict = {
             "foo": {"override": "replace", "command": "echo foo"}
-            }
+        }
         self.assertEqual(plan.services, services_as_dict)
 
 

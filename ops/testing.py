@@ -79,6 +79,7 @@ class Harness(typing.Generic[CharmType]):
             config.yaml. If not supplied, we will look for a 'config.yaml' file in the
             parent directory of the Charm.
     """
+
     def __init__(
             self,
             charm_cls: typing.Type[CharmType],
@@ -225,8 +226,7 @@ class Harness(typing.Generic[CharmType]):
             # the unit names. It also always fires relation-changed immediately after
             # relation-joined for the same unit.
             # Juju only fires relation-changed (app) if there is data for the related application
-            relation = self._model.
-            (rel_name, rel_id)
+            relation = self._model.get_relation(rel_name, rel_id)
             if self._backend._relation_data[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
                 self._charm.on[rel_name].relation_changed.emit(

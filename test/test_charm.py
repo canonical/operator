@@ -473,8 +473,8 @@ containers:
         self.assertIsInstance(meta.containers['test1'], ContainerMeta)
         self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
         self.assertEqual(
-                meta.containers['test1'].mounts["data"].locations[0],
-                '/test/storagemount')
+            meta.containers['test1'].mounts["data"].locations[0],
+            '/test/storagemount')
         self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/otherdata')
 
         with self.assertRaises(RuntimeError):
