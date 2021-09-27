@@ -23,6 +23,8 @@ from ops.charm import (
     CharmBase,
     CharmMeta,
     CharmEvents,
+    ContainerMeta,
+    ContainerStorageMeta,
 )
 from ops.framework import Framework, EventSource, EventBase
 from ops.model import Model, _ModelBackend
@@ -235,6 +237,92 @@ storage:
             'StorageAttachedEvent',
         ])
 
+    def test_workload_events(self):
+
+        class MyCharm(CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.seen = []
+                self.count = 0
+                for workload in ('container-a', 'containerb'):
+                    # Hook up relation events to generic handler.
+                    self.framework.observe(
+                        self.on[workload].pebble_ready,
+                        self.on_any_pebble_ready)
+
+            def on_any_pebble_ready(self, event):
+                self.seen.append(type(event).__name__)
+                self.count += 1
+
+        # language=YAML
+        self.meta = CharmMeta.from_yaml(metadata='''
+name: my-charm
+containers:
+  container-a:
+  containerb:
+''')
+
+        charm = MyCharm(self.create_framework())
+
+        self.assertIn('container_a_pebble_ready', repr(charm.on))
+        self.assertIn('containerb_pebble_ready', repr(charm.on))
+
+        charm.on['container-a'].pebble_ready.emit(
+            charm.framework.model.unit.get_container('container-a'))
+        charm.on['containerb'].pebble_ready.emit(
+            charm.framework.model.unit.get_container('containerb'))
+
+        self.assertEqual(charm.seen, [
+            'PebbleReadyEvent',
+            'PebbleReadyEvent'
+        ])
+        self.assertEqual(charm.count, 2)
+
+    def test_relations_meta(self):
+
+        # language=YAML
+        self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    limit: 1
+    scope: container
+  metrics:
+    interface: prometheus-scraping
+''')
+
+        self.assertEqual(self.meta.requires['database'].interface_name, 'mongodb')
+        self.assertEqual(self.meta.requires['database'].limit, 1)
+        self.assertEqual(self.meta.requires['database'].scope, 'container')
+
+        self.assertEqual(self.meta.requires['metrics'].interface_name, 'prometheus-scraping')
+        self.assertIsNone(self.meta.requires['metrics'].limit)
+        self.assertEqual(self.meta.requires['metrics'].scope, 'global')  # Default value
+
+    def test_relations_meta_limit_type_validation(self):
+        with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
+            # language=YAML
+            self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    limit: foobar
+''')
+
+    def test_relations_meta_scope_type_validation(self):
+        with self.assertRaisesRegex(TypeError,
+                                    "scope should be one of 'global', 'container'; not 'foobar'"):
+            # language=YAML
+            self.meta = CharmMeta.from_yaml('''
+name: my-charm
+requires:
+  database:
+    interface: mongodb
+    scope: foobar
+''')
+
     @classmethod
     def _get_action_test_meta(cls):
         # language=YAML
@@ -329,3 +417,65 @@ start:
 
     def test_action_event_defer_fails(self):
         self._test_action_event_defer_fails('action')
+
+    def test_containers(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  test1:
+    k: v
+  test2:
+    k: v
+""")
+        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test2'], ContainerMeta)
+        self.assertEqual(meta.containers['test1'].name, 'test1')
+        self.assertEqual(meta.containers['test2'].name, 'test2')
+
+    def test_containers_storage(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+storage:
+  data:
+    type: filesystem
+    location: /test/storage
+  other:
+    type: filesystem
+    location: /test/other
+containers:
+  test1:
+    mounts:
+      - storage: data
+        location: /test/storagemount
+      - storage: other
+        location: /test/otherdata
+""")
+        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
+        self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storagemount')
+        self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/otherdata')
+
+    def test_containers_storage_multiple_mounts(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+storage:
+  data:
+    type: filesystem
+    location: /test/storage
+containers:
+  test1:
+    mounts:
+      - storage: data
+        location: /test/storagemount
+      - storage: data
+        location: /test/otherdata
+""")
+        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
+        self.assertEqual(
+                meta.containers['test1'].mounts["data"].locations[0],
+                '/test/storagemount')
+        self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/otherdata')
+
+        with self.assertRaises(RuntimeError):
+            meta.containers["test1"].mounts["data"].location

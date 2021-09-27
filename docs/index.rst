@@ -44,6 +44,13 @@ ops.model module
 
 .. automodule:: ops.model
 
+
+ops.pebble module
+-----------------
+
+.. automodule:: ops.pebble
+
+
 ops.testing module
 ------------------
 

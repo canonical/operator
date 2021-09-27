@@ -13,20 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import OrderedDict
-import json
 import ipaddress
+import json
 import os
 import pathlib
-from textwrap import dedent
 import unittest
-
-import ops.model
-import ops.charm
-import ops.testing
-from ops.charm import RelationMeta, RelationRole
-
+from collections import OrderedDict
 from test.test_helpers import fake_script, fake_script_calls
+from textwrap import dedent
+
+import ops.charm
+import ops.model
+import ops.pebble
+import ops.testing
+from ops._private import yaml
+from ops.charm import RelationMeta, RelationRole
 
 
 class TestModel(unittest.TestCase):
@@ -119,6 +120,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(dead_rel.data[self.model.unit], {})
         self.assertBackendCalls([
             ('relation_list', 7),
+            ('relation_remote_app_name', 7),
             ('relation_get', 7, 'myapp/0', False),
         ])
 
@@ -133,7 +135,9 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([
             ('relation_ids', 'db0'),
             ('relation_list', self.relation_id_db0),
+            ('relation_remote_app_name', 0),
             ('relation_list', relation_id_db0_b),
+            ('relation_remote_app_name', 2),
         ])
 
     def test_peer_relation_app(self):
@@ -400,6 +404,17 @@ class TestModel(unittest.TestCase):
             ('relation_ids', 'db1'),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
+        ])
+
+    def test_relation_no_units(self):
+        self.harness.add_relation('db1', 'remoteapp1')
+        rel = self.model.get_relation('db1')
+        self.assertEqual(rel.units, set())
+        self.assertIs(rel.app, self.model.get_app('remoteapp1'))
+        self.assertBackendCalls([
+            ('relation_ids', 'db1'),
+            ('relation_list', 1),
+            ('relation_remote_app_name', 1),
         ])
 
     def test_config(self):
@@ -732,6 +747,399 @@ class TestModel(unittest.TestCase):
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
 
+class TestApplication(unittest.TestCase):
+
+    def setUp(self):
+        self.harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
+            name: myapp
+            provides:
+              db0:
+                interface: db0
+            requires:
+              db1:
+                interface: db1
+            peers:
+              db2:
+                interface: db2
+            resources:
+              foo: {type: file, filename: foo.txt}
+              bar: {type: file, filename: bar.txt}
+        ''')
+        self.peer_rel_id = self.harness.add_relation('db2', 'db2')
+        self.app = self.harness.model.app
+
+    def test_planned_units(self):
+        rel_id = self.peer_rel_id
+
+        # Test that we always count ourself.
+        self.assertEqual(self.app.planned_units(), 1)
+
+        # Add some units, and verify count.
+        self.harness.add_relation_unit(rel_id, 'myapp/1')
+        self.harness.add_relation_unit(rel_id, 'myapp/2')
+
+        self.assertEqual(self.app.planned_units(), 3)
+
+        self.harness.add_relation_unit(rel_id, 'myapp/3')
+        self.assertEqual(self.app.planned_units(), 4)
+
+        # And remove a unit
+        self.harness.remove_relation_unit(rel_id, 'myapp/2')
+
+        self.assertEqual(self.app.planned_units(), 3)
+
+
+class TestContainers(unittest.TestCase):
+    def setUp(self):
+        meta = ops.charm.CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  c1:
+    k: v
+  c2:
+    k: v
+""")
+        backend = ops.model._ModelBackend('myapp/0')
+        self.model = ops.model.Model(meta, backend)
+
+    def test_unit_containers(self):
+        containers = self.model.unit.containers
+        self.assertEqual(sorted(containers), ['c1', 'c2'])
+        self.assertEqual(len(containers), 2)
+        self.assertIn('c1', containers)
+        self.assertIn('c2', containers)
+        self.assertNotIn('c3', containers)
+        for name in ['c1', 'c2']:
+            container = containers[name]
+            self.assertIsInstance(container, ops.model.Container)
+            self.assertEqual(container.name, name)
+            self.assertIsInstance(container.pebble, ops.pebble.Client)
+        with self.assertRaises(KeyError):
+            containers['c3']
+
+        with self.assertRaises(RuntimeError):
+            other_unit = self.model.get_unit('other')
+            other_unit.containers
+
+    def test_unit_get_container(self):
+        unit = self.model.unit
+        for name in ['c1', 'c2']:
+            container = unit.get_container(name)
+            self.assertIsInstance(container, ops.model.Container)
+            self.assertEqual(container.name, name)
+            self.assertIsInstance(container.pebble, ops.pebble.Client)
+        with self.assertRaises(ops.model.ModelError):
+            unit.get_container('c3')
+
+        with self.assertRaises(RuntimeError):
+            other_unit = self.model.get_unit('other')
+            other_unit.get_container('foo')
+
+
+class TestContainerPebble(unittest.TestCase):
+    def setUp(self):
+        meta = ops.charm.CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  c1:
+    k: v
+""")
+        backend = MockPebbleBackend('myapp/0')
+        self.model = ops.model.Model(meta, backend)
+        self.container = self.model.unit.containers['c1']
+        self.pebble = self.container.pebble
+
+    def test_socket_path(self):
+        self.assertEqual(self.pebble.socket_path, '/charm/containers/c1/pebble.socket')
+
+    def test_autostart(self):
+        self.container.autostart()
+        self.assertEqual(self.pebble.requests, [('autostart',)])
+
+    def test_get_system_info(self):
+        self.container.can_connect()
+        self.assertEqual(self.pebble.requests, [('get_system_info',)])
+
+    def test_start(self):
+        self.container.start('foo')
+        self.container.start('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('start', ('foo',)),
+            ('start', ('foo', 'bar')),
+        ])
+
+    def test_start_no_arguments(self):
+        with self.assertRaises(TypeError):
+            self.container.start()
+
+    def test_restart(self):
+        two_services = [
+            self._make_service('foo', 'enabled', 'active'),
+            self._make_service('bar', 'disabled', 'inactive'),
+        ]
+        self.pebble.responses.append(two_services)
+        self.container.restart('foo')
+        self.pebble.responses.append(two_services)
+        self.container.restart('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('get_services', ('foo',)),
+            ('stop', ('foo',)),
+            ('start', ('foo',)),
+            ('get_services', ('foo', 'bar')),
+            ('stop', ('foo',)),
+            ('start', ('foo', 'bar',)),
+        ])
+
+    def test_stop(self):
+        self.container.stop('foo')
+        self.container.stop('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('stop', ('foo',)),
+            ('stop', ('foo', 'bar')),
+        ])
+
+    def test_stop_no_arguments(self):
+        with self.assertRaises(TypeError):
+            self.container.stop()
+
+    def test_type_errors(self):
+        meta = ops.charm.CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  c1:
+    k: v
+""")
+        # Only the real pebble Client checks types, so use actual backend class
+        backend = ops.model._ModelBackend('myapp/0')
+        model = ops.model.Model(meta, backend)
+        container = model.unit.containers['c1']
+
+        with self.assertRaises(TypeError):
+            container.start(['foo'])
+
+        with self.assertRaises(TypeError):
+            container.stop(['foo'])
+
+    def test_add_layer(self):
+        self.container.add_layer('a', 'summary: str\n')
+        self.container.add_layer('b', {'summary': 'dict'})
+        self.container.add_layer('c', ops.pebble.Layer('summary: Layer'))
+        self.container.add_layer('d', 'summary: str\n', combine=True)
+        self.assertEqual(self.pebble.requests, [
+            ('add_layer', 'a', 'summary: str\n', False),
+            ('add_layer', 'b', 'summary: dict\n', False),
+            ('add_layer', 'c', 'summary: Layer\n', False),
+            ('add_layer', 'd', 'summary: str\n', True),
+        ])
+
+        # combine is a keyword-only arg (should be combine=True)
+        with self.assertRaises(TypeError):
+            self.container.add_layer('x', {}, True)
+
+    def test_get_plan(self):
+        plan_yaml = 'services:\n foo:\n  override: replace\n  command: bar'
+        self.pebble.responses.append(ops.pebble.Plan(plan_yaml))
+        plan = self.container.get_plan()
+        self.assertEqual(self.pebble.requests, [('get_plan',)])
+        self.assertIsInstance(plan, ops.pebble.Plan)
+        self.assertEqual(plan.to_yaml(), yaml.safe_dump(yaml.safe_load(plan_yaml)))
+
+    @staticmethod
+    def _make_service(name, startup, current):
+        return ops.pebble.ServiceInfo.from_dict(
+            {'name': name, 'startup': startup, 'current': current})
+
+    def test_get_services(self):
+        two_services = [
+            self._make_service('s1', 'enabled', 'active'),
+            self._make_service('s2', 'disabled', 'inactive'),
+        ]
+        self.pebble.responses.append(two_services)
+        services = self.container.get_services()
+        self.assertEqual(len(services), 2)
+        self.assertEqual(set(services), {'s1', 's2'})
+        self.assertEqual(services['s1'].name, 's1')
+        self.assertEqual(services['s1'].startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services['s1'].current, ops.pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(services['s2'].name, 's2')
+        self.assertEqual(services['s2'].startup, ops.pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
+
+        self.pebble.responses.append(two_services)
+        services = self.container.get_services('s1', 's2')
+        self.assertEqual(len(services), 2)
+        self.assertEqual(set(services), {'s1', 's2'})
+        self.assertEqual(services['s1'].name, 's1')
+        self.assertEqual(services['s1'].startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(services['s1'].current, ops.pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(services['s2'].name, 's2')
+        self.assertEqual(services['s2'].startup, ops.pebble.ServiceStartup.DISABLED)
+        self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
+
+        self.assertEqual(self.pebble.requests, [
+            ('get_services', ()),
+            ('get_services', ('s1', 's2')),
+        ])
+
+    def test_get_service(self):
+        # Single service returned successfully
+        self.pebble.responses.append([self._make_service('s1', 'enabled', 'active')])
+        s = self.container.get_service('s1')
+        self.assertEqual(self.pebble.requests, [('get_services', ('s1', ))])
+        self.assertEqual(s.name, 's1')
+        self.assertEqual(s.startup, ops.pebble.ServiceStartup.ENABLED)
+        self.assertEqual(s.current, ops.pebble.ServiceStatus.ACTIVE)
+
+        # If Pebble returns no services, should be a ModelError
+        self.pebble.responses.append([])
+        with self.assertRaises(ops.model.ModelError) as cm:
+            self.container.get_service('s2')
+        self.assertEqual(str(cm.exception), "service 's2' not found")
+
+        # If Pebble returns more than one service, RuntimeError is raised
+        self.pebble.responses.append([
+            self._make_service('s1', 'enabled', 'active'),
+            self._make_service('s2', 'disabled', 'inactive'),
+        ])
+        with self.assertRaises(RuntimeError):
+            self.container.get_service('s1')
+
+    def test_pull(self):
+        self.pebble.responses.append('dummy1')
+        got = self.container.pull('/path/1')
+        self.assertEqual(got, 'dummy1')
+        self.assertEqual(self.pebble.requests, [
+            ('pull', '/path/1', 'utf-8'),
+        ])
+        self.pebble.requests = []
+
+        self.pebble.responses.append(b'dummy2')
+        got = self.container.pull('/path/2', encoding=None)
+        self.assertEqual(got, b'dummy2')
+        self.assertEqual(self.pebble.requests, [
+            ('pull', '/path/2', None),
+        ])
+
+    def test_push(self):
+        self.container.push('/path/1', 'content1')
+        self.assertEqual(self.pebble.requests, [
+            ('push', '/path/1', 'content1', 'utf-8', False, None,
+             None, None, None, None),
+        ])
+        self.pebble.requests = []
+
+        self.container.push('/path/2', b'content2', encoding=None, make_dirs=True,
+                            permissions=0o600, user_id=12, user='bob', group_id=34, group='staff')
+        self.assertEqual(self.pebble.requests, [
+            ('push', '/path/2', b'content2', None, True, 0o600, 12, 'bob', 34, 'staff'),
+        ])
+
+    def test_list_files(self):
+        self.pebble.responses.append('dummy1')
+        ret = self.container.list_files('/path/1')
+        self.assertEqual(ret, 'dummy1')
+        self.assertEqual(self.pebble.requests, [
+            ('list_files', '/path/1', None, False),
+        ])
+        self.pebble.requests = []
+
+        self.pebble.responses.append('dummy2')
+        ret = self.container.list_files('/path/2', pattern='*.txt', itself=True)
+        self.assertEqual(ret, 'dummy2')
+        self.assertEqual(self.pebble.requests, [
+            ('list_files', '/path/2', '*.txt', True),
+        ])
+
+    def test_make_dir(self):
+        self.container.make_dir('/path/1')
+        self.assertEqual(self.pebble.requests, [
+            ('make_dir', '/path/1', False, None, None, None, None, None),
+        ])
+        self.pebble.requests = []
+
+        self.container.make_dir('/path/2', make_parents=True, permissions=0o700,
+                                user_id=12, user='bob', group_id=34, group='staff')
+        self.assertEqual(self.pebble.requests, [
+            ('make_dir', '/path/2', True, 0o700, 12, 'bob', 34, 'staff'),
+        ])
+
+    def test_remove_path(self):
+        self.container.remove_path('/path/1')
+        self.assertEqual(self.pebble.requests, [
+            ('remove_path', '/path/1', False),
+        ])
+        self.pebble.requests = []
+
+        self.container.remove_path('/path/2', recursive=True)
+        self.assertEqual(self.pebble.requests, [
+            ('remove_path', '/path/2', True),
+        ])
+
+    def test_bare_can_connect_call(self):
+        self.pebble.responses.append('dummy')
+        self.assertTrue(self.container.can_connect())
+
+
+class MockPebbleBackend(ops.model._ModelBackend):
+    def get_pebble(self, socket_path):
+        return MockPebbleClient(socket_path)
+
+
+class MockPebbleClient:
+    def __init__(self, socket_path):
+        self.socket_path = socket_path
+        self.requests = []
+        self.responses = []
+
+    def autostart_services(self):
+        self.requests.append(('autostart',))
+
+    def get_system_info(self):
+        self.requests.append(('get_system_info',))
+
+    def start_services(self, service_names):
+        self.requests.append(('start', service_names))
+
+    def stop_services(self, service_names):
+        self.requests.append(('stop', service_names))
+
+    def add_layer(self, label, layer, combine=False):
+        if isinstance(layer, dict):
+            layer = ops.pebble.Layer(layer).to_yaml()
+        elif isinstance(layer, ops.pebble.Layer):
+            layer = layer.to_yaml()
+        self.requests.append(('add_layer', label, layer, combine))
+
+    def get_plan(self):
+        self.requests.append(('get_plan',))
+        return self.responses.pop(0)
+
+    def get_services(self, names=None):
+        self.requests.append(('get_services', names))
+        return self.responses.pop(0)
+
+    def pull(self, path, *, encoding='utf-8'):
+        self.requests.append(('pull', path, encoding))
+        return self.responses.pop(0)
+
+    def push(self, path, source, *, encoding='utf-8', make_dirs=False, permissions=None,
+             user_id=None, user=None, group_id=None, group=None):
+        self.requests.append(('push', path, source, encoding, make_dirs, permissions,
+                              user_id, user, group_id, group))
+
+    def list_files(self, path, *, pattern=None, itself=False):
+        self.requests.append(('list_files', path, pattern, itself))
+        return self.responses.pop(0)
+
+    def make_dir(self, path, *, make_parents=False, permissions=None, user_id=None, user=None,
+                 group_id=None, group=None):
+        self.requests.append(('make_dir', path, make_parents, permissions, user_id, user,
+                              group_id, group))
+
+    def remove_path(self, path, *, recursive=False):
+        self.requests.append(('remove_path', path, recursive))
+
+
 class TestModelBindings(unittest.TestCase):
 
     def setUp(self):
@@ -882,7 +1290,7 @@ class TestModelBindings(unittest.TestCase):
                     'interface-name': '',
                     'addresses': [
                         {
-                            'hostname':  '',
+                            'hostname': '',
                             'value': '10.1.89.35',
                             'cidr': ''
                         }
@@ -918,6 +1326,14 @@ class TestModelBindings(unittest.TestCase):
 
     def test_empty_bind_addresses(self):
         network_data = json.dumps({'bind-addresses': [{}]})
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(binding.network.interfaces, [])
+
+    def test_no_bind_addresses(self):
+        network_data = json.dumps({'bind-addresses': [{'addresses': None}]})
         fake_script(self, 'network-get',
                     '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
         binding_name = 'db0'
@@ -1416,6 +1832,61 @@ class TestModelBackend(unittest.TestCase):
         for metrics, labels in invalid_inputs:
             with self.assertRaises(ops.model.ModelError):
                 self.backend.add_metrics(metrics, labels)
+
+    def test_relation_remote_app_name_env(self):
+        self.addCleanup(os.environ.pop, 'JUJU_RELATION_ID', None)
+        self.addCleanup(os.environ.pop, 'JUJU_REMOTE_APP', None)
+
+        os.environ['JUJU_RELATION_ID'] = 'x:5'
+        os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
+        os.environ['JUJU_RELATION_ID'] = '5'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp1')
+
+    def test_relation_remote_app_name_script_success(self):
+        self.addCleanup(os.environ.pop, 'JUJU_RELATION_ID', None)
+        self.addCleanup(os.environ.pop, 'JUJU_REMOTE_APP', None)
+
+        # JUJU_RELATION_ID and JUJU_REMOTE_APP both unset
+        fake_script(self, 'relation-list', r"""
+echo '"remoteapp2"'
+""")
+        self.assertEqual(self.backend.relation_remote_app_name(1), 'remoteapp2')
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '1', '--app', '--format=json'],
+        ])
+
+        # JUJU_RELATION_ID set but JUJU_REMOTE_APP unset
+        os.environ['JUJU_RELATION_ID'] = 'x:5'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+        # JUJU_RELATION_ID unset but JUJU_REMOTE_APP set
+        del os.environ['JUJU_RELATION_ID']
+        os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+        # Both set, but JUJU_RELATION_ID a different relation
+        os.environ['JUJU_RELATION_ID'] = 'x:6'
+        self.assertEqual(self.backend.relation_remote_app_name(5), 'remoteapp2')
+
+    def test_relation_remote_app_name_script_errors(self):
+        fake_script(self, 'relation-list', r"""
+echo "ERROR invalid value \"6\" for option -r: relation not found" >&2  # NOQA
+exit 2
+""")
+        self.assertIs(self.backend.relation_remote_app_name(6), None)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '6', '--app', '--format=json'],
+        ])
+
+        fake_script(self, 'relation-list', r"""
+echo "ERROR option provided but not defined: --app" >&2
+exit 2
+""")
+        self.assertIs(self.backend.relation_remote_app_name(6), None)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '6', '--app', '--format=json'],
+        ])
 
 
 class TestLazyMapping(unittest.TestCase):

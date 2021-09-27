@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,16 +19,9 @@ import os
 import pathlib
 import typing
 
-import yaml
-
-from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
 from ops import model
-
-
-def _loadYaml(source):
-    if yaml.__with_libyaml__:
-        return yaml.load(source, Loader=yaml.CSafeLoader)
-    return yaml.load(source, Loader=yaml.SafeLoader)
+from ops._private import yaml
+from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
 
 
 class HookEvent(EventBase):
@@ -125,7 +118,7 @@ class InstallEvent(HookEvent):
 
 
 class StartEvent(HookEvent):
-    """Event triggered immediately after first configuation change.
+    """Event triggered immediately after first configuration change.
 
     This event is triggered immediately after the first
     :class:`ConfigChangedEvent`. Callback methods bound to the event should be
@@ -397,12 +390,6 @@ class RelationDepartedEvent(RelationEvent):
     removed, the relation is being removed). It is fired once for each unit that
     is going away.
 
-    When the remote unit is known to be leaving the relation, this will result
-    in the :class:`RelationChangedEvent` firing at least once, after which the
-    :class:`RelationDepartedEvent` will fire. The :class:`RelationDepartedEvent`
-    will fire once only. Once the :class:`RelationDepartedEvent` has fired no
-    further :class:`RelationChangedEvent` will fire.
-
     Callback methods bound to this event may be used to remove all
     references to the departing remote unit, because there’s no
     guarantee that it’s still part of the system; it’s perfectly
@@ -425,7 +412,7 @@ class RelationBrokenEvent(RelationEvent):
     the charm’s software must be configured as though the relation had never
     existed. It will only be called after every callback method bound to
     :class:`RelationDepartedEvent` has been run. If a callback method
-    bound to this event is being executed, it is gauranteed that no remote units
+    bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
 
@@ -467,6 +454,60 @@ class StorageDetachingEvent(StorageEvent):
     removed and before the unit terminates. The name prefix of the
     hook will depend on the storage key defined in the ``metadata.yaml``
     file.
+    """
+
+
+class WorkloadEvent(HookEvent):
+    """Base class representing workload-related events.
+
+    Workload events are generated for all containers that the charm
+    expects in metadata. Workload containers currently only trigger
+    a PebbleReadyEvent.
+
+    Attributes:
+        workload: The :class:`~ops.model.Container` involved in this event.
+                  Workload currently only can be a Container but in future may
+                  be other types that represent the specific workload type e.g.
+                  a Machine.
+    """
+
+    def __init__(self, handle, workload):
+        super().__init__(handle)
+
+        self.workload = workload
+
+    def snapshot(self) -> dict:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        snapshot = {}
+        if isinstance(self.workload, model.Container):
+            snapshot['container_name'] = self.workload.name
+        return snapshot
+
+    def restore(self, snapshot: dict) -> None:
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        container_name = snapshot.get('container_name')
+        if container_name:
+            self.workload = self.framework.model.unit.get_container(container_name)
+        else:
+            self.workload = None
+
+
+class PebbleReadyEvent(WorkloadEvent):
+    """Event triggered when pebble is ready for a workload.
+
+    This event is triggered when the Pebble process for a workload/container
+    starts up, allowing the charm to configure how services should be launched.
+
+    Callback methods bound to this event allow the charm to run code after
+    a workload has started its Pebble instance and is ready to receive instructions
+    regarding what services should be started. The name prefix of the hook
+    will depend on the container key defined in the ``metadata.yaml`` file.
     """
 
 
@@ -575,6 +616,10 @@ class CharmBase(Object):
         for action_name in self.framework.meta.actions:
             action_name = action_name.replace('-', '_')
             self.on.define_event(action_name + '_action', ActionEvent)
+
+        for container_name in self.framework.meta.containers:
+            container_name = container_name.replace('-', '_')
+            self.on.define_event(container_name + '_pebble_ready', PebbleReadyEvent)
 
     @property
     def app(self) -> model.Application:
@@ -686,6 +731,11 @@ class CharmMeta:
                          for name, payload in raw.get('payloads', {}).items()}
         self.extra_bindings = raw.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw.items()}
+        # This is taken from Charm Metadata v2, but only the "containers" and
+        # "containers.name" fields that we need right now for Pebble. See:
+        # https://discourse.charmhub.io/t/charm-metadata-v2/3674
+        self.containers = {name: ContainerMeta(name, container)
+                           for name, container in raw.get('containers', {}).items()}
 
     @classmethod
     def from_yaml(
@@ -698,10 +748,10 @@ class CharmMeta:
                 This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
             actions: YAML description of Actions for this charm (eg actions.yaml)
         """
-        meta = _loadYaml(metadata)
+        meta = yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = _loadYaml(actions)
+            raw_actions = yaml.safe_load(actions)
             if raw_actions is None:
                 raw_actions = {}
         return cls(meta, raw_actions)
@@ -739,16 +789,28 @@ class RelationMeta:
         role: This is :class:`RelationRole`; one of peer/requires/provides
         relation_name: Name of this relation from metadata.yaml
         interface_name: Optional definition of the interface protocol.
-        scope: "global" or "container" scope based on how the relation should be used.
+        limit: Optional definition of maximum number of connections to this relation endpoint.
+        scope: "global" (default) or "container" scope based on how the relation should be used.
     """
+
+    VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: dict):
         if not isinstance(role, RelationRole):
             raise TypeError("role should be a Role, not {!r}".format(role))
+        self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
         self.interface_name = raw['interface']
-        self.scope = raw.get('scope')
+
+        self.limit = raw.get('limit')
+        if self.limit and not isinstance(self.limit, int):
+            raise TypeError("limit should be an int, not {}".format(type(self.limit)))
+
+        self.scope = raw.get('scope') or self._default_scope
+        if self.scope not in self.VALID_SCOPES:
+            raise TypeError("scope should be one of {}; not '{}'".format(
+                ', '.join("'{}'".format(s) for s in self.VALID_SCOPES), self.scope))
 
 
 class StorageMeta:
@@ -821,3 +883,102 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
+
+
+class ContainerMeta:
+    """Metadata about an individual container.
+
+    NOTE: this is extremely lightweight right now, and just includes the fields we need for
+    Pebble interaction.
+
+    Attributes:
+        name: Name of container (key in the YAML)
+        mounts: :class:`ContainerStorageMeta` mounts available to the container
+    """
+    def __init__(self, name, raw):
+        self.name = name
+        self._mounts = {}
+
+        # This is not guaranteed to be populated/is not enforced yet
+        if raw:
+            self._populate_mounts(raw.get('mounts', []))
+
+    @property
+    def mounts(self) -> typing.Dict:
+        """An accessor for the mounts in a container.
+
+        Dict keys match key name in :class:`StorageMeta`
+
+        Example::
+
+            storage:
+              foo:
+                type: filesystem
+                location: /test
+            containers:
+              bar:
+                mounts:
+                  - storage: foo
+                  - location: /test/mount
+        """
+        return self._mounts
+
+    def _populate_mounts(self, mounts: typing.List):
+        """Populate a list of container mountpoints.
+
+        Since Charm Metadata v2 specifies the mounts as a List, do a little data manipulation
+        to convert the values to "friendly" names which contain a list of mountpoints
+        under each key.
+        """
+        for mount in mounts:
+            storage = mount.get("storage", "")
+            mount = mount.get("location", "")
+
+            if not mount:
+                continue
+
+            if storage in self._mounts:
+                self._mounts[storage].add_location(mount)
+            else:
+                self._mounts[storage] = ContainerStorageMeta(storage, mount)
+
+
+class ContainerStorageMeta:
+    """Metadata about storage for an individual container.
+
+    Attributes:
+        storage: a name for the mountpoint, which should exist the keys for :class:`StorageMeta`
+                 for the charm
+        location: the location `storage` is mounted at
+        locations: a list of mountpoints for the key
+
+    If multiple locations are specified for the same storage, such as Kubernetes subPath mounts,
+    `location` will not be an accessible attribute, as it would not be possible to determine
+    which mount point was desired, and `locations` should be iterated over.
+    """
+    def __init__(self, storage, location):
+        self.storage = storage
+        self._locations = [location]
+
+    def add_location(self, location):
+        """Add an additional mountpoint to a known storage."""
+        self._locations.append(location)
+
+    @property
+    def locations(self) -> typing.List:
+        """An accessor for the list of locations for a mount."""
+        return self._locations
+
+    def __getattr__(self, name):
+        if name == "location":
+            if len(self._locations) == 1:
+                return self._locations[0]
+            else:
+                raise RuntimeError(
+                    "container has more than one mountpoint with the same backing storage. "
+                    "Request .locations to see a list"
+                )
+        else:
+            raise AttributeError(
+                "{.__class__.__name__} has no such attribute: {}!".format(self, name)
+            )

@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import datetime
 import decimal
 import ipaddress
 import json
+import logging
 import os
 import re
 import shutil
@@ -25,21 +26,17 @@ import tempfile
 import time
 import typing
 import weakref
-
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from subprocess import run, PIPE, CalledProcessError
-import yaml
+from subprocess import PIPE, CalledProcessError, run
 
 import ops
+import ops.pebble as pebble
+from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
-
-if yaml.__with_libyaml__:
-    _DefaultDumper = yaml.CSafeDumper
-else:
-    _DefaultDumper = yaml.SafeDumper
+logger = logging.getLogger(__name__)
 
 
 class Model:
@@ -50,7 +47,7 @@ class Model:
     """
 
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
-        self._cache = _ModelCache(backend)
+        self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
@@ -111,6 +108,14 @@ class Model:
         """
         return self._backend.model_name
 
+    @property
+    def uuid(self) -> str:
+        """Return the identifier of the Model that this unit is running in.
+
+        This is read from the environment variable ``JUJU_MODEL_UUID``.
+        """
+        return self._backend.model_uuid
+
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
@@ -164,7 +169,8 @@ class Model:
 
 class _ModelCache:
 
-    def __init__(self, backend):
+    def __init__(self, meta, backend):
+        self._meta = meta
         self._backend = backend
         self._weakrefs = weakref.WeakValueDictionary()
 
@@ -172,7 +178,7 @@ class _ModelCache:
         key = (entity_type,) + args
         entity = self._weakrefs.get(key)
         if entity is None:
-            entity = entity_type(*args, backend=self._backend, cache=self)
+            entity = entity_type(*args, meta=self._meta, backend=self._backend, cache=self)
             self._weakrefs[key] = entity
         return entity
 
@@ -189,7 +195,7 @@ class Application:
             the charm, if the user has deployed it to a different name.
     """
 
-    def __init__(self, name, backend, cache):
+    def __init__(self, name, meta, backend, cache):
         self.name = name
         self._backend = backend
         self._cache = cache
@@ -246,6 +252,24 @@ class Application:
         self._backend.status_set(value.name, value.message, is_app=True)
         self._status = value
 
+    def planned_units(self) -> int:
+        """Get the number of units that Juju has "planned" for this application.
+
+        E.g., if an operator ran "juju deploy foo", then "juju add-unit -n 2 foo", the
+        planned unit count for foo would be 3.
+
+        We deliberately do not attempt to inspect whether these units are actually running
+        or not at present.
+
+        This only works for this charm's application -- the unit agent isn't able to get
+        planned units for other applications in the model.
+        """
+        if not self._is_our_app:
+            raise RuntimeError(
+                'cannot get planned units for a remote application {}.'.format(self))
+
+        return self._backend.planned_units()
+
     def __repr__(self):
         return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
 
@@ -261,7 +285,7 @@ class Unit:
         app: The Application the unit is a part of.
     """
 
-    def __init__(self, name, backend, cache):
+    def __init__(self, name, meta, backend, cache):
         self.name = name
 
         app_name = name.split('/')[0]
@@ -271,6 +295,9 @@ class Unit:
         self._cache = cache
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
+
+        if self._is_our_unit:
+            self._containers = ContainerMapping(meta.containers, backend)
 
     def _invalidate(self):
         self._status = None
@@ -345,6 +372,24 @@ class Unit:
             raise TypeError("workload version must be a str, not {}: {!r}".format(
                 type(version).__name__, version))
         self._backend.application_version_set(version)
+
+    @property
+    def containers(self) -> 'ContainerMapping':
+        """Return a mapping of containers indexed by name."""
+        if not self._is_our_unit:
+            raise RuntimeError('cannot get container for a remote unit {}'.format(self))
+        return self._containers
+
+    def get_container(self, container_name: str) -> 'Container':
+        """Get a single container by name.
+
+        Raises:
+            ModelError: if the named container doesn't exist
+        """
+        try:
+            return self.containers[container_name]
+        except KeyError:
+            raise ModelError('container {!r} not found'.format(container_name))
 
 
 class LazyMapping(Mapping, ABC):
@@ -542,8 +587,10 @@ class Network:
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
             interface_name = interface_info.get('interface-name')
-            for address_info in interface_info.get('addresses', []):
-                self.interfaces.append(NetworkInterface(interface_name, address_info))
+            addrs = interface_info.get('addresses')
+            if addrs is not None:
+                for address_info in addrs:
+                    self.interfaces.append(NetworkInterface(interface_name, address_info))
         self.ingress_addresses = []
         for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(ipaddress.ip_address(address))
@@ -615,7 +662,8 @@ class Relation:
     """Represents an established relation between this application and another application.
 
     This class should not be instantiated directly, instead use :meth:`Model.get_relation`
-    or :attr:`ops.charm.RelationEvent.relation`.
+    or :attr:`ops.charm.RelationEvent.relation`. This is principally used by
+    :class:`ops.charm.RelationMeta` to represent the relationships between charms.
 
     Attributes:
         name: The name of the local endpoint of the relation (eg 'db')
@@ -635,18 +683,28 @@ class Relation:
         self.app = None
         self.units = set()
 
-        # For peer relations, both the remote and the local app are the same.
         if is_peer:
+            # For peer relations, both the remote and the local app are the same.
             self.app = our_unit.app
+
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
                 if self.app is None:
+                    # Use the app of one of the units if available.
                     self.app = unit.app
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             pass
+
+        # If we didn't get the remote app via our_unit.app or the units list,
+        # look it up via JUJU_REMOTE_APP or "relation-list --app".
+        if self.app is None:
+            app_name = backend.relation_remote_app_name(relation_id)
+            if app_name is not None:
+                self.app = cache.get(Application, app_name)
+
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
@@ -985,6 +1043,277 @@ class Storage:
         return self._location
 
 
+class Container:
+    """Represents a named container in a unit.
+
+    This class should not be instantiated directly, instead use :meth:`Unit.get_container`
+    or :attr:`Unit.containers`.
+
+    Attributes:
+        name: The name of the container from metadata.yaml (eg, 'postgres').
+    """
+    def __init__(self, name, backend, pebble_client=None):
+        self.name = name
+
+        if pebble_client is None:
+            socket_path = '/charm/containers/{}/pebble.socket'.format(name)
+            pebble_client = backend.get_pebble(socket_path)
+        self._pebble = pebble_client
+
+    @property
+    def pebble(self) -> 'pebble.Client':
+        """The low-level :class:`ops.pebble.Client` instance for this container."""
+        return self._pebble
+
+    def can_connect(self) -> bool:
+        """Report whether the Pebble API is reachable in the container.
+
+        :meth:`can_connect` returns a bool that indicates whether the Pebble API is available at
+        the time the method is called. It does not guard against the Pebble API becoming
+        unavailable, and should be treated as a 'point in time' status only.
+
+        If the Pebble API later fails, serious consideration should be given as to the reason for
+        this.
+
+        Example::
+
+            container = self.unit.get_container("example")
+            if container.can_connect():
+                try:
+                    c.pull('/does/not/exist')
+                except ProtocolError, PathError:
+                    # handle it
+            else:
+                event.defer()
+        """
+        try:
+            # TODO: This call to `get_system_info` should be replaced with a call to a more
+            # appropriate endpoint that has stronger connotations of what constitutes a Pebble
+            # instance that is in fact 'ready'.
+            self._pebble.get_system_info()
+        except pebble.ConnectionError as e:
+            logger.debug("Pebble API is not ready; ConnectionError: %s", e.message())
+            return False
+        except FileNotFoundError as e:
+            # In some cases, charm authors can attempt to hit the Pebble API before it has had the
+            # chance to create the UNIX socket in the shared volume.
+            logger.debug("Pebble API is not ready; UNIX socket not found:", str(e))
+            return False
+        except pebble.APIError as e:
+            # An API error is only raised when the Pebble API returns invalid JSON, or the response
+            # cannot be read. Both of these are a likely indicator that something is wrong.
+            logger.warning("Pebble API is not ready; APIError: %s", str(e))
+            return False
+        return True
+
+    def autostart(self):
+        """Autostart all services marked as startup: enabled."""
+        self._pebble.autostart_services()
+
+    def start(self, *service_names: str):
+        """Start given service(s) by name."""
+        if not service_names:
+            raise TypeError('start expected at least 1 argument, got 0')
+
+        self._pebble.start_services(service_names)
+
+    def restart(self, *service_names: str):
+        """Restart the given service(s) by name."""
+        if not service_names:
+            raise TypeError('restart expected at least 1 argument, got 0')
+
+        for svc in self.get_services(*service_names).values():
+            if svc.is_running():
+                self._pebble.stop_services((*[svc.name],))
+        self._pebble.start_services(service_names)
+
+    def stop(self, *service_names: str):
+        """Stop given service(s) by name."""
+        if not service_names:
+            raise TypeError('stop expected at least 1 argument, got 0')
+
+        self._pebble.stop_services(service_names)
+
+    # TODO(benhoyt) - should be: layer: typing.Union[str, typing.Dict, 'pebble.Layer'],
+    # but this breaks on Python 3.5.2 (the default on Xenial). See:
+    # https://github.com/canonical/operator/issues/517
+    def add_layer(self, label: str, layer, *, combine: bool = False):
+        """Dynamically add a new layer onto the Pebble configuration layers.
+
+        Args:
+            label: Label for new layer (and label of layer to merge with if
+                combining).
+            layer: A YAML string, configuration layer dict, or pebble.Layer
+                object containing the Pebble layer to add.
+            combine: If combine is False (the default), append the new layer
+                as the top layer with the given label (must be unique). If
+                combine is True and the label already exists, the two layers
+                are combined into a single one considering the layer override
+                rules; if the layer doesn't exist, it is added as usual.
+        """
+        self._pebble.add_layer(label, layer, combine=combine)
+
+    def get_plan(self) -> 'pebble.Plan':
+        """Get the current effective pebble configuration."""
+        return self._pebble.get_plan()
+
+    def get_services(self, *service_names: str) -> 'ServiceInfoMapping':
+        """Fetch and return a mapping of status information indexed by service name.
+
+        If no service names are specified, return status information for all
+        services, otherwise return information for only the given services.
+        """
+        services = self._pebble.get_services(service_names)
+        return ServiceInfoMapping(services)
+
+    def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
+        """Get status information for a single named service.
+
+        Raises model error if service_name is not found.
+        """
+        services = self.get_services(service_name)
+        if not services:
+            raise ModelError('service {!r} not found'.format(service_name))
+        if len(services) > 1:
+            raise RuntimeError('expected 1 service, got {}'.format(len(services)))
+        return services[service_name]
+
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
+                                                                          typing.TextIO]:
+        """Read a file's content from the remote system.
+
+        Args:
+            path: Path of the file to read from the remote system.
+            encoding: Encoding to use for decoding the file's bytes to str,
+                or None to specify no decoding.
+
+        Returns:
+            A readable file-like object, whose read() method will return str
+            objects decoded according to the specified encoding, or bytes if
+            encoding is None.
+        """
+        return self._pebble.pull(path, encoding=encoding)
+
+    def push(
+            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        """Write content to a given file path on the remote system.
+
+        Args:
+            path: Path of the file to write to on the remote system.
+            source: Source of data to write. This is either a concrete str or
+                bytes instance, or a readable file-like object.
+            encoding: Encoding to use for encoding source str to bytes, or
+                strings read from source if it is a TextIO type. Ignored if
+                source is bytes or BinaryIO.
+            make_dirs: If True, create parent directories if they don't exist.
+            permissions: Permissions (mode) to create file with (Pebble default
+                is 0o644).
+            user_id: User ID (UID) for file.
+            user: Username for file. User's UID must match user_id if both are
+                specified.
+            group_id: Group ID (GID) for file.
+            group: Group name for file. Group's GID must match group_id if
+                both are specified.
+        """
+        self._pebble.push(path, source, encoding=encoding, make_dirs=make_dirs,
+                          permissions=permissions, user_id=user_id, user=user,
+                          group_id=group_id, group=group)
+
+    def list_files(self, path: str, *, pattern: str = None,
+                   itself: bool = False) -> typing.List['pebble.FileInfo']:
+        """Return list of directory entries from given path on remote system.
+
+        Despite the name, this method returns a list of files *and*
+        directories, similar to :func:`os.listdir` or :func:`os.scandir`.
+
+        Args:
+            path: Path of the directory to list, or path of the file to return
+                information about.
+            pattern: If specified, filter the list to just the files that match,
+                for example ``*.txt``.
+            itself: If path refers to a directory, return information about the
+                directory itself, rather than its contents.
+        """
+        return self._pebble.list_files(path, pattern=pattern, itself=itself)
+
+    def make_dir(
+            self, path: str, *, make_parents: bool = False, permissions: int = None,
+            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        """Create a directory on the remote system with the given attributes.
+
+        Args:
+            path: Path of the directory to create on the remote system.
+            make_parents: If True, create parent directories if they don't exist.
+            permissions: Permissions (mode) to create directory with (Pebble
+                default is 0o755).
+            user_id: User ID (UID) for directory.
+            user: Username for directory. User's UID must match user_id if
+                both are specified.
+            group_id: Group ID (GID) for directory.
+            group: Group name for directory. Group's GID must match group_id
+                if both are specified.
+        """
+        self._pebble.make_dir(path, make_parents=make_parents, permissions=permissions,
+                              user_id=user_id, user=user, group_id=group_id, group=group)
+
+    def remove_path(self, path: str, *, recursive: bool = False):
+        """Remove a file or directory on the remote system.
+
+        Args:
+            path: Path of the file or directory to delete from the remote system.
+            recursive: If True, recursively delete path and everything under it.
+        """
+        self._pebble.remove_path(path, recursive=recursive)
+
+
+class ContainerMapping(Mapping):
+    """Map of container names to Container objects.
+
+    This is done as a mapping object rather than a plain dictionary so that we
+    can extend it later, and so it's not mutable.
+    """
+
+    def __init__(self, names: typing.Iterable[str], backend: '_ModelBackend'):
+        self._containers = {name: Container(name, backend) for name in names}
+
+    def __getitem__(self, key: str):
+        return self._containers[key]
+
+    def __iter__(self):
+        return iter(self._containers)
+
+    def __len__(self):
+        return len(self._containers)
+
+    def __repr__(self):
+        return repr(self._containers)
+
+
+class ServiceInfoMapping(Mapping):
+    """Map of service names to pebble.ServiceInfo objects.
+
+    This is done as a mapping object rather than a plain dictionary so that we
+    can extend it later, and so it's not mutable.
+    """
+
+    def __init__(self, services: typing.Iterable['pebble.ServiceInfo']):
+        self._services = {s.name: s for s in services}
+
+    def __getitem__(self, key: str):
+        return self._services[key]
+
+    def __iter__(self):
+        return iter(self._services)
+
+    def __len__(self):
+        return len(self._services)
+
+    def __repr__(self):
+        return repr(self._services)
+
+
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
     pass
@@ -1027,14 +1356,17 @@ class _ModelBackend:
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
 
-    def __init__(self, unit_name=None, model_name=None):
+    def __init__(self, unit_name=None, model_name=None, model_uuid=None):
         if unit_name is None:
             self.unit_name = os.environ['JUJU_UNIT_NAME']
         else:
             self.unit_name = unit_name
         if model_name is None:
             model_name = os.environ.get('JUJU_MODEL_NAME')
+        if model_uuid is None:
+            model_uuid = os.environ.get('JUJU_MODEL_UUID')
         self.model_name = model_name
+        self.model_uuid = model_uuid
         self.app_name = self.unit_name.split('/')[0]
 
         self._is_leader = None
@@ -1059,6 +1391,10 @@ class _ModelBackend:
                 else:
                     return text
 
+    @staticmethod
+    def _is_relation_not_found(model_error):
+        return 'relation not found' in str(model_error)
+
     def relation_ids(self, relation_name):
         relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
@@ -1068,8 +1404,30 @@ class _ModelBackend:
             return self._run('relation-list', '-r', str(relation_id),
                              return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
+            raise
+
+    def relation_remote_app_name(self, relation_id: int) -> typing.Optional[str]:
+        """Return remote app name for given relation ID, or None if not known."""
+        if 'JUJU_RELATION_ID' in os.environ and 'JUJU_REMOTE_APP' in os.environ:
+            event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+            if relation_id == event_relation_id:
+                # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
+                return os.environ['JUJU_REMOTE_APP']
+
+        # If caller is asking for information about another relation, use
+        # "relation-list --app" to get it.
+        try:
+            return self._run('relation-list', '-r', str(relation_id), '--app',
+                             return_output=True, use_json=True)
+        except ModelError as e:
+            if self._is_relation_not_found(e):
+                return None
+            if 'option provided but not defined: --app' in str(e):
+                # "--app" was introduced to relation-list in Juju 2.8.1, so
+                # handle previous versions of Juju gracefully
+                return None
             raise
 
     def relation_get(self, relation_id, member_name, is_app):
@@ -1089,7 +1447,7 @@ class _ModelBackend:
         try:
             return self._run(*args, return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
@@ -1110,7 +1468,7 @@ class _ModelBackend:
         try:
             return self._run(*args)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
@@ -1144,12 +1502,12 @@ class _ModelBackend:
         try:
             spec_path = tmpdir / 'spec.yaml'
             with spec_path.open("wt", encoding="utf8") as f:
-                yaml.dump(spec, stream=f, Dumper=_DefaultDumper)
+                yaml.safe_dump(spec, stream=f)
             args = ['--file', str(spec_path)]
             if k8s_resources:
                 k8s_res_path = tmpdir / 'k8s-resources.yaml'
                 with k8s_res_path.open("wt", encoding="utf8") as f:
-                    yaml.dump(k8s_resources, stream=f, Dumper=_DefaultDumper)
+                    yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:
@@ -1245,7 +1603,7 @@ class _ModelBackend:
         try:
             return self._run(*cmd, return_output=True, use_json=True)
         except ModelError as e:
-            if 'relation not found' in str(e):
+            if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
@@ -1267,6 +1625,23 @@ class _ModelBackend:
             metric_args.append('{}={}'.format(k, metric_value))
         cmd.extend(metric_args)
         self._run(*cmd)
+
+    def get_pebble(self, socket_path: str) -> 'pebble.Client':
+        """Create a pebble.Client instance from given socket path."""
+        return pebble.Client(socket_path=socket_path)
+
+    def planned_units(self) -> int:
+        """Count of "planned" units that will run this application.
+
+        Includes the current unit in the count.
+
+        """
+        # The goal-state tool will return the information that we need. Goal state as a general
+        # concept is being deprecated, however, in favor of approaches such as the one that we use
+        # here.
+        app_state = self._run('goal-state', return_output=True, use_json=True)
+        # Planned units can be zero. We don't need to do error checking here.
+        return len(app_state.get('units', []))
 
 
 class _ModelBackendValidator:

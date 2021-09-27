@@ -6,3 +6,6 @@ __pycache__
 .idea
 /docs/_build
 *~
+.venv
+venv
+.vscode
