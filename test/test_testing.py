@@ -27,14 +27,14 @@ from ops import pebble
 from ops.charm import CharmBase, PebbleReadyEvent, RelationEvent
 from ops.framework import Object
 from ops.model import (
-    Application,
     ActiveStatus,
+    Application,
     MaintenanceStatus,
     ModelError,
     RelationNotFoundError,
+    Unit,
     UnknownStatus,
     _ModelBackend,
-    Unit,
 )
 from ops.testing import Harness, _TestingPebbleClient
 
