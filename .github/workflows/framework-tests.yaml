@@ -1,4 +1,4 @@
-name: CI
+name: Operator Framework Tests
 
 on: [push, pull_request]
 
