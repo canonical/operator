@@ -16,8 +16,7 @@ jobs:
         with:
           python-version: 3.9
       - name: Build
-        run: >-
-          python setup.py bdist
+        run: python setup.py bdist
       - name: Publish
         uses: pypa/gh-action-pypi-publish@master
         with:
