@@ -469,13 +469,13 @@ services:
                                      raw={
                                           "override": "replace",
                                           "command": "echo foo"
-                                         })
+                                     })
         old_services = {"foo": old_service}
         self.assertEqual(plan.services, old_services)
 
         services_as_dict = {
             "foo": {"override": "replace", "command": "echo foo"}
-            }
+        }
         self.assertEqual(plan.services, services_as_dict)
 
 
@@ -746,7 +746,7 @@ class TestServiceInfo(unittest.TestCase):
 
 
 class MockClient(pebble.Client):
-    """Mock Pebble client that simply records reqeusts and returns stored responses."""
+    """Mock Pebble client that simply records requests and returns stored responses."""
 
     def __init__(self):
         self.requests = []

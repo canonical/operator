@@ -204,14 +204,12 @@ self.assertEqual(harness.charm. ...)
 ## Talk to us
 
 If you need help, have ideas, or would just like to chat with us, reach out on
-IRC: we're in [#smooth-operator] on freenode (or try the [webchat]).
+[Charmhub Chat](https://chat.charmhub.io/charmhub/channels/juju).
 
 We also pay attention to [Charmhub discourse](https://discourse.charmhub.io/)
 
 You can also deep dive into the [API docs] if that's your thing.
 
-[webchat]: https://webchat.freenode.net/#smooth-operator
-[#smooth-operator]: irc://chat.freenode.net/%23smooth-operator
 [discourse]: https://discourse.juju.is/c/charming
 [API docs]: https://ops.rtfd.io/
 

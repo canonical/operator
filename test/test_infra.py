@@ -1,4 +1,4 @@
-# Copyright 2020 Canonical Ltd.
+# Copyright 2020-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ class InfrastructureTests(unittest.TestCase):
         with patch('sys.stdout', fake_stdout):
             report = style_guide.check_files(python_filepaths)
 
-        # if flake8 didnt' report anything, we're done
+        # if flake8 didn't report anything, we're done
         if report.total_errors == 0:
             return
 

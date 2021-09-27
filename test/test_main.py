@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -739,7 +739,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
                     self.assertFalse(hook_path.is_symlink())
                 else:
                     # hooks are not symlinks, and this hook is not one of the initial ones
-                    # check that it's a symlink to the inital ones
+                    # check that it's a symlink to the initial ones
                     self.assertTrue(hook_path.is_symlink())
                     self.assertEqual(os.readlink(str(hook_path)), event_spec.event_name)
 
