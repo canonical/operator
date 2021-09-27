@@ -30,6 +30,13 @@ from ops._private import yaml
 # pass in a file-like object or the string directly.
 OptionalYAML = typing.Optional[typing.Union[str, typing.TextIO]]
 
+
+# An instance of an Application or Unit, or the name of either.
+# This is done here to avoid a scoping issue with the `model` property
+# of the Harness class below.
+AppUnitOrName = typing.Union[str, model.Application, model.Unit]
+
+
 # CharmType represents user charms that are derived from CharmBase.
 CharmType = typing.TypeVar('CharmType', bound=charm.CharmBase)
 
@@ -572,7 +579,7 @@ class Harness(typing.Generic[CharmType]):
             raise ValueError('Invalid Unit Name')
         self._charm.on[rel_name].relation_departed.emit(relation, app, unit)
 
-    def get_relation_data(self, relation_id: int, app_or_unit: str) -> typing.Mapping:
+    def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
 
         This ignores all of the safety checks of who can and can't see data in relations (eg,
@@ -581,13 +588,15 @@ class Harness(typing.Generic[CharmType]):
 
         Args:
             relation_id: The relation whose content we want to look at.
-            app_or_unit: The name of the application or unit whose data we want to read
+            app_or_unit: An Application or Unit instance, or its name, whose data we want to read
         Return:
             A dict containing the relation data for `app_or_unit` or None.
 
         Raises:
             KeyError: if relation_id doesn't exist
         """
+        if hasattr(app_or_unit, 'name'):
+            app_or_unit = app_or_unit.name
         return self._backend._relation_data[relation_id].get(app_or_unit, None)
 
     def get_pod_spec(self) -> (typing.Mapping, typing.Mapping):

@@ -27,12 +27,14 @@ from ops import pebble
 from ops.charm import CharmBase, PebbleReadyEvent, RelationEvent
 from ops.framework import Object
 from ops.model import (
+    Application,
     ActiveStatus,
     MaintenanceStatus,
     ModelError,
     RelationNotFoundError,
     UnknownStatus,
     _ModelBackend,
+    Unit,
 )
 from ops.testing import Harness, _TestingPebbleClient
 
@@ -540,12 +542,13 @@ class TestHarness(unittest.TestCase):
               }}])
 
     def test_get_relation_data(self):
-        harness = Harness(CharmBase, meta='''
+        charm_meta = '''
             name: test-app
             requires:
                 db:
                     interface: pgsql
-            ''')
+        '''
+        harness = Harness(CharmBase, meta=charm_meta)
         self.addCleanup(harness.cleanup)
         rel_id = harness.add_relation('db', 'postgresql')
         harness.update_relation_data(rel_id, 'postgresql', {'remote': 'data'})
@@ -556,6 +559,16 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(KeyError):
             # unknown relation id
             harness.get_relation_data(99, 'postgresql')
+
+        meta = yaml.safe_load(charm_meta)
+        t_app = Application('test-app', meta, harness._backend, None)
+        t_unit0 = Unit('test-app/0', meta, harness._backend, {Application: t_app})
+        t_unit1 = Unit('test-app/1', meta, harness._backend, {Application: t_app})
+        self.assertEqual(harness.get_relation_data(rel_id, t_app), {})
+        self.assertEqual(harness.get_relation_data(rel_id, t_unit0), {})
+        self.assertEqual(harness.get_relation_data(rel_id, t_unit1), None)
+        pg_app = Application('postgresql', meta, harness._backend, None)
+        self.assertEqual(harness.get_relation_data(rel_id, pg_app), {'remote': 'data'})
 
     def test_create_harness_twice(self):
         metadata = '''

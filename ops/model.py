@@ -296,7 +296,7 @@ class Unit:
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
 
-        if self._is_our_unit:
+        if self._is_our_unit and hasattr(meta, "containers"):
             self._containers = ContainerMapping(meta.containers, backend)
 
     def _invalidate(self):
