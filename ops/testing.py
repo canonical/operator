@@ -65,6 +65,7 @@ class Harness(typing.Generic[CharmType]):
             config.yaml. If not supplied, we will look for a 'config.yaml' file in the
             parent directory of the Charm.
     """
+
     def __init__(
             self,
             charm_cls: typing.Type[CharmType],

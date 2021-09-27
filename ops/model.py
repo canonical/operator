@@ -1052,6 +1052,7 @@ class Container:
     Attributes:
         name: The name of the container from metadata.yaml (eg, 'postgres').
     """
+
     def __init__(self, name, backend, pebble_client=None):
         self.name = name
 
