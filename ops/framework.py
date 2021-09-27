@@ -1,4 +1,4 @@
-# Copyright 2020 Canonical Ltd.
+# Copyright 2020-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -433,11 +433,11 @@ class PrefixedEvents:
 
 
 class PreCommitEvent(EventBase):
-    """Events that will be emited first on commit."""
+    """Events that will be emitted first on commit."""
 
 
 class CommitEvent(EventBase):
-    """Events that will be emited second on commit."""
+    """Events that will be emitted second on commit."""
 
 
 class FrameworkEvents(ObjectEvents):
