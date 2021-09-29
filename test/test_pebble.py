@@ -774,8 +774,8 @@ class MockClient(pebble.Client):
         headers, body = self.responses.pop(0)
         return MockHTTPResponse(headers, body)
 
-    def _connect_websocket(self, change_id, websocket_id):
-        return self.websockets[change_id, websocket_id]
+    def _connect_websocket(self, task_id, websocket_id):
+        return self.websockets[task_id, websocket_id]
 
 
 class MockHTTPResponse:
@@ -2008,15 +2008,10 @@ class TestExec(unittest.TestCase):
         self.addCleanup(time_patcher.stop)
 
     def add_responses(self, change_id, exit_code, change_err=None):
+        task_id = 'T' + change_id  # create a task_id based on change_id
         self.client.responses.append({
             'change': change_id,
-            'result': {
-                'websocket-ids': {
-                    'io': 'IO',
-                    'stderr': 'STDERR',
-                    'control': 'CONTROL',
-                }
-            },
+            'result': {'task-id': task_id},
         })
 
         change = build_mock_change_dict(change_id)
@@ -2027,15 +2022,15 @@ class TestExec(unittest.TestCase):
             'result': change,
         })
 
-        io = MockWebsocket()
+        stdio = MockWebsocket()
         stderr = MockWebsocket()
         control = MockWebsocket()
         self.client.websockets = {
-            (change_id, 'IO'): io,
-            (change_id, 'STDERR'): stderr,
-            (change_id, 'CONTROL'): control,
+            (task_id, 'stdio'): stdio,
+            (task_id, 'stderr'): stderr,
+            (task_id, 'control'): control,
         }
-        return (io, stderr, control)
+        return (stdio, stderr, control)
 
     def build_exec_data(
             self, command, environment=None, working_dir=None, timeout=None,
@@ -2176,9 +2171,9 @@ class TestExec(unittest.TestCase):
                              {'command': 'signal', 'signal': {'name': 'SIGHUP'}})
 
     def test_wait_output(self):
-        io, stderr, _ = self.add_responses('123', 0)
-        io.receives.append(b'Python 3.8.10\n')
-        io.receives.append('')
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'Python 3.8.10\n')
+        stdio.receives.append('')
         stderr.receives.append('')
 
         process = self.client.exec(['python3', '--version'])
@@ -2190,12 +2185,12 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [])
+        self.assertEqual(stdio.sends, [])
 
     def test_wait_output_combine_stderr(self):
-        io, _, _ = self.add_responses('123', 0)
-        io.receives.append(b'invalid time interval\n')
-        io.receives.append('')
+        stdio, _, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'invalid time interval\n')
+        stdio.receives.append('')
 
         process = self.client.exec(['sleep', 'x'], combine_stderr=True)
         out, err = process.wait_output()
@@ -2208,12 +2203,12 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, exec_data),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [])
+        self.assertEqual(stdio.sends, [])
 
     def test_wait_output_bytes(self):
-        io, stderr, _ = self.add_responses('123', 0)
-        io.receives.append(b'Python 3.8.10\n')
-        io.receives.append('')
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'Python 3.8.10\n')
+        stdio.receives.append('')
         stderr.receives.append('')
 
         process = self.client.exec(['python3', '--version'], encoding=None)
@@ -2225,11 +2220,11 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [])
+        self.assertEqual(stdio.sends, [])
 
     def test_wait_output_exit_nonzero(self):
-        io, stderr, _ = self.add_responses('123', 0)
-        io.receives.append('')
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append('')
         stderr.receives.append(b'file not found: x\n')
         stderr.receives.append('')
 
@@ -2242,12 +2237,12 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, self.build_exec_data(['ls', 'x'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [])
+        self.assertEqual(stdio.sends, [])
 
     def test_wait_output_exit_nonzero_combine_stderr(self):
-        io, _, _ = self.add_responses('123', 0)
-        io.receives.append(b'file not found: x\n')
-        io.receives.append('')
+        stdio, _, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'file not found: x\n')
+        stdio.receives.append('')
 
         process = self.client.exec(['ls', 'x'], combine_stderr=True)
         out, err = process.wait_output()
@@ -2259,12 +2254,12 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, exec_data),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [])
+        self.assertEqual(stdio.sends, [])
 
     def test_wait_output_send_stdin(self):
-        io, stderr, _ = self.add_responses('123', 0)
-        io.receives.append(b'FOO\nBAR\n')
-        io.receives.append('')
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'FOO\nBAR\n')
+        stdio.receives.append('')
         stderr.receives.append('')
 
         process = self.client.exec(['awk', '{ print toupper($) }'], stdin='foo\nbar\n')
@@ -2276,15 +2271,15 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [
+        self.assertEqual(stdio.sends, [
             ('BIN', b'foo\nbar\n'),
             ('TXT', ''),
         ])
 
     def test_wait_output_send_stdin_bytes(self):
-        io, stderr, _ = self.add_responses('123', 0)
-        io.receives.append(b'FOO\nBAR\n')
-        io.receives.append('')
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'FOO\nBAR\n')
+        stdio.receives.append('')
         stderr.receives.append('')
 
         process = self.client.exec(['awk', '{ print toupper($) }'], stdin=b'foo\nbar\n',
@@ -2297,7 +2292,7 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [
+        self.assertEqual(stdio.sends, [
             ('BIN', b'foo\nbar\n'),
             ('TXT', ''),
         ])
@@ -2398,10 +2393,10 @@ class TestExec(unittest.TestCase):
             err.close()
 
     def test_wait_returned_io(self):
-        io, stderr, _ = self.add_responses('123', 0)
-        io.receives.append(b'FOO BAR\n')
-        io.receives.append(b'BAZZ\n')
-        io.receives.append('')
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'FOO BAR\n')
+        stdio.receives.append(b'BAZZ\n')
+        stdio.receives.append('')
 
         process = self.client.exec(['awk', '{ print toupper($) }'])
         process.stdin.write('Foo Bar\n')
@@ -2417,17 +2412,17 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [
+        self.assertEqual(stdio.sends, [
             ('BIN', b'Foo Bar\n'),
             ('BIN', b'bazz\n'),
             ('TXT', ''),
         ])
 
     def test_wait_returned_io_bytes(self):
-        io, stderr, _ = self.add_responses('123', 0)
-        io.receives.append(b'FOO BAR\n')
-        io.receives.append(b'BAZZ\n')
-        io.receives.append('')
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'FOO BAR\n')
+        stdio.receives.append(b'BAZZ\n')
+        stdio.receives.append('')
 
         process = self.client.exec(['awk', '{ print toupper($) }'], encoding=None)
         process.stdin.write(b'Foo Bar\n')
@@ -2443,7 +2438,7 @@ class TestExec(unittest.TestCase):
             ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
-        self.assertEqual(io.sends, [
+        self.assertEqual(stdio.sends, [
             ('BIN', b'Foo Bar\n'),
             ('BIN', b'bazz\n'),
             ('TXT', ''),

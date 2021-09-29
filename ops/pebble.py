@@ -1695,14 +1695,14 @@ class Client:
         }
         resp = self._request('POST', '/v1/exec', body=body)
         change_id = resp['change']
-        websocket_ids = resp['result']['websocket-ids']
+        task_id = resp['result']['task-id']
 
         stderr_ws = None
         try:
-            control_ws = self._connect_websocket(change_id, websocket_ids['control'])
-            io_ws = self._connect_websocket(change_id, websocket_ids['io'])
+            control_ws = self._connect_websocket(task_id, 'control')
+            stdio_ws = self._connect_websocket(task_id, 'stdio')
             if not combine_stderr:
-                stderr_ws = self._connect_websocket(change_id, websocket_ids['stderr'])
+                stderr_ws = self._connect_websocket(task_id, 'stderr')
         except websocket.WebSocketException as e:
             # Error connecting to websockets, probably due to the exec/change
             # finishing early with an error. Call wait_change to pick that up.
@@ -1726,18 +1726,18 @@ class Client:
                     os.write(w, b'x')  # doesn't matter what we write
                     os.close(w)
 
-            t = _start_thread(_reader_to_websocket, stdin, io_ws, encoding, cancel_reader)
+            t = _start_thread(_reader_to_websocket, stdin, stdio_ws, encoding, cancel_reader)
             threads.append(t)
             process_stdin = None
         else:
-            process_stdin = _WebsocketWriter(io_ws, encoding)
+            process_stdin = _WebsocketWriter(stdio_ws, encoding)
 
         if stdout is not None:
-            t = _start_thread(_websocket_to_writer, io_ws, stdout, encoding)
+            t = _start_thread(_websocket_to_writer, stdio_ws, stdout, encoding)
             threads.append(t)
             process_stdout = None
         else:
-            process_stdout = _WebsocketReader(io_ws, encoding)
+            process_stdout = _WebsocketReader(stdio_ws, encoding)
 
         process_stderr = None
         if not combine_stderr:
@@ -1763,17 +1763,15 @@ class Client:
         )
         return process
 
-    def _connect_websocket(self, change_id: str, websocket_id: str) -> websocket.WebSocket:
+    def _connect_websocket(self, task_id: str, websocket_id: str) -> websocket.WebSocket:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(self.socket_path)
-        url = self._websocket_url(change_id, websocket_id)
+        url = self._websocket_url(task_id, websocket_id)
         ws = websocket.WebSocket(skip_utf8_validation=True)
         ws.connect(url, socket=sock)
         return ws
 
-    def _websocket_url(self, change_id: str, websocket_id: str) -> str:
-        query = {'id': websocket_id}
+    def _websocket_url(self, task_id: str, websocket_id: str) -> str:
         base_url = self.base_url.replace('http://', 'ws://')
-        url = '{}/v1/changes/{}/websocket?{}'.format(
-            base_url, change_id, urllib.parse.urlencode(query))
+        url = '{}/v1/tasks/{}/websocket/{}'.format(base_url, task_id, websocket_id)
         return url
