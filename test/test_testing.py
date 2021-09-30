@@ -20,26 +20,21 @@ import sys
 import tempfile
 import textwrap
 import unittest
+
 import yaml
 
 from ops import pebble
-from ops.charm import (
-    CharmBase,
-    RelationEvent,
-    PebbleReadyEvent,
-)
-from ops.framework import (
-    Object,
-)
+from ops.charm import CharmBase, PebbleReadyEvent, RelationEvent
+from ops.framework import Object
 from ops.model import (
-    Application,
     ActiveStatus,
+    Application,
     MaintenanceStatus,
-    UnknownStatus,
     ModelError,
     RelationNotFoundError,
-    _ModelBackend,
     Unit,
+    UnknownStatus,
+    _ModelBackend,
 )
 from ops.testing import Harness, _TestingPebbleClient
 
@@ -315,7 +310,7 @@ class TestHarness(unittest.TestCase):
         harness.charm.get_changes(reset=True)  # created event ignored
         # Check exception is raised if relation id is invalid
         with self.assertRaises(RelationNotFoundError):
-            harness.remove_relation(rel_id+1)
+            harness.remove_relation(rel_id + 1)
 
     def test_remove_relation_unit(self):
         harness = Harness(RelationEventCharm, meta='''
@@ -1036,7 +1031,7 @@ class TestHarness(unittest.TestCase):
 
     def _get_dummy_charm_harness(self, tmp):
         self._write_dummy_charm(tmp)
-        charm_mod = importlib.import_module('charm')
+        charm_mod = importlib.import_module('testcharm')
         harness = Harness(charm_mod.MyTestingCharm)
         self.addCleanup(harness.cleanup)
         return harness
@@ -1044,7 +1039,7 @@ class TestHarness(unittest.TestCase):
     def _write_dummy_charm(self, tmp):
         srcdir = tmp / 'src'
         srcdir.mkdir(0o755)
-        charm_filename = srcdir / 'charm.py'
+        charm_filename = srcdir / 'testcharm.py'
         with charm_filename.open('wt') as charmpy:
             # language=Python
             charmpy.write(textwrap.dedent('''
@@ -1057,7 +1052,7 @@ class TestHarness(unittest.TestCase):
 
         def cleanup():
             sys.path = orig
-            sys.modules.pop('charm')
+            sys.modules.pop('testcharm')
 
         self.addCleanup(cleanup)
 

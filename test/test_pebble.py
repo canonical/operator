@@ -18,15 +18,14 @@ import datetime
 import email.parser
 import io
 import json
+import sys
+import test.fake_pebble as fake_pebble
 import unittest
 import unittest.mock
 import unittest.util
-import sys
 
 import ops.pebble as pebble
-import test.fake_pebble as fake_pebble
 from ops._private import yaml
-
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000
@@ -1702,8 +1701,8 @@ bad path
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
         parser = email.parser.BytesFeedParser()
-        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
-                    boundary.encode('utf-8') + b'\r\n\r\n')
+        parser.feed(b'Content-Type: multipart/form-data; boundary='
+                    + boundary.encode('utf-8') + b'\r\n\r\n')
         parser.feed(body)
         message = parser.close()
 
