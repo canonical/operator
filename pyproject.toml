@@ -1,0 +1,28 @@
+# Testing tools configuration
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+# Formatting tools configuration
+[tool.autopep8]
+max-line-length = 99
+ignore = ["E203", "W503"]
+recursive = true
+jobs = -1
+aggressive = 3
+
+[tool.isort]
+profile = "black"
+
+# Linting tools configuration
+[tool.flake8]
+max-line-length = 99
+max-doc-length = 99
+exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
+select = ["E", "W", "F", "C", "N", "R", "D", "H"]
+ignore = ["D105", "D107", "E203", "W503"]
+# D100, D101, D102, D103, D104: Ignore missing docstrings in tests
+per-file-ignores = ["test/*:D100,D101,D102,D103,D104"]
+docstring-convention = "google"

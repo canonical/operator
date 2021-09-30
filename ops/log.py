@@ -14,8 +14,8 @@
 
 """Interface to emit messages to the Juju logging system."""
 
-import sys
 import logging
+import sys
 
 
 class JujuLogHandler(logging.Handler):

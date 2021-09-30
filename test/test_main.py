@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import abc
+import importlib.util
 import io
 import logging
-import logassert
 import os
 import platform
 import shutil
@@ -23,36 +23,37 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import importlib.util
 import warnings
-import yaml
 from pathlib import Path
 from unittest.mock import patch
 
+import logassert
+import yaml
+
 from ops.charm import (
+    ActionEvent,
     CharmBase,
     CharmEvents,
     CharmMeta,
+    CollectMetricsEvent,
+    ConfigChangedEvent,
     HookEvent,
     InstallEvent,
-    StartEvent,
-    ConfigChangedEvent,
-    UpgradeCharmEvent,
-    UpdateStatusEvent,
     LeaderSettingsChangedEvent,
-    RelationJoinedEvent,
+    PebbleReadyEvent,
+    RelationBrokenEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
-    RelationBrokenEvent,
     RelationEvent,
+    RelationJoinedEvent,
+    StartEvent,
     StorageAttachedEvent,
-    ActionEvent,
-    CollectMetricsEvent,
+    UpdateStatusEvent,
+    UpgradeCharmEvent,
     WorkloadEvent,
-    PebbleReadyEvent,
 )
 from ops.framework import Framework, StoredStateData
-from ops.main import main, CHARM_STATE_FILE, _should_use_controller_storage
+from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
 from ops.storage import SQLiteStorage
 from ops.version import version
 
@@ -785,7 +786,9 @@ class _TestMainWithDispatch(_TestMain):
     has_dispatch = True
 
     def test_setup_event_links(self):
-        """Test auto-creation of symlinks caused by initial events does _not_ happen when using dispatch.
+        """Test auto-creation of symlinks.
+
+        Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
         all_event_hooks = ['hooks/' + e.replace("_", "-")
                            for e in self.charm_module.Charm.on.events().keys()]

@@ -20,31 +20,29 @@ import sys
 import tempfile
 import textwrap
 import unittest
+
 import yaml
 
 from ops import pebble
 from ops.charm import (
     CharmBase,
-    RelationEvent,
     PebbleReadyEvent,
+    RelationEvent,
     StorageAttachedEvent,
     StorageDetachingEvent,
 )
-from ops.framework import (
-    Object,
-)
+from ops.framework import Object
 from ops.model import (
     ActiveStatus,
+    Application,
     MaintenanceStatus,
-    UnknownStatus,
     ModelError,
     RelationNotFoundError,
+    Unit,
+    UnknownStatus,
     _ModelBackend,
 )
-from ops.testing import (
-    Harness,
-    _TestingPebbleClient,
-)
+from ops.testing import Harness, _TestingPebbleClient
 
 
 class StorageTester(CharmBase):
@@ -336,7 +334,7 @@ class TestHarness(unittest.TestCase):
         harness.charm.get_changes(reset=True)  # created event ignored
         # Check exception is raised if relation id is invalid
         with self.assertRaises(RelationNotFoundError):
-            harness.remove_relation(rel_id+1)
+            harness.remove_relation(rel_id + 1)
 
     def test_remove_relation_unit(self):
         harness = Harness(RelationEventCharm, meta='''
@@ -568,12 +566,13 @@ class TestHarness(unittest.TestCase):
               }}])
 
     def test_get_relation_data(self):
-        harness = Harness(CharmBase, meta='''
+        charm_meta = '''
             name: test-app
             requires:
                 db:
                     interface: pgsql
-            ''')
+        '''
+        harness = Harness(CharmBase, meta=charm_meta)
         self.addCleanup(harness.cleanup)
         rel_id = harness.add_relation('db', 'postgresql')
         harness.update_relation_data(rel_id, 'postgresql', {'remote': 'data'})
@@ -584,6 +583,16 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(KeyError):
             # unknown relation id
             harness.get_relation_data(99, 'postgresql')
+
+        meta = yaml.safe_load(charm_meta)
+        t_app = Application('test-app', meta, harness._backend, None)
+        t_unit0 = Unit('test-app/0', meta, harness._backend, {Application: t_app})
+        t_unit1 = Unit('test-app/1', meta, harness._backend, {Application: t_app})
+        self.assertEqual(harness.get_relation_data(rel_id, t_app), {})
+        self.assertEqual(harness.get_relation_data(rel_id, t_unit0), {})
+        self.assertEqual(harness.get_relation_data(rel_id, t_unit1), None)
+        pg_app = Application('postgresql', meta, harness._backend, None)
+        self.assertEqual(harness.get_relation_data(rel_id, pg_app), {'remote': 'data'})
 
     def test_create_harness_twice(self):
         metadata = '''
@@ -1327,7 +1336,7 @@ class TestHarness(unittest.TestCase):
 
     def _get_dummy_charm_harness(self, tmp):
         self._write_dummy_charm(tmp)
-        charm_mod = importlib.import_module('charm')
+        charm_mod = importlib.import_module('testcharm')
         harness = Harness(charm_mod.MyTestingCharm)
         self.addCleanup(harness.cleanup)
         return harness
@@ -1335,7 +1344,7 @@ class TestHarness(unittest.TestCase):
     def _write_dummy_charm(self, tmp):
         srcdir = tmp / 'src'
         srcdir.mkdir(0o755)
-        charm_filename = srcdir / 'charm.py'
+        charm_filename = srcdir / 'testcharm.py'
         with charm_filename.open('wt') as charmpy:
             # language=Python
             charmpy.write(textwrap.dedent('''
@@ -1348,7 +1357,7 @@ class TestHarness(unittest.TestCase):
 
         def cleanup():
             sys.path = orig
-            sys.modules.pop('charm')
+            sys.modules.pop('testcharm')
 
         self.addCleanup(cleanup)
 

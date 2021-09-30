@@ -21,7 +21,7 @@ import typing
 
 from ops import model
 from ops._private import yaml
-from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
+from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 
 class HookEvent(EventBase):
@@ -895,6 +895,7 @@ class ContainerMeta:
         name: Name of container (key in the YAML)
         mounts: :class:`ContainerStorageMeta` mounts available to the container
     """
+
     def __init__(self, name, raw):
         self.name = name
         self._mounts = {}
@@ -956,6 +957,7 @@ class ContainerStorageMeta:
     `location` will not be an accessible attribute, as it would not be possible to determine
     which mount point was desired, and `locations` should be iterated over.
     """
+
     def __init__(self, storage, location):
         self.storage = storage
         self._locations = [location]

@@ -296,7 +296,7 @@ class Unit:
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
 
-        if self._is_our_unit:
+        if self._is_our_unit and hasattr(meta, "containers"):
             self._containers = ContainerMapping(meta.containers, backend)
 
     def _invalidate(self):
@@ -1052,6 +1052,7 @@ class Container:
     Attributes:
         name: The name of the container from metadata.yaml (eg, 'postgres').
     """
+
     def __init__(self, name, backend, pebble_client=None):
         self.name = name
 
