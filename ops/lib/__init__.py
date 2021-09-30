@@ -18,10 +18,9 @@ import logging
 import os
 import re
 import sys
-
 from ast import literal_eval
-from importlib.util import module_from_spec
 from importlib.machinery import ModuleSpec
+from importlib.util import module_from_spec
 from pkgutil import get_importer
 from types import ModuleType
 from typing import List

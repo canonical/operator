@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import itertools
 import os
 import re
@@ -20,11 +19,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
-
-import autopep8
-import pydocstyle
-from flake8.api.legacy import get_style_guide
 
 import ops
 
@@ -44,55 +38,6 @@ def get_python_filepaths(include_tests=True):
 
 
 class InfrastructureTests(unittest.TestCase):
-
-    def test_pep8(self):
-        # verify all files are nicely styled
-        python_filepaths = get_python_filepaths()
-        style_guide = get_style_guide()
-        fake_stdout = io.StringIO()
-        with patch('sys.stdout', fake_stdout):
-            report = style_guide.check_files(python_filepaths)
-
-        # if flake8 didn't report anything, we're done
-        if report.total_errors == 0:
-            return
-
-        # grab on which files we have issues
-        flake8_issues = fake_stdout.getvalue().split('\n')
-        broken_filepaths = {item.split(':')[0] for item in flake8_issues if item}
-
-        # give hints to the developer on how files' style could be improved
-        options = autopep8.parse_args([''])
-        options.aggressive = 1
-        options.diff = True
-        options.max_line_length = 99
-
-        issues = []
-        for filepath in broken_filepaths:
-            diff = autopep8.fix_file(filepath, options=options)
-            if diff:
-                issues.append(diff)
-
-        report = ["Please fix files as suggested by autopep8:"] + issues
-        report += ["\n-- Original flake8 reports:"] + flake8_issues
-        self.fail("\n".join(report))
-
-    def test_pep257(self):
-        python_filepaths = get_python_filepaths(include_tests=False)
-        to_ignore = {
-            'D105',  # Missing docstring in magic method
-            'D107',  # Missing docstring in __init__
-        }
-        to_include = pydocstyle.violations.conventions.google - to_ignore
-        errors = list(pydocstyle.check(python_filepaths, select=to_include))
-
-        # if nothing to report, we're done
-        if not errors:
-            return
-
-        report = ["Please fix files as suggested by pydocstyle ({:d} issues):".format(len(errors))]
-        report.extend(str(e) for e in errors)
-        self.fail("\n".join(report))
 
     def test_quote_backslashes(self):
         # ensure we're not using unneeded backslash to escape strings

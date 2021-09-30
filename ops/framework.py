@@ -29,10 +29,7 @@ import types
 import weakref
 
 from ops import charm
-from ops.storage import (
-    NoSnapshotError,
-    SQLiteStorage,
-)
+from ops.storage import NoSnapshotError, SQLiteStorage
 
 logger = logging.getLogger(__name__)
 
@@ -312,8 +309,8 @@ class _Metaclass(type):
 
     """
 
-    def __new__(typ, *a, **kw):
-        k = super().__new__(typ, *a, **kw)
+    def __new__(cls, *a, **kw):
+        k = super().__new__(cls, *a, **kw)
         # k is now the Object-derived class; loop over its class attributes
         for n, v in vars(k).items():
             # we could do duck typing here if we want to support

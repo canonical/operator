@@ -3,7 +3,21 @@ name: Operator Framework Tests
 on: [push, pull_request]
 
 jobs:
-  unit-tests:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3
+        uses: actions/setup-python@v2
+
+      - name: Install tox
+        run: pip install tox
+
+      - name: Run linting
+        run: tox -e lint
+
+  test:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -18,10 +32,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dev dependencies
-        run: |
-          pip install -r requirements-dev.txt
+      - name: Install tox
+        run: pip install tox
 
       - name: Run unit tests
-        run: |
-          python -m unittest
+        run: tox -e unit

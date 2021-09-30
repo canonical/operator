@@ -740,10 +740,10 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.model.storages = {}
 
-    def resetBackendCalls(self):
+    def resetBackendCalls(self):  # noqa: N802
         self.harness._get_backend_calls(reset=True)
 
-    def assertBackendCalls(self, expected, *, reset=True):
+    def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
 
