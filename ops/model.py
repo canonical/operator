@@ -38,6 +38,8 @@ from ops.jujuversion import JujuVersion
 
 logger = logging.getLogger(__name__)
 
+MAX_STR_LEN = 131071  # Max length of strings to pass to subshell.
+
 
 class Model:
     """Represents the Juju Model as seen from this unit.
@@ -1589,7 +1591,20 @@ class _ModelBackend:
         self._run('application-version-set', '--', version)
 
     def juju_log(self, level, message):
-        self._run('juju-log', '--log-level', level, "--", message)
+        # In most cases, simply log.
+        if len(message) <= MAX_STR_LEN:
+            return self._run('juju-log', '--log-level', level, "--", message)
+
+        # Handle very long log messages.
+        messages = [
+            "Log string greater than {}. Splitting into multiple chunks: ".format(MAX_STR_LEN)
+        ]
+        while message:
+            messages.append(message[:MAX_STR_LEN])
+            message = message[MAX_STR_LEN:]
+
+        for message in messages:
+            self._run('juju-log', '--log-level', level, "--", message)
 
     def network_get(self, binding_name, relation_id=None):
         """Return network info provided by network-get for a given binding.

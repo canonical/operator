@@ -20,6 +20,7 @@ import unittest
 from unittest.mock import patch
 
 import ops.log
+from ops.model import MAX_STR_LEN
 
 
 class FakeModelBackend:
@@ -33,8 +34,21 @@ class FakeModelBackend:
             self._calls = []
         return calls
 
-    def juju_log(self, message, level):
-        self._calls.append((message, level))
+    def juju_log(self, level, message):
+        # In most cases, simply log.
+        if len(message) <= MAX_STR_LEN:
+            return self._calls.append((level, message))
+
+        # Handle very long log messages.
+        messages = [
+            "Log string greater than {}. Splitting into multiple chunks: ".format(MAX_STR_LEN)
+        ]
+        while message:
+            messages.append(message[:MAX_STR_LEN])
+            message = message[MAX_STR_LEN:]
+
+        for message in messages:
+            self._calls.append((level, message))
 
 
 class TestLogging(unittest.TestCase):
@@ -125,6 +139,30 @@ class TestLogging(unittest.TestCase):
         logger.info('info')
         logger.warning('warning')
         self.assertEqual(self.backend.calls(), [('WARNING', 'warning')])
+
+    def test_long_string_logging(self):
+        buffer = io.StringIO()
+
+        with patch('sys.stderr', buffer):
+            ops.log.setup_root_logging(self.backend, debug=True)
+            logger = logging.getLogger()
+            logger.debug('{}'.format('l' * 131071))
+
+        self.assertEqual(len(self.backend.calls()), 1)
+
+        self.backend.calls(clear=True)
+
+        with patch('sys.stderr', buffer):
+            logger.debug('{}'.format('l' * 131080))
+
+        calls = self.backend.calls()
+        self.assertEqual(len(calls), 3)
+        # Verify that we note that we are splitting the log message.
+        self.assertTrue("Splitting into multiple chunks" in calls[0][1])
+
+        # Verify that it got split into the expected chunks.
+        self.assertTrue(len(calls[1][1]) == 131071)
+        self.assertTrue(len(calls[2][1]) == 131080 - 131071)
 
 
 if __name__ == '__main__':
