@@ -22,8 +22,9 @@ import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from test.test_helpers import BaseTestCase, fake_script
+from unittest.mock import patch
 
 import logassert
 
@@ -33,21 +34,20 @@ from ops.framework import (
     BoundStoredState,
     CommitEvent,
     EventBase,
-    _event_regex,
-    ObjectEvents,
     EventSource,
     Framework,
     Handle,
     Object,
+    ObjectEvents,
     PreCommitEvent,
     StoredDict,
     StoredList,
     StoredSet,
     StoredState,
     StoredStateData,
+    _event_regex,
 )
 from ops.storage import NoSnapshotError, SQLiteStorage
-from test.test_helpers import fake_script, BaseTestCase
 
 
 class TestFramework(BaseTestCase):

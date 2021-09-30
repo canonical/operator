@@ -37,7 +37,6 @@ import urllib.request
 
 from ops._private import yaml
 
-
 _not_provided = object()
 
 
@@ -624,7 +623,7 @@ class FileType(enum.Enum):
 
 
 class FileInfo:
-    """Stat-like information about a single file."""
+    """Stat-like information about a single file or directory."""
 
     def __init__(
         self,
@@ -1022,8 +1021,8 @@ class Client:
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
         parser = email.parser.BytesFeedParser()
-        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
-                    boundary.encode('utf-8') + b'\r\n\r\n')
+        parser.feed(b'Content-Type: multipart/form-data; boundary='
+                    + boundary.encode('utf-8') + b'\r\n\r\n')
 
         # Then read the rest of the response and feed it to the parser.
         while True:
@@ -1159,7 +1158,10 @@ class Client:
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[FileInfo]:
-        """Return list of file information from given path on remote system.
+        """Return list of directory entries from given path on remote system.
+
+        Despite the name, this method returns a list of files *and*
+        directories, similar to :func:`os.listdir` or :func:`os.scandir`.
 
         Args:
             path: Path of the directory to list, or path of the file to return
