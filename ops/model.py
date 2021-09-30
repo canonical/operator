@@ -1348,11 +1348,15 @@ class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
 
 
-def _flatten(dictionary, parent_key=False):
+def _create_action_set_dict(dictionary, parent_key=False):
     """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
 
     This is used to allow nested dictionaries to be translated into the dotted format required by
     the Juju `action-set` hook tool in order to set nested data on an action.
+
+    Additionally, this method performs some validation on keys to ensure they only use permitted
+    characters, which according to the action-set docs, are lowercase characters, digits, hyphens,
+    and periods.
 
     Example::
 
@@ -1366,15 +1370,24 @@ def _flatten(dictionary, parent_key=False):
 
     Returns:
         A flattened dictionary
+
+    Raises:
+        ValueError: if a dict is passes with a key that fails to meet the format requirements
     """
     items = []
     for key, value in dictionary.items():
+        # Ensure the key is of a valid format, and raise a ValueError if not
+        if not re.match(r'^[0-9a-z](([A-Za-z0-9-]+)?[a-z0-9])?$', key):
+            raise ValueError("Key '{}' is invalid: keys must start and end with lowercase "
+                             "alphanumeric, and contain only lowercase alphanumeric hyphens and "
+                             "periods".format(key))
+        # Construct a new key for the flattened dict
         new_key = "{}.{}".format(parent_key, key) if parent_key else key
         if isinstance(value, MutableMapping):
-            items.extend(_flatten(value, new_key).items())
+            items.extend(_create_action_set_dict(value, new_key).items())
         elif isinstance(value, list):
             for k, v in enumerate(value):
-                items.extend(_flatten({str(k): v}, new_key).items())
+                items.extend(_create_action_set_dict({str(k): v}, new_key).items())
         else:
             items.append((new_key, value))
     return dict(items)
@@ -1611,7 +1624,7 @@ class _ModelBackend:
     def action_set(self, results):
         # The Juju action-set hook tool cannot interpret nested dicts, the _flatten helper here is
         # and convenience method to flatten out any nested dict structures into a dotted notation.
-        flat_results = _flatten(results)
+        flat_results = _create_action_set_dict(results)
         self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
 
     def action_log(self, message):
