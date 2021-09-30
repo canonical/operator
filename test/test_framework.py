@@ -1481,6 +1481,32 @@ class TestStoredState(BaseTestCase):
         # TODO: jam 2020-01-30 is there a clean way to tell that
         #       parent._stored._data.dirty is False?
 
+    def test_update(self):
+        framework = self.create_framework()
+
+        class StatefulObject(Object):
+            _stored = StoredState()
+        parent = StatefulObject(framework, 'key')
+
+        # Check updating a single key, not yet set
+        parent._stored.update(foo="bar")
+        self.assertEqual(parent._stored.foo, "bar")
+        parent._stored.update(foo="baz")
+
+        # Set some defaults, ensure the update method overrides them
+        parent._stored.set_default(operator=True, framework=False)
+        self.assertEqual(parent._stored.operator, True)
+        parent._stored.update(operator=False)
+        self.assertEqual(parent._stored.operator, False)
+
+        # Check updating multiple items
+        parent._stored.update(operator=True, framework=True)
+        self.assertEqual(parent._stored.operator, True)
+        self.assertEqual(parent._stored.framework, True)
+        parent._stored.update(foo="qux", operator=False)
+        self.assertEqual(parent._stored.operator, False)
+        self.assertEqual(parent._stored.foo, "qux")
+
 
 class GenericObserver(Object):
     """Generic observer for the tests."""

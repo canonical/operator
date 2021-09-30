@@ -917,6 +917,16 @@ class BoundStoredState:
             if k not in self._data:
                 self._data[k] = v
 
+    def update(self, **kwargs):
+        """Set the value of any given set of keys.
+
+        Example::
+
+            self._stored.update(foo="bar", baz="qux")
+        """
+        for k, v in kwargs.items():
+            self._data[k] = v
+
 
 class StoredState:
     """A class used to store data the charm needs persisted across invocations.
