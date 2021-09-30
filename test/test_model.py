@@ -1724,6 +1724,20 @@ class TestModelBackend(unittest.TestCase):
         self.backend.action_set(OrderedDict([('x', 'dead beef'), ('y', 1)]))
         self.assertEqual(fake_script_calls(self), [['action-set', 'x=dead beef', 'y=1']])
 
+    def test_action_set_nested(self):
+        fake_script(self, 'action-get', 'exit 1')
+        fake_script(self, 'action-set', 'exit 0')
+        self.backend.action_set({'a': {'b': 1, 'c': 2}, 'd': 3})
+        self.assertEqual(fake_script_calls(self), [['action-set', 'a.b=1', 'a.c=2', 'd=3']])
+
+    def test_action_set_more_nested(self):
+        fake_script(self, 'action-get', 'exit 1')
+        fake_script(self, 'action-set', 'exit 0')
+        self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4})
+        self.assertEqual(
+            fake_script_calls(self),
+            [['action-set', 'a.b=1', 'a.c=2', 'a.d.e=3', 'f=4']])
+
     def test_action_fail(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-fail', 'exit 0')

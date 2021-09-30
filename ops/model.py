@@ -1348,6 +1348,38 @@ class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
 
 
+def _flatten(dictionary, parent_key=False):
+    """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
+
+    This is used to allow nested dictionaries to be translated into the dotted format required by
+    the Juju `action-set` hook tool in order to set nested data on an action.
+
+    Example::
+
+        test_dict = {'a': {'b': 1, 'c': 2}}
+        flat_dict = flatten(test_dict)
+        # flat_dict is now {'a.b': 1, 'a.c': 2}
+
+    Arguments:
+        dictionary: The dictionary to flatten
+        parent_key: The string to prepend to dictionary's keys
+
+    Returns:
+        A flattened dictionary
+    """
+    items = []
+    for key, value in dictionary.items():
+        new_key = "{}.{}".format(parent_key, key) if parent_key else key
+        if isinstance(value, MutableMapping):
+            items.extend(_flatten(value, new_key).items())
+        elif isinstance(value, list):
+            for k, v in enumerate(value):
+                items.extend(_flatten({str(k): v}, new_key).items())
+        else:
+            items.append((new_key, value))
+    return dict(items)
+
+
 class _ModelBackend:
     """Represents the connection between the Model representation and talking to Juju.
 
@@ -1577,7 +1609,10 @@ class _ModelBackend:
         return self._run('action-get', return_output=True, use_json=True)
 
     def action_set(self, results):
-        self._run('action-set', *["{}={}".format(k, v) for k, v in results.items()])
+        # The Juju action-set hook tool cannot interpret nested dicts, the _flatten helper here is
+        # and convenience method to flatten out any nested dict structures into a dotted notation.
+        flat_results = _flatten(results)
+        self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
 
     def action_log(self, message):
         self._run('action-log', message)
