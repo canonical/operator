@@ -22,7 +22,7 @@ skip = "ops/_vendor"
 [tool.flake8]
 max-line-length = 99
 max-doc-length = 99
-exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
+exclude = ["ops/_vendor", ".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
 select = ["E", "W", "F", "C", "N", "R", "D", "H"]
 ignore = ["D105", "D107", "E203", "W503"]
 # D100, D101, D102, D103, D104: Ignore missing docstrings in tests
