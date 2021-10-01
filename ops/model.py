@@ -1368,7 +1368,7 @@ def _validate_action_result_key(key: str) -> None:
     # TODO: Drop this in a future release
     if '.' in key:
         msg = ("a '.' was detected in the dict key: '{}' while formatting a dict passed to "
-               "ActionEvent.set_result(). Keys using the dotted notation will be deprecated in a "
+               "ActionEvent.set_result(). Keys using the dotted notation will be rejected in a "
                "later release.")
         warnings.warn(msg.format(key), DeprecationWarning)
 
