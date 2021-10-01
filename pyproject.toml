@@ -12,9 +12,11 @@ ignore = ["E203", "W503"]
 recursive = true
 jobs = -1
 aggressive = 3
+exclude = "ops/_vendor/**"
 
 [tool.isort]
 profile = "black"
+skip = "ops/_vendor"
 
 # Linting tools configuration
 [tool.flake8]
