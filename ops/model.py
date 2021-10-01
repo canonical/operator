@@ -25,6 +25,7 @@ import shutil
 import tempfile
 import time
 import typing
+import warnings
 import weakref
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
@@ -1361,6 +1362,17 @@ def _validate_action_result_key(key: str) -> None:
     Raises:
         ValueError: if a dict is passes with a key that fails to meet the format requirements.
     """
+    # Existing charms may well be passing dicts to set_result that contain dicts pre-formatted
+    # to use dotted notation having worked around this in the past. We will deprecate this in the
+    # future to avoid possible duplication of keys.
+    # TODO: Drop this in a future release
+    if '.' in key:
+        msg = ("a '.' was detected in the dict key: '{}' while formatting a dict passed to "
+               "ActionEvent.set_result(). Keys using the dotted notation will be deprecated in a "
+               "later release.")
+        warnings.warn(msg.format(key), DeprecationWarning)
+
+    # TODO: Drop the period from this regex when the above DeprecationWarning is removed
     key_pattern = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
 
     if not key_pattern.match(key):

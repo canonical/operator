@@ -1753,7 +1753,8 @@ class TestModelBackend(unittest.TestCase):
     def test_action_set_dotted_dict(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
-        self.backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
+        with self.assertWarns(DeprecationWarning):
+            self.backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
         expected_args = ['a.b=1', 'a.c=2', 'd=3']
         self.assertTrue(all(item in fake_script_calls(self)[0] for item in expected_args))
 
