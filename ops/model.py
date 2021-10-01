@@ -1399,9 +1399,6 @@ def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict
         new_key = "{}.{}".format(parent_key, key) if parent_key else key
         if isinstance(value, MutableMapping):
             items.extend(_format_action_result_dict(value, new_key).items())
-        elif isinstance(value, list):
-            for k, v in enumerate(value):
-                items.extend(_format_action_result_dict({str(k): v}, new_key).items())
         else:
             items.append((new_key, value))
     return dict(items)
