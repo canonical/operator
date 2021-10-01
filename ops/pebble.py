@@ -383,6 +383,7 @@ class Task:
         progress: TaskProgress,
         spawn_time: datetime.datetime,
         ready_time: typing.Optional[datetime.datetime],
+        data: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ):
         self.id = id
         self.kind = kind
@@ -392,6 +393,7 @@ class Task:
         self.progress = progress
         self.spawn_time = spawn_time
         self.ready_time = ready_time
+        self.data = data or {}
 
     @classmethod
     def from_dict(cls, d: typing.Dict) -> 'Task':
@@ -405,6 +407,7 @@ class Task:
             progress=TaskProgress.from_dict(d['progress']),
             spawn_time=_parse_timestamp(d['spawn-time']),
             ready_time=_parse_timestamp(d['ready-time']) if d.get('ready-time') else None,
+            data=d.get('data') or {},
         )
 
     def __repr__(self):
@@ -416,7 +419,8 @@ class Task:
                 'log={self.log!r}, '
                 'progress={self.progress!r}, '
                 'spawn_time={self.spawn_time!r}, '
-                'ready_time={self.ready_time!r})'
+                'ready_time={self.ready_time!r}, '
+                'data={self.data!r})'
                 ).format(self=self)
 
 
@@ -840,7 +844,10 @@ class ExecProcess:
 
         if change.err:
             raise ChangeError(change.err, change)
-        exit_code = change.data.get('exit-code', -1)
+
+        exit_code = -1
+        if change.tasks:
+            exit_code = change.tasks[0].data.get('exit-code', -1)
         return exit_code
 
     def wait_output(self) -> typing.Tuple[typing.AnyStr, typing.AnyStr]:

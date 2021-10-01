@@ -272,6 +272,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(task.progress.total, 7)
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
         self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
+        self.assertEqual(task.data, {})
 
     def test_task_from_dict(self):
         d = {
@@ -286,6 +287,7 @@ class TestTypes(unittest.TestCase):
             "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
             "status": "Done",
             "summary": 'Start service "svc"',
+            "data": {"exit-code": 42},
         }
         task = pebble.Task.from_dict(d)
         self.assertEqual(task.id, '78')
@@ -298,6 +300,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(task.progress.total, 1)
         self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219))
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
+        self.assertEqual(task.data, {'exit-code': 42})
 
         d['ready-time'] = '2021-01-28T14:37:03.270218778+00:00'
         d['spawn-time'] = '2021-01-28T14:37:02.247158162+00:00'
@@ -330,6 +333,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.status, 'Done')
         self.assertEqual(change.summary, 'Autostart service "svc"')
         self.assertEqual(change.tasks, [])
+        self.assertEqual(change.data, {})
 
     def test_change_from_dict(self):
         d = {
@@ -342,6 +346,7 @@ class TestTypes(unittest.TestCase):
             "status": "Done",
             "summary": 'Autostart service "svc"',
             "tasks": [],
+            "data": {"exit-code": 42},
         }
         change = pebble.Change.from_dict(d)
         self.assertEqual(change.id, '70')
@@ -353,6 +358,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(change.status, 'Done')
         self.assertEqual(change.summary, 'Autostart service "svc"')
         self.assertEqual(change.tasks, [])
+        self.assertEqual(change.data, {'exit-code': 42})
 
         d['ready-time'] = '2021-01-28T14:37:04.291517768+00:00'
         d['spawn-time'] = '2021-01-28T14:37:02.247202105+00:00'
@@ -2015,7 +2021,7 @@ class TestExec(unittest.TestCase):
         })
 
         change = build_mock_change_dict(change_id)
-        change['data'] = {'exit-code': exit_code}
+        change['tasks'][0]['data'] = {'exit-code': exit_code}
         if change_err is not None:
             change['err'] = change_err
         self.client.responses.append({
