@@ -1732,7 +1732,7 @@ class TestModelBackend(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.backend.action_set({'some&key': 'dead beef', 'y': 1})
         with self.assertRaises(ValueError):
-            self.backend.action_set({'someKEY': 'dead beef', 'y': 1})
+            self.backend.action_set({'someKey': 'dead beef', 'y': 1})
         with self.assertRaises(ValueError):
             self.backend.action_set({'some_key': 'dead beef', 'y': 1})
 
@@ -1748,6 +1748,13 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-set', 'exit 0')
         self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4})
         expected_args = ['a.b=1', 'a.c=2', 'a.d.e=3', 'f=4']
+        self.assertTrue(all(item in fake_script_calls(self)[0] for item in expected_args))
+
+    def test_action_set_dotted_dict(self):
+        fake_script(self, 'action-get', 'exit 1')
+        fake_script(self, 'action-set', 'exit 0')
+        self.backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
+        expected_args = ['a.b=1', 'a.c=2', 'd=3']
         self.assertTrue(all(item in fake_script_calls(self)[0] for item in expected_args))
 
     def test_action_fail(self):

@@ -1348,20 +1348,40 @@ class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
 
 
-def _create_action_set_dict(dictionary, parent_key=False):
+def _validate_action_result_key(key: str) -> None:
+    """Use regular expressions to validate that the given key is in the correct format.
+
+    Correct format is defined as starting with and ending with a lowercase alphanumeric
+    character, and containing nothing but lowercase, alphanumeric characters, hyphens and
+    periods.
+
+    Arguments:
+        key: a string representing the key for an item in an action result.
+
+    Raises:
+        ValueError: if a dict is passes with a key that fails to meet the format requirements.
+    """
+    key_pattern = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
+
+    if not key_pattern.match(key):
+        raise ValueError("Key '{}' is invalid: keys must start and end with lowercase "
+                         "alphanumeric, and contain only lowercase alphanumeric hyphens and "
+                         "periods".format(key))
+
+
+def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict:
     """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
 
     This is used to allow nested dictionaries to be translated into the dotted format required by
     the Juju `action-set` hook tool in order to set nested data on an action.
 
     Additionally, this method performs some validation on keys to ensure they only use permitted
-    characters, which according to the action-set docs, are lowercase characters, digits, hyphens,
-    and periods.
+    characters.
 
     Example::
 
         test_dict = {'a': {'b': 1, 'c': 2}}
-        flat_dict = flatten(test_dict)
+        flat_dict = _format_action_result_dict(test_dict)
         # flat_dict is now {'a.b': 1, 'a.c': 2}
 
     Arguments:
@@ -1369,25 +1389,19 @@ def _create_action_set_dict(dictionary, parent_key=False):
         parent_key: The string to prepend to dictionary's keys
 
     Returns:
-        A flattened dictionary
-
-    Raises:
-        ValueError: if a dict is passes with a key that fails to meet the format requirements
+        A flattened dictionary with validated keys
     """
     items = []
     for key, value in dictionary.items():
         # Ensure the key is of a valid format, and raise a ValueError if not
-        if not re.match(r'^[0-9a-z](([A-Za-z0-9-]+)?[a-z0-9])?$', key):
-            raise ValueError("Key '{}' is invalid: keys must start and end with lowercase "
-                             "alphanumeric, and contain only lowercase alphanumeric hyphens and "
-                             "periods".format(key))
+        _validate_action_result_key(key)
         # Construct a new key for the flattened dict
         new_key = "{}.{}".format(parent_key, key) if parent_key else key
         if isinstance(value, MutableMapping):
-            items.extend(_create_action_set_dict(value, new_key).items())
+            items.extend(_format_action_result_dict(value, new_key).items())
         elif isinstance(value, list):
             for k, v in enumerate(value):
-                items.extend(_create_action_set_dict({str(k): v}, new_key).items())
+                items.extend(_format_action_result_dict({str(k): v}, new_key).items())
         else:
             items.append((new_key, value))
     return dict(items)
@@ -1622,9 +1636,9 @@ class _ModelBackend:
         return self._run('action-get', return_output=True, use_json=True)
 
     def action_set(self, results):
-        # The Juju action-set hook tool cannot interpret nested dicts, the _flatten helper here is
-        # and convenience method to flatten out any nested dict structures into a dotted notation.
-        flat_results = _create_action_set_dict(results)
+        # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
+        # flatten out any nested dict structures into a dotted notation, and validate keys.
+        flat_results = _format_action_result_dict(results)
         self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
 
     def action_log(self, message):
