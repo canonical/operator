@@ -1,4 +1,4 @@
-# Copyright 2020 Canonical Ltd.
+# Copyright 2020-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,10 +29,7 @@ import types
 import weakref
 
 from ops import charm
-from ops.storage import (
-    NoSnapshotError,
-    SQLiteStorage,
-)
+from ops.storage import NoSnapshotError, SQLiteStorage
 
 logger = logging.getLogger(__name__)
 
@@ -312,8 +309,8 @@ class _Metaclass(type):
 
     """
 
-    def __new__(typ, *a, **kw):
-        k = super().__new__(typ, *a, **kw)
+    def __new__(cls, *a, **kw):
+        k = super().__new__(cls, *a, **kw)
         # k is now the Object-derived class; loop over its class attributes
         for n, v in vars(k).items():
             # we could do duck typing here if we want to support
@@ -436,11 +433,11 @@ class PrefixedEvents:
 
 
 class PreCommitEvent(EventBase):
-    """Events that will be emited first on commit."""
+    """Events that will be emitted first on commit."""
 
 
 class CommitEvent(EventBase):
-    """Events that will be emited second on commit."""
+    """Events that will be emitted second on commit."""
 
 
 class FrameworkEvents(ObjectEvents):

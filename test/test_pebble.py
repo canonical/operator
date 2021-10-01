@@ -19,20 +19,19 @@ import email.parser
 import io
 import json
 import os
-import unittest
-import unittest.mock
-import unittest.util
 import signal
 import sys
 import tempfile
+import test.fake_pebble as fake_pebble
 import threading
 import time
+import unittest
+import unittest.mock
+import unittest.util
 
 import ops.pebble as pebble
-import test.fake_pebble as fake_pebble
 from ops._private import yaml
 from ops._vendor import websocket
-
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000
@@ -481,13 +480,13 @@ services:
                                      raw={
                                           "override": "replace",
                                           "command": "echo foo"
-                                         })
+                                     })
         old_services = {"foo": old_service}
         self.assertEqual(plan.services, old_services)
 
         services_as_dict = {
             "foo": {"override": "replace", "command": "echo foo"}
-            }
+        }
         self.assertEqual(plan.services, services_as_dict)
 
 
@@ -758,7 +757,7 @@ class TestServiceInfo(unittest.TestCase):
 
 
 class MockClient(pebble.Client):
-    """Mock Pebble client that simply records reqeusts and returns stored responses."""
+    """Mock Pebble client that simply records requests and returns stored responses."""
 
     def __init__(self):
         self.requests = []
@@ -1717,8 +1716,8 @@ bad path
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
         parser = email.parser.BytesFeedParser()
-        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
-                    boundary.encode('utf-8') + b'\r\n\r\n')
+        parser.feed(b'Content-Type: multipart/form-data; boundary='
+                    + boundary.encode('utf-8') + b'\r\n\r\n')
         parser.feed(body)
         message = parser.close()
 
@@ -1978,13 +1977,13 @@ class TestExecError(unittest.TestCase):
         self.assertEqual(str(e), "non-zero exit code 1 executing ['x'], stderr='only-err'")
 
         e = pebble.ExecError(['a', 'b'], 1, 'out', 'err')
-        self.assertEqual(str(e), "non-zero exit code 1 executing ['a', 'b'], " +
-                                 "stdout='out', stderr='err'")
+        self.assertEqual(str(e), "non-zero exit code 1 executing ['a', 'b'], "
+                                 + "stdout='out', stderr='err'")
 
     def test_str_truncated(self):
         e = pebble.ExecError(['foo'], 2, 'longout', 'longerr', max_output=5)
-        self.assertEqual(str(e), "non-zero exit code 2 executing ['foo'], " +
-                                 "stdout='longo' [truncated], stderr='longe' [truncated]")
+        self.assertEqual(str(e), "non-zero exit code 2 executing ['foo'], "
+                                 + "stdout='longo' [truncated], stderr='longe' [truncated]")
 
 
 class MockWebsocket:

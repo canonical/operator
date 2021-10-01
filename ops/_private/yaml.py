@@ -16,7 +16,6 @@
 
 import yaml
 
-
 # Use C speedups if available
 _safe_loader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 _safe_dumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)

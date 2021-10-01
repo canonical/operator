@@ -13,15 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import sys
-import logging
 
 sys.path.append('lib')
 
-from ops.charm import CharmBase  # noqa: E402 (module-level import after non-import code)
+from ops.charm import (  # noqa: E402 (module-level import after non-import code)
+    CharmBase,
+)
 from ops.framework import StoredState  # noqa: E402
-from ops.main import main        # noqa: E402 (ditto)
+from ops.main import main  # noqa: E402 (ditto)
 
 logger = logging.getLogger()
 

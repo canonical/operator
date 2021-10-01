@@ -42,7 +42,6 @@ import urllib.request
 from ops._private import yaml
 from ops._vendor import websocket
 
-
 _not_provided = object()
 
 
@@ -779,6 +778,7 @@ class ExecProcess:
             None if stderr was passed to :meth:`Client.exec` or combine_stderr
             was True.
     """
+
     def __init__(
         self,
         stdin: typing.Optional[typing.Union[typing.TextIO, typing.BinaryIO]],
@@ -911,7 +911,7 @@ def _has_fileno(f):
         return False
 
 
-def _reader_to_websocket(reader, ws, encoding, cancel_reader=None, bufsize=128*1024):
+def _reader_to_websocket(reader, ws, encoding, cancel_reader=None, bufsize=128 * 1024):
     """Read reader through to EOF and send each chunk read to the websocket."""
     while True:
         if cancel_reader is not None:
@@ -1335,8 +1335,8 @@ class Client:
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
         parser = email.parser.BytesFeedParser()
-        parser.feed(b'Content-Type: multipart/form-data; boundary=' +
-                    boundary.encode('utf-8') + b'\r\n\r\n')
+        parser.feed(b'Content-Type: multipart/form-data; boundary='
+                    + boundary.encode('utf-8') + b'\r\n\r\n')
 
         # Then read the rest of the response and feed it to the parser.
         while True:
