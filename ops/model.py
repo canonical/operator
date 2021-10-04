@@ -1349,6 +1349,10 @@ class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
 
 
+# TODO: Drop the period from this regex when the above DeprecationWarning is removed
+ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
+
+
 def _validate_action_result_key(key: str) -> None:
     """Use regular expressions to validate that the given key is in the correct format.
 
@@ -1360,7 +1364,7 @@ def _validate_action_result_key(key: str) -> None:
         key: a string representing the key for an item in an action result.
 
     Raises:
-        ValueError: if a dict is passes with a key that fails to meet the format requirements.
+        ValueError: if a dict is passed with a key that fails to meet the format requirements.
     """
     # Existing charms may well be passing dicts to set_result that contain dicts pre-formatted
     # to use dotted notation having worked around this in the past. We will deprecate this in the
@@ -1372,10 +1376,7 @@ def _validate_action_result_key(key: str) -> None:
                "later release.")
         warnings.warn(msg.format(key), DeprecationWarning)
 
-    # TODO: Drop the period from this regex when the above DeprecationWarning is removed
-    key_pattern = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
-
-    if not key_pattern.match(key):
+    if not ACTION_RESULT_KEY_REGEX.match(key):
         raise ValueError("Key '{}' is invalid: keys must start and end with lowercase "
                          "alphanumeric, and contain only lowercase alphanumeric hyphens and "
                          "periods".format(key))
@@ -1392,9 +1393,9 @@ def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict
 
     Example::
 
-        test_dict = {'a': {'b': 1, 'c': 2}}
-        flat_dict = _format_action_result_dict(test_dict)
-        # flat_dict is now {'a.b': 1, 'a.c': 2}
+        >>> test_dict = {'a': {'b': 1, 'c': 2}}
+        >>> _format_action_result_dict(test_dict)
+        {'a.b': 1, 'a.c': 2}
 
     Arguments:
         dictionary: The dictionary to flatten
