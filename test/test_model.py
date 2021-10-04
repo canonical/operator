@@ -1700,9 +1700,8 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-set', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
-        expected_args = ["dead=beef cafe", "foo=bar"]
-        result = fake_script_calls(self, clear=True)[0]
-        self.assertTrue(all(item in result for item in expected_args))
+        self.assertCountEqual(
+            ["action-set", "dead=beef cafe", "foo=bar"], fake_script_calls(self, clear=True)[0])
 
     def test_action_log_error(self):
         fake_script(self, 'action-get', '')
@@ -1723,8 +1722,7 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
         self.backend.action_set({'x': 'dead beef', 'y': 1})
-        expected_args = ['x=dead beef', 'y=1']
-        self.assertTrue(all(item in fake_script_calls(self)[0] for item in expected_args))
+        self.assertCountEqual(['action-set', 'x=dead beef', 'y=1'], fake_script_calls(self)[0])
 
     def test_action_set_key_validation(self):
         with self.assertRaises(ValueError):
@@ -1740,23 +1738,21 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
         self.backend.action_set({'a': {'b': 1, 'c': 2}, 'd': 3})
-        expected_args = ['a.b=1', 'a.c=2', 'd=3']
-        self.assertTrue(all(item in fake_script_calls(self)[0] for item in expected_args))
+        self.assertCountEqual(['action-set', 'a.b=1', 'a.c=2', 'd=3'], fake_script_calls(self)[0])
 
     def test_action_set_more_nested(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
         self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4})
-        expected_args = ['a.b=1', 'a.c=2', 'a.d.e=3', 'f=4']
-        self.assertTrue(all(item in fake_script_calls(self)[0] for item in expected_args))
+        self.assertCountEqual(
+            ['action-set', 'a.b=1', 'a.c=2', 'a.d.e=3', 'f=4'], fake_script_calls(self)[0])
 
     def test_action_set_dotted_dict(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
         with self.assertWarns(DeprecationWarning):
             self.backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
-        expected_args = ['a.b=1', 'a.c=2', 'd=3']
-        self.assertTrue(all(item in fake_script_calls(self)[0] for item in expected_args))
+        self.assertCountEqual(['action-set', 'a.b=1', 'a.c=2', 'd=3'], fake_script_calls(self)[0])
 
     def test_action_fail(self):
         fake_script(self, 'action-get', 'exit 1')
