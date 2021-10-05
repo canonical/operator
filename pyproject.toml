@@ -1,9 +1,11 @@
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
+omit = ["ops/_vendor/**"]
 
 [tool.coverage.report]
 show_missing = true
+omit = ["ops/_vendor/**"]
 
 # Formatting tools configuration
 [tool.autopep8]
