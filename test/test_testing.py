@@ -784,7 +784,7 @@ class TestHarness(unittest.TestCase):
             harness.charm.changes,
             [{'name': 'config-changed', 'data': {'a': 'foo', 'b': 2}},
              {'name': 'config-changed', 'data': {'a': 'foo', 'b': 3}},
-             {'name': 'config-changed', 'data': {'a': '', 'b': None}},
+             {'name': 'config-changed', 'data': {'a': ''}},
              ])
 
     def test_update_config_undefined_option(self):
@@ -857,7 +857,7 @@ class TestHarness(unittest.TestCase):
         harness.update_config({'value': 'second'})
         self.assertEqual(
             harness.charm.get_changes(reset=True),
-            [{'name': 'config-changed', 'data': {'value': 'second', 'third': None}}])
+            [{'name': 'config-changed', 'data': {'value': 'second'}}])
         # Once disabled, we won't see config-changed when we make an update
         harness.disable_hooks()
         harness.update_config({'third': '3'})
@@ -886,7 +886,7 @@ class TestHarness(unittest.TestCase):
         harness.update_config({'value': 'second'})
         self.assertEqual(
             harness.charm.get_changes(reset=True),
-            [{'name': 'config-changed', 'data': {'value': 'second', 'third': None}}])
+            [{'name': 'config-changed', 'data': {'value': 'second'}}])
         # Once disabled, we won't see config-changed when we make an update
         with harness.hooks_disabled():
             harness.update_config({'third': '3'})
@@ -982,13 +982,13 @@ class TestHarness(unittest.TestCase):
         harness = self._get_dummy_charm_harness(tmp)
         self.assertEqual(harness.model.config['opt_str'], 'val')
         self.assertEqual(harness.model.config['opt_str_empty'], '')
-        self.assertIsNone(harness.model.config['opt_null'])
         self.assertIs(harness.model.config['opt_bool'], True)
         self.assertEqual(harness.model.config['opt_int'], 1)
         self.assertIsInstance(harness.model.config['opt_int'], int)
         self.assertEqual(harness.model.config['opt_float'], 1.0)
         self.assertIsInstance(harness.model.config['opt_float'], float)
-        self.assertIsNone(harness.model.config['opt_no_default'])
+        self.assertIsNone(harness._defaults['opt_null'])
+        self.assertIsNone(harness._defaults['opt_no_default'])
 
     def test_set_model_name(self):
         harness = Harness(CharmBase, meta='''
