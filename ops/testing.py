@@ -94,7 +94,7 @@ class Harness(typing.Generic[CharmType]):
         self._oci_resources = {}
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
-        self._update_config(key_values=self._load_config_defaults(config))
+        self._update_config(key_values=self._load_config_defaults(config), ignore_missing=True)
 
     @property
     def charm(self) -> CharmType:
@@ -288,8 +288,7 @@ class Harness(typing.Generic[CharmType]):
             charm_config = dedent(charm_config)
         charm_config = yaml.safe_load(charm_config)
         charm_config = charm_config.get('options', {})
-        return {key: value['default'] for key, value in charm_config.items()
-                if 'default' in value}
+        return {key: value.get('default', None) for key, value in charm_config.items()}
 
     def add_oci_resource(self, resource_name: str,
                          contents: typing.Mapping[str, str] = None) -> None:
@@ -742,6 +741,7 @@ class Harness(typing.Generic[CharmType]):
             self,
             key_values: typing.Mapping[str, str] = None,
             unset: typing.Iterable[str] = (),
+            ignore_missing: bool = False
     ) -> None:
         """Update the config as seen by the charm.
 
@@ -754,6 +754,8 @@ class Harness(typing.Generic[CharmType]):
             key_values: A Mapping of key:value pairs to update in config.
             unset: An iterable of keys to remove from Config. (Note that this does
                 not currently reset the config values to the default defined in config.yaml.)
+            ignore_missing: Do not raise an exception when trying to set keys that are not already
+                defined in the config.yaml. Used during initialisation only.
         """
         # NOTE: jam 2020-03-01 Note that this sort of works "by accident". Config
         # is a LazyMapping, but its _load returns a dict and this method mutates
@@ -762,9 +764,14 @@ class Harness(typing.Generic[CharmType]):
         config = self._backend._config
         if key_values is not None:
             for key, value in key_values.items():
-                config[key] = value
+                if ignore_missing or key in self._backend._config:
+                    config[key] = value
+                else:
+                    raise ValueError("unknown config option: '{}'".format(key))
         for key in unset:
-            config.pop(key, None)
+            # For now, unsetting will just reset the config item to 'None', which does not respect
+            # the 'default' key.
+            config[key] = None
 
     def update_config(
             self,

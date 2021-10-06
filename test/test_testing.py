@@ -758,7 +758,15 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(viewer.changes, [{'initial': 'data'}, {}])
 
     def test_update_config(self):
-        harness = Harness(RecordingCharm)
+        harness = Harness(RecordingCharm, config='''
+            options:
+                a:
+                    description: a config option
+                    type: string
+                b:
+                    description: another config option
+                    type: int
+            ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
         harness.update_config(key_values={'a': 'foo', 'b': 2})
@@ -776,8 +784,15 @@ class TestHarness(unittest.TestCase):
             harness.charm.changes,
             [{'name': 'config-changed', 'data': {'a': 'foo', 'b': 2}},
              {'name': 'config-changed', 'data': {'a': 'foo', 'b': 3}},
-             {'name': 'config-changed', 'data': {'a': ''}},
+             {'name': 'config-changed', 'data': {'a': '', 'b': None}},
              ])
+
+    def test_update_config_undefined_option(self):
+        harness = Harness(RecordingCharm)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        with self.assertRaises(ValueError):
+            harness.update_config(key_values={'nonexistent': 'foo'})
 
     def test_set_leader(self):
         harness = Harness(RecordingCharm)
@@ -822,9 +837,18 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.get_relation_data(rel_id, 'test-charm'), {'foo': 'bar'})
 
     def test_hooks_enabled_and_disabled(self):
-        harness = Harness(RecordingCharm, meta='''
-            name: test-charm
-        ''')
+        harness = Harness(
+            RecordingCharm,
+            meta='''
+                    name: test-charm
+                ''',
+            config='''
+                    options:
+                        value:
+                            type: string
+                        third:
+                            type: string
+                    ''')
         self.addCleanup(harness.cleanup)
         # Before begin() there are no events.
         harness.update_config({'value': 'first'})
@@ -833,7 +857,7 @@ class TestHarness(unittest.TestCase):
         harness.update_config({'value': 'second'})
         self.assertEqual(
             harness.charm.get_changes(reset=True),
-            [{'name': 'config-changed', 'data': {'value': 'second'}}])
+            [{'name': 'config-changed', 'data': {'value': 'second', 'third': None}}])
         # Once disabled, we won't see config-changed when we make an update
         harness.disable_hooks()
         harness.update_config({'third': '3'})
@@ -846,8 +870,14 @@ class TestHarness(unittest.TestCase):
 
     def test_hooks_disabled_contextmanager(self):
         harness = Harness(RecordingCharm, meta='''
-            name: test-charm
-        ''')
+                name: test-charm
+                ''', config='''
+                options:
+                    value:
+                        type: string
+                    third:
+                        type: string
+            ''')
         self.addCleanup(harness.cleanup)
         # Before begin() there are no events.
         harness.update_config({'value': 'first'})
@@ -856,7 +886,7 @@ class TestHarness(unittest.TestCase):
         harness.update_config({'value': 'second'})
         self.assertEqual(
             harness.charm.get_changes(reset=True),
-            [{'name': 'config-changed', 'data': {'value': 'second'}}])
+            [{'name': 'config-changed', 'data': {'value': 'second', 'third': None}}])
         # Once disabled, we won't see config-changed when we make an update
         with harness.hooks_disabled():
             harness.update_config({'third': '3'})
@@ -868,8 +898,14 @@ class TestHarness(unittest.TestCase):
 
     def test_hooks_disabled_nested_contextmanager(self):
         harness = Harness(RecordingCharm, meta='''
-            name: test-charm
-        ''')
+                name: test-charm
+            ''', config='''
+                options:
+                    fifth:
+                        type: string
+                    sixth:
+                        type: string
+                ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
         # Context manager can be nested, so a test using it can invoke a helper using it.
@@ -881,8 +917,14 @@ class TestHarness(unittest.TestCase):
 
     def test_hooks_disabled_noop(self):
         harness = Harness(RecordingCharm, meta='''
-            name: test-charm
-        ''')
+                name: test-charm
+            ''', config='''
+            options:
+                seventh:
+                    type: string
+                eighth:
+                    type: string
+            ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
         # If hooks are already disabled, it is a no op, and on exit hooks remain disabled.
@@ -946,7 +988,7 @@ class TestHarness(unittest.TestCase):
         self.assertIsInstance(harness.model.config['opt_int'], int)
         self.assertEqual(harness.model.config['opt_float'], 1.0)
         self.assertIsInstance(harness.model.config['opt_float'], float)
-        self.assertNotIn('opt_no_default', harness.model.config)
+        self.assertIsNone(harness.model.config['opt_no_default'])
 
     def test_set_model_name(self):
         harness = Harness(CharmBase, meta='''
@@ -1347,6 +1389,11 @@ class TestHarness(unittest.TestCase):
     def test_begin_with_initial_hooks_no_relations(self):
         harness = Harness(RecordingCharm, meta='''
             name: test-app
+            ''', config='''
+            options:
+                foo:
+                    description: a config option
+                    type: string
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
@@ -1367,6 +1414,11 @@ class TestHarness(unittest.TestCase):
     def test_begin_with_initial_hooks_no_relations_not_leader(self):
         harness = Harness(RecordingCharm, meta='''
             name: test-app
+            ''', config='''
+            options:
+                foo:
+                    description: a config option
+                    type: string
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
@@ -1393,6 +1445,11 @@ class TestHarness(unittest.TestCase):
             peers:
               peer:
                 interface: app-peer
+            ''', config='''
+            options:
+                foo:
+                    description: a config option
+                    type: string
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
