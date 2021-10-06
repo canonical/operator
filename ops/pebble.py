@@ -232,19 +232,19 @@ class ExecError(Error):
             called or combine_stderr was True, this is None.
     """
 
+    STR_MAX_OUTPUT = 1024
+
     def __init__(
         self,
         command: typing.List[str],
         exit_code: int,
         stdout: typing.Optional[typing.AnyStr],
         stderr: typing.Optional[typing.AnyStr],
-        max_output: int = 1024,
     ):
         self.command = command
         self.exit_code = exit_code
         self.stdout = stdout
         self.stderr = stderr
-        self._max_output = max_output
 
     def __str__(self):
         message = 'non-zero exit code {} executing {!r}'.format(
@@ -253,8 +253,8 @@ class ExecError(Error):
         for name, out in [('stdout', self.stdout), ('stderr', self.stderr)]:
             if out is None:
                 continue
-            truncated = ' [truncated]' if len(out) > self._max_output else ''
-            out = out[:self._max_output]
+            truncated = ' [truncated]' if len(out) > self.STR_MAX_OUTPUT else ''
+            out = out[:self.STR_MAX_OUTPUT]
             message = '{}, {}={!r}{}'.format(message, name, out, truncated)
 
         return message

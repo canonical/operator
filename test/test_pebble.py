@@ -1981,7 +1981,8 @@ class TestExecError(unittest.TestCase):
                                  + "stdout='out', stderr='err'")
 
     def test_str_truncated(self):
-        e = pebble.ExecError(['foo'], 2, 'longout', 'longerr', max_output=5)
+        e = pebble.ExecError(['foo'], 2, 'longout', 'longerr')
+        e.STR_MAX_OUTPUT = 5
         self.assertEqual(str(e), "non-zero exit code 2 executing ['foo'], "
                                  + "stdout='longo' [truncated], stderr='longe' [truncated]")
 
