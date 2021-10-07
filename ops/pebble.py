@@ -812,7 +812,7 @@ class ExecProcess:
     def __del__(self):
         if not self._waited:
             msg = 'ExecProcess instance garbage collected without call to wait() or wait_output()'
-            warnings.warn(msg, ResourceWarning, source=self)
+            warnings.warn(msg, ResourceWarning)
 
     def wait(self):
         """Wait for the process to finish.
