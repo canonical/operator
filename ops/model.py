@@ -1291,7 +1291,7 @@ class Container:
         and return value, as well as examples.
         """
         return self._pebble.exec(
-            commmand,
+            command,
             environment=environment,
             working_dir=working_dir,
             timeout=timeout,

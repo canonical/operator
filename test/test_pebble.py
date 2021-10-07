@@ -2112,7 +2112,7 @@ class TestExec(unittest.TestCase):
         self.add_responses('123', 0)
 
         process = self.client.exec(
-            command=['true'],
+            ['true'],
             environment={'K1': 'V1', 'K2': 'V2'},
             working_dir='WD',
             user_id=1000,
