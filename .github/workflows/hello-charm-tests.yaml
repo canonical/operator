@@ -8,7 +8,9 @@ jobs:
 
     strategy:
       matrix:
-        charm-repo: ["jnsgruk/hello-kubecon", "juju/hello-juju-charm"]
+        charm-repo:
+          - "jnsgruk/hello-kubecon"
+          - "juju/hello-juju-charm"
 
     steps:
       - name: Set up Python 3.8
@@ -24,7 +26,8 @@ jobs:
       - name: Remove 'ops' from charm requirements.txt
         run: |
           sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-          echo "git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+          TEST_OPS="git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops"
+          echo -e "\n${TEST_OPS}" >> requirements.txt
 
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
