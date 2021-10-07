@@ -794,6 +794,28 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(ValueError):
             harness.update_config(key_values={'nonexistent': 'foo'})
 
+    def test_update_config_unset_boolean(self):
+        harness = Harness(RecordingCharm, config='''
+            options:
+                a:
+                    description: a config option
+                    type: bool
+                    default: False
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        # Check the default was set correctly
+        self.assertEqual(harness.charm.config, {'a': False})
+        # Set the boolean value to True
+        harness.update_config(key_values={'a': True})
+        self.assertEqual(harness.charm.changes, [{'name': 'config-changed', 'data': {'a': True}}])
+        # Unset the boolean value
+        harness.update_config(unset={'a'})
+        self.assertEqual(
+            harness.charm.changes,
+            [{'name': 'config-changed', 'data': {'a': True}},
+             {'name': 'config-changed', 'data': {'a': False}}])
+
     def test_set_leader(self):
         harness = Harness(RecordingCharm)
         self.addCleanup(harness.cleanup)
@@ -987,6 +1009,7 @@ class TestHarness(unittest.TestCase):
         self.assertIsInstance(harness.model.config['opt_int'], int)
         self.assertEqual(harness.model.config['opt_float'], 1.0)
         self.assertIsInstance(harness.model.config['opt_float'], float)
+        self.assertFalse('opt_null' in harness.model.config)
         self.assertIsNone(harness._defaults['opt_null'])
         self.assertIsNone(harness._defaults['opt_no_default'])
 
