@@ -13,19 +13,19 @@
 # limitations under the License.
 
 import os
-import unittest
-import tempfile
 import shutil
-
+import tempfile
+import unittest
 from pathlib import Path
 
 from ops.charm import (
     CharmBase,
-    CharmMeta,
     CharmEvents,
+    CharmMeta,
     ContainerMeta,
+    ContainerStorageMeta,
 )
-from ops.framework import Framework, EventSource, EventBase
+from ops.framework import EventBase, EventSource, Framework
 from ops.model import Model, _ModelBackend
 from ops.storage import SQLiteStorage
 
@@ -430,3 +430,51 @@ containers:
         self.assertIsInstance(meta.containers['test2'], ContainerMeta)
         self.assertEqual(meta.containers['test1'].name, 'test1')
         self.assertEqual(meta.containers['test2'].name, 'test2')
+
+    def test_containers_storage(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+storage:
+  data:
+    type: filesystem
+    location: /test/storage
+  other:
+    type: filesystem
+    location: /test/other
+containers:
+  test1:
+    mounts:
+      - storage: data
+        location: /test/storagemount
+      - storage: other
+        location: /test/otherdata
+""")
+        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
+        self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storagemount')
+        self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/otherdata')
+
+    def test_containers_storage_multiple_mounts(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+storage:
+  data:
+    type: filesystem
+    location: /test/storage
+containers:
+  test1:
+    mounts:
+      - storage: data
+        location: /test/storagemount
+      - storage: data
+        location: /test/otherdata
+""")
+        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
+        self.assertEqual(
+            meta.containers['test1'].mounts["data"].locations[0],
+            '/test/storagemount')
+        self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/otherdata')
+
+        with self.assertRaises(RuntimeError):
+            meta.containers["test1"].mounts["data"].location

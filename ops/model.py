@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -296,7 +296,7 @@ class Unit:
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
 
-        if self._is_our_unit:
+        if self._is_our_unit and hasattr(meta, "containers"):
             self._containers = ContainerMapping(meta.containers, backend)
 
     def _invalidate(self):
@@ -1052,6 +1052,7 @@ class Container:
     Attributes:
         name: The name of the container from metadata.yaml (eg, 'postgres').
     """
+
     def __init__(self, name, backend, pebble_client=None):
         self.name = name
 
@@ -1223,7 +1224,10 @@ class Container:
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List['pebble.FileInfo']:
-        """Return list of file information from given path on remote system.
+        """Return list of directory entries from given path on remote system.
+
+        Despite the name, this method returns a list of files *and*
+        directories, similar to :func:`os.listdir` or :func:`os.scandir`.
 
         Args:
             path: Path of the directory to list, or path of the file to return
@@ -1423,7 +1427,7 @@ class _ModelBackend:
                 return None
             if 'option provided but not defined: --app' in str(e):
                 # "--app" was introduced to relation-list in Juju 2.8.1, so
-                # handle previous verions of Juju gracefully
+                # handle previous versions of Juju gracefully
                 return None
             raise
 

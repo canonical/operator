@@ -14,12 +14,12 @@
 
 """Structures to offer storage to the charm (through Juju or locally)."""
 
-from datetime import timedelta
 import pickle
 import shutil
-import subprocess
 import sqlite3
+import subprocess
 import typing
+from datetime import timedelta
 
 import yaml
 

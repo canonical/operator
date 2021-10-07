@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import abc
+import importlib.util
 import io
 import logging
-import logassert
 import os
 import platform
 import shutil
@@ -23,36 +23,37 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import importlib.util
 import warnings
-import yaml
 from pathlib import Path
 from unittest.mock import patch
 
+import logassert
+import yaml
+
 from ops.charm import (
+    ActionEvent,
     CharmBase,
     CharmEvents,
     CharmMeta,
+    CollectMetricsEvent,
+    ConfigChangedEvent,
     HookEvent,
     InstallEvent,
-    StartEvent,
-    ConfigChangedEvent,
-    UpgradeCharmEvent,
-    UpdateStatusEvent,
     LeaderSettingsChangedEvent,
-    RelationJoinedEvent,
+    PebbleReadyEvent,
+    RelationBrokenEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
-    RelationBrokenEvent,
     RelationEvent,
+    RelationJoinedEvent,
+    StartEvent,
     StorageAttachedEvent,
-    ActionEvent,
-    CollectMetricsEvent,
+    UpdateStatusEvent,
+    UpgradeCharmEvent,
     WorkloadEvent,
-    PebbleReadyEvent,
 )
 from ops.framework import Framework, StoredStateData
-from ops.main import main, CHARM_STATE_FILE, _should_use_controller_storage
+from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
 from ops.storage import SQLiteStorage
 from ops.version import version
 
@@ -739,7 +740,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
                     self.assertFalse(hook_path.is_symlink())
                 else:
                     # hooks are not symlinks, and this hook is not one of the initial ones
-                    # check that it's a symlink to the inital ones
+                    # check that it's a symlink to the initial ones
                     self.assertTrue(hook_path.is_symlink())
                     self.assertEqual(os.readlink(str(hook_path)), event_spec.event_name)
 
@@ -785,7 +786,9 @@ class _TestMainWithDispatch(_TestMain):
     has_dispatch = True
 
     def test_setup_event_links(self):
-        """Test auto-creation of symlinks caused by initial events does _not_ happen when using dispatch.
+        """Test auto-creation of symlinks.
+
+        Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
         all_event_hooks = ['hooks/' + e.replace("_", "-")
                            for e in self.charm_module.Charm.on.events().keys()]

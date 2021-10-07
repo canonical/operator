@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +14,14 @@
 
 import os
 import pathlib
-import subprocess
 import shutil
+import subprocess
 import tempfile
 import unittest
 
+from ops.charm import CharmMeta
 from ops.framework import Framework
 from ops.model import Model, _ModelBackend
-from ops.charm import CharmMeta
 from ops.storage import SQLiteStorage
 
 
@@ -110,7 +110,7 @@ class BaseTestCase(unittest.TestCase):
         """Create a Framework object.
 
         By default operate in-memory; pass a temporary directory via the 'tmpdir'
-        parameter if you whish to instantiate several frameworks sharing the
+        parameter if you wish to instantiate several frameworks sharing the
         same dir (e.g. for storing state).
         """
         if tmpdir is None:

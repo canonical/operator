@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Canonical Ltd.
+# Copyright 2019-2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import typing
 
 from ops import model
 from ops._private import yaml
-from ops.framework import Object, EventSource, EventBase, Framework, ObjectEvents
+from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 
 class HookEvent(EventBase):
@@ -118,7 +118,7 @@ class InstallEvent(HookEvent):
 
 
 class StartEvent(HookEvent):
-    """Event triggered immediately after first configuation change.
+    """Event triggered immediately after first configuration change.
 
     This event is triggered immediately after the first
     :class:`ConfigChangedEvent`. Callback methods bound to the event should be
@@ -412,7 +412,7 @@ class RelationBrokenEvent(RelationEvent):
     the charm’s software must be configured as though the relation had never
     existed. It will only be called after every callback method bound to
     :class:`RelationDepartedEvent` has been run. If a callback method
-    bound to this event is being executed, it is gauranteed that no remote units
+    bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
 
@@ -893,7 +893,94 @@ class ContainerMeta:
 
     Attributes:
         name: Name of container (key in the YAML)
+        mounts: :class:`ContainerStorageMeta` mounts available to the container
     """
 
     def __init__(self, name, raw):
         self.name = name
+        self._mounts = {}
+
+        # This is not guaranteed to be populated/is not enforced yet
+        if raw:
+            self._populate_mounts(raw.get('mounts', []))
+
+    @property
+    def mounts(self) -> typing.Dict:
+        """An accessor for the mounts in a container.
+
+        Dict keys match key name in :class:`StorageMeta`
+
+        Example::
+
+            storage:
+              foo:
+                type: filesystem
+                location: /test
+            containers:
+              bar:
+                mounts:
+                  - storage: foo
+                  - location: /test/mount
+        """
+        return self._mounts
+
+    def _populate_mounts(self, mounts: typing.List):
+        """Populate a list of container mountpoints.
+
+        Since Charm Metadata v2 specifies the mounts as a List, do a little data manipulation
+        to convert the values to "friendly" names which contain a list of mountpoints
+        under each key.
+        """
+        for mount in mounts:
+            storage = mount.get("storage", "")
+            mount = mount.get("location", "")
+
+            if not mount:
+                continue
+
+            if storage in self._mounts:
+                self._mounts[storage].add_location(mount)
+            else:
+                self._mounts[storage] = ContainerStorageMeta(storage, mount)
+
+
+class ContainerStorageMeta:
+    """Metadata about storage for an individual container.
+
+    Attributes:
+        storage: a name for the mountpoint, which should exist the keys for :class:`StorageMeta`
+                 for the charm
+        location: the location `storage` is mounted at
+        locations: a list of mountpoints for the key
+
+    If multiple locations are specified for the same storage, such as Kubernetes subPath mounts,
+    `location` will not be an accessible attribute, as it would not be possible to determine
+    which mount point was desired, and `locations` should be iterated over.
+    """
+
+    def __init__(self, storage, location):
+        self.storage = storage
+        self._locations = [location]
+
+    def add_location(self, location):
+        """Add an additional mountpoint to a known storage."""
+        self._locations.append(location)
+
+    @property
+    def locations(self) -> typing.List:
+        """An accessor for the list of locations for a mount."""
+        return self._locations
+
+    def __getattr__(self, name):
+        if name == "location":
+            if len(self._locations) == 1:
+                return self._locations[0]
+            else:
+                raise RuntimeError(
+                    "container has more than one mountpoint with the same backing storage. "
+                    "Request .locations to see a list"
+                )
+        else:
+            raise AttributeError(
+                "{.__class__.__name__} has no such attribute: {}!".format(self, name)
+            )
