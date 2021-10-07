@@ -1268,6 +1268,44 @@ class Container:
         """
         self._pebble.remove_path(path, recursive=recursive)
 
+    def exec(
+        self,
+        command: typing.List[str],
+        *,
+        environment: typing.Dict[str, str] = None,
+        working_dir: str = None,
+        timeout: float = None,
+        user_id: int = None,
+        user: str = None,
+        group_id: int = None,
+        group: str = None,
+        stdin: typing.Union[str, bytes, typing.TextIO, typing.BinaryIO] = None,
+        stdout: typing.Union[typing.TextIO, typing.BinaryIO] = None,
+        stderr: typing.Union[typing.TextIO, typing.BinaryIO] = None,
+        encoding: str = 'utf-8',
+        combine_stderr: bool = False
+    ) -> 'pebble.ExecProcess':
+        """Execute the given command on the remote system.
+
+        See :meth:`ops.pebble.Client.exec` for documentation of the parameters
+        and return value, as well as examples.
+        """
+        return self._pebble.exec(
+            commmand,
+            environment=environment,
+            working_dir=working_dir,
+            timeout=timeout,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            encoding=encoding,
+            combine_stderr=combine_stderr,
+        )
+
 
 class ContainerMapping(Mapping):
     """Map of container names to Container objects.
