@@ -38,6 +38,7 @@ import typing
 import urllib.error
 import urllib.parse
 import urllib.request
+import warnings
 
 from ops._private import yaml
 from ops._vendor import websocket
@@ -806,6 +807,12 @@ class ExecProcess:
         self._cancel_stdin = cancel_stdin
         self._cancel_reader = cancel_reader
         self._threads = threads
+        self._waited = False
+
+    def __del__(self):
+        if not self._waited:
+            msg = 'ExecProcess instance garbage collected without call to wait() or wait_output()'
+            warnings.warn(msg, ResourceWarning, source=self)
 
     def wait(self):
         """Wait for the process to finish.
@@ -821,6 +828,7 @@ class ExecProcess:
             raise ExecError(self._command, exit_code, None, None)
 
     def _wait(self):
+        self._waited = True
         timeout = self._timeout
         if timeout is not None:
             # A bit more than the command timeout to ensure that happens first

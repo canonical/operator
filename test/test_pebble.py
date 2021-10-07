@@ -2068,6 +2068,14 @@ class TestExec(unittest.TestCase):
             self.client.exec(['foo'], stdout=io.StringIO(), stderr=io.StringIO(),
                              combine_stderr=True)
 
+    def test_no_wait_call(self):
+        self.add_responses('123', 0)
+        with self.assertWarns(ResourceWarning) as cm:
+            process = self.client.exec(['true'])
+            del process
+        self.assertEqual(str(cm.warning), 'ExecProcess instance garbage collected '
+                                          + 'without call to wait() or wait_output()')
+
     def test_wait_exit_zero(self):
         self.add_responses('123', 0)
 
