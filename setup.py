@@ -75,6 +75,7 @@ version = {!r}
         ],
         python_requires='>=3.5',
         install_requires=["PyYAML"],
+        package_data={'ops': ['py.typed']},
     )
 
 finally:
