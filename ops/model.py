@@ -38,7 +38,7 @@ from ops.jujuversion import JujuVersion
 
 logger = logging.getLogger(__name__)
 
-MAX_STR_LEN = 131071  # Max length of strings to pass to subshell.
+MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
 
 class Model:
@@ -1590,21 +1590,24 @@ class _ModelBackend:
     def application_version_set(self, version):
         self._run('application-version-set', '--', version)
 
-    def juju_log(self, level, message):
-        # In most cases, simply log.
-        if len(message) <= MAX_STR_LEN:
-            return self._run('juju-log', '--log-level', level, "--", message)
+    @classmethod
+    def log_split(cls, message, max_len=MAX_LOG_LINE_LEN):
+        """Helper to handle log messages that are potentially too long.
 
-        # Handle very long log messages.
-        messages = [
-            "Log string greater than {}. Splitting into multiple chunks: ".format(MAX_STR_LEN)
-        ]
+        This is a generator that splits a message string into multiple chunks if it is too long
+        to safely pass to bash. Will only generate a single entry if the line is not too long.
+        """
+        if len(message) > max_len:
+            yield "Log string greater than {}. Splitting into multiple chunks: ".format(max_len)
+
         while message:
-            messages.append(message[:MAX_STR_LEN])
-            message = message[MAX_STR_LEN:]
+            yield message[:max_len]
+            message = message[max_len:]
 
-        for message in messages:
-            self._run('juju-log', '--log-level', level, "--", message)
+    def juju_log(self, level, message):
+        """Pass a log message on to the juju logger."""
+        for line in self.log_split(message):
+            self._run('juju-log', '--log-level', level, "--", line)
 
     def network_get(self, binding_name, relation_id=None):
         """Return network info provided by network-get for a given binding.
