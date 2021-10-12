@@ -1289,7 +1289,8 @@ ChangeError: cannot perform the following tasks:
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
         try:
             if permissions is not None and not (0 <= permissions <= 0o777):
-                raise pebble.PathError('generic-file-error', None)
+                raise pebble.PathError(
+                    'generic-file-error', 'Permissions not within 0o000 to 0o777')
             self._fs.create_file(
                 path,
                 source,
@@ -1301,8 +1302,9 @@ ChangeError: cannot perform the following tasks:
                 group_id=group_id,
                 group=group,
             )
-        except FileNotFoundError:
-            raise pebble.PathError('not-found', None)
+        except FileNotFoundError as e:
+            raise pebble.PathError(
+                'not-found', 'Parent directory not found: {}'.format(e.args[0]))
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
@@ -1340,7 +1342,8 @@ ChangeError: cannot perform the following tasks:
             self, path: str, *, make_parents: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
         if permissions is not None and not (0 <= permissions <= 0o777):
-            raise pebble.PathError('generic-file-error', None)
+            raise pebble.PathError(
+                'generic-file-error', 'Permissions not within 0o000 to 0o777')
         try:
             self._fs.create_dir(
                 path,
@@ -1348,17 +1351,19 @@ ChangeError: cannot perform the following tasks:
                 permissions=permissions,
                 user_id=user_id, user=user,
                 group_id=group_id, group=group)
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             # Parent directory doesn't exist and make_parents is False
-            raise pebble.PathError('not-found', None)
-        except NotADirectoryError:
+            raise pebble.PathError(
+                'not-found', 'Parent directory not found: {}'.format(e.args[0]))
+        except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
-            raise pebble.PathError('generic-file-error', None)
+            raise pebble.PathError('generic-file-error', 'Not a directory: {}'.format(e.args[0]))
 
     def remove_path(self, path: str, *, recursive: bool = False):
         file_or_dir = self._fs[path]
         if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
-            raise pebble.PathError('generic-file-error', None)
+            raise pebble.PathError(
+                'generic-file-error', 'Cannot remove non-empty directory without recursive=True')
         del self._fs[path]
 
 
@@ -1435,7 +1440,8 @@ class _MockFilesystem:
             else:
                 raise
         if not isinstance(dir_, _Directory):
-            raise pebble.PathError('generic-file-error', None)
+            raise pebble.PathError(
+                'generic-file-error', 'Parent is not a directory: {}'.format(str(dir_)))
         return dir_.create_file(
             path.name,
             data,
