@@ -15,12 +15,16 @@
 """Infrastructure to build unittests for Charms using the Operator Framework."""
 
 import datetime
+import fnmatch
 import inspect
+import os
 import pathlib
 import random
 import tempfile
 import typing
 from contextlib import contextmanager
+from io import BytesIO, StringIO
+from pathlib import Path
 from textwrap import dedent
 
 from ops import charm, framework, model, pebble, storage
@@ -1091,6 +1095,7 @@ class _TestingPebbleClient:
         self._layers = {}
         # Has a service been started/stopped?
         self._service_status = {}
+        self._fs = _MockFilesystem()
 
     def get_system_info(self) -> pebble.SystemInfo:
         return pebble.SystemInfo(version="1.0.0")
@@ -1276,22 +1281,362 @@ ChangeError: cannot perform the following tasks:
 
     def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
                                                                           typing.TextIO]:
-        raise NotImplementedError(self.pull)
+        return self._fs.open(path, encoding=encoding)
 
     def push(
             self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
-        raise NotImplementedError(self.push)
+        try:
+            if permissions is not None and not (0 <= permissions <= 0o777):
+                raise pebble.PathError('generic-file-error', None)
+            self._fs.create_file(
+                path,
+                source,
+                encoding=encoding,
+                make_dirs=make_dirs,
+                permissions=permissions,
+                user_id=user_id,
+                user=user,
+                group_id=group_id,
+                group=group,
+            )
+        except FileNotFoundError:
+            raise pebble.PathError('not-found', None)
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
-        raise NotImplementedError(self.list_files)
+        files = [self._fs[path]]
+        if not itself:
+            try:
+                files = self._fs.list_dir(path)
+            except NotADirectoryError:
+                pass
+
+        if pattern is not None:
+            files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
+
+        type_mappings = {
+            _File: pebble.FileType.FILE,
+            _Directory: pebble.FileType.DIRECTORY,
+        }
+        return [
+            pebble.FileInfo(
+                str(file.path),
+                file.path.name,
+                type_mappings.get(type(file)),
+                file.size if isinstance(file, _File) else None,
+                file.permissions,
+                None,   # Note: this is a type annoation violation
+                file.user_id,
+                file.user,
+                file.group_id,
+                file.group,
+            )
+            for file in files
+        ]
 
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
-        raise NotImplementedError(self.make_dir)
+        if permissions is not None and not (0 <= permissions <= 0o777):
+            raise pebble.PathError('generic-file-error', None)
+        try:
+            self._fs.create_dir(
+                path,
+                make_parents=make_parents,
+                permissions=permissions,
+                user_id=user_id, user=user,
+                group_id=group_id, group=group)
+        except FileNotFoundError:
+            # Parent directory doesn't exist and make_parents is False
+            raise pebble.PathError('not-found', None)
+        except NotADirectoryError:
+            # Attempted to create a subdirectory of a file
+            raise pebble.PathError('generic-file-error', None)
 
     def remove_path(self, path: str, *, recursive: bool = False):
-        raise NotImplementedError(self.remove_path)
+        file_or_dir = self._fs[path]
+        if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
+            raise pebble.PathError('generic-file-error', None)
+        del self._fs[path]
+
+
+class _MockFilesystem:
+
+    def __init__(self):
+        self.root = _Directory(Path('/'))
+
+    def create_dir(
+            self,
+            path: str,
+            make_parents: bool = False,
+            permissions: typing.Optional[int] = None,
+            user_id: typing.Optional[int] = None,
+            user: typing.Optional[str] = None,
+            group_id: typing.Optional[int] = None,
+            group: typing.Optional[str] = None,
+    ) -> '_Directory':
+        if not path.startswith('/'):
+            raise ValueError('Path must start with slash')
+        current_dir = self.root
+        tokens = Path(path).parts[1:]
+        for token in tokens[:-1]:
+            if token in current_dir:
+                current_dir = current_dir[token]
+            else:
+                if make_parents:
+                    # NOTE: Ownership/permissions only get applied to the final directory.
+                    # (At the time of writing, Pebble defaults to 0o755 permissions and root:root
+                    # ownership.)
+                    current_dir = current_dir.create_dir(token)
+                else:
+                    raise FileNotFoundError(str(current_dir.path / token))
+            if isinstance(current_dir, _File):
+                raise NotADirectoryError(str(current_dir.path))
+
+        # Current backend will always raise an error if the final directory component
+        # already exists.
+        token = tokens[-1]
+        if token not in current_dir:
+            current_dir = current_dir.create_dir(
+                token,
+                permissions=permissions,
+                user_id=user_id,
+                user=user,
+                group_id=group_id,
+                group=group)
+        else:
+            raise FileExistsError(str(current_dir.path / token))
+        return current_dir
+
+    def create_file(
+            self,
+            path: typing.Union[str, Path],
+            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
+            encoding: typing.Optional[str] = 'utf-8',
+            make_dirs: bool = False,
+            permissions: typing.Optional[int] = None,
+            user_id: typing.Optional[int] = None,
+            user: typing.Optional[str] = None,
+            group_id: typing.Optional[int] = None,
+            group: typing.Optional[str] = None,
+    ) -> '_File':
+        path = Path(path)
+        try:
+            dir_ = self[path.parent]
+        except FileNotFoundError:
+            if make_dirs:
+                dir_ = self.create_dir(str(path.parent))
+                # NOTE: Ownership/permissions only get applied to the final directory.
+                # (At the time of writing, Pebble defaults to the specified permissions and
+                # root:root ownership, which is inconsistent with the push function's
+                # behavior for parent directories.)
+            else:
+                raise
+        if not isinstance(dir_, _Directory):
+            raise pebble.PathError('generic-file-error', None)
+        return dir_.create_file(
+            path.name,
+            data,
+            encoding=encoding,
+            permissions=permissions,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group)
+
+    def list_dir(self, path) -> typing.List['_File']:
+        current_dir = self.root
+        tokens = Path(path).parts[1:]
+        for token in tokens:
+            try:
+                current_dir = current_dir[token]
+            except KeyError:
+                raise FileNotFoundError(str(current_dir.path / token))
+            if isinstance(current_dir, _File):
+                raise NotADirectoryError(str(current_dir.path))
+            if not isinstance(current_dir, _Directory):
+                # For now, ignoring other possible cases besides File and Directory (e.g. Symlink).
+                raise NotImplementedError()
+
+        return [child for child in current_dir]
+
+    def open(
+            self,
+            path: typing.Union[str, Path],
+            encoding: typing.Optional[str] = 'utf-8',
+    ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
+        path = Path(path)
+        file = self[path]  # warning: no check re: directories
+        if isinstance(file, _Directory):
+            raise IsADirectoryError(str(file.path))
+        return file.open(encoding=encoding)
+
+    def __getitem__(self, path: typing.Union[str, Path]) \
+            -> typing.Union['_Directory', '_File']:
+        path = Path(path)
+        tokens = path.parts[1:]
+        current_object = self.root
+        for token in tokens:
+            # ASSUMPTION / TESTME: object might be file
+            if token in current_object:
+                current_object = current_object[token]
+            else:
+                raise FileNotFoundError(str(current_object.path / token))
+        return current_object
+
+    def __delitem__(self, path: typing.Union[str, Path]) -> None:
+        path = Path(path)
+        parent_dir: _Directory = self[path.parent]
+        del parent_dir[path.name]
+
+
+class _Directory:
+    def __init__(
+            self,
+            path: Path,
+            permissions: typing.Optional[int] = None,
+            user_id: typing.Optional[int] = None,
+            user: typing.Optional[str] = None,
+            group_id: typing.Optional[int] = None,
+            group: typing.Optional[str] = None):
+        self.path = path
+        self._children: typing.Dict[str, typing.Union[_Directory, _File]] = {}
+        self.permissions = permissions
+        self.user = user
+        self.user_id = user_id
+        self.group = group
+        self.group_id = group_id
+
+    @property
+    def name(self) -> str:
+        return self.path.name
+
+    def __contains__(self, child: str) -> bool:
+        return child in self._children
+
+    def __iter__(self) -> typing.Iterator[typing.Union['_File', '_Directory']]:
+        return (value for value in self._children.values())
+
+    def __getitem__(self, key: str) -> typing.Union['_File', '_Directory']:
+        return self._children[key]
+
+    def __delitem__(self, key: str) -> None:
+        try:
+            del self._children[key]
+        except KeyError:
+            raise FileNotFoundError(str(self.path / key))
+
+    def __len__(self):
+        return len(self._children)
+
+    def create_dir(
+            self,
+            name: str,
+            permissions: typing.Optional[int] = None,
+            user_id: typing.Optional[int] = None,
+            user: typing.Optional[str] = None,
+            group_id: typing.Optional[int] = None,
+            group: typing.Optional[str] = None,
+    ) -> '_Directory':
+        self._children[name] = _Directory(
+            self.path / name,
+            permissions=permissions,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group)
+        return self._children[name]
+
+    def create_file(
+            self,
+            name: str,
+            data: typing.Union[bytes, str, StringIO, BytesIO],
+            encoding: typing.Optional[str] = 'utf-8',
+            permissions: typing.Optional[int] = None,
+            user_id: typing.Optional[int] = None,
+            user: typing.Optional[str] = None,
+            group_id: typing.Optional[int] = None,
+            group: typing.Optional[str] = None,
+    ) -> '_File':
+        self._children[name] = _File(
+            self.path / name,
+            data,
+            encoding=encoding,
+            permissions=permissions,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group)
+        return self._children[name]
+
+
+class _File:
+    READ_BLOCK_SIZE = 102400
+
+    def __init__(
+            self,
+            path: Path,
+            data: typing.Union[str, bytes, StringIO, BytesIO],
+            encoding: typing.Optional[str] = 'utf-8',
+            permissions: typing.Optional[int] = None,
+            user_id: typing.Optional[int] = None,
+            user: typing.Optional[str] = None,
+            group_id: typing.Optional[int] = None,
+            group: typing.Optional[str] = None):
+        if isinstance(data, (StringIO, BytesIO)):
+            data, data_size = self._get_data_from_filelike_object(data, encoding)
+        else:
+            data, data_size = self._get_data_from_str_or_bytes(data, encoding)
+        self.path = path
+        self.data = data
+        self.permissions = permissions
+        self.user = user
+        self.user_id = user_id
+        self.group = group
+        self.group_id = group_id
+        self.size = data_size
+
+    @property
+    def name(self) -> str:
+        return self.path.name
+
+    def _get_data_from_filelike_object(self, source, encoding):
+        total_read = 0
+        temp = tempfile.NamedTemporaryFile(delete=False)
+        with temp:
+            while True:
+                block = source.read(_File.READ_BLOCK_SIZE)
+                if len(block) == 0:
+                    break
+                if isinstance(block, str):
+                    block = block.encode(encoding)
+                total_read += len(block)
+                temp.write(block)
+        data = temp
+        return data, total_read
+
+    def _get_data_from_str_or_bytes(self, data, encoding):
+        if isinstance(data, str):
+            if encoding is not None:
+                data = data.encode(encoding)
+            else:
+                # We explicitly passed encoding=None, yet data is bytes?  This seems wrong.
+                raise NotImplementedError()
+        data_size = len(data)
+        tf = tempfile.NamedTemporaryFile(delete=False)
+        with tf:
+            tf.write(data)
+        data = tf
+        return data, data_size
+
+    def open(
+            self,
+            encoding: typing.Optional[str] = 'utf-8',
+    ) -> typing.Union[typing.TextIO, typing.BinaryIO]:
+        mode = 'r' if encoding is not None else 'rb'
+        return open(self.data.name, mode, encoding=encoding)
+
+    def __del__(self, unlink=os.unlink) -> None:
+        unlink(self.data.name)

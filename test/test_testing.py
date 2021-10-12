@@ -14,12 +14,14 @@
 
 import importlib
 import inspect
+import io
 import pathlib
 import shutil
 import sys
 import tempfile
 import textwrap
 import unittest
+from io import BytesIO, StringIO
 
 import yaml
 
@@ -36,7 +38,7 @@ from ops.model import (
     UnknownStatus,
     _ModelBackend,
 )
-from ops.testing import Harness, _TestingPebbleClient
+from ops.testing import Harness, _Directory, _MockFilesystem, _TestingPebbleClient
 
 
 class TestHarness(unittest.TestCase):
@@ -2599,3 +2601,458 @@ services:
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+
+    # Push/pull bytes
+    def test_push_and_pull_bytes(self):
+        original_data = b"\x00\x01\x02\x03\x04"
+        encoding = None
+        stream_class = io.BytesIO
+        self._test_push_and_pull_data(original_data, encoding, stream_class)
+
+    # Push/pull encoded data
+    def test_push_and_pull_non_utf8_data(self):
+        original_data = '日本語'  # "Japanese" in Japanese
+        encoding = 'sjis'
+        stream_class = io.StringIO
+        self._test_push_and_pull_data(original_data, encoding, stream_class)
+
+    def _test_push_and_pull_data(self, original_data, encoding, stream_class):
+        client = self.get_testing_client()
+        client.push('/test', original_data, encoding=encoding)
+        with client.pull('/test', encoding=encoding) as infile:
+            received_data = infile.read()
+        self.assertEqual(original_data, received_data)
+
+        # We also support file-like objects as input, so let's test that case as well.
+        small_file = stream_class(original_data)
+        client.push('/test', small_file, encoding=encoding)
+        with client.pull('/test', encoding=encoding) as infile:
+            received_data = infile.read()
+        self.assertEqual(original_data, received_data)
+
+    # Push to non-existant subdir, make_dirs=True: succeeds
+    # Push to non-existant subdir, make_dirs=False: error
+    def test_push_to_non_existant_subdir(self):
+        data = 'data'
+        client = self.get_testing_client()
+
+        with self.assertRaises(pebble.PathError) as cm:
+            client.push('/nonexistant_dir/test', data, make_dirs=False)
+        self.assertEqual(cm.exception.args[0], 'not-found')
+
+        client.push('/nonexistant_dir/test', data, make_dirs=True)
+
+    # Push to child of file: error
+    def test_push_as_child_of_file_raises_error(self):
+        data = 'data'
+        client = self.get_testing_client()
+        client.push('/file', data)
+        with self.assertRaises(pebble.PathError) as cm:
+            client.push('/file/file', data)
+        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+
+    # Push with permission between 0 and 0o777: succeeds
+    # Push with invalid permission (not between 0 and 0o777): error
+    def test_push_with_permission_mask(self):
+        data = 'data'
+        client = self.get_testing_client()
+        client.push('/file', data, permissions=0o000)
+        client.push('/file', data, permissions=0o777)
+        # If permissions are outside of the range 0o000 through 0o777, an exception should be
+        # raised.
+        for bad_permission in (
+            0o1000,  # Exceeds 0o777
+            -1,      # Less than 0o000
+        ):
+            with self.assertRaises(pebble.PathError) as cm:
+                client.push('/file', data, permissions=bad_permission)
+        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+
+    def test_push_ownership(self):
+        # Note: To simplify implementation, ownership is simply stored as-is with no verification.
+        data = 'data'
+        client = self.get_testing_client()
+        client.push('/file', data, user_id=1, user='foo', group_id=3, group='bar')
+        file_ = client.list_files('/file')[0]
+        self.assertEqual(file_.user_id, 1)
+        self.assertEqual(file_.user, 'foo')
+        self.assertEqual(file_.group_id, 3)
+        self.assertEqual(file_.group, 'bar')
+
+    # List directory, itself=False: Return list of child files/dirs
+    def test_push_files_and_list(self):
+        data = 'data'
+        client = self.get_testing_client()
+
+        # Let's push the first file with a bunch of details.  We'll check on this later.
+        client.push(
+            '/file1', data,
+            permissions=0o123,
+            user_id=1, user='foo', group_id=3, group='bar')
+
+        # Do a quick push with defaults for the other files.
+        client.push('/file2', data)
+        client.push('/file3', data)
+
+        files = client.list_files('/')
+        self.assertEqual({file.path for file in files}, {'/file1', '/file2', '/file3'})
+
+        # Let's pull the first file again and check its details
+        file = [f for f in files if f.path == '/file1'][0]
+        self.assertEqual(file.name, 'file1')
+        self.assertEqual(file.type, pebble.FileType.FILE)
+        self.assertEqual(file.size, 4)
+        self.assertEqual(file.permissions, 0o123)
+        self.assertEqual(file.last_modified, None)
+        self.assertEqual(file.user_id, 1)
+        self.assertEqual(file.user, 'foo')
+        self.assertEqual(file.group_id, 3)
+        self.assertEqual(file.group, 'bar')
+
+    # List file: Return single item list with file object
+    def test_push_and_list_file(self):
+        data = 'data'
+        client = self.get_testing_client()
+        client.push('/file', data)
+        files = client.list_files('/')
+        self.assertEqual({file.path for file in files}, {'/file'})
+
+    # List directory, itself=True: Return single item list with directory object
+    def test_list_directory_object_itself(self):
+        client = self.get_testing_client()
+
+        # Test with root dir
+        files = client.list_files('/', itself=True)
+        self.assertEqual(len(files), 1)
+        dir_: pebble.FileInfo = files[0]
+        self.assertEqual(dir_.path, '/')
+        self.assertEqual(dir_.name, '')
+        self.assertEqual(dir_.type, pebble.FileType.DIRECTORY)
+
+        # Test with subdirs
+        client.make_dir('/subdir')
+        files = client.list_files('/subdir', itself=True)
+        self.assertEqual(len(files), 1)
+        dir_ = files[0]
+        self.assertEqual(dir_.name, 'subdir')
+        self.assertEqual(dir_.type, pebble.FileType.DIRECTORY)
+
+    # List directory, itself=False, pattern specified: works like glob.
+    #   (Deltas between golang and Python exist, but test simple stuff.)
+    def test_push_files_and_list_by_pattern(self):
+        data = 'data'
+        client = self.get_testing_client()
+        for filename in (
+            '/file1.gz',
+            '/file2.tar.gz',
+            '/file3.tar.bz2',
+            '/backup_file.gz',
+        ):
+            client.push(filename, data)
+        files = client.list_files('/', pattern='file*.gz')
+        self.assertEqual({file.path for file in files}, {'/file1.gz', '/file2.tar.gz'})
+
+    # Make directory with existing parent: succeeds
+    def test_make_directory(self):
+        client = self.get_testing_client()
+        client.make_dir('/subdir')
+        self.assertEqual(client.list_files('/', pattern='subdir')[0].path, '/subdir')
+        client.make_dir('/subdir/subdir')
+        self.assertEqual(client.list_files('/subdir', pattern='subdir')[0].path, '/subdir/subdir')
+
+    # Make directory with non-existing parent: make_parents=True: succeeds
+    # Make directory with non-existing parent: make_parents=False: error
+    def test_make_directory_recursively(self):
+        client = self.get_testing_client()
+
+        with self.assertRaises(pebble.PathError) as cm:
+            client.make_dir('/subdir/subdir', make_parents=False)
+        self.assertEqual(cm.exception.args[0], 'not-found')
+
+        client.make_dir('/subdir/subdir', make_parents=True)
+        self.assertEqual(client.list_files('/subdir', pattern='subdir')[0].path, '/subdir/subdir')
+
+    # Make directory with file as parent: error
+    # Make directory, make_dirs=True, with closest existing ancestor as file: error
+    def test_make_subdir_of_file_fails(self):
+        client = self.get_testing_client()
+        client.push('/file', 'data')
+
+        # Direct child case
+        with self.assertRaises(pebble.PathError) as cm:
+            client.make_dir('/file/subdir')
+        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+
+        # Recursive creation case, in case its flow is different
+        with self.assertRaises(pebble.PathError) as cm:
+            client.make_dir('/file/subdir/subdir', make_parents=True)
+        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+
+    # Make directory with permission between 0 and 0o777: succeeds
+    # Make directory with invalid permission (not between 0 and 0o777): error
+    def test_make_dir_with_permission_mask(self):
+        client = self.get_testing_client()
+        client.make_dir('/dir1', permissions=0o000)
+        client.make_dir('/dir2', permissions=0o777)
+
+        files = client.list_files('/', pattern='dir*')
+        self.assertEqual([f for f in files if f.path == '/dir1'][0].permissions, 0o000)
+        self.assertEqual([f for f in files if f.path == '/dir2'][0].permissions, 0o777)
+
+        # If permissions are outside of the range 0o000 through 0o777, an exception should be
+        # raised.
+        for i, bad_permission in enumerate((
+            0o1000,  # Exceeds 0o777
+            -1,      # Less than 0o000
+        )):
+            with self.assertRaises(pebble.PathError) as cm:
+                client.make_dir('/dir3_{}'.format(i), permissions=bad_permission)
+            self.assertEqual(cm.exception.args[0], 'generic-file-error')
+
+    # Make directory with ownership parameters: succeeds, stored as-is.
+    def test_make_dir_with_ownership(self):
+        client = self.get_testing_client()
+        client.make_dir('/dir1', user_id=1, user="foo", group_id=3, group="bar")
+        dir_ = client.list_files('/dir1', itself=True)[0]
+        self.assertEqual(dir_.user_id, 1)
+        self.assertEqual(dir_.user, "foo")
+        self.assertEqual(dir_.group_id, 3)
+        self.assertEqual(dir_.group, "bar")
+
+    def test_remove_path(self):
+        client = self.get_testing_client()
+        client.push('/file', '')
+        client.make_dir('/dir/subdir', make_parents=True)
+        client.push('/dir/subdir/file1', '')
+        client.push('/dir/subdir/file2', '')
+        client.push('/dir/subdir/file3', '')
+        client.make_dir('/empty_dir')
+
+        client.remove_path('/file')
+
+        client.remove_path('/empty_dir')
+
+        # Remove non-empty directory, recursive=False: error
+        with self.assertRaises(pebble.PathError) as cm:
+            client.remove_path('/dir', recursive=False)
+        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+
+        # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
+        client.remove_path('/dir', recursive=True)
+
+        # Deliberately ignoring a few cases right now, as the behavior for these may
+        # change based upon discussions:
+        # * Removing non-existant path, recursive=False: currently does error
+        # * Removing non-existant path, recursive=True: currently does not error
+
+    # Other notes:
+    # * Parent directories created via push(make_dirs=True) default to root:root ownership
+    #   and whatever permissions are specified via the permissions argument; as we default to None
+    #   for ownership/permissions, we do ignore this nuance.
+    # * Parent directories created via make_dir(make_parents=True) default to root:root ownership
+    #   and 0o755 permissions; as we default to None for ownership/permissions, we do ignore this
+    #   nuance.
+
+
+class TestMockFilesystem(unittest.TestCase):
+    def setUp(self):
+        self.fs = _MockFilesystem()
+
+    def test_listdir_root_on_empty_os(self):
+        self.assertEqual(self.fs.list_dir('/'), [])
+
+    def test_listdir_on_nonexistant_dir(self):
+        with self.assertRaises(FileNotFoundError) as cm:
+            self.fs.list_dir('/etc')
+        self.assertEqual(cm.exception.args[0], '/etc')
+
+    def test_listdir(self):
+        self.fs.create_dir('/opt')
+        self.fs.create_file('/opt/file1', 'data')
+        self.fs.create_file('/opt/file2', 'data')
+        expected_results = {pathlib.Path('/opt/file1'), pathlib.Path('/opt/file2')}
+        self.assertEqual(expected_results, {f.path for f in self.fs.list_dir('/opt')})
+        # Ensure that Paths also work for listdir
+        self.assertEqual(
+            expected_results, {f.path for f in self.fs.list_dir(pathlib.Path('/opt'))})
+
+    def test_listdir_on_file(self):
+        self.fs.create_file('/file', 'data')
+        with self.assertRaises(NotADirectoryError) as cm:
+            self.fs.list_dir('/file')
+        self.assertEqual(cm.exception.args[0], '/file')
+
+    def test_makedir(self):
+        d = self.fs.create_dir('/etc')
+        self.assertEqual(d.name, 'etc')
+        self.assertEqual(d.path, pathlib.Path('/etc'))
+        d2 = self.fs.create_dir('/etc/init.d')
+        self.assertEqual(d2.name, 'init.d')
+        self.assertEqual(d2.path, pathlib.Path('/etc/init.d'))
+
+    def test_makedir_fails_if_already_exists(self):
+        self.fs.create_dir('/etc')
+        with self.assertRaises(FileExistsError) as cm:
+            self.fs.create_dir('/etc')
+        self.assertEqual(cm.exception.args[0], '/etc')
+
+    def test_makedir_fails_if_parent_dir_doesnt_exist(self):
+        with self.assertRaises(FileNotFoundError) as cm:
+            self.fs.create_dir('/etc/init.d')
+        self.assertEqual(cm.exception.args[0], '/etc')
+
+    def test_make_and_list_directory(self):
+        self.fs.create_dir('/etc')
+        self.fs.create_dir('/var')
+        self.assertEqual(
+            {f.path for f in self.fs.list_dir('/')},
+            {pathlib.Path('/etc'), pathlib.Path('/var')})
+
+    def test_make_directory_recursively(self):
+        self.fs.create_dir('/etc/init.d', make_parents=True)
+        self.assertEqual([str(o.path) for o in self.fs.list_dir('/')], ['/etc'])
+        self.assertEqual([str(o.path) for o in self.fs.list_dir('/etc')], ['/etc/init.d'])
+
+    def test_makedir_path_must_start_with_slash(self):
+        with self.assertRaises(ValueError) as cm:
+            self.fs.create_dir("noslash")
+        self.assertEqual(cm.exception.args[0], "Path must start with slash")
+
+    def test_create_file_from_str(self):
+        self.fs.create_file('/test', "foo")
+        with self.fs.open('/test') as infile:
+            self.assertEqual(infile.read(), 'foo')
+
+    def test_create_file_from_bytes(self):
+        self.fs.create_file('/test', b"foo")
+        with self.fs.open('/test', encoding=None) as infile:
+            self.assertEqual(infile.read(), b'foo')
+
+    def test_create_file_from_files(self):
+        data = "foo"
+
+        sio = StringIO(data)
+        self.fs.create_file('/test', sio)
+        with self.fs.open('/test') as infile:
+            self.assertEqual(infile.read(), 'foo')
+
+        bio = BytesIO(data.encode())
+        self.fs.create_file('/test2', bio)
+        with self.fs.open('/test2') as infile:
+            self.assertEqual(infile.read(), 'foo')
+
+    def test_create_and_read_large_file(self):
+        # Create somewhat non-trivial data
+        # (32 distinct printable ASCII characters, repeated 2**15 times,
+        # 1 MiB of total data)
+        data = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345" * (2**15)
+
+        # Test via blob
+        self.fs.create_file('/test', data)
+        file = self.fs['/test']
+        self.assertTrue(hasattr(file.data, 'name'))  # not present on str/bytes
+        with self.fs.open('/test') as infile:
+            self.assertEqual(infile.read(), data)
+
+        # Test via file-like object
+        self.fs.create_file('/test2', StringIO(data))
+        file = self.fs['/test2']
+        self.assertTrue(hasattr(file.data, 'name'))  # not present on str/bytes
+        with self.fs.open('/test2') as infile:
+            self.assertEqual(infile.read(), data)
+
+    def test_create_and_read_with_different_encodings(self):
+        # write str, read as utf-8 bytes
+        self.fs.create_file('/test', "foo")
+        with self.fs.open('/test', encoding=None) as infile:
+            self.assertEqual(infile.read(), b'foo')
+
+        # write bytes, read as utf-8-decoded str
+        data = "日本語"  # Japanese for "Japanese"
+        self.fs.create_file('/test2', data.encode('utf-8'))
+        with self.fs.open('/test2') as infile:                    # Implicit utf-8 read
+            self.assertEqual(infile.read(), data)
+        with self.fs.open('/test2', encoding='utf-8') as infile:  # Explicit utf-8 read
+            self.assertEqual(infile.read(), data)
+
+    def test_open_directory_fails(self):
+        self.fs.create_dir('/dir1')
+        with self.assertRaises(IsADirectoryError) as cm:
+            self.fs.open('/dir1')
+        self.assertEqual(cm.exception.args[0], '/dir1')
+
+    def test_delete_file(self):
+        self.fs.create_file(pathlib.Path('/test'), "foo")
+        del self.fs[pathlib.Path('/test')]
+        with self.assertRaises(FileNotFoundError) as cm:
+            self.fs[pathlib.Path('/test')]
+
+        # Deleting deleted files should fail as well
+        with self.assertRaises(FileNotFoundError) as cm:
+            del self.fs[pathlib.Path('/test')]
+        self.assertEqual(cm.exception.args[0], '/test')
+
+    def test_create_dir_with_permissions(self):
+        # Permissions are simply stored if provided.  No defaults are provided.
+        d = self.fs.create_dir('/dir1')
+        self.assertEqual(d.permissions, None)
+
+        d = self.fs.create_dir('/dir2', permissions=0o700)
+        self.assertEqual(d.permissions, 0o700)
+
+    def test_create_file_with_permissions(self):
+        # Permissions are simply stored if provided.  No defaults are provided.
+        d = self.fs.create_file('/file1', 'data')
+        self.assertEqual(d.permissions, None)
+
+        d = self.fs.create_file('/file2', 'data', permissions=0o754)
+        self.assertEqual(d.permissions, 0o754)
+
+    def test_create_dir_with_ownership(self):
+        d = self.fs.create_dir('/dir1')
+        self.assertIs(d.user, None)
+        self.assertIs(d.user_id, None)
+        self.assertIs(d.group, None)
+        self.assertIs(d.group_id, None)
+
+        d = self.fs.create_dir('/dir2', user='ubuntu', user_id=1000, group='www-data', group_id=33)
+        self.assertEqual(d.user, 'ubuntu')
+        self.assertEqual(d.user_id, 1000)
+        self.assertEqual(d.group, 'www-data')
+        self.assertEqual(d.group_id, 33)
+
+    def test_create_file_with_ownership(self):
+        f = self.fs.create_file('/file1', 'data')
+        self.assertIs(f.user, None)
+        self.assertIs(f.user_id, None)
+        self.assertIs(f.group, None)
+        self.assertIs(f.group_id, None)
+
+        f = self.fs.create_file('/file2', 'data',
+                                user='ubuntu', user_id=1000,
+                                group='www-data', group_id=33)
+        self.assertEqual(f.user, 'ubuntu')
+        self.assertEqual(f.user_id, 1000)
+        self.assertEqual(f.group, 'www-data')
+        self.assertEqual(f.group_id, 33)
+
+    def test_getattr(self):
+        self.fs.create_dir('/etc/init.d', make_parents=True)
+
+        # By path
+        o = self.fs[pathlib.Path('/etc/init.d')]
+        self.assertIsInstance(o, _Directory)
+        self.assertEqual(o.path, pathlib.Path('/etc/init.d'))
+
+        # By str
+        o = self.fs['/etc/init.d']
+        self.assertIsInstance(o, _Directory)
+        self.assertEqual(o.path, pathlib.Path('/etc/init.d'))
+
+    def test_getattr_file_not_found(self):
+        # Arguably this could be a KeyError given the dictionary-style access.
+        # However, FileNotFoundError seems more appropriate for a filesystem, and it
+        # gives a closer semantic feeling, in my opinion.
+        with self.assertRaises(FileNotFoundError) as cm:
+            self.fs['/nonexistant_file']
+        self.assertEqual(cm.exception.args[0], '/nonexistant_file')
