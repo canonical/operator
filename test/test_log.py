@@ -15,10 +15,10 @@
 # limitations under the License.
 
 import io
+import logging
 import unittest
 from unittest.mock import patch
 
-import logging
 import ops.log
 
 

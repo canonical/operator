@@ -20,29 +20,23 @@ import sys
 import tempfile
 import textwrap
 import unittest
+
 import yaml
 
 from ops import pebble
-from ops.charm import (
-    CharmBase,
-    RelationEvent,
-    PebbleReadyEvent,
-)
-from ops.framework import (
-    Object,
-)
+from ops.charm import CharmBase, PebbleReadyEvent, RelationEvent
+from ops.framework import Object
 from ops.model import (
     ActiveStatus,
+    Application,
     MaintenanceStatus,
-    UnknownStatus,
     ModelError,
     RelationNotFoundError,
+    Unit,
+    UnknownStatus,
     _ModelBackend,
 )
-from ops.testing import (
-    Harness,
-    _TestingPebbleClient,
-)
+from ops.testing import Harness, _TestingPebbleClient
 
 
 class TestHarness(unittest.TestCase):
@@ -316,7 +310,7 @@ class TestHarness(unittest.TestCase):
         harness.charm.get_changes(reset=True)  # created event ignored
         # Check exception is raised if relation id is invalid
         with self.assertRaises(RelationNotFoundError):
-            harness.remove_relation(rel_id+1)
+            harness.remove_relation(rel_id + 1)
 
     def test_remove_relation_unit(self):
         harness = Harness(RelationEventCharm, meta='''
@@ -376,6 +370,38 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_ids('db'), [])
         self.assertRaises(RelationNotFoundError, backend.relation_get,
                           rel_id, remote_app, is_app=True)
+
+    def test_removing_relation_refreshes_charm_model(self):
+        # language=YAML
+        harness = Harness(RelationEventCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('db')
+        # Add a relation and update app data
+        remote_app = 'postgresql'
+        rel_id = harness.add_relation('db', remote_app)
+        harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
+        self.assertIsInstance(rel_id, int)
+        self.assertIsNotNone(self._find_relation_in_model_by_id(harness, rel_id))
+
+        # Check relation app data exists
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_app, is_app=True))
+        harness.remove_relation(rel_id)
+        self.assertIsNone(self._find_relation_in_model_by_id(harness, rel_id))
+
+    def _find_relation_in_model_by_id(self, harness, rel_id):
+        for relations in harness.charm.model.relations.values():
+            for relation in relations:
+                if rel_id == relation.id:
+                    return relation
+        return None
 
     def test_removing_relation_unit_removes_data_also(self):
         harness = Harness(RelationEventCharm, meta='''
@@ -516,12 +542,13 @@ class TestHarness(unittest.TestCase):
               }}])
 
     def test_get_relation_data(self):
-        harness = Harness(CharmBase, meta='''
+        charm_meta = '''
             name: test-app
             requires:
                 db:
                     interface: pgsql
-            ''')
+        '''
+        harness = Harness(CharmBase, meta=charm_meta)
         self.addCleanup(harness.cleanup)
         rel_id = harness.add_relation('db', 'postgresql')
         harness.update_relation_data(rel_id, 'postgresql', {'remote': 'data'})
@@ -532,6 +559,16 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(KeyError):
             # unknown relation id
             harness.get_relation_data(99, 'postgresql')
+
+        meta = yaml.safe_load(charm_meta)
+        t_app = Application('test-app', meta, harness._backend, None)
+        t_unit0 = Unit('test-app/0', meta, harness._backend, {Application: t_app})
+        t_unit1 = Unit('test-app/1', meta, harness._backend, {Application: t_app})
+        self.assertEqual(harness.get_relation_data(rel_id, t_app), {})
+        self.assertEqual(harness.get_relation_data(rel_id, t_unit0), {})
+        self.assertEqual(harness.get_relation_data(rel_id, t_unit1), None)
+        pg_app = Application('postgresql', meta, harness._backend, None)
+        self.assertEqual(harness.get_relation_data(rel_id, pg_app), {'remote': 'data'})
 
     def test_create_harness_twice(self):
         metadata = '''
@@ -962,6 +999,21 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.model.name, 'foo')
         self.assertEqual(harness.model.uuid, '96957e90-e006-11eb-ba80-0242ac130004')
 
+    def test_storage_add(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        stor_id = harness.add_storage("test")
+        self.assertIsNotNone(stor_id)
+
+        self.assertIn(str(stor_id), harness._backend.storage_list("test"))
+        self.assertEqual("/test0", harness._backend.storage_get("test/0", "location"))
+
     def test_actions_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(tmp))
@@ -979,7 +1031,7 @@ class TestHarness(unittest.TestCase):
 
     def _get_dummy_charm_harness(self, tmp):
         self._write_dummy_charm(tmp)
-        charm_mod = importlib.import_module('charm')
+        charm_mod = importlib.import_module('testcharm')
         harness = Harness(charm_mod.MyTestingCharm)
         self.addCleanup(harness.cleanup)
         return harness
@@ -987,7 +1039,7 @@ class TestHarness(unittest.TestCase):
     def _write_dummy_charm(self, tmp):
         srcdir = tmp / 'src'
         srcdir.mkdir(0o755)
-        charm_filename = srcdir / 'charm.py'
+        charm_filename = srcdir / 'testcharm.py'
         with charm_filename.open('wt') as charmpy:
             # language=Python
             charmpy.write(textwrap.dedent('''
@@ -1000,7 +1052,7 @@ class TestHarness(unittest.TestCase):
 
         def cleanup():
             sys.path = orig
-            sys.modules.pop('charm')
+            sys.modules.pop('testcharm')
 
         self.addCleanup(cleanup)
 

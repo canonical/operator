@@ -1,0 +1,38 @@
+name: Hello Charm Tests
+
+on: [push, pull_request]
+
+jobs:
+  hello-charm-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        charm-repo:
+          - "jnsgruk/hello-kubecon"
+          - "juju/hello-juju-charm"
+
+    steps:
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Checkout the ${{ matrix.charm-repo }} repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ matrix.charm-repo }}
+
+      - name: Remove 'ops' from charm requirements.txt
+        run: |
+          sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+          TEST_OPS="git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops"
+          echo -e "\n${TEST_OPS}" >> requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run the charm tests
+        run: |
+          export PYTHONPATH="lib:src:$PYTHONPATH"
+          python3 -m unittest

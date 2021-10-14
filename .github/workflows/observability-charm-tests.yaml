@@ -1,0 +1,31 @@
+name: Observability Charm Tests
+
+on: [push, pull_request]
+
+jobs:
+  o11y-charm-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        charm-repo:
+          - "canonical/alertmanager-operator"
+          - "canonical/prometheus-operator"
+          - "canonical/grafana-operator"
+
+    steps:
+      - name: Checkout the ${{ matrix.charm-repo }} repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ matrix.charm-repo }}
+
+      - name: Update 'ops' library dependency in test charm
+        run: |
+          sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+          echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+
+      - name: Install dependencies
+        run: pip install tox
+
+      - name: Run the charm tests
+        run: tox -vve unit

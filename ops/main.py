@@ -30,9 +30,8 @@ import ops.charm
 import ops.framework
 import ops.model
 import ops.storage
-
-from ops.log import setup_root_logging
 from ops.jujuversion import JujuVersion
+from ops.log import setup_root_logging
 
 CHARM_STATE_FILE = '.unit-state.db'
 

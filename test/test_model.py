@@ -13,23 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import OrderedDict
-import json
 import ipaddress
+import json
 import os
 import pathlib
-from textwrap import dedent
 import unittest
+from collections import OrderedDict
+from test.test_helpers import fake_script, fake_script_calls
+from textwrap import dedent
 
-import ops.model
 import ops.charm
+import ops.model
 import ops.pebble
 import ops.testing
-from ops.charm import RelationMeta, RelationRole
-
 from ops._private import yaml
-
-from test.test_helpers import fake_script, fake_script_calls
+from ops.charm import RelationMeta, RelationRole
 
 
 class TestModel(unittest.TestCase):
@@ -742,11 +740,53 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.model.storages = {}
 
-    def resetBackendCalls(self):
+    def resetBackendCalls(self):  # noqa: N802
         self.harness._get_backend_calls(reset=True)
 
-    def assertBackendCalls(self, expected, *, reset=True):
+    def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
+
+
+class TestApplication(unittest.TestCase):
+
+    def setUp(self):
+        self.harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
+            name: myapp
+            provides:
+              db0:
+                interface: db0
+            requires:
+              db1:
+                interface: db1
+            peers:
+              db2:
+                interface: db2
+            resources:
+              foo: {type: file, filename: foo.txt}
+              bar: {type: file, filename: bar.txt}
+        ''')
+        self.peer_rel_id = self.harness.add_relation('db2', 'db2')
+        self.app = self.harness.model.app
+
+    def test_planned_units(self):
+        rel_id = self.peer_rel_id
+
+        # Test that we always count ourself.
+        self.assertEqual(self.app.planned_units(), 1)
+
+        # Add some units, and verify count.
+        self.harness.add_relation_unit(rel_id, 'myapp/1')
+        self.harness.add_relation_unit(rel_id, 'myapp/2')
+
+        self.assertEqual(self.app.planned_units(), 3)
+
+        self.harness.add_relation_unit(rel_id, 'myapp/3')
+        self.assertEqual(self.app.planned_units(), 4)
+
+        # And remove a unit
+        self.harness.remove_relation_unit(rel_id, 'myapp/2')
+
+        self.assertEqual(self.app.planned_units(), 3)
 
 
 class TestContainers(unittest.TestCase):
@@ -820,6 +860,10 @@ containers:
         self.container.replan()
         self.assertEqual(self.pebble.requests, [('replan',)])
 
+    def test_get_system_info(self):
+        self.container.can_connect()
+        self.assertEqual(self.pebble.requests, [('get_system_info',)])
+
     def test_start(self):
         self.container.start('foo')
         self.container.start('foo', 'bar')
@@ -831,6 +875,24 @@ containers:
     def test_start_no_arguments(self):
         with self.assertRaises(TypeError):
             self.container.start()
+
+    def test_restart(self):
+        two_services = [
+            self._make_service('foo', 'enabled', 'active'),
+            self._make_service('bar', 'disabled', 'inactive'),
+        ]
+        self.pebble.responses.append(two_services)
+        self.container.restart('foo')
+        self.pebble.responses.append(two_services)
+        self.container.restart('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            ('get_services', ('foo',)),
+            ('stop', ('foo',)),
+            ('start', ('foo',)),
+            ('get_services', ('foo', 'bar')),
+            ('stop', ('foo',)),
+            ('start', ('foo', 'bar',)),
+        ])
 
     def test_stop(self):
         self.container.stop('foo')
@@ -1029,21 +1091,9 @@ containers:
             ('remove_path', '/path/2', True),
         ])
 
-    def test_no_exception_with_contextmanager(self):
-        with self.assertLogs() as logs:
-            self.pebble.responses.append('dummy')
-            with self.container.is_ready() as c:
-                raise ops.pebble.ConnectionError("Some dummy message")
-        self.assertIn("was raised due to", logs.records[0].getMessage())
-        self.assertEqual(c.completed, False)
-
-    def test_exception_without_contextmanager(self):
-        with self.assertRaises(ops.pebble.ConnectionError):
-            raise ops.pebble.ConnectionError("Some dummy message")
-
-    def test_bare_is_ready_call(self):
+    def test_bare_can_connect_call(self):
         self.pebble.responses.append('dummy')
-        self.assertTrue(self.container.is_ready())
+        self.assertTrue(self.container.can_connect())
 
 
 class MockPebbleBackend(ops.model._ModelBackend):
@@ -1062,6 +1112,9 @@ class MockPebbleClient:
 
     def replan_services(self):
         self.requests.append(('replan',))
+
+    def get_system_info(self):
+        self.requests.append(('get_system_info',))
 
     def start_services(self, service_names):
         self.requests.append(('start', service_names))
