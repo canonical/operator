@@ -1286,10 +1286,10 @@ ChangeError: cannot perform the following tasks:
             self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        if permissions is not None and not (0 <= permissions <= 0o777):
+            raise pebble.PathError(
+                'generic-file-error', 'Permissions not within 0o000 to 0o777')
         try:
-            if permissions is not None and not (0 <= permissions <= 0o777):
-                raise pebble.PathError(
-                    'generic-file-error', 'Permissions not within 0o000 to 0o777')
             self._fs.create_file(
                 path, source, encoding=encoding, make_dirs=make_dirs, permissions=permissions,
                 user_id=user_id, user=user, group_id=group_id, group=group)
