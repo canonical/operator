@@ -2941,26 +2941,6 @@ class TestMockFilesystem(unittest.TestCase):
         with self.fs.open('/test2') as infile:
             self.assertEqual(infile.read(), 'foo')
 
-    def test_create_and_read_large_file(self):
-        # Create somewhat non-trivial data
-        # (32 distinct printable ASCII characters, repeated 2**15 times,
-        # 1 MiB of total data)
-        data = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345" * (2**15)
-
-        # Test via blob
-        self.fs.create_file('/test', data)
-        file = self.fs['/test']
-        self.assertTrue(hasattr(file.data, 'name'))  # not present on str/bytes
-        with self.fs.open('/test') as infile:
-            self.assertEqual(infile.read(), data)
-
-        # Test via file-like object
-        self.fs.create_file('/test2', StringIO(data))
-        file = self.fs['/test2']
-        self.assertTrue(hasattr(file.data, 'name'))  # not present on str/bytes
-        with self.fs.open('/test2') as infile:
-            self.assertEqual(infile.read(), data)
-
     def test_create_and_read_with_different_encodings(self):
         # write str, read as utf-8 bytes
         self.fs.create_file('/test', "foo")
@@ -2992,49 +2972,34 @@ class TestMockFilesystem(unittest.TestCase):
             del self.fs[pathlib.Path('/test')]
         self.assertEqual(cm.exception.args[0], '/test')
 
-    def test_create_dir_with_permissions(self):
-        # Permissions are simply stored if provided.  No defaults are provided.
+    def test_create_dir_with_extra_args(self):
         d = self.fs.create_dir('/dir1')
-        self.assertEqual(d.permissions, None)
+        self.assertEqual(d.kwargs, {})
 
-        d = self.fs.create_dir('/dir2', permissions=0o700)
-        self.assertEqual(d.permissions, 0o700)
+        d = self.fs.create_dir(
+            '/dir2', permissions=0o700, user='ubuntu', user_id=1000, group='www-data', group_id=33)
+        self.assertEqual(d.kwargs, {
+            'permissions': 0o700,
+            'user': 'ubuntu',
+            'user_id': 1000,
+            'group': 'www-data',
+            'group_id': 33,
+        })
 
-    def test_create_file_with_permissions(self):
-        # Permissions are simply stored if provided.  No defaults are provided.
-        d = self.fs.create_file('/file1', 'data')
-        self.assertEqual(d.permissions, None)
-
-        d = self.fs.create_file('/file2', 'data', permissions=0o754)
-        self.assertEqual(d.permissions, 0o754)
-
-    def test_create_dir_with_ownership(self):
-        d = self.fs.create_dir('/dir1')
-        self.assertIs(d.user, None)
-        self.assertIs(d.user_id, None)
-        self.assertIs(d.group, None)
-        self.assertIs(d.group_id, None)
-
-        d = self.fs.create_dir('/dir2', user='ubuntu', user_id=1000, group='www-data', group_id=33)
-        self.assertEqual(d.user, 'ubuntu')
-        self.assertEqual(d.user_id, 1000)
-        self.assertEqual(d.group, 'www-data')
-        self.assertEqual(d.group_id, 33)
-
-    def test_create_file_with_ownership(self):
+    def test_create_file_with_extra_args(self):
         f = self.fs.create_file('/file1', 'data')
-        self.assertIs(f.user, None)
-        self.assertIs(f.user_id, None)
-        self.assertIs(f.group, None)
-        self.assertIs(f.group_id, None)
+        self.assertEqual(f.kwargs, {})
 
-        f = self.fs.create_file('/file2', 'data',
-                                user='ubuntu', user_id=1000,
-                                group='www-data', group_id=33)
-        self.assertEqual(f.user, 'ubuntu')
-        self.assertEqual(f.user_id, 1000)
-        self.assertEqual(f.group, 'www-data')
-        self.assertEqual(f.group_id, 33)
+        f = self.fs.create_file(
+            '/file2', 'data',
+            permissions=0o754, user='ubuntu', user_id=1000, group='www-data', group_id=33)
+        self.assertEqual(f.kwargs, {
+            'permissions': 0o754,
+            'user': 'ubuntu',
+            'user_id': 1000,
+            'group': 'www-data',
+            'group_id': 33,
+        })
 
     def test_getattr(self):
         self.fs.create_dir('/etc/init.d', make_parents=True)

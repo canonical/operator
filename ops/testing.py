@@ -1292,16 +1292,8 @@ ChangeError: cannot perform the following tasks:
                 raise pebble.PathError(
                     'generic-file-error', 'Permissions not within 0o000 to 0o777')
             self._fs.create_file(
-                path,
-                source,
-                encoding=encoding,
-                make_dirs=make_dirs,
-                permissions=permissions,
-                user_id=user_id,
-                user=user,
-                group_id=group_id,
-                group=group,
-            )
+                path, source, encoding=encoding, make_dirs=make_dirs, permissions=permissions,
+                user_id=user_id, user=user, group_id=group_id, group=group)
         except FileNotFoundError as e:
             raise pebble.PathError(
                 'not-found', 'Parent directory not found: {}'.format(e.args[0]))
@@ -1328,12 +1320,12 @@ ChangeError: cannot perform the following tasks:
                 file.path.name,
                 type_mappings.get(type(file)),
                 file.size if isinstance(file, _File) else None,
-                file.permissions,
+                file.kwargs.get('permissions'),
                 None,   # Note: this is a type annoation violation
-                file.user_id,
-                file.user,
-                file.group_id,
-                file.group,
+                file.kwargs.get('user_id'),
+                file.kwargs.get('user'),
+                file.kwargs.get('group_id'),
+                file.kwargs.get('group'),
             )
             for file in files
         ]
@@ -1346,11 +1338,8 @@ ChangeError: cannot perform the following tasks:
                 'generic-file-error', 'Permissions not within 0o000 to 0o777')
         try:
             self._fs.create_dir(
-                path,
-                make_parents=make_parents,
-                permissions=permissions,
-                user_id=user_id, user=user,
-                group_id=group_id, group=group)
+                path, make_parents=make_parents, permissions=permissions,
+                user_id=user_id, user=user, group_id=group_id, group=group)
         except FileNotFoundError as e:
             # Parent directory doesn't exist and make_parents is False
             raise pebble.PathError(
@@ -1372,16 +1361,7 @@ class _MockFilesystem:
     def __init__(self):
         self.root = _Directory(Path('/'))
 
-    def create_dir(
-            self,
-            path: str,
-            make_parents: bool = False,
-            permissions: typing.Optional[int] = None,
-            user_id: typing.Optional[int] = None,
-            user: typing.Optional[str] = None,
-            group_id: typing.Optional[int] = None,
-            group: typing.Optional[str] = None,
-    ) -> '_Directory':
+    def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
         if not path.startswith('/'):
             raise ValueError('Path must start with slash')
         current_dir = self.root
@@ -1391,7 +1371,8 @@ class _MockFilesystem:
                 current_dir = current_dir[token]
             else:
                 if make_parents:
-                    # NOTE: Ownership/permissions only get applied to the final directory.
+                    # NOTE: other parameters (e.g. ownership, permissions) only get applied to the
+                    # final directory.
                     # (At the time of writing, Pebble defaults to 0o755 permissions and root:root
                     # ownership.)
                     current_dir = current_dir.create_dir(token)
@@ -1404,36 +1385,27 @@ class _MockFilesystem:
         # already exists.
         token = tokens[-1]
         if token not in current_dir:
-            current_dir = current_dir.create_dir(
-                token,
-                permissions=permissions,
-                user_id=user_id,
-                user=user,
-                group_id=group_id,
-                group=group)
+            current_dir = current_dir.create_dir(token, **kwargs)
         else:
             raise FileExistsError(str(current_dir.path / token))
         return current_dir
 
     def create_file(
             self,
-            path: typing.Union[str, Path],
+            path: str,
             data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
             encoding: typing.Optional[str] = 'utf-8',
             make_dirs: bool = False,
-            permissions: typing.Optional[int] = None,
-            user_id: typing.Optional[int] = None,
-            user: typing.Optional[str] = None,
-            group_id: typing.Optional[int] = None,
-            group: typing.Optional[str] = None,
+            **kwargs,
     ) -> '_File':
-        path = Path(path)
+        path_obj = Path(path)
         try:
-            dir_ = self[path.parent]
+            dir_ = self[path_obj.parent]
         except FileNotFoundError:
             if make_dirs:
-                dir_ = self.create_dir(str(path.parent))
-                # NOTE: Ownership/permissions only get applied to the final directory.
+                dir_ = self.create_dir(str(path_obj.parent))
+                # NOTE: other parameters (e.g. ownership, permissions) only get applied to the
+                # final directory.
                 # (At the time of writing, Pebble defaults to the specified permissions and
                 # root:root ownership, which is inconsistent with the push function's
                 # behavior for parent directories.)
@@ -1442,15 +1414,7 @@ class _MockFilesystem:
         if not isinstance(dir_, _Directory):
             raise pebble.PathError(
                 'generic-file-error', 'Parent is not a directory: {}'.format(str(dir_)))
-        return dir_.create_file(
-            path.name,
-            data,
-            encoding=encoding,
-            permissions=permissions,
-            user_id=user_id,
-            user=user,
-            group_id=group_id,
-            group=group)
+        return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
     def list_dir(self, path) -> typing.List['_File']:
         current_dir = self.root
@@ -1499,21 +1463,10 @@ class _MockFilesystem:
 
 
 class _Directory:
-    def __init__(
-            self,
-            path: Path,
-            permissions: typing.Optional[int] = None,
-            user_id: typing.Optional[int] = None,
-            user: typing.Optional[str] = None,
-            group_id: typing.Optional[int] = None,
-            group: typing.Optional[str] = None):
+    def __init__(self, path: Path, **kwargs):
         self.path = path
         self._children: typing.Dict[str, typing.Union[_Directory, _File]] = {}
-        self.permissions = permissions
-        self.user = user
-        self.user_id = user_id
-        self.group = group
-        self.group_id = group_id
+        self.kwargs = kwargs
 
     @property
     def name(self) -> str:
@@ -1537,112 +1490,49 @@ class _Directory:
     def __len__(self):
         return len(self._children)
 
-    def create_dir(
-            self,
-            name: str,
-            permissions: typing.Optional[int] = None,
-            user_id: typing.Optional[int] = None,
-            user: typing.Optional[str] = None,
-            group_id: typing.Optional[int] = None,
-            group: typing.Optional[str] = None,
-    ) -> '_Directory':
-        self._children[name] = _Directory(
-            self.path / name,
-            permissions=permissions,
-            user_id=user_id,
-            user=user,
-            group_id=group_id,
-            group=group)
+    def create_dir(self, name: str, **kwargs) -> '_Directory':
+        self._children[name] = _Directory(self.path / name, **kwargs)
         return self._children[name]
 
     def create_file(
             self,
             name: str,
-            data: typing.Union[bytes, str, StringIO, BytesIO],
+            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
             encoding: typing.Optional[str] = 'utf-8',
-            permissions: typing.Optional[int] = None,
-            user_id: typing.Optional[int] = None,
-            user: typing.Optional[str] = None,
-            group_id: typing.Optional[int] = None,
-            group: typing.Optional[str] = None,
+            **kwargs,
     ) -> '_File':
-        self._children[name] = _File(
-            self.path / name,
-            data,
-            encoding=encoding,
-            permissions=permissions,
-            user_id=user_id,
-            user=user,
-            group_id=group_id,
-            group=group)
+        self._children[name] = _File(self.path / name, data, encoding=encoding, **kwargs)
         return self._children[name]
 
 
 class _File:
-    READ_BLOCK_SIZE = 102400
-
     def __init__(
             self,
             path: Path,
-            data: typing.Union[str, bytes, StringIO, BytesIO],
+            data: typing.Union[str, bytes, typing.BinaryIO, typing.TextIO],
             encoding: typing.Optional[str] = 'utf-8',
-            permissions: typing.Optional[int] = None,
-            user_id: typing.Optional[int] = None,
-            user: typing.Optional[str] = None,
-            group_id: typing.Optional[int] = None,
-            group: typing.Optional[str] = None):
-        if isinstance(data, (StringIO, BytesIO)):
-            data, data_size = self._get_data_from_filelike_object(data, encoding)
-        else:
-            data, data_size = self._get_data_from_str_or_bytes(data, encoding)
+            **kwargs):
+
+        if hasattr(data, 'read'):
+            data = data.read()
+        if isinstance(data, str):
+            data = data.encode(encoding)
+        data_size = len(data)
+
         self.path = path
-        self.data = data
-        self.permissions = permissions
-        self.user = user
-        self.user_id = user_id
-        self.group = group
-        self.group_id = group_id
+        self.data: bytes = data
         self.size = data_size
+        self.kwargs = kwargs
 
     @property
     def name(self) -> str:
         return self.path.name
 
-    def _get_data_from_filelike_object(self, source, encoding):
-        total_read = 0
-        temp = tempfile.NamedTemporaryFile(delete=False)
-        with temp:
-            while True:
-                block = source.read(_File.READ_BLOCK_SIZE)
-                if len(block) == 0:
-                    break
-                if isinstance(block, str):
-                    block = block.encode(encoding)
-                total_read += len(block)
-                temp.write(block)
-        data = temp
-        return data, total_read
-
-    def _get_data_from_str_or_bytes(self, data, encoding):
-        if isinstance(data, str):
-            if encoding is not None:
-                data = data.encode(encoding)
-            else:
-                # We explicitly passed encoding=None, yet data is bytes?  This seems wrong.
-                raise NotImplementedError()
-        data_size = len(data)
-        tf = tempfile.NamedTemporaryFile(delete=False)
-        with tf:
-            tf.write(data)
-        data = tf
-        return data, data_size
-
     def open(
             self,
             encoding: typing.Optional[str] = 'utf-8',
     ) -> typing.Union[typing.TextIO, typing.BinaryIO]:
-        mode = 'r' if encoding is not None else 'rb'
-        return open(self.data.name, mode, encoding=encoding)
-
-    def __del__(self, unlink=os.unlink) -> None:
-        unlink(self.data.name)
+        if encoding is None:
+            return BytesIO(self.data)
+        else:
+            return StringIO(self.data.decode(encoding))
