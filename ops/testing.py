@@ -94,7 +94,8 @@ class Harness(typing.Generic[CharmType]):
         self._oci_resources = {}
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
-        self._update_config(key_values=self._load_config_defaults(config))
+        self._defaults = self._load_config_defaults(config)
+        self._update_config(key_values=self._defaults)
 
     @property
     def charm(self) -> CharmType:
@@ -288,8 +289,7 @@ class Harness(typing.Generic[CharmType]):
             charm_config = dedent(charm_config)
         charm_config = yaml.safe_load(charm_config)
         charm_config = charm_config.get('options', {})
-        return {key: value['default'] for key, value in charm_config.items()
-                if 'default' in value}
+        return {key: value.get('default', None) for key, value in charm_config.items()}
 
     def add_oci_resource(self, resource_name: str,
                          contents: typing.Mapping[str, str] = None) -> None:
@@ -555,12 +555,15 @@ class Harness(typing.Generic[CharmType]):
         relation = self._model.get_relation(relation_name, relation_id)
         unit_cache = relation.data.get(remote_unit, None)
 
-        # statements which could access cache
+        # remove the unit from the list of units in the relation
+        relation.units.remove(remote_unit)
+
         self._emit_relation_departed(relation_id, remote_unit_name)
-        self._backend._relation_data[relation_id].pop(remote_unit_name)
-        self._backend._relation_app_and_units[relation_id][
-            "units"].remove(remote_unit_name)
+        # remove the relation data for the departed unit now that the event has happened
         self._backend._relation_list_map[relation_id].remove(remote_unit_name)
+        self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)
+        self._backend._relation_data[relation_id].pop(remote_unit_name)
+        self.model._relations._invalidate(relation_name=relation.name)
 
         if unit_cache is not None:
             unit_cache._invalidate()
@@ -752,8 +755,7 @@ class Harness(typing.Generic[CharmType]):
 
         Args:
             key_values: A Mapping of key:value pairs to update in config.
-            unset: An iterable of keys to remove from Config. (Note that this does
-                not currently reset the config values to the default defined in config.yaml.)
+            unset: An iterable of keys to remove from config.
         """
         # NOTE: jam 2020-03-01 Note that this sort of works "by accident". Config
         # is a LazyMapping, but its _load returns a dict and this method mutates
@@ -762,9 +764,19 @@ class Harness(typing.Generic[CharmType]):
         config = self._backend._config
         if key_values is not None:
             for key, value in key_values.items():
-                config[key] = value
+                if key in self._defaults:
+                    if value is not None:
+                        config[key] = value
+                else:
+                    raise ValueError("unknown config option: '{}'".format(key))
+
         for key in unset:
-            config.pop(key, None)
+            # When the key is unset, revert to the default if one exists
+            default = self._defaults.get(key, None)
+            if default is not None:
+                config[key] = default
+            else:
+                config.pop(key, None)
 
     def update_config(
             self,
@@ -1126,6 +1138,9 @@ class _TestingPebbleClient:
             if startup == pebble.ServiceStartup.ENABLED:
                 self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
+    def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+        return self.autostart_services(timeout, delay)
+
     def start_services(
             self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> pebble.ChangeID:
@@ -1186,6 +1201,25 @@ ChangeError: cannot perform the following tasks:
 '''.format(name, name), change=1234)  # the change id is not respected
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
+
+    def restart_services(
+            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.ChangeID:
+        # handle a common mistake of passing just a name rather than a list of names
+        if isinstance(services, str):
+            raise TypeError('restart_services should take a list of names, not just "{}"'.format(
+                services))
+        # TODO: handle invalid names
+        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
+        # Container.restart() which currently ignores the return value
+        known_services = self._render_services()
+        for name in services:
+            if name not in known_services:
+                # TODO: jam 2021-04-20 This needs a better error type
+                #  400 Bad Request: service "bal" does not exist
+                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+        for name in services:
+            self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def wait_change(
             self, change_id: pebble.ChangeID, timeout: float = 30.0, delay: float = 0.1,

@@ -326,24 +326,39 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         self.assertIsInstance(rel_id, int)
         harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
         # Check relation and unit were created
         backend = harness._backend
         self.assertEqual(backend.relation_ids('db'), [rel_id])
         self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
         harness.charm.get_changes(reset=True)  # ignore relation created events
+        relation = harness.charm.model.get_relation('db')
+        self.assertEqual(len(relation.units), 1)
+        # Check relation data is correct
+        rel_unit = harness.charm.model.get_unit('postgresql/0')
+        self.assertEqual(relation.data[rel_unit]['foo'], 'bar')
+        # Instruct the charm to record the relation data it sees in the list of changes
+        harness.charm.record_relation_data_on_events = True
         # Now remove unit
         harness.remove_relation_unit(rel_id, 'postgresql/0')
         # Check relation still exists
         self.assertEqual(backend.relation_ids('db'), [rel_id])
         # Check removed unit does not exist
         self.assertEqual(backend.relation_list(rel_id), [])
+        # Check the unit is actually removed from the relations the model knows about
+        self.assertEqual(len(harness.charm.model.get_relation('db').units), 0)
+        self.assertFalse(rel_unit in harness.charm.model.get_relation('db').data)
         # Check relation departed was raised with correct data
         self.assertEqual(harness.charm.get_changes()[0],
                          {'name': 'relation-departed',
                           'relation': 'db',
                           'data': {'app': 'postgresql',
                                    'unit': 'postgresql/0',
-                                   'relation_id': rel_id}})
+                                   'relation_id': 0,
+                                   'relation_data': {'test-app/0': {},
+                                                     'test-app': {},
+                                                     'postgresql/0': {'foo': 'bar'},
+                                                     'postgresql': {}}}})
 
     def test_removing_relation_removes_remote_app_data(self):
         # language=YAML
@@ -758,7 +773,15 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(viewer.changes, [{'initial': 'data'}, {}])
 
     def test_update_config(self):
-        harness = Harness(RecordingCharm)
+        harness = Harness(RecordingCharm, config='''
+            options:
+                a:
+                    description: a config option
+                    type: string
+                b:
+                    description: another config option
+                    type: int
+            ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
         harness.update_config(key_values={'a': 'foo', 'b': 2})
@@ -778,6 +801,35 @@ class TestHarness(unittest.TestCase):
              {'name': 'config-changed', 'data': {'a': 'foo', 'b': 3}},
              {'name': 'config-changed', 'data': {'a': ''}},
              ])
+
+    def test_update_config_undefined_option(self):
+        harness = Harness(RecordingCharm)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        with self.assertRaises(ValueError):
+            harness.update_config(key_values={'nonexistent': 'foo'})
+
+    def test_update_config_unset_boolean(self):
+        harness = Harness(RecordingCharm, config='''
+            options:
+                a:
+                    description: a config option
+                    type: bool
+                    default: False
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        # Check the default was set correctly
+        self.assertEqual(harness.charm.config, {'a': False})
+        # Set the boolean value to True
+        harness.update_config(key_values={'a': True})
+        self.assertEqual(harness.charm.changes, [{'name': 'config-changed', 'data': {'a': True}}])
+        # Unset the boolean value
+        harness.update_config(unset={'a'})
+        self.assertEqual(
+            harness.charm.changes,
+            [{'name': 'config-changed', 'data': {'a': True}},
+             {'name': 'config-changed', 'data': {'a': False}}])
 
     def test_set_leader(self):
         harness = Harness(RecordingCharm)
@@ -822,9 +874,18 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.get_relation_data(rel_id, 'test-charm'), {'foo': 'bar'})
 
     def test_hooks_enabled_and_disabled(self):
-        harness = Harness(RecordingCharm, meta='''
-            name: test-charm
-        ''')
+        harness = Harness(
+            RecordingCharm,
+            meta='''
+                    name: test-charm
+                ''',
+            config='''
+                    options:
+                        value:
+                            type: string
+                        third:
+                            type: string
+                    ''')
         self.addCleanup(harness.cleanup)
         # Before begin() there are no events.
         harness.update_config({'value': 'first'})
@@ -846,8 +907,14 @@ class TestHarness(unittest.TestCase):
 
     def test_hooks_disabled_contextmanager(self):
         harness = Harness(RecordingCharm, meta='''
-            name: test-charm
-        ''')
+                name: test-charm
+                ''', config='''
+                options:
+                    value:
+                        type: string
+                    third:
+                        type: string
+            ''')
         self.addCleanup(harness.cleanup)
         # Before begin() there are no events.
         harness.update_config({'value': 'first'})
@@ -868,8 +935,14 @@ class TestHarness(unittest.TestCase):
 
     def test_hooks_disabled_nested_contextmanager(self):
         harness = Harness(RecordingCharm, meta='''
-            name: test-charm
-        ''')
+                name: test-charm
+            ''', config='''
+                options:
+                    fifth:
+                        type: string
+                    sixth:
+                        type: string
+                ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
         # Context manager can be nested, so a test using it can invoke a helper using it.
@@ -881,8 +954,14 @@ class TestHarness(unittest.TestCase):
 
     def test_hooks_disabled_noop(self):
         harness = Harness(RecordingCharm, meta='''
-            name: test-charm
-        ''')
+                name: test-charm
+            ''', config='''
+            options:
+                seventh:
+                    type: string
+                eighth:
+                    type: string
+            ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
         # If hooks are already disabled, it is a no op, and on exit hooks remain disabled.
@@ -940,13 +1019,14 @@ class TestHarness(unittest.TestCase):
         harness = self._get_dummy_charm_harness(tmp)
         self.assertEqual(harness.model.config['opt_str'], 'val')
         self.assertEqual(harness.model.config['opt_str_empty'], '')
-        self.assertIsNone(harness.model.config['opt_null'])
         self.assertIs(harness.model.config['opt_bool'], True)
         self.assertEqual(harness.model.config['opt_int'], 1)
         self.assertIsInstance(harness.model.config['opt_int'], int)
         self.assertEqual(harness.model.config['opt_float'], 1.0)
         self.assertIsInstance(harness.model.config['opt_float'], float)
-        self.assertNotIn('opt_no_default', harness.model.config)
+        self.assertFalse('opt_null' in harness.model.config)
+        self.assertIsNone(harness._defaults['opt_null'])
+        self.assertIsNone(harness._defaults['opt_no_default'])
 
     def test_set_model_name(self):
         harness = Harness(CharmBase, meta='''
@@ -1347,6 +1427,11 @@ class TestHarness(unittest.TestCase):
     def test_begin_with_initial_hooks_no_relations(self):
         harness = Harness(RecordingCharm, meta='''
             name: test-app
+            ''', config='''
+            options:
+                foo:
+                    description: a config option
+                    type: string
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
@@ -1367,6 +1452,11 @@ class TestHarness(unittest.TestCase):
     def test_begin_with_initial_hooks_no_relations_not_leader(self):
         harness = Harness(RecordingCharm, meta='''
             name: test-app
+            ''', config='''
+            options:
+                foo:
+                    description: a config option
+                    type: string
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
@@ -1393,6 +1483,11 @@ class TestHarness(unittest.TestCase):
             peers:
               peer:
                 interface: app-peer
+            ''', config='''
+            options:
+                foo:
+                    description: a config option
+                    type: string
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
@@ -1887,6 +1982,10 @@ class RelationEventCharm(RecordingCharm):
 
     def __init__(self, framework):
         super().__init__(framework)
+        # When set, this instructs the charm to include a 'relation_data' field in the 'data'
+        # section of each change it logs, which allows us to test which relation data was available
+        # in each hook invocation
+        self.record_relation_data_on_events = False
 
     def observe_relation_events(self, relation_name):
         self.framework.observe(self.on[relation_name].relation_created, self._on_relation_created)
@@ -1918,9 +2017,17 @@ class RelationEventCharm(RecordingCharm):
         app_name = None
         if event.app is not None:
             app_name = event.app.name
-        self.changes.append(
-            dict(name=event_name, relation=event.relation.name,
-                 data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id)))
+
+        recording = dict(name=event_name, relation=event.relation.name,
+                         data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id))
+
+        if self.record_relation_data_on_events:
+            recording["data"].update({'relation_data': {
+                str(x.name): dict(event.relation.data[x])
+                for x in event.relation.data
+            }})
+
+        self.changes.append(recording)
 
 
 class ContainerEventCharm(RecordingCharm):
