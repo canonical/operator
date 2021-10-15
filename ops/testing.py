@@ -555,12 +555,15 @@ class Harness(typing.Generic[CharmType]):
         relation = self._model.get_relation(relation_name, relation_id)
         unit_cache = relation.data.get(remote_unit, None)
 
-        # statements which could access cache
+        # remove the unit from the list of units in the relation
+        relation.units.remove(remote_unit)
+
         self._emit_relation_departed(relation_id, remote_unit_name)
-        self._backend._relation_data[relation_id].pop(remote_unit_name)
-        self._backend._relation_app_and_units[relation_id][
-            "units"].remove(remote_unit_name)
+        # remove the relation data for the departed unit now that the event has happened
         self._backend._relation_list_map[relation_id].remove(remote_unit_name)
+        self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)
+        self._backend._relation_data[relation_id].pop(remote_unit_name)
+        self.model._relations._invalidate(relation_name=relation.name)
 
         if unit_cache is not None:
             unit_cache._invalidate()
@@ -1135,6 +1138,9 @@ class _TestingPebbleClient:
             if startup == pebble.ServiceStartup.ENABLED:
                 self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
+    def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+        return self.autostart_services(timeout, delay)
+
     def start_services(
             self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> pebble.ChangeID:
@@ -1195,6 +1201,25 @@ ChangeError: cannot perform the following tasks:
 '''.format(name, name), change=1234)  # the change id is not respected
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
+
+    def restart_services(
+            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> pebble.ChangeID:
+        # handle a common mistake of passing just a name rather than a list of names
+        if isinstance(services, str):
+            raise TypeError('restart_services should take a list of names, not just "{}"'.format(
+                services))
+        # TODO: handle invalid names
+        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
+        # Container.restart() which currently ignores the return value
+        known_services = self._render_services()
+        for name in services:
+            if name not in known_services:
+                # TODO: jam 2021-04-20 This needs a better error type
+                #  400 Bad Request: service "bal" does not exist
+                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+        for name in services:
+            self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def wait_change(
             self, change_id: pebble.ChangeID, timeout: float = 30.0, delay: float = 0.1,

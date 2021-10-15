@@ -326,24 +326,39 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         self.assertIsInstance(rel_id, int)
         harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
         # Check relation and unit were created
         backend = harness._backend
         self.assertEqual(backend.relation_ids('db'), [rel_id])
         self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
         harness.charm.get_changes(reset=True)  # ignore relation created events
+        relation = harness.charm.model.get_relation('db')
+        self.assertEqual(len(relation.units), 1)
+        # Check relation data is correct
+        rel_unit = harness.charm.model.get_unit('postgresql/0')
+        self.assertEqual(relation.data[rel_unit]['foo'], 'bar')
+        # Instruct the charm to record the relation data it sees in the list of changes
+        harness.charm.record_relation_data_on_events = True
         # Now remove unit
         harness.remove_relation_unit(rel_id, 'postgresql/0')
         # Check relation still exists
         self.assertEqual(backend.relation_ids('db'), [rel_id])
         # Check removed unit does not exist
         self.assertEqual(backend.relation_list(rel_id), [])
+        # Check the unit is actually removed from the relations the model knows about
+        self.assertEqual(len(harness.charm.model.get_relation('db').units), 0)
+        self.assertFalse(rel_unit in harness.charm.model.get_relation('db').data)
         # Check relation departed was raised with correct data
         self.assertEqual(harness.charm.get_changes()[0],
                          {'name': 'relation-departed',
                           'relation': 'db',
                           'data': {'app': 'postgresql',
                                    'unit': 'postgresql/0',
-                                   'relation_id': rel_id}})
+                                   'relation_id': 0,
+                                   'relation_data': {'test-app/0': {},
+                                                     'test-app': {},
+                                                     'postgresql/0': {'foo': 'bar'},
+                                                     'postgresql': {}}}})
 
     def test_removing_relation_removes_remote_app_data(self):
         # language=YAML
@@ -1967,6 +1982,10 @@ class RelationEventCharm(RecordingCharm):
 
     def __init__(self, framework):
         super().__init__(framework)
+        # When set, this instructs the charm to include a 'relation_data' field in the 'data'
+        # section of each change it logs, which allows us to test which relation data was available
+        # in each hook invocation
+        self.record_relation_data_on_events = False
 
     def observe_relation_events(self, relation_name):
         self.framework.observe(self.on[relation_name].relation_created, self._on_relation_created)
@@ -1998,9 +2017,17 @@ class RelationEventCharm(RecordingCharm):
         app_name = None
         if event.app is not None:
             app_name = event.app.name
-        self.changes.append(
-            dict(name=event_name, relation=event.relation.name,
-                 data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id)))
+
+        recording = dict(name=event_name, relation=event.relation.name,
+                         data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id))
+
+        if self.record_relation_data_on_events:
+            recording["data"].update({'relation_data': {
+                str(x.name): dict(event.relation.data[x])
+                for x in event.relation.data
+            }})
+
+        self.changes.append(recording)
 
 
 class ContainerEventCharm(RecordingCharm):
