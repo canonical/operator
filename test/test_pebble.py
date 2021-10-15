@@ -1012,6 +1012,12 @@ class TestClient(unittest.TestCase):
     def test_autostart_services_async(self):
         self._services_action_async_helper('autostart', self.client.autostart_services, [])
 
+    def test_replan_services(self):
+        self._services_action_helper('replan', self.client.replan_services, [])
+
+    def test_replan_services_async(self):
+        self._services_action_async_helper('replan', self.client.replan_services, [])
+
     def test_start_services(self):
         def api_func():
             return self.client.start_services(['svc'])
@@ -1049,6 +1055,25 @@ class TestClient(unittest.TestCase):
         def api_func(timeout=30):
             return self.client.stop_services(['svc'], timeout=timeout)
         self._services_action_async_helper('stop', api_func, ['svc'])
+
+    def test_restart_services(self):
+        def api_func():
+            return self.client.restart_services(['svc'])
+        self._services_action_helper('restart', api_func, ['svc'])
+
+        with self.assertRaises(TypeError):
+            self.client.restart_services(1)
+
+        with self.assertRaises(TypeError):
+            self.client.restart_services([1])
+
+        with self.assertRaises(TypeError):
+            self.client.restart_services([['foo']])
+
+    def test_restart_services_async(self):
+        def api_func(timeout=30):
+            return self.client.restart_services(['svc'], timeout=timeout)
+        self._services_action_async_helper('restart', api_func, ['svc'])
 
     def test_change_error(self):
         self.client.responses.append({

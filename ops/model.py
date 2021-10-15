@@ -1111,6 +1111,10 @@ class Container:
         """Autostart all services marked as startup: enabled."""
         self._pebble.autostart_services()
 
+    def replan(self):
+        """Replan all services: restart changed services and start startup-enabled services."""
+        self._pebble.replan_services()
+
     def start(self, *service_names: str):
         """Start given service(s) by name."""
         if not service_names:
@@ -1123,10 +1127,14 @@ class Container:
         if not service_names:
             raise TypeError('restart expected at least 1 argument, got 0')
 
-        for svc in self.get_services(*service_names).values():
-            if svc.is_running():
-                self._pebble.stop_services((*[svc.name],))
-        self._pebble.start_services(service_names)
+        try:
+            self._pebble.restart_services(service_names)
+        except pebble.APIError as e:
+            if e.code != 400:
+                raise e
+            # support old Pebble instances that don't support the "restart" action
+            self._pebble.stop_services(service_names)
+            self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
