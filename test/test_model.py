@@ -856,6 +856,10 @@ containers:
         self.container.autostart()
         self.assertEqual(self.pebble.requests, [('autostart',)])
 
+    def test_replan(self):
+        self.container.replan()
+        self.assertEqual(self.pebble.requests, [('replan',)])
+
     def test_get_system_info(self):
         self.container.can_connect()
         self.assertEqual(self.pebble.requests, [('get_system_info',)])
@@ -875,24 +879,6 @@ containers:
     def test_start_no_arguments(self):
         with self.assertRaises(TypeError):
             self.container.start()
-
-    def test_restart(self):
-        two_services = [
-            self._make_service('foo', 'enabled', 'active'),
-            self._make_service('bar', 'disabled', 'inactive'),
-        ]
-        self.pebble.responses.append(two_services)
-        self.container.restart('foo')
-        self.pebble.responses.append(two_services)
-        self.container.restart('foo', 'bar')
-        self.assertEqual(self.pebble.requests, [
-            ('get_services', ('foo',)),
-            ('stop', ('foo',)),
-            ('start', ('foo',)),
-            ('get_services', ('foo', 'bar')),
-            ('stop', ('foo',)),
-            ('start', ('foo', 'bar',)),
-        ])
 
     def test_stop(self):
         self.container.stop('foo')
@@ -1110,13 +1096,11 @@ class MockPebbleClient:
     def autostart_services(self):
         self.requests.append(('autostart',))
 
-<<<<<<< HEAD
     def get_system_info(self):
         self.requests.append(('get_system_info',))
-=======
+
     def replan_services(self):
         self.requests.append(('replan',))
->>>>>>> 861e555 (Add pebble replan, support serverside restart.)
 
     def start_services(self, service_names):
         self.requests.append(('start', service_names))

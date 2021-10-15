@@ -823,13 +823,13 @@ class Client:
 
         Raises:
             ChangeError: if one or more of the services didn't start. If
-            timeout is 0, submit the action but don't wait; just return the change
-            ID immediately.
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
         """
         return self._services_action('autostart', [], timeout, delay)
 
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
-        """Replan by (re)starting changed and startup-enabled services, then wait for them to be started.
+        """Replan by (re)starting changed and startup-enabled services and wait for them to start.
 
         Args:
             timeout: Seconds before replan change is considered timed out (float).
@@ -840,8 +840,8 @@ class Client:
 
         Raises:
             ChangeError: if one or more of the services didn't stop/start. If
-            timeout is 0, submit the action but don't wait; just return the change
-            ID immediately.
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
         """
         return self._services_action('replan', [], timeout, delay)
 
@@ -859,9 +859,9 @@ class Client:
             ChangeID of the start change.
 
         Raises:
-            ChangeError: if one or more of the services didn't start. If
-            timeout is 0, submit the action but don't wait; just return the change
-            ID immediately.
+            ChangeError: if one or more of the services didn't stop/start. If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -879,9 +879,9 @@ class Client:
             ChangeID of the stop change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop. If
-            timeout is 0, submit the action but don't wait; just return the change
-            ID immediately.
+            ChangeError: if one or more of the services didn't stop/start. If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
         """
         return self._services_action('stop', services, timeout, delay)
 
@@ -900,8 +900,8 @@ class Client:
 
         Raises:
             ChangeError: if one or more of the services didn't stop/start. If
-            timeout is 0, submit the action but don't wait; just return the change
-            ID immediately.
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
         """
         return self._services_action('restart', services, timeout, delay)
 
