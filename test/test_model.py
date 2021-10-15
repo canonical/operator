@@ -864,10 +864,6 @@ containers:
         self.container.can_connect()
         self.assertEqual(self.pebble.requests, [('get_system_info',)])
 
-    def test_replan(self):
-        self.container.replan()
-        self.assertEqual(self.pebble.requests, [('replan',)])
-
     def test_start(self):
         self.container.start('foo')
         self.container.start('foo', 'bar')
