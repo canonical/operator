@@ -2602,19 +2602,17 @@ services:
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
-    # Push/pull bytes
     def test_push_and_pull_bytes(self):
-        original_data = b"\x00\x01\x02\x03\x04"
-        encoding = None
-        stream_class = io.BytesIO
-        self._test_push_and_pull_data(original_data, encoding, stream_class)
+        self._test_push_and_pull_data(
+            original_data=b"\x00\x01\x02\x03\x04",
+            encoding=None,
+            stream_class=io.BytesIO)
 
-    # Push/pull encoded data
     def test_push_and_pull_non_utf8_data(self):
-        original_data = '日本語'  # "Japanese" in Japanese
-        encoding = 'sjis'
-        stream_class = io.StringIO
-        self._test_push_and_pull_data(original_data, encoding, stream_class)
+        self._test_push_and_pull_data(
+            original_data='日本語',  # "Japanese" in Japanese
+            encoding='sjis',
+            stream_class=io.StringIO)
 
     def _test_push_and_pull_data(self, original_data, encoding, stream_class):
         client = self.get_testing_client()
@@ -2630,8 +2628,6 @@ services:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
 
-    # Push to non-existant subdir, make_dirs=True: succeeds
-    # Push to non-existant subdir, make_dirs=False: error
     def test_push_to_non_existant_subdir(self):
         data = 'data'
         client = self.get_testing_client()
@@ -2642,7 +2638,6 @@ services:
 
         client.push('/nonexistant_dir/test', data, make_dirs=True)
 
-    # Push to child of file: error
     def test_push_as_child_of_file_raises_error(self):
         data = 'data'
         client = self.get_testing_client()
@@ -2651,8 +2646,6 @@ services:
             client.push('/file/file', data)
         self.assertEqual(cm.exception.args[0], 'generic-file-error')
 
-    # Push with permission between 0 and 0o777: succeeds
-    # Push with invalid permission (not between 0 and 0o777): error
     def test_push_with_permission_mask(self):
         data = 'data'
         client = self.get_testing_client()
@@ -2679,7 +2672,6 @@ services:
         self.assertEqual(file_.group_id, 3)
         self.assertEqual(file_.group, 'bar')
 
-    # List directory, itself=False: Return list of child files/dirs
     def test_push_files_and_list(self):
         data = 'data'
         client = self.get_testing_client()
@@ -2709,7 +2701,6 @@ services:
         self.assertEqual(file.group_id, 3)
         self.assertEqual(file.group, 'bar')
 
-    # List file: Return single item list with file object
     def test_push_and_list_file(self):
         data = 'data'
         client = self.get_testing_client()
@@ -2717,7 +2708,12 @@ services:
         files = client.list_files('/')
         self.assertEqual({file.path for file in files}, {'/file'})
 
-    # List directory, itself=True: Return single item list with directory object
+    def test_push_file_with_relative_path_fails(self):
+        client = self.get_testing_client()
+        with self.assertRaises(pebble.PathError) as cm:
+            client.push('file', '')
+        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+
     def test_list_directory_object_itself(self):
         client = self.get_testing_client()
 
@@ -2737,9 +2733,9 @@ services:
         self.assertEqual(dir_.name, 'subdir')
         self.assertEqual(dir_.type, pebble.FileType.DIRECTORY)
 
-    # List directory, itself=False, pattern specified: works like glob.
-    #   (Deltas between golang and Python exist, but test simple stuff.)
     def test_push_files_and_list_by_pattern(self):
+        # Note: glob pattern deltas do exist between golang and Python, but here,
+        # we'll just use a simple * pattern.
         data = 'data'
         client = self.get_testing_client()
         for filename in (
@@ -2752,7 +2748,6 @@ services:
         files = client.list_files('/', pattern='file*.gz')
         self.assertEqual({file.path for file in files}, {'/file1.gz', '/file2.tar.gz'})
 
-    # Make directory with existing parent: succeeds
     def test_make_directory(self):
         client = self.get_testing_client()
         client.make_dir('/subdir')
@@ -2760,8 +2755,6 @@ services:
         client.make_dir('/subdir/subdir')
         self.assertEqual(client.list_files('/subdir', pattern='subdir')[0].path, '/subdir/subdir')
 
-    # Make directory with non-existing parent: make_parents=True: succeeds
-    # Make directory with non-existing parent: make_parents=False: error
     def test_make_directory_recursively(self):
         client = self.get_testing_client()
 
@@ -2772,8 +2765,12 @@ services:
         client.make_dir('/subdir/subdir', make_parents=True)
         self.assertEqual(client.list_files('/subdir', pattern='subdir')[0].path, '/subdir/subdir')
 
-    # Make directory with file as parent: error
-    # Make directory, make_dirs=True, with closest existing ancestor as file: error
+    def test_make_directory_with_relative_path_fails(self):
+        client = self.get_testing_client()
+        with self.assertRaises(pebble.PathError) as cm:
+            client.make_dir('dir')
+        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+
     def test_make_subdir_of_file_fails(self):
         client = self.get_testing_client()
         client.push('/file', 'data')
@@ -2788,8 +2785,6 @@ services:
             client.make_dir('/file/subdir/subdir', make_parents=True)
         self.assertEqual(cm.exception.args[0], 'generic-file-error')
 
-    # Make directory with permission between 0 and 0o777: succeeds
-    # Make directory with invalid permission (not between 0 and 0o777): error
     def test_make_dir_with_permission_mask(self):
         client = self.get_testing_client()
         client.make_dir('/dir1', permissions=0o000)
@@ -2809,7 +2804,6 @@ services:
                 client.make_dir('/dir3_{}'.format(i), permissions=bad_permission)
             self.assertEqual(cm.exception.args[0], 'generic-file-error')
 
-    # Make directory with ownership parameters: succeeds, stored as-is.
     def test_make_dir_with_ownership(self):
         client = self.get_testing_client()
         client.make_dir('/dir1', user_id=1, user="foo", group_id=3, group="bar")

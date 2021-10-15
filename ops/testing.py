@@ -1288,7 +1288,8 @@ ChangeError: cannot perform the following tasks:
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
-                'generic-file-error', 'Permissions not within 0o000 to 0o777')
+                'generic-file-error',
+                'Permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
         try:
             self._fs.create_file(
                 path, source, encoding=encoding, make_dirs=make_dirs, permissions=permissions,
@@ -1296,6 +1297,13 @@ ChangeError: cannot perform the following tasks:
         except FileNotFoundError as e:
             raise pebble.PathError(
                 'not-found', 'Parent directory not found: {}'.format(e.args[0]))
+        except ValueError as e:
+            if e.args[0] == 'Path must start with slash':
+                raise pebble.PathError(
+                    'generic-file-error',
+                    'paths must be absolute, got {!r}'.format(e.args[1])
+                )
+            raise
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
@@ -1334,7 +1342,8 @@ ChangeError: cannot perform the following tasks:
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
-                'generic-file-error', 'Permissions not within 0o000 to 0o777')
+                'generic-file-error',
+                'Permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
         try:
             self._fs.create_dir(
                 path, make_parents=make_parents, permissions=permissions,
@@ -1346,6 +1355,13 @@ ChangeError: cannot perform the following tasks:
         except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
             raise pebble.PathError('generic-file-error', 'Not a directory: {}'.format(e.args[0]))
+        except ValueError as e:
+            if e.args[0] == 'Path must start with slash':
+                raise pebble.PathError(
+                    'generic-file-error',
+                    'paths must be absolute, got {!r}'.format(e.args[1])
+                )
+            raise
 
     def remove_path(self, path: str, *, recursive: bool = False):
         file_or_dir = self._fs[path]
@@ -1362,7 +1378,7 @@ class _MockFilesystem:
 
     def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
         if not path.startswith('/'):
-            raise ValueError('Path must start with slash')
+            raise ValueError('Path must start with slash', path)
         current_dir = self.root
         tokens = Path(path).parts[1:]
         for token in tokens[:-1]:
@@ -1397,6 +1413,8 @@ class _MockFilesystem:
             make_dirs: bool = False,
             **kwargs,
     ) -> '_File':
+        if not path.startswith('/'):
+            raise ValueError('Path must start with slash', path)
         path_obj = Path(path)
         try:
             dir_ = self[path_obj.parent]
