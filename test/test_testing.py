@@ -326,12 +326,17 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         self.assertIsInstance(rel_id, int)
         harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'db_name': 'someapp'})
         # Check relation and unit were created
         backend = harness._backend
         self.assertEqual(backend.relation_ids('db'), [rel_id])
         self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
         harness.charm.get_changes(reset=True)  # ignore relation created events
-        self.assertEqual(len(harness.charm.model.get_relation('db').units), 1)
+        relation = harness.charm.model.get_relation('db')
+        self.assertEqual(len(relation.units), 1)
+        # Check relation data is correct
+        rel_unit = harness.charm.model.get_unit('postgresql/0')
+        self.assertEqual(relation.data[rel_unit]['db_name'], 'someapp')
         # Now remove unit
         harness.remove_relation_unit(rel_id, 'postgresql/0')
         # Check relation still exists
@@ -340,6 +345,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_list(rel_id), [])
         # Check the unit is actually removed from the relations the model knows about
         self.assertEqual(len(harness.charm.model.get_relation('db').units), 0)
+        self.assertFalse(rel_unit in harness.charm.model.get_relation('db').data)
         # Check relation departed was raised with correct data
         self.assertEqual(harness.charm.get_changes()[0],
                          {'name': 'relation-departed',

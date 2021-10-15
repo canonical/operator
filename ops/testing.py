@@ -556,16 +556,21 @@ class Harness(typing.Generic[CharmType]):
         unit_cache = relation.data.get(remote_unit, None)
 
         # statements which could access cache
-        self._backend._relation_data[relation_id].pop(remote_unit_name)
+        # remove the unit from the list of units in the relation
         self._backend._relation_app_and_units[relation_id][
             "units"].remove(remote_unit_name)
         self._backend._relation_list_map[relation_id].remove(remote_unit_name)
+        # this is required for _emit_relation_departed to pickup the changes
+        self.model._relations._invalidate(relation_name=relation.name)
+
+        # emit the event
+        self._emit_relation_departed(relation_id, remote_unit_name)
+        # remove the relation data for the departed unit now that the event has happened
+        self._backend._relation_data[relation_id].pop(remote_unit_name)
         self.model._relations._invalidate(relation_name=relation.name)
 
         if unit_cache is not None:
             unit_cache._invalidate()
-
-        self._emit_relation_departed(relation_id, remote_unit_name)
 
     def _emit_relation_departed(self, relation_id, unit_name):
         """Trigger relation-departed event for a given relation id and unit."""
