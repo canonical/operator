@@ -565,21 +565,19 @@ class Harness(typing.Generic[CharmType]):
         if unit_cache is not None:
             unit_cache._invalidate()
 
-        self._emit_relation_departed(relation_id, remote_unit_name)
+        self._emit_relation_departed(relation, remote_unit_name)
 
-    def _emit_relation_departed(self, relation_id, unit_name):
+    def _emit_relation_departed(self, relation, unit_name):
         """Trigger relation-departed event for a given relation id and unit."""
         if self._charm is None or not self._hooks_enabled:
             return
-        rel_name = self._backend._relation_names[relation_id]
-        relation = self.model.get_relation(rel_name, relation_id)
         if '/' in unit_name:
             app_name = unit_name.split('/')[0]
             app = self.model.get_app(app_name)
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(relation, app, unit)
+        self._charm.on[relation.name].relation_departed.emit(relation, app, unit)
 
     def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
