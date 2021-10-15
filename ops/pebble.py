@@ -814,20 +814,54 @@ class Client:
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Start the startup-enabled services and wait (poll) for them to be started.
 
-        Raises ChangeError if one or more of the services didn't start. If
-        timeout is 0, submit the action but don't wait; just return the change
-        ID immediately.
+        Args:
+            timeout: Seconds before autostart change is considered timed out (float).
+            delay: Seconds before executing the autostart change (float).
+
+        Returns:
+            ChangeID of the autostart change.
+
+        Raises:
+            ChangeError: if one or more of the services didn't start. If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
         """
         return self._services_action('autostart', [], timeout, delay)
+
+    def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
+        """Replan by (re)starting changed and startup-enabled services and wait for them to start.
+
+        Args:
+            timeout: Seconds before replan change is considered timed out (float).
+            delay: Seconds before executing the replan change (float).
+
+        Returns:
+            ChangeID of the replan change.
+
+        Raises:
+            ChangeError: if one or more of the services didn't stop/start. If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
+        """
+        return self._services_action('replan', [], timeout, delay)
 
     def start_services(
         self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> ChangeID:
         """Start services by name and wait (poll) for them to be started.
 
-        Raises ChangeError if one or more of the services didn't start. If
-        timeout is 0, submit the action but don't wait; just return the change
-        ID immediately.
+        Args:
+            services: Non-empty list of services to start.
+            timeout: Seconds before start change is considered timed out (float).
+            delay: Seconds before executing the start change (float).
+
+        Returns:
+            ChangeID of the start change.
+
+        Raises:
+            ChangeError: if one or more of the services didn't stop/start. If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -836,11 +870,40 @@ class Client:
     ) -> ChangeID:
         """Stop services by name and wait (poll) for them to be started.
 
-        Raises ChangeError if one or more of the services didn't stop. If
-        timeout is 0, submit the action but don't wait; just return the change
-        ID immediately.
+        Args:
+            services: Non-empty list of services to stop.
+            timeout: Seconds before stop change is considered timed out (float).
+            delay: Seconds before executing the stop change (float).
+
+        Returns:
+            ChangeID of the stop change.
+
+        Raises:
+            ChangeError: if one or more of the services didn't stop/start. If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
         """
         return self._services_action('stop', services, timeout, delay)
+
+    def restart_services(
+        self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+    ) -> ChangeID:
+        """Restart services by name and wait (poll) for them to be started.
+
+        Args:
+            services: Non-empty list of services to restart.
+            timeout: Seconds before restart change is considered timed out (float).
+            delay: Seconds before executing the restart change (float).
+
+        Returns:
+            ChangeID of the restart change.
+
+        Raises:
+            ChangeError: if one or more of the services didn't stop/start. If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
+        """
+        return self._services_action('restart', services, timeout, delay)
 
     def _services_action(
         self, action: str, services: typing.Iterable[str], timeout: float, delay: float,
