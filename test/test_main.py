@@ -710,6 +710,26 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         event_file = self.JUJU_CHARM_DIR / rel_path
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
+        fake_script(
+            self,
+            "storage-get",
+            """
+            if [ "$1" = --format=json ]; then
+                echo '{"type": "filesystem", "location": "/var/srv/disks/0"}'
+            elif [ "$2" = disks/0 ]; then
+                echo '"/var/srv/disks/0"'
+            else
+                exit 0
+            fi
+            """,
+        )
+        fake_script(
+            self,
+            "storage-list",
+            """
+            echo '["disks/0"]'
+            """,
+        )
         subprocess.run(
             [sys.executable, str(event_file)],
             check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
@@ -960,6 +980,26 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
+        fake_script(
+            self,
+            "storage-get",
+            """
+            if [ "$1" = --format=json ]; then
+                echo '{"type": "filesystem", "location": "/var/srv/disks/0"}'
+            elif [ "$2" = disks/0 ]; then
+                echo '"/var/srv/disks/0"'
+            else
+                exit 0
+            fi
+            """,
+        )
+        fake_script(
+            self,
+            "storage-list",
+            """
+            echo '["disks/0"]'
+            """,
+        )
         subprocess.run(
             [sys.executable, str(dispatch)],
             # stdout=self.stdout,
@@ -990,6 +1030,26 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
+        fake_script(
+            self,
+            "storage-get",
+            """
+            if [ "$1" = --format=json ]; then
+                echo '{"type": "filesystem", "location": "/var/srv/disks/0"}'
+            elif [ "$2" = disks/0 ]; then
+                echo '"/var/srv/disks/0"'
+            else
+                exit 0
+            fi
+            """,
+        )
+        fake_script(
+            self,
+            "storage-list",
+            """
+            echo '["disks/0"]'
+            """,
+        )
         dispatch = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
         subprocess.check_call([str(dispatch)], env=env, cwd=str(self.JUJU_CHARM_DIR))
 

@@ -1008,6 +1008,22 @@ class StorageMapping(Mapping):
                 storage_list.append(Storage(storage_name, storage_id, self._backend))
         return storage_list
 
+    def get_by_name_and_location(self, storage_name: str, location: str) -> "Storage":
+        """Looks up an entry by the location.
+
+        :class:`Storage` objects do not necessarily have any unique identifiers
+        which can resolve to the informaiton returned by `storage-get` when a storage
+        is attached or detached, which returns only the location and type. A lookup
+        here allows for :class:`Model``.storages`:meth:`get_by_location` to aggregate
+        lookups in a single place.
+        """
+        # Force population of the lookup table if it isn't initialized
+        for val in self.__getitem__(storage_name):
+            if val.location == location:
+                return val
+        raise ModelError("Cannot find storage by location {!r}: no storage with the given "
+                         "location found".format(location))
+
     def request(self, storage_name: str, count: int = 1):
         """Requests new storage instances of a given name.
 

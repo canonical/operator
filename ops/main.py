@@ -150,6 +150,22 @@ def _get_event_args(charm, bound_event):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
         return [container], {}
+    elif issubclass(event_type, ops.charm.StorageEvent):
+        storage_info = model._backend._run("storage-get", return_output=True, use_json=True)
+
+        # Find the appropriate storage -- it would be nice if Juju
+        # had a better primitive to get all of this at once
+        storage = None
+
+        for storage_name in charm.meta.storages.keys():
+            try:
+                storage = model.storages.get_by_name_and_location(
+                    storage_name, storage_info["location"]
+                )
+                break
+            except ops.model.ModelError:
+                logger.debug("Storage location '{}' not found in '{}', trying next")
+        return [storage], {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])

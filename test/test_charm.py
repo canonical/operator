@@ -26,7 +26,7 @@ from ops.charm import (
     ContainerStorageMeta,
 )
 from ops.framework import EventBase, EventSource, Framework
-from ops.model import Model, _ModelBackend
+from ops.model import Model, Storage, _ModelBackend
 from ops.storage import SQLiteStorage
 
 from .test_helpers import fake_script, fake_script_calls
@@ -217,6 +217,29 @@ storage:
     type: filesystem
 ''')
 
+        fake_script(
+            self,
+            "storage-get",
+            """
+            if [ "$1" = --format=json ]; then
+                echo '{"type": "filesystem", "location": "/var/srv/disks/0"}'
+            else
+                # Return the same path for all disks since `storage-get`
+                # on attach and detach takes no parameters and is not
+                # deterministically faked with fake_script
+                echo '"/var/srv/disks/0"'
+                exit 0
+            fi
+            """,
+        )
+        fake_script(
+            self,
+            "storage-list",
+            """
+            echo '["disks/0"]'
+            """,
+        )
+
         self.assertIsNone(self.meta.storages['stor1'].multiple_range)
         self.assertEqual(self.meta.storages['stor2'].multiple_range, (2, 2))
         self.assertEqual(self.meta.storages['stor3'].multiple_range, (2, None))
@@ -224,10 +247,10 @@ storage:
 
         charm = MyCharm(self.create_framework())
 
-        charm.on['stor1'].storage_attached.emit()
-        charm.on['stor2'].storage_detaching.emit()
-        charm.on['stor3'].storage_attached.emit()
-        charm.on['stor-4'].storage_attached.emit()
+        charm.on['stor1'].storage_attached.emit(Storage("stor1", 0, None))
+        charm.on['stor2'].storage_detaching.emit(Storage("stor2", 0, None))
+        charm.on['stor3'].storage_attached.emit(Storage("stor3", 0, None))
+        charm.on['stor-4'].storage_attached.emit(Storage("stor-4", 0, None))
 
         self.assertEqual(charm.seen, [
             'StorageAttachedEvent',
