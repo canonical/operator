@@ -925,7 +925,7 @@ def _has_fileno(f):
         return False
 
 
-def _reader_to_websocket(reader, ws, encoding, cancel_reader=None, bufsize=128 * 1024):
+def _reader_to_websocket(reader, ws, encoding, cancel_reader=None, bufsize=16 * 1024):
     """Read reader through to EOF and send each chunk read to the websocket."""
     while True:
         if cancel_reader is not None:
