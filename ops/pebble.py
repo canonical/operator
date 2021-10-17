@@ -825,6 +825,7 @@ class ExecProcess:
         at most that duration.
 
         Raises:
+            ChangeError: if there was an error starting or running the process.
             ExecError: if the process exits with a non-zero exit code.
         """
         exit_code = self._wait()
@@ -870,6 +871,7 @@ class ExecProcess:
         the process's standard error, and stderr will be None.
 
         Raises:
+            ChangeError: if there was an error starting or running the process.
             ExecError: if the process exits with a non-zero exit code.
         """
         if self._encoding is not None:
