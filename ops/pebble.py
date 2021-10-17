@@ -927,6 +927,7 @@ def _reader_to_websocket(reader, ws, encoding, cancel_reader=None, bufsize=128 *
     """Read reader through to EOF and send each chunk read to the websocket."""
     while True:
         if cancel_reader is not None:
+            # Wait for either a read to be ready or the caller to cancel stdin
             result = select.select([cancel_reader, reader], [], [])
             if cancel_reader in result[0]:
                 break
@@ -1803,11 +1804,14 @@ class Client:
                 if sys.platform == 'win32':
                     raise NotImplementedError('file-based stdin not supported on Windows')
 
-                cancel_reader, w = os.pipe()
+                # Create a pipe so _reader_to_websocket can select() on the
+                # reader as well as this cancel_reader; when we write anything
+                # to cancel_writer it'll trigger the select and end the thread.
+                cancel_reader, cancel_writer = os.pipe()
 
                 def cancel_stdin():
-                    os.write(w, b'x')  # doesn't matter what we write
-                    os.close(w)
+                    os.write(cancel_writer, b'x')  # doesn't matter what we write
+                    os.close(cancel_writer)
 
             t = _start_thread(_reader_to_websocket, stdin, stdio_ws, encoding, cancel_reader)
             threads.append(t)
