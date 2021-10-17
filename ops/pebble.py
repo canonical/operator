@@ -118,7 +118,11 @@ def _parse_timestamp(s):
 
 
 def _format_timeout(timeout: float):
-    """Format timeout as a formatted Go time.Duration value."""
+    """Format timeout for use in the Pebble API.
+
+    The format is in seconds with a millisecond resolution and an 's' suffix,
+    as accepted by the Pebble API (which uses Go's time.ParseDuration).
+    """
     return '{:.3f}s'.format(timeout)
 
 
