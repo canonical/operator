@@ -955,7 +955,8 @@ def _websocket_to_writer(ws, writer, encoding):
 class _WebsocketWriter(io.BufferedIOBase):
     """A writable file-like object that sends what's written to it to a websocket."""
 
-    def __init__(self, ws, encoding):
+    def __init__(self, name, ws, encoding):
+        self.name = name
         self.ws = ws
         self.encoding = encoding
 
@@ -967,10 +968,10 @@ class _WebsocketWriter(io.BufferedIOBase):
         """Write chunk to the websocket."""
         if isinstance(chunk, str):
             if self.encoding is None:
-                raise ValueError('encoding must be set if writing str to stdin')
+                raise ValueError('encoding must be set if writing str to {}'.format(self.name))
             chunk = chunk.encode(self.encoding)
         elif self.encoding is not None:
-            raise ValueError('encoding must be None if writing bytes to stdin')
+            raise ValueError('encoding must be None if writing bytes to {}'.format(self.name))
         self.ws.send_binary(chunk)
         return len(chunk)
 
@@ -1812,7 +1813,7 @@ class Client:
             threads.append(t)
             process_stdin = None
         else:
-            process_stdin = _WebsocketWriter(stdio_ws, encoding)
+            process_stdin = _WebsocketWriter('stdin', stdio_ws, encoding)
 
         if stdout is not None:
             t = _start_thread(_websocket_to_writer, stdio_ws, stdout, encoding)
