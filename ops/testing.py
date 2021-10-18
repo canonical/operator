@@ -1065,6 +1065,10 @@ class _TestingModelBackend:
     def add_metrics(self, metrics, labels=None):
         raise NotImplementedError(self.add_metrics)
 
+    @classmethod
+    def log_split(cls, message, max_len):
+        raise NotImplementedError(cls.log_split)
+
     def juju_log(self, level, msg):
         raise NotImplementedError(self.juju_log)
 
