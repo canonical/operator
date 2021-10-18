@@ -2500,6 +2500,58 @@ class TestExec(unittest.TestCase):
             self.client.exec(['foo'])
         self.assertIn(str(cm.exception), 'unexpected error connecting to websockets: conn!')
 
+    def test_websocket_send_binary_raises(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        raised = False
+
+        def send_binary(b):
+            nonlocal raised
+            raised = True
+            raise Exception('a simulated error!')
+
+        stdio.send_binary = send_binary
+        stdio.receives.append('')
+        stderr.receives.append('')
+
+        process = self.client.exec(['cat'], stdin='foo\nbar\n')
+        out, err = process.wait_output()
+        self.assertEqual(out, '')
+        self.assertEqual(err, '')
+        self.assertTrue(raised)
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['cat'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
+    def test_websocket_recv_raises(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        raised = False
+
+        def recv():
+            nonlocal raised
+            raised = True
+            raise Exception('a simulated error!')
+
+        stdio.recv = recv
+        stderr.receives.append('')
+
+        process = self.client.exec(['cat'], stdin='foo\nbar\n')
+        out, err = process.wait_output()
+        self.assertEqual(out, '')
+        self.assertEqual(err, '')
+        self.assertTrue(raised)
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['cat'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [
+            ('BIN', b'foo\nbar\n'),
+            ('TXT', ''),
+        ])
+
 
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
 # against a real Pebble server. For example, in one terminal, run Pebble:
