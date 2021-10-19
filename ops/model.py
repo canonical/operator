@@ -25,7 +25,6 @@ import shutil
 import tempfile
 import time
 import typing
-import warnings
 import weakref
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
@@ -1361,7 +1360,6 @@ class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
 
 
-# TODO: Drop the period from this regex when the above DeprecationWarning is removed
 _ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
 
 
@@ -1378,16 +1376,6 @@ def _validate_action_result_key(key: str) -> None:
     Raises:
         ValueError: if a dict is passed with a key that fails to meet the format requirements.
     """
-    # Existing charms may well be passing dicts to set_result that contain dicts pre-formatted
-    # to use dotted notation having worked around this in the past. We will deprecate this in the
-    # future to avoid possible duplication of keys.
-    # TODO: Drop this in a future release
-    if '.' in key:
-        msg = ("a '.' was detected in the dict key: '{}' while formatting a dict passed to "
-               "ActionEvent.set_result(). Keys using the dotted notation will be rejected in a "
-               "later release.")
-        warnings.warn(msg.format(key), DeprecationWarning)
-
     if not _ACTION_RESULT_KEY_REGEX.match(key):
         raise ValueError("key '{!r}' is invalid: must be similar to 'key' or 'some-key2', with "
                          "'.' as a separator".format(key))
@@ -1414,6 +1402,10 @@ def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict
 
     Returns:
         A flattened dictionary with validated keys
+
+    Raises:
+        ValueError: if the dict is passed with a mix of dotted/non-dotted keys that expand out to
+            result in duplicate keys. For example: {'a': {'b': 1}, 'a.b': 2}.
     """
     items = []
     for key, value in dictionary.items():
@@ -1429,7 +1421,17 @@ def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict
             items.extend(_format_action_result_dict(value, new_key).items())
         else:
             items.append((new_key, value))
-    return dict(items)
+
+    # Check for duplicate keys which can occur when a charm author mixes dotted and non-dotted keys
+    keys = [k[0] for k in items]
+    duplicate_keys = set(k for k in keys if keys.count(k) > 1)
+
+    if duplicate_keys:
+        raise ValueError(
+            "duplicate keys detected in dictionary passed to 'action-set': {!r}"
+            .format(", ".join(duplicate_keys)))
+    else:
+        return dict(items)
 
 
 class _ModelBackend:

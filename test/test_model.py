@@ -1762,9 +1762,16 @@ class TestModelBackend(unittest.TestCase):
     def test_action_set_dotted_dict(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
-        with self.assertWarns(DeprecationWarning):
-            self.backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
+        self.backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
         self.assertCountEqual(['action-set', 'a.b=1', 'a.c=2', 'd=3'], fake_script_calls(self)[0])
+
+    def test_action_set_duplicated_keys(self):
+        fake_script(self, 'action-get', 'exit 1')
+        fake_script(self, 'action-set', 'exit 0')
+        with self.assertRaises(ValueError):
+            self.backend.action_set({'a.b': 1, 'a': {'b': 2}, 'd': 3})
+        with self.assertRaises(ValueError):
+            self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4, 'a.d.e': 'foo'})
 
     def test_action_fail(self):
         fake_script(self, 'action-get', 'exit 1')
