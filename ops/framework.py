@@ -327,20 +327,24 @@ class Object(metaclass=_Metaclass):
     handle_kind = HandleKind()
 
     def __init__(self, parent, key):
-        """Initialize the Object, tracking the framework reference and the object's unique name.
+        """Initialize an Object as a new leaf in :class:`Framework`, identified by `key`
 
         Args:
-            parent: The class that this inherits from. Used here to track and maintain a
-                    convenient reference to the framework object in this class. Note that this
-                    class and the framework object may be one and the same.
-            key: The unique name of this object (see below).
+            parent: parent node in the tree.
+            key: unique identifier for this object.
 
-        Each object in the Operator Framework has a unique identity. Event handlers use this id to
-        track the destination of their events, and the Framework uses this id to track persisted
-        state between event executions.
+        Every object belongs to exactly one framework.
+
+        Every object has a parent, which might be a framework.
+
+        We track a "path to object," which is the path to the parent, plus the object's
+        unique identifier. Event handlers use this identity to track the destination of
+        their events, and the Framework uses this id to track persisted state between
+        event executions.
 
         The Framework should raise an error if it ever detects that two objects with the same id
         have been created.
+
         """
         kind = self.handle_kind
         if isinstance(parent, Framework):
