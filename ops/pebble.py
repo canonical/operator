@@ -920,8 +920,8 @@ def _has_fileno(f):
         f.fileno()
         return True
     except Exception:
-        # Should be AttributeError or io.UnsupportedOperation, but catching
-        # all exceptions here won't hurt
+        # Some types define a fileno method that raises io.UnsupportedOperation,
+        # but just catching all exceptions here won't hurt.
         return False
 
 
