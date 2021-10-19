@@ -26,7 +26,6 @@ import pdb
 import re
 import sys
 import types
-import warnings
 import weakref
 
 from ops import charm
@@ -917,19 +916,6 @@ class BoundStoredState:
         for k, v in kwargs.items():
             if k not in self._data:
                 self._data[k] = v
-
-    def update(self, **kwargs):
-        """Set the value of any given set of keys.
-
-        Example::
-
-            self._stored.update(foo="bar", baz="qux")
-        """
-        if not kwargs:
-            warnings.warn("BoundStoredState.update called with no arguments is a no-np.", Warning)
-
-        for k, v in kwargs.items():
-            self._data[k] = v
 
 
 class StoredState:
