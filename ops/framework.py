@@ -322,7 +322,7 @@ class _Metaclass(type):
 
 
 class Object(metaclass=_Metaclass):
-    """Initialize an Object as a new leaf in :class:`Framework`, identified by `key`
+    """Initialize an Object as a new leaf in :class:`Framework`, identified by `key`.
 
     Args:
         parent: parent node in the tree.
