@@ -38,6 +38,8 @@ from ops.jujuversion import JujuVersion
 
 logger = logging.getLogger(__name__)
 
+MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
+
 
 class Model:
     """Represents the Juju Model as seen from this unit.
@@ -1133,7 +1135,9 @@ class Container:
             if e.code != 400:
                 raise e
             # support old Pebble instances that don't support the "restart" action
-            self._pebble.stop_services(service_names)
+            for svc in self.get_services(service_names):
+                if svc.is_running():
+                    self._pebble.stop_services(svc.name)
             self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
@@ -1596,8 +1600,24 @@ class _ModelBackend:
     def application_version_set(self, version):
         self._run('application-version-set', '--', version)
 
+    @classmethod
+    def log_split(cls, message, max_len=MAX_LOG_LINE_LEN):
+        """Helper to handle log messages that are potentially too long.
+
+        This is a generator that splits a message string into multiple chunks if it is too long
+        to safely pass to bash. Will only generate a single entry if the line is not too long.
+        """
+        if len(message) > max_len:
+            yield "Log string greater than {}. Splitting into multiple chunks: ".format(max_len)
+
+        while message:
+            yield message[:max_len]
+            message = message[max_len:]
+
     def juju_log(self, level, message):
-        self._run('juju-log', '--log-level', level, "--", message)
+        """Pass a log message on to the juju logger."""
+        for line in self.log_split(message):
+            self._run('juju-log', '--log-level', level, "--", line)
 
     def network_get(self, binding_name, relation_id=None):
         """Return network info provided by network-get for a given binding.
