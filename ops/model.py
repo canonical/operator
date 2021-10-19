@@ -15,10 +15,10 @@
 """Representations of Juju's model, application, unit, and other entities."""
 
 import datetime
-import decimal
 import ipaddress
 import json
 import logging
+import math
 import os
 import re
 import shutil
@@ -1771,16 +1771,14 @@ class _ModelBackendValidator:
 
     @classmethod
     def format_metric_value(cls, value):
-        try:
-            decimal_value = decimal.Decimal.from_float(value)
-        except TypeError as e:
-            e2 = ModelError('invalid metric value {!r} provided:'
-                            ' must be a positive finite float'.format(value))
-            raise e2 from e
-        if decimal_value.is_nan() or decimal_value.is_infinite() or decimal_value < 0:
+        if not isinstance(value, (int, float)):
             raise ModelError('invalid metric value {!r} provided:'
                              ' must be a positive finite float'.format(value))
-        return str(decimal_value)
+
+        if math.isnan(value) or math.isinf(value) or value < 0:
+            raise ModelError('invalid metric value {!r} provided:'
+                             ' must be a positive finite float'.format(value))
+        return str(value)
 
     @classmethod
     def validate_label_value(cls, label, value):

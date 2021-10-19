@@ -884,14 +884,6 @@ class TestFramework(BaseTestCase):
                 'ObjectWithStorage[obj]/on/event[1]']))
 
 
-def is_stored_data_dirty(stored):
-    """Inspect underlying data structure behind Stored* to check if structure is dirty.
-
-    To be used in testing only, as it inspects private properties on the Stored* objects.
-    """
-    return stored._data.dirty
-
-
 class TestStoredState(BaseTestCase):
 
     def setUp(self):
@@ -1486,47 +1478,8 @@ class TestStoredState(BaseTestCase):
         parent._stored.set_default(foo=5, bar=6)
         self.assertEqual(parent._stored.foo, 1)
         self.assertEqual(parent._stored.bar, 4)
-        self.assertFalse(is_stored_data_dirty(parent._stored))
-
-    def test_update(self):
-        framework = self.create_framework()
-
-        class StatefulObject(Object):
-            _stored = StoredState()
-        parent = StatefulObject(framework, 'key')
-
-        # Check updating a single key, not yet set
-        parent._stored.update(foo="bar")
-        # Ensure underlying data structure is marked dirty
-        self.assertTrue(is_stored_data_dirty(parent._stored))
-        self.assertEqual(parent._stored.foo, "bar")
-        parent._stored.update(foo="baz")
-
-        # Set some defaults, ensure the update method overrides them
-        parent._stored.set_default(operator=True, framework=False)
-        self.assertEqual(parent._stored.operator, True)
-        parent._stored.update(operator=False)
-        self.assertEqual(parent._stored.operator, False)
-
-        # Check updating multiple items
-        parent._stored.update(operator=True, framework=True)
-        self.assertEqual(parent._stored.operator, True)
-        self.assertEqual(parent._stored.framework, True)
-        parent._stored.update(foo="qux", operator=False)
-        self.assertEqual(parent._stored.operator, False)
-        self.assertEqual(parent._stored.foo, "qux")
-
-        # Check calling using other dicts
-        d = {"foo": "bar", "baz": "qux"}
-        parent._stored.update(**d)
-        self.assertEqual(parent._stored.foo, "bar")
-        self.assertEqual(parent._stored.baz, "qux")
-
-        # Test error cases
-        with self.assertRaises(TypeError):
-            parent._stored.update(d)
-        with self.assertWarns(Warning):
-            parent._stored.update()
+        # TODO: jam 2020-01-30 is there a clean way to tell that
+        #       parent._stored._data.dirty is False?
 
 
 class GenericObserver(Object):
