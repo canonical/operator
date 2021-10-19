@@ -2212,8 +2212,8 @@ class TestExec(unittest.TestCase):
     def test_wait_output(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         stdio.receives.append(b'Python 3.8.10\n')
-        stdio.receives.append('')
-        stderr.receives.append('')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
 
         process = self.client.exec(['python3', '--version'])
         out, err = process.wait_output()
@@ -2229,7 +2229,7 @@ class TestExec(unittest.TestCase):
     def test_wait_output_combine_stderr(self):
         stdio, _, _ = self.add_responses('123', 0)
         stdio.receives.append(b'invalid time interval\n')
-        stdio.receives.append('')
+        stdio.receives.append('{"command":"end"}')
 
         process = self.client.exec(['sleep', 'x'], combine_stderr=True)
         out, err = process.wait_output()
@@ -2247,8 +2247,8 @@ class TestExec(unittest.TestCase):
     def test_wait_output_bytes(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         stdio.receives.append(b'Python 3.8.10\n')
-        stdio.receives.append('')
-        stderr.receives.append('')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
 
         process = self.client.exec(['python3', '--version'], encoding=None)
         out, err = process.wait_output()
@@ -2263,9 +2263,9 @@ class TestExec(unittest.TestCase):
 
     def test_wait_output_exit_nonzero(self):
         stdio, stderr, _ = self.add_responses('123', 0)
-        stdio.receives.append('')
+        stdio.receives.append('{"command":"end"}')
         stderr.receives.append(b'file not found: x\n')
-        stderr.receives.append('')
+        stderr.receives.append('{"command":"end"}')
 
         process = self.client.exec(['ls', 'x'])
         out, err = process.wait_output()
@@ -2281,7 +2281,7 @@ class TestExec(unittest.TestCase):
     def test_wait_output_exit_nonzero_combine_stderr(self):
         stdio, _, _ = self.add_responses('123', 0)
         stdio.receives.append(b'file not found: x\n')
-        stdio.receives.append('')
+        stdio.receives.append('{"command":"end"}')
 
         process = self.client.exec(['ls', 'x'], combine_stderr=True)
         out, err = process.wait_output()
@@ -2298,8 +2298,8 @@ class TestExec(unittest.TestCase):
     def test_wait_output_send_stdin(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         stdio.receives.append(b'FOO\nBAR\n')
-        stdio.receives.append('')
-        stderr.receives.append('')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
 
         process = self.client.exec(['awk', '{ print toupper($) }'], stdin='foo\nbar\n')
         out, err = process.wait_output()
@@ -2312,14 +2312,14 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(stdio.sends, [
             ('BIN', b'foo\nbar\n'),
-            ('TXT', ''),
+            ('TXT', '{"command":"end"}'),
         ])
 
     def test_wait_output_send_stdin_bytes(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         stdio.receives.append(b'FOO\nBAR\n')
-        stdio.receives.append('')
-        stderr.receives.append('')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
 
         process = self.client.exec(['awk', '{ print toupper($) }'], stdin=b'foo\nbar\n',
                                    encoding=None)
@@ -2333,15 +2333,15 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(stdio.sends, [
             ('BIN', b'foo\nbar\n'),
-            ('TXT', ''),
+            ('TXT', '{"command":"end"}'),
         ])
 
     def test_wait_passed_output(self):
         io_ws, stderr, _ = self.add_responses('123', 0)
         io_ws.receives.append(b'foo\n')
-        io_ws.receives.append('')
+        io_ws.receives.append('{"command":"end"}')
         stderr.receives.append(b'some error\n')
-        stderr.receives.append('')
+        stderr.receives.append('{"command":"end"}')
 
         out = io.StringIO()
         err = io.StringIO()
@@ -2360,7 +2360,7 @@ class TestExec(unittest.TestCase):
         io_ws, _, _ = self.add_responses('123', 0)
         io_ws.receives.append(b'foo\n')
         io_ws.receives.append(b'some error\n')
-        io_ws.receives.append('')
+        io_ws.receives.append('{"command":"end"}')
 
         out = io.StringIO()
         process = self.client.exec(['echo', 'foo'], stdout=out, combine_stderr=True)
@@ -2378,9 +2378,9 @@ class TestExec(unittest.TestCase):
     def test_wait_passed_output_bytes(self):
         io_ws, stderr, _ = self.add_responses('123', 0)
         io_ws.receives.append(b'foo\n')
-        io_ws.receives.append('')
+        io_ws.receives.append('{"command":"end"}')
         stderr.receives.append(b'some error\n')
-        stderr.receives.append('')
+        stderr.receives.append('{"command":"end"}')
 
         out = io.BytesIO()
         err = io.BytesIO()
@@ -2406,9 +2406,9 @@ class TestExec(unittest.TestCase):
 
             io_ws, stderr, _ = self.add_responses('123', 0)
             io_ws.receives.append(b'foo\n')
-            io_ws.receives.append('')
+            io_ws.receives.append('{"command":"end"}')
             stderr.receives.append(b'some error\n')
-            stderr.receives.append('')
+            stderr.receives.append('{"command":"end"}')
 
             process = self.client.exec(['echo', 'foo'], stdin=fin, stdout=out, stderr=err)
             process.wait()
@@ -2424,7 +2424,7 @@ class TestExec(unittest.TestCase):
             ])
             self.assertEqual(io_ws.sends, [
                 ('BIN', b'foo\n'),
-                ('TXT', ''),
+                ('TXT', '{"command":"end"}'),
             ])
         finally:
             fin.close()
@@ -2435,7 +2435,7 @@ class TestExec(unittest.TestCase):
         stdio, stderr, _ = self.add_responses('123', 0)
         stdio.receives.append(b'FOO BAR\n')
         stdio.receives.append(b'BAZZ\n')
-        stdio.receives.append('')
+        stdio.receives.append('{"command":"end"}')
 
         process = self.client.exec(['awk', '{ print toupper($) }'])
         process.stdin.write('Foo Bar\n')
@@ -2454,14 +2454,14 @@ class TestExec(unittest.TestCase):
         self.assertEqual(stdio.sends, [
             ('BIN', b'Foo Bar\n'),
             ('BIN', b'bazz\n'),
-            ('TXT', ''),
+            ('TXT', '{"command":"end"}'),
         ])
 
     def test_wait_returned_io_bytes(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         stdio.receives.append(b'FOO BAR\n')
         stdio.receives.append(b'BAZZ\n')
-        stdio.receives.append('')
+        stdio.receives.append('{"command":"end"}')
 
         process = self.client.exec(['awk', '{ print toupper($) }'], encoding=None)
         process.stdin.write(b'Foo Bar\n')
@@ -2480,7 +2480,7 @@ class TestExec(unittest.TestCase):
         self.assertEqual(stdio.sends, [
             ('BIN', b'Foo Bar\n'),
             ('BIN', b'bazz\n'),
-            ('TXT', ''),
+            ('TXT', '{"command":"end"}'),
         ])
 
     def test_connect_websocket_error(self):
@@ -2510,8 +2510,8 @@ class TestExec(unittest.TestCase):
             raise Exception('a simulated error!')
 
         stdio.send_binary = send_binary
-        stdio.receives.append('')
-        stderr.receives.append('')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
 
         process = self.client.exec(['cat'], stdin='foo\nbar\n')
         out, err = process.wait_output()
@@ -2535,7 +2535,7 @@ class TestExec(unittest.TestCase):
             raise Exception('a simulated error!')
 
         stdio.recv = recv
-        stderr.receives.append('')
+        stderr.receives.append('{"command":"end"}')
 
         process = self.client.exec(['cat'], stdin='foo\nbar\n')
         out, err = process.wait_output()
@@ -2549,7 +2549,7 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(stdio.sends, [
             ('BIN', b'foo\nbar\n'),
-            ('TXT', ''),
+            ('TXT', '{"command":"end"}'),
         ])
 
 

@@ -941,15 +941,26 @@ def _reader_to_websocket(reader, ws, encoding, cancel_reader=None, bufsize=16 * 
             chunk = chunk.encode(encoding)
         ws.send_binary(chunk)
 
-    ws.send('')  # Send message barrier to signal EOF
+    ws.send('{"command":"end"}')  # Send "end" command as TEXT frame to signal EOF
 
 
 def _websocket_to_writer(ws, writer, encoding):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
         chunk = ws.recv()
-        if not chunk:
+
+        if isinstance(chunk, str):
+            try:
+                command = json.loads(chunk)
+            except ValueError:
+                # Garbage sent, try to keep going
+                continue
+            if command.get('command') != 'end':
+                # A command we don't recognize, keep going
+                continue
+            # Received "end" command (EOF signal), stop thread
             break
+
         if encoding is not None:
             chunk = chunk.decode(encoding)
         writer.write(chunk)
@@ -980,7 +991,7 @@ class _WebsocketWriter(io.BufferedIOBase):
 
     def close(self):
         """Send end-of-file message to websocket."""
-        self.ws.send('')
+        self.ws.send('{"command":"end"}')
 
 
 class _WebsocketReader(io.BufferedIOBase):
@@ -999,9 +1010,12 @@ class _WebsocketReader(io.BufferedIOBase):
         """Read up to n bytes from the websocket (or one message if n<0)."""
         if not self.remaining:
             recv = self.ws.recv()
-            if not recv:
-                # Message barrier received, signal EOF
+
+            if isinstance(recv, str):
+                _ = json.loads(recv)  # raise ValueError on invalid JSON
+                # Received "end" command, return EOF designator
                 return '' if self.encoding is not None else b''
+
             if self.encoding is not None:
                 recv = recv.decode(self.encoding)
             self.remaining = recv
