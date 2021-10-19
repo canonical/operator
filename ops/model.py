@@ -1362,7 +1362,7 @@ class InvalidStatusError(ModelError):
 
 
 # TODO: Drop the period from this regex when the above DeprecationWarning is removed
-ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
+_ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
 
 
 def _validate_action_result_key(key: str) -> None:
@@ -1388,10 +1388,9 @@ def _validate_action_result_key(key: str) -> None:
                "later release.")
         warnings.warn(msg.format(key), DeprecationWarning)
 
-    if not ACTION_RESULT_KEY_REGEX.match(key):
-        raise ValueError("Key '{}' is invalid: keys must start and end with lowercase "
-                         "alphanumeric, and contain only lowercase alphanumeric hyphens and "
-                         "periods".format(key))
+    if not _ACTION_RESULT_KEY_REGEX.match(key):
+        raise ValueError("key '{!r}' is invalid: must be similar to 'key' or 'some-key2', with "
+                         "'.' as a separator".format(key))
 
 
 def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict:
@@ -1421,7 +1420,11 @@ def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict
         # Ensure the key is of a valid format, and raise a ValueError if not
         _validate_action_result_key(key)
         # Construct a new key for the flattened dict
-        new_key = "{}.{}".format(parent_key, key) if parent_key else key
+        if parent_key:
+            new_key = "{}.{}".format(parent_key, key)
+        else:
+            new_key = key
+
         if isinstance(value, MutableMapping):
             items.extend(_format_action_result_dict(value, new_key).items())
         else:
