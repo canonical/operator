@@ -47,6 +47,14 @@ class TestModel(unittest.TestCase):
             resources:
               foo: {type: file, filename: foo.txt}
               bar: {type: file, filename: bar.txt}
+        ''', config='''
+        options:
+            foo:
+                type: string
+            bar:
+                type: int
+            qux:
+                type: bool
         ''')
         self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
