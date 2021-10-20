@@ -1327,6 +1327,59 @@ class ServiceInfoMapping(Mapping):
         return repr(self._services)
 
 
+class SecretOptions:
+    """SecretOptions holds options for creating secrets.
+
+    TODO: Example here -just a password length option for passwords.
+    """
+    def __init__(self, secret_type: str, length: int = None):
+        self._secret_type = secret_type
+        self._length = length
+
+    @classmethod
+    def password_secret(cls, length: int = None):
+        """Specify the required minimum length of a password."""
+        return SecretOptions('password', length)
+
+
+class Secrets:
+    """TODO: nice description of what a secret is.
+
+    TODO: Probably link to public docs.
+
+    TODO: Make some notes about how this class in particularly works.
+    """
+    def __init__(self, backend: '_ModelBackend'):
+        self._backend = backend
+
+    def create(self, name: str, rotation_policy: int = None, staged: bool = False,
+               options: 'SecretOptions' = None, **kwargs) -> str:
+        """Create a secret.
+
+        kwargs are the secret key values.
+
+        TODO: be more formal about accepting kwargs? Or leave as drafted, for flexibility
+        and ease of maintenance?
+        """
+        pass  # TODO
+
+    def grant(self, secret_id: str, scope: str, entity: str) -> None:
+        """Grant access to a secret.
+
+        Scope is app or unit.
+        """
+        pass  # TODO
+
+    def get_value(self, secret_id: str, *args) -> [str, dict]:
+        """Get contents of the secret.
+
+        Returns a string value if the secret is just a string, or just a single attribute value is
+        requested, or a dict of key-value pairs if more than one attr is requested or the whole
+        secret is requested.
+        """
+        pass  # TODO
+
+
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
     pass
@@ -1728,6 +1781,10 @@ class _ModelBackend:
         app_state = self._run('goal-state', return_output=True, use_json=True)
         # Planned units can be zero. We don't need to do error checking here.
         return len(app_state.get('units', []))
+
+    @property
+    def secrets(self) -> 'Secrets':
+        return self._secrets
 
 
 class _ModelBackendValidator:
