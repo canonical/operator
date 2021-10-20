@@ -1363,25 +1363,7 @@ class InvalidStatusError(ModelError):
 _ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
 
 
-def _validate_action_result_key(key: str) -> None:
-    """Use regular expressions to validate that the given key is in the correct format.
-
-    Correct format is defined as starting with and ending with a lowercase alphanumeric
-    character, and containing nothing but lowercase, alphanumeric characters, hyphens and
-    periods.
-
-    Arguments:
-        key: a string representing the key for an item in an action result.
-
-    Raises:
-        ValueError: if a dict is passed with a key that fails to meet the format requirements.
-    """
-    if not _ACTION_RESULT_KEY_REGEX.match(key):
-        raise ValueError("key '{!r}' is invalid: must be similar to 'key' or 'some-key2', with "
-                         "'.' as a separator".format(key))
-
-
-def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict:
+def _format_action_result_dict(input: dict, parent_key: str = None, output: dict = None) -> dict:
     """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
 
     This is used to allow nested dictionaries to be translated into the dotted format required by
@@ -1397,41 +1379,39 @@ def _format_action_result_dict(dictionary: dict, parent_key: str = None) -> dict
         {'a.b': 1, 'a.c': 2}
 
     Arguments:
-        dictionary: The dictionary to flatten
+        input: The dictionary to flatten
         parent_key: The string to prepend to dictionary's keys
+        output: The current dictionary to be returned, which may or may not yet be completely flat
 
     Returns:
         A flattened dictionary with validated keys
 
     Raises:
         ValueError: if the dict is passed with a mix of dotted/non-dotted keys that expand out to
-            result in duplicate keys. For example: {'a': {'b': 1}, 'a.b': 2}.
+            result in duplicate keys. For example: {'a': {'b': 1}, 'a.b': 2}. Also raised if a dict
+            is passed with a key that fails to meet the format requirements.
     """
-    items = []
-    for key, value in dictionary.items():
+    if output is None:
+        output = {}
+
+    for key, value in input.items():
         # Ensure the key is of a valid format, and raise a ValueError if not
-        _validate_action_result_key(key)
-        # Construct a new key for the flattened dict
+        if not _ACTION_RESULT_KEY_REGEX.match(key):
+            raise ValueError("key '{!r}' is invalid: must be similar to 'key' or 'some-key2', with"
+                             " '.' as a separator".format(key))
+
         if parent_key:
-            new_key = "{}.{}".format(parent_key, key)
-        else:
-            new_key = key
+            key = "{}.{}".format(parent_key, key)
 
         if isinstance(value, MutableMapping):
-            items.extend(_format_action_result_dict(value, new_key).items())
+            output = _format_action_result_dict(value, key, output)
+        elif key in output:
+            raise ValueError("duplicate key detected in dictionary passed to 'action-set': {!r}"
+                             .format(key))
         else:
-            items.append((new_key, value))
+            output[key] = value
 
-    # Check for duplicate keys which can occur when a charm author mixes dotted and non-dotted keys
-    keys = [k[0] for k in items]
-    duplicate_keys = set(k for k in keys if keys.count(k) > 1)
-
-    if duplicate_keys:
-        raise ValueError(
-            "duplicate keys detected in dictionary passed to 'action-set': {!r}"
-            .format(", ".join(duplicate_keys)))
-    else:
-        return dict(items)
+    return output
 
 
 class _ModelBackend:
