@@ -1085,6 +1085,41 @@ containers:
         self.pebble.responses.append('dummy')
         self.assertTrue(self.container.can_connect())
 
+    def test_exec(self):
+        self.pebble.responses.append('fake_exec_process')
+        p = self.container.exec(
+            ['echo', 'foo'],
+            environment={'K1': 'V1', 'K2': 'V2'},
+            working_dir='WD',
+            timeout=10.5,
+            user_id=1000,
+            user='bob',
+            group_id=1000,
+            group='staff',
+            stdin='STDIN',
+            stdout='STDOUT',
+            stderr='STDERR',
+            encoding=None,
+            combine_stderr=True,
+        )
+        self.assertEqual(self.pebble.requests, [
+            ('exec', ['echo', 'foo'], dict(
+                environment={'K1': 'V1', 'K2': 'V2'},
+                working_dir='WD',
+                timeout=10.5,
+                user_id=1000,
+                user='bob',
+                group_id=1000,
+                group='staff',
+                stdin='STDIN',
+                stdout='STDOUT',
+                stderr='STDERR',
+                encoding=None,
+                combine_stderr=True,
+            ))
+        ])
+        self.assertEqual(p, 'fake_exec_process')
+
 
 class MockPebbleBackend(ops.model._ModelBackend):
     def get_pebble(self, socket_path):
@@ -1150,6 +1185,10 @@ class MockPebbleClient:
 
     def remove_path(self, path, *, recursive=False):
         self.requests.append(('remove_path', path, recursive))
+
+    def exec(self, command, **kwargs):
+        self.requests.append(('exec', command, kwargs))
+        return self.responses.pop(0)
 
 
 class TestModelBindings(unittest.TestCase):
