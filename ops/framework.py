@@ -26,7 +26,6 @@ import pdb
 import re
 import sys
 import types
-import warnings
 import weakref
 
 from ops import charm
@@ -323,8 +322,24 @@ class _Metaclass(type):
 
 
 class Object(metaclass=_Metaclass):
-    """Base class of all the charm-related objects."""
+    """Initialize an Object as a new leaf in :class:`Framework`, identified by `key`.
 
+    Args:
+        parent: parent node in the tree.
+        key: unique identifier for this object.
+
+    Every object belongs to exactly one framework.
+
+    Every object has a parent, which might be a framework.
+
+    We track a "path to object," which is the path to the parent, plus the object's unique
+    identifier. Event handlers use this identity to track the destination of their events, and the
+    Framework uses this id to track persisted state between event executions.
+
+    The Framework should raise an error if it ever detects that two objects with the same id have
+    been created.
+
+    """
     handle_kind = HandleKind()
 
     def __init__(self, parent, key):
@@ -917,19 +932,6 @@ class BoundStoredState:
         for k, v in kwargs.items():
             if k not in self._data:
                 self._data[k] = v
-
-    def update(self, **kwargs):
-        """Set the value of any given set of keys.
-
-        Example::
-
-            self._stored.update(foo="bar", baz="qux")
-        """
-        if not kwargs:
-            warnings.warn("BoundStoredState.update called with no arguments is a no-np.", Warning)
-
-        for k, v in kwargs.items():
-            self._data[k] = v
 
 
 class StoredState:
