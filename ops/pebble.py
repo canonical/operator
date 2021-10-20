@@ -137,7 +137,7 @@ def _json_loads(s: typing.Union[str, bytes]) -> typing.Dict:
     return json.loads(s)
 
 
-def _start_thread(target, *args, **kwargs):
+def _start_thread(target, *args, **kwargs) -> threading.Thread:
     """Helper to simplify starting a thread."""
     thread = threading.Thread(target=target, args=args, kwargs=kwargs)
     thread.start()
@@ -387,7 +387,7 @@ class Task:
         progress: TaskProgress,
         spawn_time: datetime.datetime,
         ready_time: typing.Optional[datetime.datetime],
-        data: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        data: typing.Dict[str, typing.Any] = None,
     ):
         self.id = id
         self.kind = kind
@@ -449,7 +449,7 @@ class Change:
         err: typing.Optional[str],
         spawn_time: datetime.datetime,
         ready_time: typing.Optional[datetime.datetime],
-        data: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        data: typing.Dict[str, typing.Any] = None,
     ):
         self.id = id
         self.kind = kind
@@ -795,7 +795,7 @@ class ExecProcess:
         command: typing.List[str],
         encoding: typing.Optional[str],
         change_id: ChangeID,
-        cancel_stdin: typing.Callable,
+        cancel_stdin: typing.Callable[[], None],
         cancel_reader: typing.Optional[int],
         threads: typing.List[threading.Thread],
     ):
@@ -1000,7 +1000,7 @@ class _WebsocketReader(io.BufferedIOBase):
     def __init__(self, ws, encoding):
         self.ws = ws
         self.encoding = encoding
-        self.remaining = b'' if encoding is not None else ''
+        self.remaining = '' if encoding is not None else b''
 
     def readable(self):
         """Denote this file-like object as readable."""
@@ -1673,10 +1673,10 @@ class Client:
             >>> schema, logs = process.wait_output()
 
             # Stream input from a string and write output to files
-            >>> in = 'foo\nbar\n'
+            >>> stdin = 'foo\nbar\n'
             >>> with open('out.txt', 'w') as out, open('err.txt', 'w') as err:
             ...     process = client.exec(['awk', '{ print toupper($0) }'],
-            ...                           stdin=in, stdout=out, stderr=err)
+            ...                           stdin=stdin, stdout=out, stderr=err)
             ...     process.wait()
             >>> open('out.txt').read()
             'FOO\nBAR\n'
@@ -1761,7 +1761,7 @@ class Client:
             arguments to :meth:`exec`, or :meth:`ExecProcess.wait_output` if
             not.
         """
-        if isinstance(command, (bytes, str)):
+        if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
             raise TypeError('command must be a list of str, not {}'.format(
                 type(command).__name__))
         if len(command) < 1:

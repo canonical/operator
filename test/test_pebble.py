@@ -2562,8 +2562,7 @@ class TestExec(unittest.TestCase):
 # In another terminal, run the tests:
 #
 # $ source .tox/unit/bin/activate
-# $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble \
-#     pytest test/test_pebble.py -v -k RealPebble
+# $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_pebble.py -v -k RealPebble
 # $ deactivate
 #
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
