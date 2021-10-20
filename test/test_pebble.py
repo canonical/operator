@@ -140,15 +140,70 @@ class TestTypes(unittest.TestCase):
             status='Done',
             tasks=[],
             ready=True,
-            err=None,
+            err='Some error',
             spawn_time=datetime.datetime.now(),
             ready_time=datetime.datetime.now(),
         )
-        error = pebble.ChangeError('Some error', change)
+        error = pebble.ChangeError(change.err, change)
         self.assertIsInstance(error, pebble.Error)
         self.assertEqual(error.err, 'Some error')
         self.assertEqual(error.change, change)
         self.assertEqual(str(error), 'Some error')
+
+    def test_change_error_with_task_logs(self):
+        change = pebble.Change(
+            id=pebble.ChangeID('1234'),
+            kind='start',
+            summary='Start service "foo"',
+            status='Done',
+            tasks=[
+                pebble.Task(
+                    id=pebble.TaskID('12345'),
+                    kind='start',
+                    summary='Start service "foo"',
+                    status='Error',
+                    log=['LINE1', 'LINE2'],
+                    progress=pebble.TaskProgress(label='foo', done=3, total=7),
+                    spawn_time=datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218),
+                    ready_time=datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158),
+                ),
+                pebble.Task(
+                    id=pebble.TaskID('12346'),
+                    kind='start',
+                    summary='Start service "bar"',
+                    status='Error',
+                    log=[],
+                    progress=pebble.TaskProgress(label='foo', done=3, total=7),
+                    spawn_time=datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218),
+                    ready_time=datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158),
+                ),
+                pebble.Task(
+                    id=pebble.TaskID('12347'),
+                    kind='start',
+                    summary='Start service "bazz"',
+                    status='Error',
+                    log=['single log'],
+                    progress=pebble.TaskProgress(label='foo', done=3, total=7),
+                    spawn_time=datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218),
+                    ready_time=datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158),
+                ),
+            ],
+            ready=True,
+            err='Some error',
+            spawn_time=datetime.datetime.now(),
+            ready_time=datetime.datetime.now(),
+        )
+        error = pebble.ChangeError(change.err, change)
+        self.assertIsInstance(error, pebble.Error)
+        self.assertEqual(error.err, 'Some error')
+        self.assertEqual(error.change, change)
+        self.assertEqual(str(error), """Some error
+----- Logs from task 0 -----
+LINE1
+LINE2
+----- Logs from task 2 -----
+single log
+-----""")
 
     def test_warning_state(self):
         self.assertEqual(list(pebble.WarningState), [
