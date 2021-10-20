@@ -1397,8 +1397,8 @@ def _format_action_result_dict(input: dict, parent_key: str = None, output: dict
     for key, value in input.items():
         # Ensure the key is of a valid format, and raise a ValueError if not
         if not _ACTION_RESULT_KEY_REGEX.match(key):
-            raise ValueError("key '{!r}' is invalid: must be similar to 'key' or 'some-key2', with"
-                             " '.' as a separator".format(key))
+            raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
+                             "'some.key'".format(key))
 
         if parent_key:
             key = "{}.{}".format(parent_key, key)
