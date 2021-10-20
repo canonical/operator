@@ -1398,6 +1398,60 @@ class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
 
 
+_ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
+
+
+def _format_action_result_dict(input: dict, parent_key: str = None, output: dict = None) -> dict:
+    """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
+
+    This is used to allow nested dictionaries to be translated into the dotted format required by
+    the Juju `action-set` hook tool in order to set nested data on an action.
+
+    Additionally, this method performs some validation on keys to ensure they only use permitted
+    characters.
+
+    Example::
+
+        >>> test_dict = {'a': {'b': 1, 'c': 2}}
+        >>> _format_action_result_dict(test_dict)
+        {'a.b': 1, 'a.c': 2}
+
+    Arguments:
+        input: The dictionary to flatten
+        parent_key: The string to prepend to dictionary's keys
+        output: The current dictionary to be returned, which may or may not yet be completely flat
+
+    Returns:
+        A flattened dictionary with validated keys
+
+    Raises:
+        ValueError: if the dict is passed with a mix of dotted/non-dotted keys that expand out to
+            result in duplicate keys. For example: {'a': {'b': 1}, 'a.b': 2}. Also raised if a dict
+            is passed with a key that fails to meet the format requirements.
+    """
+    if output is None:
+        output = {}
+
+    for key, value in input.items():
+        # Ensure the key is of a valid format, and raise a ValueError if not
+        if not _ACTION_RESULT_KEY_REGEX.match(key):
+            raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
+                             "'some.key'".format(key))
+
+        if parent_key:
+            key = "{}.{}".format(parent_key, key)
+
+        if isinstance(value, MutableMapping):
+            output = _format_action_result_dict(value, key, output)
+        elif key in output:
+            raise ValueError("duplicate key detected in dictionary passed to 'action-set': {!r}"
+                             .format(key))
+        else:
+            output[key] = value
+
+    return output
+
+
 class _ModelBackend:
     """Represents the connection between the Model representation and talking to Juju.
 
@@ -1627,7 +1681,10 @@ class _ModelBackend:
         return self._run('action-get', return_output=True, use_json=True)
 
     def action_set(self, results):
-        self._run('action-set', *["{}={}".format(k, v) for k, v in results.items()])
+        # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
+        # flatten out any nested dict structures into a dotted notation, and validate keys.
+        flat_results = _format_action_result_dict(results)
+        self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
 
     def action_log(self, message):
         self._run('action-log', message)
