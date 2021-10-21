@@ -1117,9 +1117,8 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
-        stor_id = harness.add_storage("test", count=3)
-        self.assertIsNotNone(stor_id)
-        self.assertIn(str(stor_id), harness._backend.storage_list("test"))
+        stor_ids = harness.add_storage("test", count=3)
+        self.assertSetEqual(set(stor_ids), set(harness._backend.storage_list("test")))
         self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
 
         harness.begin_with_initial_hooks()
@@ -1155,9 +1154,8 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         # Set up initial storage
-        stor_id = harness.add_storage("test")
-        self.assertIsNotNone(stor_id)
-        self.assertIn(str(stor_id), harness._backend.storage_list("test"))
+        stor_id = harness.add_storage("test")[0]
+        self.assertIn(stor_id, harness._backend.storage_list("test"))
         self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
 
         harness.begin_with_initial_hooks()
@@ -1165,14 +1163,14 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
 
         # Add additional storage
-        stor_id = harness.add_storage("test", count=3)
+        stor_ids = harness.add_storage("test", count=3)
         # NOTE: stor_id now reflects the 4th ID.  The 2nd and 3rd IDs are created and
         # used, but not returned by Harness.add_storage.
         # (Should we consider changing its return type?)
 
-        self.assertIn(str(stor_id - 2), harness._backend.storage_list("test"))
-        self.assertIn(str(stor_id - 1), harness._backend.storage_list("test"))
-        self.assertIn(str(stor_id), harness._backend.storage_list("test"))
+        self.assertIn(stor_ids[0], harness._backend.storage_list("test"))
+        self.assertIn(stor_ids[1], harness._backend.storage_list("test"))
+        self.assertIn(stor_ids[2], harness._backend.storage_list("test"))
         self.assertEqual("/test/1", harness._backend.storage_get("test/1", "location"))
         self.assertEqual("/test/2", harness._backend.storage_get("test/2", "location"))
         self.assertEqual("/test/3", harness._backend.storage_get("test/3", "location"))
@@ -1193,7 +1191,7 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         # Set up initial storage
-        stor_id = harness.add_storage("test")
+        stor_id = harness.add_storage("test")[0]
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 1)
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
@@ -1205,7 +1203,7 @@ class TestHarness(unittest.TestCase):
 
         # Verify backend functions return appropriate values.
         # Real backend would return info only for actively attached storage units.
-        self.assertNotIn(str(stor_id), harness._backend.storage_list("test"))
+        self.assertNotIn(stor_id, harness._backend.storage_list("test"))
         with self.assertRaises(ModelError) as cm:
             harness._backend.storage_get("test/0", "location")
         # Error message modeled after output of
@@ -1232,7 +1230,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
-        stor_id = harness.add_storage("test")
+        stor_id = harness.add_storage("test")[0]
         with self.assertRaises(RuntimeError) as cm:
             harness.detach_storage("test/{}".format(stor_id))
         self.assertEqual(cm.exception.args[0],
@@ -1256,7 +1254,7 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         # Set up initial storage
-        stor_id = harness.add_storage("test")
+        stor_id = harness.add_storage("test")[0]
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 1)
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
@@ -1273,7 +1271,7 @@ class TestHarness(unittest.TestCase):
 
         # Verify backend functions return appropriate values.
         # Real backend would return info only for actively attached storage units.
-        self.assertIn(str(stor_id), harness._backend.storage_list("test"))
+        self.assertIn(stor_id, harness._backend.storage_list("test"))
         self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
 
         # Retry attach
@@ -1294,7 +1292,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
-        stor_id = harness.add_storage("test")
+        stor_id = harness.add_storage("test")[0]
         # This admittedly doesn't really make sense since we block pre-begin attachments; added for
         # completeness.
         with self.assertRaises(RuntimeError) as cm:
@@ -1316,8 +1314,8 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
-        stor_id = harness.add_storage("test", count=2)
-        harness.remove_storage("test/{}".format(stor_id))
+        stor_ids = harness.add_storage("test", count=2)
+        harness.remove_storage("test/{}".format(stor_ids[0]))
         # Note re: delta between real behavior and Harness: Juju doesn't allow removal
         # of the last attached storage unit while a workload is still running.  To more
         # easily allow testing of storage removal, I am presently ignoring this detail.
@@ -1359,21 +1357,19 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
-        stor_id = harness.add_storage("test", count=2)
+        stor_ids = harness.add_storage("test", count=2)
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 2)
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
         self.assertTrue(isinstance(harness.charm.observed_events[1], StorageAttachedEvent))
 
-        harness.remove_storage("test/{}".format(stor_id))
+        harness.remove_storage("test/{}".format(stor_ids[1]))
         self.assertEqual(len(harness.charm.observed_events), 3)
         self.assertTrue(isinstance(harness.charm.observed_events[2], StorageDetachingEvent))
 
-        # stor_id will reflect the second storage unit, i.e. test/1 (integer id: 1)
-        # Since we removed the stor_id entry; I expect the other entry to remain.
         attached_storage_ids = harness._backend.storage_list("test")
-        self.assertIn(str(stor_id - 1), attached_storage_ids)
-        self.assertNotIn(str(stor_id), attached_storage_ids)
+        self.assertIn(stor_ids[0], attached_storage_ids)
+        self.assertNotIn(stor_ids[1], attached_storage_ids)
 
     def test_remove_detached_storage(self):
         harness = Harness(StorageTester, meta='''
@@ -1389,10 +1385,10 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
-        stor_id = harness.add_storage("test", count=2)
+        stor_ids = harness.add_storage("test", count=2)
         harness.begin_with_initial_hooks()
-        harness.detach_storage("test/{}".format(stor_id))
-        harness.remove_storage("test/{}".format(stor_id))  # Already detached, so won't fire a hook
+        harness.detach_storage("test/{}".format(stor_ids[0]))
+        harness.remove_storage("test/{}".format(stor_ids[0]))  # Already detached, so won't fire a hook
         self.assertEqual(len(harness.charm.observed_events), 3)
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
         self.assertTrue(isinstance(harness.charm.observed_events[1], StorageAttachedEvent))

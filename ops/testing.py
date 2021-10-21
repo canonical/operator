@@ -177,9 +177,9 @@ class Harness(typing.Generic[CharmType]):
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
             storage_name = storage_name.replace('-', '_')
-            for _ in range(len(self._backend.storage_list(storage_name))):
+            for storage_index in self._backend.storage_list(storage_name):
                 # Storage device(s) detected, emit storage-attached event(s)
-                self._charm.on[storage_name].storage_attached.emit()
+                self._charm.on[storage_name].storage_attached.emit(model.Storage(storage_name, storage_index, self._backend))
         # Storage done, emit install event
         self._charm.on.install.emit()
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
@@ -389,7 +389,7 @@ class Harness(typing.Generic[CharmType]):
         self._relation_id_counter += 1
         return rel_id
 
-    def add_storage(self, storage_name: str, count: int = 1) -> int:
+    def add_storage(self, storage_name: str, count: int = 1) -> typing.List[int]:
         """Declare a new storage device attached to this unit.
 
         To have repeatable tests, each device will be initialized with
@@ -401,15 +401,19 @@ class Harness(typing.Generic[CharmType]):
             count: Number of disks being added
 
         Return:
-            The storage_id created
+            A list of storage IDs, expressed as the integer component after the slash,
+            rather than the full string-based identifier.
+            For example, with storage_name="my-storage" and count=3, assuming counting
+            begins at 0, this would return [0, 1, 2].
         """
         if storage_name not in self._meta.storages:
             raise RuntimeError(
                 "{} not found as a valid storage key in metadata".format(storage_name))
+        storage_indices = self._backend.storage_add(storage_name, count)
         if self.charm is not None and self._hooks_enabled:
-            for _ in range(count):
-                self.charm.on[storage_name].storage_attached.emit()
-        return self._backend.storage_add(storage_name, count)
+            for storage_index in storage_indices:
+                self.charm.on[storage_name].storage_attached.emit(model.Storage(storage_name, storage_index, self._backend))
+        return storage_indices
 
     def detach_storage(self, storage_id: str) -> None:
         """Detach a storage device.
@@ -424,15 +428,17 @@ class Harness(typing.Generic[CharmType]):
         """
         if self.charm is None:
             raise RuntimeError('Cannot detach when harness has not been started yet')
-        if self._backend._storage_detach(storage_id) and self._hooks_enabled:
-            storage_name = storage_id.split('/')[0]
-            self.charm.on[storage_name].storage_detaching.emit()
+        storage_name, storage_index = storage_id.split('/', 1)
+        storage_index = int(storage_index)
+        if self._backend._storage_is_attached(storage_name, storage_index) and self._hooks_enabled:
+            self.charm.on[storage_name].storage_detaching.emit(model.Storage(storage_name, storage_index, self._backend))
+        self._backend._storage_detach(storage_id)
 
     def attach_storage(self, storage_id: str) -> None:
         """Attach a storage device.
 
         The intent of this function is to simulate a "juju attach-storage" call.
-        It will trigger a storage-detaching hook if the storage unit in question exists
+        It will trigger a storage-attached hook if the storage unit in question exists
         and is presently marked as detached.
 
         Args:
@@ -442,8 +448,9 @@ class Harness(typing.Generic[CharmType]):
         if self.charm is None:
             raise RuntimeError('Cannot attach when harness has not been started yet')
         if self._backend._storage_attach(storage_id) and self._hooks_enabled:
-            storage_name = storage_id.split('/')[0]
-            self.charm.on[storage_name].storage_attached.emit()
+            storage_name, storage_index = storage_id.split('/', 1)
+            storage_index = int(storage_index)
+            self.charm.on[storage_name].storage_attached.emit(model.Storage(storage_name, storage_index, self._backend))
 
     def remove_storage(self, storage_id: str) -> None:
         """Attach a storage device.
@@ -457,13 +464,15 @@ class Harness(typing.Generic[CharmType]):
             storage_id: The full storage ID being detached, including the storage key,
                 e.g. my-storage/0.
         """
-        storage_name = storage_id.split('/')[0]
+        storage_name, storage_index = storage_id.split('/', 1)
+        storage_index = int(storage_index)
         if storage_name not in self._meta.storages:
             raise RuntimeError(
                 "{} not found as a valid storage key in metadata".format(storage_name))
-        removed = self._backend._storage_remove(storage_id)
-        if self.charm is not None and self._hooks_enabled and removed:
-            self.charm.on[storage_name].storage_detaching.emit()
+        is_attached = self._backend._storage_is_attached(storage_name, storage_index)
+        if self.charm is not None and self._hooks_enabled and is_attached:
+            self.charm.on[storage_name].storage_detaching.emit(model.Storage(storage_name, storage_index, self._backend))
+        self._backend._storage_remove(storage_id)
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
@@ -1086,59 +1095,64 @@ class _TestingModelBackend:
             self._unit_status = {'status': status, 'message': message}
 
     def storage_list(self, name):
-        return list(id_ for id_ in self._storage_list[name]
-                    if id_ not in self._storage_detached[name])
+        return list(index for index in self._storage_list[name]
+                    if self._storage_is_attached(name, index))
 
     def storage_get(self, storage_name_id, attribute):
-        name, id_ = storage_name_id.split("/", 1)
+        name, index = storage_name_id.split("/", 1)
+        index = int(index)
         try:
-            if id_ in self._storage_detached[name]:
+            if index in self._storage_detached[name]:
                 raise KeyError()  # Pretend the key isn't there
             else:
-                return self._storage_list[name][id_][attribute]
+                return self._storage_list[name][index][attribute]
         except KeyError:
             raise model.ModelError(
-                'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, id_))
+                'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
 
     def storage_add(self, name: str, count: int = 1):
         if name not in self._storage_list:
             self._storage_list[name] = {}
-        storage_id = None
+        result = []
         for i in range(count):
-            storage_id = self._storage_id_counter
+            index = self._storage_id_counter
             self._storage_id_counter += 1
-            self._storage_list[name][str(storage_id)] = {
-                "location": "/{}/{}".format(name, storage_id)
+            self._storage_list[name][index] = {
+                "location": "/{}/{}".format(name, index)
             }
-        return storage_id
+            result.append(index)
+        return result
 
     def _storage_detach(self, storage_id: str):
         # NOTE: This is an extra function for _TestingModelBackend to simulate
         # detachment of a storage unit.  This is not present in ops.model._ModelBackend.
-        name, id_ = storage_id.split('/', 1)
-        if id_ not in self._storage_detached[name]:
-            self._storage_detached[name].add(id_)
-            return True
-        return False
+        name, index = storage_id.split('/', 1)
+        index = int(index)
+        if self._storage_is_attached(name, index):
+            self._storage_detached[name].add(index)
 
     def _storage_attach(self, storage_id: str):
         # NOTE: This is an extra function for _TestingModelBackend to simulate
         # re-attachment of a storage unit.  This is not present in
         # ops.model._ModelBackend.
-        name, id_ = storage_id.split('/', 1)
-        if id_ in self._storage_detached[name]:
-            self._storage_detached[name].remove(id_)
+        name, index = storage_id.split('/', 1)
+        index = int(index)
+        if not self._storage_is_attached(name, index):
+            self._storage_detached[name].remove(index)
             return True
         return False
+
+    def _storage_is_attached(self, storage_name, storage_index):
+        return storage_index not in self._storage_detached[storage_name]
 
     def _storage_remove(self, storage_id: str):
         # NOTE: This is an extra function for _TestingModelBackend to simulate
         # full removal of a storage unit.  This is not present in
         # ops.model._ModelBackend.
-        detached = self._storage_detach(storage_id)
-        name, id_ = storage_id.split('/', 1)
-        self._storage_list[name].pop(id_, None)
-        return detached
+        self._storage_detach(storage_id)
+        name, index = storage_id.split('/', 1)
+        index = int(index)
+        self._storage_list[name].pop(index, None)
 
     def action_get(self):
         raise NotImplementedError(self.action_get)
