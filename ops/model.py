@@ -15,10 +15,10 @@
 """Representations of Juju's model, application, unit, and other entities."""
 
 import datetime
-import decimal
 import ipaddress
 import json
 import logging
+import math
 import os
 import re
 import shutil
@@ -37,6 +37,8 @@ from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
 logger = logging.getLogger(__name__)
+
+MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
 
 class Model:
@@ -1111,6 +1113,10 @@ class Container:
         """Autostart all services marked as startup: enabled."""
         self._pebble.autostart_services()
 
+    def replan(self):
+        """Replan all services: restart changed services and start startup-enabled services."""
+        self._pebble.replan_services()
+
     def start(self, *service_names: str):
         """Start given service(s) by name."""
         if not service_names:
@@ -1123,10 +1129,16 @@ class Container:
         if not service_names:
             raise TypeError('restart expected at least 1 argument, got 0')
 
-        for svc in self.get_services(*service_names).values():
-            if svc.is_running():
-                self._pebble.stop_services((*[svc.name],))
-        self._pebble.start_services(service_names)
+        try:
+            self._pebble.restart_services(service_names)
+        except pebble.APIError as e:
+            if e.code != 400:
+                raise e
+            # support old Pebble instances that don't support the "restart" action
+            for svc in self.get_services(service_names):
+                if svc.is_running():
+                    self._pebble.stop_services(svc.name)
+            self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
@@ -1268,6 +1280,44 @@ class Container:
         """
         self._pebble.remove_path(path, recursive=recursive)
 
+    def exec(
+        self,
+        command: typing.List[str],
+        *,
+        environment: typing.Dict[str, str] = None,
+        working_dir: str = None,
+        timeout: float = None,
+        user_id: int = None,
+        user: str = None,
+        group_id: int = None,
+        group: str = None,
+        stdin: typing.Union[str, bytes, typing.TextIO, typing.BinaryIO] = None,
+        stdout: typing.Union[typing.TextIO, typing.BinaryIO] = None,
+        stderr: typing.Union[typing.TextIO, typing.BinaryIO] = None,
+        encoding: str = 'utf-8',
+        combine_stderr: bool = False
+    ) -> 'pebble.ExecProcess':
+        """Execute the given command on the remote system.
+
+        See :meth:`ops.pebble.Client.exec` for documentation of the parameters
+        and return value, as well as examples.
+        """
+        return self._pebble.exec(
+            command,
+            environment=environment,
+            working_dir=working_dir,
+            timeout=timeout,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            encoding=encoding,
+            combine_stderr=combine_stderr,
+        )
+
 
 class ContainerMapping(Mapping):
     """Map of container names to Container objects.
@@ -1346,6 +1396,60 @@ class RelationNotFoundError(ModelError):
 
 class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
+
+
+_ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
+
+
+def _format_action_result_dict(input: dict, parent_key: str = None, output: dict = None) -> dict:
+    """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
+
+    This is used to allow nested dictionaries to be translated into the dotted format required by
+    the Juju `action-set` hook tool in order to set nested data on an action.
+
+    Additionally, this method performs some validation on keys to ensure they only use permitted
+    characters.
+
+    Example::
+
+        >>> test_dict = {'a': {'b': 1, 'c': 2}}
+        >>> _format_action_result_dict(test_dict)
+        {'a.b': 1, 'a.c': 2}
+
+    Arguments:
+        input: The dictionary to flatten
+        parent_key: The string to prepend to dictionary's keys
+        output: The current dictionary to be returned, which may or may not yet be completely flat
+
+    Returns:
+        A flattened dictionary with validated keys
+
+    Raises:
+        ValueError: if the dict is passed with a mix of dotted/non-dotted keys that expand out to
+            result in duplicate keys. For example: {'a': {'b': 1}, 'a.b': 2}. Also raised if a dict
+            is passed with a key that fails to meet the format requirements.
+    """
+    if output is None:
+        output = {}
+
+    for key, value in input.items():
+        # Ensure the key is of a valid format, and raise a ValueError if not
+        if not _ACTION_RESULT_KEY_REGEX.match(key):
+            raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
+                             "'some.key'".format(key))
+
+        if parent_key:
+            key = "{}.{}".format(parent_key, key)
+
+        if isinstance(value, MutableMapping):
+            output = _format_action_result_dict(value, key, output)
+        elif key in output:
+            raise ValueError("duplicate key detected in dictionary passed to 'action-set': {!r}"
+                             .format(key))
+        else:
+            output[key] = value
+
+    return output
 
 
 class _ModelBackend:
@@ -1577,7 +1681,10 @@ class _ModelBackend:
         return self._run('action-get', return_output=True, use_json=True)
 
     def action_set(self, results):
-        self._run('action-set', *["{}={}".format(k, v) for k, v in results.items()])
+        # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
+        # flatten out any nested dict structures into a dotted notation, and validate keys.
+        flat_results = _format_action_result_dict(results)
+        self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
 
     def action_log(self, message):
         self._run('action-log', message)
@@ -1588,8 +1695,24 @@ class _ModelBackend:
     def application_version_set(self, version):
         self._run('application-version-set', '--', version)
 
+    @classmethod
+    def log_split(cls, message, max_len=MAX_LOG_LINE_LEN):
+        """Helper to handle log messages that are potentially too long.
+
+        This is a generator that splits a message string into multiple chunks if it is too long
+        to safely pass to bash. Will only generate a single entry if the line is not too long.
+        """
+        if len(message) > max_len:
+            yield "Log string greater than {}. Splitting into multiple chunks: ".format(max_len)
+
+        while message:
+            yield message[:max_len]
+            message = message[max_len:]
+
     def juju_log(self, level, message):
-        self._run('juju-log', '--log-level', level, "--", message)
+        """Pass a log message on to the juju logger."""
+        for line in self.log_split(message):
+            self._run('juju-log', '--log-level', level, "--", line)
 
     def network_get(self, binding_name, relation_id=None):
         """Return network info provided by network-get for a given binding.
@@ -1666,16 +1789,14 @@ class _ModelBackendValidator:
 
     @classmethod
     def format_metric_value(cls, value):
-        try:
-            decimal_value = decimal.Decimal.from_float(value)
-        except TypeError as e:
-            e2 = ModelError('invalid metric value {!r} provided:'
-                            ' must be a positive finite float'.format(value))
-            raise e2 from e
-        if decimal_value.is_nan() or decimal_value.is_infinite() or decimal_value < 0:
+        if not isinstance(value, (int, float)):
             raise ModelError('invalid metric value {!r} provided:'
                              ' must be a positive finite float'.format(value))
-        return str(decimal_value)
+
+        if math.isnan(value) or math.isinf(value) or value < 0:
+            raise ModelError('invalid metric value {!r} provided:'
+                             ' must be a positive finite float'.format(value))
+        return str(value)
 
     @classmethod
     def validate_label_value(cls, label, value):
