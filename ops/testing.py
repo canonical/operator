@@ -1333,3 +1333,6 @@ ChangeError: cannot perform the following tasks:
 
     def remove_path(self, path: str, *, recursive: bool = False):
         raise NotImplementedError(self.remove_path)
+
+    def exec(self, command, **kwargs):
+        raise NotImplementedError(self.exec)

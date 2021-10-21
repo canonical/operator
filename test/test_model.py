@@ -1085,6 +1085,41 @@ containers:
         self.pebble.responses.append('dummy')
         self.assertTrue(self.container.can_connect())
 
+    def test_exec(self):
+        self.pebble.responses.append('fake_exec_process')
+        p = self.container.exec(
+            ['echo', 'foo'],
+            environment={'K1': 'V1', 'K2': 'V2'},
+            working_dir='WD',
+            timeout=10.5,
+            user_id=1000,
+            user='bob',
+            group_id=1000,
+            group='staff',
+            stdin='STDIN',
+            stdout='STDOUT',
+            stderr='STDERR',
+            encoding=None,
+            combine_stderr=True,
+        )
+        self.assertEqual(self.pebble.requests, [
+            ('exec', ['echo', 'foo'], dict(
+                environment={'K1': 'V1', 'K2': 'V2'},
+                working_dir='WD',
+                timeout=10.5,
+                user_id=1000,
+                user='bob',
+                group_id=1000,
+                group='staff',
+                stdin='STDIN',
+                stdout='STDOUT',
+                stderr='STDERR',
+                encoding=None,
+                combine_stderr=True,
+            ))
+        ])
+        self.assertEqual(p, 'fake_exec_process')
+
 
 class MockPebbleBackend(ops.model._ModelBackend):
     def get_pebble(self, socket_path):
@@ -1150,6 +1185,10 @@ class MockPebbleClient:
 
     def remove_path(self, path, *, recursive=False):
         self.requests.append(('remove_path', path, recursive))
+
+    def exec(self, command, **kwargs):
+        self.requests.append(('exec', command, kwargs))
+        return self.responses.pop(0)
 
 
 class TestModelBindings(unittest.TestCase):
@@ -1712,8 +1751,8 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-set', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.model.ModelError):
             self.backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
-        calls = [["action-set", "foo=bar", "dead=beef cafe"]]
-        self.assertEqual(fake_script_calls(self, clear=True), calls)
+        self.assertCountEqual(
+            ["action-set", "dead=beef cafe", "foo=bar"], fake_script_calls(self, clear=True)[0])
 
     def test_action_log_error(self):
         fake_script(self, 'action-get', '')
@@ -1733,8 +1772,45 @@ class TestModelBackend(unittest.TestCase):
     def test_action_set(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
-        self.backend.action_set(OrderedDict([('x', 'dead beef'), ('y', 1)]))
-        self.assertEqual(fake_script_calls(self), [['action-set', 'x=dead beef', 'y=1']])
+        self.backend.action_set({'x': 'dead beef', 'y': 1})
+        self.assertCountEqual(['action-set', 'x=dead beef', 'y=1'], fake_script_calls(self)[0])
+
+    def test_action_set_key_validation(self):
+        with self.assertRaises(ValueError):
+            self.backend.action_set({'X': 'dead beef', 'y': 1})
+        with self.assertRaises(ValueError):
+            self.backend.action_set({'some&key': 'dead beef', 'y': 1})
+        with self.assertRaises(ValueError):
+            self.backend.action_set({'someKey': 'dead beef', 'y': 1})
+        with self.assertRaises(ValueError):
+            self.backend.action_set({'some_key': 'dead beef', 'y': 1})
+
+    def test_action_set_nested(self):
+        fake_script(self, 'action-get', 'exit 1')
+        fake_script(self, 'action-set', 'exit 0')
+        self.backend.action_set({'a': {'b': 1, 'c': 2}, 'd': 3})
+        self.assertCountEqual(['action-set', 'a.b=1', 'a.c=2', 'd=3'], fake_script_calls(self)[0])
+
+    def test_action_set_more_nested(self):
+        fake_script(self, 'action-get', 'exit 1')
+        fake_script(self, 'action-set', 'exit 0')
+        self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4})
+        self.assertCountEqual(
+            ['action-set', 'a.b=1', 'a.c=2', 'a.d.e=3', 'f=4'], fake_script_calls(self)[0])
+
+    def test_action_set_dotted_dict(self):
+        fake_script(self, 'action-get', 'exit 1')
+        fake_script(self, 'action-set', 'exit 0')
+        self.backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
+        self.assertCountEqual(['action-set', 'a.b=1', 'a.c=2', 'd=3'], fake_script_calls(self)[0])
+
+    def test_action_set_duplicated_keys(self):
+        fake_script(self, 'action-get', 'exit 1')
+        fake_script(self, 'action-set', 'exit 0')
+        with self.assertRaises(ValueError):
+            self.backend.action_set({'a.b': 1, 'a': {'b': 2}, 'd': 3})
+        with self.assertRaises(ValueError):
+            self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4, 'a.d.e': 'foo'})
 
     def test_action_fail(self):
         fake_script(self, 'action-get', 'exit 1')
