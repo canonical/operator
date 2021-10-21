@@ -18,14 +18,20 @@ import datetime
 import email.parser
 import io
 import json
+import os
+import signal
 import sys
+import tempfile
 import test.fake_pebble as fake_pebble
+import threading
+import time
 import unittest
 import unittest.mock
 import unittest.util
 
 import ops.pebble as pebble
 from ops._private import yaml
+from ops._vendor import websocket
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000
@@ -320,6 +326,7 @@ single log
         self.assertEqual(task.progress.total, 7)
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270218))
         self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
+        self.assertEqual(task.data, {})
 
     def test_task_from_dict(self):
         d = {
@@ -334,6 +341,7 @@ single log
             "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
             "status": "Done",
             "summary": 'Start service "svc"',
+            "data": {"exit-code": 42},
         }
         task = pebble.Task.from_dict(d)
         self.assertEqual(task.id, '78')
@@ -346,6 +354,7 @@ single log
         self.assertEqual(task.progress.total, 1)
         self.assertEqual(task.ready_time, datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219))
         self.assertEqual(task.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158))
+        self.assertEqual(task.data, {'exit-code': 42})
 
         d['ready-time'] = '2021-01-28T14:37:03.270218778+00:00'
         d['spawn-time'] = '2021-01-28T14:37:02.247158162+00:00'
@@ -378,6 +387,7 @@ single log
         self.assertEqual(change.status, 'Done')
         self.assertEqual(change.summary, 'Autostart service "svc"')
         self.assertEqual(change.tasks, [])
+        self.assertEqual(change.data, {})
 
     def test_change_from_dict(self):
         d = {
@@ -390,6 +400,7 @@ single log
             "status": "Done",
             "summary": 'Autostart service "svc"',
             "tasks": [],
+            "data": {"exit-code": 42},
         }
         change = pebble.Change.from_dict(d)
         self.assertEqual(change.id, '70')
@@ -401,6 +412,7 @@ single log
         self.assertEqual(change.status, 'Done')
         self.assertEqual(change.summary, 'Autostart service "svc"')
         self.assertEqual(change.tasks, [])
+        self.assertEqual(change.data, {'exit-code': 42})
 
         d['ready-time'] = '2021-01-28T14:37:04.291517768+00:00'
         d['spawn-time'] = '2021-01-28T14:37:02.247202105+00:00'
@@ -806,6 +818,7 @@ class MockClient(pebble.Client):
         self.requests = []
         self.responses = []
         self.timeout = 5
+        self.websockets = {}
 
     def _request(self, method, path, query=None, body=None):
         self.requests.append((method, path, query, body))
@@ -820,6 +833,9 @@ class MockClient(pebble.Client):
         self.requests.append((method, path, query, headers, data))
         headers, body = self.responses.pop(0)
         return MockHTTPResponse(headers, body)
+
+    def _connect_websocket(self, task_id, websocket_id):
+        return self.websockets[task_id, websocket_id]
 
 
 class MockHTTPResponse:
@@ -845,11 +861,45 @@ class MockTime:
         self._time += delay
 
 
+def build_mock_change_dict(change_id='70'):
+    return {
+        "id": change_id,
+        "kind": "autostart",
+        "ready": True,
+        "ready-time": "2021-01-28T14:37:04.291517768+13:00",
+        "spawn-time": "2021-01-28T14:37:02.247202105+13:00",
+        "status": "Done",
+        "summary": 'Autostart service "svc"',
+        "tasks": [
+            {
+                "id": "78",
+                "kind": "start",
+                "progress": {
+                    "done": 1,
+                    "label": "",
+                    "total": 1,
+                    "extra-field": "foo",
+                },
+                "ready-time": "2021-01-28T14:37:03.270218778+13:00",
+                "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
+                "status": "Done",
+                "summary": 'Start service "svc"',
+                "extra-field": "foo",
+            },
+        ],
+        "extra-field": "foo",
+    }
+
+
 class TestClient(unittest.TestCase):
     maxDiff = None
 
     def setUp(self):
         self.client = MockClient()
+        self.time = MockTime()
+        time_patcher = unittest.mock.patch('ops.pebble.time', self.time)
+        time_patcher.start()
+        self.addCleanup(time_patcher.stop)
 
     def test_client_init(self):
         pebble.Client(socket_path='foo')  # test that constructor runs
@@ -908,35 +958,6 @@ class TestClient(unittest.TestCase):
             }),
         ])
 
-    def build_mock_change_dict(self):
-        return {
-            "id": "70",
-            "kind": "autostart",
-            "ready": True,
-            "ready-time": "2021-01-28T14:37:04.291517768+13:00",
-            "spawn-time": "2021-01-28T14:37:02.247202105+13:00",
-            "status": "Done",
-            "summary": 'Autostart service "svc"',
-            "tasks": [
-                {
-                    "id": "78",
-                    "kind": "start",
-                    "progress": {
-                        "done": 1,
-                        "label": "",
-                        "total": 1,
-                        "extra-field": "foo",
-                    },
-                    "ready-time": "2021-01-28T14:37:03.270218778+13:00",
-                    "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
-                    "status": "Done",
-                    "summary": 'Start service "svc"',
-                    "extra-field": "foo",
-                },
-            ],
-            "extra-field": "foo",
-        }
-
     def assert_mock_change(self, change):
         self.assertEqual(change.id, '70')
         self.assertEqual(change.kind, 'autostart')
@@ -981,7 +1002,7 @@ class TestClient(unittest.TestCase):
 
         self.client.responses.append({
             "result": [
-                self.build_mock_change_dict(),
+                build_mock_change_dict(),
             ],
             "status": "OK",
             "status-code": 200,
@@ -1000,7 +1021,7 @@ class TestClient(unittest.TestCase):
 
     def test_get_change(self):
         self.client.responses.append({
-            "result": self.build_mock_change_dict(),
+            "result": build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
@@ -1013,7 +1034,7 @@ class TestClient(unittest.TestCase):
 
     def test_abort_change(self):
         self.client.responses.append({
-            "result": self.build_mock_change_dict(),
+            "result": build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
@@ -1032,7 +1053,7 @@ class TestClient(unittest.TestCase):
             "status-code": 202,
             "type": "async"
         })
-        change = self.build_mock_change_dict()
+        change = build_mock_change_dict()
         change['ready'] = True
         self.client.responses.append({
             "result": change,
@@ -1138,7 +1159,7 @@ class TestClient(unittest.TestCase):
             "status-code": 202,
             "type": "async"
         })
-        change = self.build_mock_change_dict()
+        change = build_mock_change_dict()
         change['err'] = 'Some kind of service error'
         self.client.responses.append({
             "result": change,
@@ -1159,7 +1180,7 @@ class TestClient(unittest.TestCase):
         ])
 
     def test_wait_change_success(self, timeout=30.0):
-        change = self.build_mock_change_dict()
+        change = build_mock_change_dict()
         self.client.responses.append({
             "result": change,
             "status": "OK",
@@ -1179,14 +1200,38 @@ class TestClient(unittest.TestCase):
         self.test_wait_change_success(timeout=None)
 
     def test_wait_change_success_multiple_calls(self):
-        mock_time = MockTime()
-        with unittest.mock.patch('ops.pebble.time', mock_time):
-            def timeout_response(n):
-                mock_time.sleep(n)  # simulate passing of time due to wait_change call
-                raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
-            self.client.responses.append(lambda: timeout_response(4))
+        def timeout_response(n):
+            self.time.sleep(n)  # simulate passing of time due to wait_change call
+            raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
-            change = self.build_mock_change_dict()
+        self.client.responses.append(lambda: timeout_response(4))
+
+        change = build_mock_change_dict()
+        self.client.responses.append({
+            "result": change,
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+
+        response = self.client.wait_change('70')
+        self.assertEqual(response.id, '70')
+        self.assertTrue(response.ready)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+        ])
+
+        self.assertEqual(self.time.time(), 4)
+
+    def test_wait_change_success_polled(self, timeout=30.0):
+        # Trigger polled mode
+        self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+
+        for i in range(3):
+            change = build_mock_change_dict()
+            change['ready'] = i == 2
             self.client.responses.append({
                 "result": change,
                 "status": "OK",
@@ -1194,102 +1239,72 @@ class TestClient(unittest.TestCase):
                 "type": "sync"
             })
 
-            response = self.client.wait_change('70')
-            self.assertEqual(response.id, '70')
-            self.assertTrue(response.ready)
+        response = self.client.wait_change('70', timeout=timeout, delay=1)
+        self.assertEqual(response.id, '70')
+        self.assertTrue(response.ready)
 
-            self.assertEqual(self.client.requests, [
-                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
-                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
-            ])
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70', None, None),
+        ])
 
-        self.assertEqual(mock_time.time(), 4)
-
-    def test_wait_change_success_polled(self, timeout=30.0):
-        mock_time = MockTime()
-        with unittest.mock.patch('ops.pebble.time', mock_time):
-            # Trigger polled mode
-            self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
-
-            for i in range(3):
-                change = self.build_mock_change_dict()
-                change['ready'] = i == 2
-                self.client.responses.append({
-                    "result": change,
-                    "status": "OK",
-                    "status-code": 200,
-                    "type": "sync"
-                })
-
-            response = self.client.wait_change('70', timeout=timeout, delay=1)
-            self.assertEqual(response.id, '70')
-            self.assertTrue(response.ready)
-
-            self.assertEqual(self.client.requests, [
-                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
-                ('GET', '/v1/changes/70', None, None),
-                ('GET', '/v1/changes/70', None, None),
-                ('GET', '/v1/changes/70', None, None),
-            ])
-
-        self.assertEqual(mock_time.time(), 2)
+        self.assertEqual(self.time.time(), 2)
 
     def test_wait_change_success_polled_timeout_none(self):
         self.test_wait_change_success_polled(timeout=None)
 
     def test_wait_change_timeout(self):
-        mock_time = MockTime()
-        with unittest.mock.patch('ops.pebble.time', mock_time):
-            def timeout_response(n):
-                mock_time.sleep(n)  # simulate passing of time due to wait_change call
-                raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
-            self.client.responses.append(lambda: timeout_response(4))
-            self.client.responses.append(lambda: timeout_response(2))
+        def timeout_response(n):
+            self.time.sleep(n)  # simulate passing of time due to wait_change call
+            raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
-            with self.assertRaises(pebble.TimeoutError) as cm:
-                self.client.wait_change('70', timeout=6)
-            self.assertIsInstance(cm.exception, pebble.Error)
-            self.assertIsInstance(cm.exception, TimeoutError)
+        self.client.responses.append(lambda: timeout_response(4))
+        self.client.responses.append(lambda: timeout_response(2))
 
-            self.assertEqual(self.client.requests, [
-                ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
-                ('GET', '/v1/changes/70/wait', {'timeout': '2.000s'}, None),
-            ])
+        with self.assertRaises(pebble.TimeoutError) as cm:
+            self.client.wait_change('70', timeout=6)
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertIsInstance(cm.exception, TimeoutError)
 
-        self.assertEqual(mock_time.time(), 6)
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
+            ('GET', '/v1/changes/70/wait', {'timeout': '2.000s'}, None),
+        ])
+
+        self.assertEqual(self.time.time(), 6)
 
     def test_wait_change_timeout_polled(self):
-        mock_time = MockTime()
-        with unittest.mock.patch('ops.pebble.time', mock_time):
-            # Trigger polled mode
-            self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+        # Trigger polled mode
+        self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
 
-            change = self.build_mock_change_dict()
-            change['ready'] = False
-            for _ in range(3):
-                self.client.responses.append({
-                    "result": change,
-                    "status": "OK",
-                    "status-code": 200,
-                    "type": "sync"
-                })
+        change = build_mock_change_dict()
+        change['ready'] = False
+        for _ in range(3):
+            self.client.responses.append({
+                "result": change,
+                "status": "OK",
+                "status-code": 200,
+                "type": "sync"
+            })
 
-            with self.assertRaises(pebble.TimeoutError) as cm:
-                self.client.wait_change('70', timeout=3, delay=1)
-            self.assertIsInstance(cm.exception, pebble.Error)
-            self.assertIsInstance(cm.exception, TimeoutError)
+        with self.assertRaises(pebble.TimeoutError) as cm:
+            self.client.wait_change('70', timeout=3, delay=1)
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertIsInstance(cm.exception, TimeoutError)
 
-            self.assertEqual(self.client.requests, [
-                ('GET', '/v1/changes/70/wait', {'timeout': '3.000s'}, None),
-                ('GET', '/v1/changes/70', None, None),
-                ('GET', '/v1/changes/70', None, None),
-                ('GET', '/v1/changes/70', None, None),
-            ])
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70/wait', {'timeout': '3.000s'}, None),
+            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70', None, None),
+            ('GET', '/v1/changes/70', None, None),
+        ])
 
-        self.assertEqual(mock_time.time(), 3)
+        self.assertEqual(self.time.time(), 3)
 
     def test_wait_change_error(self):
-        change = self.build_mock_change_dict()
+        change = build_mock_change_dict()
         change['err'] = 'Some kind of service error'
         self.client.responses.append({
             "result": change,
@@ -1993,15 +2008,14 @@ bad path
         self.assertEqual(cm.exception.message, 'some other error')
 
 
+@unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
 class TestSocketClient(unittest.TestCase):
-    @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
     def test_socket_not_found(self):
         client = pebble.Client(socket_path='does_not_exist')
         with self.assertRaises(pebble.ConnectionError) as cm:
             client.get_system_info()
         self.assertIsInstance(cm.exception, pebble.Error)
 
-    @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
     def test_real_client(self):
         shutdown, socket_path = fake_pebble.start_server()
 
@@ -2022,3 +2036,680 @@ class TestSocketClient(unittest.TestCase):
 
         finally:
             shutdown()
+
+
+class TestExecError(unittest.TestCase):
+    def test_init(self):
+        e = pebble.ExecError(['foo'], 42, 'out', 'err')
+        self.assertEqual(e.command, ['foo'])
+        self.assertEqual(e.exit_code, 42)
+        self.assertEqual(e.stdout, 'out')
+        self.assertEqual(e.stderr, 'err')
+
+    def test_str(self):
+        e = pebble.ExecError(['x'], 1, None, None)
+        self.assertEqual(str(e), "non-zero exit code 1 executing ['x']")
+
+        e = pebble.ExecError(['x'], 1, 'only-out', None)
+        self.assertEqual(str(e), "non-zero exit code 1 executing ['x'], stdout='only-out'")
+
+        e = pebble.ExecError(['x'], 1, None, 'only-err')
+        self.assertEqual(str(e), "non-zero exit code 1 executing ['x'], stderr='only-err'")
+
+        e = pebble.ExecError(['a', 'b'], 1, 'out', 'err')
+        self.assertEqual(str(e), "non-zero exit code 1 executing ['a', 'b'], "
+                                 + "stdout='out', stderr='err'")
+
+    def test_str_truncated(self):
+        e = pebble.ExecError(['foo'], 2, 'longout', 'longerr')
+        e.STR_MAX_OUTPUT = 5
+        self.assertEqual(str(e), "non-zero exit code 2 executing ['foo'], "
+                                 + "stdout='longo' [truncated], stderr='longe' [truncated]")
+
+
+class MockWebsocket:
+    def __init__(self):
+        self.sends = []
+        self.receives = []
+
+    def send_binary(self, b):
+        self.sends.append(('BIN', b))
+
+    def send(self, s):
+        self.sends.append(('TXT', s))
+
+    def recv(self):
+        return self.receives.pop(0)
+
+    def close(self):
+        pass
+
+
+class TestExec(unittest.TestCase):
+    def setUp(self):
+        self.client = MockClient()
+        self.time = MockTime()
+        time_patcher = unittest.mock.patch('ops.pebble.time', self.time)
+        time_patcher.start()
+        self.addCleanup(time_patcher.stop)
+
+    def add_responses(self, change_id, exit_code, change_err=None):
+        task_id = 'T' + change_id  # create a task_id based on change_id
+        self.client.responses.append({
+            'change': change_id,
+            'result': {'task-id': task_id},
+        })
+
+        change = build_mock_change_dict(change_id)
+        change['tasks'][0]['data'] = {'exit-code': exit_code}
+        if change_err is not None:
+            change['err'] = change_err
+        self.client.responses.append({
+            'result': change,
+        })
+
+        stdio = MockWebsocket()
+        stderr = MockWebsocket()
+        control = MockWebsocket()
+        self.client.websockets = {
+            (task_id, 'stdio'): stdio,
+            (task_id, 'stderr'): stderr,
+            (task_id, 'control'): control,
+        }
+        return (stdio, stderr, control)
+
+    def build_exec_data(
+            self, command, environment=None, working_dir=None, timeout=None,
+            user_id=None, user=None, group_id=None, group=None, combine_stderr=False):
+        return {
+            'command': command,
+            'environment': environment or {},
+            'working-dir': working_dir,
+            'timeout': '{:.3f}s'.format(timeout) if timeout is not None else None,
+            'user-id': user_id,
+            'user': user,
+            'group-id': group_id,
+            'group': group,
+            'split-stderr': not combine_stderr,
+        }
+
+    def test_arg_errors(self):
+        with self.assertRaises(TypeError):
+            self.client.exec('foo')
+        with self.assertRaises(ValueError):
+            self.client.exec([])
+        with self.assertRaises(ValueError):
+            self.client.exec(['foo'], stdin='s', encoding=None)
+        with self.assertRaises(ValueError):
+            self.client.exec(['foo'], stdin=b's')
+        with self.assertRaises(TypeError):
+            self.client.exec(['foo'], stdin=123)
+        with self.assertRaises(ValueError):
+            self.client.exec(['foo'], stdout=io.StringIO(), stderr=io.StringIO(),
+                             combine_stderr=True)
+
+    def test_no_wait_call(self):
+        self.add_responses('123', 0)
+        with self.assertWarns(ResourceWarning) as cm:
+            process = self.client.exec(['true'])
+            del process
+        self.assertEqual(str(cm.warning), 'ExecProcess instance garbage collected '
+                                          + 'without call to wait() or wait_output()')
+
+    def test_wait_exit_zero(self):
+        self.add_responses('123', 0)
+
+        process = self.client.exec(['true'])
+        self.assertIsNotNone(process.stdout)
+        self.assertIsNotNone(process.stderr)
+        process.wait()
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['true'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+
+    def test_wait_exit_nonzero(self):
+        self.add_responses('456', 1)
+
+        process = self.client.exec(['false'])
+        with self.assertRaises(pebble.ExecError) as cm:
+            process.wait()
+        self.assertEqual(cm.exception.command, ['false'])
+        self.assertEqual(cm.exception.exit_code, 1)
+        self.assertEqual(cm.exception.stdout, None)
+        self.assertEqual(cm.exception.stderr, None)
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['false'])),
+            ('GET', '/v1/changes/456/wait', {'timeout': '4.000s'}, None),
+        ])
+
+    def test_wait_timeout(self):
+        self.add_responses('123', 0)
+
+        process = self.client.exec(['true'], timeout=2)
+        process.wait()
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['true'], timeout=2)),
+            ('GET', '/v1/changes/123/wait', {'timeout': '3.000s'}, None),
+        ])
+
+    def test_wait_other_args(self):
+        self.add_responses('123', 0)
+
+        process = self.client.exec(
+            ['true'],
+            environment={'K1': 'V1', 'K2': 'V2'},
+            working_dir='WD',
+            user_id=1000,
+            user='bob',
+            group_id=1000,
+            group='staff',
+        )
+        process.wait()
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(
+                command=['true'],
+                environment={'K1': 'V1', 'K2': 'V2'},
+                working_dir='WD',
+                user_id=1000,
+                user='bob',
+                group_id=1000,
+                group='staff',
+            )),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+
+    def test_wait_change_error(self):
+        self.add_responses('123', 0, change_err='change error!')
+
+        process = self.client.exec(['true'])
+        with self.assertRaises(pebble.ChangeError) as cm:
+            process.wait()
+        self.assertEqual(cm.exception.err, 'change error!')
+        self.assertEqual(cm.exception.change.id, '123')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['true'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+
+    def test_send_signal(self):
+        _, _, control = self.add_responses('123', 0)
+
+        process = self.client.exec(['server'])
+        process.send_signal('SIGHUP')
+        num_sends = 1
+        if hasattr(signal, 'SIGHUP'):  # Skip this part on Windows
+            process.send_signal(1)
+            process.send_signal(signal.SIGHUP)
+            num_sends += 2
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['server'])),
+        ])
+
+        self.assertEqual(len(control.sends), num_sends)
+        self.assertEqual(control.sends[0][0], 'TXT')
+        self.assertEqual(json.loads(control.sends[0][1]),
+                         {'command': 'signal', 'signal': {'name': 'SIGHUP'}})
+        if hasattr(signal, 'SIGHUP'):
+            self.assertEqual(control.sends[1][0], 'TXT')
+            self.assertEqual(json.loads(control.sends[1][1]),
+                             {'command': 'signal', 'signal': {'name': signal.Signals(1).name}})
+            self.assertEqual(control.sends[2][0], 'TXT')
+            self.assertEqual(json.loads(control.sends[2][1]),
+                             {'command': 'signal', 'signal': {'name': 'SIGHUP'}})
+
+    def test_wait_output(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'Python 3.8.10\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['python3', '--version'])
+        out, err = process.wait_output()
+        self.assertEqual(out, 'Python 3.8.10\n')
+        self.assertEqual(err, '')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
+    def test_wait_output_combine_stderr(self):
+        stdio, _, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'invalid time interval\n')
+        stdio.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['sleep', 'x'], combine_stderr=True)
+        out, err = process.wait_output()
+        self.assertEqual(out, 'invalid time interval\n')
+        self.assertIsNone(err)
+        self.assertIsNone(process.stderr)
+
+        exec_data = self.build_exec_data(['sleep', 'x'], combine_stderr=True)
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, exec_data),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
+    def test_wait_output_bytes(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'Python 3.8.10\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['python3', '--version'], encoding=None)
+        out, err = process.wait_output()
+        self.assertEqual(out, b'Python 3.8.10\n')
+        self.assertEqual(err, b'')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
+    def test_wait_output_exit_nonzero(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append(b'file not found: x\n')
+        stderr.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['ls', 'x'])
+        out, err = process.wait_output()
+        self.assertEqual(out, '')
+        self.assertEqual(err, 'file not found: x\n')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['ls', 'x'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
+    def test_wait_output_exit_nonzero_combine_stderr(self):
+        stdio, _, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'file not found: x\n')
+        stdio.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['ls', 'x'], combine_stderr=True)
+        out, err = process.wait_output()
+        self.assertEqual(out, 'file not found: x\n')
+        self.assertIsNone(err)
+
+        exec_data = self.build_exec_data(['ls', 'x'], combine_stderr=True)
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, exec_data),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
+    def test_wait_output_send_stdin(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'FOO\nBAR\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['awk', '{ print toupper($) }'], stdin='foo\nbar\n')
+        out, err = process.wait_output()
+        self.assertEqual(out, 'FOO\nBAR\n')
+        self.assertEqual(err, '')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [
+            ('BIN', b'foo\nbar\n'),
+            ('TXT', '{"command":"end"}'),
+        ])
+
+    def test_wait_output_send_stdin_bytes(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'FOO\nBAR\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['awk', '{ print toupper($) }'], stdin=b'foo\nbar\n',
+                                   encoding=None)
+        out, err = process.wait_output()
+        self.assertEqual(out, b'FOO\nBAR\n')
+        self.assertEqual(err, b'')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [
+            ('BIN', b'foo\nbar\n'),
+            ('TXT', '{"command":"end"}'),
+        ])
+
+    def test_wait_passed_output(self):
+        io_ws, stderr, _ = self.add_responses('123', 0)
+        io_ws.receives.append(b'foo\n')
+        io_ws.receives.append('{"command":"end"}')
+        stderr.receives.append(b'some error\n')
+        stderr.receives.append('{"command":"end"}')
+
+        out = io.StringIO()
+        err = io.StringIO()
+        process = self.client.exec(['echo', 'foo'], stdout=out, stderr=err)
+        process.wait()
+        self.assertEqual(out.getvalue(), 'foo\n')
+        self.assertEqual(err.getvalue(), 'some error\n')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(io_ws.sends, [])
+
+    def test_wait_passed_output_combine_stderr(self):
+        io_ws, _, _ = self.add_responses('123', 0)
+        io_ws.receives.append(b'foo\n')
+        io_ws.receives.append(b'some error\n')
+        io_ws.receives.append('{"command":"end"}')
+
+        out = io.StringIO()
+        process = self.client.exec(['echo', 'foo'], stdout=out, combine_stderr=True)
+        process.wait()
+        self.assertEqual(out.getvalue(), 'foo\nsome error\n')
+        self.assertIsNone(process.stderr)
+
+        exec_data = self.build_exec_data(['echo', 'foo'], combine_stderr=True)
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, exec_data),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(io_ws.sends, [])
+
+    def test_wait_passed_output_bytes(self):
+        io_ws, stderr, _ = self.add_responses('123', 0)
+        io_ws.receives.append(b'foo\n')
+        io_ws.receives.append('{"command":"end"}')
+        stderr.receives.append(b'some error\n')
+        stderr.receives.append('{"command":"end"}')
+
+        out = io.BytesIO()
+        err = io.BytesIO()
+        process = self.client.exec(['echo', 'foo'], stdout=out, stderr=err, encoding=None)
+        process.wait()
+        self.assertEqual(out.getvalue(), b'foo\n')
+        self.assertEqual(err.getvalue(), b'some error\n')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(io_ws.sends, [])
+
+    @unittest.skipIf(sys.platform == 'win32', "exec() with files doesn't work on Windows")
+    def test_wait_file_io(self):
+        fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
+        out = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
+        err = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
+        try:
+            fin.write('foo\n')
+            fin.seek(0)
+
+            io_ws, stderr, _ = self.add_responses('123', 0)
+            io_ws.receives.append(b'foo\n')
+            io_ws.receives.append('{"command":"end"}')
+            stderr.receives.append(b'some error\n')
+            stderr.receives.append('{"command":"end"}')
+
+            process = self.client.exec(['echo', 'foo'], stdin=fin, stdout=out, stderr=err)
+            process.wait()
+
+            out.seek(0)
+            self.assertEqual(out.read(), 'foo\n')
+            err.seek(0)
+            self.assertEqual(err.read(), 'some error\n')
+
+            self.assertEqual(self.client.requests, [
+                ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
+                ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+            ])
+            self.assertEqual(io_ws.sends, [
+                ('BIN', b'foo\n'),
+                ('TXT', '{"command":"end"}'),
+            ])
+        finally:
+            fin.close()
+            out.close()
+            err.close()
+
+    def test_wait_returned_io(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'FOO BAR\n')
+        stdio.receives.append(b'BAZZ\n')
+        stdio.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['awk', '{ print toupper($) }'])
+        process.stdin.write('Foo Bar\n')
+        self.assertEqual(process.stdout.read(4), 'FOO ')
+        self.assertEqual(process.stdout.read(), 'BAR\n')
+        process.stdin.write('bazz\n')
+        self.assertEqual(process.stdout.read(), 'BAZZ\n')
+        process.stdin.close()
+        self.assertEqual(process.stdout.read(), '')
+        process.wait()
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [
+            ('BIN', b'Foo Bar\n'),
+            ('BIN', b'bazz\n'),
+            ('TXT', '{"command":"end"}'),
+        ])
+
+    def test_wait_returned_io_bytes(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'FOO BAR\n')
+        stdio.receives.append(b'BAZZ\n')
+        stdio.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['awk', '{ print toupper($) }'], encoding=None)
+        process.stdin.write(b'Foo Bar\n')
+        self.assertEqual(process.stdout.read(4), b'FOO ')
+        self.assertEqual(process.stdout.read(), b'BAR\n')
+        process.stdin.write(b'bazz\n')
+        self.assertEqual(process.stdout.read(), b'BAZZ\n')
+        process.stdin.close()
+        self.assertEqual(process.stdout.read(), b'')
+        process.wait()
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [
+            ('BIN', b'Foo Bar\n'),
+            ('BIN', b'bazz\n'),
+            ('TXT', '{"command":"end"}'),
+        ])
+
+    def test_connect_websocket_error(self):
+        class Client(MockClient):
+            def _connect_websocket(self, change_id, websocket_id):
+                raise websocket.WebSocketException('conn!')
+
+        self.client = Client()
+        self.add_responses('123', 0, change_err='change error!')
+        with self.assertRaises(pebble.ChangeError) as cm:
+            self.client.exec(['foo'])
+        self.assertEqual(str(cm.exception), 'change error!')
+
+        self.client = Client()
+        self.add_responses('123', 0)
+        with self.assertRaises(pebble.ConnectionError) as cm:
+            self.client.exec(['foo'])
+        self.assertIn(str(cm.exception), 'unexpected error connecting to websockets: conn!')
+
+    def test_websocket_send_binary_raises(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        raised = False
+
+        def send_binary(b):
+            nonlocal raised
+            raised = True
+            raise Exception('a simulated error!')
+
+        stdio.send_binary = send_binary
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['cat'], stdin='foo\nbar\n')
+        out, err = process.wait_output()
+        self.assertEqual(out, '')
+        self.assertEqual(err, '')
+        self.assertTrue(raised)
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['cat'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
+    def test_websocket_recv_raises(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        raised = False
+
+        def recv():
+            nonlocal raised
+            raised = True
+            raise Exception('a simulated error!')
+
+        stdio.recv = recv
+        stderr.receives.append('{"command":"end"}')
+
+        process = self.client.exec(['cat'], stdin='foo\nbar\n')
+        out, err = process.wait_output()
+        self.assertEqual(out, '')
+        self.assertEqual(err, '')
+        self.assertTrue(raised)
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['cat'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [
+            ('BIN', b'foo\nbar\n'),
+            ('TXT', '{"command":"end"}'),
+        ])
+
+
+# Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
+# against a real Pebble server. For example, in one terminal, run Pebble:
+#
+# $ PEBBLE=~/pebble pebble run
+# 2021-09-20T04:10:34.934Z [pebble] Started daemon
+#
+# In another terminal, run the tests:
+#
+# $ source .tox/unit/bin/activate
+# $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_pebble.py -v -k RealPebble
+# $ deactivate
+#
+@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
+class TestRealPebble(unittest.TestCase):
+    def setUp(self):
+        socket_path = os.getenv('PEBBLE_SOCKET')
+        if not socket_path and os.getenv('PEBBLE'):
+            socket_path = os.path.join(os.getenv('PEBBLE'), '.pebble.socket')
+        assert socket_path, 'PEBBLE or PEBBLE_SOCKET must be set if RUN_REAL_PEBBLE_TESTS set'
+
+        self.client = pebble.Client(socket_path=socket_path)
+
+    def test_exec_wait(self):
+        process = self.client.exec(['true'])
+        process.wait()
+
+        with self.assertRaises(pebble.ExecError) as cm:
+            process = self.client.exec(['/bin/sh', '-c', 'exit 42'])
+            process.wait()
+        self.assertEqual(cm.exception.exit_code, 42)
+
+    def test_exec_wait_output(self):
+        process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2'])
+        out, err = process.wait_output()
+        self.assertEqual(out, 'OUT\n')
+        self.assertEqual(err, 'ERR\n')
+
+        process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2'], encoding=None)
+        out, err = process.wait_output()
+        self.assertEqual(out, b'OUT\n')
+        self.assertEqual(err, b'ERR\n')
+
+        with self.assertRaises(pebble.ExecError) as cm:
+            process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2; exit 42'])
+            process.wait_output()
+        self.assertEqual(cm.exception.exit_code, 42)
+        self.assertEqual(cm.exception.stdout, 'OUT\n')
+        self.assertEqual(cm.exception.stderr, 'ERR\n')
+
+    def test_exec_send_stdin(self):
+        process = self.client.exec(['awk', '{ print toupper($0) }'], stdin='foo\nBar\n')
+        out, err = process.wait_output()
+        self.assertEqual(out, 'FOO\nBAR\n')
+        self.assertEqual(err, '')
+
+        process = self.client.exec(['awk', '{ print toupper($0) }'], stdin=b'foo\nBar\n',
+                                   encoding=None)
+        out, err = process.wait_output()
+        self.assertEqual(out, b'FOO\nBAR\n')
+        self.assertEqual(err, b'')
+
+    def test_exec_timeout(self):
+        process = self.client.exec(['sleep', '0.2'], timeout=0.1)
+        with self.assertRaises(pebble.ChangeError) as cm:
+            process.wait()
+        self.assertIn('timed out', cm.exception.err)
+
+    def test_exec_working_dir(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            process = self.client.exec(['pwd'], working_dir=temp_dir)
+            out, err = process.wait_output()
+            self.assertEqual(out, temp_dir + '\n')
+            self.assertEqual(err, '')
+
+    def test_exec_environment(self):
+        process = self.client.exec(['/bin/sh', '-c', 'echo $ONE.$TWO.$THREE'],
+                                   environment={'ONE': '1', 'TWO': '2'})
+        out, err = process.wait_output()
+        self.assertEqual(out, '1.2.\n')
+        self.assertEqual(err, '')
+
+    def test_exec_streaming(self):
+        process = self.client.exec(['cat'])
+
+        def stdin_thread():
+            for line in ['one\n', '2\n', 'THREE\n']:
+                process.stdin.write(line)
+                process.stdin.flush()
+                time.sleep(0.1)
+            process.stdin.close()
+
+        threading.Thread(target=stdin_thread).start()
+
+        # TODO: fix OSError with "for line in process.stdout: ...":
+        # OSError: read() should have returned a bytes object, not 'str'
+        reads = []
+        while True:
+            chunk = process.stdout.read()
+            if not chunk:
+                break
+            reads.append(chunk)
+
+        process.wait()
+
+        self.assertEqual(reads, ['one\n', '2\n', 'THREE\n'])

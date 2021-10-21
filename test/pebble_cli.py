@@ -57,6 +57,20 @@ def main():
                    choices=[s.value for s in pebble.ChangeState], default='all')
     p.add_argument('--service', help='optional service name to filter on')
 
+    p = subparsers.add_parser('exec', help='execute a command')
+    p.add_argument('--env', help='environment variables to set', action='append',
+                   metavar='KEY=VALUE')
+    p.add_argument('--working-dir', help='working directory to run command in')
+    p.add_argument('--io-mode', help='input/output mode, default %(default)r',
+                   choices=['passthrough', 'string'], default='passthrough')
+    p.add_argument('-t', '--timeout', type=float, help='timeout in seconds')
+    p.add_argument('-u', '--user', help='user to run as')
+    p.add_argument('-g', '--group', help='group to run as')
+    p.add_argument('--encoding', help="input/output encoding or 'none', default %(default)r",
+                   default='utf-8')
+    p.add_argument('--combine-stderr', help='combine stderr into stdout', action='store_true')
+    p.add_argument('exec_command', help='command and arguments', nargs='+', metavar='command')
+
     p = subparsers.add_parser('ls', help='list files')
     p.add_argument('-d', '--directory', action='store_true',
                    help='list directories themselves, not their contents')
@@ -143,6 +157,63 @@ def main():
         elif args.command == 'changes':
             result = client.get_changes(select=pebble.ChangeState(args.select),
                                         service=args.service)
+        elif args.command == 'exec':
+            environment = {}
+            for env in args.env or []:
+                key, _, value = env.partition('=')
+                environment[key] = value
+
+            encoding = args.encoding if args.encoding != 'none' else None
+            if args.io_mode == 'passthrough':
+                if encoding is not None:
+                    stdin = sys.stdin
+                    stdout = sys.stdout
+                    stderr = sys.stderr if not args.combine_stderr else None
+                else:
+                    stdin = sys.stdin.buffer
+                    stdout = sys.stdout.buffer
+                    stderr = sys.stderr.buffer if not args.combine_stderr else None
+            else:
+                if sys.stdin.isatty():
+                    if encoding is not None:
+                        stdin = sys.stdin
+                    else:
+                        stdin = sys.stdin.buffer
+                else:
+                    if encoding is not None:
+                        stdin = sys.stdin.read()
+                    else:
+                        stdin = sys.stdin.buffer.read()
+                stdout = None
+                stderr = None
+
+            process = client.exec(
+                args.exec_command,
+                environment=environment,
+                working_dir=args.working_dir,
+                timeout=args.timeout,
+                user=args.user,
+                group=args.group,
+                stdin=stdin,
+                stdout=stdout,
+                stderr=stderr,
+                encoding=encoding,
+                combine_stderr=args.combine_stderr,
+            )
+
+            try:
+                if args.io_mode == 'passthrough':
+                    process.wait()
+                else:
+                    stdout, stderr = process.wait_output()
+                    print(repr(stdout))
+                    if stderr:
+                        print(repr(stderr), end='', file=sys.stderr)
+                sys.exit(0)
+            except pebble.ExecError as e:
+                print('ExecError:', e, file=sys.stderr)
+                sys.exit(e.exit_code)
+
         elif args.command == 'ls':
             result = client.list_files(args.path, pattern=args.pattern, itself=args.directory)
         elif args.command == 'mkdir':
@@ -197,7 +268,7 @@ def main():
     if isinstance(result, list):
         for x in result:
             print(x)
-    else:
+    elif result is not None:
         print(result)
 
 
