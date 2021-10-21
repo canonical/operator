@@ -1092,6 +1092,27 @@ class _TestingModelBackend:
 
         return count + 1  # Account for this unit.
 
+    def secret_create(self):
+        raise NotImplementedError(self.secret_create)
+
+    def secret_update(self):
+        raise NotImplementedError(self.secret_update)
+
+    def secret_get(self):
+        raise NotImplementedError(self.secret_get)
+
+    def secret_metadata(self):
+        raise NotImplementedError(self.secret_metadata)
+
+    def secret_grant(self):
+        raise NotImplementedError(self.secret_grant)
+
+    def secret_revoke(self):
+        raise NotImplementedError(self.secret_revoke)
+
+    def secret_expire(self):
+        raise NotImplementedError(self.secret_expire)
+
 
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:

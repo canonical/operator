@@ -1342,6 +1342,14 @@ class SecretOptions:
         return SecretOptions('password', length)
 
 
+class Secret:
+    """A Juju secret.
+
+    Use this object to update and pass around metadata for a secret.
+    """
+    pass
+
+
 class Secrets:
     """TODO: nice description of what a secret is.
 
@@ -1785,6 +1793,107 @@ class _ModelBackend:
     @property
     def secrets(self) -> 'Secrets':
         return self._secrets
+
+    def secret_create(self, name: str, base64: bool = True, staged: bool = False,
+                      type_: str = 'password', options: list = None,
+                      rotate: int = None, tags: dict = None,
+                      description: str = None) -> None:
+        """Create a secret.
+
+        Will pull up a subshell and invoke the secret-create command.
+
+        TODO: so many args! We probably want to move a lot of stuff to a Secret class, and then
+        make that class smart enough to unpack itself into command line args. The logic outlined
+        below should probably live there.
+
+        Docs for underlying command:
+
+        secret-create <name>
+        [--base64]
+        [--staged]
+        [--type password] [--<option>=<xxx>...]
+        [--rotate=<duration>]
+        [--tag <key>=<value>...]
+        [--description <sometext>]
+
+        """
+        args = []
+
+        if base64:
+            args.append('--base64')
+        if staged:
+            args.append('--staged')
+
+        args.append('--type', type_)
+
+        for option in ([] if options is None else options):
+            args.append('--option', option)
+
+        if rotate is not None:
+            args.append('--rotate')
+
+        for key, val in ({} if tags is None else tags):
+            args.append('--tag', '{}={}'.format(key, val))
+
+        if description:
+            args.append(description)
+
+        self._run('secret-create', *args)
+
+    def secret_update(self) -> None:
+        """Update a secret.
+
+        secret-update <name>
+        [--base64]
+        [--active |--staged]
+        [--rotate=<duration>]
+        [--tag <key>=<value>...]
+        [--description <sometext>]
+        [<key>=<value>...]
+        """
+        pass
+
+    def secret_get(self) -> 'Secret':
+        """Fetch a secret.
+
+        secret-get <secret-id>
+        [--base64]
+        """
+        pass
+
+    def secret_metadata(self) -> 'SecretOptions':
+        """Fetch metadata for a specific secret.
+
+        secret-metadata <name>
+            [--tags]
+        """
+        pass
+
+    def secret_grant(self) -> None:
+        """Grant access to a secret.
+
+        secret-grant <secret-id>
+        [--app app_name]
+        [--rel relation_id]
+        [--unit unit_name]
+        """
+        pass
+
+    def secret_revoke(self) -> None:
+        """Revoke access to a secret.
+
+        secret-revoke <secret-id>
+        [--app app_name]
+        [--unit unit_name]
+        """
+        pass
+
+    def secret_expire(self) -> None:
+        """Expire a secret.
+
+        secret-expire <secret-id>
+        """
+        pass
 
 
 class _ModelBackendValidator:
