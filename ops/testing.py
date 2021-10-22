@@ -410,6 +410,11 @@ class Harness(typing.Generic[CharmType]):
             raise RuntimeError(
                 "{} not found as a valid storage key in metadata".format(storage_name))
         storage_indices = self._backend.storage_add(storage_name, count)
+
+        # Reset associated cached value in the storage mappings.  If we don't do this,
+        # Model._storages won't return Storage objects for subsequently-added storage.
+        self._model._storages._storage_map[storage_name] = None
+
         if self.charm is not None and self._hooks_enabled:
             for storage_index in storage_indices:
                 self.charm.on[storage_name].storage_attached.emit(model.Storage(storage_name, storage_index, self._backend))
