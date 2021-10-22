@@ -2508,7 +2508,7 @@ class TestExec(unittest.TestCase):
             self.client.exec(['foo'])
         self.assertIn(str(cm.exception), 'unexpected error connecting to websockets: conn!')
 
-    def test_websocket_send_binary_raises(self):
+    def test_websocket_send_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         raised = False
 
@@ -2533,9 +2533,11 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(stdio.sends, [])
 
-    if pytest is not None:
-        test_websocket_send_binary_raises = pytest.mark.filterwarnings(
-            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_send_binary_raises)
+    # You'd normally use pytest.mark.filterwarnings as a decorator, but we
+    # want to support running via straight unittest (as well as via pytest).
+    if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
+        test_websocket_send_raises = pytest.mark.filterwarnings(
+            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_send_raises)
 
     def test_websocket_recv_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
@@ -2564,7 +2566,7 @@ class TestExec(unittest.TestCase):
             ('TXT', '{"command":"end"}'),
         ])
 
-    if pytest is not None:
+    if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
         test_websocket_recv_raises = pytest.mark.filterwarnings(
             'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_recv_raises)
 
