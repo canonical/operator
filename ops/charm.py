@@ -451,8 +451,10 @@ class StorageEvent(HookEvent):
         storage_name = snapshot.get("storage_name")
         storage_id = snapshot.get("storage_id")
         storage_location = snapshot.get("storage_location")
+        print(storage_name)
+        print(storage_id)
 
-        if storage_name and storage_id:
+        if storage_name and storage_id is not None:
             self.storage = next(
                 (s for s in self.framework.model.storages[storage_name] if s.id == storage_id),
                 None,)
