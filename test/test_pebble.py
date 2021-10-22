@@ -2193,8 +2193,11 @@ class TestExec(unittest.TestCase):
             process.send_signal(signal.SIGHUP)
             num_sends += 2
 
+        process.wait()
+
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['server'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
 
         self.assertEqual(len(control.sends), num_sends)
