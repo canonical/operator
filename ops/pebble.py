@@ -792,6 +792,8 @@ class ExecProcess:
         client: 'Client',
         timeout: typing.Optional[float],
         control_ws: websocket.WebSocket,
+        stdio_ws: websocket.WebSocket,
+        stderr_ws: websocket.WebSocket,
         command: typing.List[str],
         encoding: typing.Optional[str],
         change_id: ChangeID,
@@ -805,6 +807,8 @@ class ExecProcess:
         self._client = client
         self._timeout = timeout
         self._control_ws = control_ws
+        self._stdio_ws = stdio_ws
+        self._stderr_ws = stderr_ws
         self._command = command
         self._encoding = encoding
         self._change_id = change_id
@@ -853,7 +857,11 @@ class ExecProcess:
         if self._cancel_reader is not None:
             os.close(self._cancel_reader)
 
-        self._control_ws.close()
+        # Close websockets (shutdown doesn't send CLOSE message or wait for response).
+        self._control_ws.shutdown()
+        self._stdio_ws.shutdown()
+        if self._stderr_ws is not None:
+            self._stderr_ws.shutdown()
 
         if change.err:
             raise ChangeError(change.err, change)
@@ -1856,6 +1864,8 @@ class Client:
             stderr=process_stderr,
             client=self,
             timeout=timeout,
+            stdio_ws=stdio_ws,
+            stderr_ws=stderr_ws,
             control_ws=control_ws,
             command=command,
             encoding=encoding,

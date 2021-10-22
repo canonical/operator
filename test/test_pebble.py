@@ -2026,7 +2026,7 @@ class MockWebsocket:
     def recv(self):
         return self.receives.pop(0)
 
-    def close(self):
+    def shutdown(self):
         pass
 
 
