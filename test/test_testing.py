@@ -1118,7 +1118,8 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         stor_ids = harness.add_storage("test", count=3)
-        self.assertSetEqual(set(stor_ids), set(harness._backend.storage_list("test")))
+        self.assertSetEqual(set(self._extract_storage_index(stor_id) for stor_id in stor_ids),
+                            set(harness._backend.storage_list("test")))
         self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
 
         harness.begin_with_initial_hooks()
@@ -1155,8 +1156,9 @@ class TestHarness(unittest.TestCase):
 
         # Set up initial storage
         stor_id = harness.add_storage("test")[0]
-        self.assertIn(stor_id, harness._backend.storage_list("test"))
-        self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
+        self.assertIn(self._extract_storage_index(stor_id),
+                      harness._backend.storage_list("test"))
+        self.assertEqual("/test/0", harness._backend.storage_get(stor_id, "location"))
 
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 1)
@@ -1168,9 +1170,8 @@ class TestHarness(unittest.TestCase):
         # used, but not returned by Harness.add_storage.
         # (Should we consider changing its return type?)
 
-        self.assertIn(stor_ids[0], harness._backend.storage_list("test"))
-        self.assertIn(stor_ids[1], harness._backend.storage_list("test"))
-        self.assertIn(stor_ids[2], harness._backend.storage_list("test"))
+        added_indices = {self._extract_storage_index(stor_id) for stor_id in stor_ids}
+        self.assertTrue(added_indices.issubset(set(harness._backend.storage_list("test"))))
         self.assertEqual("/test/1", harness._backend.storage_get("test/1", "location"))
         self.assertEqual("/test/2", harness._backend.storage_get("test/2", "location"))
         self.assertEqual("/test/3", harness._backend.storage_get("test/3", "location"))
@@ -1197,7 +1198,7 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
 
         # Detach storage
-        harness.detach_storage("test/{}".format(stor_id))
+        harness.detach_storage(stor_id)
         self.assertEqual(len(harness.charm.observed_events), 2)
         self.assertTrue(isinstance(harness.charm.observed_events[1], StorageDetachingEvent))
 
@@ -1214,7 +1215,7 @@ class TestHarness(unittest.TestCase):
 
         # Retry detach
         # Since already detached, no more hooks should fire
-        harness.detach_storage("test/{}".format(stor_id))
+        harness.detach_storage(stor_id)
         self.assertEqual(len(harness.charm.observed_events), 2)
         self.assertTrue(isinstance(harness.charm.observed_events[1], StorageDetachingEvent))
 
@@ -1236,11 +1237,6 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "Cannot detach when harness has not been started yet")
 
-    # Additional test cases to cover new functionality:
-    # * Harness.attach_storage: Attaches a previously detached storage.
-    #   * Charm not yet running?  Doesn't make sense to attach storage; raise an error.
-    #   * Charm started?  fire attached hook if state is detached, change state
-
     def test_attach_storage(self):
         harness = Harness(StorageTester, meta='''
             name: test-app
@@ -1260,23 +1256,23 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
 
         # Detach storage
-        harness.detach_storage("test/{}".format(stor_id))
+        harness.detach_storage(stor_id)
         self.assertEqual(len(harness.charm.observed_events), 2)
         self.assertTrue(isinstance(harness.charm.observed_events[1], StorageDetachingEvent))
 
         # Re-attach storage
-        harness.attach_storage("test/{}".format(stor_id))
+        harness.attach_storage(stor_id)
         self.assertEqual(len(harness.charm.observed_events), 3)
         self.assertTrue(isinstance(harness.charm.observed_events[2], StorageAttachedEvent))
 
         # Verify backend functions return appropriate values.
         # Real backend would return info only for actively attached storage units.
-        self.assertIn(stor_id, harness._backend.storage_list("test"))
+        self.assertIn(self._extract_storage_index(stor_id), harness._backend.storage_list("test"))
         self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
 
         # Retry attach
         # Since already detached, no more hooks should fire
-        harness.attach_storage("test/{}".format(stor_id))
+        harness.attach_storage(stor_id)
         self.assertEqual(len(harness.charm.observed_events), 3)
         self.assertTrue(isinstance(harness.charm.observed_events[2], StorageAttachedEvent))
 
@@ -1315,7 +1311,7 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         stor_ids = harness.add_storage("test", count=2)
-        harness.remove_storage("test/{}".format(stor_ids[0]))
+        harness.remove_storage(stor_ids[0])
         # Note re: delta between real behavior and Harness: Juju doesn't allow removal
         # of the last attached storage unit while a workload is still running.  To more
         # easily allow testing of storage removal, I am presently ignoring this detail.
@@ -1363,13 +1359,16 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
         self.assertTrue(isinstance(harness.charm.observed_events[1], StorageAttachedEvent))
 
-        harness.remove_storage("test/{}".format(stor_ids[1]))
+        harness.remove_storage(stor_ids[1])
         self.assertEqual(len(harness.charm.observed_events), 3)
         self.assertTrue(isinstance(harness.charm.observed_events[2], StorageDetachingEvent))
 
         attached_storage_ids = harness._backend.storage_list("test")
-        self.assertIn(stor_ids[0], attached_storage_ids)
-        self.assertNotIn(stor_ids[1], attached_storage_ids)
+        self.assertIn(self._extract_storage_index(stor_ids[0]), attached_storage_ids)
+        self.assertNotIn(self._extract_storage_index(stor_ids[1]), attached_storage_ids)
+
+    def _extract_storage_index(self, stor_id):
+        return int(stor_id.split('/')[-1])
 
     def test_remove_detached_storage(self):
         harness = Harness(StorageTester, meta='''
@@ -1387,8 +1386,8 @@ class TestHarness(unittest.TestCase):
 
         stor_ids = harness.add_storage("test", count=2)
         harness.begin_with_initial_hooks()
-        harness.detach_storage("test/{}".format(stor_ids[0]))
-        harness.remove_storage("test/{}".format(stor_ids[0]))  # Already detached, so won't fire a hook
+        harness.detach_storage(stor_ids[0])
+        harness.remove_storage(stor_ids[0])  # Already detached, so won't fire a hook
         self.assertEqual(len(harness.charm.observed_events), 3)
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
         self.assertTrue(isinstance(harness.charm.observed_events[1], StorageAttachedEvent))

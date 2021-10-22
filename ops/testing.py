@@ -389,7 +389,7 @@ class Harness(typing.Generic[CharmType]):
         self._relation_id_counter += 1
         return rel_id
 
-    def add_storage(self, storage_name: str, count: int = 1) -> typing.List[int]:
+    def add_storage(self, storage_name: str, count: int = 1) -> typing.List[str]:
         """Declare a new storage device attached to this unit.
 
         To have repeatable tests, each device will be initialized with
@@ -401,10 +401,7 @@ class Harness(typing.Generic[CharmType]):
             count: Number of disks being added
 
         Return:
-            A list of storage IDs, expressed as the integer component after the slash,
-            rather than the full string-based identifier.
-            For example, with storage_name="my-storage" and count=3, assuming counting
-            begins at 0, this would return [0, 1, 2].
+            A list of storage IDs, e.g. ["my-storage/1", "my-storage/2"].
         """
         if storage_name not in self._meta.storages:
             raise RuntimeError(
@@ -418,7 +415,7 @@ class Harness(typing.Generic[CharmType]):
         if self.charm is not None and self._hooks_enabled:
             for storage_index in storage_indices:
                 self.charm.on[storage_name].storage_attached.emit(model.Storage(storage_name, storage_index, self._backend))
-        return storage_indices
+        return ["{}/{}".format(storage_name, storage_index) for storage_index in storage_indices]
 
     def detach_storage(self, storage_id: str) -> None:
         """Detach a storage device.
