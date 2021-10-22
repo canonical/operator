@@ -33,6 +33,11 @@ import ops.pebble as pebble
 from ops._private import yaml
 from ops._vendor import websocket
 
+try:
+    import pytest
+except ImportError:
+    pytest = None
+
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000
 
@@ -2528,6 +2533,10 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(stdio.sends, [])
 
+    if pytest is not None:
+        test_websocket_send_binary_raises = pytest.mark.filterwarnings(
+            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_send_binary_raises)
+
     def test_websocket_recv_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         raised = False
@@ -2554,6 +2563,10 @@ class TestExec(unittest.TestCase):
             ('BIN', b'foo\nbar\n'),
             ('TXT', '{"command":"end"}'),
         ])
+
+    if pytest is not None:
+        test_websocket_recv_raises = pytest.mark.filterwarnings(
+            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_recv_raises)
 
 
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
