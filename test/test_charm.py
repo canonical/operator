@@ -247,10 +247,10 @@ storage:
 
         charm = MyCharm(self.create_framework())
 
-        charm.on['stor1'].storage_attached.emit(Storage("stor1", 0, None))
-        charm.on['stor2'].storage_detaching.emit(Storage("stor2", 0, None))
-        charm.on['stor3'].storage_attached.emit(Storage("stor3", 0, None))
-        charm.on['stor-4'].storage_attached.emit(Storage("stor-4", 0, None))
+        charm.on['stor1'].storage_attached.emit(Storage("stor1", 0, charm.model._backend))
+        charm.on['stor2'].storage_detaching.emit(Storage("stor2", 0, charm.model._backend))
+        charm.on['stor3'].storage_attached.emit(Storage("stor3", 0, charm.model._backend))
+        charm.on['stor-4'].storage_attached.emit(Storage("stor-4", 0, charm.model._backend))
 
         self.assertEqual(charm.seen, [
             'StorageAttachedEvent',
