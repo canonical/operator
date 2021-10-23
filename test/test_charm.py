@@ -175,6 +175,7 @@ peers:
         ])
 
     def test_storage_events(self):
+        this = self
 
         class MyCharm(CharmBase):
             def __init__(self, *args):
@@ -187,6 +188,7 @@ peers:
 
             def _on_stor1_attach(self, event):
                 self.seen.append(type(event).__name__)
+                this.assertEqual(str(event.storage.location), "/var/srv/stor1/0")
 
             def _on_stor2_detach(self, event):
                 self.seen.append(type(event).__name__)
@@ -221,14 +223,32 @@ storage:
             self,
             "storage-get",
             """
-            if [ "$1" = --format=json ]; then
-                echo '{"type": "filesystem", "location": "/var/srv/disks/0"}'
+            if [ "$1" = "-s" ]; then
+                id=${2#*/}
+                key=${2%/*}
+                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+            elif [ "$1" = '--help' ]; then
+                printf '%s\\n' \\
+                'Usage: storage-get [options] [<key>]' \\
+                '   ' \\
+                'Summary:' \\
+                'print information for storage instance with specified id' \\
+                '   ' \\
+                'Options:' \\
+                '--format  (= smart)' \\
+                '    Specify output format (json|smart|yaml)' \\
+                '-o, --output (= "")' \\
+                '    Specify an output file' \\
+                '-s  (= test-stor/0)' \\
+                '    specify a storage instance by id' \\
+                '   ' \\
+                'Details:' \\
+                'When no <key> is supplied, all keys values are printed.'
             else
                 # Return the same path for all disks since `storage-get`
                 # on attach and detach takes no parameters and is not
                 # deterministically faked with fake_script
-                echo '"/var/srv/disks/0"'
-                exit 0
+                exit 1
             fi
             """,
         )

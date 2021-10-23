@@ -714,12 +714,32 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
             self,
             "storage-get",
             """
-            if [ "$1" = --format=json ]; then
-                echo '{"type": "filesystem", "location": "/var/srv/disks/0"}'
-            elif [ "$2" = disks/0 ]; then
-                echo '"/var/srv/disks/0"'
+            if [ "$1" = "-s" ]; then
+                id=${2#*/}
+                key=${2%/*}
+                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+            elif [ "$1" = '--help' ]; then
+                printf '%s\\n' \\
+                'Usage: storage-get [options] [<key>]' \\
+                '   ' \\
+                'Summary:' \\
+                'print information for storage instance with specified id' \\
+                '   ' \\
+                'Options:' \\
+                '--format  (= smart)' \\
+                '    Specify output format (json|smart|yaml)' \\
+                '-o, --output (= "")' \\
+                '    Specify an output file' \\
+                '-s  (= test-stor/0)' \\
+                '    specify a storage instance by id' \\
+                '   ' \\
+                'Details:' \\
+                'When no <key> is supplied, all keys values are printed.'
             else
-                exit 0
+                # Return the same path for all disks since `storage-get`
+                # on attach and detach takes no parameters and is not
+                # deterministically faked with fake_script
+                exit 1
             fi
             """,
         )
@@ -984,12 +1004,32 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
             self,
             "storage-get",
             """
-            if [ "$1" = --format=json ]; then
-                echo '{"type": "filesystem", "location": "/var/srv/disks/0"}'
-            elif [ "$2" = disks/0 ]; then
-                echo '"/var/srv/disks/0"'
+            if [ "$1" = "-s" ]; then
+                id=${2#*/}
+                key=${2%/*}
+                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+            elif [ "$1" = '--help' ]; then
+                printf '%s\\n' \\
+                'Usage: storage-get [options] [<key>]' \\
+                '   ' \\
+                'Summary:' \\
+                'print information for storage instance with specified id' \\
+                '   ' \\
+                'Options:' \\
+                '--format  (= smart)' \\
+                '    Specify output format (json|smart|yaml)' \\
+                '-o, --output (= "")' \\
+                '    Specify an output file' \\
+                '-s  (= test-stor/0)' \\
+                '    specify a storage instance by id' \\
+                '   ' \\
+                'Details:' \\
+                'When no <key> is supplied, all keys values are printed.'
             else
-                exit 0
+                # Return the same path for all disks since `storage-get`
+                # on attach and detach takes no parameters and is not
+                # deterministically faked with fake_script
+                exit 1
             fi
             """,
         )
@@ -1034,12 +1074,32 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
             self,
             "storage-get",
             """
-            if [ "$1" = --format=json ]; then
-                echo '{"type": "filesystem", "location": "/var/srv/disks/0"}'
-            elif [ "$2" = disks/0 ]; then
-                echo '"/var/srv/disks/0"'
+            if [ "$1" = "-s" ]; then
+                id=${2#*/}
+                key=${2%/*}
+                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+            elif [ "$1" = '--help' ]; then
+                printf '%s\\n' \\
+                'Usage: storage-get [options] [<key>]' \\
+                '   ' \\
+                'Summary:' \\
+                'print information for storage instance with specified id' \\
+                '   ' \\
+                'Options:' \\
+                '--format  (= smart)' \\
+                '    Specify output format (json|smart|yaml)' \\
+                '-o, --output (= "")' \\
+                '    Specify an output file' \\
+                '-s  (= test-stor/0)' \\
+                '    specify a storage instance by id' \\
+                '   ' \\
+                'Details:' \\
+                'When no <key> is supplied, all keys values are printed.'
             else
-                exit 0
+                # Return the same path for all disks since `storage-get`
+                # on attach and detach takes no parameters and is not
+                # deterministically faked with fake_script
+                exit 1
             fi
             """,
         )
