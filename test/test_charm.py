@@ -188,7 +188,7 @@ peers:
 
             def _on_stor1_attach(self, event):
                 self.seen.append(type(event).__name__)
-                this.assertEqual(str(event.storage.location), "/var/srv/stor1/0")
+                this.assertEqual(event.storage.location, Path("/var/srv/stor1/0"))
 
             def _on_stor2_detach(self, event):
                 self.seen.append(type(event).__name__)
