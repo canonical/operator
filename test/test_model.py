@@ -927,6 +927,15 @@ containers:
             ('start', ('foo', 'bar'))
         ])
 
+    def test_restart_fallback_non_400_error(self):
+        def restart_services(services):
+            raise APIError({}, 500, "", "")
+
+        self.pebble.restart_services = restart_services
+        with self.assertRaises(ops.pebble.APIError) as cm:
+            self.container.restart('foo')
+        self.assertEqual(cm.exception.code, 500)
+
     def test_restart_no_arguments(self):
         with self.assertRaises(TypeError):
             self.container.restart()
