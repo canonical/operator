@@ -29,14 +29,11 @@ import unittest
 import unittest.mock
 import unittest.util
 
+import pytest
+
 import ops.pebble as pebble
 from ops._private import yaml
 from ops._vendor import websocket
-
-try:
-    import pytest
-except ImportError:
-    pytest = None
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000
@@ -2508,6 +2505,7 @@ class TestExec(unittest.TestCase):
             self.client.exec(['foo'])
         self.assertIn(str(cm.exception), 'unexpected error connecting to websockets: conn!')
 
+    @pytest.mark.filterwarnings('ignore::pytest.PytestUnhandledThreadExceptionWarning')
     def test_websocket_send_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         raised = False
@@ -2533,12 +2531,7 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(stdio.sends, [])
 
-    # You'd normally use pytest.mark.filterwarnings as a decorator, but we
-    # want to support running via straight unittest (as well as via pytest).
-    if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
-        test_websocket_send_raises = pytest.mark.filterwarnings(
-            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_send_raises)
-
+    @pytest.mark.filterwarnings('ignore::pytest.PytestUnhandledThreadExceptionWarning')
     def test_websocket_recv_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         raised = False
@@ -2565,10 +2558,6 @@ class TestExec(unittest.TestCase):
             ('BIN', b'foo\nbar\n'),
             ('TXT', '{"command":"end"}'),
         ])
-
-    if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
-        test_websocket_recv_raises = pytest.mark.filterwarnings(
-            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_recv_raises)
 
 
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
