@@ -2505,7 +2505,6 @@ class TestExec(unittest.TestCase):
             self.client.exec(['foo'])
         self.assertIn(str(cm.exception), 'unexpected error connecting to websockets: conn!')
 
-    @pytest.mark.filterwarnings('ignore::pytest.PytestUnhandledThreadExceptionWarning')
     def test_websocket_send_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         raised = False
@@ -2531,7 +2530,12 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(stdio.sends, [])
 
-    @pytest.mark.filterwarnings('ignore::pytest.PytestUnhandledThreadExceptionWarning')
+    # You'd normally use pytest.mark.filterwarnings as a decorator, but
+    # PytestUnhandledThreadExceptionWarning isn't present on older Python versions.
+    if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
+        test_websocket_send_raises = pytest.mark.filterwarnings(
+            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_send_raises)
+
     def test_websocket_recv_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         raised = False
@@ -2558,6 +2562,10 @@ class TestExec(unittest.TestCase):
             ('BIN', b'foo\nbar\n'),
             ('TXT', '{"command":"end"}'),
         ])
+
+    if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
+        test_websocket_recv_raises = pytest.mark.filterwarnings(
+            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_recv_raises)
 
 
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
