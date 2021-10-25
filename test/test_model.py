@@ -28,7 +28,7 @@ import ops.model
 import ops.testing
 from ops._private import yaml
 from ops.charm import RelationMeta, RelationRole
-from ops.pebble import APIError, ServiceInfo, ServiceStartup, ServiceStatus
+from ops.pebble import APIError, ServiceInfo
 
 
 class TestModel(unittest.TestCase):
@@ -914,8 +914,8 @@ containers:
         self.pebble.restart_services = restart_mock
         # Setup the Pebble client  to respond to a call to get_services()
         self.pebble.responses.append([
-            ServiceInfo(name='foo', startup=ServiceStartup.ENABLED, current=ServiceStatus.ACTIVE),
-            ServiceInfo(name='bar', startup=ServiceStartup.ENABLED, current=ServiceStatus.INACTIVE)
+            ServiceInfo.from_dict({'name': 'foo', 'startup': 'enabled', 'current': 'active'}),
+            ServiceInfo.from_dict({'name': 'bar', 'startup': 'enabled', 'current': 'inactive'}),
         ])
 
         self.container.restart('foo', 'bar')
