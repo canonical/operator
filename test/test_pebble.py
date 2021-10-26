@@ -2445,9 +2445,8 @@ class TestExec(unittest.TestCase):
         process = self.client.exec(['awk', '{ print toupper($) }'])
         process.stdin.write('Foo Bar\n')
         self.assertEqual(process.stdout.read(4), 'FOO ')
-        self.assertEqual(process.stdout.read(), 'BAR\n')
         process.stdin.write('bazz\n')
-        self.assertEqual(process.stdout.read(), 'BAZZ\n')
+        self.assertEqual(process.stdout.read(), 'BAR\nBAZZ\n')
         process.stdin.close()
         self.assertEqual(process.stdout.read(), '')
         process.wait()
@@ -2457,8 +2456,7 @@ class TestExec(unittest.TestCase):
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
         self.assertEqual(stdio.sends, [
-            ('BIN', b'Foo Bar\n'),
-            ('BIN', b'bazz\n'),
+            ('BIN', b'Foo Bar\nbazz\n'),  # TextIOWrapper groups the writes together
             ('TXT', '{"command":"end"}'),
         ])
 
@@ -2653,23 +2651,42 @@ class TestRealPebble(unittest.TestCase):
         process = self.client.exec(['cat'])
 
         def stdin_thread():
-            for line in ['one\n', '2\n', 'THREE\n']:
-                process.stdin.write(line)
-                process.stdin.flush()
-                time.sleep(0.1)
-            process.stdin.close()
+            try:
+                for line in ['one\n', '2\n', 'THREE\n']:
+                    process.stdin.write(line)
+                    process.stdin.flush()
+                    time.sleep(0.1)
+            finally:
+                process.stdin.close()
 
         threading.Thread(target=stdin_thread).start()
 
-        # TODO: fix OSError with "for line in process.stdout: ...":
-        # OSError: read() should have returned a bytes object, not 'str'
         reads = []
-        while True:
-            chunk = process.stdout.read()
-            if not chunk:
-                break
-            reads.append(chunk)
+        for line in process.stdout:
+            reads.append(line)
 
         process.wait()
 
         self.assertEqual(reads, ['one\n', '2\n', 'THREE\n'])
+
+    def test_exec_streaming_bytes(self):
+        process = self.client.exec(['cat'], encoding=None)
+
+        def stdin_thread():
+            try:
+                for line in [b'one\n', b'2\n', b'THREE\n']:
+                    process.stdin.write(line)
+                    process.stdin.flush()
+                    time.sleep(0.1)
+            finally:
+                process.stdin.close()
+
+        threading.Thread(target=stdin_thread).start()
+
+        reads = []
+        for line in process.stdout:
+            reads.append(line)
+
+        process.wait()
+
+        self.assertEqual(reads, [b'one\n', b'2\n', b'THREE\n'])

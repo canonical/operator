@@ -977,10 +977,8 @@ def _websocket_to_writer(ws, writer, encoding):
 class _WebsocketWriter(io.BufferedIOBase):
     """A writable file-like object that sends what's written to it to a websocket."""
 
-    def __init__(self, name, ws, encoding):
-        self.name = name
+    def __init__(self, ws):
         self.ws = ws
-        self.encoding = encoding
 
     def writable(self):
         """Denote this file-like object as writable."""
@@ -988,12 +986,8 @@ class _WebsocketWriter(io.BufferedIOBase):
 
     def write(self, chunk):
         """Write chunk to the websocket."""
-        if isinstance(chunk, str):
-            if self.encoding is None:
-                raise ValueError('encoding must be set if writing str to {}'.format(self.name))
-            chunk = chunk.encode(self.encoding)
-        elif self.encoding is not None:
-            raise ValueError('encoding must be None if writing bytes to {}'.format(self.name))
+        if not isinstance(chunk, bytes):
+            raise TypeError('value to write must be bytes, not {}'.format(type(chunk).__name__))
         self.ws.send_binary(chunk)
         return len(chunk)
 
@@ -1005,10 +999,10 @@ class _WebsocketWriter(io.BufferedIOBase):
 class _WebsocketReader(io.BufferedIOBase):
     """A readable file-like object whose reads come from a websocket."""
 
-    def __init__(self, ws, encoding):
+    def __init__(self, ws):
         self.ws = ws
-        self.encoding = encoding
-        self.remaining = '' if encoding is not None else b''
+        self.remaining = b''
+        self.eof = False
 
     def readable(self):
         """Denote this file-like object as readable."""
@@ -1016,16 +1010,19 @@ class _WebsocketReader(io.BufferedIOBase):
 
     def read(self, n=-1):
         """Read up to n bytes from the websocket (or one message if n<0)."""
+        if self.eof:
+            # Calling read() multiple times after EOF should still return EOF
+            return b''
+
         if not self.remaining:
             recv = self.ws.recv()
 
             if isinstance(recv, str):
                 _ = json.loads(recv)  # raise ValueError on invalid JSON
                 # Received "end" command, return EOF designator
-                return '' if self.encoding is not None else b''
+                self.eof = True
+                return b''
 
-            if self.encoding is not None:
-                recv = recv.decode(self.encoding)
             self.remaining = recv
 
         if n < 0:
@@ -1033,6 +1030,10 @@ class _WebsocketReader(io.BufferedIOBase):
         result = self.remaining[:n]
         self.remaining = self.remaining[n:]
         return result
+
+    def read1(self, n=-1):
+        """An alias for read."""
+        return self.read(n)
 
 
 class Client:
@@ -1841,14 +1842,18 @@ class Client:
             threads.append(t)
             process_stdin = None
         else:
-            process_stdin = _WebsocketWriter('stdin', stdio_ws, encoding)
+            process_stdin = _WebsocketWriter(stdio_ws)
+            if encoding is not None:
+                process_stdin = io.TextIOWrapper(process_stdin, encoding=encoding)
 
         if stdout is not None:
             t = _start_thread(_websocket_to_writer, stdio_ws, stdout, encoding)
             threads.append(t)
             process_stdout = None
         else:
-            process_stdout = _WebsocketReader(stdio_ws, encoding)
+            process_stdout = _WebsocketReader(stdio_ws)
+            if encoding is not None:
+                process_stdout = io.TextIOWrapper(process_stdout, encoding=encoding)
 
         process_stderr = None
         if not combine_stderr:
@@ -1856,7 +1861,9 @@ class Client:
                 t = _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
                 threads.append(t)
             else:
-                process_stderr = _WebsocketReader(stderr_ws, encoding)
+                process_stderr = _WebsocketReader(stderr_ws)
+                if encoding is not None:
+                    process_stderr = io.TextIOWrapper(process_stderr, encoding=encoding)
 
         process = ExecProcess(
             stdin=process_stdin,
