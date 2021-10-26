@@ -1844,7 +1844,7 @@ class Client:
         else:
             process_stdin = _WebsocketWriter(stdio_ws)
             if encoding is not None:
-                process_stdin = io.TextIOWrapper(process_stdin, encoding=encoding)
+                process_stdin = io.TextIOWrapper(process_stdin, encoding=encoding, newline='')
 
         if stdout is not None:
             t = _start_thread(_websocket_to_writer, stdio_ws, stdout, encoding)
@@ -1853,7 +1853,7 @@ class Client:
         else:
             process_stdout = _WebsocketReader(stdio_ws)
             if encoding is not None:
-                process_stdout = io.TextIOWrapper(process_stdout, encoding=encoding)
+                process_stdout = io.TextIOWrapper(process_stdout, encoding=encoding, newline='')
 
         process_stderr = None
         if not combine_stderr:
@@ -1863,7 +1863,8 @@ class Client:
             else:
                 process_stderr = _WebsocketReader(stderr_ws)
                 if encoding is not None:
-                    process_stderr = io.TextIOWrapper(process_stderr, encoding=encoding)
+                    process_stderr = io.TextIOWrapper(
+                        process_stderr, encoding=encoding, newline='')
 
         process = ExecProcess(
             stdin=process_stdin,
