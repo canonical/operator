@@ -21,7 +21,6 @@ import unittest
 from collections import OrderedDict
 from test.test_helpers import fake_script, fake_script_calls
 from textwrap import dedent
-from unittest.mock import Mock
 
 import ops.charm
 import ops.model
@@ -906,13 +905,12 @@ containers:
         ])
 
     def test_restart_fallback(self):
-        def restart_services(pebble, *service_names):
-            pebble.requests.append(('restart', service_names))
+        def restart_services(services):
+            self.pebble.requests.append(('restart', services))
             raise APIError({}, 400, "", "")
 
-        restart_mock = Mock(side_effect=lambda p: restart_services(self.pebble, *p))
-        self.pebble.restart_services = restart_mock
-        # Setup the Pebble client  to respond to a call to get_services()
+        self.pebble.restart_services = restart_services
+        # Setup the Pebble client to respond to a call to get_services()
         self.pebble.responses.append([
             ServiceInfo.from_dict({'name': 'foo', 'startup': 'enabled', 'current': 'active'}),
             ServiceInfo.from_dict({'name': 'bar', 'startup': 'enabled', 'current': 'inactive'}),
@@ -928,6 +926,15 @@ containers:
             # Then start all the specified services
             ('start', ('foo', 'bar'))
         ])
+
+    def test_restart_fallback_non_400_error(self):
+        def restart_services(services):
+            raise APIError({}, 500, "", "")
+
+        self.pebble.restart_services = restart_services
+        with self.assertRaises(ops.pebble.APIError) as cm:
+            self.container.restart('foo')
+        self.assertEqual(cm.exception.code, 500)
 
     def test_restart_no_arguments(self):
         with self.assertRaises(TypeError):
