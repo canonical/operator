@@ -1037,7 +1037,7 @@ class Storage:
         self._location = None
 
     @property
-    def location(self) -> typing.Union[Path, str]:
+    def location(self) -> Path:
         """Return the location of the storage."""
         if self._location is None:
             raw = self._backend.storage_get('{}/{}'.format(self.name, self.id), "location")
