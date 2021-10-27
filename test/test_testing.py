@@ -2685,7 +2685,8 @@ class _PebbleStorageAPIsTestMixin:
         client.push(self.prefix + '/file3', data)
 
         files = client.list_files(self.prefix + '/')
-        self.assertEqual({file.path for file in files}, {self.prefix + file for file in ('/file1', '/file2', '/file3')})
+        self.assertEqual({file.path for file in files},
+                         {self.prefix + file for file in ('/file1', '/file2', '/file3')})
 
         # Let's pull the first file again and check its details
         file = [f for f in files if f.path == self.prefix + '/file1'][0]
@@ -2742,14 +2743,19 @@ class _PebbleStorageAPIsTestMixin:
         ):
             client.push(self.prefix + filename, data)
         files = client.list_files(self.prefix + '/', pattern='file*.gz')
-        self.assertEqual({file.path for file in files}, {self.prefix + file for file in ('/file1.gz', '/file2.tar.gz')})
+        self.assertEqual({file.path for file in files},
+                         {self.prefix + file for file in ('/file1.gz', '/file2.tar.gz')})
 
     def test_make_directory(self):
         client = self.client
         client.make_dir(self.prefix + '/subdir')
-        self.assertEqual(client.list_files(self.prefix + '/', pattern='subdir')[0].path, self.prefix + '/subdir')
+        self.assertEqual(
+            client.list_files(self.prefix + '/', pattern='subdir')[0].path,
+            self.prefix + '/subdir')
         client.make_dir(self.prefix + '/subdir/subdir')
-        self.assertEqual(client.list_files(self.prefix + '/subdir', pattern='subdir')[0].path, self.prefix + '/subdir/subdir')
+        self.assertEqual(
+            client.list_files(self.prefix + '/subdir', pattern='subdir')[0].path,
+            self.prefix + '/subdir/subdir')
 
     def test_make_directory_recursively(self):
         client = self.client
@@ -2759,7 +2765,9 @@ class _PebbleStorageAPIsTestMixin:
         self.assertEqual(cm.exception.args[0], 'not-found')
 
         client.make_dir(self.prefix + '/subdir/subdir', make_parents=True)
-        self.assertEqual(client.list_files(self.prefix + '/subdir', pattern='subdir')[0].path, self.prefix + '/subdir/subdir')
+        self.assertEqual(
+            client.list_files(self.prefix + '/subdir', pattern='subdir')[0].path,
+            self.prefix + '/subdir/subdir')
 
     def test_make_directory_with_relative_path_fails(self):
         client = self.client
@@ -2787,8 +2795,10 @@ class _PebbleStorageAPIsTestMixin:
         client.make_dir(self.prefix + '/dir2', permissions=0o777)
 
         files = client.list_files(self.prefix + '/', pattern='dir*')
-        self.assertEqual([f for f in files if f.path == self.prefix + '/dir1'][0].permissions, 0o700)
-        self.assertEqual([f for f in files if f.path == self.prefix + '/dir2'][0].permissions, 0o777)
+        self.assertEqual([f for f in files if f.path == self.prefix + '/dir1']
+                         [0].permissions, 0o700)
+        self.assertEqual([f for f in files if f.path == self.prefix + '/dir2']
+                         [0].permissions, 0o777)
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
@@ -3004,7 +3014,10 @@ class TestMockFilesystem(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], '/nonexistant_file')
 
 
-class TestPebbleStorageAPIsUsingMocks(unittest.TestCase, _TestingPebbleClientMixin, _PebbleStorageAPIsTestMixin):
+class TestPebbleStorageAPIsUsingMocks(
+        unittest.TestCase,
+        _TestingPebbleClientMixin,
+        _PebbleStorageAPIsTestMixin):
     def setUp(self):
         self.prefix = '/prefix'
         self.client = self.get_testing_client()
