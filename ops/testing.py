@@ -1516,14 +1516,14 @@ class _MockFilesystem:
 
     def __delitem__(self, path: typing.Union[str, Path]) -> None:
         path = Path(path)
-        parent_dir: _Directory = self[path.parent]
+        parent_dir = self[path.parent]
         del parent_dir[path.name]
 
 
 class _Directory:
     def __init__(self, path: Path, **kwargs):
         self.path = path
-        self._children: typing.Dict[str, typing.Union[_Directory, _File]] = {}
+        self._children = {}
         self.last_modified = datetime.datetime.now()
         self.kwargs = kwargs
 
@@ -1581,7 +1581,7 @@ class _File:
         data_size = len(data)
 
         self.path = path
-        self.data: bytes = data
+        self.data = data
         self.size = data_size
         self.last_modified = datetime.datetime.now()
         self.kwargs = kwargs
