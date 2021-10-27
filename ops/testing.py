@@ -1324,11 +1324,11 @@ ChangeError: cannot perform the following tasks:
         return [
             pebble.FileInfo(
                 str(file.path),
-                file.path.name,
+                file.name,
                 type_mappings.get(type(file)),
                 file.size if isinstance(file, _File) else None,
                 file.kwargs.get('permissions'),
-                None,   # Note: this is a type annoation violation
+                file.last_modified,   # Note: this is a type annoation violation
                 file.kwargs.get('user_id'),
                 file.kwargs.get('user'),
                 file.kwargs.get('group_id'),
@@ -1483,11 +1483,14 @@ class _Directory:
     def __init__(self, path: Path, **kwargs):
         self.path = path
         self._children: typing.Dict[str, typing.Union[_Directory, _File]] = {}
+        self.last_modified = datetime.datetime.now()
         self.kwargs = kwargs
 
     @property
     def name(self) -> str:
-        return self.path.name
+        # Need to handle special case for root.
+        # pathlib.Path('/').name is '', but pebble returns '/'.
+        return self.path.name if self.path.name else '/'
 
     def __contains__(self, child: str) -> bool:
         return child in self._children
@@ -1539,6 +1542,7 @@ class _File:
         self.path = path
         self.data: bytes = data
         self.size = data_size
+        self.last_modified = datetime.datetime.now()
         self.kwargs = kwargs
 
     @property
