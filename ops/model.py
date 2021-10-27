@@ -1135,9 +1135,11 @@ class Container:
             if e.code != 400:
                 raise e
             # support old Pebble instances that don't support the "restart" action
-            for svc in self.get_services(service_names):
-                if svc.is_running():
-                    self._pebble.stop_services(svc.name)
+            stop = tuple(s.name for s in self.get_services(*service_names).values()
+                         if s.is_running())
+            if stop:
+                self._pebble.stop_services(stop)
+
             self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
