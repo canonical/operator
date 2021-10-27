@@ -2824,7 +2824,7 @@ class _PebbleStorageAPIsTestMixin:
         # (Special case; we won't prefix this, even when using the real Pebble server.)
         files = client.list_files('/', itself=True)
         self.assertEqual(len(files), 1)
-        dir_: pebble.FileInfo = files[0]
+        dir_ = files[0]
         self.assertEqual(dir_.path, '/')
         self.assertEqual(dir_.name, '/')
         self.assertEqual(dir_.type, pebble.FileType.DIRECTORY)
