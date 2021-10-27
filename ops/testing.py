@@ -1452,7 +1452,7 @@ class _MockFilesystem:
             data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
             encoding: typing.Optional[str] = 'utf-8',
             make_dirs: bool = False,
-            **kwargs,
+            **kwargs
     ) -> '_File':
         if not path.startswith('/'):
             raise ValueError('Path must start with slash', path)
@@ -1560,7 +1560,7 @@ class _Directory:
             name: str,
             data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
             encoding: typing.Optional[str] = 'utf-8',
-            **kwargs,
+            **kwargs
     ) -> '_File':
         self._children[name] = _File(self.path / name, data, encoding=encoding, **kwargs)
         return self._children[name]
