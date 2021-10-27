@@ -179,7 +179,8 @@ class Harness(typing.Generic[CharmType]):
             storage_name = storage_name.replace('-', '_')
             for storage_index in self._backend.storage_list(storage_name):
                 # Storage device(s) detected, emit storage-attached event(s)
-                self._charm.on[storage_name].storage_attached.emit(model.Storage(storage_name, storage_index, self._backend))
+                self._charm.on[storage_name].storage_attached.emit(
+                    model.Storage(storage_name, storage_index, self._backend))
         # Storage done, emit install event
         self._charm.on.install.emit()
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
@@ -414,7 +415,8 @@ class Harness(typing.Generic[CharmType]):
 
         if self.charm is not None and self._hooks_enabled:
             for storage_index in storage_indices:
-                self.charm.on[storage_name].storage_attached.emit(model.Storage(storage_name, storage_index, self._backend))
+                self.charm.on[storage_name].storage_attached.emit(
+                    model.Storage(storage_name, storage_index, self._backend))
         return ["{}/{}".format(storage_name, storage_index) for storage_index in storage_indices]
 
     def detach_storage(self, storage_id: str) -> None:
@@ -433,7 +435,8 @@ class Harness(typing.Generic[CharmType]):
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
         if self._backend._storage_is_attached(storage_name, storage_index) and self._hooks_enabled:
-            self.charm.on[storage_name].storage_detaching.emit(model.Storage(storage_name, storage_index, self._backend))
+            self.charm.on[storage_name].storage_detaching.emit(
+                model.Storage(storage_name, storage_index, self._backend))
         self._backend._storage_detach(storage_id)
 
     def attach_storage(self, storage_id: str) -> None:
@@ -452,7 +455,8 @@ class Harness(typing.Generic[CharmType]):
         if self._backend._storage_attach(storage_id) and self._hooks_enabled:
             storage_name, storage_index = storage_id.split('/', 1)
             storage_index = int(storage_index)
-            self.charm.on[storage_name].storage_attached.emit(model.Storage(storage_name, storage_index, self._backend))
+            self.charm.on[storage_name].storage_attached.emit(
+                model.Storage(storage_name, storage_index, self._backend))
 
     def remove_storage(self, storage_id: str) -> None:
         """Attach a storage device.
@@ -473,7 +477,8 @@ class Harness(typing.Generic[CharmType]):
                 "{} not found as a valid storage key in metadata".format(storage_name))
         is_attached = self._backend._storage_is_attached(storage_name, storage_index)
         if self.charm is not None and self._hooks_enabled and is_attached:
-            self.charm.on[storage_name].storage_detaching.emit(model.Storage(storage_name, storage_index, self._backend))
+            self.charm.on[storage_name].storage_detaching.emit(
+                model.Storage(storage_name, storage_index, self._backend))
         self._backend._storage_remove(storage_id)
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
