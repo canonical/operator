@@ -3060,14 +3060,14 @@ class TestMockFilesystem(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], '/dir1')
 
     def test_delete_file(self):
-        self.fs.create_file(pathlib.Path('/test'), "foo")
-        del self.fs[pathlib.Path('/test')]
+        self.fs.create_file('/test', "foo")
+        del self.fs['/test']
         with self.assertRaises(FileNotFoundError) as cm:
-            self.fs[pathlib.Path('/test')]
+            self.fs['/test']
 
         # Deleting deleted files should fail as well
         with self.assertRaises(FileNotFoundError) as cm:
-            del self.fs[pathlib.Path('/test')]
+            del self.fs['/test']
         self.assertEqual(cm.exception.args[0], '/test')
 
     def test_create_dir_with_extra_args(self):
