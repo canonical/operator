@@ -24,10 +24,10 @@ from textwrap import dedent
 
 import ops.charm
 import ops.model
-import ops.pebble
 import ops.testing
 from ops._private import yaml
 from ops.charm import RelationMeta, RelationRole
+from ops.pebble import APIError, ServiceInfo
 
 
 class TestModel(unittest.TestCase):
@@ -903,6 +903,38 @@ containers:
             ('restart', ('foo',)),
             ('restart', ('foo', 'bar')),
         ])
+
+    def test_restart_fallback(self):
+        def restart_services(services):
+            self.pebble.requests.append(('restart', services))
+            raise APIError({}, 400, "", "")
+
+        self.pebble.restart_services = restart_services
+        # Setup the Pebble client to respond to a call to get_services()
+        self.pebble.responses.append([
+            ServiceInfo.from_dict({'name': 'foo', 'startup': 'enabled', 'current': 'active'}),
+            ServiceInfo.from_dict({'name': 'bar', 'startup': 'enabled', 'current': 'inactive'}),
+        ])
+
+        self.container.restart('foo', 'bar')
+        self.assertEqual(self.pebble.requests, [
+            # This is the first request, which in real life fails with APIError on older versions
+            ('restart', ('foo', 'bar')),
+            # Next the code should loop over the started services, and stop them
+            ('get_services', ('foo', 'bar')),
+            ('stop', ('foo',)),
+            # Then start all the specified services
+            ('start', ('foo', 'bar'))
+        ])
+
+    def test_restart_fallback_non_400_error(self):
+        def restart_services(services):
+            raise APIError({}, 500, "", "")
+
+        self.pebble.restart_services = restart_services
+        with self.assertRaises(ops.pebble.APIError) as cm:
+            self.container.restart('foo')
+        self.assertEqual(cm.exception.code, 500)
 
     def test_restart_no_arguments(self):
         with self.assertRaises(TypeError):
