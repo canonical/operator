@@ -687,7 +687,7 @@ class CharmMeta:
     class is mostly for the framework to understand what the charm has defined.
 
     The :attr:`maintainers`, :attr:`tags`, :attr:`terms`, :attr:`series`, and
-    :attr:`extra_bindings` attributes are all lists of strings.  The
+    :attr:`extra_bindings` attributes are all lists of strings.  The :attr:`containers`,
     :attr:`requires`, :attr:`provides`, :attr:`peers`, :attr:`relations`,
     :attr:`storages`, :attr:`resources`, and :attr:`payloads` attributes are all
     mappings of names to instances of the respective :class:`RelationMeta`,
@@ -714,6 +714,8 @@ class CharmMeta:
                      subordinate charm.
         min_juju_version: If supplied, indicates this charm needs features that
                           are not available in older versions of Juju.
+        containers: A dict of {name: :class:`ContainerMeta` } for each of the 'containers'
+                   declared by this charm in the `matadata.yaml` file.
         requires: A dict of {name: :class:`RelationMeta` } for each 'requires' relation.
         provides: A dict of {name: :class:`RelationMeta` } for each 'provides' relation.
         peers: A dict of {name: :class:`RelationMeta` } for each 'peer' relation.
