@@ -23,7 +23,6 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from io import BytesIO, StringIO
-from pathlib import Path
 from textwrap import dedent
 
 from ops import charm, framework, model, pebble, storage
@@ -1414,14 +1413,20 @@ ChangeError: cannot perform the following tasks:
 
 class _MockFilesystem:
 
+    """An in-memory mock of a pebble-controlled container's filesystem.
+
+    For now, the filesystem is assumed to be a POSIX-style filesytem; Windows-style directories
+    (e.g. \, \fooba, C:\foo\bar) are not supported.
+    """
+
     def __init__(self):
-        self.root = _Directory(Path('/'))
+        self.root = _Directory(pathlib.PosixPurePath('/'))
 
     def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
         if not path.startswith('/'):
             raise ValueError('Path must start with slash', path)
         current_dir = self.root
-        tokens = Path(path).parts[1:]
+        tokens = pathlib.PosixPurePath(path).parts[1:]
         for token in tokens[:-1]:
             if token in current_dir:
                 current_dir = current_dir[token]
@@ -1456,7 +1461,7 @@ class _MockFilesystem:
     ) -> '_File':
         if not path.startswith('/'):
             raise ValueError('Path must start with slash', path)
-        path_obj = Path(path)
+        path_obj = pathlib.PosixPurePath(path)
         try:
             dir_ = self[path_obj.parent]
         except FileNotFoundError:
@@ -1476,7 +1481,7 @@ class _MockFilesystem:
 
     def list_dir(self, path) -> typing.List['_File']:
         current_dir = self.root
-        tokens = Path(path).parts[1:]
+        tokens = pathlib.PosixPurePath(path).parts[1:]
         for token in tokens:
             try:
                 current_dir = current_dir[token]
@@ -1492,18 +1497,18 @@ class _MockFilesystem:
 
     def open(
             self,
-            path: typing.Union[str, Path],
+            path: typing.Union[str, pathlib.PosixPurePath],
             encoding: typing.Optional[str] = 'utf-8',
     ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
-        path = Path(path)
+        path = pathlib.PosixPurePath(path)
         file = self[path]  # warning: no check re: directories
         if isinstance(file, _Directory):
             raise IsADirectoryError(str(file.path))
         return file.open(encoding=encoding)
 
-    def __getitem__(self, path: typing.Union[str, Path]) \
+    def __getitem__(self, path: typing.Union[str, pathlib.PosixPurePath]) \
             -> typing.Union['_Directory', '_File']:
-        path = Path(path)
+        path = pathlib.PosixPurePath(path)
         tokens = path.parts[1:]
         current_object = self.root
         for token in tokens:
@@ -1514,14 +1519,14 @@ class _MockFilesystem:
                 raise FileNotFoundError(str(current_object.path / token))
         return current_object
 
-    def __delitem__(self, path: typing.Union[str, Path]) -> None:
-        path = Path(path)
+    def __delitem__(self, path: typing.Union[str, pathlib.PosixPurePath]) -> None:
+        path = pathlib.PosixPurePath(path)
         parent_dir = self[path.parent]
         del parent_dir[path.name]
 
 
 class _Directory:
-    def __init__(self, path: Path, **kwargs):
+    def __init__(self, path: pathlib.PosixPurePath, **kwargs):
         self.path = path
         self._children = {}
         self.last_modified = datetime.datetime.now()
@@ -1530,7 +1535,7 @@ class _Directory:
     @property
     def name(self) -> str:
         # Need to handle special case for root.
-        # pathlib.Path('/').name is '', but pebble returns '/'.
+        # pathlib.PosixPurePath('/').name is '', but pebble returns '/'.
         return self.path.name if self.path.name else '/'
 
     def __contains__(self, child: str) -> bool:
@@ -1569,7 +1574,7 @@ class _Directory:
 class _File:
     def __init__(
             self,
-            path: Path,
+            path: pathlib.PosixPurePath,
             data: typing.Union[str, bytes, typing.BinaryIO, typing.TextIO],
             encoding: typing.Optional[str] = 'utf-8',
             **kwargs):
