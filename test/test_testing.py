@@ -3165,4 +3165,4 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIs
         self.client = pebble.Client(socket_path=socket_path)
 
     def tearDown(self):
-        shutil.rmtree(self.root_prefix)
+        shutil.rmtree(self.prefix)
