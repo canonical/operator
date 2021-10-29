@@ -1326,16 +1326,16 @@ ChangeError: cannot perform the following tasks:
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
                 'generic-file-error',
-                'Permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
+                'permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
         try:
             self._fs.create_file(
                 path, source, encoding=encoding, make_dirs=make_dirs, permissions=permissions,
                 user_id=user_id, user=user, group_id=group_id, group=group)
         except FileNotFoundError as e:
             raise pebble.PathError(
-                'not-found', 'Parent directory not found: {}'.format(e.args[0]))
+                'not-found', 'parent directory not found: {}'.format(e.args[0]))
         except ValueError as e:
-            if e.args[0] == 'Path must start with slash':
+            if e.args[0] == 'path must start with slash':
                 raise pebble.PathError(
                     'generic-file-error',
                     'paths must be absolute, got {!r}'.format(e.args[1])
@@ -1365,7 +1365,7 @@ ChangeError: cannot perform the following tasks:
                 type_mappings.get(type(file)),
                 file.size if isinstance(file, _File) else None,
                 file.kwargs.get('permissions'),
-                file.last_modified,   # Note: this is a type annoation violation
+                file.last_modified,
                 file.kwargs.get('user_id'),
                 file.kwargs.get('user'),
                 file.kwargs.get('group_id'),
@@ -1380,7 +1380,7 @@ ChangeError: cannot perform the following tasks:
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
                 'generic-file-error',
-                'Permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
+                'permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
         try:
             self._fs.create_dir(
                 path, make_parents=make_parents, permissions=permissions,
@@ -1388,12 +1388,12 @@ ChangeError: cannot perform the following tasks:
         except FileNotFoundError as e:
             # Parent directory doesn't exist and make_parents is False
             raise pebble.PathError(
-                'not-found', 'Parent directory not found: {}'.format(e.args[0]))
+                'not-found', 'parent directory not found: {}'.format(e.args[0]))
         except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
-            raise pebble.PathError('generic-file-error', 'Not a directory: {}'.format(e.args[0]))
+            raise pebble.PathError('generic-file-error', 'not a directory: {}'.format(e.args[0]))
         except ValueError as e:
-            if e.args[0] == 'Path must start with slash':
+            if e.args[0] == 'path must start with slash':
                 raise pebble.PathError(
                     'generic-file-error',
                     'paths must be absolute, got {!r}'.format(e.args[1])
@@ -1404,7 +1404,7 @@ ChangeError: cannot perform the following tasks:
         file_or_dir = self._fs[path]
         if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
             raise pebble.PathError(
-                'generic-file-error', 'Cannot remove non-empty directory without recursive=True')
+                'generic-file-error', 'cannot remove non-empty directory without recursive=True')
         del self._fs[path]
 
     def exec(self, command, **kwargs):
@@ -1423,7 +1423,7 @@ class _MockFilesystem:
 
     def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
         if not path.startswith('/'):
-            raise ValueError('Path must start with slash', path)
+            raise ValueError('path must start with slash', path)
         current_dir = self.root
         tokens = pathlib.PurePosixPath(path).parts[1:]
         for token in tokens[:-1]:
@@ -1459,7 +1459,7 @@ class _MockFilesystem:
             **kwargs
     ) -> '_File':
         if not path.startswith('/'):
-            raise ValueError('Path must start with slash', path)
+            raise ValueError('path must start with slash', path)
         path_obj = pathlib.PurePosixPath(path)
         try:
             dir_ = self[path_obj.parent]
@@ -1475,7 +1475,7 @@ class _MockFilesystem:
                 raise
         if not isinstance(dir_, _Directory):
             raise pebble.PathError(
-                'generic-file-error', 'Parent is not a directory: {}'.format(str(dir_)))
+                'generic-file-error', 'parent is not a directory: {}'.format(str(dir_)))
         return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
     def list_dir(self, path) -> typing.List['_File']:

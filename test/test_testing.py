@@ -3016,7 +3016,7 @@ class TestMockFilesystem(unittest.TestCase):
     def test_makedir_path_must_start_with_slash(self):
         with self.assertRaises(ValueError) as cm:
             self.fs.create_dir("noslash")
-        self.assertEqual(cm.exception.args[0], "Path must start with slash")
+        self.assertEqual(cm.exception.args[0], "path must start with slash")
 
     def test_create_file_from_str(self):
         self.fs.create_file('/test', "foo")
