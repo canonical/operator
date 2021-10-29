@@ -406,7 +406,7 @@ class Harness(typing.Generic[CharmType]):
         """
         if storage_name not in self._meta.storages:
             raise RuntimeError(
-                "{} not found as a valid storage key in metadata".format(storage_name))
+                "the key '{}' is not specified as a storage key in metadata".format(storage_name))
         storage_indices = self._backend.storage_add(storage_name, count)
 
         # Reset associated cached value in the storage mappings.  If we don't do this,
@@ -431,7 +431,7 @@ class Harness(typing.Generic[CharmType]):
                 e.g. my-storage/0.
         """
         if self.charm is None:
-            raise RuntimeError('Cannot detach when harness has not been started yet')
+            raise RuntimeError('cannot detach storage before Harness is initialised')
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
         if self._backend._storage_is_attached(storage_name, storage_index) and self._hooks_enabled:
@@ -451,7 +451,7 @@ class Harness(typing.Generic[CharmType]):
                 e.g. my-storage/0.
         """
         if self.charm is None:
-            raise RuntimeError('Cannot attach when harness has not been started yet')
+            raise RuntimeError('cannot attach storage before Harness is initialised')
         if self._backend._storage_attach(storage_id) and self._hooks_enabled:
             storage_name, storage_index = storage_id.split('/', 1)
             storage_index = int(storage_index)
@@ -474,7 +474,7 @@ class Harness(typing.Generic[CharmType]):
         storage_index = int(storage_index)
         if storage_name not in self._meta.storages:
             raise RuntimeError(
-                "{} not found as a valid storage key in metadata".format(storage_name))
+                "the key '{}' is not specified as a storage key in metadata".format(storage_name))
         is_attached = self._backend._storage_is_attached(storage_name, storage_index)
         if self.charm is not None and self._hooks_enabled and is_attached:
             self.charm.on[storage_name].storage_detaching.emit(
