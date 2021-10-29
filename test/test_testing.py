@@ -1138,7 +1138,9 @@ class TestHarness(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             harness.add_storage("test")
-        self.assertEqual(cm.exception.args[0], "the key 'test' is not specified as a storage key in metadata")
+        self.assertEqual(
+            cm.exception.args[0],
+            "the key 'test' is not specified as a storage key in metadata")
 
     def test_add_storage_after_harness_begin(self):
         harness = Harness(StorageTester, meta='''
@@ -1337,7 +1339,9 @@ class TestHarness(unittest.TestCase):
         # but included for completeness.
         with self.assertRaises(RuntimeError) as cm:
             harness.remove_storage("test/0")
-        self.assertEqual(cm.exception.args[0], "the key 'test' is not specified as a storage key in metadata")
+        self.assertEqual(
+            cm.exception.args[0],
+            "the key 'test' is not specified as a storage key in metadata")
 
     def test_remove_storage_after_harness_begin(self):
         harness = Harness(StorageTester, meta='''
