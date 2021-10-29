@@ -1138,7 +1138,7 @@ class TestHarness(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             harness.add_storage("test")
-        self.assertEqual(cm.exception.args[0], "test not found as a valid storage key in metadata")
+        self.assertEqual(cm.exception.args[0], "the key 'test' is not specified as a storage key in metadata")
 
     def test_add_storage_after_harness_begin(self):
         harness = Harness(StorageTester, meta='''
@@ -1235,7 +1235,7 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             harness.detach_storage("test/{}".format(stor_id))
         self.assertEqual(cm.exception.args[0],
-                         "Cannot detach when harness has not been started yet")
+                         "cannot detach storage before Harness is initialised")
 
     def test_attach_storage(self):
         harness = Harness(StorageTester, meta='''
@@ -1294,7 +1294,7 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             harness.attach_storage("test/{}".format(stor_id))
         self.assertEqual(cm.exception.args[0],
-                         "Cannot attach when harness has not been started yet")
+                         "cannot attach storage before Harness is initialised")
 
     def test_remove_storage_before_harness_begin(self):
         harness = Harness(StorageTester, meta='''
@@ -1337,7 +1337,7 @@ class TestHarness(unittest.TestCase):
         # but included for completeness.
         with self.assertRaises(RuntimeError) as cm:
             harness.remove_storage("test/0")
-        self.assertEqual(cm.exception.args[0], "test not found as a valid storage key in metadata")
+        self.assertEqual(cm.exception.args[0], "the key 'test' is not specified as a storage key in metadata")
 
     def test_remove_storage_after_harness_begin(self):
         harness = Harness(StorageTester, meta='''
