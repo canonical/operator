@@ -1412,11 +1412,10 @@ ChangeError: cannot perform the following tasks:
 
 
 class _MockFilesystem:
-
-    """An in-memory mock of a pebble-controlled container's filesystem.
+    r"""An in-memory mock of a pebble-controlled container's filesystem.
 
     For now, the filesystem is assumed to be a POSIX-style filesytem; Windows-style directories
-    (e.g. \, \fooba, C:\foo\bar) are not supported.
+    (e.g. \, \foo\bar, C:\foo\bar) are not supported.
     """
 
     def __init__(self):
