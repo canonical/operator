@@ -427,8 +427,8 @@ class Harness(typing.Generic[CharmType]):
         and is presently marked as attached.
 
         Args:
-            storage_id: The full storage ID being detached, including the storage key,
-                e.g. my-storage/0.
+            storage_id: The full storage ID of the storage unit being detached, including the
+                storage key, e.g. my-storage/0.
         """
         if self.charm is None:
             raise RuntimeError('cannot detach storage before Harness is initialised')
@@ -447,8 +447,8 @@ class Harness(typing.Generic[CharmType]):
         and is presently marked as detached.
 
         Args:
-            storage_id: The full storage ID being detached, including the storage key,
-                e.g. my-storage/0.
+            storage_id: The full storage ID of the storage unit being attached, including the
+                storage key, e.g. my-storage/0.
         """
         if self.charm is None:
             raise RuntimeError('cannot attach storage before Harness is initialised')
@@ -467,8 +467,8 @@ class Harness(typing.Generic[CharmType]):
         unit from the testing backend.
 
         Args:
-            storage_id: The full storage ID being detached, including the storage key,
-                e.g. my-storage/0.
+            storage_id: The full storage ID of the storage unit being removed, including the
+                storage key, e.g. my-storage/0.
         """
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
