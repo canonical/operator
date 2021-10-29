@@ -2968,11 +2968,11 @@ class TestMockFilesystem(unittest.TestCase):
         self.fs.create_dir('/opt')
         self.fs.create_file('/opt/file1', 'data')
         self.fs.create_file('/opt/file2', 'data')
-        expected_results = {pathlib.Path('/opt/file1'), pathlib.Path('/opt/file2')}
+        expected_results = {pathlib.PosixPath('/opt/file1'), pathlib.PosixPath('/opt/file2')}
         self.assertEqual(expected_results, {f.path for f in self.fs.list_dir('/opt')})
         # Ensure that Paths also work for listdir
         self.assertEqual(
-            expected_results, {f.path for f in self.fs.list_dir(pathlib.Path('/opt'))})
+            expected_results, {f.path for f in self.fs.list_dir(pathlib.PosixPath('/opt'))})
 
     def test_listdir_on_file(self):
         self.fs.create_file('/file', 'data')
@@ -2983,10 +2983,10 @@ class TestMockFilesystem(unittest.TestCase):
     def test_makedir(self):
         d = self.fs.create_dir('/etc')
         self.assertEqual(d.name, 'etc')
-        self.assertEqual(d.path, pathlib.Path('/etc'))
+        self.assertEqual(d.path, pathlib.PosixPath('/etc'))
         d2 = self.fs.create_dir('/etc/init.d')
         self.assertEqual(d2.name, 'init.d')
-        self.assertEqual(d2.path, pathlib.Path('/etc/init.d'))
+        self.assertEqual(d2.path, pathlib.PosixPath('/etc/init.d'))
 
     def test_makedir_fails_if_already_exists(self):
         self.fs.create_dir('/etc')
@@ -3004,7 +3004,7 @@ class TestMockFilesystem(unittest.TestCase):
         self.fs.create_dir('/var')
         self.assertEqual(
             {f.path for f in self.fs.list_dir('/')},
-            {pathlib.Path('/etc'), pathlib.Path('/var')})
+            {pathlib.PosixPath('/etc'), pathlib.PosixPath('/var')})
 
     def test_make_directory_recursively(self):
         self.fs.create_dir('/etc/init.d', make_parents=True)
@@ -3105,12 +3105,12 @@ class TestMockFilesystem(unittest.TestCase):
         # By path
         o = self.fs[pathlib.Path('/etc/init.d')]
         self.assertIsInstance(o, _Directory)
-        self.assertEqual(o.path, pathlib.Path('/etc/init.d'))
+        self.assertEqual(o.path, pathlib.PosixPath('/etc/init.d'))
 
         # By str
         o = self.fs['/etc/init.d']
         self.assertIsInstance(o, _Directory)
-        self.assertEqual(o.path, pathlib.Path('/etc/init.d'))
+        self.assertEqual(o.path, pathlib.PosixPath('/etc/init.d'))
 
     def test_getattr_file_not_found(self):
         # Arguably this could be a KeyError given the dictionary-style access.
