@@ -214,9 +214,23 @@ class ChangeError(Error):
 
     def __init__(self, err: str, change: 'Change'):
         """This shouldn't be instantiated directly."""
-        super().__init__(err)  # Makes str(e) return err
         self.err = err
         self.change = change
+
+    def __str__(self):
+        parts = [self.err]
+
+        # Append any task logs to the error message
+        for i, task in enumerate(self.change.tasks):
+            if not task.log:
+                continue
+            parts.append('\n----- Logs from task {} -----\n'.format(i))
+            parts.append('\n'.join(task.log))
+
+        if len(parts) > 1:
+            parts.append('\n-----')
+
+        return ''.join(parts)
 
     def __repr__(self):
         return 'ChangeError({!r}, {!r})'.format(self.err, self.change)
