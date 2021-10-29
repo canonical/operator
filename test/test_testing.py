@@ -2968,7 +2968,9 @@ class TestMockFilesystem(unittest.TestCase):
         self.fs.create_dir('/opt')
         self.fs.create_file('/opt/file1', 'data')
         self.fs.create_file('/opt/file2', 'data')
-        expected_results = {pathlib.PurePosixPath('/opt/file1'), pathlib.PurePosixPath('/opt/file2')}
+        expected_results = {
+            pathlib.PurePosixPath('/opt/file1'),
+            pathlib.PurePosixPath('/opt/file2')}
         self.assertEqual(expected_results, {f.path for f in self.fs.list_dir('/opt')})
         # Ensure that Paths also work for listdir
         self.assertEqual(
