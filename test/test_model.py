@@ -796,6 +796,17 @@ class TestApplication(unittest.TestCase):
 
         self.assertEqual(self.app.planned_units(), 3)
 
+    def test_planned_units_user_set(self):
+
+        self.harness.set_planned_units(1)
+        self.assertEqual(self.app.planned_units(), 1)
+
+        self.harness.set_planned_units(2)
+        self.assertEqual(self.app.planned_units(), 2)
+
+        self.harness.set_planned_units(100)
+        self.assertEqual(self.app.planned_units(), 100)
+
 
 class TestContainers(unittest.TestCase):
     def setUp(self):

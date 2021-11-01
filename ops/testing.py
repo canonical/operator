@@ -815,6 +815,19 @@ class Harness(typing.Generic[CharmType]):
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
+    def set_planned_units(self, num_units: int) -> None:
+        """Set the number of "planned" units  that "Application.planned_units" should return.
+
+        In real world circumstances, this number will be the number of units in the
+        application. E.g., this number will be the number of peers this unit has, plus one, as we
+        count our own unit in the total.
+
+        At the time of this writing (2021/11), a change to the return from planned_units will not
+        generate an event. Typically, a charm author would check planned units during a config or
+        install hook, or after receiving a peer relation joined event.
+        """
+        self._backend._planned_units = num_units
+
     def _get_backend_calls(self, reset: bool = True) -> list:
         """Return the calls that we have made to the TestingModelBackend.
 
@@ -928,6 +941,7 @@ class _TestingModelBackend:
         # {socket_path : _TestingPebbleClient}
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
+        self._planned_units = None
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -1080,6 +1094,17 @@ class _TestingModelBackend:
         return client
 
     def planned_units(self):
+        """Simulate processing the return from goal-state into a count of planned units.
+
+        If self._planned_units is None, then we simulate what the Juju controller will do, which is
+        to report the number of peers, plus one (we include this unit in the count).
+
+        For testing purposes, a charm author can set self._planned_units explicitly by calling
+        "Harness.set_planned_units".
+        """
+        if isinstance(self._planned_units, int):
+            return self._planned_units
+
         units = []
         peer_names = set(self._meta.peers.keys())
         for peer_id, peer_name in self._relation_names.items():
