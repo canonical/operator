@@ -150,6 +150,23 @@ def _get_event_args(charm, bound_event):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
         return [container], {}
+    elif issubclass(event_type, ops.charm.StorageEvent):
+        storage_id = os.environ.get("JUJU_STORAGE_ID", "")
+        if storage_id:
+            storage_name = storage_id.split("/")[0]
+        else:
+            # Before JUJU_STORAGE_ID exists
+            storage_name = bound_event.event_kind.split("_", 1)[0]
+
+        storages = model.storages[storage_name]
+        id, storage_location = model._backend._storage_event_details()
+        if len(storages) == 1:
+            storage = storages[0]
+        else:
+            # If there's more than one value, pick the right one. We'll realize the key on lookup
+            storage = next((s for s in storages if s.id == id), None)
+        storage.location = storage_location
+        return [storage], {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])

@@ -710,6 +710,46 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         event_file = self.JUJU_CHARM_DIR / rel_path
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
+        fake_script(
+            self,
+            "storage-get",
+            """
+            if [ "$1" = "-s" ]; then
+                id=${2#*/}
+                key=${2%/*}
+                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+            elif [ "$1" = '--help' ]; then
+                printf '%s\\n' \\
+                'Usage: storage-get [options] [<key>]' \\
+                '   ' \\
+                'Summary:' \\
+                'print information for storage instance with specified id' \\
+                '   ' \\
+                'Options:' \\
+                '--format  (= smart)' \\
+                '    Specify output format (json|smart|yaml)' \\
+                '-o, --output (= "")' \\
+                '    Specify an output file' \\
+                '-s  (= test-stor/0)' \\
+                '    specify a storage instance by id' \\
+                '   ' \\
+                'Details:' \\
+                'When no <key> is supplied, all keys values are printed.'
+            else
+                # Return the same path for all disks since `storage-get`
+                # on attach and detach takes no parameters and is not
+                # deterministically faked with fake_script
+                exit 1
+            fi
+            """,
+        )
+        fake_script(
+            self,
+            "storage-list",
+            """
+            echo '["disks/0"]'
+            """,
+        )
         subprocess.run(
             [sys.executable, str(event_file)],
             check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
@@ -960,6 +1000,46 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
+        fake_script(
+            self,
+            "storage-get",
+            """
+            if [ "$1" = "-s" ]; then
+                id=${2#*/}
+                key=${2%/*}
+                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+            elif [ "$1" = '--help' ]; then
+                printf '%s\\n' \\
+                'Usage: storage-get [options] [<key>]' \\
+                '   ' \\
+                'Summary:' \\
+                'print information for storage instance with specified id' \\
+                '   ' \\
+                'Options:' \\
+                '--format  (= smart)' \\
+                '    Specify output format (json|smart|yaml)' \\
+                '-o, --output (= "")' \\
+                '    Specify an output file' \\
+                '-s  (= test-stor/0)' \\
+                '    specify a storage instance by id' \\
+                '   ' \\
+                'Details:' \\
+                'When no <key> is supplied, all keys values are printed.'
+            else
+                # Return the same path for all disks since `storage-get`
+                # on attach and detach takes no parameters and is not
+                # deterministically faked with fake_script
+                exit 1
+            fi
+            """,
+        )
+        fake_script(
+            self,
+            "storage-list",
+            """
+            echo '["disks/0"]'
+            """,
+        )
         subprocess.run(
             [sys.executable, str(dispatch)],
             # stdout=self.stdout,
@@ -990,6 +1070,46 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
     def _call_event(self, rel_path, env):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
+        fake_script(
+            self,
+            "storage-get",
+            """
+            if [ "$1" = "-s" ]; then
+                id=${2#*/}
+                key=${2%/*}
+                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+            elif [ "$1" = '--help' ]; then
+                printf '%s\\n' \\
+                'Usage: storage-get [options] [<key>]' \\
+                '   ' \\
+                'Summary:' \\
+                'print information for storage instance with specified id' \\
+                '   ' \\
+                'Options:' \\
+                '--format  (= smart)' \\
+                '    Specify output format (json|smart|yaml)' \\
+                '-o, --output (= "")' \\
+                '    Specify an output file' \\
+                '-s  (= test-stor/0)' \\
+                '    specify a storage instance by id' \\
+                '   ' \\
+                'Details:' \\
+                'When no <key> is supplied, all keys values are printed.'
+            else
+                # Return the same path for all disks since `storage-get`
+                # on attach and detach takes no parameters and is not
+                # deterministically faked with fake_script
+                exit 1
+            fi
+            """,
+        )
+        fake_script(
+            self,
+            "storage-list",
+            """
+            echo '["disks/0"]'
+            """,
+        )
         dispatch = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
         subprocess.check_call([str(dispatch)], env=env, cwd=str(self.JUJU_CHARM_DIR))
 
