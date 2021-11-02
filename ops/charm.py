@@ -426,6 +426,38 @@ class StorageEvent(HookEvent):
     of :class:`StorageEvent`.
     """
 
+    def __init__(self, handle, storage):
+        super().__init__(handle)
+        self.storage = storage
+
+    def snapshot(self) -> dict:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        snapshot = {}
+
+        if isinstance(self.storage, model.Storage):
+            snapshot["storage_name"] = self.storage.name
+            snapshot["storage_id"] = self.storage.id
+            snapshot["storage_location"] = str(self.storage.location)
+        return snapshot
+
+    def restore(self, snapshot: dict) -> None:
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        storage_name = snapshot.get("storage_name")
+        storage_id = snapshot.get("storage_id")
+        storage_location = snapshot.get("storage_location")
+
+        if storage_name and storage_id is not None:
+            self.storage = next(
+                (s for s in self.framework.model.storages[storage_name] if s.id == storage_id),
+                None,)
+            self.storage.location = storage_location
+
 
 class StorageAttachedEvent(StorageEvent):
     """Event triggered when new storage becomes available.

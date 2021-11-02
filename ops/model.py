@@ -1037,12 +1037,21 @@ class Storage:
         self._location = None
 
     @property
-    def location(self):
+    def location(self) -> Path:
         """Return the location of the storage."""
         if self._location is None:
             raw = self._backend.storage_get('{}/{}'.format(self.name, self.id), "location")
             self._location = Path(raw)
         return self._location
+
+    @location.setter
+    def location(self, location: str) -> None:
+        """Sets the location for use in events.
+
+        For :class:`StorageAttachedEvent` and :class:`StorageDetachingEvent` in case
+        the actual details are gone from Juju by the time of a dynamic lookup.
+        """
+        self._location = Path(location)
 
 
 class Container:
@@ -1135,9 +1144,11 @@ class Container:
             if e.code != 400:
                 raise e
             # support old Pebble instances that don't support the "restart" action
-            for svc in self.get_services(*service_names).values():
-                if svc.is_running():
-                    self._pebble.stop_services((*[svc.name],))
+            stop = tuple(s.name for s in self.get_services(*service_names).values()
+                         if s.is_running())
+            if stop:
+                self._pebble.stop_services(stop)
+
             self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
@@ -1666,6 +1677,20 @@ class _ModelBackend:
     def storage_list(self, name):
         return [int(s.split('/')[1]) for s in self._run('storage-list', name,
                                                         return_output=True, use_json=True)]
+
+    def _storage_event_details(self) -> typing.Tuple[int, str]:
+        output = self._run('storage-get', '--help', return_output=True)
+
+        # Match the entire string at once instead of going line by line
+        matcher = re.compile(
+            r'.*^-s\s+\(=\s+(?P<storage_key>.*?)\)\s*?$',
+            re.MULTILINE | re.DOTALL
+        )
+        key = matcher.match(output).groupdict()["storage_key"]
+
+        id = int(key.split("/")[1])
+        location = self.storage_get(key, "location")
+        return id, location
 
     def storage_get(self, storage_name_id, attribute):
         return self._run('storage-get', '-s', storage_name_id, attribute,

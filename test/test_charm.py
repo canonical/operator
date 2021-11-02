@@ -26,7 +26,7 @@ from ops.charm import (
     ContainerStorageMeta,
 )
 from ops.framework import EventBase, EventSource, Framework
-from ops.model import Model, _ModelBackend
+from ops.model import Model, Storage, _ModelBackend
 from ops.storage import SQLiteStorage
 
 from .test_helpers import fake_script, fake_script_calls
@@ -175,6 +175,7 @@ peers:
         ])
 
     def test_storage_events(self):
+        this = self
 
         class MyCharm(CharmBase):
             def __init__(self, *args):
@@ -187,6 +188,7 @@ peers:
 
             def _on_stor1_attach(self, event):
                 self.seen.append(type(event).__name__)
+                this.assertEqual(event.storage.location, Path("/var/srv/stor1/0"))
 
             def _on_stor2_detach(self, event):
                 self.seen.append(type(event).__name__)
@@ -217,6 +219,47 @@ storage:
     type: filesystem
 ''')
 
+        fake_script(
+            self,
+            "storage-get",
+            """
+            if [ "$1" = "-s" ]; then
+                id=${2#*/}
+                key=${2%/*}
+                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+            elif [ "$1" = '--help' ]; then
+                printf '%s\\n' \\
+                'Usage: storage-get [options] [<key>]' \\
+                '   ' \\
+                'Summary:' \\
+                'print information for storage instance with specified id' \\
+                '   ' \\
+                'Options:' \\
+                '--format  (= smart)' \\
+                '    Specify output format (json|smart|yaml)' \\
+                '-o, --output (= "")' \\
+                '    Specify an output file' \\
+                '-s  (= test-stor/0)' \\
+                '    specify a storage instance by id' \\
+                '   ' \\
+                'Details:' \\
+                'When no <key> is supplied, all keys values are printed.'
+            else
+                # Return the same path for all disks since `storage-get`
+                # on attach and detach takes no parameters and is not
+                # deterministically faked with fake_script
+                exit 1
+            fi
+            """,
+        )
+        fake_script(
+            self,
+            "storage-list",
+            """
+            echo '["disks/0"]'
+            """,
+        )
+
         self.assertIsNone(self.meta.storages['stor1'].multiple_range)
         self.assertEqual(self.meta.storages['stor2'].multiple_range, (2, 2))
         self.assertEqual(self.meta.storages['stor3'].multiple_range, (2, None))
@@ -224,10 +267,10 @@ storage:
 
         charm = MyCharm(self.create_framework())
 
-        charm.on['stor1'].storage_attached.emit()
-        charm.on['stor2'].storage_detaching.emit()
-        charm.on['stor3'].storage_attached.emit()
-        charm.on['stor-4'].storage_attached.emit()
+        charm.on['stor1'].storage_attached.emit(Storage("stor1", 0, charm.model._backend))
+        charm.on['stor2'].storage_detaching.emit(Storage("stor2", 0, charm.model._backend))
+        charm.on['stor3'].storage_attached.emit(Storage("stor3", 0, charm.model._backend))
+        charm.on['stor-4'].storage_attached.emit(Storage("stor-4", 0, charm.model._backend))
 
         self.assertEqual(charm.seen, [
             'StorageAttachedEvent',
