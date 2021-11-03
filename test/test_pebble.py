@@ -29,6 +29,8 @@ import unittest
 import unittest.mock
 import unittest.util
 
+import pytest
+
 import ops.pebble as pebble
 from ops._private import yaml
 from ops._vendor import websocket
@@ -2081,7 +2083,7 @@ class MockWebsocket:
     def recv(self):
         return self.receives.pop(0)
 
-    def close(self):
+    def shutdown(self):
         pass
 
 
@@ -2248,8 +2250,11 @@ class TestExec(unittest.TestCase):
             process.send_signal(signal.SIGHUP)
             num_sends += 2
 
+        process.wait()
+
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['server'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
 
         self.assertEqual(len(control.sends), num_sends)
@@ -2391,6 +2396,31 @@ class TestExec(unittest.TestCase):
             ('TXT', '{"command":"end"}'),
         ])
 
+    def test_wait_output_bad_command(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'Python 3.8.10\n')
+        stdio.receives.append('not json')  # bad JSON should be ignored
+        stdio.receives.append('{"command":"foo"}')  # unknown command should be ignored
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        with self.assertLogs('ops.pebble', level='WARNING') as cm:
+            process = self.client.exec(['python3', '--version'])
+            out, err = process.wait_output()
+        self.assertEqual(cm.output, [
+            "WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)",
+            "WARNING:ops.pebble:Invalid I/O command 'foo'",
+        ])
+
+        self.assertEqual(out, 'Python 3.8.10\n')
+        self.assertEqual(err, '')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
     def test_wait_passed_output(self):
         io_ws, stderr, _ = self.add_responses('123', 0)
         io_ws.receives.append(b'foo\n')
@@ -2450,6 +2480,35 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(io_ws.sends, [])
 
+    def test_wait_passed_output_bad_command(self):
+        io_ws, stderr, _ = self.add_responses('123', 0)
+        io_ws.receives.append(b'foo\n')
+        io_ws.receives.append('not json')  # bad JSON should be ignored
+        io_ws.receives.append('{"command":"foo"}')  # unknown command should be ignored
+        io_ws.receives.append('{"command":"end"}')
+        stderr.receives.append(b'some error\n')
+        stderr.receives.append('{"command":"end"}')
+
+        out = io.StringIO()
+        err = io.StringIO()
+
+        with self.assertLogs('ops.pebble', level='WARNING') as cm:
+            process = self.client.exec(['echo', 'foo'], stdout=out, stderr=err)
+            process.wait()
+        self.assertEqual(cm.output, [
+            "WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)",
+            "WARNING:ops.pebble:Invalid I/O command 'foo'",
+        ])
+
+        self.assertEqual(out.getvalue(), 'foo\n')
+        self.assertEqual(err.getvalue(), 'some error\n')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(io_ws.sends, [])
+
     @unittest.skipIf(sys.platform == 'win32', "exec() with files doesn't work on Windows")
     def test_wait_file_io(self):
         fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
@@ -2495,9 +2554,8 @@ class TestExec(unittest.TestCase):
         process = self.client.exec(['awk', '{ print toupper($) }'])
         process.stdin.write('Foo Bar\n')
         self.assertEqual(process.stdout.read(4), 'FOO ')
-        self.assertEqual(process.stdout.read(), 'BAR\n')
         process.stdin.write('bazz\n')
-        self.assertEqual(process.stdout.read(), 'BAZZ\n')
+        self.assertEqual(process.stdout.read(), 'BAR\nBAZZ\n')
         process.stdin.close()
         self.assertEqual(process.stdout.read(), '')
         process.wait()
@@ -2507,8 +2565,7 @@ class TestExec(unittest.TestCase):
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
         self.assertEqual(stdio.sends, [
-            ('BIN', b'Foo Bar\n'),
-            ('BIN', b'bazz\n'),
+            ('BIN', b'Foo Bar\nbazz\n'),  # TextIOWrapper groups the writes together
             ('TXT', '{"command":"end"}'),
         ])
 
@@ -2555,7 +2612,7 @@ class TestExec(unittest.TestCase):
             self.client.exec(['foo'])
         self.assertIn(str(cm.exception), 'unexpected error connecting to websockets: conn!')
 
-    def test_websocket_send_binary_raises(self):
+    def test_websocket_send_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         raised = False
 
@@ -2579,6 +2636,12 @@ class TestExec(unittest.TestCase):
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
         self.assertEqual(stdio.sends, [])
+
+    # You'd normally use pytest.mark.filterwarnings as a decorator, but
+    # PytestUnhandledThreadExceptionWarning isn't present on older Python versions.
+    if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
+        test_websocket_send_raises = pytest.mark.filterwarnings(
+            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_send_raises)
 
     def test_websocket_recv_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)
@@ -2606,6 +2669,10 @@ class TestExec(unittest.TestCase):
             ('BIN', b'foo\nbar\n'),
             ('TXT', '{"command":"end"}'),
         ])
+
+    if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
+        test_websocket_recv_raises = pytest.mark.filterwarnings(
+            'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_recv_raises)
 
 
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
@@ -2693,23 +2760,42 @@ class TestRealPebble(unittest.TestCase):
         process = self.client.exec(['cat'])
 
         def stdin_thread():
-            for line in ['one\n', '2\n', 'THREE\n']:
-                process.stdin.write(line)
-                process.stdin.flush()
-                time.sleep(0.1)
-            process.stdin.close()
+            try:
+                for line in ['one\n', '2\n', 'THREE\n']:
+                    process.stdin.write(line)
+                    process.stdin.flush()
+                    time.sleep(0.1)
+            finally:
+                process.stdin.close()
 
         threading.Thread(target=stdin_thread).start()
 
-        # TODO: fix OSError with "for line in process.stdout: ...":
-        # OSError: read() should have returned a bytes object, not 'str'
         reads = []
-        while True:
-            chunk = process.stdout.read()
-            if not chunk:
-                break
-            reads.append(chunk)
+        for line in process.stdout:
+            reads.append(line)
 
         process.wait()
 
         self.assertEqual(reads, ['one\n', '2\n', 'THREE\n'])
+
+    def test_exec_streaming_bytes(self):
+        process = self.client.exec(['cat'], encoding=None)
+
+        def stdin_thread():
+            try:
+                for line in [b'one\n', b'2\n', b'THREE\n']:
+                    process.stdin.write(line)
+                    process.stdin.flush()
+                    time.sleep(0.1)
+            finally:
+                process.stdin.close()
+
+        threading.Thread(target=stdin_thread).start()
+
+        reads = []
+        for line in process.stdout:
+            reads.append(line)
+
+        process.wait()
+
+        self.assertEqual(reads, [b'one\n', b'2\n', b'THREE\n'])

@@ -25,6 +25,7 @@ import enum
 import http.client
 import io
 import json
+import logging
 import os
 import re
 import select
@@ -42,6 +43,8 @@ import warnings
 
 from ops._private import yaml
 from ops._vendor import websocket
+
+logger = logging.getLogger(__name__)
 
 _not_provided = object()
 
@@ -806,6 +809,8 @@ class ExecProcess:
         client: 'Client',
         timeout: typing.Optional[float],
         control_ws: websocket.WebSocket,
+        stdio_ws: websocket.WebSocket,
+        stderr_ws: websocket.WebSocket,
         command: typing.List[str],
         encoding: typing.Optional[str],
         change_id: ChangeID,
@@ -819,6 +824,8 @@ class ExecProcess:
         self._client = client
         self._timeout = timeout
         self._control_ws = control_ws
+        self._stdio_ws = stdio_ws
+        self._stderr_ws = stderr_ws
         self._command = command
         self._encoding = encoding
         self._change_id = change_id
@@ -867,7 +874,11 @@ class ExecProcess:
         if self._cancel_reader is not None:
             os.close(self._cancel_reader)
 
-        self._control_ws.close()
+        # Close websockets (shutdown doesn't send CLOSE message or wait for response).
+        self._control_ws.shutdown()
+        self._stdio_ws.shutdown()
+        if self._stderr_ws is not None:
+            self._stderr_ws.shutdown()
 
         if change.err:
             raise ChangeError(change.err, change)
@@ -965,12 +976,15 @@ def _websocket_to_writer(ws, writer, encoding):
 
         if isinstance(chunk, str):
             try:
-                command = json.loads(chunk)
+                payload = json.loads(chunk)
             except ValueError:
                 # Garbage sent, try to keep going
+                logger.warning('Cannot decode I/O command (invalid JSON)')
                 continue
-            if command.get('command') != 'end':
+            command = payload.get('command')
+            if command != 'end':
                 # A command we don't recognize, keep going
+                logger.warning('Invalid I/O command {!r}'.format(command))
                 continue
             # Received "end" command (EOF signal), stop thread
             break
@@ -983,10 +997,8 @@ def _websocket_to_writer(ws, writer, encoding):
 class _WebsocketWriter(io.BufferedIOBase):
     """A writable file-like object that sends what's written to it to a websocket."""
 
-    def __init__(self, name, ws, encoding):
-        self.name = name
+    def __init__(self, ws):
         self.ws = ws
-        self.encoding = encoding
 
     def writable(self):
         """Denote this file-like object as writable."""
@@ -994,12 +1006,8 @@ class _WebsocketWriter(io.BufferedIOBase):
 
     def write(self, chunk):
         """Write chunk to the websocket."""
-        if isinstance(chunk, str):
-            if self.encoding is None:
-                raise ValueError('encoding must be set if writing str to {}'.format(self.name))
-            chunk = chunk.encode(self.encoding)
-        elif self.encoding is not None:
-            raise ValueError('encoding must be None if writing bytes to {}'.format(self.name))
+        if not isinstance(chunk, bytes):
+            raise TypeError('value to write must be bytes, not {}'.format(type(chunk).__name__))
         self.ws.send_binary(chunk)
         return len(chunk)
 
@@ -1011,10 +1019,10 @@ class _WebsocketWriter(io.BufferedIOBase):
 class _WebsocketReader(io.BufferedIOBase):
     """A readable file-like object whose reads come from a websocket."""
 
-    def __init__(self, ws, encoding):
+    def __init__(self, ws):
         self.ws = ws
-        self.encoding = encoding
-        self.remaining = '' if encoding is not None else b''
+        self.remaining = b''
+        self.eof = False
 
     def readable(self):
         """Denote this file-like object as readable."""
@@ -1022,23 +1030,40 @@ class _WebsocketReader(io.BufferedIOBase):
 
     def read(self, n=-1):
         """Read up to n bytes from the websocket (or one message if n<0)."""
-        if not self.remaining:
-            recv = self.ws.recv()
+        if self.eof:
+            # Calling read() multiple times after EOF should still return EOF
+            return b''
 
-            if isinstance(recv, str):
-                _ = json.loads(recv)  # raise ValueError on invalid JSON
+        while not self.remaining:
+            chunk = self.ws.recv()
+
+            if isinstance(chunk, str):
+                try:
+                    payload = json.loads(chunk)
+                except ValueError:
+                    # Garbage sent, try to keep going
+                    logger.warning('Cannot decode I/O command (invalid JSON)')
+                    continue
+                command = payload.get('command')
+                if command != 'end':
+                    # A command we don't recognize, keep going
+                    logger.warning('Invalid I/O command {!r}'.format(command))
+                    continue
                 # Received "end" command, return EOF designator
-                return '' if self.encoding is not None else b''
+                self.eof = True
+                return b''
 
-            if self.encoding is not None:
-                recv = recv.decode(self.encoding)
-            self.remaining = recv
+            self.remaining = chunk
 
         if n < 0:
             n = len(self.remaining)
         result = self.remaining[:n]
         self.remaining = self.remaining[n:]
         return result
+
+    def read1(self, n=-1):
+        """An alias for read."""
+        return self.read(n)
 
 
 class Client:
@@ -1847,14 +1872,18 @@ class Client:
             threads.append(t)
             process_stdin = None
         else:
-            process_stdin = _WebsocketWriter('stdin', stdio_ws, encoding)
+            process_stdin = _WebsocketWriter(stdio_ws)
+            if encoding is not None:
+                process_stdin = io.TextIOWrapper(process_stdin, encoding=encoding, newline='')
 
         if stdout is not None:
             t = _start_thread(_websocket_to_writer, stdio_ws, stdout, encoding)
             threads.append(t)
             process_stdout = None
         else:
-            process_stdout = _WebsocketReader(stdio_ws, encoding)
+            process_stdout = _WebsocketReader(stdio_ws)
+            if encoding is not None:
+                process_stdout = io.TextIOWrapper(process_stdout, encoding=encoding, newline='')
 
         process_stderr = None
         if not combine_stderr:
@@ -1862,7 +1891,10 @@ class Client:
                 t = _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
                 threads.append(t)
             else:
-                process_stderr = _WebsocketReader(stderr_ws, encoding)
+                process_stderr = _WebsocketReader(stderr_ws)
+                if encoding is not None:
+                    process_stderr = io.TextIOWrapper(
+                        process_stderr, encoding=encoding, newline='')
 
         process = ExecProcess(
             stdin=process_stdin,
@@ -1870,6 +1902,8 @@ class Client:
             stderr=process_stderr,
             client=self,
             timeout=timeout,
+            stdio_ws=stdio_ws,
+            stderr_ws=stderr_ws,
             control_ws=control_ws,
             command=command,
             encoding=encoding,
