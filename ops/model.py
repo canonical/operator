@@ -951,10 +951,10 @@ class Resources:
         """Fetch the resource from the controller or store.
 
         If successfully fetched, this returns a Path object to where the resource is stored
-        on disk, otherwise it raises a ModelError.
+        on disk, otherwise it raises a NameError.
         """
         if name not in self._paths:
-            raise RuntimeError('invalid resource name: {}'.format(name))
+            raise NameError('invalid resource name: {}'.format(name))
         if self._paths[name] is None:
             self._paths[name] = Path(self._backend.resource_get(name))
         return self._paths[name]
