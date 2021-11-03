@@ -954,7 +954,7 @@ class Resources:
         on disk, otherwise it raises a ModelError.
         """
         if name not in self._paths:
-            raise RuntimeError('invalid resource name: {}'.format(name))
+            raise ModelError('invalid resource name: {}'.format(name))
         if self._paths[name] is None:
             self._paths[name] = Path(self._backend.resource_get(name))
         return self._paths[name]
