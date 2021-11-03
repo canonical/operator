@@ -275,7 +275,8 @@ storage:
         charm.on['stor2'].storage_detaching.emit(Storage("stor2", 0, charm.model._backend))
         charm.on['stor3'].storage_attached.emit(Storage("stor3", 0, charm.model._backend))
         charm.on['stor-4'].storage_attached.emit(Storage("stor-4", 0, charm.model._backend))
-        charm.on['stor-multiple-dashes'].storage_attached.emit(Storage("stor-multiple-dashes", 0, charm.model._backend))
+        charm.on['stor-multiple-dashes'].storage_attached.emit(
+            Storage("stor-multiple-dashes", 0, charm.model._backend))
 
         self.assertEqual(charm.seen, [
             'StorageAttachedEvent',
