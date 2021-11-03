@@ -26,6 +26,7 @@ import pdb
 import re
 import sys
 import types
+import typing
 import weakref
 
 from ops import charm
@@ -640,7 +641,7 @@ class Framework(Object):
         """Discard a persistent snapshot."""
         self._storage.drop_snapshot(handle.path)
 
-    def observe(self, bound_event: BoundEvent, observer: types.MethodType):
+    def observe(self, bound_event: BoundEvent, observer: typing.Callable[[EventBase], None]):
         """Register observer to be called when bound_event is emitted.
 
         The bound_event is generally provided as an attribute of the object that emits
