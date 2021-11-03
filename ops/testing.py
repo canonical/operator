@@ -822,9 +822,9 @@ class Harness(typing.Generic[CharmType]):
         application. E.g., this number will be the number of peers this unit has, plus one, as we
         count our own unit in the total.
 
-        At the time of this writing (2021/11), a change to the return from planned_units will not
-        generate an event. Typically, a charm author would check planned units during a config or
-        install hook, or after receiving a peer relation joined event.
+        A change to the return from planned_units will not generate an event. Typically, a charm author
+        would check planned units during a config or install hook, or after receiving a peer relation
+        joined event.
         """
         self._backend._planned_units = num_units
 
@@ -1094,13 +1094,12 @@ class _TestingModelBackend:
         return client
 
     def planned_units(self):
-        """Simulate processing the return from goal-state into a count of planned units.
+        """Simulate fetching the number of planned application units from the model.
 
         If self._planned_units is None, then we simulate what the Juju controller will do, which is
-        to report the number of peers, plus one (we include this unit in the count).
-
-        For testing purposes, a charm author can set self._planned_units explicitly by calling
-        "Harness.set_planned_units".
+        to report the number of peers, plus one (we include this unit in the count). This can be
+        overridden for testing purposes: a charm author can set the number of planned units 
+        explicitly by calling `Harness.set_planned_units`
         """
         if isinstance(self._planned_units, int):
             return self._planned_units
