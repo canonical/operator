@@ -25,6 +25,7 @@ import enum
 import http.client
 import io
 import json
+import logging
 import os
 import re
 import select
@@ -42,6 +43,8 @@ import warnings
 
 from ops._private import yaml
 from ops._vendor import websocket
+
+logger = logging.getLogger(__name__)
 
 _not_provided = object()
 
@@ -973,12 +976,15 @@ def _websocket_to_writer(ws, writer, encoding):
 
         if isinstance(chunk, str):
             try:
-                command = json.loads(chunk)
+                payload = json.loads(chunk)
             except ValueError:
                 # Garbage sent, try to keep going
+                logger.warning('Cannot decode I/O command (invalid JSON)')
                 continue
-            if command.get('command') != 'end':
+            command = payload.get('command')
+            if command != 'end':
                 # A command we don't recognize, keep going
+                logger.warning('Invalid I/O command {!r}'.format(command))
                 continue
             # Received "end" command (EOF signal), stop thread
             break
@@ -1028,16 +1034,26 @@ class _WebsocketReader(io.BufferedIOBase):
             # Calling read() multiple times after EOF should still return EOF
             return b''
 
-        if not self.remaining:
-            recv = self.ws.recv()
+        while not self.remaining:
+            chunk = self.ws.recv()
 
-            if isinstance(recv, str):
-                _ = json.loads(recv)  # raise ValueError on invalid JSON
+            if isinstance(chunk, str):
+                try:
+                    payload = json.loads(chunk)
+                except ValueError:
+                    # Garbage sent, try to keep going
+                    logger.warning('Cannot decode I/O command (invalid JSON)')
+                    continue
+                command = payload.get('command')
+                if command != 'end':
+                    # A command we don't recognize, keep going
+                    logger.warning('Invalid I/O command {!r}'.format(command))
+                    continue
                 # Received "end" command, return EOF designator
                 self.eof = True
                 return b''
 
-            self.remaining = recv
+            self.remaining = chunk
 
         if n < 0:
             n = len(self.remaining)

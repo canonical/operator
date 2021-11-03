@@ -2396,6 +2396,31 @@ class TestExec(unittest.TestCase):
             ('TXT', '{"command":"end"}'),
         ])
 
+    def test_wait_output_bad_command(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append(b'Python 3.8.10\n')
+        stdio.receives.append('not json')  # bad JSON should be ignored
+        stdio.receives.append('{"command":"foo"}')  # unknown command should be ignored
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        with self.assertLogs('ops.pebble', level='WARNING') as cm:
+            process = self.client.exec(['python3', '--version'])
+            out, err = process.wait_output()
+        self.assertEqual(cm.output, [
+            "WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)",
+            "WARNING:ops.pebble:Invalid I/O command 'foo'",
+        ])
+
+        self.assertEqual(out, 'Python 3.8.10\n')
+        self.assertEqual(err, '')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(stdio.sends, [])
+
     def test_wait_passed_output(self):
         io_ws, stderr, _ = self.add_responses('123', 0)
         io_ws.receives.append(b'foo\n')
@@ -2448,6 +2473,35 @@ class TestExec(unittest.TestCase):
         process.wait()
         self.assertEqual(out.getvalue(), b'foo\n')
         self.assertEqual(err.getvalue(), b'some error\n')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
+            ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
+        ])
+        self.assertEqual(io_ws.sends, [])
+
+    def test_wait_passed_output_bad_command(self):
+        io_ws, stderr, _ = self.add_responses('123', 0)
+        io_ws.receives.append(b'foo\n')
+        io_ws.receives.append('not json')  # bad JSON should be ignored
+        io_ws.receives.append('{"command":"foo"}')  # unknown command should be ignored
+        io_ws.receives.append('{"command":"end"}')
+        stderr.receives.append(b'some error\n')
+        stderr.receives.append('{"command":"end"}')
+
+        out = io.StringIO()
+        err = io.StringIO()
+
+        with self.assertLogs('ops.pebble', level='WARNING') as cm:
+            process = self.client.exec(['echo', 'foo'], stdout=out, stderr=err)
+            process.wait()
+        self.assertEqual(cm.output, [
+            "WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)",
+            "WARNING:ops.pebble:Invalid I/O command 'foo'",
+        ])
+
+        self.assertEqual(out.getvalue(), 'foo\n')
+        self.assertEqual(err.getvalue(), 'some error\n')
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
