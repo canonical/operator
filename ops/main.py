@@ -156,7 +156,7 @@ def _get_event_args(charm, bound_event):
             storage_name = storage_id.split("/")[0]
         else:
             # Before JUJU_STORAGE_ID exists, take the event name as
-            # <storage_name>_storage_<attached|detached> and replace it with <storage_name<
+            # <storage_name>_storage_<attached|detached> and replace it with <storage_name>
             storage_name = "-".join(bound_event.event_kind.split("_")[:-2])
 
         storages = model.storages[storage_name]
