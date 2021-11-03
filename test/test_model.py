@@ -490,7 +490,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_resource('foo', 'foo contents\n')
         self.harness.add_resource('bar', '')
 
-        with self.assertRaises(ops.model.ModelError):
+        with self.assertRaises(NameError):
             self.harness.model.resources.fetch('qux')
 
         self.assertEqual(self.harness.model.resources.fetch('foo').name, 'foo.txt')
