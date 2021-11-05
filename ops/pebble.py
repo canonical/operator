@@ -33,6 +33,7 @@ import shutil
 import signal
 import socket
 import sys
+import tempfile
 import threading
 import time
 import typing
@@ -1464,45 +1465,28 @@ class Client:
         if not boundary:
             raise ProtocolError('invalid boundary {!r}'.format(boundary))
 
-        # We have to manually write the Content-Type with boundary, because
-        # email.parser expects the entire multipart message with headers.
-        parser = email.parser.BytesFeedParser()
-        parser.feed(b'Content-Type: multipart/form-data; boundary='
-                    + boundary.encode('utf-8') + b'\r\n\r\n')
-
-        # Then read the rest of the response and feed it to the parser.
+        parser = MultipartLargeFileParser(boundary)
         while True:
             chunk = response.read(8192)
             if not chunk:
                 break
             parser.feed(chunk)
-        message = parser.close()
 
-        # Walk over the multipart parts and read content and metadata.
-        resp = None
-        content = None
-        for part in message.walk():
-            name = part.get_param('name', header='Content-Disposition')
-            if name == 'response':
-                resp = _json_loads(part.get_payload())
-            elif name == 'files':
-                filename = part.get_filename()
-                if filename != path:
-                    raise ProtocolError('path not expected: {}'.format(filename))
-                # decode=True, ironically, avoids decoding bytes to str
-                content = part.get_payload(decode=True)
-
+        resp = parser.get_response()
         if resp is None:
             raise ProtocolError('no "response" field in multipart body')
         self._raise_on_path_error(resp, path)
 
-        if content is None:
+        filenames = parser.filenames()
+        if len(filenames) < 1:
             raise ProtocolError('no file content in multipart response')
-        if encoding is not None:
-            reader = io.StringIO(content.decode(encoding))
-        else:
-            reader = io.BytesIO(content)
-        return reader
+        if len(filenames) > 1:
+            raise NotImplementedError('Multiple file responses not yet supported')
+        filename = filenames[0]
+        if filename != path:
+            raise ProtocolError('path not expected: {}'.format(filename))
+
+        return parser.get_file(path, encoding)
 
     @staticmethod
     def _raise_on_path_error(resp, path):
@@ -1926,3 +1910,181 @@ class Client:
         base_url = self.base_url.replace('http://', 'ws://')
         url = '{}/v1/tasks/{}/websocket/{}'.format(base_url, task_id, websocket_id)
         return url
+
+
+class ParserStage(enum.IntEnum):
+    BOUNDARY = enum.auto()
+    HEADER = enum.auto()
+    RESPONSE = enum.auto()
+    FILES = enum.auto()
+    FINISHED = enum.auto()
+
+
+class MultipartLargeFileParser:
+    """A limited purpose multi-part parser backed by files for memory efficiency."""
+
+    def __init__(self, boundary: bytes):
+        self.buffer = b''
+        self.stage = ParserStage.BOUNDARY
+        self.filename = None
+
+        boundary_rgx_pattern = r"""
+            --{}     # Boundary pattern
+            (--)?    # Optional --; if present, this is the final, terminating boundary
+            \r\n
+        """.format(boundary)
+        # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
+        # and the optional "--" suffix.  Pebble doesn't use this, so to simplify implementation I
+        # am ignoring it.
+
+        self.boundary_rgx = re.compile(boundary_rgx_pattern.encode(), re.VERBOSE)
+
+        # When streaming file data to tempfiles, we need to make sure we don't feed part of the
+        # boundary line by mistake.  This is easy if we detect the boundary in full, but if we
+        # haven't received it yet, we need to be careful not to feed any partial boundary line
+        # to disk.  This minimum buffer length threshold will ensure that, and will work for both
+        # regular and terminating boundary cases.
+        #
+        # Calculated as: boundary header length + prefix/suffix -- (4 bytes) + \r\n (2 bytes)
+        self.safe_buffer_len = len(boundary) + 6
+
+        self.response = None
+        self.files = {}
+
+    def __del__(self):
+        for file in self.files.values():
+            os.unlink(file.name)
+
+    def feed(self, data: bytes):
+        self.buffer += data
+        while self._run_one_pass():
+            pass
+
+    def _run_one_pass(self):
+        """Processes data in buffer.
+
+        Returns True when it expects more data can be parsed by another pass; or False
+        if no further passes are needed based upon the current buffer.
+        """
+        if self.stage == ParserStage.BOUNDARY:
+            match = self.boundary_rgx.search(self.buffer)
+            if match is None:
+                # Couldn't find a complete boundary in the buffer; stop for now
+                return False
+
+            span = match.span()
+            data_before = self.buffer[:span[0]]
+            if data_before:
+                raise RuntimeError('Unexpected data before boundary: {!r}'.format(data_before))
+
+            is_terminating_boundary = match.group(1)
+            if is_terminating_boundary:
+                # Ignore any remaining data
+                self.stage = ParserStage.FINISHED
+                return False
+            else:
+                # Consume the boundary and get ready for parsing the headers.
+                self.buffer = self.buffer[span[1]:]
+                self.stage = ParserStage.HEADER
+
+        if self.stage == ParserStage.HEADER:
+            try:
+                headers, content = self.buffer.split(b'\r\n\r\n', 1)
+            except ValueError:
+                # Not enough data; stop for now
+                return False
+
+            parser = email.parser.BytesFeedParser()
+            parser.feed(headers)
+            message = parser.close()
+
+            content_disposition = message.get_content_disposition()
+            if content_disposition != 'form-data':
+                raise RuntimeError('unexpected content disposition: {}'.format(content_disposition))
+
+            name = message.get_param('name', header='content-disposition')
+            if name == 'response':
+                self.stage = ParserStage.RESPONSE
+            elif name == 'files':
+                filename = message.get_filename()
+                if filename is None:
+                    raise NotImplementedError('multipart "files" part missing filename')
+                self._create_tempfile(filename)
+                self.stage = ParserStage.FILES
+            else:
+                raise RuntimeError('unexpected name in content-disposition header: {}'.format(name))
+
+            # Consume the header; now we're ready to parse the part body
+            # (either "request" or "files")
+            self.buffer = content
+
+        if self.stage == ParserStage.RESPONSE:
+            # Response is handled purely in memory; wait on parsing until we've received
+            # the full part.
+            match = self.boundary_rgx.search(self.buffer)
+            if match is None:
+                return False
+
+            span = match.span()
+            # Content is terminated by \r\n<boundary>; adjust for the \r\n
+            end_of_content = span[0] - 2
+            content = self.buffer[:end_of_content]
+
+            self.response = json.loads(content.decode())
+
+            self.buffer = self.buffer[span[0]:]
+            self.stage = ParserStage.BOUNDARY
+
+        if self.stage == ParserStage.FILES:
+            # Files can be huge; we shouldn't keep them in memory; rather we should
+            # stream them to files.  For now, using tempfiles.
+
+            match = self.boundary_rgx.search(self.buffer)
+            if match is None:
+                # We may have data, but we haven't reached the end of the file.
+                # Store as much data as we safely can without accidentally storing
+                # bytes of the boundary line.
+                content = self.buffer[:-self.safe_buffer_len]
+                self.buffer = self.buffer[-self.safe_buffer_len:]
+                with self._open_tempfile() as outfile:
+                    outfile.write(content)
+                # No more to parse right now
+                return False
+
+            span = match.span()
+            # Content is terminated by \r\n<boundary>; adjust for the \r\n
+            end_of_content = span[0] - 2
+            content = self.buffer[:end_of_content]
+
+            with self._open_tempfile() as outfile:
+                outfile.write(content)
+
+            self.buffer = self.buffer[span[0]:]
+            self.stage = ParserStage.BOUNDARY
+
+        if self.stage == ParserStage.FINISHED:
+            return False
+
+        # If we get here, assume we have more data and loop again.
+        # DANGER: infinite loop...?
+        return True
+
+    def _create_tempfile(self, filename):
+        tf = tempfile.NamedTemporaryFile(delete=False)
+        # Close for now; we'll open/close it on demand later via its path.
+        tf.close()
+        self.files[filename] = tf
+        self.current_filename = filename
+
+    def _open_tempfile(self):
+        return open(self.files[self.current_filename].name, 'ab')
+
+    def get_response(self):
+        return self.response
+
+    def filenames(self):
+        return list(self.files.keys())
+
+    def get_file(self, path, encoding):
+        mode = 'r' if encoding else 'rb'
+        return open(self.files[path].name, mode, encoding=encoding)
