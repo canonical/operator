@@ -1334,13 +1334,11 @@ ChangeError: cannot perform the following tasks:
         except FileNotFoundError as e:
             raise pebble.PathError(
                 'not-found', 'parent directory not found: {}'.format(e.args[0]))
-        except ValueError as e:
-            if e.args[0] == 'path must start with slash':
-                raise pebble.PathError(
-                    'generic-file-error',
-                    'paths must be absolute, got {!r}'.format(e.args[1])
-                )
-            raise
+        except NonAbsolutePathError as e:
+            raise pebble.PathError(
+                'generic-file-error',
+                'paths must be absolute, got {!r}'.format(e.args[0])
+            )
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
@@ -1392,13 +1390,11 @@ ChangeError: cannot perform the following tasks:
         except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
             raise pebble.PathError('generic-file-error', 'not a directory: {}'.format(e.args[0]))
-        except ValueError as e:
-            if e.args[0] == 'path must start with slash':
-                raise pebble.PathError(
-                    'generic-file-error',
-                    'paths must be absolute, got {!r}'.format(e.args[1])
-                )
-            raise
+        except NonAbsolutePathError as e:
+            raise pebble.PathError(
+                'generic-file-error',
+                'paths must be absolute, got {!r}'.format(e.args[0])
+            )
 
     def remove_path(self, path: str, *, recursive: bool = False):
         file_or_dir = self._fs[path]
@@ -1409,6 +1405,10 @@ ChangeError: cannot perform the following tasks:
 
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
+
+
+class NonAbsolutePathError(Exception):
+    pass
 
 
 class _MockFilesystem:
@@ -1423,7 +1423,7 @@ class _MockFilesystem:
 
     def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
         if not path.startswith('/'):
-            raise ValueError('path must start with slash', path)
+            raise NonAbsolutePathError(path)
         current_dir = self.root
         tokens = pathlib.PurePosixPath(path).parts[1:]
         for token in tokens[:-1]:
@@ -1459,7 +1459,7 @@ class _MockFilesystem:
             **kwargs
     ) -> '_File':
         if not path.startswith('/'):
-            raise ValueError('path must start with slash', path)
+            raise NonAbsolutePathError(path)
         path_obj = pathlib.PurePosixPath(path)
         try:
             dir_ = self[path_obj.parent]

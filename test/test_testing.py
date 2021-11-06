@@ -39,7 +39,13 @@ from ops.model import (
     UnknownStatus,
     _ModelBackend,
 )
-from ops.testing import Harness, _Directory, _MockFilesystem, _TestingPebbleClient
+from ops.testing import (
+    Harness,
+    NonAbsolutePathError,
+    _Directory,
+    _MockFilesystem,
+    _TestingPebbleClient,
+)
 
 
 class TestHarness(unittest.TestCase):
@@ -3014,9 +3020,8 @@ class TestMockFilesystem(unittest.TestCase):
         self.assertEqual([str(o.path) for o in self.fs.list_dir('/etc')], ['/etc/init.d'])
 
     def test_makedir_path_must_start_with_slash(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(NonAbsolutePathError):
             self.fs.create_dir("noslash")
-        self.assertEqual(cm.exception.args[0], "path must start with slash")
 
     def test_create_file_from_str(self):
         self.fs.create_file('/test', "foo")
