@@ -1342,7 +1342,7 @@ ChangeError: cannot perform the following tasks:
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
-        files = [self._fs[path]]
+        files = [self._fs.get_path(path)]
         if not itself:
             try:
                 files = self._fs.list_dir(path)
@@ -1397,11 +1397,11 @@ ChangeError: cannot perform the following tasks:
             )
 
     def remove_path(self, path: str, *, recursive: bool = False):
-        file_or_dir = self._fs[path]
+        file_or_dir = self._fs.get_path(path)
         if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
             raise pebble.PathError(
                 'generic-file-error', 'cannot remove non-empty directory without recursive=True')
-        del self._fs[path]
+        self._fs.delete_path(path)
 
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
@@ -1462,7 +1462,7 @@ class _MockFilesystem:
             raise NonAbsolutePathError(path)
         path_obj = pathlib.PurePosixPath(path)
         try:
-            dir_ = self[path_obj.parent]
+            dir_ = self.get_path(path_obj.parent)
         except FileNotFoundError:
             if make_dirs:
                 dir_ = self.create_dir(str(path_obj.parent))
@@ -1500,12 +1500,12 @@ class _MockFilesystem:
             encoding: typing.Optional[str] = 'utf-8',
     ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
         path = pathlib.PurePosixPath(path)
-        file = self[path]  # warning: no check re: directories
+        file = self.get_path(path)  # warning: no check re: directories
         if isinstance(file, _Directory):
             raise IsADirectoryError(str(file.path))
         return file.open(encoding=encoding)
 
-    def __getitem__(self, path: typing.Union[str, pathlib.PurePosixPath]) \
+    def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]) \
             -> typing.Union['_Directory', '_File']:
         path = pathlib.PurePosixPath(path)
         tokens = path.parts[1:]
@@ -1518,9 +1518,9 @@ class _MockFilesystem:
                 raise FileNotFoundError(str(current_object.path / token))
         return current_object
 
-    def __delitem__(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
+    def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
         path = pathlib.PurePosixPath(path)
-        parent_dir = self[path.parent]
+        parent_dir = self.get_path(path.parent)
         del parent_dir[path.name]
 
 

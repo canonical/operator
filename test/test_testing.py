@@ -3068,13 +3068,13 @@ class TestMockFilesystem(unittest.TestCase):
 
     def test_delete_file(self):
         self.fs.create_file('/test', "foo")
-        del self.fs['/test']
+        self.fs.delete_path('/test')
         with self.assertRaises(FileNotFoundError) as cm:
-            self.fs['/test']
+            self.fs.get_path('/test')
 
         # Deleting deleted files should fail as well
         with self.assertRaises(FileNotFoundError) as cm:
-            del self.fs['/test']
+            self.fs.delete_path('/test')
         self.assertEqual(cm.exception.args[0], '/test')
 
     def test_create_dir_with_extra_args(self):
@@ -3110,12 +3110,12 @@ class TestMockFilesystem(unittest.TestCase):
         self.fs.create_dir('/etc/init.d', make_parents=True)
 
         # By path
-        o = self.fs[pathlib.Path('/etc/init.d')]
+        o = self.fs.get_path(pathlib.Path('/etc/init.d'))
         self.assertIsInstance(o, _Directory)
         self.assertEqual(o.path, pathlib.PurePosixPath('/etc/init.d'))
 
         # By str
-        o = self.fs['/etc/init.d']
+        o = self.fs.get_path('/etc/init.d')
         self.assertIsInstance(o, _Directory)
         self.assertEqual(o.path, pathlib.PurePosixPath('/etc/init.d'))
 
@@ -3124,7 +3124,7 @@ class TestMockFilesystem(unittest.TestCase):
         # However, FileNotFoundError seems more appropriate for a filesystem, and it
         # gives a closer semantic feeling, in my opinion.
         with self.assertRaises(FileNotFoundError) as cm:
-            self.fs['/nonexistent_file']
+            self.fs.get_path('/nonexistent_file')
         self.assertEqual(cm.exception.args[0], '/nonexistent_file')
 
 
