@@ -1912,8 +1912,8 @@ class Client:
         return url
 
 
-class StopParsing(Exception):
-    pass
+class StopParsing(Exception):   # noqa: N818
+    """Signals that the parser should stop parsing, at least for now."""
 
 
 class MultipartLargeFileParser:
@@ -1948,6 +1948,7 @@ class MultipartLargeFileParser:
             os.unlink(file.name)
 
     def feed(self, data: bytes):
+        """Provide more data to the parser to process."""
         self._buffer += data
         self._run_parser_fsm()
 
