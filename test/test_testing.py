@@ -2757,7 +2757,7 @@ class _PebbleStorageAPIsTestMixin:
 
         with self.assertRaises(pebble.PathError) as cm:
             client.push(self.prefix + '/nonexistent_dir/test', data, make_dirs=False)
-        self.assertEqual(cm.exception.args[0], 'not-found')
+        self.assertEqual(cm.exception.kind, 'not-found')
 
         client.push(self.prefix + '/nonexistent_dir/test', data, make_dirs=True)
 
@@ -2767,7 +2767,7 @@ class _PebbleStorageAPIsTestMixin:
         client.push(self.prefix + '/file', data)
         with self.assertRaises(pebble.PathError) as cm:
             client.push(self.prefix + '/file/file', data)
-        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_with_permission_mask(self):
         data = 'data'
@@ -2782,7 +2782,7 @@ class _PebbleStorageAPIsTestMixin:
         ):
             with self.assertRaises(pebble.PathError) as cm:
                 client.push(self.prefix + '/file', data, permissions=bad_permission)
-        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_files_and_list(self):
         data = 'data'
@@ -2821,7 +2821,7 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
         with self.assertRaises(pebble.PathError) as cm:
             client.push('file', '')
-        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_list_directory_object_itself(self):
         client = self.client
@@ -2875,7 +2875,7 @@ class _PebbleStorageAPIsTestMixin:
 
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(self.prefix + '/subdir/subdir', make_parents=False)
-        self.assertEqual(cm.exception.args[0], 'not-found')
+        self.assertEqual(cm.exception.kind, 'not-found')
 
         client.make_dir(self.prefix + '/subdir/subdir', make_parents=True)
         self.assertEqual(
@@ -2886,7 +2886,7 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir('dir')
-        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_make_subdir_of_file_fails(self):
         client = self.client
@@ -2895,14 +2895,13 @@ class _PebbleStorageAPIsTestMixin:
         # Direct child case
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(self.prefix + '/file/subdir')
-        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Recursive creation case, in case its flow is different
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(self.prefix + '/file/subdir/subdir', make_parents=True)
-        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
 
-    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         client = self.client
         client.make_dir(self.prefix + '/dir1', permissions=0o700)
@@ -2922,7 +2921,7 @@ class _PebbleStorageAPIsTestMixin:
         )):
             with self.assertRaises(pebble.PathError) as cm:
                 client.make_dir(self.prefix + '/dir3_{}'.format(i), permissions=bad_permission)
-            self.assertEqual(cm.exception.args[0], 'generic-file-error')
+            self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_remove_path(self):
         client = self.client
@@ -2940,7 +2939,7 @@ class _PebbleStorageAPIsTestMixin:
         # Remove non-empty directory, recursive=False: error
         with self.assertRaises(pebble.PathError) as cm:
             client.remove_path(self.prefix + '/dir', recursive=False)
-        self.assertEqual(cm.exception.args[0], 'generic-file-error')
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
         client.remove_path(self.prefix + '/dir', recursive=True)
@@ -3174,3 +3173,9 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIs
 
     def tearDown(self):
         shutil.rmtree(self.prefix)
+
+    # Remove this entirely once the associated bug is fixed; it overrides the original test in the
+    # test mixin class.
+    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
+    def test_make_dir_with_permission_mask(self):
+        pass
