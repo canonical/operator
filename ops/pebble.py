@@ -1069,6 +1069,8 @@ class _WebsocketReader(io.BufferedIOBase):
 class Client:
     """Pebble API client."""
 
+    _chunk_size = 8192
+
     def __init__(self, socket_path=None, opener=None, base_url='http://localhost', timeout=5.0):
         """Initialize a client instance.
 
@@ -1083,7 +1085,6 @@ class Client:
         self.opener = opener
         self.base_url = base_url
         self.timeout = timeout
-        self.block_size = 102400  # hard-coded for now
 
     @classmethod
     def _get_default_opener(cls, socket_path):
@@ -1473,7 +1474,7 @@ class Client:
 
         # Then read the rest of the response and feed it to the parser.
         while True:
-            chunk = response.read(8192)
+            chunk = response.read(self._chunk_size)
             if not chunk:
                 break
             parser.feed(chunk)
@@ -1601,12 +1602,12 @@ class Client:
                 b'\r\n',
             ])
 
-            content = source.read(self.block_size)
+            content = source.read(self._chunk_size)
             while content:
                 if isinstance(content, str):
                     content = content.encode(encoding)
                 yield content
-                content = source.read(self.block_size)
+                content = source.read(self._chunk_size)
 
             yield b''.join([
                 b'\r\n',
