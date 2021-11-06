@@ -1408,7 +1408,11 @@ ChangeError: cannot perform the following tasks:
 
 
 class NonAbsolutePathError(Exception):
-    pass
+    """Error raised by _MockFilesystem.
+
+    This error is raised when an absolute path is required but the code instead encountered a
+    relative path.
+    """
 
 
 class _MockFilesystem:
