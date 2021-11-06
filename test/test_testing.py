@@ -2902,6 +2902,7 @@ class _PebbleStorageAPIsTestMixin:
             client.make_dir(self.prefix + '/file/subdir/subdir', make_parents=True)
         self.assertEqual(cm.exception.args[0], 'generic-file-error')
 
+    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         client = self.client
         client.make_dir(self.prefix + '/dir1', permissions=0o700)
