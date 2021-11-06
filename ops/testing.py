@@ -1358,16 +1358,16 @@ ChangeError: cannot perform the following tasks:
         }
         return [
             pebble.FileInfo(
-                str(file.path),
-                file.name,
-                type_mappings.get(type(file)),
-                file.size if isinstance(file, _File) else None,
-                file.kwargs.get('permissions'),
-                file.last_modified,
-                file.kwargs.get('user_id'),
-                file.kwargs.get('user'),
-                file.kwargs.get('group_id'),
-                file.kwargs.get('group'),
+                path=str(file.path),
+                name=file.name,
+                type=type_mappings.get(type(file)),
+                size=file.size if isinstance(file, _File) else None,
+                permissions=file.kwargs.get('permissions'),
+                last_modified=file.last_modified,
+                user_id=file.kwargs.get('user_id'),
+                user=file.kwargs.get('user'),
+                group_id=file.kwargs.get('group_id'),
+                group=file.kwargs.get('group'),
             )
             for file in files
         ]

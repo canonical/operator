@@ -2751,15 +2751,15 @@ class _PebbleStorageAPIsTestMixin:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
 
-    def test_push_to_non_existant_subdir(self):
+    def test_push_to_non_existent_subdir(self):
         data = 'data'
         client = self.client
 
         with self.assertRaises(pebble.PathError) as cm:
-            client.push(self.prefix + '/nonexistant_dir/test', data, make_dirs=False)
+            client.push(self.prefix + '/nonexistent_dir/test', data, make_dirs=False)
         self.assertEqual(cm.exception.args[0], 'not-found')
 
-        client.push(self.prefix + '/nonexistant_dir/test', data, make_dirs=True)
+        client.push(self.prefix + '/nonexistent_dir/test', data, make_dirs=True)
 
     def test_push_as_child_of_file_raises_error(self):
         data = 'data'
@@ -2946,8 +2946,8 @@ class _PebbleStorageAPIsTestMixin:
 
         # Deliberately ignoring a few cases right now, as the behavior for these may
         # change based upon discussions:
-        # * Removing non-existant path, recursive=False: currently does error
-        # * Removing non-existant path, recursive=True: currently does not error
+        # * Removing non-existent path, recursive=False: currently does error
+        # * Removing non-existent path, recursive=True: currently does not error
 
     # Other notes:
     # * Parent directories created via push(make_dirs=True) default to root:root ownership
@@ -2965,7 +2965,7 @@ class TestMockFilesystem(unittest.TestCase):
     def test_listdir_root_on_empty_os(self):
         self.assertEqual(self.fs.list_dir('/'), [])
 
-    def test_listdir_on_nonexistant_dir(self):
+    def test_listdir_on_nonexistent_dir(self):
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.list_dir('/etc')
         self.assertEqual(cm.exception.args[0], '/etc')
@@ -3124,8 +3124,8 @@ class TestMockFilesystem(unittest.TestCase):
         # However, FileNotFoundError seems more appropriate for a filesystem, and it
         # gives a closer semantic feeling, in my opinion.
         with self.assertRaises(FileNotFoundError) as cm:
-            self.fs['/nonexistant_file']
-        self.assertEqual(cm.exception.args[0], '/nonexistant_file')
+            self.fs['/nonexistent_file']
+        self.assertEqual(cm.exception.args[0], '/nonexistent_file')
 
 
 class TestPebbleStorageAPIsUsingMocks(
