@@ -1912,10 +1912,6 @@ class Client:
         return url
 
 
-class StopParsing(Exception):   # noqa: N818
-    """Signals that the parser should stop parsing, at least for now."""
-
-
 class MultipartLargeFileParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
 
@@ -1925,7 +1921,7 @@ class MultipartLargeFileParser:
         self._files = {}
 
         # Store the initial FSM state.  See _run_parser_fsm() for a full explanation.
-        self._next_state_fn = self._state_detect_boundary
+        self._initial_state_fn = self._state_detect_boundary
 
         # Prepare the MIME multipart boundary line matcher.
         # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
@@ -1957,101 +1953,113 @@ class MultipartLargeFileParser:
 
         Each FSM state is represented by a function.  Transitions to other FSM states are done by
         returning the next state's function.  If None is returned, the FSM will be terminated.
-
-        As a special case, to avoid the need to transfer to and from an explicit paused state when
-        we run out of pending data to parse, we use the StopParsing exception to signal that the
-        FSM should be paused.  It will be restarted from the same state the next time data is
-        received.
         """
-        try:
-            while self._next_state_fn:
-                self._next_state_fn = self._next_state_fn()
-        except StopParsing:
-            pass
+        next_state = self._initial_state_fn
+        while next_state:
+            next_state = next_state()
 
     def _state_detect_boundary(self):
+        next_state = None
         match = self._boundary_rgx.search(self._buffer)
-        if match is None:
-            # Couldn't find a complete boundary in the buffer; stop for now
-            raise StopIteration()
+        if match:
+            # This is here as a paranoia check; we should only be in this state when the buffer
+            # immediately starts with the boundary line.
+            span = match.span()
+            data_before = self._buffer[:span[0]]
+            if data_before:
+                raise RuntimeError(
+                    'Unexpected data before boundary: {!r}'.format(data_before))
 
-        # This is here as a paranoia check; we should only be in this state when the buffer
-        # immediately starts with the boundary line.
-        span = match.span()
-        data_before = self._buffer[:span[0]]
-        if data_before:
-            raise RuntimeError(
-                'Unexpected data before boundary: {!r}'.format(data_before))
-
-        is_terminating_boundary = match.group(1)
-        if is_terminating_boundary:
-            # Ignore any remaining data
-            next_state = None
+            is_terminating_boundary = match.group(1)
+            if is_terminating_boundary:
+                # Permanently stop the FSM, ignoring any remaining data
+                next_state = self._state_stop
+                self._update_initial_state(next_state)
+            else:
+                # Consume the boundary and get ready for parsing the headers.
+                self._buffer = self._buffer[span[1]:]
+                next_state = self._state_parse_header
         else:
-            # Consume the boundary and get ready for parsing the headers.
-            self._buffer = self._buffer[span[1]:]
-            next_state = self._state_parse_header
+            # Couldn't find a complete boundary in the buffer; stop for now
+            self._update_initial_state(self._state_detect_boundary)
+            next_state = self._state_stop
         return next_state
 
     def _state_parse_header(self):
+        next_state = None
         try:
             headers, content = self._buffer.split(b'\r\n\r\n', 1)
         except ValueError:
             # Not enough data; stop for now
-            raise StopParsing()
-
-        # Rely on the stdlib for parsing the headers, since this can be done purely
-        # in memory without any realistic worry of memory concerns.
-        parser = email.parser.BytesFeedParser()
-        parser.feed(headers)
-        message = parser.close()
-
-        content_disposition = message.get_content_disposition()
-        if content_disposition != 'form-data':
-            raise RuntimeError(
-                'unexpected content disposition: {}'.format(content_disposition))
-
-        name = message.get_param('name', header='content-disposition')
-        if name == 'response':
-            next_state = self._state_parse_response_part
-        elif name == 'files':
-            filename = message.get_filename()
-            if filename is None:
-                raise NotImplementedError('multipart "files" part missing filename')
-            self._prepare_tempfile(filename)
-            next_state = self._state_parse_files_part
+            self._update_initial_state(self._state_parse_header)
+            next_state = self._state_stop
         else:
-            raise RuntimeError(
-                'unexpected name in content-disposition header: {}'.format(name))
+            # Rely on the stdlib for parsing the headers, since this can be done purely
+            # in memory without any realistic worry of memory concerns.
+            parser = email.parser.BytesFeedParser()
+            parser.feed(headers)
+            message = parser.close()
 
-        # Consume the header; now we're ready to parse the part body
-        # (either "request" or "files")
-        self._buffer = content
+            content_disposition = message.get_content_disposition()
+            if content_disposition != 'form-data':
+                raise RuntimeError(
+                    'unexpected content disposition: {}'.format(content_disposition))
+
+            name = message.get_param('name', header='content-disposition')
+            if name == 'response':
+                next_state = self._state_parse_response_part
+            elif name == 'files':
+                filename = message.get_filename()
+                if filename is None:
+                    raise NotImplementedError('multipart "files" part missing filename')
+                self._prepare_tempfile(filename)
+                next_state = self._state_parse_files_part
+            else:
+                raise RuntimeError(
+                    'unexpected name in content-disposition header: {}'.format(name))
+
+            # Consume the header; now we're ready to parse the part body
+            # (either "request" or "files")
+            self._buffer = content
         return next_state
 
     def _state_parse_response_part(self):
         # Response is handled purely in memory; wait on parsing until we've received
         # the full part.
+        next_state = None
         match = self._boundary_rgx.search(self._buffer)
-        if match is None:
-            raise StopParsing()
+        if match:
+            span = match.span()
+            # Content is terminated by \r\n<boundary>; adjust for the \r\n
+            end_of_content = span[0] - 2
+            content = self._buffer[:end_of_content]
 
-        span = match.span()
-        # Content is terminated by \r\n<boundary>; adjust for the \r\n
-        end_of_content = span[0] - 2
-        content = self._buffer[:end_of_content]
+            self._response = json.loads(content.decode())
 
-        self._response = json.loads(content.decode())
-
-        self._buffer = self._buffer[span[0]:]
-        return self._state_detect_boundary
+            self._buffer = self._buffer[span[0]:]
+            next_state = self._state_detect_boundary
+        else:
+            self._update_initial_state(self._state_parse_response_part)
+            next_state = self._state_stop
+        return next_state
 
     def _state_parse_files_part(self):
         # Files can be huge; we shouldn't keep them in memory; rather we should
         # stream them to files.  For now, using tempfiles.
-
+        next_state = None
         match = self._boundary_rgx.search(self._buffer)
-        if match is None:
+        if match:
+            span = match.span()
+            # Content is terminated by \r\n<boundary>; adjust for the \r\n
+            end_of_content = span[0] - 2
+            content = self._buffer[:end_of_content]
+
+            with self._open_tempfile() as outfile:
+                outfile.write(content)
+
+            self._buffer = self._buffer[span[0]:]
+            next_state = self._state_detect_boundary
+        else:
             # We may have data, but we haven't reached the end of the file.
             # Store as much data as we safely can without accidentally storing
             # bytes of the boundary line.
@@ -2060,18 +2068,16 @@ class MultipartLargeFileParser:
             with self._open_tempfile() as outfile:
                 outfile.write(content)
             # No more to parse right now
-            raise StopParsing()
+            self._update_initial_state(self._state_parse_files_part)
+            next_state = self._state_stop
+        return next_state
 
-        span = match.span()
-        # Content is terminated by \r\n<boundary>; adjust for the \r\n
-        end_of_content = span[0] - 2
-        content = self._buffer[:end_of_content]
+    def _state_stop(self):
+        # Signal the FSM to terminate
+        return None
 
-        with self._open_tempfile() as outfile:
-            outfile.write(content)
-
-        self._buffer = self._buffer[span[0]:]
-        return self._state_detect_boundary
+    def _update_initial_state(self, state_fn):
+        self._initial_state_fn = state_fn
 
     def _prepare_tempfile(self, filename):
         tf = tempfile.NamedTemporaryFile(delete=False)
