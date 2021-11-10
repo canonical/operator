@@ -2054,7 +2054,8 @@ class MultipartLargeFileParser:
             end_of_content = span[0] - 2
             content = self._buffer[:end_of_content]
 
-            with self._open_tempfile() as outfile:
+            # Perform the final write to the tempfile
+            with self._get_open_tempfile() as outfile:
                 outfile.write(content)
 
             self._buffer = self._buffer[span[0]:]
@@ -2065,8 +2066,11 @@ class MultipartLargeFileParser:
             # bytes of the boundary line.
             content = self._buffer[:-self._safe_buffer_len]
             self._buffer = self._buffer[-self._safe_buffer_len:]
-            with self._open_tempfile() as outfile:
-                outfile.write(content)
+
+            # Write the partial data.  Leave the tempfile open.
+            outfile = self._get_open_tempfile()
+            outfile.write(content)
+
             # No more to parse right now
             self._update_initial_state(self._state_parse_files_part)
             next_state = self._state_stop
@@ -2086,8 +2090,8 @@ class MultipartLargeFileParser:
         self._files[filename] = tf
         self.current_filename = filename
 
-    def _open_tempfile(self):
-        return open(self._files[self.current_filename].name, 'ab')
+    def _get_open_tempfile(self):
+        return self._files[self.current_filename]
 
     def get_response(self):
         """Return the deserialized JSON object from the multipart "response" field."""
