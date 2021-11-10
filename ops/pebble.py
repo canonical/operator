@@ -1588,7 +1588,6 @@ class Client:
         content_type = 'multipart/form-data; boundary="' + boundary.decode('utf-8') + '"'
 
         def generator():
-            nonlocal source
             yield b''.join([
                 b'--', boundary, b'\r\n',
                 b'Content-Type: application/json\r\n',

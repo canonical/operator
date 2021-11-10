@@ -2755,8 +2755,8 @@ class _PebbleStorageAPIsTestMixin:
         # Intent: to ensure things work appropriately with larger files.
         # Larger files may be sent/received in multiple chunks; this should help for
         # checking that such logic is correct.
-        data_size = 2**20
-        original_data = "".join(chr(i % 128) for i in range(data_size)).encode('ascii')
+        data_size = 1024 * 1024
+        original_data = os.urandom(data_size)
 
         client = self.client
         client.push(self.prefix + '/test', original_data, encoding=None)
