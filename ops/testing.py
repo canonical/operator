@@ -1336,3 +1336,6 @@ ChangeError: cannot perform the following tasks:
 
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
+
+    def get_checks(self, level=None, names=None):
+        raise NotImplementedError(self.get_checks)
