@@ -518,6 +518,8 @@ class Plan:
         self._raw = raw
         self._services = {name: Service(name, service)
                           for name, service in d.get('services', {}).items()}
+        self._checks = {name: Check(name, check)
+                        for name, check in d.get('checks', {}).items()}
 
     @property
     def services(self):
@@ -527,14 +529,21 @@ class Plan:
         """
         return self._services
 
+    @property
+    def checks(self):
+        """This plan's checks mapping (maps check name to Check).
+
+        This property is currently read-only.
+        """
+        return self._services
+
     def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this plan to its dict representation."""
-        as_dicts = {name: service.to_dict() for name, service in self._services.items()}
-        if not as_dicts:
-            return {}
-        return {
-            'services': as_dicts,
-        }
+        fields = [
+            ('services', {name: service.to_dict() for name, service in self._services.items()}),
+            ('checks', {name: check.to_dict() for name, check in self._checks.items()}),
+        ]
+        return {name: value for name, value in fields if value}
 
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
@@ -552,7 +561,8 @@ class Layer:
     Attributes:
         summary: A summary of the purpose of this layer
         description: A long form description of this layer
-        services: A mapping of name: :class:`Service` defined by this layer
+        services: A mapping of name to :class:`Service` defined by this layer
+        checks: A mapping of check to :class:`Check` defined by this layer
     """
 
     # This is how you do type annotations, but it is not supported by Python 3.5
@@ -569,6 +579,8 @@ class Layer:
         self.description = d.get('description', '')
         self.services = {name: Service(name, service)
                          for name, service in d.get('services', {}).items()}
+        self.checks = {name: Check(name, check)
+                       for name, check in d.get('checks', {}).items()}
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
@@ -579,7 +591,8 @@ class Layer:
         fields = [
             ('summary', self.summary),
             ('description', self.description),
-            ('services', {name: service.to_dict() for name, service in self.services.items()})
+            ('services', {name: service.to_dict() for name, service in self.services.items()}),
+            ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
         ]
         return {name: value for name, value in fields if value}
 
@@ -608,6 +621,12 @@ class Service:
         self.user_id = raw.get('user-id')
         self.group = raw.get('group', '')
         self.group_id = raw.get('group-id')
+        self.on_success = raw.get('on-success', '')
+        self.on_failure = raw.get('on-failure', '')
+        self.on_check_failure = raw.get('', {})
+        self.backoff_delay = raw.get('backoff-delay', '')
+        self.backoff_factor = raw.get('backoff-factor')
+        self.backoff_limit = raw.get('backoff-limit', '')
 
     def to_dict(self) -> typing.Dict:
         """Convert this service object to its dict representation."""
@@ -625,6 +644,12 @@ class Service:
             ('user-id', self.user_id),
             ('group', self.group),
             ('group-id', self.group_id),
+            ('on-success', self.on_success),
+            ('on-failure', self.on_failure),
+            ('on-check-failure', self.on_check_failure),
+            ('backoff-delay', self.backoff_delay),
+            ('backoff-factor', self.backoff_factor),
+            ('backoff-limit', self.backoff_limit),
         ]
         return {name: value for name, value in fields if value}
 
@@ -666,10 +691,12 @@ class ServiceInfo:
         name: str,
         startup: typing.Union[ServiceStartup, str],
         current: typing.Union[ServiceStatus, str],
+        restarts: int = None,
     ):
         self.name = name
         self.startup = startup
         self.current = current
+        self.restarts = restarts
 
     def is_running(self) -> bool:
         """Return True if this service is running (in the active state)."""
@@ -690,14 +717,69 @@ class ServiceInfo:
             name=d['name'],
             startup=startup,
             current=current,
+            restarts=d.get('restarts'),
         )
 
     def __repr__(self):
         return ('ServiceInfo('
                 'name={self.name!r}, '
                 'startup={self.startup}, '
-                'current={self.current})'
+                'current={self.current}, '
+                'restarts={self.restarts})'
                 ).format(self=self)
+
+
+class Check:
+    """Represents a check configuration in a Pebble configuration layer."""
+
+    def __init__(self, name: str, raw: typing.Dict = None):
+        self.name = name
+        raw = raw or {}
+        self.override = raw.get('override', '')
+        try:
+            self.level = CheckLevel(raw.get('level', ''))
+        except ValueError:
+            self.level = raw.get('level')
+        self.period = raw.get('period', '')
+        self.timeout = raw.get('timeout', '')
+        self.failures = raw.get('failures')
+        self.http = raw.get('http')
+        self.tcp = raw.tcp('tcp')
+        self.exec = raw.tcp('exec')
+
+    def to_dict(self) -> typing.Dict:
+        """Convert this check object to its dict representation."""
+        fields = [
+            ('override', self.override),
+            ('level', self.level.value),
+            ('period', self.period),
+            ('timeout', self.timeout),
+            ('failures', self.failures),
+            ('http', self.http),
+            ('tcp', self.tcp),
+            ('exec', self.exec),
+        ]
+        return {name: value for name, value in fields if value}
+
+    def __repr__(self) -> str:
+        return 'Check({!r})'.format(self.to_dict())
+
+    def __eq__(self, other: typing.Union[typing.Dict, 'Check']) -> bool:
+        """Compare this check configuration to another."""
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Check):
+            return self.to_dict() == other.to_dict()
+        else:
+            raise ValueError("Cannot compare pebble.Check to {}".format(type(other)))
+
+
+class CheckLevel(enum.Enum):
+    """Enum of check levels."""
+
+    UNSET = ''
+    ALIVE = 'alive'
+    READY = 'ready'
 
 
 class FileType(enum.Enum):
@@ -771,6 +853,52 @@ class FileInfo:
                 'user={self.user!r}, '
                 'group_id={self.group_id}, '
                 'group={self.group!r})'
+                ).format(self=self)
+
+
+class CheckInfo:
+    """Check status information."""
+
+    def __init__(
+        self,
+        name: str,
+        level: str,
+        healthy: bool,
+        failures: int = None,
+        last_error: str = None,
+        error_details: str = None,
+    ):
+        self.name = name
+        self.level = level
+        self.healthy = healthy
+        self.failures = failures
+        self.last_error = last_error
+        self.error_details = error_details
+
+    @classmethod
+    def from_dict(cls, d: typing.Dict) -> 'CheckInfo':
+        """Create new CheckInfo object from dict parsed from JSON."""
+        try:
+            level = CheckLevel(d.get('level', ''))
+        except ValueError:
+            level = d.get('level')
+        return cls(
+            name=d['name'],
+            level=level,
+            healthy=d['healthy'],
+            failures=d.get('failures', 0),
+            last_error=d.get('last-error', ''),
+            error_details=d.get('error-details', ''),
+        )
+
+    def __repr__(self):
+        return ('CheckInfo('
+                'name={self.name!r}, '
+                'level={self.level!r}, '
+                'healthy={self.healthy}, '
+                'failures={self.failures}, '
+                'last_error={self.last_error!r}, '
+                'error_details={self.error_details!r})'
                 ).format(self=self)
 
 
@@ -1132,7 +1260,7 @@ class Client:
         """Make a request to the Pebble server; return the raw HTTPResponse object."""
         url = self.base_url + path
         if query:
-            url = url + '?' + urllib.parse.urlencode(query)
+            url = url + '?' + urllib.parse.urlencode(query, doseq=True)
 
         if headers is None:
             headers = {}
@@ -1926,3 +2054,28 @@ class Client:
         base_url = self.base_url.replace('http://', 'ws://')
         url = '{}/v1/tasks/{}/websocket/{}'.format(base_url, task_id, websocket_id)
         return url
+
+    def get_checks(
+        self,
+        level: CheckLevel = None,
+        names: typing.List[str] = None
+    ) -> typing.List[CheckInfo]:
+        """Get the check status for the configured checks.
+
+        Args:
+            level: Optional check level to query for. Because "ready" implies
+                "alive", if level is AliveLevel, checks with level "ready" are
+                included too.
+            names: Optional list of check names to query for (default is to
+                fetch all).
+
+        Returns:
+            List of CheckInfo objects.
+        """
+        query = {}
+        if level is not None:
+            query['level'] = level.value
+        if names:
+            query['names'] = names
+        resp = self._request('GET', '/v1/checks', query)
+        return [CheckInfo.from_dict(info) for info in resp['result']]
