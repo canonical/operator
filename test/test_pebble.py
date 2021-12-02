@@ -509,6 +509,22 @@ class TestPlan(unittest.TestCase):
         with self.assertRaises(AttributeError):
             plan.services = {}
 
+    def test_checks(self):
+        plan = pebble.Plan('')
+        self.assertEqual(plan.checks, {})
+
+        plan = pebble.Plan(
+            'checks:\n bar:\n  override: replace\n  http:\n   url: https://example.com/')
+
+        self.assertEqual(len(plan.checks), 1)
+        self.assertEqual(plan.checks['bar'].name, 'bar')
+        self.assertEqual(plan.checks['bar'].override, 'replace')
+        self.assertEqual(plan.checks['bar'].http, {'url': 'https://example.com/'})
+
+        # Should be read-only ("can't set attribute")
+        with self.assertRaises(AttributeError):
+            plan.checks = {}
+
     def test_yaml(self):
         # Starting with nothing, we get the empty result
         plan = pebble.Plan('')
@@ -521,6 +537,11 @@ services:
  foo:
   override: replace
   command: echo foo
+
+checks:
+ bar:
+  http:
+   https://example.com/
 '''
         plan = pebble.Plan(raw)
         reformed = yaml.safe_dump(yaml.safe_load(raw))
@@ -528,9 +549,6 @@ services:
         self.assertEqual(str(plan), reformed)
 
     def test_service_equality(self):
-        plan = pebble.Plan('')
-        self.assertEqual(plan.services, {})
-
         plan = pebble.Plan('services:\n foo:\n  override: replace\n  command: echo foo')
 
         old_service = pebble.Service(name="foo",
@@ -592,7 +610,11 @@ class TestLayer(unittest.TestCase):
         s = pebble.Layer('')
         self._assert_empty(s)
 
-        yaml = """description: The quick brown fox!
+        yaml = """checks:
+  chk:
+    http:
+      url: https://example.com/
+description: The quick brown fox!
 services:
   bar:
     command: echo bar
@@ -624,6 +646,9 @@ summary: Sum Mary
         self.assertEqual(s.services['bar'].user_id, 1000)
         self.assertEqual(s.services['bar'].group, 'staff')
         self.assertEqual(s.services['bar'].group_id, 2000)
+
+        self.assertEqual(s.checks['chk'].name, 'chk')
+        self.assertEqual(s.checks['chk'].http, {'url': 'https://example.com/'})
 
         self.assertEqual(s.to_yaml(), yaml)
         self.assertEqual(str(s), yaml)
@@ -668,6 +693,12 @@ class TestService(unittest.TestCase):
         self.assertIs(service.user_id, None)
         self.assertEqual(service.group, '')
         self.assertIs(service.group_id, None)
+        self.assertEqual(service.on_success, '')
+        self.assertEqual(service.on_failure, '')
+        self.assertEqual(service.on_check_failure, {})
+        self.assertEqual(service.backoff_delay, '')
+        self.assertIs(service.backoff_factor, None)
+        self.assertEqual(service.backoff_limit, '')
         self.assertEqual(service.to_dict(), {})
 
     def test_name_only(self):
@@ -692,6 +723,12 @@ class TestService(unittest.TestCase):
             'user-id': 1000,
             'group': 'staff',
             'group-id': 2000,
+            'on-success': 'restart',
+            'on-failure': 'ignore',
+            'on-check-failure': {'chk1': 'halt'},
+            'backoff-delay': '1s',
+            'backoff-factor': 4,
+            'backoff-limit': '10s',
         }
         s = pebble.Service('Name 2', d)
         self.assertEqual(s.name, 'Name 2')
@@ -707,6 +744,12 @@ class TestService(unittest.TestCase):
         self.assertEqual(s.user_id, 1000)
         self.assertEqual(s.group, 'staff')
         self.assertEqual(s.group_id, 2000)
+        self.assertEqual(s.on_success, 'restart')
+        self.assertEqual(s.on_failure, 'ignore')
+        self.assertEqual(s.on_check_failure, {'chk1': 'halt'})
+        self.assertEqual(s.backoff_delay, '1s')
+        self.assertEqual(s.backoff_factor, 4)
+        self.assertEqual(s.backoff_limit, '10s')
 
         self.assertEqual(s.to_dict(), d)
 
@@ -715,6 +758,7 @@ class TestService(unittest.TestCase):
         s.before.append('b3')
         s.requires.append('r3')
         s.environment['k3'] = 'v3'
+        s.on_check_failure['chk2'] = 'ignore'
         self.assertEqual(s.after, ['a1', 'a2', 'a3'])
         self.assertEqual(s.before, ['b1', 'b2', 'b3'])
         self.assertEqual(s.requires, ['r1', 'r2', 'r3'])
@@ -723,6 +767,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(d['before'], ['b1', 'b2'])
         self.assertEqual(d['requires'], ['r1', 'r2'])
         self.assertEqual(d['environment'], {'k1': 'v1', 'k2': 'v2'})
+        self.assertEqual(d['on-check-failure'], {'chk1': 'halt'})
 
     def test_equality(self):
         d = {
@@ -761,6 +806,82 @@ class TestService(unittest.TestCase):
         }
         self.assertEqual(one, as_dict)
 
+        with self.assertRaises(ValueError):
+            self.assertEqual(one, 5)
+
+
+class TestCheck(unittest.TestCase):
+    def _assert_empty(self, check, name):
+        self.assertEqual(check.name, name)
+        self.assertEqual(check.override, '')
+        self.assertEqual(check.level, pebble.CheckLevel.UNSET)
+        self.assertEqual(check.period, '')
+        self.assertEqual(check.timeout, '')
+        self.assertIs(check.failures, None)
+        self.assertIs(check.http, None)
+        self.assertIs(check.tcp, None)
+        self.assertIs(check.exec, None)
+
+    def test_name_only(self):
+        check = pebble.Check('chk')
+        self._assert_empty(check, 'chk')
+
+    def test_dict(self):
+        d = {
+            'override': 'replace',
+            'level': 'alive',
+            'period': '10s',
+            'timeout': '3s',
+            'failures': 5,
+            # Not valid for Pebble to have more than one of http, tcp, and exec,
+            # but it makes things simpler for the unit tests.
+            'http': {'url': 'https://example.com/'},
+            'tcp': {'port': 80},
+            'exec': {'command': 'echo foo'},
+        }
+        check = pebble.Check('chk-http', d)
+        self.assertEqual(check.name, 'chk-http')
+        self.assertEqual(check.override, 'replace')
+        self.assertEqual(check.level, pebble.CheckLevel.ALIVE)
+        self.assertEqual(check.period, '10s')
+        self.assertEqual(check.timeout, '3s')
+        self.assertEqual(check.failures, 5)
+        self.assertEqual(check.http, {'url': 'https://example.com/'})
+        self.assertEqual(check.tcp, {'port': 80})
+        self.assertEqual(check.exec, {'command': 'echo foo'})
+
+        self.assertEqual(check.to_dict(), d)
+
+        # Ensure pebble.Check has made copies of mutable objects
+        check.http['url'] = 'https://www.google.com'
+        self.assertEqual(d['http'], {'url': 'https://example.com/'})
+        check.tcp['port'] = 81
+        self.assertEqual(d['tcp'], {'port': 80})
+        check.exec['command'] = 'foo'
+        self.assertEqual(d['exec'], {'command': 'echo foo'})
+
+    def test_equality(self):
+        d = {
+            'override': 'replace',
+            'level': 'alive',
+            'period': '10s',
+            'timeout': '3s',
+            'failures': 5,
+            'http': {'url': 'https://example.com/'},
+        }
+        one = pebble.Check('one', d)
+        two = pebble.Check('two', d)
+        self.assertEqual(one, two)
+        self.assertEqual(one, d)
+        self.assertEqual(two, d)
+        self.assertEqual(one, one.to_dict())
+        self.assertEqual(two, two.to_dict())
+        d['level'] = 'ready'
+        self.assertNotEqual(one, d)
+
+        with self.assertRaises(ValueError):
+            self.assertEqual(one, 5)
+
 
 class TestServiceInfo(unittest.TestCase):
     def test_service_startup(self):
@@ -786,15 +907,28 @@ class TestServiceInfo(unittest.TestCase):
         self.assertEqual(s.name, 'svc1')
         self.assertEqual(s.startup, pebble.ServiceStartup.ENABLED)
         self.assertEqual(s.current, pebble.ServiceStatus.ACTIVE)
+        self.assertIs(s.restarts, None)
+
+        s = pebble.ServiceInfo(
+            'svc1',
+            pebble.ServiceStartup.ENABLED,
+            pebble.ServiceStatus.ACTIVE,
+            restarts=3)
+        self.assertEqual(s.name, 'svc1')
+        self.assertEqual(s.startup, pebble.ServiceStartup.ENABLED)
+        self.assertEqual(s.current, pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(s.restarts, 3)
 
         s = pebble.ServiceInfo.from_dict({
             'name': 'svc2',
             'startup': 'disabled',
             'current': 'inactive',
+            'restarts': 3,
         })
         self.assertEqual(s.name, 'svc2')
         self.assertEqual(s.startup, pebble.ServiceStartup.DISABLED)
         self.assertEqual(s.current, pebble.ServiceStatus.INACTIVE)
+        self.assertEqual(s.restarts, 3)
 
         s = pebble.ServiceInfo.from_dict({
             'name': 'svc2',
@@ -811,6 +945,72 @@ class TestServiceInfo(unittest.TestCase):
         for current in [pebble.ServiceStatus.INACTIVE, pebble.ServiceStatus.ERROR, 'other']:
             s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, current)
             self.assertFalse(s.is_running())
+
+
+class TestCheckInfo(unittest.TestCase):
+    def test_check_level(self):
+        self.assertEqual(list(pebble.CheckLevel), [
+            pebble.CheckLevel.UNSET,
+            pebble.CheckLevel.ALIVE,
+            pebble.CheckLevel.READY,
+        ])
+        self.assertEqual(pebble.CheckLevel.UNSET.value, '')
+        self.assertEqual(pebble.CheckLevel.ALIVE.value, 'alive')
+        self.assertEqual(pebble.CheckLevel.READY.value, 'ready')
+
+    def test_check_info(self):
+        check = pebble.CheckInfo(
+            name='chk1',
+            level=pebble.CheckLevel.READY,
+            healthy=True,
+        )
+        self.assertEqual(check.name, 'chk1')
+        self.assertEqual(check.level, pebble.CheckLevel.READY)
+        self.assertEqual(check.healthy, True)
+        self.assertIs(check.failures, 0)
+        self.assertIs(check.last_error, None)
+        self.assertIs(check.error_details, None)
+
+        check = pebble.CheckInfo(
+            name='chk2',
+            level=pebble.CheckLevel.ALIVE,
+            healthy=False,
+            failures=5,
+            last_error='ERR',
+            error_details='deets',
+        )
+        self.assertEqual(check.name, 'chk2')
+        self.assertEqual(check.level, pebble.CheckLevel.ALIVE)
+        self.assertEqual(check.healthy, False)
+        self.assertEqual(check.failures, 5)
+        self.assertEqual(check.last_error, 'ERR')
+        self.assertEqual(check.error_details, 'deets')
+
+        check = pebble.CheckInfo.from_dict({
+            'name': 'chk3',
+            'healthy': True,
+        })
+        self.assertEqual(check.name, 'chk3')
+        self.assertEqual(check.level, pebble.CheckLevel.UNSET)
+        self.assertEqual(check.healthy, True)
+        self.assertEqual(check.failures, 0)
+        self.assertEqual(check.last_error, '')
+        self.assertEqual(check.error_details, '')
+
+        check = pebble.CheckInfo.from_dict({
+            'name': 'chk4',
+            'level': pebble.CheckLevel.UNSET,
+            'healthy': False,
+            'failures': 3,
+            'last-error': 'ERR2',
+            'error-details': 'deetz',
+        })
+        self.assertEqual(check.name, 'chk4')
+        self.assertEqual(check.level, pebble.CheckLevel.UNSET)
+        self.assertEqual(check.healthy, False)
+        self.assertEqual(check.failures, 3)
+        self.assertEqual(check.last_error, 'ERR2')
+        self.assertEqual(check.error_details, 'deetz')
 
 
 class MockClient(pebble.Client):
@@ -2008,6 +2208,68 @@ bad path
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
         self.assertEqual(cm.exception.message, 'some other error')
+
+    def test_get_checks_all(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    "name": "chk1",
+                    "healthy": True,
+                },
+                {
+                    "name": "chk2",
+                    "level": "alive",
+                    "healthy": False,
+                    "failures": 5,
+                    "last-error": "ERR!",
+                    "error-details": "deets",
+                }
+            ],
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        checks = self.client.get_checks()
+        self.assertEqual(len(checks), 2)
+        self.assertEqual(checks[0].name, 'chk1')
+        self.assertEqual(checks[0].level, pebble.CheckLevel.UNSET)
+        self.assertEqual(checks[0].healthy, True)
+        self.assertEqual(checks[0].failures, 0)
+        self.assertEqual(checks[0].last_error, '')
+        self.assertEqual(checks[0].error_details, '')
+        self.assertEqual(checks[1].name, 'chk2')
+        self.assertEqual(checks[1].level, pebble.CheckLevel.ALIVE)
+        self.assertEqual(checks[1].healthy, False)
+        self.assertEqual(checks[1].failures, 5)
+        self.assertEqual(checks[1].last_error, 'ERR!')
+        self.assertEqual(checks[1].error_details, 'deets')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/checks', {}, None),
+        ])
+
+    def test_get_checks_filters(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    "name": "chk2",
+                    "level": "ready",
+                    "healthy": True,
+                },
+            ],
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0].name, 'chk2')
+        self.assertEqual(checks[0].level, pebble.CheckLevel.READY)
+        self.assertEqual(checks[0].healthy, True)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
+        ])
 
 
 @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")

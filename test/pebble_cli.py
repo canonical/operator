@@ -60,7 +60,7 @@ def main():
     p = subparsers.add_parser('checks', help='show (filtered) checks')
     p.add_argument('--level', help='check level to filter on, default all levels',
                    choices=[c.value for c in pebble.CheckLevel], default='')
-    p.add_argument('--name', help='check name(s) to filter on', action='append')
+    p.add_argument('name', help='check name(s) to filter on', nargs='*')
 
     p = subparsers.add_parser('exec', help='execute a command')
     p.add_argument('--env', help='environment variables to set', action='append',

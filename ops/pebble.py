@@ -19,6 +19,7 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 
 import binascii
 import cgi
+import copy
 import datetime
 import email.parser
 import enum
@@ -535,7 +536,7 @@ class Plan:
 
         This property is currently read-only.
         """
-        return self._services
+        return self._checks
 
     def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this plan to its dict representation."""
@@ -623,7 +624,7 @@ class Service:
         self.group_id = raw.get('group-id')
         self.on_success = raw.get('on-success', '')
         self.on_failure = raw.get('on-failure', '')
-        self.on_check_failure = raw.get('', {})
+        self.on_check_failure = dict(raw.get('on-check-failure', {}))
         self.backoff_delay = raw.get('backoff-delay', '')
         self.backoff_factor = raw.get('backoff-factor')
         self.backoff_limit = raw.get('backoff-limit', '')
@@ -743,9 +744,21 @@ class Check:
         self.period = raw.get('period', '')
         self.timeout = raw.get('timeout', '')
         self.failures = raw.get('failures')
-        self.http = raw.get('http')
-        self.tcp = raw.tcp('tcp')
-        self.exec = raw.tcp('exec')
+
+        http = raw.get('http')
+        if http is not None:
+            http = copy.deepcopy(http)
+        self.http = http
+
+        tcp = raw.get('tcp')
+        if tcp is not None:
+            tcp = copy.deepcopy(tcp)
+        self.tcp = tcp
+
+        exec_ = raw.get('exec')
+        if exec_ is not None:
+            exec_ = copy.deepcopy(exec_)
+        self.exec = exec_
 
     def to_dict(self) -> typing.Dict:
         """Convert this check object to its dict representation."""
@@ -864,7 +877,7 @@ class CheckInfo:
         name: str,
         level: str,
         healthy: bool,
-        failures: int = None,
+        failures: int = 0,
         last_error: str = None,
         error_details: str = None,
     ):
@@ -1550,7 +1563,7 @@ class Client:
         self._request('POST', '/v1/layers', body=body)
 
     def get_plan(self) -> Plan:
-        """Get the Pebble plan (currently contains only combined services)."""
+        """Get the Pebble plan (contains combined layer configuration)."""
         resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
         return Plan(resp['result'])
 
