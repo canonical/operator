@@ -692,7 +692,7 @@ class ServiceInfo:
         name: str,
         startup: typing.Union[ServiceStartup, str],
         current: typing.Union[ServiceStatus, str],
-        restarts: int = None,
+        restarts: int = 0,
     ):
         self.name = name
         self.startup = startup
@@ -718,7 +718,7 @@ class ServiceInfo:
             name=d['name'],
             startup=startup,
             current=current,
-            restarts=d.get('restarts'),
+            restarts=d.get('restarts', 0),
         )
 
     def __repr__(self):

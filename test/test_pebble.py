@@ -907,7 +907,7 @@ class TestServiceInfo(unittest.TestCase):
         self.assertEqual(s.name, 'svc1')
         self.assertEqual(s.startup, pebble.ServiceStartup.ENABLED)
         self.assertEqual(s.current, pebble.ServiceStatus.ACTIVE)
-        self.assertIs(s.restarts, None)
+        self.assertEqual(s.restarts, 0)
 
         s = pebble.ServiceInfo(
             'svc1',
@@ -938,6 +938,7 @@ class TestServiceInfo(unittest.TestCase):
         self.assertEqual(s.name, 'svc2')
         self.assertEqual(s.startup, 'thingy')
         self.assertEqual(s.current, 'bob')
+        self.assertEqual(s.restarts, 0)
 
     def test_is_running(self):
         s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
