@@ -839,6 +839,10 @@ class TestApplication(unittest.TestCase):
 
         self.assertEqual(self.app.planned_units(), 10)
 
+        # Verify that we can clear the override.
+        self.harness.reset_planned_units()
+        self.assertEqual(self.app.planned_units(), 3)
+
 
 class TestContainers(unittest.TestCase):
     def setUp(self):

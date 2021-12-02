@@ -831,6 +831,16 @@ class Harness(typing.Generic[CharmType]):
             raise TypeError("num_units must be 0 or a positive integer.")
         self._backend._planned_units = num_units
 
+    def reset_planned_units(self):
+        """Reset the planned units override.
+
+        This allows the harness to fall through to the built in methods that will try to
+        guess at a value for planned units, based on the number of peer relations that
+        have been setup in the testing harness.
+
+        """
+        self._backend._planned_units = None
+
     def _get_backend_calls(self, reset: bool = True) -> list:
         """Return the calls that we have made to the TestingModelBackend.
 
