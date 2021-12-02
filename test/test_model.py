@@ -827,8 +827,8 @@ class TestApplication(unittest.TestCase):
 
         When a charm author writes a test that explicitly calls set_planned_units, we assume that
         their intent is to override the calculated return value. Often, this will be because the
-        charm author is composing a charm without peer relations, and the harness's count of planned
-        units, which is based on the number of peer relations, will not be accurate.
+        charm author is composing a charm without peer relations, and the harness's count of
+        planned units, which is based on the number of peer relations, will not be accurate.
         """
         peer_id = self.peer_rel_id
 
@@ -841,7 +841,7 @@ class TestApplication(unittest.TestCase):
 
         # Verify that we can clear the override.
         self.harness.reset_planned_units()
-        self.assertEqual(self.app.planned_units(), 3)
+        self.assertEqual(self.app.planned_units(), 4)  # self + 3 peers
 
 
 class TestContainers(unittest.TestCase):
