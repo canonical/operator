@@ -3002,6 +3002,12 @@ class TestMockFilesystem(unittest.TestCase):
             self.fs.create_dir('/etc')
         self.assertEqual(cm.exception.args[0], '/etc')
 
+    def test_makedir_succeeds_if_already_exists_when_make_parents_true(self):
+        d1 = self.fs.create_dir('/etc')
+        d2 = self.fs.create_dir('/etc', make_parents=True)
+        self.assertEqual(d1.path, d2.path)
+        self.assertEqual(d1.name, d2.name)
+
     def test_makedir_fails_if_parent_dir_doesnt_exist(self):
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.create_dir('/etc/init.d')
