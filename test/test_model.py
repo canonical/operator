@@ -796,6 +796,53 @@ class TestApplication(unittest.TestCase):
 
         self.assertEqual(self.app.planned_units(), 3)
 
+    def test_planned_units_user_set(self):
+
+        self.harness.set_planned_units(1)
+        self.assertEqual(self.app.planned_units(), 1)
+
+        self.harness.set_planned_units(2)
+        self.assertEqual(self.app.planned_units(), 2)
+
+        self.harness.set_planned_units(100)
+        self.assertEqual(self.app.planned_units(), 100)
+
+    def test_planned_units_garbage_values(self):
+        # Planned units should be a positive integer, or zero.
+        with self.assertRaises(TypeError):
+            self.harness.set_planned_units(-1)
+        # Verify that we didn't set our value before raising the error.
+        self.assertTrue(self.harness._backend._planned_units is None)
+        # Verify that we still get the default value back from .planned_units.
+        self.assertEqual(self.app.planned_units(), 1)
+
+        with self.assertRaises(TypeError):
+            self.harness.set_planned_units("foo")
+
+        with self.assertRaises(TypeError):
+            self.harness.set_planned_units(-3423000102312321090)
+
+    def test_planned_units_override(self):
+        """Verify that we override the calculated value of planned_units when we set it manually.
+
+        When a charm author writes a test that explicitly calls set_planned_units, we assume that
+        their intent is to override the calculated return value. Often, this will be because the
+        charm author is composing a charm without peer relations, and the harness's count of
+        planned units, which is based on the number of peer relations, will not be accurate.
+        """
+        peer_id = self.peer_rel_id
+
+        self.harness.set_planned_units(10)
+        self.harness.add_relation_unit(peer_id, 'myapp/1')
+        self.harness.add_relation_unit(peer_id, 'myapp/2')
+        self.harness.add_relation_unit(peer_id, 'myapp/3')
+
+        self.assertEqual(self.app.planned_units(), 10)
+
+        # Verify that we can clear the override.
+        self.harness.reset_planned_units()
+        self.assertEqual(self.app.planned_units(), 4)  # self + 3 peers
+
 
 class TestContainers(unittest.TestCase):
     def setUp(self):
