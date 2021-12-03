@@ -1602,7 +1602,12 @@ class _MockFilesystem:
         if token not in current_dir:
             current_dir = current_dir.create_dir(token, **kwargs)
         else:
-            raise FileExistsError(str(current_dir.path / token))
+            # If 'make_parents' is specified, behave like 'mkdir -p' and ignore if the dir already
+            # exists.
+            if make_parents:
+                current_dir = _Directory(current_dir.path / token)
+            else:
+                raise FileExistsError(str(current_dir.path / token))
         return current_dir
 
     def create_file(
