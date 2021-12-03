@@ -817,6 +817,32 @@ class Harness(typing.Generic[CharmType]):
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
+    def set_planned_units(self, num_units: int) -> None:
+        """Set the number of "planned" units  that "Application.planned_units" should return.
+
+        In real world circumstances, this number will be the number of units in the
+        application. E.g., this number will be the number of peers this unit has, plus one, as we
+        count our own unit in the total.
+
+        A change to the return from planned_units will not generate an event. Typically, a charm
+        author would check planned units during a config or install hook, or after receiving a peer
+        relation joined event.
+
+        """
+        if num_units < 0:
+            raise TypeError("num_units must be 0 or a positive integer.")
+        self._backend._planned_units = num_units
+
+    def reset_planned_units(self):
+        """Reset the planned units override.
+
+        This allows the harness to fall through to the built in methods that will try to
+        guess at a value for planned units, based on the number of peer relations that
+        have been setup in the testing harness.
+
+        """
+        self._backend._planned_units = None
+
     def _get_backend_calls(self, reset: bool = True) -> list:
         """Return the calls that we have made to the TestingModelBackend.
 
@@ -930,6 +956,7 @@ class _TestingModelBackend:
         # {socket_path : _TestingPebbleClient}
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
+        self._planned_units = None
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -1082,6 +1109,16 @@ class _TestingModelBackend:
         return client
 
     def planned_units(self):
+        """Simulate fetching the number of planned application units from the model.
+
+        If self._planned_units is None, then we simulate what the Juju controller will do, which is
+        to report the number of peers, plus one (we include this unit in the count). This can be
+        overridden for testing purposes: a charm author can set the number of planned units
+        explicitly by calling `Harness.set_planned_units`
+        """
+        if self._planned_units is not None:
+            return self._planned_units
+
         units = []
         peer_names = set(self._meta.peers.keys())
         for peer_id, peer_name in self._relation_names.items():
