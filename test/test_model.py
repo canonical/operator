@@ -1152,6 +1152,22 @@ containers:
         ])
         self.assertEqual(p, 'fake_exec_process')
 
+    def test_send_signal(self):
+        with self.assertRaises(TypeError):
+            self.container.send_signal('SIGHUP')
+
+        self.container.send_signal('SIGHUP', 's1')
+        self.assertEqual(self.pebble.requests, [
+            ('send_signal', 'SIGHUP', ('s1',)),
+        ])
+        self.pebble.requests = []
+
+        self.container.send_signal('SIGHUP', 's1', 's2')
+        self.assertEqual(self.pebble.requests, [
+            ('send_signal', 'SIGHUP', ('s1', 's2')),
+        ])
+        self.pebble.requests = []
+
 
 class MockPebbleBackend(ops.model._ModelBackend):
     def get_pebble(self, socket_path):
@@ -1221,6 +1237,9 @@ class MockPebbleClient:
     def exec(self, command, **kwargs):
         self.requests.append(('exec', command, kwargs))
         return self.responses.pop(0)
+
+    def send_signal(self, signal, service_names):
+        self.requests.append(('send_signal', signal, service_names))
 
 
 class TestModelBindings(unittest.TestCase):

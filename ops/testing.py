@@ -1336,3 +1336,6 @@ ChangeError: cannot perform the following tasks:
 
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
+
+    def send_signal(self, sig: typing.Union[int, str], services: typing.List[str]):
+        raise NotImplementedError(self.send_signal)
