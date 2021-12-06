@@ -15,12 +15,14 @@
 """Infrastructure to build unittests for Charms using the Operator Framework."""
 
 import datetime
+import fnmatch
 import inspect
 import pathlib
 import random
 import tempfile
 import typing
 from contextlib import contextmanager
+from io import BytesIO, StringIO
 from textwrap import dedent
 
 from ops import charm, framework, model, pebble, storage
@@ -815,6 +817,32 @@ class Harness(typing.Generic[CharmType]):
         if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
+    def set_planned_units(self, num_units: int) -> None:
+        """Set the number of "planned" units  that "Application.planned_units" should return.
+
+        In real world circumstances, this number will be the number of units in the
+        application. E.g., this number will be the number of peers this unit has, plus one, as we
+        count our own unit in the total.
+
+        A change to the return from planned_units will not generate an event. Typically, a charm
+        author would check planned units during a config or install hook, or after receiving a peer
+        relation joined event.
+
+        """
+        if num_units < 0:
+            raise TypeError("num_units must be 0 or a positive integer.")
+        self._backend._planned_units = num_units
+
+    def reset_planned_units(self):
+        """Reset the planned units override.
+
+        This allows the harness to fall through to the built in methods that will try to
+        guess at a value for planned units, based on the number of peer relations that
+        have been setup in the testing harness.
+
+        """
+        self._backend._planned_units = None
+
     def _get_backend_calls(self, reset: bool = True) -> list:
         """Return the calls that we have made to the TestingModelBackend.
 
@@ -928,6 +956,7 @@ class _TestingModelBackend:
         # {socket_path : _TestingPebbleClient}
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
+        self._planned_units = None
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -1080,6 +1109,16 @@ class _TestingModelBackend:
         return client
 
     def planned_units(self):
+        """Simulate fetching the number of planned application units from the model.
+
+        If self._planned_units is None, then we simulate what the Juju controller will do, which is
+        to report the number of peers, plus one (we include this unit in the count). This can be
+        overridden for testing purposes: a charm author can set the number of planned units
+        explicitly by calling `Harness.set_planned_units`
+        """
+        if self._planned_units is not None:
+            return self._planned_units
+
         units = []
         peer_names = set(self._meta.peers.keys())
         for peer_id, peer_name in self._relation_names.items():
@@ -1107,6 +1146,7 @@ class _TestingPebbleClient:
         self._layers = {}
         # Has a service been started/stopped?
         self._service_status = {}
+        self._fs = _MockFilesystem()
 
     def get_system_info(self) -> pebble.SystemInfo:
         return pebble.SystemInfo(version="1.0.0")
@@ -1314,28 +1354,300 @@ ChangeError: cannot perform the following tasks:
 
     def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
                                                                           typing.TextIO]:
-        raise NotImplementedError(self.pull)
+        return self._fs.open(path, encoding=encoding)
 
     def push(
             self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
-        raise NotImplementedError(self.push)
+        if permissions is not None and not (0 <= permissions <= 0o777):
+            raise pebble.PathError(
+                'generic-file-error',
+                'permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
+        try:
+            self._fs.create_file(
+                path, source, encoding=encoding, make_dirs=make_dirs, permissions=permissions,
+                user_id=user_id, user=user, group_id=group_id, group=group)
+        except FileNotFoundError as e:
+            raise pebble.PathError(
+                'not-found', 'parent directory not found: {}'.format(e.args[0]))
+        except NonAbsolutePathError as e:
+            raise pebble.PathError(
+                'generic-file-error',
+                'paths must be absolute, got {!r}'.format(e.args[0])
+            )
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
-        raise NotImplementedError(self.list_files)
+        files = [self._fs.get_path(path)]
+        if not itself:
+            try:
+                files = self._fs.list_dir(path)
+            except NotADirectoryError:
+                pass
+
+        if pattern is not None:
+            files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
+
+        type_mappings = {
+            _File: pebble.FileType.FILE,
+            _Directory: pebble.FileType.DIRECTORY,
+        }
+        return [
+            pebble.FileInfo(
+                path=str(file.path),
+                name=file.name,
+                type=type_mappings.get(type(file)),
+                size=file.size if isinstance(file, _File) else None,
+                permissions=file.kwargs.get('permissions'),
+                last_modified=file.last_modified,
+                user_id=file.kwargs.get('user_id'),
+                user=file.kwargs.get('user'),
+                group_id=file.kwargs.get('group_id'),
+                group=file.kwargs.get('group'),
+            )
+            for file in files
+        ]
 
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
-        raise NotImplementedError(self.make_dir)
+        if permissions is not None and not (0 <= permissions <= 0o777):
+            raise pebble.PathError(
+                'generic-file-error',
+                'permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
+        try:
+            self._fs.create_dir(
+                path, make_parents=make_parents, permissions=permissions,
+                user_id=user_id, user=user, group_id=group_id, group=group)
+        except FileNotFoundError as e:
+            # Parent directory doesn't exist and make_parents is False
+            raise pebble.PathError(
+                'not-found', 'parent directory not found: {}'.format(e.args[0]))
+        except NotADirectoryError as e:
+            # Attempted to create a subdirectory of a file
+            raise pebble.PathError('generic-file-error', 'not a directory: {}'.format(e.args[0]))
+        except NonAbsolutePathError as e:
+            raise pebble.PathError(
+                'generic-file-error',
+                'paths must be absolute, got {!r}'.format(e.args[0])
+            )
 
     def remove_path(self, path: str, *, recursive: bool = False):
-        raise NotImplementedError(self.remove_path)
+        file_or_dir = self._fs.get_path(path)
+        if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
+            raise pebble.PathError(
+                'generic-file-error', 'cannot remove non-empty directory without recursive=True')
+        self._fs.delete_path(path)
 
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
 
     def get_checks(self, level=None, names=None):
         raise NotImplementedError(self.get_checks)
+
+
+class NonAbsolutePathError(Exception):
+    """Error raised by _MockFilesystem.
+
+    This error is raised when an absolute path is required but the code instead encountered a
+    relative path.
+    """
+
+
+class _MockFilesystem:
+    r"""An in-memory mock of a pebble-controlled container's filesystem.
+
+    For now, the filesystem is assumed to be a POSIX-style filesytem; Windows-style directories
+    (e.g. \, \foo\bar, C:\foo\bar) are not supported.
+    """
+
+    def __init__(self):
+        self.root = _Directory(pathlib.PurePosixPath('/'))
+
+    def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
+        if not path.startswith('/'):
+            raise NonAbsolutePathError(path)
+        current_dir = self.root
+        tokens = pathlib.PurePosixPath(path).parts[1:]
+        for token in tokens[:-1]:
+            if token in current_dir:
+                current_dir = current_dir[token]
+            else:
+                if make_parents:
+                    # NOTE: other parameters (e.g. ownership, permissions) only get applied to the
+                    # final directory.
+                    # (At the time of writing, Pebble defaults to 0o755 permissions and root:root
+                    # ownership.)
+                    current_dir = current_dir.create_dir(token)
+                else:
+                    raise FileNotFoundError(str(current_dir.path / token))
+            if isinstance(current_dir, _File):
+                raise NotADirectoryError(str(current_dir.path))
+
+        # Current backend will always raise an error if the final directory component
+        # already exists.
+        token = tokens[-1]
+        if token not in current_dir:
+            current_dir = current_dir.create_dir(token, **kwargs)
+        else:
+            # If 'make_parents' is specified, behave like 'mkdir -p' and ignore if the dir already
+            # exists.
+            if make_parents:
+                current_dir = _Directory(current_dir.path / token)
+            else:
+                raise FileExistsError(str(current_dir.path / token))
+        return current_dir
+
+    def create_file(
+            self,
+            path: str,
+            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
+            encoding: typing.Optional[str] = 'utf-8',
+            make_dirs: bool = False,
+            **kwargs
+    ) -> '_File':
+        if not path.startswith('/'):
+            raise NonAbsolutePathError(path)
+        path_obj = pathlib.PurePosixPath(path)
+        try:
+            dir_ = self.get_path(path_obj.parent)
+        except FileNotFoundError:
+            if make_dirs:
+                dir_ = self.create_dir(str(path_obj.parent))
+                # NOTE: other parameters (e.g. ownership, permissions) only get applied to the
+                # final directory.
+                # (At the time of writing, Pebble defaults to the specified permissions and
+                # root:root ownership, which is inconsistent with the push function's
+                # behavior for parent directories.)
+            else:
+                raise
+        if not isinstance(dir_, _Directory):
+            raise pebble.PathError(
+                'generic-file-error', 'parent is not a directory: {}'.format(str(dir_)))
+        return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
+
+    def list_dir(self, path) -> typing.List['_File']:
+        current_dir = self.root
+        tokens = pathlib.PurePosixPath(path).parts[1:]
+        for token in tokens:
+            try:
+                current_dir = current_dir[token]
+            except KeyError:
+                raise FileNotFoundError(str(current_dir.path / token))
+            if isinstance(current_dir, _File):
+                raise NotADirectoryError(str(current_dir.path))
+            if not isinstance(current_dir, _Directory):
+                # For now, ignoring other possible cases besides File and Directory (e.g. Symlink).
+                raise NotImplementedError()
+
+        return [child for child in current_dir]
+
+    def open(
+            self,
+            path: typing.Union[str, pathlib.PurePosixPath],
+            encoding: typing.Optional[str] = 'utf-8',
+    ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
+        path = pathlib.PurePosixPath(path)
+        file = self.get_path(path)  # warning: no check re: directories
+        if isinstance(file, _Directory):
+            raise IsADirectoryError(str(file.path))
+        return file.open(encoding=encoding)
+
+    def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]) \
+            -> typing.Union['_Directory', '_File']:
+        path = pathlib.PurePosixPath(path)
+        tokens = path.parts[1:]
+        current_object = self.root
+        for token in tokens:
+            # ASSUMPTION / TESTME: object might be file
+            if token in current_object:
+                current_object = current_object[token]
+            else:
+                raise FileNotFoundError(str(current_object.path / token))
+        return current_object
+
+    def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
+        path = pathlib.PurePosixPath(path)
+        parent_dir = self.get_path(path.parent)
+        del parent_dir[path.name]
+
+
+class _Directory:
+    def __init__(self, path: pathlib.PurePosixPath, **kwargs):
+        self.path = path
+        self._children = {}
+        self.last_modified = datetime.datetime.now()
+        self.kwargs = kwargs
+
+    @property
+    def name(self) -> str:
+        # Need to handle special case for root.
+        # pathlib.PurePosixPath('/').name is '', but pebble returns '/'.
+        return self.path.name if self.path.name else '/'
+
+    def __contains__(self, child: str) -> bool:
+        return child in self._children
+
+    def __iter__(self) -> typing.Iterator[typing.Union['_File', '_Directory']]:
+        return (value for value in self._children.values())
+
+    def __getitem__(self, key: str) -> typing.Union['_File', '_Directory']:
+        return self._children[key]
+
+    def __delitem__(self, key: str) -> None:
+        try:
+            del self._children[key]
+        except KeyError:
+            raise FileNotFoundError(str(self.path / key))
+
+    def __len__(self):
+        return len(self._children)
+
+    def create_dir(self, name: str, **kwargs) -> '_Directory':
+        self._children[name] = _Directory(self.path / name, **kwargs)
+        return self._children[name]
+
+    def create_file(
+            self,
+            name: str,
+            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
+            encoding: typing.Optional[str] = 'utf-8',
+            **kwargs
+    ) -> '_File':
+        self._children[name] = _File(self.path / name, data, encoding=encoding, **kwargs)
+        return self._children[name]
+
+
+class _File:
+    def __init__(
+            self,
+            path: pathlib.PurePosixPath,
+            data: typing.Union[str, bytes, typing.BinaryIO, typing.TextIO],
+            encoding: typing.Optional[str] = 'utf-8',
+            **kwargs):
+
+        if hasattr(data, 'read'):
+            data = data.read()
+        if isinstance(data, str):
+            data = data.encode(encoding)
+        data_size = len(data)
+
+        self.path = path
+        self.data = data
+        self.size = data_size
+        self.last_modified = datetime.datetime.now()
+        self.kwargs = kwargs
+
+    @property
+    def name(self) -> str:
+        return self.path.name
+
+    def open(
+            self,
+            encoding: typing.Optional[str] = 'utf-8',
+    ) -> typing.Union[typing.TextIO, typing.BinaryIO]:
+        if encoding is None:
+            return BytesIO(self.data)
+        else:
+            return StringIO(self.data.decode(encoding))
