@@ -1329,6 +1329,23 @@ class Container:
             combine_stderr=combine_stderr,
         )
 
+    def send_signal(self, sig: typing.Union[int, str], *service_names: str):
+        """Send the given signal to one or more services.
+
+        Args:
+            sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
+                signal.SIGHUP.
+            service_names: Name(s) of the service(s) to send the signal to.
+
+        Raises:
+            pebble.APIError: If any of the services are not in the plan or are
+                not currently running.
+        """
+        if not service_names:
+            raise TypeError('send_signal expected at least 1 service name, got 0')
+
+        self._pebble.send_signal(sig, service_names)
+
 
 class ContainerMapping(Mapping):
     """Map of container names to Container objects.
