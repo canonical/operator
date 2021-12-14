@@ -3035,7 +3035,7 @@ class TestMockFilesystem(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], '/etc')
 
     def test_create_file_succeeds_if_parent_dir_doesnt_exist_when_make_dirs_true(self):
-        f = self.fs.create_file('/test/subdir/testfile', "foo", make_dirs=True)
+        self.fs.create_file('/test/subdir/testfile', "foo", make_dirs=True)
         with self.fs.open('/test/subdir/testfile') as infile:
             self.assertEqual(infile.read(), 'foo')
 
