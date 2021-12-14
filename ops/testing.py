@@ -413,7 +413,7 @@ class Harness(typing.Generic[CharmType]):
 
         # Reset associated cached value in the storage mappings.  If we don't do this,
         # Model._storages won't return Storage objects for subsequently-added storage.
-        self._model._storages._storage_map[storage_name] = None
+        self._model._storages._invalidate(storage_name)
 
         if self.charm is not None and self._hooks_enabled:
             for storage_index in storage_indices:
