@@ -1514,7 +1514,7 @@ class _MockFilesystem:
             dir_ = self.get_path(path_obj.parent)
         except FileNotFoundError:
             if make_dirs:
-                dir_ = self.create_dir(str(path_obj.parent))
+                dir_ = self.create_dir(str(path_obj.parent), make_parents=make_dirs)
                 # NOTE: other parameters (e.g. ownership, permissions) only get applied to the
                 # final directory.
                 # (At the time of writing, Pebble defaults to the specified permissions and
