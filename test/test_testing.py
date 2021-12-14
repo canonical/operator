@@ -1299,13 +1299,10 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
+        # We deliberately don't guard against attaching storage before the harness begins,
+        # as there are legitimate reasons to do so.
         stor_id = harness.add_storage("test")[0]
-        # This admittedly doesn't really make sense since we block pre-begin attachments; added for
-        # completeness.
-        with self.assertRaises(RuntimeError) as cm:
-            harness.attach_storage("test/{}".format(stor_id))
-        self.assertEqual(cm.exception.args[0],
-                         "cannot attach storage before Harness is initialised")
+        self.assertTrue(stor_id)
 
     def test_remove_storage_before_harness_begin(self):
         harness = Harness(StorageTester, meta='''
