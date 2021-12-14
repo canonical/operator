@@ -629,7 +629,7 @@ class Service:
         self.backoff_factor = raw.get('backoff-factor')
         self.backoff_limit = raw.get('backoff-limit', '')
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this service object to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -760,7 +760,7 @@ class Check:
             exec_ = copy.deepcopy(exec_)
         self.exec = exec_
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this check object to its dict representation."""
         fields = [
             ('override', self.override),
