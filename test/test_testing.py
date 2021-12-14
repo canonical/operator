@@ -3029,6 +3029,16 @@ class TestMockFilesystem(unittest.TestCase):
         with self.assertRaises(NonAbsolutePathError):
             self.fs.create_dir("noslash")
 
+    def test_create_file_fails_if_parent_dir_doesnt_exist(self):
+        with self.assertRaises(FileNotFoundError) as cm:
+            self.fs.create_file('/etc/passwd', "foo")
+        self.assertEqual(cm.exception.args[0], '/etc')
+
+    def test_create_file_succeeds_if_parent_dir_doesnt_exist_when_make_dirs_true(self):
+        self.fs.create_file('/test/subdir/testfile', "foo", make_dirs=True)
+        with self.fs.open('/test/subdir/testfile') as infile:
+            self.assertEqual(infile.read(), 'foo')
+
     def test_create_file_from_str(self):
         self.fs.create_file('/test', "foo")
         with self.fs.open('/test') as infile:
