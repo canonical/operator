@@ -1021,6 +1021,13 @@ class StorageMapping(Mapping):
                               ' it is not present in the charm metadata').format(storage_name))
         self._backend.storage_add(storage_name, count)
 
+    def _invalidate(self, storage_name):
+        """Remove an entry from the storage map.
+
+        Not meant to be used by charm authors -- this exists mainly for testing purposes.
+        """
+        self._storage_map[storage_name] = None
+
 
 class Storage:
     """Represents a storage as defined in metadata.yaml.
