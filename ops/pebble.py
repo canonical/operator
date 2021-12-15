@@ -1926,3 +1926,30 @@ class Client:
         base_url = self.base_url.replace('http://', 'ws://')
         url = '{}/v1/tasks/{}/websocket/{}'.format(base_url, task_id, websocket_id)
         return url
+
+    def send_signal(self, sig: typing.Union[int, str], services: typing.List[str]):
+        """Send the given signal to the list of services named.
+
+        Args:
+            sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
+                signal.SIGHUP.
+            services: Non-empty list of service names to send the signal to.
+
+        Raises:
+            APIError: If any of the services are not in the plan or are not
+                currently running.
+        """
+        if not isinstance(services, (list, tuple)):
+            raise TypeError('services must be a list of str, not {}'.format(
+                type(services).__name__))
+        for s in services:
+            if not isinstance(s, str):
+                raise TypeError('service names must be str, not {}'.format(type(s).__name__))
+
+        if isinstance(sig, int):
+            sig = signal.Signals(sig).name
+        body = {
+            'signal': sig,
+            'services': services,
+        }
+        self._request('POST', '/v1/signals', body=body)
