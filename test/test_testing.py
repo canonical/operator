@@ -27,7 +27,13 @@ from io import BytesIO, StringIO
 import yaml
 
 from ops import pebble
-from ops.charm import CharmBase, PebbleReadyEvent, RelationEvent
+from ops.charm import (
+    CharmBase,
+    PebbleReadyEvent,
+    RelationEvent,
+    StorageAttachedEvent,
+    StorageDetachingEvent,
+)
 from ops.framework import Object
 from ops.model import (
     ActiveStatus,
@@ -46,6 +52,24 @@ from ops.testing import (
     _MockFilesystem,
     _TestingPebbleClient,
 )
+
+
+class StorageTester(CharmBase):
+    """Record the relation-changed events."""
+
+    def __init__(self, framework):
+        super().__init__(framework)
+        self.observed_events = []
+        self.framework.observe(self.on.test_storage_attached,
+                               self._on_test_storage_attached)
+        self.framework.observe(self.on.test_storage_detaching,
+                               self._on_test_storage_detaching)
+
+    def _on_test_storage_attached(self, event):
+        self.observed_events.append(event)
+
+    def _on_test_storage_detaching(self, event):
+        self.observed_events.append(event)
 
 
 class TestHarness(unittest.TestCase):
@@ -1088,7 +1112,31 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.model.name, 'foo')
         self.assertEqual(harness.model.uuid, '96957e90-e006-11eb-ba80-0242ac130004')
 
-    def test_storage_add(self):
+    def test_add_storage_before_harness_begin(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                    multiple:
+                        range: 1-3
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        stor_ids = harness.add_storage("test", count=3)
+        self.assertSetEqual(set(self._extract_storage_index(stor_id) for stor_id in stor_ids),
+                            set(harness._backend.storage_list("test")))
+        self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
+
+        harness.begin_with_initial_hooks()
+        self.assertEqual(len(harness.charm.observed_events), 3)
+        for i in range(3):
+            self.assertTrue(isinstance(harness.charm.observed_events[i], StorageAttachedEvent))
+
+    def test_add_storage_without_metadata_key_fails(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             requires:
@@ -1097,11 +1145,263 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
-        stor_id = harness.add_storage("test")
-        self.assertIsNotNone(stor_id)
+        with self.assertRaises(RuntimeError) as cm:
+            harness.add_storage("test")
+        self.assertEqual(
+            cm.exception.args[0],
+            "the key 'test' is not specified as a storage key in metadata")
 
-        self.assertIn(str(stor_id), harness._backend.storage_list("test"))
-        self.assertEqual("/test0", harness._backend.storage_get("test/0", "location"))
+    def test_add_storage_after_harness_begin(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                    multiple:
+                        range: 1-3
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        # Set up initial storage
+        stor_id = harness.add_storage("test")[0]
+        self.assertIn(self._extract_storage_index(stor_id),
+                      harness._backend.storage_list("test"))
+        self.assertEqual("/test/0", harness._backend.storage_get(stor_id, "location"))
+
+        harness.begin_with_initial_hooks()
+        self.assertEqual(len(harness.charm.observed_events), 1)
+        self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
+
+        # Add additional storage
+        stor_ids = harness.add_storage("test", count=3)
+        # NOTE: stor_id now reflects the 4th ID.  The 2nd and 3rd IDs are created and
+        # used, but not returned by Harness.add_storage.
+        # (Should we consider changing its return type?)
+
+        added_indices = {self._extract_storage_index(stor_id) for stor_id in stor_ids}
+        self.assertTrue(added_indices.issubset(set(harness._backend.storage_list("test"))))
+        self.assertEqual("/test/1", harness._backend.storage_get("test/1", "location"))
+        self.assertEqual("/test/2", harness._backend.storage_get("test/2", "location"))
+        self.assertEqual("/test/3", harness._backend.storage_get("test/3", "location"))
+        self.assertEqual(len(harness.charm.observed_events), 4)
+        for i in range(1, 4):
+            self.assertTrue(isinstance(harness.charm.observed_events[i], StorageAttachedEvent))
+
+    def test_detach_storage(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        # Set up initial storage
+        stor_id = harness.add_storage("test")[0]
+        harness.begin_with_initial_hooks()
+        self.assertEqual(len(harness.charm.observed_events), 1)
+        self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
+
+        # Detach storage
+        harness.detach_storage(stor_id)
+        self.assertEqual(len(harness.charm.observed_events), 2)
+        self.assertTrue(isinstance(harness.charm.observed_events[1], StorageDetachingEvent))
+
+        # Verify backend functions return appropriate values.
+        # Real backend would return info only for actively attached storage units.
+        self.assertNotIn(stor_id, harness._backend.storage_list("test"))
+        with self.assertRaises(ModelError) as cm:
+            harness._backend.storage_get("test/0", "location")
+        # Error message modeled after output of
+        # "storage-get -s <invalid/inactive id> location" on real deployment
+        self.assertEqual(
+            cm.exception.args[0],
+            'ERROR invalid value "test/0" for option -s: storage not found')
+
+        # Retry detach
+        # Since already detached, no more hooks should fire
+        harness.detach_storage(stor_id)
+        self.assertEqual(len(harness.charm.observed_events), 2)
+        self.assertTrue(isinstance(harness.charm.observed_events[1], StorageDetachingEvent))
+
+    def test_detach_storage_before_harness_begin(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        stor_id = harness.add_storage("test")[0]
+        with self.assertRaises(RuntimeError) as cm:
+            harness.detach_storage("test/{}".format(stor_id))
+        self.assertEqual(cm.exception.args[0],
+                         "cannot detach storage before Harness is initialised")
+
+    def test_attach_storage(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        # Set up initial storage
+        stor_id = harness.add_storage("test")[0]
+        harness.begin_with_initial_hooks()
+        self.assertEqual(len(harness.charm.observed_events), 1)
+        self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
+
+        # Detach storage
+        harness.detach_storage(stor_id)
+        self.assertEqual(len(harness.charm.observed_events), 2)
+        self.assertTrue(isinstance(harness.charm.observed_events[1], StorageDetachingEvent))
+
+        # Re-attach storage
+        harness.attach_storage(stor_id)
+        self.assertEqual(len(harness.charm.observed_events), 3)
+        self.assertTrue(isinstance(harness.charm.observed_events[2], StorageAttachedEvent))
+
+        # Verify backend functions return appropriate values.
+        # Real backend would return info only for actively attached storage units.
+        self.assertIn(self._extract_storage_index(stor_id), harness._backend.storage_list("test"))
+        self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
+
+        # Retry attach
+        # Since already detached, no more hooks should fire
+        harness.attach_storage(stor_id)
+        self.assertEqual(len(harness.charm.observed_events), 3)
+        self.assertTrue(isinstance(harness.charm.observed_events[2], StorageAttachedEvent))
+
+    def test_attach_storage_before_harness_begin(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        # We deliberately don't guard against attaching storage before the harness begins,
+        # as there are legitimate reasons to do so.
+        stor_id = harness.add_storage("test")[0]
+        self.assertTrue(stor_id)
+
+    def test_remove_storage_before_harness_begin(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                    multiple:
+                        range: 1-3
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        stor_ids = harness.add_storage("test", count=2)
+        harness.remove_storage(stor_ids[0])
+        # Note re: delta between real behavior and Harness: Juju doesn't allow removal
+        # of the last attached storage unit while a workload is still running.  To more
+        # easily allow testing of storage removal, I am presently ignoring this detail.
+        # (Otherwise, the user would need to flag somehow that they are intentionally
+        # removing the final unit as part of a shutdown procedure, else it'd block the
+        # removal.  I'm not sure such behavior is productive.)
+
+        harness.begin_with_initial_hooks()
+        # Only one hook will fire; one won't since it was removed
+        self.assertEqual(len(harness.charm.observed_events), 1)
+        self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
+
+    def test_remove_storage_without_metadata_key_fails(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        # Doesn't really make sense since we already can't add storage which isn't in the metadata,
+        # but included for completeness.
+        with self.assertRaises(RuntimeError) as cm:
+            harness.remove_storage("test/0")
+        self.assertEqual(
+            cm.exception.args[0],
+            "the key 'test' is not specified as a storage key in metadata")
+
+    def test_remove_storage_after_harness_begin(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                    multiple:
+                        range: 1-3
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        stor_ids = harness.add_storage("test", count=2)
+        harness.begin_with_initial_hooks()
+        self.assertEqual(len(harness.charm.observed_events), 2)
+        self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
+        self.assertTrue(isinstance(harness.charm.observed_events[1], StorageAttachedEvent))
+
+        harness.remove_storage(stor_ids[1])
+        self.assertEqual(len(harness.charm.observed_events), 3)
+        self.assertTrue(isinstance(harness.charm.observed_events[2], StorageDetachingEvent))
+
+        attached_storage_ids = harness._backend.storage_list("test")
+        self.assertIn(self._extract_storage_index(stor_ids[0]), attached_storage_ids)
+        self.assertNotIn(self._extract_storage_index(stor_ids[1]), attached_storage_ids)
+
+    def _extract_storage_index(self, stor_id):
+        return int(stor_id.split('/')[-1])
+
+    def test_remove_detached_storage(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                    multiple:
+                        range: 1-3
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        stor_ids = harness.add_storage("test", count=2)
+        harness.begin_with_initial_hooks()
+        harness.detach_storage(stor_ids[0])
+        harness.remove_storage(stor_ids[0])  # Already detached, so won't fire a hook
+        self.assertEqual(len(harness.charm.observed_events), 3)
+        self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
+        self.assertTrue(isinstance(harness.charm.observed_events[1], StorageAttachedEvent))
+        self.assertTrue(isinstance(harness.charm.observed_events[2], StorageDetachingEvent))
 
     def test_actions_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
@@ -3028,6 +3328,16 @@ class TestMockFilesystem(unittest.TestCase):
     def test_makedir_path_must_start_with_slash(self):
         with self.assertRaises(NonAbsolutePathError):
             self.fs.create_dir("noslash")
+
+    def test_create_file_fails_if_parent_dir_doesnt_exist(self):
+        with self.assertRaises(FileNotFoundError) as cm:
+            self.fs.create_file('/etc/passwd', "foo")
+        self.assertEqual(cm.exception.args[0], '/etc')
+
+    def test_create_file_succeeds_if_parent_dir_doesnt_exist_when_make_dirs_true(self):
+        self.fs.create_file('/test/subdir/testfile', "foo", make_dirs=True)
+        with self.fs.open('/test/subdir/testfile') as infile:
+            self.assertEqual(infile.read(), 'foo')
 
     def test_create_file_from_str(self):
         self.fs.create_file('/test', "foo")
