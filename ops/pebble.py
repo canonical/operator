@@ -1069,6 +1069,8 @@ class _WebsocketReader(io.BufferedIOBase):
 class Client:
     """Pebble API client."""
 
+    _chunk_size = 8192
+
     def __init__(self, socket_path=None, opener=None, base_url='http://localhost', timeout=5.0):
         """Initialize a client instance.
 
@@ -1472,7 +1474,7 @@ class Client:
 
         # Then read the rest of the response and feed it to the parser.
         while True:
-            chunk = response.read(8192)
+            chunk = response.read(self._chunk_size)
             if not chunk:
                 break
             parser.feed(chunk)
@@ -1546,14 +1548,7 @@ class Client:
             'files': [info],
         }
 
-        if hasattr(source, 'read'):
-            content = source.read()
-        else:
-            content = source
-        if isinstance(content, str):
-            content = content.encode(encoding)
-
-        data, content_type = self._encode_multipart(metadata, path, content)
+        data, content_type = self._encode_multipart(metadata, path, source, encoding)
 
         headers = {
             'Accept': 'application/json',
@@ -1579,28 +1574,46 @@ class Client:
             d['group'] = group
         return d
 
-    @staticmethod
-    def _encode_multipart(metadata, path, content):
+    def _encode_multipart(self, metadata, path, source, encoding):
         # Python's stdlib mime/multipart handling is screwy and doesn't handle
         # binary properly, so roll our own.
+
+        if isinstance(source, str):
+            source = io.StringIO(source)
+        elif isinstance(source, bytes):
+            source = io.BytesIO(source)
+
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
-        parts = []
-        parts.extend([
-            b'--', boundary, b'\r\n',
-            b'Content-Type: application/json\r\n',
-            b'Content-Disposition: form-data; name="request"\r\n',
-            b'\r\n',
-            json.dumps(metadata).encode('utf-8'), b'\r\n',
-            b'--', boundary, b'\r\n',
-            b'Content-Type: application/octet-stream\r\n',
-            b'Content-Disposition: form-data; name="files"; filename="', path_escaped, b'"\r\n',
-            b'\r\n',
-            content, b'\r\n',
-            b'--', boundary, b'--\r\n',
-        ])
         content_type = 'multipart/form-data; boundary="' + boundary.decode('utf-8') + '"'
-        return b''.join(parts), content_type
+
+        def generator():
+            yield b''.join([
+                b'--', boundary, b'\r\n',
+                b'Content-Type: application/json\r\n',
+                b'Content-Disposition: form-data; name="request"\r\n',
+                b'\r\n',
+                json.dumps(metadata).encode('utf-8'), b'\r\n',
+                b'--', boundary, b'\r\n',
+                b'Content-Type: application/octet-stream\r\n',
+                b'Content-Disposition: form-data; name="files"; filename="',
+                path_escaped, b'"\r\n',
+                b'\r\n',
+            ])
+
+            content = source.read(self._chunk_size)
+            while content:
+                if isinstance(content, str):
+                    content = content.encode(encoding)
+                yield content
+                content = source.read(self._chunk_size)
+
+            yield b''.join([
+                b'\r\n',
+                b'--', boundary, b'--\r\n',
+            ])
+
+        return generator(), content_type
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[FileInfo]:

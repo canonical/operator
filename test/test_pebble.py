@@ -1635,6 +1635,7 @@ bad path
         self.assertEqual(request[:3], ('POST', '/v1/files', None))
 
         headers, body = request[3:]
+
         content_type = headers['Content-Type']
         req, filename, content = self._parse_write_multipart(content_type, body)
         self.assertEqual(filename, '/foo/bar')
@@ -1800,7 +1801,9 @@ bad path
         parser = email.parser.BytesFeedParser()
         parser.feed(b'Content-Type: multipart/form-data; boundary='
                     + boundary.encode('utf-8') + b'\r\n\r\n')
-        parser.feed(body)
+        for b in body:
+            # With the "memory efficient push" changes, body is an iterable.
+            parser.feed(b)
         message = parser.close()
 
         req = None
