@@ -1474,19 +1474,21 @@ class Client:
                 break
             parser.feed(chunk)
 
+        filenames = parser.filenames()
+        if filenames:
+            filename = filenames[0]
+            if filename != path:
+                raise ProtocolError('path not expected: {}'.format(filename))
+
         resp = parser.get_response()
         if resp is None:
             raise ProtocolError('no "response" field in multipart body')
         self._raise_on_path_error(resp, path)
 
-        filenames = parser.filenames()
         if len(filenames) < 1:
             raise ProtocolError('no file content in multipart response')
         if len(filenames) > 1:
             raise NotImplementedError('Multiple file responses not yet supported')
-        filename = filenames[0]
-        if filename != path:
-            raise ProtocolError('path not expected: {}'.format(filename))
 
         return parser.get_file(path, encoding)
 
@@ -2142,4 +2144,7 @@ class MultipartLargeFileParser:
     def get_file(self, path, encoding):
         """Return an open file object containing the data of the specified file."""
         mode = 'r' if encoding else 'rb'
-        return open(self._files[path].name, mode, encoding=encoding)
+        # We're using text-based file I/O purely for file encoding purposes, not for
+        # newline normalization.  newline='' serves the line endings as-is.
+        newline = '' if encoding else None
+        return open(self._files[path].name, mode, encoding=encoding, newline=newline)

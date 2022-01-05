@@ -1481,21 +1481,21 @@ services:
     def test_pull_text(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80\nfoo\r\nbar' + b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [{"path": "/etc/hosts"}],
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
@@ -1510,21 +1510,21 @@ Content-Disposition: form-data; name="response"
     def test_pull_binary(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80\nfoo\r\nbar' + b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [{"path": "/etc/hosts"}],
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
@@ -1539,10 +1539,10 @@ Content-Disposition: form-data; name="response"
     def test_pull_path_error(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [
         {"path": "/etc/hosts", "error": {"kind": "not-found", "message": "not found"}}
@@ -1550,8 +1550,8 @@ Content-Disposition: form-data; name="response"
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
@@ -1581,12 +1581,12 @@ Content-Disposition: form-data; name="response"
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/bad"
-
-bad path
---01234567890123456789012345678901--
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/bad"\r
+\r
+bad path\r
+--01234567890123456789012345678901--\r
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
@@ -1595,12 +1595,12 @@ bad path
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-bad path
---01234567890123456789012345678901--
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+bad path\r
+--01234567890123456789012345678901--\r
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
