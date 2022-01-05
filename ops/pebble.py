@@ -2125,8 +2125,6 @@ class MultipartLargeFileParser:
 
     def _prepare_tempfile(self, filename):
         tf = tempfile.NamedTemporaryFile(delete=False)
-        # Close for now; we'll open/close it on demand later via its path.
-        tf.close()
         self._files[filename] = tf
         self.current_filename = filename
 
