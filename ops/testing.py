@@ -178,10 +178,11 @@ class Harness(typing.Generic[CharmType]):
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
-            if len(self._backend.storage_list(storage_name)) > 0:
-                # Storage device(s) detected, emit storage-attached event
-                storage_name = storage_name.replace('-', '_')
-                self._charm.on[storage_name].storage_attached.emit()
+            storage_name = storage_name.replace('-', '_')
+            for storage_index in self._backend.storage_list(storage_name):
+                # Storage device(s) detected, emit storage-attached event(s)
+                self._charm.on[storage_name].storage_attached.emit(
+                    model.Storage(storage_name, storage_index, self._backend))
         # Storage done, emit install event
         self._charm.on.install.emit()
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
@@ -391,7 +392,7 @@ class Harness(typing.Generic[CharmType]):
         self._relation_id_counter += 1
         return rel_id
 
-    def add_storage(self, storage_name: str, count: int = 1) -> int:
+    def add_storage(self, storage_name: str, count: int = 1) -> typing.List[str]:
         """Declare a new storage device attached to this unit.
 
         To have repeatable tests, each device will be initialized with
@@ -403,9 +404,82 @@ class Harness(typing.Generic[CharmType]):
             count: Number of disks being added
 
         Return:
-            The storage_id created
+            A list of storage IDs, e.g. ["my-storage/1", "my-storage/2"].
         """
-        return self._backend.storage_add(storage_name, count)
+        if storage_name not in self._meta.storages:
+            raise RuntimeError(
+                "the key '{}' is not specified as a storage key in metadata".format(storage_name))
+        storage_indices = self._backend.storage_add(storage_name, count)
+
+        # Reset associated cached value in the storage mappings.  If we don't do this,
+        # Model._storages won't return Storage objects for subsequently-added storage.
+        self._model._storages._invalidate(storage_name)
+
+        if self.charm is not None and self._hooks_enabled:
+            for storage_index in storage_indices:
+                self.charm.on[storage_name].storage_attached.emit(
+                    model.Storage(storage_name, storage_index, self._backend))
+        return ["{}/{}".format(storage_name, storage_index) for storage_index in storage_indices]
+
+    def detach_storage(self, storage_id: str) -> None:
+        """Detach a storage device.
+
+        The intent of this function is to simulate a "juju detach-storage" call.
+        It will trigger a storage-detaching hook if the storage unit in question exists
+        and is presently marked as attached.
+
+        Args:
+            storage_id: The full storage ID of th e storage unit being detached, including the
+                storage key, e.g. my-storage/0.
+        """
+        if self.charm is None:
+            raise RuntimeError('cannot detach storage before Harness is initialised')
+        storage_name, storage_index = storage_id.split('/', 1)
+        storage_index = int(storage_index)
+        if self._backend._storage_is_attached(storage_name, storage_index) and self._hooks_enabled:
+            self.charm.on[storage_name].storage_detaching.emit(
+                model.Storage(storage_name, storage_index, self._backend))
+        self._backend._storage_detach(storage_id)
+
+    def attach_storage(self, storage_id: str) -> None:
+        """Attach a storage device.
+
+        The intent of this function is to simulate a "juju attach-storage" call.
+        It will trigger a storage-attached hook if the storage unit in question exists
+        and is presently marked as detached.
+
+        Args:
+            storage_id: The full storage ID of the storage unit being attached, including the
+                storage key, e.g. my-storage/0.
+        """
+        if self._backend._storage_attach(storage_id) and self._hooks_enabled:
+            storage_name, storage_index = storage_id.split('/', 1)
+            storage_index = int(storage_index)
+            self.charm.on[storage_name].storage_attached.emit(
+                model.Storage(storage_name, storage_index, self._backend))
+
+    def remove_storage(self, storage_id: str) -> None:
+        """Attach a storage device.
+
+        The intent of this function is to simulate a "juju remove-storage" call.
+        It will trigger a storage-detaching hook if the storage unit in question exists
+        and is presently marked as detached.  Additionally, it will remove the storage
+        unit from the testing backend.
+
+        Args:
+            storage_id: The full storage ID of the storage unit being removed, including the
+                storage key, e.g. my-storage/0.
+        """
+        storage_name, storage_index = storage_id.split('/', 1)
+        storage_index = int(storage_index)
+        if storage_name not in self._meta.storages:
+            raise RuntimeError(
+                "the key '{}' is not specified as a storage key in metadata".format(storage_name))
+        is_attached = self._backend._storage_is_attached(storage_name, storage_index)
+        if self.charm is not None and self._hooks_enabled and is_attached:
+            self.charm.on[storage_name].storage_detaching.emit(
+                model.Storage(storage_name, storage_index, self._backend))
+        self._backend._storage_remove(storage_id)
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
@@ -949,9 +1023,7 @@ class _TestingModelBackend:
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
         self._storage_list = {k: {} for k in self._meta.storages}
-        # Every new storage device gets an id from the _storage_id_counter.
-        # That id is mapped back to the storage name on _storage_ids_map
-        self._storage_ids_map = {}
+        self._storage_detached = {k: set() for k in self._meta.storages}
         self._storage_id_counter = 0
         # {socket_path : _TestingPebbleClient}
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
@@ -1057,24 +1129,64 @@ class _TestingModelBackend:
             self._unit_status = {'status': status, 'message': message}
 
     def storage_list(self, name):
-        return list(self._storage_list[name])
+        return list(index for index in self._storage_list[name]
+                    if self._storage_is_attached(name, index))
 
     def storage_get(self, storage_name_id, attribute):
-        name = self._storage_ids_map[storage_name_id]
-        id = storage_name_id.split("/")[1]
-        return self._storage_list[name][id][attribute]
+        name, index = storage_name_id.split("/", 1)
+        index = int(index)
+        try:
+            if index in self._storage_detached[name]:
+                raise KeyError()  # Pretend the key isn't there
+            else:
+                return self._storage_list[name][index][attribute]
+        except KeyError:
+            raise model.ModelError(
+                'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
 
-    def storage_add(self, name, count=1):
+    def storage_add(self, name: str, count: int = 1):
         if name not in self._storage_list:
             self._storage_list[name] = {}
+        result = []
         for i in range(count):
-            storage_id = self._storage_id_counter
+            index = self._storage_id_counter
             self._storage_id_counter += 1
-            self._storage_list[name][str(storage_id)] = {
-                "location": "/{}{}".format(name, i)
+            self._storage_list[name][index] = {
+                "location": "/{}/{}".format(name, index)
             }
-            self._storage_ids_map['{}/{}'.format(name, storage_id)] = name
-        return storage_id
+            result.append(index)
+        return result
+
+    def _storage_detach(self, storage_id: str):
+        # NOTE: This is an extra function for _TestingModelBackend to simulate
+        # detachment of a storage unit.  This is not present in ops.model._ModelBackend.
+        name, index = storage_id.split('/', 1)
+        index = int(index)
+        if self._storage_is_attached(name, index):
+            self._storage_detached[name].add(index)
+
+    def _storage_attach(self, storage_id: str):
+        # NOTE: This is an extra function for _TestingModelBackend to simulate
+        # re-attachment of a storage unit.  This is not present in
+        # ops.model._ModelBackend.
+        name, index = storage_id.split('/', 1)
+        index = int(index)
+        if not self._storage_is_attached(name, index):
+            self._storage_detached[name].remove(index)
+            return True
+        return False
+
+    def _storage_is_attached(self, storage_name, storage_index):
+        return storage_index not in self._storage_detached[storage_name]
+
+    def _storage_remove(self, storage_id: str):
+        # NOTE: This is an extra function for _TestingModelBackend to simulate
+        # full removal of a storage unit.  This is not present in
+        # ops.model._ModelBackend.
+        self._storage_detach(storage_id)
+        name, index = storage_id.split('/', 1)
+        index = int(index)
+        self._storage_list[name].pop(index, None)
 
     def action_get(self):
         raise NotImplementedError(self.action_get)
@@ -1443,6 +1555,9 @@ ChangeError: cannot perform the following tasks:
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
 
+    def send_signal(self, sig: typing.Union[int, str], services: typing.List[str]):
+        raise NotImplementedError(self.send_signal)
+
 
 class NonAbsolutePathError(Exception):
     """Error raised by _MockFilesystem.
@@ -1511,7 +1626,7 @@ class _MockFilesystem:
             dir_ = self.get_path(path_obj.parent)
         except FileNotFoundError:
             if make_dirs:
-                dir_ = self.create_dir(str(path_obj.parent))
+                dir_ = self.create_dir(str(path_obj.parent), make_parents=make_dirs)
                 # NOTE: other parameters (e.g. ownership, permissions) only get applied to the
                 # final directory.
                 # (At the time of writing, Pebble defaults to the specified permissions and

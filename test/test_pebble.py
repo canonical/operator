@@ -1635,6 +1635,7 @@ bad path
         self.assertEqual(request[:3], ('POST', '/v1/files', None))
 
         headers, body = request[3:]
+
         content_type = headers['Content-Type']
         req, filename, content = self._parse_write_multipart(content_type, body)
         self.assertEqual(filename, '/foo/bar')
@@ -1800,7 +1801,9 @@ bad path
         parser = email.parser.BytesFeedParser()
         parser.feed(b'Content-Type: multipart/form-data; boundary='
                     + boundary.encode('utf-8') + b'\r\n\r\n')
-        parser.feed(body)
+        for b in body:
+            # With the "memory efficient push" changes, body is an iterable.
+            parser.feed(b)
         message = parser.close()
 
         req = None
@@ -2008,6 +2011,42 @@ bad path
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
         self.assertEqual(cm.exception.message, 'some other error')
+
+    def test_send_signal_name(self):
+        self.client.responses.append({
+            'result': True,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        self.client.send_signal('SIGHUP', ['s1', 's2'])
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/signals', None, {'signal': 'SIGHUP', 'services': ['s1', 's2']}),
+        ])
+
+    @unittest.skipUnless(hasattr(signal, 'SIGHUP'), 'signal constants not present on Windows')
+    def test_send_signal_number(self):
+        self.client.responses.append({
+            'result': True,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        self.client.send_signal(signal.SIGHUP, ['s1', 's2'])
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/signals', None, {'signal': 'SIGHUP', 'services': ['s1', 's2']}),
+        ])
+
+    def test_send_signal_type_error(self):
+        with self.assertRaises(TypeError):
+            self.client.send_signal('SIGHUP', 'should-be-a-list')
+
+        with self.assertRaises(TypeError):
+            self.client.send_signal('SIGHUP', [1, 2])
 
 
 @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")

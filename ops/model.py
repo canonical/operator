@@ -1021,6 +1021,13 @@ class StorageMapping(Mapping):
                               ' it is not present in the charm metadata').format(storage_name))
         self._backend.storage_add(storage_name, count)
 
+    def _invalidate(self, storage_name):
+        """Remove an entry from the storage map.
+
+        Not meant to be used by charm authors -- this exists mainly for testing purposes.
+        """
+        self._storage_map[storage_name] = None
+
 
 class Storage:
     """Represents a storage as defined in metadata.yaml.
@@ -1328,6 +1335,23 @@ class Container:
             encoding=encoding,
             combine_stderr=combine_stderr,
         )
+
+    def send_signal(self, sig: typing.Union[int, str], *service_names: str):
+        """Send the given signal to one or more services.
+
+        Args:
+            sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
+                signal.SIGHUP.
+            service_names: Name(s) of the service(s) to send the signal to.
+
+        Raises:
+            pebble.APIError: If any of the services are not in the plan or are
+                not currently running.
+        """
+        if not service_names:
+            raise TypeError('send_signal expected at least 1 service name, got 0')
+
+        self._pebble.send_signal(sig, service_names)
 
 
 class ContainerMapping(Mapping):
