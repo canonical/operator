@@ -1958,9 +1958,13 @@ class MultipartLargeFileParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
 
     def __init__(self, boundary: bytes):
-        self._buffer = b''
         self._response = None
         self._files = {}
+
+        # RFC 2046 says that the boundary string needs to be preceded by a CRLF.
+        # Unfortunately, the request library's header parsing logic strips off one of
+        # these, so we'll prime the buffer with that missing sequence.
+        self._buffer = b'\r\n'
 
         # Store the initial FSM state.  See _run_parser_fsm() for a full explanation.
         self._initial_state_fn = self._state_detect_boundary
@@ -1969,7 +1973,7 @@ class MultipartLargeFileParser:
         # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
         # and the optional "--" suffix.  Pebble doesn't use this, so to simplify implementation I
         # am ignoring it.
-        boundary_rgx_pattern = r"--{}(--)?\r\n".format(boundary)
+        boundary_rgx_pattern = r"\r\n--{}(--)?\r\n".format(boundary)
         self._boundary_rgx = re.compile(boundary_rgx_pattern.encode())
 
         # When streaming file data to tempfiles, we need to make sure we don't feed part of the
@@ -2072,9 +2076,7 @@ class MultipartLargeFileParser:
         match = self._boundary_rgx.search(self._buffer)
         if match:
             span = match.span()
-            # Content is terminated by \r\n<boundary>; adjust for the \r\n
-            end_of_content = span[0] - 2
-            content = self._buffer[:end_of_content]
+            content = self._buffer[:span[0]]
 
             self._response = json.loads(content.decode())
 
@@ -2092,9 +2094,7 @@ class MultipartLargeFileParser:
         match = self._boundary_rgx.search(self._buffer)
         if match:
             span = match.span()
-            # Content is terminated by \r\n<boundary>; adjust for the \r\n
-            end_of_content = span[0] - 2
-            content = self._buffer[:end_of_content]
+            content = self._buffer[:span[0]]
 
             # Perform the final write to the tempfile
             with self._get_open_tempfile() as outfile:
