@@ -1967,23 +1967,14 @@ class MultipartLargeFileParser:
         self._buffer = b'\r\n'
 
         # Store the initial FSM state.  See _run_parser_fsm() for a full explanation.
-        self._initial_state_fn = self._state_detect_boundary
+        self._initial_state_fn = self._state_handle_header
 
-        # Prepare the MIME multipart boundary line matcher.
+        # Prepare the MIME multipart boundary line patterns.
         # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
         # and the optional "--" suffix.  Pebble doesn't use this, so to simplify implementation I
         # am ignoring it.
-        boundary_rgx_pattern = r"\r\n--{}(--)?\r\n".format(boundary)
-        self._boundary_rgx = re.compile(boundary_rgx_pattern.encode())
-
-        # When streaming file data to tempfiles, we need to make sure we don't feed part of the
-        # boundary line by mistake.  This is easy if we detect the boundary in full, but if we
-        # haven't received it yet, we need to be careful not to feed any partial boundary line
-        # to disk.  This minimum buffer length threshold will ensure that, and will work for both
-        # regular and terminating boundary cases.
-        #
-        # Calculated as: boundary header length + prefix/suffix -- (4 bytes) + \r\n (2 bytes)
-        self._safe_buffer_len = len(boundary) + 6
+        self._boundary = "\r\n--{}\r\n".format(boundary).encode()
+        self._terminal_boundary = "\r\n--{}--\r\n".format(boundary).encode()
 
     def __del__(self):
         for file in self._files.values():
@@ -2004,84 +1995,63 @@ class MultipartLargeFileParser:
         while next_state:
             next_state = next_state()
 
-    def _state_detect_boundary(self):
-        next_state = None
-        match = self._boundary_rgx.search(self._buffer)
-        if match:
-            # This is here as a paranoia check; we should only be in this state when the buffer
-            # immediately starts with the boundary line.
-            span = match.span()
-            data_before = self._buffer[:span[0]]
-            if data_before:
-                raise RuntimeError(
-                    'Unexpected data before boundary: {!r}'.format(data_before))
+    def _state_handle_header(self):
+        next_state = self._state_stop
+        header_terminator = b'\r\n\r\n'
+        if self._buffer.startswith(self._boundary) and header_terminator in self._buffer:
+            # Data is everything after the boundary, up to and including the double CRLF
+            # of the headers.
+            data_start = len(self._boundary)
+            data_end = self._buffer.index(header_terminator) + len(header_terminator)
+            data = self._buffer[data_start:data_end]
 
-            is_terminating_boundary = match.group(1)
-            if is_terminating_boundary:
-                # Permanently stop the FSM, ignoring any remaining data
-                next_state = self._state_stop
-                self._update_initial_state(next_state)
-            else:
-                # Consume the boundary and get ready for parsing the headers.
-                self._buffer = self._buffer[span[1]:]
-                next_state = self._state_parse_header
-        else:
-            # Couldn't find a complete boundary in the buffer; stop for now
-            self._update_initial_state(self._state_detect_boundary)
-            next_state = self._state_stop
+            message = self._parse_headers(data)
+            self._detect_invalid_content_disposition(message)
+            next_state = self._prepare_for_part_body(message)
+
+            # Advance the buffer to point at the data.
+            self._buffer = self._buffer[data_end:]
+        elif self._buffer.startswith(self._terminal_boundary):
+            # We've reached the terminal boundary; ignore any remaining data
+            self._update_initial_state(self._state_stop)
         return next_state
 
-    def _state_parse_header(self):
-        next_state = None
-        try:
-            headers, content = self._buffer.split(b'\r\n\r\n', 1)
-        except ValueError:
-            # Not enough data; stop for now
-            self._update_initial_state(self._state_parse_header)
-            next_state = self._state_stop
+    def _parse_headers(self, data):
+        parser = email.parser.BytesFeedParser()
+        parser.feed(data)
+        message = parser.close()
+        return message
+
+    def _detect_invalid_content_disposition(self, message):
+        content_disposition = message.get_content_disposition()
+        if content_disposition != 'form-data':
+            raise RuntimeError(
+                'unexpected content disposition: {}'.format(content_disposition))
+
+    def _prepare_for_part_body(self, message):
+        name = message.get_param('name', header='content-disposition')
+        if name == 'response':
+            next_state = self._state_parse_response_part
+        elif name == 'files':
+            filename = message.get_filename()
+            if filename is None:
+                raise NotImplementedError('multipart "files" part missing filename')
+            self._prepare_tempfile(filename)
+            next_state = self._state_parse_files_part
         else:
-            # Rely on the stdlib for parsing the headers, since this can be done purely
-            # in memory without any realistic worry of memory concerns.
-            parser = email.parser.BytesFeedParser()
-            parser.feed(headers)
-            message = parser.close()
-
-            content_disposition = message.get_content_disposition()
-            if content_disposition != 'form-data':
-                raise RuntimeError(
-                    'unexpected content disposition: {}'.format(content_disposition))
-
-            name = message.get_param('name', header='content-disposition')
-            if name == 'response':
-                next_state = self._state_parse_response_part
-            elif name == 'files':
-                filename = message.get_filename()
-                if filename is None:
-                    raise NotImplementedError('multipart "files" part missing filename')
-                self._prepare_tempfile(filename)
-                next_state = self._state_parse_files_part
-            else:
-                raise RuntimeError(
-                    'unexpected name in content-disposition header: {}'.format(name))
-
-            # Consume the header; now we're ready to parse the part body
-            # (either "request" or "files")
-            self._buffer = content
+            raise RuntimeError(
+                'unexpected name in content-disposition header: {}'.format(name))
         return next_state
 
     def _state_parse_response_part(self):
-        # Response is handled purely in memory; wait on parsing until we've received
-        # the full part.
         next_state = None
-        match = self._boundary_rgx.search(self._buffer)
-        if match:
-            span = match.span()
-            content = self._buffer[:span[0]]
-
-            self._response = json.loads(content.decode())
-
-            self._buffer = self._buffer[span[0]:]
-            next_state = self._state_detect_boundary
+        next_boundary_index = self._get_next_boundary_index()
+        if next_boundary_index is not None:
+            data = self._buffer[:next_boundary_index]
+            self._response = json.loads(data.decode())
+            next_state = self._state_handle_header
+            # Advance the buffer to point at the next boundary
+            self._buffer = self._buffer[next_boundary_index:]
         else:
             self._update_initial_state(self._state_parse_response_part)
             next_state = self._state_stop
@@ -2091,32 +2061,42 @@ class MultipartLargeFileParser:
         # Files can be huge; we shouldn't keep them in memory; rather we should
         # stream them to files.  For now, using tempfiles.
         next_state = None
-        match = self._boundary_rgx.search(self._buffer)
-        if match:
-            span = match.span()
-            content = self._buffer[:span[0]]
+        next_boundary_index = self._get_next_boundary_index()
+        if next_boundary_index is None:
+            # Data present but boundary not yet found.
+            # Write data from buffer, but don't accidentally write data which may belong
+            # to a boundary line.
+            safe_bound = len(self._buffer) - len(self._terminal_boundary)
+            data = self._buffer[:safe_bound]
 
-            # Perform the final write to the tempfile
-            with self._get_open_tempfile() as outfile:
-                outfile.write(content)
-
-            self._buffer = self._buffer[span[0]:]
-            next_state = self._state_detect_boundary
-        else:
-            # We may have data, but we haven't reached the end of the file.
-            # Store as much data as we safely can without accidentally storing
-            # bytes of the boundary line.
-            content = self._buffer[:-self._safe_buffer_len]
-            self._buffer = self._buffer[-self._safe_buffer_len:]
-
-            # Write the partial data.  Leave the tempfile open.
+            # Don't open/close file for intermediate writes
             outfile = self._get_open_tempfile()
-            outfile.write(content)
+            outfile.write(data)
 
-            # No more to parse right now
             self._update_initial_state(self._state_parse_files_part)
             next_state = self._state_stop
+            # Advance the buffer for bytes consumed
+            self._buffer = self._buffer[safe_bound:]
+        else:
+            # Next boundary's location is known; this is the final write.
+            data = self._buffer[:next_boundary_index]
+            with self._get_open_tempfile() as outfile:
+                outfile.write(data)
+            next_state = self._state_handle_header
+            # Advance the buffer to point at the next boundary
+            self._buffer = self._buffer[next_boundary_index:]
         return next_state
+
+    def _get_next_boundary_index(self) -> typing.Optional[int]:
+        indices = set()
+        for boundary in (self._boundary, self._terminal_boundary):
+            try:
+                index = self._buffer.index(boundary)
+            except ValueError:
+                pass
+            else:
+                indices.add(index)
+        return min(indices) if indices else None
 
     def _state_stop(self):
         # Signal the FSM to terminate
