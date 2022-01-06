@@ -2009,7 +2009,7 @@ class MultipartLargeFileParser:
                     self.terminated = True
                     break
                 else:
-                    # Insufficient data
+                    # Insufficient data to continue
                     break
 
             if self._part_type == 'response':
@@ -2021,10 +2021,19 @@ class MultipartLargeFileParser:
                     self._buffer = self._buffer[next_boundary_index:]
                     self._headers = None
                 else:
+                    # Insufficient data to continue
                     break
             elif self._part_type == 'files':
                 next_boundary_index = self._get_next_boundary_index()
-                if next_boundary_index is None:
+                if next_boundary_index is not None:
+                    # Next boundary's location is known; this is the final write.
+                    data = self._buffer[:next_boundary_index]
+                    with self._get_open_tempfile() as outfile:
+                        outfile.write(data)
+                    # Advance the buffer to point at the next boundary
+                    self._buffer = self._buffer[next_boundary_index:]
+                    self._headers = None
+                else:
                     # Data present but boundary not yet found.
                     # Write data from buffer, but don't accidentally write data which may belong
                     # to a boundary line.
@@ -2037,15 +2046,9 @@ class MultipartLargeFileParser:
 
                     # Advance the buffer for bytes consumed
                     self._buffer = self._buffer[safe_bound:]
+
+                    # Insufficient data to continue
                     break
-                else:
-                    # Next boundary's location is known; this is the final write.
-                    data = self._buffer[:next_boundary_index]
-                    with self._get_open_tempfile() as outfile:
-                        outfile.write(data)
-                    # Advance the buffer to point at the next boundary
-                    self._buffer = self._buffer[next_boundary_index:]
-                    self._headers = None
 
     def _parse_headers(self, data):
         parser = email.parser.BytesFeedParser()
