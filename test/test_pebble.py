@@ -1499,7 +1499,8 @@ Content-Disposition: form-data; name="response"\r
 """,
         ))
 
-        content = self.client.pull('/etc/hosts').read()
+        with self.client.pull('/etc/hosts') as infile:
+            content = infile.read()
         self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
 
         self.assertEqual(self.client.requests, [
@@ -1528,7 +1529,8 @@ Content-Disposition: form-data; name="response"\r
 """,
         ))
 
-        content = self.client.pull('/etc/hosts', encoding=None).read()
+        with self.client.pull('/etc/hosts', encoding=None) as infile:
+            content = infile.read()
         self.assertEqual(content, b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar')
 
         self.assertEqual(self.client.requests, [
