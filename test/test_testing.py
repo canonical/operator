@@ -3257,8 +3257,10 @@ class _PebbleStorageAPIsTestMixin:
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
         client.remove_path(self.prefix + '/dir', recursive=True)
 
-        # Remove non-existent path, recursive=False: succeeds
-        client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=False)
+        # Remove non-existent path, recursive=False: error
+        with self.assertRaises(pebble.PathError) as cm:
+            client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=False)
+        self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Remove non-existent path, recursive=True: succeeds
         client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=True)

@@ -1549,7 +1549,10 @@ ChangeError: cannot perform the following tasks:
         try:
             file_or_dir = self._fs.get_path(path)
         except FileNotFoundError:
-            return
+            if recursive:
+                return
+            raise pebble.PathError(
+                'generic-file-error', 'cannot remove non-existing path without recursive=True')
 
         if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
             raise pebble.PathError(
