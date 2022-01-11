@@ -1546,7 +1546,15 @@ ChangeError: cannot perform the following tasks:
             )
 
     def remove_path(self, path: str, *, recursive: bool = False):
-        file_or_dir = self._fs.get_path(path)
+        try:
+            file_or_dir = self._fs.get_path(path)
+        except FileNotFoundError:
+            if recursive:
+                # Pebble doesn't give not-found error when recursive is specified
+                return
+            raise pebble.PathError(
+                'not-found', 'remove {}: no such file or directory'.format(path))
+
         if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
             raise pebble.PathError(
                 'generic-file-error', 'cannot remove non-empty directory without recursive=True')
