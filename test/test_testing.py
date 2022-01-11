@@ -3257,10 +3257,13 @@ class _PebbleStorageAPIsTestMixin:
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
         client.remove_path(self.prefix + '/dir', recursive=True)
 
-        # Deliberately ignoring a few cases right now, as the behavior for these may
-        # change based upon discussions:
-        # * Removing non-existent path, recursive=False: currently does error
-        # * Removing non-existent path, recursive=True: currently does not error
+        # Remove non-existent path, recursive=False: error
+        with self.assertRaises(pebble.PathError) as cm:
+            client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=False)
+        self.assertEqual(cm.exception.kind, 'not-found')
+
+        # Remove non-existent path, recursive=True: succeeds
+        client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=True)
 
     # Other notes:
     # * Parent directories created via push(make_dirs=True) default to root:root ownership
