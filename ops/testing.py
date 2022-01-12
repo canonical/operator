@@ -98,6 +98,8 @@ class Harness(typing.Generic[CharmType]):
             self._storage, self._charm_dir, self._meta, self._model)
         self._defaults = self._load_config_defaults(config)
         self._update_config(key_values=self._defaults)
+        # Add a NetworkHarness object to this object, and to our backend.
+        self._network = self._backend._network = _NetworkHarness()
 
     @property
     def charm(self) -> CharmType:
@@ -987,6 +989,104 @@ class _ResourceEntry:
         self.name = resource_name
 
 
+class _NetworkHarness:
+    """Helpers and cache for networking data in the harness."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self, keep_active_endpoints=False):
+        """Reset the data in this harness.
+
+        Args:
+            keep_active_endpoints: optionally, keep the list of endpoits that should exist.
+        """
+        self._harness_ips = list()
+        self._endpoints = dict()
+
+        if not keep_active_endpoints:
+            self._active_endoints = None
+
+    def _generate_ip(self, subnet="10.0.0"):
+        """Auto generate an ipv4 address.
+
+        We attempt to avoid generating duplicate ips, but do not do anything fancier right now.
+        """
+        addr = "{}.{}".format(subnet, random.randint(2, 255))
+
+        if addr not in self._harness_ips:
+            self._harness_ips.append(addr)
+            return addr
+
+        return self.generate_ip()
+
+    def get_endpoint(self, endpoint_name):
+        """Return network info for an endpoint.
+
+        Generate the data if it has not been manually set.
+        """
+        if self._active_endpoints is not None and endpoint_name not in self._active_endpoints:
+            raise Exception("TODO: raise an exception that reflect's Juju's production behavior.")
+
+        endpoint_info = self._endpoints.get(endpoint_name, None)
+
+        if endpoint_info is None:
+            endpoint_info = {}
+            endpoint_info["bind-addresses"] = {
+                "macaddress": "",
+                "interfacename": "",
+                "addresses": [self._generate_ip()],
+            }
+            endpoint_info["ingress-addresses"] = {"address": self._generate_ip(), "cidr": ""}
+
+        return endpoint_info
+
+    def add_active_endpoints(self, endpoints: typing.List[str]):
+        """Specify a list of endpoints for which the harness should return valid network data."""
+        if self._active_endpoints is None:
+            self._active_endpoints = []
+
+        self._active_endpoints.extend(endpoints)
+
+    def remove_active_endpoints(self, endpoints: typing.List[str]):
+        """Remove the given endpoints from the testing harness."""
+        if not self._active_endpoints:
+            return
+
+        self._active_endpoints = [e for e in self._active_endpoints if e not in endpoints]
+
+    def set_endpoint_info(self, endpoint_name: str, info: typing.Dict):
+        """Set dummy data to be returned for a given endpoint.
+
+        To access this data, call framework.model.get_binding(binding).
+
+        Args:
+            endpoint_name: Name of the binding. E.g. "db" for network info on a unit related
+                to mysql via the "db" relation.
+            info: A dict containing network info, matching the format returned by
+                `juju network-get <binding>` (see below).
+
+        Example "info" dict:
+
+        ```
+        {
+            "bind-addresses": {
+                "macdaddress": "",
+                "interfacename": ""
+                "addresses": [
+                    { "address": "10.136.107.33", "cidr": "" },
+                ]
+
+            },
+            "ingress-addresses": "10.136.107.33"
+        }
+        ```
+
+        [Juju docs](https://discourse.charmhub.io/t/charm-network-primitives/1126)
+        """
+        self._endpoints[endpoint_name] = info
+
+
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
@@ -1029,6 +1129,7 @@ class _TestingModelBackend:
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
         self._planned_units = None
+        self._network = None  # The harness will populate this with a _NetworkHarness object.
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -1201,7 +1302,17 @@ class _TestingModelBackend:
         raise NotImplementedError(self.action_fail)
 
     def network_get(self, endpoint_name, relation_id=None):
-        raise NotImplementedError(self.network_get)
+        """Given a juju endpoint, return information about that endpoint.
+
+        Charm authors may use `self._network.set_endpoint_info` in this class to populate this
+        with custom data.
+
+        Charm authors can call self._network.set_active_endpoints with a list of endpoint names
+        in order to restrict which endpoints will return data. If a list of endpoints is
+        not set in the harness, it will generate data for any provided endpoint.
+
+        """
+        return self._network.get_endpoint(endpoint_name)
 
     def add_metrics(self, metrics, labels=None):
         raise NotImplementedError(self.add_metrics)
