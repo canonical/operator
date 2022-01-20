@@ -72,6 +72,19 @@ class StorageTester(CharmBase):
         self.observed_events.append(event)
 
 
+class StorageWithHyphensHelper(Object):
+    def __init__(self, parent, key):
+        super().__init__(parent, key)
+        self.changes = []
+        parent.framework.observe(parent.on.test_with_hyphens_storage_attached,
+                                 self.on_storage_changed)
+        parent.framework.observe(parent.on.test_with_hyphens_storage_detaching,
+                                 self.on_storage_changed)
+
+    def on_storage_changed(self, event):
+        self.changes.append(event)
+
+
 class TestHarness(unittest.TestCase):
 
     def test_add_relation(self):
@@ -1247,6 +1260,27 @@ class TestHarness(unittest.TestCase):
             harness.detach_storage("test/{}".format(stor_id))
         self.assertEqual(cm.exception.args[0],
                          "cannot detach storage before Harness is initialised")
+
+    def test_storage_with_hyphens_works(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                test-with-hyphens:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        # Set up initial storage
+        harness.begin()
+        helper = StorageWithHyphensHelper(harness.charm, "helper")
+        harness.add_storage("test-with-hyphens")[0]
+
+        self.assertEqual(len(helper.changes), 1)
 
     def test_attach_storage(self):
         harness = Harness(StorageTester, meta='''
