@@ -484,6 +484,10 @@ class Harness(typing.Generic[CharmType]):
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
 
+        This function creates a relation with an application and will trigger a relation-created
+        hook. To relate units (and trigger relation-joined and relation-changed hooks), you should
+        also call :meth:`.add_relation_unit`.
+
         Args:
             relation_name: The relation on Charm that is being related to
             remote_app: The name of the application that is being related to
