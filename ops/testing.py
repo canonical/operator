@@ -178,8 +178,8 @@ class Harness(typing.Generic[CharmType]):
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
-            storage_name = storage_name.replace('-', '_')
             for storage_index in self._backend.storage_list(storage_name):
+                storage_name = storage_name.replace('-', '_')
                 # Storage device(s) detected, emit storage-attached event(s)
                 self._charm.on[storage_name].storage_attached.emit(
                     model.Storage(storage_name, storage_index, self._backend))
