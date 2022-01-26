@@ -1964,7 +1964,7 @@ class MultipartLargeFileParser:
         # RFC 2046 says that the boundary string needs to be preceded by a CRLF.
         # Unfortunately, the request library's header parsing logic strips off one of
         # these, so we'll prime the buffer with that missing sequence.
-        self._buffer = b'\r\n'
+        self._buffer = bytearray(b'\r\n')
 
         # Prepare the MIME multipart boundary line patterns.
         # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
@@ -1983,8 +1983,7 @@ class MultipartLargeFileParser:
 
     def feed(self, data: bytes):
         """Provide more data to the parser to process."""
-        self._buffer += data
-        # self._run_parser_fsm()
+        self._buffer.extend(data)
 
         header_terminator = b'\r\n\r\n'
 
