@@ -1971,8 +1971,10 @@ class MultipartFileParser:
         # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
         # and the optional "--" suffix.  Pebble doesn't use this, so to simplify implementation I
         # am ignoring it.
-        self._boundary = "\r\n--{}\r\n".format(boundary).encode()
-        self._terminal_boundary = "\r\n--{}--\r\n".format(boundary).encode()
+        if isinstance(boundary, str):
+            boundary = boundary.encode()
+        self._boundary = b'\r\n--' + boundary + b'\r\n'
+        self._terminal_boundary = b'\r\n--' + boundary + b'--\r\n'
 
         # State vars, as we may enter the feed() function multiple times.
         self._headers = None
@@ -2028,8 +2030,10 @@ class MultipartFileParser:
                 if next_boundary_index is not None:
                     # Next boundary's location is known; this is the final write.
                     data = self._buffer[:next_boundary_index]
-                    with self._get_open_tempfile() as outfile:
-                        outfile.write(data)
+                    outfile = self._get_open_tempfile()
+                    outfile.write(data)
+                    outfile.close()
+
                     # Advance the buffer to point at the next boundary
                     self._buffer = self._buffer[next_boundary_index:]
                     self._headers = None
@@ -2078,15 +2082,13 @@ class MultipartFileParser:
         return part_type
 
     def _get_next_boundary_index(self) -> typing.Optional[int]:
-        indices = set()
-        for boundary in (self._boundary, self._terminal_boundary):
-            try:
-                index = self._buffer.index(boundary)
-            except ValueError:
-                pass
-            else:
-                indices.add(index)
-        return min(indices) if indices else None
+        boundary_index = self._buffer.find(self._boundary)
+        terminal_index = self._buffer.find(self._terminal_boundary)
+        if boundary_index >= 0:
+            return boundary_index
+        elif terminal_index >= 0:
+            return terminal_index
+        return None
 
     def _prepare_tempfile(self, filename):
         tf = tempfile.NamedTemporaryFile(delete=False)
