@@ -1467,7 +1467,8 @@ class Client:
         if not boundary:
             raise ProtocolError('invalid boundary {!r}'.format(boundary))
 
-        parser = MultipartLargeFileParser(boundary)
+        parser = MultipartFileParser(boundary)
+
         while True:
             chunk = response.read(self._chunk_size)
             if not chunk:
@@ -1954,7 +1955,7 @@ class Client:
         self._request('POST', '/v1/signals', body=body)
 
 
-class MultipartLargeFileParser:
+class MultipartFileParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
 
     def __init__(self, boundary: bytes):
