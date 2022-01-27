@@ -1979,6 +1979,7 @@ class MultipartFileParser:
         # State vars, as we may enter the feed() function multiple times.
         self._headers = None
         self._part_type = None
+        self._pre_first_boundary = True
 
     def __del__(self):
         for file in self._files.values():
@@ -1989,6 +1990,17 @@ class MultipartFileParser:
         self._buffer.extend(data)
 
         header_terminator = b'\r\n\r\n'
+
+        # RFC2046 (p. 19) states that there generally shouldn't be content
+        # before the first boundary and after the last, but there could be and
+        # it should be ignored.
+        next_boundary_index = self._get_next_boundary_index()
+        if self._pre_first_boundary:
+            if next_boundary_index is None:
+                return
+            else:
+                self._pre_first_boundary = False
+                self._buffer = self._buffer[next_boundary_index:]
 
         while True:
             # Try to read headers, if present.
