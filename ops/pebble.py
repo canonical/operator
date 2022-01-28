@@ -1491,7 +1491,13 @@ class Client:
         if len(filenames) > 1:
             raise NotImplementedError('multiple file responses not yet supported')
 
-        return parser.get_file(path, encoding)
+        f = parser.get_file(path, encoding)
+        # the opened file remains usable after removing/unlinking until it is
+        # closed.  This prevents callers from interacting with it on disk.
+        # But windows doesn't allow removing opened files like this.
+        if os.name != 'nt':
+            parser.remove_files()
+        return f
 
     @staticmethod
     def _raise_on_path_error(resp, path):
@@ -1981,9 +1987,11 @@ class MultipartFileParser:
         self._part_type = None
         self._pre_first_boundary = True
 
-    def __del__(self):
+    def remove_files(self):
+        """remove/unlink all files stored on disk that were parsed from the feed."""
         for file in self._files.values():
             os.unlink(file.name)
+        self._files.clear()
 
     def feed(self, data: bytes):
         """Provide more data to the parser to process."""
