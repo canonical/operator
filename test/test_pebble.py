@@ -1478,6 +1478,37 @@ services:
             ('GET', '/v1/services', {'names': 'svc2'}, None),
         ])
 
+    def test_pull_boundary_spanning_chunk(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
+""",
+        ))
+
+        self.client._chunk_size = 13
+        with self.client.pull('/etc/hosts') as infile:
+            content = infile.read()
+        self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
     def test_pull_text(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},

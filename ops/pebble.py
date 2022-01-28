@@ -2061,8 +2061,8 @@ class MultipartFileParser:
                 else:
                     # Data present but boundary not yet found.
                     # Write data from buffer, but don't accidentally write data which may belong
-                    # to a boundary line.
-                    safe_bound = len(self._buffer) - len(self._terminal_boundary)
+                    # to the next boundary line.
+                    safe_bound = max(0, len(self._buffer) - len(self._terminal_boundary))
                     data = self._buffer[:safe_bound]
 
                     # Don't open/close file for intermediate writes
