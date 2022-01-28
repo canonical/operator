@@ -28,6 +28,7 @@ import time
 import unittest
 import unittest.mock
 import unittest.util
+import uuid
 
 import pytest
 
@@ -2807,6 +2808,16 @@ class TestRealPebble(unittest.TestCase):
         out, err = process.wait_output()
         self.assertEqual(out, b'FOO\nBAR\n')
         self.assertEqual(err, b'')
+
+    def test_push_pull(self):
+        fname = os.path.join(tempfile.gettempdir(), 'pebbletest-{}'.format(uuid.uuid4()))
+        content = 'foo\nbar\nbaz-42'
+        self.client.push(fname, content)
+        with self.client.pull(fname) as f:
+            data = f.read()
+            self.assertEqual(data, content)
+        process = self.client.exec(['/bin/rm', fname])
+        process.wait()
 
     def test_exec_timeout(self):
         process = self.client.exec(['sleep', '0.2'], timeout=0.1)
