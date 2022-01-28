@@ -1489,7 +1489,7 @@ class Client:
         if len(filenames) < 1:
             raise ProtocolError('no file content in multipart response')
         if len(filenames) > 1:
-            raise NotImplementedError('Multiple file responses not yet supported')
+            raise NotImplementedError('multiple file responses not yet supported')
 
         return parser.get_file(path, encoding)
 
