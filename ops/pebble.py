@@ -1979,8 +1979,9 @@ class MultipartFileParser:
         # am ignoring it.
         if isinstance(boundary, str):
             boundary = boundary.encode()
-        self._boundary = b'\r\n--' + boundary + b'\r\n'
-        self._terminal_boundary = b'\r\n--' + boundary + b'--\r\n'
+        self._boundary_prefix = b'\r\n--' + boundary
+        self._boundary = self._boundary_prefix + b'\r\n'
+        self._terminal_boundary = self._boundary_prefix + b'--\r\n'
 
         # State vars, as we may enter the feed() function multiple times.
         self._headers = None
@@ -2102,12 +2103,11 @@ class MultipartFileParser:
         return part_type
 
     def _get_next_boundary_index(self) -> typing.Optional[int]:
-        boundary_index = self._buffer.find(self._boundary)
-        terminal_index = self._buffer.find(self._terminal_boundary)
-        if boundary_index >= 0:
+        boundary_index = self._buffer.find(self._boundary_prefix)
+        if self._buffer[boundary_index:].startswith(self._boundary):
             return boundary_index
-        elif terminal_index >= 0:
-            return terminal_index
+        elif self._buffer[boundary_index:].startswith(self._terminal_boundary):
+            return boundary_index
         return None
 
     def _prepare_tempfile(self, filename):
