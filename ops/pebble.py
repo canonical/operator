@@ -2003,8 +2003,8 @@ class MultipartFileParser:
         # RFC2046 (p. 19) states that there generally shouldn't be content
         # before the first boundary and after the last, but there could be and
         # it should be ignored.
-        next_boundary_index = self._get_next_boundary_index()
         if self._pre_first_boundary:
+            next_boundary_index = self._get_next_boundary_index()
             if next_boundary_index is None:
                 return
             else:
