@@ -1492,11 +1492,13 @@ class Client:
             raise NotImplementedError('multiple file responses not yet supported')
 
         f = parser.get_file(path, encoding)
+
         # the opened file remains usable after removing/unlinking until it is
         # closed.  This prevents callers from interacting with it on disk.
-        # But windows doesn't allow removing opened files like this.
-        if os.name != 'nt':
-            parser.remove_files()
+        # But e.g. windows doesn't allow removing opened files like this.
+        if os.name != 'posix' or sys.platform == 'cygwin':
+            return tempfile._TemporaryFileWrapper(f, f.name, delete=True)
+        parser.remove_files()
         return f
 
     @staticmethod
