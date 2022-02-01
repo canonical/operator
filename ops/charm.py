@@ -15,6 +15,7 @@
 """Base objects for the Charm, events and metadata."""
 
 import enum
+import logging
 import os
 import pathlib
 import typing
@@ -22,6 +23,8 @@ import typing
 from ops import model
 from ops._private import yaml
 from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
+
+logger = logging.getLogger(__name__)
 
 
 class HookEvent(EventBase):

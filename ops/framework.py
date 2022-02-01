@@ -527,9 +527,24 @@ class Framework(Object):
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
         self._breakpoint_welcomed = False
 
+        # Define tack observer to tracked history of model config
+        self._tack_observer = ConfigHistoryObserver(self)
+
         # Parse the env var once, which may be used multiple times later
         debug_at = os.environ.get('JUJU_DEBUG_AT')
         self._juju_debug_at = set(x.strip() for x in debug_at.split(',')) if debug_at else set()
+
+    def tacked(self, keys: typing.List[str], depth: int = -1) -> None:
+        """Tacked keys from application config to tracked them."""
+        self._tack_observer.keys = keys
+        self._tack_observer.set_depth(depth)
+        # TODO: pre_commit only for config-changed hook
+        self.observe(self.on.pre_commit, self._tack_observer.on_tack)
+
+    @property
+    def tack(self) -> 'StoredDict':
+        """Return tacked keys."""
+        return self._tack_observer.history
 
     def set_breakpointhook(self):
         """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
@@ -1008,6 +1023,70 @@ class StoredState:
         raise AttributeError(
             'cannot find {} attribute in type {}'.format(
                 self.__class__.__name__, parent_type.__name__))
+
+
+class ConfigHistoryObserver(Object):
+    """A class used to store config history for current application."""
+    _stored = StoredState()
+
+    def __init__(self, parent):
+        super().__init__(parent, None)
+        self._keys = list(self.model.config.keys())
+        self._depth = -1
+        self._stored.set_default(history={key: [self.model.config[key]] for key in self.keys})
+
+    @property
+    def history(self) -> 'StoredDict':
+        """Config history."""
+        return self._stored.history
+
+    @property
+    def keys(self) -> typing.List[str]:
+        """List of tacked keys."""
+        return self._keys
+
+    @keys.setter
+    def keys(self, keys: typing.List[str]) -> None:
+        """Set list if tacked keys."""
+        _keys = []
+        for key in keys:
+            if key not in self.model.config.keys():
+                raise ValueError("Key {} was not found in application config.".format(key))
+
+            _keys.append(key)
+
+        self._keys = keys
+
+    def set_depth(self, depth: int) -> None:
+        """Set depth of tacked history."""
+        if not isinstance(depth, int) and (depth == -1 or 1 <= depth):
+            raise ValueError("Depth must be integer from range [1, inf). [inf <==> -1]")
+
+        self._depth = depth
+
+    def _get_last_value(self, key: str) -> typing.Any:
+        """Get last value for certain key."""
+        key_history = self._stored.history.get(key, [])
+        if not isinstance(key_history, (list, StoredList)) or len(key_history) == 0:
+            raise RuntimeError("Could not get last value for %s", key)
+
+        return key_history[-1]
+
+    def _tack(self, key):
+        """Tack specific key from model config."""
+        value = self.framework.model.config[key]
+        if self._get_last_value(key) != value:
+            logger.debug("tack value %s for %s key", value, key)
+            self._stored.history[key].append(value)
+
+            if self._depth != -1 and len(self._stored.history[key]) > self._depth:
+                # drop old values
+                self._stored.history[key] = self._stored.history[key][-self._depth:]
+
+    def on_tack(self, _):
+        """Tack config keys on config-changed."""
+        for key in self.keys:
+            self._tack(key)
 
 
 def _wrap_stored(parent_data, value):
