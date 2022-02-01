@@ -34,6 +34,25 @@ from ops.storage import NoSnapshotError, SQLiteStorage
 
 logger = logging.getLogger(__name__)
 
+# NOTE (rgildein): this part is for test purpose
+import time
+from functools import wraps
+from memory_profiler import profile
+
+
+def track(func):
+    @wraps(wrapped=func)
+    def wrapper(self, *args, **kwargs):
+        with open("tracking-history.log", "a+") as file:
+            start = time.time()
+            file.write(f"### track history={self.model.config['history']}\n")
+            result = profile(func=func, stream=file, precision=4)(self, *args, **kwargs)
+            file.write(f"### finished {time.time()-start:.3f}s\n")
+            return result
+
+    return wrapper
+# END
+
 
 class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
@@ -585,6 +604,7 @@ class Framework(Object):
         """Stop tracking the given object. See also _track."""
         self._objects.pop(obj.handle.path, None)
 
+    @track
     def commit(self):
         """Save changes to the underlying backends."""
         # Give a chance for objects to persist data they want to before a commit is made.

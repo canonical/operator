@@ -74,7 +74,7 @@ version = {!r}
             # "Operating System :: Microsoft :: Windows",
         ],
         python_requires='>=3.5',
-        install_requires=["PyYAML"],
+        install_requires=["PyYAML", "memory_profiler"],
         package_data={'ops': ['py.typed']},
     )
 
