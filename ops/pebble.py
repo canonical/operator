@@ -1493,9 +1493,11 @@ class Client:
 
         f = parser.get_file(path, encoding)
 
-        # the opened file remains usable after removing/unlinking until it is
-        # closed.  This prevents callers from interacting with it on disk.
-        # But e.g. windows doesn't allow removing opened files like this.
+        # The opened file remains usable after removing/unlinking on posix
+        # platforms until it is closed.  This prevents callers from
+        # interacting with it on disk.  But e.g. Windows doesn't allow
+        # removing opened files, and so we use the tempfile lib's
+        # helper class to auto-delete on close/gc for us.
         if os.name != 'posix' or sys.platform == 'cygwin':
             return tempfile._TemporaryFileWrapper(f, f.name, delete=True)
         parser.remove_files()
@@ -1991,7 +1993,7 @@ class MultipartFileParser:
         self._pre_first_boundary = True
 
     def remove_files(self):
-        """remove/unlink all files stored on disk that were parsed from the feed."""
+        """remove/unlink all temporary files stored on disk that were parsed from the feed."""
         for file in self._files.values():
             os.unlink(file.name)
         self._files.clear()
