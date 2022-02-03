@@ -111,7 +111,6 @@ logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
-
 class Model:
     """Represents the Juju Model as seen from this unit.
 
