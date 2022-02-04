@@ -26,7 +26,6 @@ from io import BytesIO, StringIO
 
 import yaml
 
-import ops.pebble
 from ops import pebble
 from ops.charm import (
     CharmBase,
