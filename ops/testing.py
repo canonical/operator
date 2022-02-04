@@ -1500,8 +1500,7 @@ ChangeError: cannot perform the following tasks:
         except FileNotFoundError as e:
             # conform with the real pebble api
             raise pebble.APIError(
-                body={}, message=str(e),
-                code=404, status='Not Found')
+                body={}, code=404, status='Not Found', message=str(e))
 
         if not itself:
             try:
