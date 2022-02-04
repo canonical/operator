@@ -26,6 +26,7 @@ from io import BytesIO, StringIO
 
 import yaml
 
+import ops.pebble
 from ops import pebble
 from ops.charm import (
     CharmBase,
@@ -3054,6 +3055,7 @@ services:
 
 
 class _PebbleStorageAPIsTestMixin:
+    client: ops.pebble.Client
 
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
@@ -3169,6 +3171,14 @@ class _PebbleStorageAPIsTestMixin:
         with self.assertRaises(pebble.PathError) as cm:
             client.push('file', '')
         self.assertEqual(cm.exception.kind, 'generic-file-error')
+
+    def test_list_files_not_found_raises(self):
+        client = self.client
+        with self.assertRaises(pebble.APIError) as cm:
+            client.list_files("/not/existing/file/")
+        self.assertEqual(cm.exception.code, 404)
+        self.assertEqual(cm.exception.status, 'Not Found')
+        self.assertEqual(cm.exception.message, '/not')
 
     def test_list_directory_object_itself(self):
         client = self.client
