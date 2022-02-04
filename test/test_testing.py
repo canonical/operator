@@ -3055,8 +3055,6 @@ services:
 
 
 class _PebbleStorageAPIsTestMixin:
-    client: ops.pebble.Client
-
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
     prefix = None
