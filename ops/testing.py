@@ -1501,7 +1501,7 @@ ChangeError: cannot perform the following tasks:
             # conform with the real pebble api
             raise pebble.APIError(
                 body={}, code=404, status='Not Found',
-                message="open {}: no such file or directory".format(path))
+                message="stat {}: no such file or directory".format(path))
 
         if not itself:
             try:
