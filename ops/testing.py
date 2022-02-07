@@ -1497,7 +1497,7 @@ ChangeError: cannot perform the following tasks:
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
         try:
             files = [self._fs.get_path(path)]
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             # conform with the real pebble api
             raise pebble.APIError(
                 body={}, code=404, status='Not Found',
