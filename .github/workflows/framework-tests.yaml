@@ -65,8 +65,15 @@ jobs:
         run: go install github.com/canonical/pebble/cmd/pebble@latest
 
       - name: Start Pebble
-        run: umask 0 && PEBBLE=/tmp/pebble $HOME/go/bin/pebble run --create-dirs &
+        run: |
+          umask 0
+          $HOME/go/bin/pebble run --create-dirs &
+        env:
+          PEBBLE: /tmp/pebble
 
       - name: Run Real pebble tests
-        run: RUN_REAL_PEBBLE_TESTS=1 PEBBLE=/tmp/pebble tox -e unit -- -k RealPebble
+        run: tox -e unit -- -k RealPebble
+        env:
+          RUN_REAL_PEBBLE_TESTS: 1 
+          PEBBLE: /tmp/pebble 
 
