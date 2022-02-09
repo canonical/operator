@@ -3175,7 +3175,7 @@ class _PebbleStorageAPIsTestMixin:
             client.list_files("/not/existing/file/")
         self.assertEqual(cm.exception.code, 404)
         self.assertEqual(cm.exception.status, 'Not Found')
-        self.assertEqual(cm.exception.message, 'open /not/existing/file/: no '
+        self.assertEqual(cm.exception.message, 'stat /not/existing/file/: no '
                                                'such file or directory')
 
     def test_list_directory_object_itself(self):
