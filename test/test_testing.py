@@ -72,6 +72,19 @@ class StorageTester(CharmBase):
         self.observed_events.append(event)
 
 
+class StorageWithHyphensHelper(Object):
+    def __init__(self, parent, key):
+        super().__init__(parent, key)
+        self.changes = []
+        parent.framework.observe(parent.on.test_with_hyphens_storage_attached,
+                                 self.on_storage_changed)
+        parent.framework.observe(parent.on.test_with_hyphens_storage_detaching,
+                                 self.on_storage_changed)
+
+    def on_storage_changed(self, event):
+        self.changes.append(event)
+
+
 class TestHarness(unittest.TestCase):
 
     def test_add_relation(self):
@@ -1247,6 +1260,27 @@ class TestHarness(unittest.TestCase):
             harness.detach_storage("test/{}".format(stor_id))
         self.assertEqual(cm.exception.args[0],
                          "cannot detach storage before Harness is initialised")
+
+    def test_storage_with_hyphens_works(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                test-with-hyphens:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        # Set up initial storage
+        harness.begin()
+        helper = StorageWithHyphensHelper(harness.charm, "helper")
+        harness.add_storage("test-with-hyphens")[0]
+
+        self.assertEqual(len(helper.changes), 1)
 
     def test_attach_storage(self):
         harness = Harness(StorageTester, meta='''
@@ -3020,7 +3054,6 @@ services:
 
 
 class _PebbleStorageAPIsTestMixin:
-
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
     prefix = None
@@ -3135,6 +3168,15 @@ class _PebbleStorageAPIsTestMixin:
         with self.assertRaises(pebble.PathError) as cm:
             client.push('file', '')
         self.assertEqual(cm.exception.kind, 'generic-file-error')
+
+    def test_list_files_not_found_raises(self):
+        client = self.client
+        with self.assertRaises(pebble.APIError) as cm:
+            client.list_files("/not/existing/file/")
+        self.assertEqual(cm.exception.code, 404)
+        self.assertEqual(cm.exception.status, 'Not Found')
+        self.assertEqual(cm.exception.message, 'stat /not/existing/file/: no '
+                                               'such file or directory')
 
     def test_list_directory_object_itself(self):
         client = self.client
@@ -3257,10 +3299,13 @@ class _PebbleStorageAPIsTestMixin:
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
         client.remove_path(self.prefix + '/dir', recursive=True)
 
-        # Deliberately ignoring a few cases right now, as the behavior for these may
-        # change based upon discussions:
-        # * Removing non-existent path, recursive=False: currently does error
-        # * Removing non-existent path, recursive=True: currently does not error
+        # Remove non-existent path, recursive=False: error
+        with self.assertRaises(pebble.PathError) as cm:
+            client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=False)
+        self.assertEqual(cm.exception.kind, 'not-found')
+
+        # Remove non-existent path, recursive=True: succeeds
+        client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=True)
 
     # Other notes:
     # * Parent directories created via push(make_dirs=True) default to root:root ownership

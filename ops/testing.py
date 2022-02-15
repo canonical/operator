@@ -178,8 +178,8 @@ class Harness(typing.Generic[CharmType]):
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
-            storage_name = storage_name.replace('-', '_')
             for storage_index in self._backend.storage_list(storage_name):
+                storage_name = storage_name.replace('-', '_')
                 # Storage device(s) detected, emit storage-attached event(s)
                 self._charm.on[storage_name].storage_attached.emit(
                     model.Storage(storage_name, storage_index, self._backend))
@@ -483,6 +483,10 @@ class Harness(typing.Generic[CharmType]):
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
+
+        This function creates a relation with an application and will trigger a relation-created
+        hook. To relate units (and trigger relation-joined and relation-changed hooks), you should
+        also call :meth:`.add_relation_unit`.
 
         Args:
             relation_name: The relation on Charm that is being related to
@@ -1491,7 +1495,14 @@ ChangeError: cannot perform the following tasks:
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
-        files = [self._fs.get_path(path)]
+        try:
+            files = [self._fs.get_path(path)]
+        except FileNotFoundError:
+            # conform with the real pebble api
+            raise pebble.APIError(
+                body={}, code=404, status='Not Found',
+                message="stat {}: no such file or directory".format(path))
+
         if not itself:
             try:
                 files = self._fs.list_dir(path)
@@ -1546,7 +1557,15 @@ ChangeError: cannot perform the following tasks:
             )
 
     def remove_path(self, path: str, *, recursive: bool = False):
-        file_or_dir = self._fs.get_path(path)
+        try:
+            file_or_dir = self._fs.get_path(path)
+        except FileNotFoundError:
+            if recursive:
+                # Pebble doesn't give not-found error when recursive is specified
+                return
+            raise pebble.PathError(
+                'not-found', 'remove {}: no such file or directory'.format(path))
+
         if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
             raise pebble.PathError(
                 'generic-file-error', 'cannot remove non-empty directory without recursive=True')
