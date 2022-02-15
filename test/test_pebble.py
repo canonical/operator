@@ -3002,7 +3002,7 @@ class TestRealPebble(unittest.TestCase):
 
     def test_checks_and_health(self):
         checks = self.client.get_checks()
-        self.assertTrue(len(checks)==0 or len(checks)==3, checks)
+        self.assertTrue(len(checks) == 0 or len(checks) == 3, checks)
 
         self.client.add_layer('layer', {
             'checks': {
