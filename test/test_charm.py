@@ -480,6 +480,18 @@ containers:
         self.assertEqual(meta.containers['test1'].name, 'test1')
         self.assertEqual(meta.containers['test2'].name, 'test2')
 
+    def test_versions(self):
+        meta = CharmMeta.from_yaml("""
+name: k8s-charm
+""",
+                                   versions={
+                                       "version": "1.2.3",
+                                       "revision": "987",
+                                   }
+                                   )
+        self.assertEqual(meta.version, "1.2.3")
+        self.assertEqual(meta.revision, "987")
+
     def test_containers_storage(self):
         meta = CharmMeta.from_yaml("""
 name: k8s-charm

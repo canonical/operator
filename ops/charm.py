@@ -733,7 +733,7 @@ class CharmMeta:
 
     """
 
-    def __init__(self, raw: dict = {}, actions_raw: dict = {}):
+    def __init__(self, raw: dict = {}, actions_raw: dict = {}, versions: dict = {}):
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
@@ -747,6 +747,8 @@ class CharmMeta:
         self.series = raw.get('series', [])
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
+        self.revision = versions.get('revision', '')
+        self.version = versions.get('version', '')
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw.get('requires', {}).items()}
         self.provides = {name: RelationMeta(RelationRole.provides, name, rel)
@@ -774,13 +776,15 @@ class CharmMeta:
     @classmethod
     def from_yaml(
             cls, metadata: typing.Union[str, typing.TextIO],
-            actions: typing.Optional[typing.Union[str, typing.TextIO]] = None):
+            actions: typing.Optional[typing.Union[str, typing.TextIO]] = None,
+            versions: typing.Optional[typing.Dict] = None):
         """Instantiate a CharmMeta from a YAML description of metadata.yaml.
 
         Args:
             metadata: A YAML description of charm metadata (name, relations, etc.)
                 This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
             actions: YAML description of Actions for this charm (eg actions.yaml)
+            versions: a dict describing the version and revision
         """
         meta = yaml.safe_load(metadata)
         raw_actions = {}
@@ -788,7 +792,8 @@ class CharmMeta:
             raw_actions = yaml.safe_load(actions)
             if raw_actions is None:
                 raw_actions = {}
-        return cls(meta, raw_actions)
+        raw_versions = versions or {}
+        return cls(meta, raw_actions, raw_versions)
 
 
 class RelationRole(enum.Enum):

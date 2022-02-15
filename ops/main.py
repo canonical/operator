@@ -369,9 +369,21 @@ def main(charm_class: typing.Type[ops.charm.CharmBase], use_juju_for_storage: bo
     else:
         actions_metadata = None
 
+    versions_meta = {}
+    revision_file = charm_dir / 'revision'
+    if revision_file.exists():
+        versions_meta.update({
+            "revision": revision_file.read_text()
+        })
+    version_file = charm_dir / 'version'
+    if version_file.exists():
+        versions_meta.update({
+            "version": version_file.read_text()
+        })
+
     if not yaml.__with_libyaml__:
         logger.debug('yaml does not have libyaml extensions, using slower pure Python yaml loader')
-    meta = ops.charm.CharmMeta.from_yaml(metadata, actions_metadata)
+    meta = ops.charm.CharmMeta.from_yaml(metadata, actions_metadata, versions=versions_meta)
     model = ops.model.Model(meta, model_backend)
 
     charm_state_path = charm_dir / CHARM_STATE_FILE
