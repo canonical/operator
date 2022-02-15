@@ -792,6 +792,13 @@ class CheckLevel(enum.Enum):
     READY = 'ready'
 
 
+class CheckStatus(enum.Enum):
+    """Enum of check statuses."""
+
+    UP = 'up'
+    DOWN = 'down'
+
+
 class FileType(enum.Enum):
     """Enum of file types."""
 
@@ -890,10 +897,14 @@ class CheckInfo:
             level = CheckLevel(d.get('level', ''))
         except ValueError:
             level = d.get('level')
+        try:
+            status = CheckStatus(d['status'])
+        except ValueError:
+            status = d['status']
         return cls(
             name=d['name'],
             level=level,
-            status=d['status'],
+            status=status,
             failures=d.get('failures', 0),
             threshold=d['threshold'],
         )

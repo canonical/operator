@@ -28,6 +28,8 @@ import time
 import unittest
 import unittest.mock
 import unittest.util
+import urllib.error
+import urllib.request
 
 import pytest
 
@@ -953,29 +955,37 @@ class TestCheckInfo(unittest.TestCase):
         self.assertEqual(pebble.CheckLevel.ALIVE.value, 'alive')
         self.assertEqual(pebble.CheckLevel.READY.value, 'ready')
 
+    def test_check_status(self):
+        self.assertEqual(list(pebble.CheckStatus), [
+            pebble.CheckStatus.UP,
+            pebble.CheckStatus.DOWN,
+        ])
+        self.assertEqual(pebble.CheckStatus.UP.value, 'up')
+        self.assertEqual(pebble.CheckStatus.DOWN.value, 'down')
+
     def test_check_info(self):
         check = pebble.CheckInfo(
             name='chk1',
             level=pebble.CheckLevel.READY,
-            status='up',
+            status=pebble.CheckStatus.UP,
             threshold=3,
         )
         self.assertEqual(check.name, 'chk1')
         self.assertEqual(check.level, pebble.CheckLevel.READY)
-        self.assertEqual(check.status, 'up')
+        self.assertEqual(check.status, pebble.CheckStatus.UP)
         self.assertEqual(check.failures, 0)
         self.assertEqual(check.threshold, 3)
 
         check = pebble.CheckInfo(
             name='chk2',
             level=pebble.CheckLevel.ALIVE,
-            status='down',
+            status=pebble.CheckStatus.DOWN,
             failures=5,
             threshold=3,
         )
         self.assertEqual(check.name, 'chk2')
         self.assertEqual(check.level, pebble.CheckLevel.ALIVE)
-        self.assertEqual(check.status, 'down')
+        self.assertEqual(check.status, pebble.CheckStatus.DOWN)
         self.assertEqual(check.failures, 5)
         self.assertEqual(check.threshold, 3)
 
@@ -986,20 +996,20 @@ class TestCheckInfo(unittest.TestCase):
         })
         self.assertEqual(check.name, 'chk3')
         self.assertEqual(check.level, pebble.CheckLevel.UNSET)
-        self.assertEqual(check.status, 'up')
+        self.assertEqual(check.status, pebble.CheckStatus.UP)
         self.assertEqual(check.failures, 0)
         self.assertEqual(check.threshold, 3)
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
             'level': pebble.CheckLevel.UNSET,
-            'status': 'down',
+            'status': pebble.CheckStatus.DOWN,
             'failures': 3,
             'threshold': 3,
         })
         self.assertEqual(check.name, 'chk4')
         self.assertEqual(check.level, pebble.CheckLevel.UNSET)
-        self.assertEqual(check.status, 'down')
+        self.assertEqual(check.status, pebble.CheckStatus.DOWN)
         self.assertEqual(check.failures, 3)
         self.assertEqual(check.threshold, 3)
 
@@ -2263,12 +2273,12 @@ bad path
         self.assertEqual(len(checks), 2)
         self.assertEqual(checks[0].name, 'chk1')
         self.assertEqual(checks[0].level, pebble.CheckLevel.UNSET)
-        self.assertEqual(checks[0].status, 'up')
+        self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
         self.assertEqual(checks[0].failures, 0)
         self.assertEqual(checks[0].threshold, 2)
         self.assertEqual(checks[1].name, 'chk2')
         self.assertEqual(checks[1].level, pebble.CheckLevel.ALIVE)
-        self.assertEqual(checks[1].status, 'down')
+        self.assertEqual(checks[1].status, pebble.CheckStatus.DOWN)
         self.assertEqual(checks[1].failures, 5)
         self.assertEqual(checks[1].threshold, 3)
 
@@ -2294,7 +2304,7 @@ bad path
         self.assertEqual(len(checks), 1)
         self.assertEqual(checks[0].name, 'chk2')
         self.assertEqual(checks[0].level, pebble.CheckLevel.READY)
-        self.assertEqual(checks[0].status, 'up')
+        self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
         self.assertEqual(checks[0].failures, 0)
         self.assertEqual(checks[0].threshold, 3)
 
@@ -2971,7 +2981,7 @@ class TestExec(unittest.TestCase):
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
 # against a real Pebble server. For example, in one terminal, run Pebble:
 #
-# $ PEBBLE=~/pebble pebble run
+# $ PEBBLE=~/pebble pebble run --http=:4000
 # 2021-09-20T04:10:34.934Z [pebble] Started daemon
 #
 # In another terminal, run the tests:
@@ -2989,6 +2999,94 @@ class TestRealPebble(unittest.TestCase):
         assert socket_path, 'PEBBLE or PEBBLE_SOCKET must be set if RUN_REAL_PEBBLE_TESTS set'
 
         self.client = pebble.Client(socket_path=socket_path)
+
+    def test_checks_and_health(self):
+        checks = self.client.get_checks()
+        self.assertTrue(len(checks)==0 or len(checks)==3, checks)
+
+        self.client.add_layer('layer', {
+            'checks': {
+                'bad': {
+                    'override': 'replace',
+                    'level': 'ready',
+                    'period': '50ms',
+                    'threshold': 2,
+                    'exec': {
+                        'command': 'sleep x',
+                    },
+                },
+                'good': {
+                    'override': 'replace',
+                    'level': 'alive',
+                    'period': '50ms',
+                    'exec': {
+                        'command': 'echo foo',
+                    },
+                },
+                'other': {
+                    'override': 'replace',
+                    'exec': {
+                        'command': 'echo bar',
+                    },
+                },
+            },
+        }, combine=True)
+
+        checks = self.client.get_checks()
+        self.assertEqual(len(checks), 3)
+        self.assertEqual(checks[0].name, 'bad')
+        self.assertEqual(checks[0].level, pebble.CheckLevel.READY)
+        self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
+        self.assertEqual(checks[1].name, 'good')
+        self.assertEqual(checks[1].level, pebble.CheckLevel.ALIVE)
+        self.assertEqual(checks[1].status, pebble.CheckStatus.UP)
+        self.assertEqual(checks[2].name, 'other')
+        self.assertEqual(checks[2].level, pebble.CheckLevel.UNSET)
+        self.assertEqual(checks[2].status, pebble.CheckStatus.UP)
+
+        health = self._get_health()
+        self.assertEqual(health, {
+            'result': {'healthy': True},
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        while True:
+            checks = self.client.get_checks()
+            bad_check = [c for c in checks if c.name == 'bad'][0]
+            if bad_check.status != pebble.CheckStatus.UP:
+                break
+            time.sleep(0.06)
+
+        self.assertEqual(bad_check.failures, 2)
+        self.assertEqual(bad_check.threshold, 2)
+        good_check = [c for c in checks if c.name == 'good'][0]
+        self.assertEqual(good_check.status, pebble.CheckStatus.UP)
+
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self._get_health()
+        self.assertEqual(cm.exception.code, 502)
+        health = json.load(cm.exception)
+        self.assertEqual(health, {
+            'result': {'healthy': False},
+            'status': 'Bad Gateway',
+            'status-code': 502,
+            'type': 'sync',
+        })
+
+        checks = self.client.get_checks(level=pebble.CheckLevel.ALIVE)
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0].name, 'good')
+
+        checks = self.client.get_checks(names=['good', 'bad'])
+        self.assertEqual(len(checks), 2)
+        self.assertEqual(checks[0].name, 'bad')
+        self.assertEqual(checks[1].name, 'good')
+
+    def _get_health(self):
+        f = urllib.request.urlopen('http://localhost:4000/v1/health')
+        return json.load(f)
 
     def test_exec_wait(self):
         process = self.client.exec(['true'])
