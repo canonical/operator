@@ -817,7 +817,7 @@ class TestCheck(unittest.TestCase):
         self.assertEqual(check.level, pebble.CheckLevel.UNSET)
         self.assertEqual(check.period, '')
         self.assertEqual(check.timeout, '')
-        self.assertIs(check.failures, None)
+        self.assertIs(check.threshold, None)
         self.assertIs(check.http, None)
         self.assertIs(check.tcp, None)
         self.assertIs(check.exec, None)
@@ -832,7 +832,7 @@ class TestCheck(unittest.TestCase):
             'level': 'alive',
             'period': '10s',
             'timeout': '3s',
-            'failures': 5,
+            'threshold': 5,
             # Not valid for Pebble to have more than one of http, tcp, and exec,
             # but it makes things simpler for the unit tests.
             'http': {'url': 'https://example.com/'},
@@ -845,7 +845,7 @@ class TestCheck(unittest.TestCase):
         self.assertEqual(check.level, pebble.CheckLevel.ALIVE)
         self.assertEqual(check.period, '10s')
         self.assertEqual(check.timeout, '3s')
-        self.assertEqual(check.failures, 5)
+        self.assertEqual(check.threshold, 5)
         self.assertEqual(check.http, {'url': 'https://example.com/'})
         self.assertEqual(check.tcp, {'port': 80})
         self.assertEqual(check.exec, {'command': 'echo foo'})
@@ -866,7 +866,7 @@ class TestCheck(unittest.TestCase):
             'level': 'alive',
             'period': '10s',
             'timeout': '3s',
-            'failures': 5,
+            'threshold': 5,
             'http': {'url': 'https://example.com/'},
         }
         one = pebble.Check('one', d)
@@ -907,28 +907,23 @@ class TestServiceInfo(unittest.TestCase):
         self.assertEqual(s.name, 'svc1')
         self.assertEqual(s.startup, pebble.ServiceStartup.ENABLED)
         self.assertEqual(s.current, pebble.ServiceStatus.ACTIVE)
-        self.assertEqual(s.restarts, 0)
 
         s = pebble.ServiceInfo(
             'svc1',
             pebble.ServiceStartup.ENABLED,
-            pebble.ServiceStatus.ACTIVE,
-            restarts=3)
+            pebble.ServiceStatus.ACTIVE)
         self.assertEqual(s.name, 'svc1')
         self.assertEqual(s.startup, pebble.ServiceStartup.ENABLED)
         self.assertEqual(s.current, pebble.ServiceStatus.ACTIVE)
-        self.assertEqual(s.restarts, 3)
 
         s = pebble.ServiceInfo.from_dict({
             'name': 'svc2',
             'startup': 'disabled',
             'current': 'inactive',
-            'restarts': 3,
         })
         self.assertEqual(s.name, 'svc2')
         self.assertEqual(s.startup, pebble.ServiceStartup.DISABLED)
         self.assertEqual(s.current, pebble.ServiceStatus.INACTIVE)
-        self.assertEqual(s.restarts, 3)
 
         s = pebble.ServiceInfo.from_dict({
             'name': 'svc2',
@@ -938,7 +933,6 @@ class TestServiceInfo(unittest.TestCase):
         self.assertEqual(s.name, 'svc2')
         self.assertEqual(s.startup, 'thingy')
         self.assertEqual(s.current, 'bob')
-        self.assertEqual(s.restarts, 0)
 
     def test_is_running(self):
         s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
@@ -963,55 +957,51 @@ class TestCheckInfo(unittest.TestCase):
         check = pebble.CheckInfo(
             name='chk1',
             level=pebble.CheckLevel.READY,
-            healthy=True,
+            status='up',
+            threshold=3,
         )
         self.assertEqual(check.name, 'chk1')
         self.assertEqual(check.level, pebble.CheckLevel.READY)
-        self.assertEqual(check.healthy, True)
-        self.assertIs(check.failures, 0)
-        self.assertIs(check.last_error, None)
-        self.assertIs(check.error_details, None)
+        self.assertEqual(check.status, 'up')
+        self.assertEqual(check.failures, 0)
+        self.assertEqual(check.threshold, 3)
 
         check = pebble.CheckInfo(
             name='chk2',
             level=pebble.CheckLevel.ALIVE,
-            healthy=False,
+            status='down',
             failures=5,
-            last_error='ERR',
-            error_details='deets',
+            threshold=3,
         )
         self.assertEqual(check.name, 'chk2')
         self.assertEqual(check.level, pebble.CheckLevel.ALIVE)
-        self.assertEqual(check.healthy, False)
+        self.assertEqual(check.status, 'down')
         self.assertEqual(check.failures, 5)
-        self.assertEqual(check.last_error, 'ERR')
-        self.assertEqual(check.error_details, 'deets')
+        self.assertEqual(check.threshold, 3)
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk3',
-            'healthy': True,
+            'status': 'up',
+            'threshold': 3,
         })
         self.assertEqual(check.name, 'chk3')
         self.assertEqual(check.level, pebble.CheckLevel.UNSET)
-        self.assertEqual(check.healthy, True)
+        self.assertEqual(check.status, 'up')
         self.assertEqual(check.failures, 0)
-        self.assertEqual(check.last_error, '')
-        self.assertEqual(check.error_details, '')
+        self.assertEqual(check.threshold, 3)
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
             'level': pebble.CheckLevel.UNSET,
-            'healthy': False,
+            'status': 'down',
             'failures': 3,
-            'last-error': 'ERR2',
-            'error-details': 'deetz',
+            'threshold': 3,
         })
         self.assertEqual(check.name, 'chk4')
         self.assertEqual(check.level, pebble.CheckLevel.UNSET)
-        self.assertEqual(check.healthy, False)
+        self.assertEqual(check.status, 'down')
         self.assertEqual(check.failures, 3)
-        self.assertEqual(check.last_error, 'ERR2')
-        self.assertEqual(check.error_details, 'deetz')
+        self.assertEqual(check.threshold, 3)
 
 
 class MockClient(pebble.Client):
@@ -2254,15 +2244,15 @@ bad path
             "result": [
                 {
                     "name": "chk1",
-                    "healthy": True,
+                    "status": "up",
+                    "threshold": 2,
                 },
                 {
                     "name": "chk2",
                     "level": "alive",
-                    "healthy": False,
+                    "status": "down",
                     "failures": 5,
-                    "last-error": "ERR!",
-                    "error-details": "deets",
+                    "threshold": 3,
                 }
             ],
             "status": "OK",
@@ -2273,16 +2263,14 @@ bad path
         self.assertEqual(len(checks), 2)
         self.assertEqual(checks[0].name, 'chk1')
         self.assertEqual(checks[0].level, pebble.CheckLevel.UNSET)
-        self.assertEqual(checks[0].healthy, True)
+        self.assertEqual(checks[0].status, 'up')
         self.assertEqual(checks[0].failures, 0)
-        self.assertEqual(checks[0].last_error, '')
-        self.assertEqual(checks[0].error_details, '')
+        self.assertEqual(checks[0].threshold, 2)
         self.assertEqual(checks[1].name, 'chk2')
         self.assertEqual(checks[1].level, pebble.CheckLevel.ALIVE)
-        self.assertEqual(checks[1].healthy, False)
+        self.assertEqual(checks[1].status, 'down')
         self.assertEqual(checks[1].failures, 5)
-        self.assertEqual(checks[1].last_error, 'ERR!')
-        self.assertEqual(checks[1].error_details, 'deets')
+        self.assertEqual(checks[1].threshold, 3)
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/checks', {}, None),
@@ -2294,7 +2282,8 @@ bad path
                 {
                     "name": "chk2",
                     "level": "ready",
-                    "healthy": True,
+                    "status": "up",
+                    "threshold": 3,
                 },
             ],
             "status": "OK",
@@ -2305,7 +2294,9 @@ bad path
         self.assertEqual(len(checks), 1)
         self.assertEqual(checks[0].name, 'chk2')
         self.assertEqual(checks[0].level, pebble.CheckLevel.READY)
-        self.assertEqual(checks[0].healthy, True)
+        self.assertEqual(checks[0].status, 'up')
+        self.assertEqual(checks[0].failures, 0)
+        self.assertEqual(checks[0].threshold, 3)
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),

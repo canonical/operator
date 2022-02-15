@@ -692,12 +692,10 @@ class ServiceInfo:
         name: str,
         startup: typing.Union[ServiceStartup, str],
         current: typing.Union[ServiceStatus, str],
-        restarts: int = 0,
     ):
         self.name = name
         self.startup = startup
         self.current = current
-        self.restarts = restarts
 
     def is_running(self) -> bool:
         """Return True if this service is running (in the active state)."""
@@ -718,15 +716,13 @@ class ServiceInfo:
             name=d['name'],
             startup=startup,
             current=current,
-            restarts=d.get('restarts', 0),
         )
 
     def __repr__(self):
         return ('ServiceInfo('
                 'name={self.name!r}, '
                 'startup={self.startup}, '
-                'current={self.current}, '
-                'restarts={self.restarts})'
+                'current={self.current})'
                 ).format(self=self)
 
 
@@ -743,7 +739,7 @@ class Check:
             self.level = raw.get('level')
         self.period = raw.get('period', '')
         self.timeout = raw.get('timeout', '')
-        self.failures = raw.get('failures')
+        self.threshold = raw.get('threshold')
 
         http = raw.get('http')
         if http is not None:
@@ -767,7 +763,7 @@ class Check:
             ('level', self.level.value),
             ('period', self.period),
             ('timeout', self.timeout),
-            ('failures', self.failures),
+            ('threshold', self.threshold),
             ('http', self.http),
             ('tcp', self.tcp),
             ('exec', self.exec),
@@ -876,17 +872,15 @@ class CheckInfo:
         self,
         name: str,
         level: str,
-        healthy: bool,
+        status: str,
         failures: int = 0,
-        last_error: str = None,
-        error_details: str = None,
+        threshold: int = 0,
     ):
         self.name = name
         self.level = level
-        self.healthy = healthy
+        self.status = status
         self.failures = failures
-        self.last_error = last_error
-        self.error_details = error_details
+        self.threshold = threshold
 
     @classmethod
     def from_dict(cls, d: typing.Dict) -> 'CheckInfo':
@@ -898,20 +892,18 @@ class CheckInfo:
         return cls(
             name=d['name'],
             level=level,
-            healthy=d['healthy'],
+            status=d['status'],
             failures=d.get('failures', 0),
-            last_error=d.get('last-error', ''),
-            error_details=d.get('error-details', ''),
+            threshold=d['threshold'],
         )
 
     def __repr__(self):
         return ('CheckInfo('
                 'name={self.name!r}, '
                 'level={self.level!r}, '
-                'healthy={self.healthy}, '
+                'status={self.status}, '
                 'failures={self.failures}, '
-                'last_error={self.last_error!r}, '
-                'error_details={self.error_details!r})'
+                'threshold={self.threshold!r})'
                 ).format(self=self)
 
 
