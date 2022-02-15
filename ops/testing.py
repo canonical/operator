@@ -1495,7 +1495,14 @@ ChangeError: cannot perform the following tasks:
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
-        files = [self._fs.get_path(path)]
+        try:
+            files = [self._fs.get_path(path)]
+        except FileNotFoundError:
+            # conform with the real pebble api
+            raise pebble.APIError(
+                body={}, code=404, status='Not Found',
+                message="stat {}: no such file or directory".format(path))
+
         if not itself:
             try:
                 files = self._fs.list_dir(path)
