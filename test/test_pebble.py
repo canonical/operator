@@ -3000,8 +3000,8 @@ class TestRealPebble(unittest.TestCase):
 
         self.client = pebble.Client(socket_path=socket_path)
 
-    # TODO: should be enabled after https://github.com/canonical/pebble/pull/86 is merged to get --http flag
-    def TODO_test_checks_and_health(self):
+    # TODO: should be enabled after https://github.com/canonical/pebble/pull/86 is merged
+    def _test_checks_and_health(self):
         checks = self.client.get_checks()
         self.assertTrue(len(checks) == 0 or len(checks) == 3, checks)
 
