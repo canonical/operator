@@ -748,7 +748,6 @@ class CharmMeta:
         self.subordinate = raw.get('subordinate', False)
         self.min_juju_version = raw.get('min-juju-version')
         self.revision = versions.get('revision', '')
-        self.version = versions.get('version', '')
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw.get('requires', {}).items()}
         self.provides = {name: RelationMeta(RelationRole.provides, name, rel)

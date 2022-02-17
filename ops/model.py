@@ -199,6 +199,9 @@ class Application:
 
     def __init__(self, name, meta, backend, cache):
         self.name = name
+        # test_testing passes a dict in directly, but in case 'revision' is not set on `meta` in
+        # other cases, return the default here
+        self.revision = meta.revision if hasattr(meta, 'revision') else ""
         self._backend = backend
         self._cache = cache
         self._is_our_app = self.name == self._backend.app_name

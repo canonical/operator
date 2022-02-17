@@ -375,11 +375,6 @@ def main(charm_class: typing.Type[ops.charm.CharmBase], use_juju_for_storage: bo
         versions_meta.update({
             "revision": revision_file.read_text()
         })
-    version_file = charm_dir / 'version'
-    if version_file.exists():
-        versions_meta.update({
-            "version": version_file.read_text()
-        })
 
     if not yaml.__with_libyaml__:
         logger.debug('yaml does not have libyaml extensions, using slower pure Python yaml loader')

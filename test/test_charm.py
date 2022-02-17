@@ -485,12 +485,21 @@ containers:
 name: k8s-charm
 """,
                                    versions={
-                                       "version": "1.2.3",
                                        "revision": "987",
                                    }
                                    )
-        self.assertEqual(meta.version, "1.2.3")
         self.assertEqual(meta.revision, "987")
+
+        class MyCharm(CharmBase):
+
+            def __init__(self, *args):
+                super().__init__(*args)
+
+        model = Model(meta, _ModelBackend('local/0'))
+        framework = Framework(SQLiteStorage(':memory:'), self.tmpdir, meta, model)
+        self.addCleanup(framework.close)
+        charm = MyCharm(framework)
+        self.assertEqual(charm.app.revision, "987")
 
     def test_containers_storage(self):
         meta = CharmMeta.from_yaml("""
