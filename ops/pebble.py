@@ -35,6 +35,7 @@ import socket
 import sys
 import threading
 import time
+import types
 import typing
 import urllib.error
 import urllib.parse
@@ -1135,6 +1136,11 @@ class Client:
         url = self.base_url + path
         if query:
             url = url + '?' + urllib.parse.urlencode(query)
+
+        # python 3.5 urllib requests require their data to be a bytes object -
+        # generators won't work.
+        if sys.version_info[:2] < (3, 6) and isinstance(data, types.GeneratorType):
+            data = b''.join(data)
 
         if headers is None:
             headers = {}
