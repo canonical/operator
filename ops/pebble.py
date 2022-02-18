@@ -1681,7 +1681,11 @@ class Client:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, recursively delete path and everything under it.
+            recursive: If True, and path is a directory recursively deletes it and
+                       everything under it.
+                       If True, and path is a file deletes it and ignore if file
+                       does not exists.
+
         """
         info = {'path': path}
         if recursive:
