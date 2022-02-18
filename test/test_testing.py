@@ -1285,7 +1285,8 @@ class TestHarness(unittest.TestCase):
         stor_ids = harness.add_storage("test", count=3)
         self.assertSetEqual(set(self._extract_storage_index(stor_id) for stor_id in stor_ids),
                             set(harness._backend.storage_list("test")))
-        self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
+        want = str(pathlib.PurePath('test', '0'))
+        self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
 
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 3)
@@ -1325,7 +1326,8 @@ class TestHarness(unittest.TestCase):
         stor_id = harness.add_storage("test")[0]
         self.assertIn(self._extract_storage_index(stor_id),
                       harness._backend.storage_list("test"))
-        self.assertEqual("/test/0", harness._backend.storage_get(stor_id, "location"))
+        want = str(pathlib.PurePath('test', '0'))
+        self.assertEqual(want, harness._backend.storage_get(stor_id, "location")[-6:])
 
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 1)
@@ -1339,9 +1341,11 @@ class TestHarness(unittest.TestCase):
 
         added_indices = {self._extract_storage_index(stor_id) for stor_id in stor_ids}
         self.assertTrue(added_indices.issubset(set(harness._backend.storage_list("test"))))
-        self.assertEqual("/test/1", harness._backend.storage_get("test/1", "location"))
-        self.assertEqual("/test/2", harness._backend.storage_get("test/2", "location"))
-        self.assertEqual("/test/3", harness._backend.storage_get("test/3", "location"))
+
+        for i in ['1', '2', '3']:
+            storage_name = 'test/' + i
+            want = str(pathlib.PurePath('test', i))
+            self.assertEqual(want, harness._backend.storage_get(storage_name, "location")[-6:])
         self.assertEqual(len(harness.charm.observed_events), 4)
         for i in range(1, 4):
             self.assertTrue(isinstance(harness.charm.observed_events[i], StorageAttachedEvent))
@@ -1456,7 +1460,8 @@ class TestHarness(unittest.TestCase):
         # Verify backend functions return appropriate values.
         # Real backend would return info only for actively attached storage units.
         self.assertIn(self._extract_storage_index(stor_id), harness._backend.storage_list("test"))
-        self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
+        want = str(pathlib.PurePath('test', '0'))
+        self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
 
         # Retry attach
         # Since already detached, no more hooks should fire
@@ -2750,7 +2755,7 @@ class TestTestingModelBackend(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         backend = harness._backend
 
-        client = backend.get_pebble('/custom/socket/path')
+        client = backend.get_pebble(None, '/custom/socket/path')
         self.assertIsInstance(client, _TestingPebbleClient)
 
 
@@ -2762,7 +2767,7 @@ class _TestingPebbleClientMixin:
         self.addCleanup(harness.cleanup)
         backend = harness._backend
 
-        return backend.get_pebble('/custom/socket/path')
+        return backend.get_pebble(None, '/custom/socket/path')
 
 
 # For testing non file ops of the pebble testing client.
@@ -3732,6 +3737,16 @@ class TestMockFilesystem(unittest.TestCase):
     def setUp(self):
         self.fs = _MockFilesystem()
 
+    def test_storage_mount(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        self.fs.add_mount('foo', '/foo', tmpdir.name)
+        self.fs.create_file('/foo/bar/baz.txt', 'quux', make_dirs=True)
+
+        tmppath = os.path.join(tmpdir.name, 'bar/baz.txt')
+        self.assertTrue(os.path.exists(tmppath))
+        with open(tmppath) as f:
+            self.assertEqual(f.read(), 'quux')
+
     def test_listdir_root_on_empty_os(self):
         self.assertEqual(self.fs.list_dir('/'), [])
 
@@ -3923,6 +3938,73 @@ class TestPebbleStorageAPIsUsingMocks(
         self.client = self.get_testing_client()
         if self.prefix:
             self.client.make_dir(self.prefix, make_parents=True)
+
+    @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
+    def test_container_storage_mounts(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+                c1:
+                    mounts:
+                        - storage: store1
+                          location: /mounts/foo
+                c2:
+                    mounts:
+                        - storage: store2
+                          location: /mounts/foo
+                c3:
+                    mounts:
+                        - storage: store1
+                          location: /mounts/bar
+            storage:
+                store1:
+                    type: filesystem
+                store2:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        store_id = harness.add_storage('store1')[0]
+        harness.attach_storage(store_id)
+
+        harness.begin()
+
+        # push file to c1 storage mount, check that we can see it in charm container storage path.
+        c1 = harness.model.unit.get_container('c1')
+        c1_fname = 'foo.txt'
+        c1_fpath = os.path.join('/mounts/foo', c1_fname)
+        c1.push(c1_fpath, '42')
+        self.assertTrue(c1.exists(c1_fpath))
+        fpath = os.path.join(str(harness.model.storages['store1'][0].location), 'foo.txt')
+        with open(fpath) as f:
+            self.assertEqual('42', f.read())
+
+        # check that the file is not visible in c2 which has a different storage mount
+        c2 = harness.model.unit.get_container('c2')
+        c2_fpath = os.path.join('/mounts/foo', c1_fname)
+        self.assertFalse(c2.exists(c2_fpath))
+
+        # check that the file is visible in c3 which has the same storage mount
+        c3 = harness.model.unit.get_container('c3')
+        c3_fpath = os.path.join('/mounts/bar', c1_fname)
+        self.assertTrue(c3.exists(c3_fpath))
+        with c3.pull(c3_fpath) as f:
+            self.assertEqual('42', f.read())
+
+        # test all other container file ops
+        with c1.pull(c1_fpath) as f:
+            self.assertEqual('42', f.read())
+        files = c1.list_files(c1_fpath)
+        self.assertEqual([c1_fpath], [fi.path for fi in files])
+        c1.remove_path(c1_fpath)
+        self.assertFalse(c1.exists(c1_fpath))
+
+        # test detaching storage
+        c1.push(c1_fpath, '42')
+        self.assertTrue(c1.exists(c1_fpath))
+        store1_id = harness.model.storages['store1'][0].full_id
+        harness.remove_storage(store1_id)
+        self.assertFalse(c1.exists(c1_fpath))
 
     def test_push_with_ownership(self):
         # Note: To simplify implementation, ownership is simply stored as-is with no verification.

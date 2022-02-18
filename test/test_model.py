@@ -1322,7 +1322,7 @@ containers:
 
 
 class MockPebbleBackend(ops.model._ModelBackend):
-    def get_pebble(self, socket_path):
+    def get_pebble(self, container, socket_path):
         return MockPebbleClient(socket_path)
 
 
