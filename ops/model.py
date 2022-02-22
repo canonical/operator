@@ -1194,6 +1194,7 @@ class Container:
         If no service names are specified, return status information for all
         services, otherwise return information for only the given services.
         """
+        service_names = service_names or None
         services = self._pebble.get_services(service_names)
         return ServiceInfoMapping(services)
 
