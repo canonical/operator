@@ -23,6 +23,7 @@ jobs:
         run: |
           sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
           echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+          echo -e "\nmarkupsafe==2.0.1" >> requirements.txt  # temp fix for https://github.com/canonical/grafana-k8s-operator/pull/69
 
       - name: Install dependencies
         run: pip install tox
