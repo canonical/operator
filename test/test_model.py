@@ -772,9 +772,26 @@ class TestApplication(unittest.TestCase):
             resources:
               foo: {type: file, filename: foo.txt}
               bar: {type: file, filename: bar.txt}
+            containers:
+              bar:
+                k: v
         ''')
         self.peer_rel_id = self.harness.add_relation('db2', 'db2')
         self.app = self.harness.model.app
+        self.addCleanup(self.harness.cleanup)
+
+    # Tests fix for https://github.com/canonical/operator/issues/694.
+    def test_mocked_get_services(self):
+        self.harness.begin()
+        c = self.harness.charm.unit.get_container('bar')
+        c.add_layer('layer1', {
+            'summary': 'layer',
+            'services': {"baz": {'override': 'replace', 'summary': 'echo', 'command': 'echo 1'}},
+        })
+
+        s = c.get_service('baz')  # So far, so good
+        self.assertTrue(s)
+        self.assertTrue('baz' in c.get_services())
 
     def test_planned_units(self):
         rel_id = self.peer_rel_id
@@ -1062,7 +1079,7 @@ containers:
         self.assertEqual(services['s2'].current, ops.pebble.ServiceStatus.INACTIVE)
 
         self.assertEqual(self.pebble.requests, [
-            ('get_services', ()),
+            ('get_services', None),
             ('get_services', ('s1', 's2')),
         ])
 
