@@ -2551,6 +2551,7 @@ class _TestingPebbleClientMixin:
         return backend.get_pebble('/custom/socket/path')
 
 
+# For testing non file ops of the pebble testing client.
 class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
 
     def test_methods_match_pebble_client(self):
@@ -3053,6 +3054,9 @@ services:
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
 
+# For testing file-ops of the pebble client.  This is refactored into a
+# separate mixin so we can run these tests against both the mock client as
+# well as a real pebble server instance.
 class _PebbleStorageAPIsTestMixin:
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
