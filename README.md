@@ -127,41 +127,5 @@ You can deep dive into the [API docs] if that's your thing.
 
 ## Operator Framework development
 
-To work in the framework itself you will need Python >= 3.5. Linting, testing, and docs automation
-is performed using [`tox`](https://tox.readthedocs.io/en/latest/).
+See [HACKING.md](HACKING.md) for details on dev environments, testing, etc.
 
-The following are likely to be useful during development:
-
-```sh
-# Run linting and unit tests
-tox
-
-# Run tests, specifying whole suite or specific files
-tox -e unit
-tox -e unit test/test_charm.py
-
-# Format the code using isort
-tox -e fmt
-
-# Generate a local copy of the Sphinx docs in docs/_build
-tox -e docs
-```
-
-For more in depth debugging, you can enter any of `tox`'s created virtualenvs
-provided they have been run at least once:
-
-```sh
-# Enter the unit testing virtualenv
-source .tox/unit/bin/activate
-
-# Enter the linting virtualenv
-source .tox/lint/bin/activate
-```
-
-For improved performance on the tests, ensure that you have PyYAML
-installed with the correct extensions:
-
-```sh
-apt-get install libyaml-dev
-pip install --force-reinstall --no-cache-dir pyyaml
-```
