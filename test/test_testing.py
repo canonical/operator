@@ -3080,6 +3080,45 @@ services:
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
+    def test_send_signal(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+        summary: foo
+        services:
+          foo:
+            summary: Foo
+            startup: enabled
+            command: '/bin/echo foo'
+          bar:
+            summary: Bar
+            command: '/bin/echo bar'
+        ''')
+        client.autostart_services()
+        # Foo is now started, but Bar is not
+
+        # Send a valid signal to a running service
+        client.send_signal("SIGHUP", "foo")
+
+        # Send a valid signal but omit service name
+        with self.assertRaises(TypeError):
+            client.send_signal("SIGHUP")
+
+        # Send an invalid signal to a running service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("sighup", "foo")
+
+        # Send a valid signal to a stopped service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGHUP", "bar")
+
+        # Send a valid signal to a non-existing service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGHUP", "baz")
+
+        # Send a valid signal to a multiple services, one of which is not running
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGHUP", "foo", "bar")
+
 
 # For testing file-ops of the pebble client.  This is refactored into a
 # separate mixin so we can run these tests against both the mock client as

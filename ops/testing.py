@@ -19,6 +19,7 @@ import fnmatch
 import inspect
 import pathlib
 import random
+import signal
 import tempfile
 import typing
 from contextlib import contextmanager
@@ -1574,8 +1575,41 @@ ChangeError: cannot perform the following tasks:
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
 
-    def send_signal(self, sig: typing.Union[int, str], services: typing.List[str]):
-        raise NotImplementedError(self.send_signal)
+    def send_signal(self, sig: typing.Union[int, str], *service_names: str):
+        if not service_names:
+            raise TypeError('send_signal expected at least 1 service name, got 0')
+
+        # Convert signal to str
+        if isinstance(sig, int):
+            sig = signal.Signals(sig).name
+
+        # pebble first validates the service name, and then the signal name
+
+        def is_running(service: str) -> bool:
+            # Scalar helper function for the vectorized is_running().
+            return next(iter(self.get_services([service]))).is_running()
+
+        plan = self.get_plan()
+        for service in service_names:
+            if service not in plan.services or not is_running(service):
+                # conform with the real pebble api
+                raise pebble.APIError(
+                    body={}, code=500, status='Internal Server Error',
+                    message='cannot send signal to "{}": service is not running'.format(service)
+                )
+
+        # Check if signal name is valid
+        try:
+            signal.Signals[sig]
+        except KeyError:
+            # conform with the real pebble api
+            raise pebble.APIError(
+                body={},
+                code=500,
+                status='Internal Server Error',
+                message='cannot send signal to "{}": invalid signal name "{}"'.format(
+                    service_names[0],
+                    sig))
 
 
 class NonAbsolutePathError(Exception):
