@@ -1,4 +1,3 @@
-
 # Setting up a Dev Environment
 
 To work in the framework itself you will need Python >= 3.5. Linting, testing,
@@ -91,7 +90,8 @@ To make a release of the Operator Framework, do the following:
 4. Drop notes and a changelog in the description.
 5. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
 
-This will build a Python package and publish it to PyPI.
+This will trigger an automatic build for the Python package and publish it to PyPI (the API token/secret is already set up in the repository settings).
 
-See .github/workflows.publish.yml for internals. You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions)
+See [.github/workflows/publish.yml](https://github.com/canonical/operator/blob/main/.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the github actions, not the versions of the Operator Framework.)
 
+You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
