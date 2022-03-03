@@ -1646,6 +1646,33 @@ class TestHarness(unittest.TestCase):
         self.assertFalse(path.parent.exists())
         self.assertFalse(path.parent.parent.exists())
 
+    def test_container_isdir_and_exists(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        c = harness.model.unit.containers['foo']
+
+        dir_path = '/tmp/foo/dir'
+        file_path = '/tmp/foo/file'
+
+        self.assertFalse(c.isdir(dir_path))
+        self.assertFalse(c.exists(dir_path))
+        self.assertFalse(c.isdir(file_path))
+        self.assertFalse(c.exists(file_path))
+
+        c.make_dir(dir_path, make_parents=True)
+        c.push(file_path, 'data')
+
+        self.assertTrue(c.isdir(dir_path))
+        self.assertTrue(c.exists(dir_path))
+        self.assertFalse(c.isdir(file_path))
+        self.assertTrue(c.exists(file_path))
+
     def test_add_oci_resource_custom(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
