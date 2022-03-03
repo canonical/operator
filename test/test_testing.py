@@ -3097,27 +3097,27 @@ services:
         # Foo is now started, but Bar is not
 
         # Send a valid signal to a running service
-        client.send_signal("SIGHUP", "foo")
+        client.send_signal("SIGINT", "foo")
 
         # Send a valid signal but omit service name
         with self.assertRaises(TypeError):
-            client.send_signal("SIGHUP")
+            client.send_signal("SIGINT")
 
         # Send an invalid signal to a running service
         with self.assertRaises(pebble.APIError):
-            client.send_signal("sighup", "foo")
+            client.send_signal("sigint", "foo")
 
         # Send a valid signal to a stopped service
         with self.assertRaises(pebble.APIError):
-            client.send_signal("SIGHUP", "bar")
+            client.send_signal("SIGINT", "bar")
 
         # Send a valid signal to a non-existing service
         with self.assertRaises(pebble.APIError):
-            client.send_signal("SIGHUP", "baz")
+            client.send_signal("SIGINT", "baz")
 
         # Send a valid signal to a multiple services, one of which is not running
         with self.assertRaises(pebble.APIError):
-            client.send_signal("SIGHUP", "foo", "bar")
+            client.send_signal("SIGINT", "foo", "bar")
 
 
 # For testing file-ops of the pebble client.  This is refactored into a
