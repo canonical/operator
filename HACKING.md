@@ -80,3 +80,18 @@ source .tox/unit/bin/activate
 pytest -v -k RealPebble
 ```
 
+# Publishing a Release
+
+To make a release of the Operator Framework, do the following:
+
+1. Visit the [releases page on github](https://github.com/canonical/operator/releases).
+2. Click "Draft a new release"
+3. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
+   E.g. 2.3.12
+4. Drop notes and a changelog in the description.
+5. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+
+This will build a Python package and publish it to PyPI.
+
+See .github/workflows.publish.yml for internals. You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions)
+
