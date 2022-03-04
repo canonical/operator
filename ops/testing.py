@@ -1585,17 +1585,15 @@ ChangeError: cannot perform the following tasks:
 
         # pebble first validates the service name, and then the signal name
 
-        def is_running(service: str) -> bool:
-            # Scalar helper function for the vectorized is_running().
-            return next(iter(self.get_services([service]))).is_running()
-
         plan = self.get_plan()
         for service in service_names:
-            if service not in plan.services or not is_running(service):
+            if service not in plan.services or not self.get_services([service])[0].is_running():
                 # conform with the real pebble api
+                message = 'cannot send signal to "{}": service is not running'.format(service)
+                body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
+                        'result': {'message': message}}
                 raise pebble.APIError(
-                    body={}, code=500, status='Internal Server Error',
-                    message='cannot send signal to "{}": service is not running'.format(service)
+                    body=body, code=500, status='Internal Server Error', message=message
                 )
 
         # Check if signal name is valid
@@ -1603,13 +1601,16 @@ ChangeError: cannot perform the following tasks:
             signal.Signals[sig]
         except KeyError:
             # conform with the real pebble api
+            message = 'cannot send signal to "{}": invalid signal name "{}"'.format(
+                service_names[0],
+                sig)
+            body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
+                    'result': {'message': message}}
             raise pebble.APIError(
-                body={},
+                body=body,
                 code=500,
                 status='Internal Server Error',
-                message='cannot send signal to "{}": invalid signal name "{}"'.format(
-                    service_names[0],
-                    sig))
+                message=message)
 
 
 class NonAbsolutePathError(Exception):

@@ -17,6 +17,7 @@ import inspect
 import io
 import os
 import pathlib
+import platform
 import shutil
 import sys
 import tempfile
@@ -52,6 +53,8 @@ from ops.testing import (
     _MockFilesystem,
     _TestingPebbleClient,
 )
+
+is_linux = platform.system() == 'Linux'
 
 
 class StorageTester(CharmBase):
@@ -3080,6 +3083,7 @@ services:
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
+    @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
