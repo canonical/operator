@@ -257,14 +257,17 @@ class Application:
     def planned_units(self) -> int:
         """Get the number of units that Juju has "planned" for this application.
 
-        E.g., if an operator ran "juju deploy foo", then "juju add-unit -n 2 foo", the
-        planned unit count for foo would be 3.
+        E.g., if an operator runs "juju deploy foo", then "juju add-unit -n 2 foo", the
+        planned unit count for foo will be 3.
 
-        We deliberately do not attempt to inspect whether these units are actually running
-        or not at present.
+        The data comes from the Juju agent, based on data it fetches from the
+        controller. Pending units are included in the count, and scale down events may
+        modify the count before some units have been fully torn down. The information in
+        planned_units is up-to-date as of the start of the current hook invocation.
 
-        This only works for this charm's application -- the unit agent isn't able to get
-        planned units for other applications in the model.
+        This method only returns data for this charm's application -- the Juju agent isn't
+        able to see planned unit counts for other applications in the model.
+
         """
         if not self._is_our_app:
             raise RuntimeError(
