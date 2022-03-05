@@ -818,6 +818,70 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': ''})
         self.assertEqual(viewer.changes, [{'initial': 'data'}, {}])
 
+    def test_no_event_on_empty_update_relation_unit_app(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql', {})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_no_diff_update_relation_unit_app(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_empty_update_relation_unit_bag(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql/0', {})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_no_diff_update_relation_unit_bag(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
     def test_update_config(self):
         harness = Harness(RecordingCharm, config='''
             options:
