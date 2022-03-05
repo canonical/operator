@@ -1,4 +1,3 @@
-
 # Setting up a Dev Environment
 
 To work in the framework itself you will need Python >= 3.5. Linting, testing,
@@ -80,3 +79,19 @@ source .tox/unit/bin/activate
 pytest -v -k RealPebble
 ```
 
+# Publishing a Release
+
+To make a release of the Operator Framework, do the following:
+
+1. Visit the [releases page on github](https://github.com/canonical/operator/releases).
+2. Click "Draft a new release"
+3. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
+   E.g. 2.3.12
+4. Drop notes and a changelog in the description.
+5. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+
+This will trigger an automatic build for the Python package and publish it to PyPI (the API token/secret is already set up in the repository settings).
+
+See [.github/workflows/publish.yml](https://github.com/canonical/operator/blob/main/.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the github actions, not the versions of the Operator Framework.)
+
+You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).

@@ -818,6 +818,70 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': ''})
         self.assertEqual(viewer.changes, [{'initial': 'data'}, {}])
 
+    def test_no_event_on_empty_update_relation_unit_app(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql', {})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_no_diff_update_relation_unit_app(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_empty_update_relation_unit_bag(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql/0', {})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_no_diff_update_relation_unit_bag(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
     def test_update_config(self):
         harness = Harness(RecordingCharm, config='''
             options:
@@ -1645,6 +1709,33 @@ class TestHarness(unittest.TestCase):
         self.assertFalse(path.exists())
         self.assertFalse(path.parent.exists())
         self.assertFalse(path.parent.parent.exists())
+
+    def test_container_isdir_and_exists(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        c = harness.model.unit.containers['foo']
+
+        dir_path = '/tmp/foo/dir'
+        file_path = '/tmp/foo/file'
+
+        self.assertFalse(c.isdir(dir_path))
+        self.assertFalse(c.exists(dir_path))
+        self.assertFalse(c.isdir(file_path))
+        self.assertFalse(c.exists(file_path))
+
+        c.make_dir(dir_path, make_parents=True)
+        c.push(file_path, 'data')
+
+        self.assertTrue(c.isdir(dir_path))
+        self.assertTrue(c.exists(dir_path))
+        self.assertFalse(c.isdir(file_path))
+        self.assertTrue(c.exists(file_path))
 
     def test_add_oci_resource_custom(self):
         harness = Harness(CharmBase, meta='''

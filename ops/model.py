@@ -1273,6 +1273,26 @@ class Container:
         """
         return self._pebble.list_files(path, pattern=pattern, itself=itself)
 
+    def exists(self, path: str) -> bool:
+        """Return true if the path exists on the container filesystem."""
+        try:
+            self._pebble.list_files(path, itself=True)
+        except pebble.APIError as err:
+            if err.code == 404:
+                return False
+            raise err
+        return True
+
+    def isdir(self, path: str) -> bool:
+        """Return true if a directory exists at the given path on the container filesystem."""
+        try:
+            files = self._pebble.list_files(path, itself=True)
+        except pebble.APIError as err:
+            if err.code == 404:
+                return False
+            raise err
+        return files[0].type == pebble.FileType.DIRECTORY
+
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
