@@ -84,13 +84,14 @@ class SymlinkTargetError(Exception):
 class EventSpec:
     def __init__(self, event_type, event_name, env_var=None,
                  relation_id=None, remote_app=None, remote_unit=None,
-                 model_name=None, set_in_env=None, workload_name=None):
+                 model_name=None, set_in_env=None, workload_name=None, departing_unit=None):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
         self.relation_id = relation_id
         self.remote_app = remote_app
         self.remote_unit = remote_unit
+        self.departing_unit = departing_unit
         self.model_name = model_name
         self.set_in_env = set_in_env
         self.workload_name = workload_name
@@ -382,8 +383,12 @@ class _TestMain(abc.ABC):
             remote_unit = event_spec.remote_unit
             if remote_unit is None:
                 remote_unit = ''
-
             env['JUJU_REMOTE_UNIT'] = remote_unit
+
+            departing_unit = event_spec.departing_unit
+            if departing_unit is None:
+                departing_unit = ''
+            env['JUJU_DEPARTING_UNIT'] = departing_unit
         else:
             env.update({
                 'JUJU_REMOTE_UNIT': '',
@@ -486,11 +491,12 @@ class _TestMain(abc.ABC):
         ), (
             EventSpec(RelationDepartedEvent, 'mon_relation_departed',
                       relation_id=2,
-                      remote_app='remote', remote_unit='remote/0'),
+                      remote_app='remote', remote_unit='remote/0', departing_unit='remote/42'),
             {'relation_name': 'mon',
              'relation_id': 2,
              'app_name': 'remote',
-             'unit_name': 'remote/0'},
+             'unit_name': 'remote/0',
+             'departing_unit_name': 'remote/42'},
         ), (
             EventSpec(RelationBrokenEvent, 'ha_relation_broken',
                       relation_id=3),
@@ -516,11 +522,13 @@ class _TestMain(abc.ABC):
         ), (
             EventSpec(RelationDepartedEvent, 'mon_relation_departed',
                       relation_id=2,
-                      remote_unit='remote/0'),
+                      remote_unit='remote/0',
+                      departing_unit='remote/42'),
             {'relation_name': 'mon',
              'relation_id': 2,
              'app_name': 'remote',
-             'unit_name': 'remote/0'},
+             'unit_name': 'remote/0',
+             'departing_unit_name': 'remote/42'},
         ), (
             EventSpec(ActionEvent, 'start_action',
                       env_var='JUJU_ACTION_NAME'),
