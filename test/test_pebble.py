@@ -1620,12 +1620,21 @@ Content-Disposition: form-data; name="response"\r
 Content-Disposition: form-data; name="files"; filename="/bad"\r
 \r
 bad path\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
 --01234567890123456789012345678901--\r
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
             self.client.pull('/etc/hosts')
-        self.assertEqual(str(cm.exception), "path not expected: /bad")
+        self.assertEqual(str(cm.exception), "path not expected: '/bad'")
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},

@@ -1467,7 +1467,7 @@ class Client:
         if not boundary:
             raise ProtocolError('invalid boundary {!r}'.format(boundary))
 
-        parser = MultipartFileParser(boundary)
+        parser = _MultipartFileParser(boundary)
 
         while True:
             chunk = response.read(self._chunk_size)
@@ -1475,21 +1475,20 @@ class Client:
                 break
             parser.feed(chunk)
 
-        filenames = parser.filenames()
-        if filenames:
-            filename = filenames[0]
-            if filename != path:
-                raise ProtocolError('path not expected: {}'.format(filename))
-
         resp = parser.get_response()
         if resp is None:
             raise ProtocolError('no "response" field in multipart body')
         self._raise_on_path_error(resp, path)
 
-        if len(filenames) < 1:
+        filenames = parser.filenames()
+        if not filenames:
             raise ProtocolError('no file content in multipart response')
-        if len(filenames) > 1:
-            raise NotImplementedError('multiple file responses not yet supported')
+        elif len(filenames) > 1:
+            raise ProtocolError('single file request resulted in a multi-file response')
+
+        filename = filenames[0]
+        if filename != path:
+            raise ProtocolError('path not expected: {!r}'.format(filename))
 
         f = parser.get_file(path, encoding)
 
@@ -1965,7 +1964,7 @@ class Client:
         self._request('POST', '/v1/signals', body=body)
 
 
-class MultipartFileParser:
+class _MultipartFileParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
 
     def __init__(self, boundary: bytes):
@@ -1978,14 +1977,23 @@ class MultipartFileParser:
         self._buffer = bytearray(b'\r\n')
 
         # Prepare the MIME multipart boundary line patterns.
-        # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
-        # and the optional "--" suffix.  Pebble doesn't use this, so to simplify implementation I
-        # am ignoring it.
         if isinstance(boundary, str):
             boundary = boundary.encode()
+
+        # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
+        # and the optional "--" suffix.  The boundaries strings can be constructed as follows:
+        #
+        #     boundary = <prefix>[ \t]+<suffix>
+        #     terminal_boundary = <prefix><midfix>[ \t]+<suffix>
+        #
+        # 99 is arbitrarily chosen to represent a max number of linear
+        # whitespace characters to help avoid wrongly writing boundary
+        # characters into a (temporary) file.
         self._boundary_prefix = b'\r\n--' + boundary
-        self._boundary = self._boundary_prefix + b'\r\n'
-        self._terminal_boundary = self._boundary_prefix + b'--\r\n'
+        self._boundary_suffix = b'\r\n'
+        self._terminal_boundary_midfix = b'--'
+        self._max_boundary_length = len(
+            self._boundary_prefix + self._terminal_boundary_midfix + self._boundary_suffix) + 99
 
         # State vars, as we may enter the feed() function multiple times.
         self._headers = None
@@ -1993,80 +2001,92 @@ class MultipartFileParser:
         self._pre_first_boundary = True
 
     def remove_files(self):
-        """remove/unlink all temporary files stored on disk that were parsed from the feed."""
+        """Remove all temporary files on disk."""
         for file in self._files.values():
             os.unlink(file.name)
         self._files.clear()
 
     def feed(self, data: bytes):
-        """Provide more data to the parser to process."""
+        """Provide more data to the running parser."""
         self._buffer.extend(data)
 
         header_terminator = b'\r\n\r\n'
 
+        max_boundary_lookahead = 8 * 1024 * 1024
+
         # RFC2046 (p. 19) states that there generally shouldn't be content
         # before the first boundary and after the last, but there could be and
         # it should be ignored.
+        next_boundary_start = None
         if self._pre_first_boundary:
-            next_boundary_index = self._get_next_boundary_index()
-            if next_boundary_index is None:
+            if len(self._buffer) > max_boundary_lookahead:
+                raise ProtocolError('starting boundary marker not found')
+            next_boundary_start, boundary_len, boundary_is_terminal = self._next_boundary()
+            if next_boundary_start == -1:
                 return
             else:
                 self._pre_first_boundary = False
-                self._buffer = self._buffer[next_boundary_index:]
+                self._buffer = self._buffer[next_boundary_start:]
 
         while True:
-            # Try to read headers, if present.
             if self._headers is None:
-                if self._buffer.startswith(self._boundary) and header_terminator in self._buffer:
-                    # Data is everything after the boundary, up to and including the double CRLF
-                    # of the headers.
-                    data_start = len(self._boundary)
-                    data_end = self._buffer.index(header_terminator) + len(header_terminator)
-                    data = self._buffer[data_start:data_end]
-
-                    self._headers = self._parse_headers(data)
-                    self._detect_invalid_content_disposition()
-                    self._part_type = self._prepare_for_part_body()
-
-                    # Advance the buffer to point at the data.
-                    self._buffer = self._buffer[data_end:]
-                elif self._buffer.startswith(self._terminal_boundary):
+                if next_boundary_start is None:
+                    next_boundary_start, boundary_len, boundary_is_terminal = self._next_boundary()
+                # We are looking for the start boundary of the next part with its headers.
+                if len(self._buffer) > max_boundary_lookahead:
+                    raise ProtocolError('terminal boundary marker not found for header')
+                if next_boundary_start == -1 or header_terminator not in self._buffer:
+                    # Wait for more data.
+                    break
+                if boundary_is_terminal:
                     # We've reached the terminal boundary; ignore any remaining data
                     self.terminated = True
                     break
-                else:
-                    # Insufficient data to continue
-                    break
+
+                # Data is everything after the boundary, up to and including the double CRLF
+                # of the headers.
+                data_start = boundary_len
+                data_end = self._buffer.index(header_terminator) + len(header_terminator)
+                data = self._buffer[data_start:data_end]
+
+                self._headers = self._parse_headers(data)
+                self._detect_invalid_content_disposition()
+                self._part_type = self._prepare_for_part_body()
+
+                # Advance the buffer to point at the data.
+                self._buffer = self._buffer[data_end:]
 
             if self._part_type == 'response':
-                next_boundary_index = self._get_next_boundary_index()
-                if next_boundary_index is not None:
-                    data = self._buffer[:next_boundary_index]
-                    self._response = json.loads(data.decode())
-                    # Advance the buffer to point at the next boundary
-                    self._buffer = self._buffer[next_boundary_index:]
-                    self._headers = None
-                else:
-                    # Insufficient data to continue
+                next_boundary_start, boundary_len, boundary_is_terminal = self._next_boundary()
+                if len(self._buffer) > max_boundary_lookahead:
+                    raise ProtocolError('starting boundary marker not found')
+                if next_boundary_start == -1:
+                    # Wait for more data.
                     break
+
+                data = self._buffer[:next_boundary_start]
+                self._response = json.loads(data.decode())
+                # Advance the buffer to point at the next boundary
+                self._buffer = self._buffer[next_boundary_start:]
+                self._headers = None
+
             elif self._part_type == 'files':
-                next_boundary_index = self._get_next_boundary_index()
-                if next_boundary_index is not None:
+                next_boundary_start, boundary_len, boundary_is_terminal = self._next_boundary()
+                if next_boundary_start != -1:
                     # Next boundary's location is known; this is the final write.
-                    data = self._buffer[:next_boundary_index]
+                    data = self._buffer[:next_boundary_start]
                     outfile = self._get_open_tempfile()
                     outfile.write(data)
                     outfile.close()
 
                     # Advance the buffer to point at the next boundary
-                    self._buffer = self._buffer[next_boundary_index:]
+                    self._buffer = self._buffer[next_boundary_start:]
                     self._headers = None
-                else:
+                elif len(self._buffer) > self._max_boundary_length:
                     # Data present but boundary not yet found.
                     # Write data from buffer, but don't accidentally write data which may belong
                     # to the next boundary line.
-                    safe_bound = max(0, len(self._buffer) - len(self._terminal_boundary))
+                    safe_bound = len(self._buffer) - self._max_boundary_length
                     data = self._buffer[:safe_bound]
 
                     # Don't open/close file for intermediate writes
@@ -2076,7 +2096,10 @@ class MultipartFileParser:
                     # Advance the buffer for bytes consumed
                     self._buffer = self._buffer[safe_bound:]
 
-                    # Insufficient data to continue
+                    # Wait for more data.
+                    break
+                else:
+                    # Wait for more data.
                     break
 
     def _parse_headers(self, data):
@@ -2088,31 +2111,46 @@ class MultipartFileParser:
     def _detect_invalid_content_disposition(self):
         content_disposition = self._headers.get_content_disposition()
         if content_disposition != 'form-data':
-            raise RuntimeError(
-                'unexpected content disposition: {}'.format(content_disposition))
+            raise ProtocolError(
+                'unexpected content disposition: {!r}'.format(content_disposition))
 
     def _prepare_for_part_body(self):
         name = self._headers.get_param('name', header='content-disposition')
-        if name == 'response':
-            part_type = 'response'
-        elif name == 'files':
+        if name == 'files':
             filename = self._headers.get_filename()
             if filename is None:
-                raise NotImplementedError('multipart "files" part missing filename')
+                raise ProtocolError('multipart "files" part missing filename')
             self._prepare_tempfile(filename)
-            part_type = 'files'
-        else:
-            raise RuntimeError(
-                'unexpected name in content-disposition header: {}'.format(name))
-        return part_type
+        elif name != 'response':
+            raise ProtocolError(
+                'unexpected name in content-disposition header: {!r}'.format(name))
+        return name
 
-    def _get_next_boundary_index(self) -> typing.Optional[int]:
+    def _next_boundary(self) -> typing.Tuple[int, int, bool]:
+        """Returns boundary (start, end, is_terminal) or (-1, -1, False) if none is found."""
         boundary_index = self._buffer.find(self._boundary_prefix)
-        if self._buffer[boundary_index:].startswith(self._boundary):
-            return boundary_index
-        elif self._buffer[boundary_index:].startswith(self._terminal_boundary):
-            return boundary_index
-        return None
+        if boundary_index == -1:
+            return -1, -1, False
+
+        pos = boundary_index + len(self._boundary_prefix)
+        is_terminal = False
+        if self._buffer[pos:].startswith(self._terminal_boundary_midfix):
+            is_terminal = True
+            pos += len(self._terminal_boundary_midfix)
+
+        # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
+        # and the optional "--" suffix.
+        tail = self._buffer[pos:]
+        for c in tail:
+            if c not in b' \t':
+                break
+            pos += 1
+
+        if self._buffer[pos:].startswith(self._boundary_suffix):
+            pos += len(self._boundary_suffix)
+            return boundary_index, pos - boundary_index, is_terminal
+
+        return -1, -1, False
 
     def _prepare_tempfile(self, filename):
         tf = tempfile.NamedTemporaryFile(delete=False)
@@ -2131,7 +2169,7 @@ class MultipartFileParser:
         return list(self._files.keys())
 
     def get_file(self, path, encoding):
-        """Return an open file object containing the data of the specified file."""
+        """Return an open file object containing the data."""
         mode = 'r' if encoding else 'rb'
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.
