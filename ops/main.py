@@ -189,7 +189,7 @@ def _get_event_args(charm, bound_event):
     if remote_unit_name:
         kwargs['unit'] = model.get_unit(remote_unit_name)
     if departing_unit_name:
-        kwargs['departing_unit'] = model.get_unit(departing_unit_name)
+        kwargs['departing_unit_name'] = departing_unit_name
 
     if relation:
         return [relation], kwargs
