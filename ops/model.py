@@ -1204,7 +1204,7 @@ class Container:
     def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
         """Get status information for a single named service.
 
-        Raises model error if service_name is not found.
+        Raises :class:`ModelError` if service_name is not found.
         """
         services = self.get_services(service_name)
         if not services:
@@ -1212,6 +1212,33 @@ class Container:
         if len(services) > 1:
             raise RuntimeError('expected 1 service, got {}'.format(len(services)))
         return services[service_name]
+
+    def get_checks(
+            self,
+            *check_names: str,
+            level: 'pebble.CheckLevel' = None) -> 'CheckInfoMapping':
+        """Fetch and return a mapping of check information indexed by check name.
+
+        Args:
+            check_names: Optional check names to query for. If no check names
+                are specified, return checks with any name.
+            level: Optional check level to query for. If not specified, fetch
+                checks with any level.
+        """
+        checks = self._pebble.get_checks(names=check_names or None, level=level)
+        return CheckInfoMapping(checks)
+
+    def get_check(self, check_name: str) -> 'pebble.CheckInfo':
+        """Get check information for a single named check.
+
+        Raises :class:`ModelError` if check_name is not found.
+        """
+        checks = self.get_checks(check_name)
+        if not checks:
+            raise ModelError('check {!r} not found'.format(check_name))
+        if len(checks) > 1:
+            raise RuntimeError('expected 1 check, got {}'.format(len(checks)))
+        return checks[check_name]
 
     def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
                                                                           typing.TextIO]:
@@ -1402,7 +1429,7 @@ class ContainerMapping(Mapping):
 
 
 class ServiceInfoMapping(Mapping):
-    """Map of service names to pebble.ServiceInfo objects.
+    """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
@@ -1422,6 +1449,29 @@ class ServiceInfoMapping(Mapping):
 
     def __repr__(self):
         return repr(self._services)
+
+
+class CheckInfoMapping(Mapping):
+    """Map of check names to :class:`ops.pebble.CheckInfo` objects.
+
+    This is done as a mapping object rather than a plain dictionary so that we
+    can extend it later, and so it's not mutable.
+    """
+
+    def __init__(self, checks: typing.Iterable['pebble.CheckInfo']):
+        self._checks = {c.name: c for c in checks}
+
+    def __getitem__(self, key: str):
+        return self._checks[key]
+
+    def __iter__(self):
+        return iter(self._checks)
+
+    def __len__(self):
+        return len(self._checks)
+
+    def __repr__(self):
+        return repr(self._checks)
 
 
 class ModelError(Exception):
