@@ -17,6 +17,7 @@ import inspect
 import io
 import os
 import pathlib
+import platform
 import shutil
 import sys
 import tempfile
@@ -52,6 +53,8 @@ from ops.testing import (
     _MockFilesystem,
     _TestingPebbleClient,
 )
+
+is_linux = platform.system() == 'Linux'
 
 
 class StorageTester(CharmBase):
@@ -3143,6 +3146,46 @@ services:
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+
+    @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
+    def test_send_signal(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+        summary: foo
+        services:
+          foo:
+            summary: Foo
+            startup: enabled
+            command: '/bin/echo foo'
+          bar:
+            summary: Bar
+            command: '/bin/echo bar'
+        ''')
+        client.autostart_services()
+        # Foo is now started, but Bar is not
+
+        # Send a valid signal to a running service
+        client.send_signal("SIGINT", "foo")
+
+        # Send a valid signal but omit service name
+        with self.assertRaises(TypeError):
+            client.send_signal("SIGINT")
+
+        # Send an invalid signal to a running service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("sigint", "foo")
+
+        # Send a valid signal to a stopped service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGINT", "bar")
+
+        # Send a valid signal to a non-existing service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGINT", "baz")
+
+        # Send a valid signal to a multiple services, one of which is not running
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGINT", "foo", "bar")
 
 
 # For testing file-ops of the pebble client.  This is refactored into a
