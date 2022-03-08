@@ -537,7 +537,7 @@ class Plan:
 
     @property
     def checks(self):
-        """This plan's checks mapping (maps check name to Check).
+        """This plan's checks mapping (maps check name to :class:`Check`).
 
         This property is currently read-only.
         """
@@ -732,7 +732,7 @@ class ServiceInfo:
 
 
 class Check:
-    """Represents a check configuration in a Pebble configuration layer."""
+    """Represents a check in a Pebble configuration layer."""
 
     def __init__(self, name: str, raw: typing.Dict = None):
         self.name = name
@@ -2149,14 +2149,13 @@ class Client:
         """Get the check status for the configured checks.
 
         Args:
-            level: Optional check level to query for. Because "ready" implies
-                "alive", if level is AliveLevel, checks with level "ready" are
-                included too.
+            level: Optional check level to query for (default is to fetch
+                checks with any level).
             names: Optional list of check names to query for (default is to
-                fetch all).
+                fetch checks with any name).
 
         Returns:
-            List of CheckInfo objects.
+            List of :class:`CheckInfo` objects.
         """
         query = {}
         if level is not None:
