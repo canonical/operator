@@ -3001,9 +3001,6 @@ class TestRealPebble(unittest.TestCase):
         self.client = pebble.Client(socket_path=socket_path)
 
     def test_checks_and_health(self):
-        checks = self.client.get_checks()
-        self.assertTrue(len(checks) == 0 or len(checks) == 3, checks)
-
         self.client.add_layer('layer', {
             'checks': {
                 'bad': {
@@ -3032,6 +3029,7 @@ class TestRealPebble(unittest.TestCase):
             },
         }, combine=True)
 
+        # Checks should all be "up" initially
         checks = self.client.get_checks()
         self.assertEqual(len(checks), 3)
         self.assertEqual(checks[0].name, 'bad')
@@ -3044,6 +3042,7 @@ class TestRealPebble(unittest.TestCase):
         self.assertEqual(checks[2].level, pebble.CheckLevel.UNSET)
         self.assertEqual(checks[2].status, pebble.CheckStatus.UP)
 
+        # And /v1/health should return "healthy"
         health = self._get_health()
         self.assertEqual(health, {
             'result': {'healthy': True},
@@ -3052,18 +3051,21 @@ class TestRealPebble(unittest.TestCase):
             'type': 'sync',
         })
 
-        while True:
+        # After two retries the "bad" check should go down
+        for i in range(5):
             checks = self.client.get_checks()
             bad_check = [c for c in checks if c.name == 'bad'][0]
-            if bad_check.status != pebble.CheckStatus.UP:
+            if bad_check.status == pebble.CheckStatus.DOWN:
                 break
             time.sleep(0.06)
-
+        else:
+            assert False, 'timed out waiting for "bad" check to go down'
         self.assertEqual(bad_check.failures, 2)
         self.assertEqual(bad_check.threshold, 2)
         good_check = [c for c in checks if c.name == 'good'][0]
         self.assertEqual(good_check.status, pebble.CheckStatus.UP)
 
+        # And /v1/health should return "unhealthy" (with status HTTP 502)
         with self.assertRaises(urllib.error.HTTPError) as cm:
             self._get_health()
         self.assertEqual(cm.exception.code, 502)
@@ -3075,10 +3077,10 @@ class TestRealPebble(unittest.TestCase):
             'type': 'sync',
         })
 
+        # Then test filtering by check level and by name
         checks = self.client.get_checks(level=pebble.CheckLevel.ALIVE)
         self.assertEqual(len(checks), 1)
         self.assertEqual(checks[0].name, 'good')
-
         checks = self.client.get_checks(names=['good', 'bad'])
         self.assertEqual(len(checks), 2)
         self.assertEqual(checks[0].name, 'bad')
