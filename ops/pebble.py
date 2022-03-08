@@ -874,13 +874,29 @@ class FileInfo:
 
 
 class CheckInfo:
-    """Check status information."""
+    """Check status information.
+
+    A list of these objects is returned from :meth:`Client.get_checks`.
+
+    Attributes:
+        name: The name of the check.
+        level: The check level: :attr:`CheckLevel.ALIVE`,
+            :attr:`CheckLevel.READY`, or None (level not set).
+        status: The status of the check: :attr:`CheckStatus.UP` means the
+            check is healthy (the number of failures is less than the
+            threshold), :attr:`CheckStatus.DOWN` means the check is unhealthy
+            (the number of failures has reached the threshold).
+        failures: The number of failures since the check last succeeded (reset
+            to zero if the check succeeds).
+        threshold: The failure threshold, that is, how many consecutive
+            failures for the check to be considered "down".
+    """
 
     def __init__(
         self,
         name: str,
-        level: str,
-        status: str,
+        level: typing.Optional[typing.Union[CheckLevel, str]],
+        status: typing.Union[CheckStatus, str],
         failures: int = 0,
         threshold: int = 0,
     ):
@@ -892,7 +908,7 @@ class CheckInfo:
 
     @classmethod
     def from_dict(cls, d: typing.Dict) -> 'CheckInfo':
-        """Create new CheckInfo object from dict parsed from JSON."""
+        """Create new :class:`CheckInfo` object from dict parsed from JSON."""
         try:
             level = CheckLevel(d.get('level', ''))
         except ValueError:
