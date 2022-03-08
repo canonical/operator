@@ -146,6 +146,7 @@ def _get_event_args(charm, bound_event):
     event_type = bound_event.event_type
     model = charm.framework.model
 
+    relation = None
     if issubclass(event_type, ops.charm.WorkloadEvent):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
@@ -172,22 +173,26 @@ def _get_event_args(charm, bound_event):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
         relation = model.get_relation(relation_name, relation_id)
-    else:
-        relation = None
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
     remote_unit_name = os.environ.get('JUJU_REMOTE_UNIT', '')
-    if remote_app_name or remote_unit_name:
-        if not remote_app_name:
-            if '/' not in remote_unit_name:
-                raise RuntimeError('invalid remote unit name: {}'.format(remote_unit_name))
-            remote_app_name = remote_unit_name.split('/')[0]
-        args = [relation, model.get_app(remote_app_name)]
-        if remote_unit_name:
-            args.append(model.get_unit(remote_unit_name))
-        return args, {}
-    elif relation:
-        return [relation], {}
+    departing_unit_name = os.environ.get('JUJU_DEPARTING_UNIT', '')
+
+    if not remote_app_name and remote_unit_name:
+        if '/' not in remote_unit_name:
+            raise RuntimeError('invalid remote unit name: {}'.format(remote_unit_name))
+        remote_app_name = remote_unit_name.split('/')[0]
+
+    kwargs = {}
+    if remote_app_name:
+        kwargs['app'] = model.get_app(remote_app_name)
+    if remote_unit_name:
+        kwargs['unit'] = model.get_unit(remote_unit_name)
+    if departing_unit_name:
+        kwargs['departing_unit_name'] = departing_unit_name
+
+    if relation:
+        return [relation], kwargs
     return [], {}
 
 

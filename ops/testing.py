@@ -785,12 +785,23 @@ class Harness(typing.Generic[CharmType]):
             rel_data._invalidate()
 
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
+        values_have_changed = False
         for k, v in key_values.items():
             if v == '':
-                new_values.pop(k, None)
+                if new_values.pop(k, None) != v:
+                    values_have_changed = True
             else:
-                new_values[k] = v
+                if k not in new_values or new_values[k] != v:
+                    new_values[k] = v
+                    values_have_changed = True
+
+        # Update the relation data in any case to avoid spurious references
+        # by an test to an updated value to be invalidated by a lack of assignment
         self._backend._relation_data[relation_id][app_or_unit] = new_values
+
+        if not values_have_changed:
+            # Do not issue a relation changed event if the data bags have not changed
+            return
 
         if app_or_unit == self._model.unit.name:
             # No events for our own unit
