@@ -513,7 +513,11 @@ class Change:
 
 
 class Plan:
-    """Represents the effective Pebble configuration."""
+    """Represents the effective Pebble configuration.
+
+    A plan is the combined layer configuration. The layer configuration is
+    documented at https://github.com/canonical/pebble/#layer-specification.
+    """
 
     def __init__(self, raw: str):
         d = yaml.safe_load(raw) or {}
@@ -557,8 +561,8 @@ class Plan:
 class Layer:
     """Represents a Pebble configuration layer.
 
-    The format of this is not documented, but is captured in code here:
-    https://github.com/canonical/pebble/blob/master/internal/plan/plan.go
+    The format of this is documented at
+    https://github.com/canonical/pebble/#layer-specification.
 
     Attributes:
         summary: A summary of the purpose of this layer
