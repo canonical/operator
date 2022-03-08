@@ -176,7 +176,7 @@ def _get_event_args(charm, bound_event):
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
     remote_unit_name = os.environ.get('JUJU_REMOTE_UNIT', '')
-    departing_unit_name = os.environ.get('JUJU_DEPATING_UNIT', '')
+    departing_unit_name = os.environ.get('JUJU_DEPARTING_UNIT', '')
 
     if not remote_app_name and remote_unit_name:
         if '/' not in remote_unit_name:
@@ -189,7 +189,7 @@ def _get_event_args(charm, bound_event):
     if remote_unit_name:
         kwargs['unit'] = model.get_unit(remote_unit_name)
     if departing_unit_name:
-        kwargs['departing_unit'] = model.get_unit(departing_unit_name)
+        kwargs['departing_unit_name'] = departing_unit_name
 
     if relation:
         return [relation], kwargs

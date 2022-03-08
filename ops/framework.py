@@ -126,7 +126,13 @@ class EventBase:
     Inherit this and override 'snapshot' and 'restore' methods to build a custom event.
     """
 
-    def __init__(self, handle):
+    # gets patched in by `Framework.restore()`, if this event is being reemitted
+    # after being loaded from snapshot, or by `BoundEvent.emit()` if this
+    # event is being fired for the first time.
+    # TODO this is hard to debug, this should be refactored
+    framework = None
+
+    def __init__(self, handle: Handle):
         self.handle = handle
         self.deferred = False
 
@@ -273,6 +279,7 @@ class BoundEvent:
         framework = self.emitter.framework
         key = framework._next_event_key()
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
+        event.framework = framework
         framework._emit(event)
 
 
