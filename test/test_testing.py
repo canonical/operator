@@ -17,6 +17,7 @@ import inspect
 import io
 import os
 import pathlib
+import platform
 import shutil
 import sys
 import tempfile
@@ -53,6 +54,8 @@ from ops.testing import (
     _TestingPebbleClient,
 )
 
+is_linux = platform.system() == 'Linux'
+
 
 class StorageTester(CharmBase):
     """Record the relation-changed events."""
@@ -70,6 +73,19 @@ class StorageTester(CharmBase):
 
     def _on_test_storage_detaching(self, event):
         self.observed_events.append(event)
+
+
+class StorageWithHyphensHelper(Object):
+    def __init__(self, parent, key):
+        super().__init__(parent, key)
+        self.changes = []
+        parent.framework.observe(parent.on.test_with_hyphens_storage_attached,
+                                 self.on_storage_changed)
+        parent.framework.observe(parent.on.test_with_hyphens_storage_detaching,
+                                 self.on_storage_changed)
+
+    def on_storage_changed(self, event):
+        self.changes.append(event)
 
 
 class TestHarness(unittest.TestCase):
@@ -805,6 +821,70 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': ''})
         self.assertEqual(viewer.changes, [{'initial': 'data'}, {}])
 
+    def test_no_event_on_empty_update_relation_unit_app(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql', {})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_no_diff_update_relation_unit_app(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql', {'initial': 'data'})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_empty_update_relation_unit_bag(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql/0', {})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
+    def test_no_event_on_no_diff_update_relation_unit_bag(self):
+        harness = Harness(CharmBase, meta='''
+            name: my-charm
+            requires:
+              db:
+                interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        viewer = RelationChangedViewer(harness.charm, 'db')
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
+        self.assertEqual(viewer.changes, [{'initial': 'data'}])
+
     def test_update_config(self):
         harness = Harness(RecordingCharm, config='''
             options:
@@ -1248,6 +1328,27 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "cannot detach storage before Harness is initialised")
 
+    def test_storage_with_hyphens_works(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                test-with-hyphens:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        # Set up initial storage
+        harness.begin()
+        helper = StorageWithHyphensHelper(harness.charm, "helper")
+        harness.add_storage("test-with-hyphens")[0]
+
+        self.assertEqual(len(helper.changes), 1)
+
     def test_attach_storage(self):
         harness = Harness(StorageTester, meta='''
             name: test-app
@@ -1611,6 +1712,33 @@ class TestHarness(unittest.TestCase):
         self.assertFalse(path.exists())
         self.assertFalse(path.parent.exists())
         self.assertFalse(path.parent.parent.exists())
+
+    def test_container_isdir_and_exists(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        c = harness.model.unit.containers['foo']
+
+        dir_path = '/tmp/foo/dir'
+        file_path = '/tmp/foo/file'
+
+        self.assertFalse(c.isdir(dir_path))
+        self.assertFalse(c.exists(dir_path))
+        self.assertFalse(c.isdir(file_path))
+        self.assertFalse(c.exists(file_path))
+
+        c.make_dir(dir_path, make_parents=True)
+        c.push(file_path, 'data')
+
+        self.assertTrue(c.isdir(dir_path))
+        self.assertTrue(c.exists(dir_path))
+        self.assertFalse(c.isdir(file_path))
+        self.assertTrue(c.exists(file_path))
 
     def test_add_oci_resource_custom(self):
         harness = Harness(CharmBase, meta='''
@@ -2517,6 +2645,7 @@ class _TestingPebbleClientMixin:
         return backend.get_pebble('/custom/socket/path')
 
 
+# For testing non file ops of the pebble testing client.
 class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
 
     def test_methods_match_pebble_client(self):
@@ -3018,9 +3147,51 @@ services:
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
+    @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
+    def test_send_signal(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', '''\
+        summary: foo
+        services:
+          foo:
+            summary: Foo
+            startup: enabled
+            command: '/bin/echo foo'
+          bar:
+            summary: Bar
+            command: '/bin/echo bar'
+        ''')
+        client.autostart_services()
+        # Foo is now started, but Bar is not
 
+        # Send a valid signal to a running service
+        client.send_signal("SIGINT", "foo")
+
+        # Send a valid signal but omit service name
+        with self.assertRaises(TypeError):
+            client.send_signal("SIGINT")
+
+        # Send an invalid signal to a running service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("sigint", "foo")
+
+        # Send a valid signal to a stopped service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGINT", "bar")
+
+        # Send a valid signal to a non-existing service
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGINT", "baz")
+
+        # Send a valid signal to a multiple services, one of which is not running
+        with self.assertRaises(pebble.APIError):
+            client.send_signal("SIGINT", "foo", "bar")
+
+
+# For testing file-ops of the pebble client.  This is refactored into a
+# separate mixin so we can run these tests against both the mock client as
+# well as a real pebble server instance.
 class _PebbleStorageAPIsTestMixin:
-
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
     prefix = None
@@ -3135,6 +3306,15 @@ class _PebbleStorageAPIsTestMixin:
         with self.assertRaises(pebble.PathError) as cm:
             client.push('file', '')
         self.assertEqual(cm.exception.kind, 'generic-file-error')
+
+    def test_list_files_not_found_raises(self):
+        client = self.client
+        with self.assertRaises(pebble.APIError) as cm:
+            client.list_files("/not/existing/file/")
+        self.assertEqual(cm.exception.code, 404)
+        self.assertEqual(cm.exception.status, 'Not Found')
+        self.assertEqual(cm.exception.message, 'stat /not/existing/file/: no '
+                                               'such file or directory')
 
     def test_list_directory_object_itself(self):
         client = self.client

@@ -287,7 +287,7 @@ class RelationEvent(HookEvent):
         relation: The :class:`~ops.model.Relation` involved in this event
         app: The remote :class:`~ops.model.Application` that has triggered this
              event
-        unit: The remote unit that has triggered this event. This may be
+        unit: The remote :class:`~ops.model.Unit` that has triggered this event. This may be
               ``None`` if the relation event was triggered as an
               :class:`~ops.model.Application` level event
 
@@ -387,8 +387,9 @@ class RelationDepartedEvent(RelationEvent):
 
     This is the inverse of the :class:`RelationJoinedEvent`, representing when a
     unit is leaving the relation (the unit is being removed, the app is being
-    removed, the relation is being removed). It is fired once for each unit that
-    is going away.
+    removed, the relation is being removed). For remaining units, this event is
+    emitted once for each departing unit.  For departing units, this event is
+    emitted once for each remaining unit.
 
     Callback methods bound to this event may be used to remove all
     references to the departing remote unit, because there’s no
@@ -398,7 +399,46 @@ class RelationDepartedEvent(RelationEvent):
 
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
+
+    Attributes:
+        departing_unit: The :class:`~ops.model.Unit` that is departing.  This
+            can facilitate determining e.g. whether *you* are the departing
+            unit.
     """
+
+    def __init__(self, handle, relation, app=None, unit=None,
+                 departing_unit_name=None):
+        super().__init__(handle, relation, app=app, unit=unit)
+
+        self._departing_unit_name = departing_unit_name
+
+    @property
+    def departing_unit(self) -> typing.Optional[model.Unit]:
+        """The `ops.model.Unit` that is departing, if any."""
+        # doing this on init would fail because `framework` gets patched in
+        # post-init
+        if not self._departing_unit_name:
+            return None
+        return self.framework.model.get_unit(self._departing_unit_name)
+
+    def snapshot(self) -> dict:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        snapshot = super().snapshot()
+        if self._departing_unit_name:
+            snapshot['departing_unit'] = self.departing_unit.name
+        return snapshot
+
+    def restore(self, snapshot: dict) -> None:
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        super().restore(snapshot)
+
+        self._departing_unit_name = snapshot.get('departing_unit')
 
 
 class RelationBrokenEvent(RelationEvent):

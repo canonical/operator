@@ -19,6 +19,7 @@ import fnmatch
 import inspect
 import pathlib
 import random
+import signal
 import tempfile
 import typing
 from contextlib import contextmanager
@@ -178,8 +179,8 @@ class Harness(typing.Generic[CharmType]):
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
-            storage_name = storage_name.replace('-', '_')
             for storage_index in self._backend.storage_list(storage_name):
+                storage_name = storage_name.replace('-', '_')
                 # Storage device(s) detected, emit storage-attached event(s)
                 self._charm.on[storage_name].storage_attached.emit(
                     model.Storage(storage_name, storage_index, self._backend))
@@ -484,6 +485,10 @@ class Harness(typing.Generic[CharmType]):
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
 
+        This function creates a relation with an application and will trigger a relation-created
+        hook. To relate units (and trigger relation-joined and relation-changed hooks), you should
+        also call :meth:`.add_relation_unit`.
+
         Args:
             relation_name: The relation on Charm that is being related to
             remote_app: The name of the application that is being related to
@@ -780,12 +785,23 @@ class Harness(typing.Generic[CharmType]):
             rel_data._invalidate()
 
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
+        values_have_changed = False
         for k, v in key_values.items():
             if v == '':
-                new_values.pop(k, None)
+                if new_values.pop(k, None) != v:
+                    values_have_changed = True
             else:
-                new_values[k] = v
+                if k not in new_values or new_values[k] != v:
+                    new_values[k] = v
+                    values_have_changed = True
+
+        # Update the relation data in any case to avoid spurious references
+        # by an test to an updated value to be invalidated by a lack of assignment
         self._backend._relation_data[relation_id][app_or_unit] = new_values
+
+        if not values_have_changed:
+            # Do not issue a relation changed event if the data bags have not changed
+            return
 
         if app_or_unit == self._model.unit.name:
             # No events for our own unit
@@ -1491,7 +1507,14 @@ ChangeError: cannot perform the following tasks:
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
-        files = [self._fs.get_path(path)]
+        try:
+            files = [self._fs.get_path(path)]
+        except FileNotFoundError:
+            # conform with the real pebble api
+            raise pebble.APIError(
+                body={}, code=404, status='Not Found',
+                message="stat {}: no such file or directory".format(path))
+
         if not itself:
             try:
                 files = self._fs.list_dir(path)
@@ -1563,8 +1586,42 @@ ChangeError: cannot perform the following tasks:
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
 
-    def send_signal(self, sig: typing.Union[int, str], services: typing.List[str]):
-        raise NotImplementedError(self.send_signal)
+    def send_signal(self, sig: typing.Union[int, str], *service_names: str):
+        if not service_names:
+            raise TypeError('send_signal expected at least 1 service name, got 0')
+
+        # Convert signal to str
+        if isinstance(sig, int):
+            sig = signal.Signals(sig).name
+
+        # pebble first validates the service name, and then the signal name
+
+        plan = self.get_plan()
+        for service in service_names:
+            if service not in plan.services or not self.get_services([service])[0].is_running():
+                # conform with the real pebble api
+                message = 'cannot send signal to "{}": service is not running'.format(service)
+                body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
+                        'result': {'message': message}}
+                raise pebble.APIError(
+                    body=body, code=500, status='Internal Server Error', message=message
+                )
+
+        # Check if signal name is valid
+        try:
+            signal.Signals[sig]
+        except KeyError:
+            # conform with the real pebble api
+            message = 'cannot send signal to "{}": invalid signal name "{}"'.format(
+                service_names[0],
+                sig)
+            body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
+                    'result': {'message': message}}
+            raise pebble.APIError(
+                body=body,
+                code=500,
+                status='Internal Server Error',
+                message=message)
 
 
 class NonAbsolutePathError(Exception):

@@ -36,6 +36,7 @@ import sys
 import tempfile
 import threading
 import time
+import types
 import typing
 import urllib.error
 import urllib.parse
@@ -1137,6 +1138,11 @@ class Client:
         if query:
             url = url + '?' + urllib.parse.urlencode(query)
 
+        # python 3.5 urllib requests require their data to be a bytes object -
+        # generators won't work.
+        if sys.version_info[:2] < (3, 6) and isinstance(data, types.GeneratorType):
+            data = b''.join(data)
+
         if headers is None:
             headers = {}
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
@@ -1671,7 +1677,11 @@ class Client:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, recursively delete path and everything under it.
+            recursive: If True, and path is a directory recursively deletes it and
+                       everything under it. If the path is a file, delete the file and
+                       do nothing if the file is non-existent. Behaviourally similar
+                       to `rm -rf <file|dir>`
+
         """
         info = {'path': path}
         if recursive:
