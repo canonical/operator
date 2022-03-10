@@ -402,15 +402,24 @@ class RelationDepartedEvent(RelationEvent):
 
     Attributes:
         departing_unit: The :class:`~ops.model.Unit` that is departing.  This
-            can facilitate determining e.g. whether *you* are the departing unit.
+            can facilitate determining e.g. whether *you* are the departing
+            unit.
     """
 
-    def __init__(self, handle, relation, app=None, unit=None, departing_unit=None):
+    def __init__(self, handle, relation, app=None, unit=None,
+                 departing_unit_name=None):
         super().__init__(handle, relation, app=app, unit=unit)
 
-        self.departing_unit = None
-        if departing_unit:
-            self.departing_unit = self.framework.model.get_unit(departing_unit)
+        self._departing_unit_name = departing_unit_name
+
+    @property
+    def departing_unit(self) -> typing.Optional[model.Unit]:
+        """The `ops.model.Unit` that is departing, if any."""
+        # doing this on init would fail because `framework` gets patched in
+        # post-init
+        if not self._departing_unit_name:
+            return None
+        return self.framework.model.get_unit(self._departing_unit_name)
 
     def snapshot(self) -> dict:
         """Used by the framework to serialize the event to disk.
@@ -418,7 +427,7 @@ class RelationDepartedEvent(RelationEvent):
         Not meant to be called by charm code.
         """
         snapshot = super().snapshot()
-        if self.departing_unit is not None:
+        if self._departing_unit_name:
             snapshot['departing_unit'] = self.departing_unit.name
         return snapshot
 
@@ -429,10 +438,7 @@ class RelationDepartedEvent(RelationEvent):
         """
         super().restore(snapshot)
 
-        departing_unit = snapshot.get('departing_unit')
-        self.departing_unit = None
-        if departing_unit:
-            self.departing_unit = self.framework.model.get_unit(departing_unit)
+        self._departing_unit_name = snapshot.get('departing_unit')
 
 
 class RelationBrokenEvent(RelationEvent):
