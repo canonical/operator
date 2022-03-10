@@ -79,6 +79,32 @@ source .tox/unit/bin/activate
 pytest -v -k RealPebble
 ```
 
+# Documentation
+
+In general, new functionality
+should always be accompanied by user-focused documentation that is posted to
+https://juju.is/docs/sdk.  The content for this site is written and hosted on
+https://discourse.charmhub.io/c/doc.  New documentation should get a new
+topic/post on this discourse forum and then should be linked into the main
+docs navigation page(s) as appropriate.  The operator framework SDK page
+content is pulled from
+[here](https://discourse.charmhub.io/t/the-charmed-operator-software-development-kit-sdk-docs/4449).
+Each page on [juju.is](https://juju.is/docs/sdk) has a link at the bottom that
+takes you to the corresponding discourse page where docs can be commented on
+and edited (if you have earned those privileges).
+
+The Operator Framework API docs are automatically built and published to
+[here](https://ops.readthedocs.io/en/latest/).  Please be complete with
+docstrings and keep them informative for _users_.
+
+Currently we don't publish separate versions of documentation for separate releases.  Instead, new features should be sign-posted like done [here](https://juju.is/docs/sdk/pebble#heading--file-exists) with markdown like this:
+
+```markdown
+[note status="version"]1.4[/note]
+```
+
+next to the relevant content (e.g. headings, etc.).
+
 # Publishing a Release
 
 To make a release of the Operator Framework, do the following:
