@@ -485,7 +485,7 @@ _BREAKPOINT_WELCOME_MESSAGE = """
 Starting pdb to debug charm operator.
 Run `h` for help, `c` to continue, or `exit`/CTRL-d to abort.
 Future breakpoints may interrupt execution again.
-More details at https://discourse.jujucharms.com/t/debugging-charm-hooks
+More details at https://juju.is/docs/sdk/debugging
 
 """
 
