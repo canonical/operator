@@ -1473,7 +1473,7 @@ class Client:
         if not boundary:
             raise ProtocolError('invalid boundary {!r}'.format(boundary))
 
-        parser = _PebbleFilesParser(boundary)
+        parser = _FilesParser(boundary)
 
         while True:
             chunk = response.read(self._chunk_size)
@@ -1974,10 +1974,10 @@ class Client:
         self._request('POST', '/v1/signals', body=body)
 
 
-class _PebbleFilesParser:
+class _FilesParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
 
-    def __init__(self, boundary: bytes):
+    def __init__(self, boundary: typing.Union[bytes, str]):
         self._response = None
         self._files = {}
 
@@ -1992,7 +1992,7 @@ class _PebbleFilesParser:
 
         self._max_lookahead = 8 * 1024 * 1024
 
-        self._parser = _multipart_parser(
+        self._parser = _MultipartParser(
             boundary,
             self._process_header,
             self._process_body,
@@ -2001,7 +2001,7 @@ class _PebbleFilesParser:
         # RFC 2046 says that the boundary string needs to be preceded by a CRLF.
         # Unfortunately, the request library's header parsing logic strips off one of
         # these, so we'll prime the parser buffer with that missing sequence.
-        self._parser(b'\r\n')
+        self._parser.feed(b'\r\n')
 
     def _process_header(self, data: bytes):
         parser = email.parser.BytesFeedParser()
@@ -2053,7 +2053,7 @@ class _PebbleFilesParser:
 
     def feed(self, data: bytes):
         """Provide more data to the running parser."""
-        self._parser(data)
+        self._parser.feed(data)
 
     def _prepare_tempfile(self, filename):
         tf = tempfile.NamedTemporaryFile(delete=False)
@@ -2080,93 +2080,103 @@ class _PebbleFilesParser:
         return open(self._files[path].name, mode, encoding=encoding, newline=newline)
 
 
-def _multipart_parser(
-        marker,
-        handle_header,
-        handle_body,
-        handle_done=None,
-        max_lookahead=0,
-        max_boundary_length=0):
-    r"""Returns a stateful function for parsing mime multipart messages.
+class _MultipartParser:
+    def __init__(
+            self,
+            marker: bytes,
+            handle_header,
+            handle_body,
+            handle_done=None,
+            max_lookahead: int = 0,
+            max_boundary_length: int = 0):
+        r"""Configures a parser for mime multipart messages.
 
-    Args:
-        marker: the multipar boundary marker (i.e. in "\r\n--<marker>--\r\n")
+        Args:
+            marker: the multipart boundary marker (i.e. in "\r\n--<marker>--\r\n")
 
-        handle_header(data): is called once with the entire contents of a part header
+            handle_header(data): called once with the entire contents of a part
+            header as encountered in data fed to the parser
 
-        handle_body(data, done=False): is called incrementally as part body
-        data is fed into the parser - its "done" parameter is set to true when
-        the body is complete.
+            handle_body(data, done=False): called incrementally as part body
+            data is fed into the parser - its "done" parameter is set to true when
+            the body is complete.
 
-        max_lookahead: maximum amount of bytes to buffer when searching for a complete header.
+            handle_done: called once when the terminal boundary has been reached
 
-    Returns:
-        A function you can feed bytes into by calling repeatedly until finished.
-    """
-    buf = bytearray()
-    pos = 0  # current position in buf
-    done = False  # whether we have found the terminal boundary and are done parsing
-    header_terminator = b'\r\n\r\n'
+            max_lookahead: maximum amount of bytes to buffer when searching for a complete header.
 
-    # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]+) after the boundary pattern
-    # and the optional "--" suffix.  The boundaries strings can be constructed as follows:
-    #
-    #     boundary = \r\n--<marker>[ \t]+\r\n
-    #     terminal_boundary = \r\n--<marker>--[ \t]+\r\n
-    #
-    # 99 is arbitrarily chosen to represent a max number of linear
-    # whitespace characters to help avoid wrongly writing boundary
-    # characters into a (temporary) file.
-    if not max_boundary_length:
-        max_boundary_length = len(b'\r\n--' + marker + b'--\r\n') + 99
+            max_boundary_length: maximum number of bytes that can make up a part
+            boundary (e.g. \r\n--<marker>--\r\n")
+        """
+        self._marker = marker
+        self._handle_header = handle_header
+        self._handle_body = handle_body
+        self._handle_done = handle_done
+        self._max_lookahead = max_lookahead
+        self._max_boundary_length = max_boundary_length
 
-    def feed(data: bytes):
-        nonlocal buf, pos, done
+        self._buf = bytearray()
+        self._pos = 0  # current position in buf
+        self._done = False  # whether we have found the terminal boundary and are done parsing
+        self._header_terminator = b'\r\n\r\n'
 
-        if done:
+        # RFC 2046 notes optional "linear whitespace" (e.g. [ \t]+) after the boundary pattern
+        # and the optional "--" suffix.  The boundaries strings can be constructed as follows:
+        #
+        #     boundary = \r\n--<marker>[ \t]+\r\n
+        #     terminal_boundary = \r\n--<marker>--[ \t]+\r\n
+        #
+        # 99 is arbitrarily chosen to represent a max number of linear
+        # whitespace characters to help avoid wrongly writing boundary
+        # characters into a (temporary) file.
+        if not max_boundary_length:
+            self._max_boundary_length = len(b'\r\n--' + marker + b'--\r\n') + 99
+
+    def feed(self, data: bytes):
+        """Feeds data incrementally into the parser."""
+        if self._done:
             return
-        buf.extend(data)
+        self._buf.extend(data)
 
         while True:
             # seek to a boundary if we aren't already on one
-            i, n, done = _next_part_boundary(buf, marker)
-            if i == -1 or done:
+            i, n, self._done = _next_part_boundary(self._buf, self._marker)
+            if i == -1 or self._done:
                 return  # waiting for more data or terminal boundary reached
 
-            if pos == 0:
+            if self._pos == 0:
                 # parse the part header
-                if max_lookahead and len(buf) - pos > max_lookahead:
+                if self._max_lookahead and len(self._buf) - self._pos > self._max_lookahead:
                     raise ProtocolError('header terminator not found')
-                if header_terminator not in buf:
+                term_index = self._buf.find(self._header_terminator)
+                if term_index == -1:
                     return  # waiting for more data
 
                 start = i + n
                 # data includes the double CRLF at the end of the header.
-                end = buf.index(header_terminator) + len(header_terminator)
+                end = term_index + len(self._header_terminator)
 
-                handle_header(buf[start:end])
-                pos = end
+                self._handle_header(self._buf[start:end])
+                self._pos = end
             else:
                 # parse the part body
-                ii, nn, done = _next_part_boundary(buf, marker, start=pos)
-                safe_bound = max(0, len(buf) - max_boundary_length)
+                ii, nn, self._done = _next_part_boundary(self._buf, self._marker, start=self._pos)
+                safe_bound = max(0, len(self._buf) - self._max_boundary_length)
                 if ii != -1:
                     # part body is finished
-                    handle_body(buf[pos:ii], done=True)
-                    buf = buf[ii:]
-                    pos = 0
-                    if done:
+                    self._handle_body(self._buf[self._pos:ii], done=True)
+                    self._buf = self._buf[ii:]
+                    self._pos = 0
+                    if self._done:
                         return  # terminal boundary reached
-                elif safe_bound > pos:
+                elif safe_bound > self._pos:
                     # write partial body data
-                    data = buf[pos:safe_bound]
-                    pos = safe_bound
-                    handle_body(data)
+                    data = self._buf[self._pos:safe_bound]
+                    self._pos = safe_bound
+                    self._handle_body(data)
                     return  # waiting for more data
                 else:
-                    return  # waiting for mor data
-
-    return feed
+                    return  # waiting for more data
 
 
 def _next_part_boundary(buf, marker, start=0):
