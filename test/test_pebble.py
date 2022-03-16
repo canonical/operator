@@ -903,13 +903,17 @@ class TestMultipartParser(unittest.TestCase):
                 want_headers,
                 want_bodies,
                 want_bodies_done,
-                max_boundary=14):
+                max_boundary=14,
+                max_lookahead=8 * 1024,
+                error=''):
             self.name = name
             self.data = data
             self.want_headers = want_headers
             self.want_bodies = want_bodies
             self.want_bodies_done = want_bodies_done
             self.max_boundary = max_boundary
+            self.max_lookahead = max_lookahead
+            self.error = error
 
     def test_multipart_parser(self):
         tests = [
@@ -926,6 +930,15 @@ class TestMultipartParser(unittest.TestCase):
                 [],
                 [],
                 want_bodies_done=[],
+            ),
+            TestMultipartParser._Case(
+                'missing header',
+                b'\r\n--qwerty\r\nheader foo\r\n' + 40 * b' ',
+                [],
+                [],
+                want_bodies_done=[],
+                max_lookahead=40,
+                error='header terminator not found',
             ),
             TestMultipartParser._Case(
                 'incomplete body terminator',
@@ -1004,22 +1017,33 @@ class TestMultipartParser(unittest.TestCase):
                     bodies[-1] += data
                     bodies_done[-1] = done
 
-                p = pebble._multipart_parser(
+                parser = pebble._MultipartParser(
                     marker,
                     handle_header,
                     handle_body,
-                    max_boundary_length=test.max_boundary)
+                    max_boundary_length=test.max_boundary,
+                    max_lookahead=test.max_lookahead)
                 src = io.BytesIO(test.data)
-                while True:
-                    data = src.read(chunk_size)
-                    if not data:
-                        break
-                    p(data)
 
-                msg = 'test case {} ({}), chunk size {}'.format(i + 1, test.name, chunk_size)
-                self.assertEqual(test.want_headers, headers, msg)
-                self.assertEqual(test.want_bodies, bodies, msg)
-                self.assertEqual(test.want_bodies_done, bodies_done, msg)
+                try:
+                    while True:
+                        data = src.read(chunk_size)
+                        if not data:
+                            break
+                        parser.feed(data)
+                except Exception as err:
+                    if not test.error:
+                        self.fail('unexpected error:', err)
+                        break
+                    self.assertEqual(test.error, err.message())
+                else:
+                    if test.error:
+                        self.fail('missing expected error: {!r}'.format(test.error))
+
+                    msg = 'test case {} ({}), chunk size {}'.format(i + 1, test.name, chunk_size)
+                    self.assertEqual(test.want_headers, headers, msg)
+                    self.assertEqual(test.want_bodies, bodies, msg)
+                    self.assertEqual(test.want_bodies_done, bodies_done, msg)
 
 
 class TestClient(unittest.TestCase):
@@ -2953,8 +2977,7 @@ class TestRealPebble(unittest.TestCase):
         with self.client.pull(fname) as f:
             data = f.read()
             self.assertEqual(data, content)
-        process = self.client.exec(['/bin/rm', fname])
-        process.wait()
+        os.remove(fname)
 
     def test_exec_timeout(self):
         process = self.client.exec(['sleep', '0.2'], timeout=0.1)
