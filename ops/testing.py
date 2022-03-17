@@ -186,6 +186,12 @@ class Harness(typing.Generic[CharmType]):
                     model.Storage(storage_name, storage_index, self._backend))
         # Storage done, emit install event
         self._charm.on.install.emit()
+        # If the install hook does not set a unit status, the Juju controller will switch
+        # the unit status from "Maintenance" to "Unknown". See gh#726
+        post_install_status = self._backend.status_get()
+        if post_install_status.get("status") == "maintenance":
+            if not post_install_status.get("message"):
+                self._backend.status_set("unknown", "", is_app=False)
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
         # of joined units for a given relation.
