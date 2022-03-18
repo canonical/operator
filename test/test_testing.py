@@ -886,10 +886,8 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
 
     def test_empty_config_raises(self):
-        harness = Harness(RecordingCharm, config='')
-        self.addCleanup(harness.cleanup)
         with self.assertRaises(AttributeError):
-            harness.begin()
+            Harness(RecordingCharm, config='')
 
     def test_update_config(self):
         harness = Harness(RecordingCharm, config='''
