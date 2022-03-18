@@ -885,6 +885,11 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
 
+    def test_empty_config_behaves_the_same_as_none(self):
+        harness = Harness(RecordingCharm, config='')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
     def test_update_config(self):
         harness = Harness(RecordingCharm, config='''
             options:
