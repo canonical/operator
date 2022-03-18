@@ -291,7 +291,7 @@ class Harness(typing.Generic[CharmType]):
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        charm_config = yaml.safe_load(charm_config) or {}
+        charm_config = yaml.safe_load(charm_config)
         charm_config = charm_config.get('options', {})
         return {key: value.get('default', None) for key, value in charm_config.items()}
 
