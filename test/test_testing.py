@@ -885,6 +885,10 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
 
+    def test_empty_config_raises(self):
+        with self.assertRaises(AttributeError):
+            Harness(RecordingCharm, config='')
+
     def test_update_config(self):
         harness = Harness(RecordingCharm, config='''
             options:
