@@ -27,6 +27,7 @@ from io import BytesIO, StringIO
 
 import yaml
 
+import ops.testing
 from ops import pebble
 from ops.charm import (
     CharmBase,
@@ -116,25 +117,38 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
+        self.assertRaises(RuntimeError, harness.set_can_connect, 'foo', False)
+
+        harness.begin()
+        c = harness.model.unit.get_container('foo')
+        self.assertTrue(c.can_connect())
+
+    def test_simulate_can_connect(self):
+        ops.testing.SIMULATE_CAN_CONNECT = True
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+
         harness.begin()
         c = harness.model.unit.get_container('foo')
 
-        self.assertRaises(RuntimeError, harness.set_can_connect, 'foo', False)
-        self.assertTrue(c.can_connect())
-
-        harness.simulate_can_connect()
         self.assertFalse(c.can_connect())
+        self.assertRaises(pebble.ConnectionError, c.get_plan)
 
         harness.set_can_connect('foo', True)
         self.assertTrue(c.can_connect())
 
         harness.set_can_connect('foo', False)
         self.assertFalse(c.can_connect())
-        self.assertRaises(pebble.ConnectionError, c.get_plan)
 
         harness.container_pebble_ready('foo')
         self.assertTrue(c.can_connect())
         c.get_plan()
+        ops.testing.SIMULATE_CAN_CONNECT = False
 
     def test_add_relation_and_unit(self):
         harness = Harness(CharmBase, meta='''
