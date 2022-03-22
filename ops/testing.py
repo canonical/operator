@@ -215,6 +215,11 @@ class Harness(typing.Generic[CharmType]):
             self._charm.on.leader_settings_changed.emit()
         self._charm.on.config_changed.emit()
         self._charm.on.start.emit()
+        # If the initial hooks do not set a unit status, the Juju controller will switch
+        # the unit status from "Maintenance" to "Unknown". See gh#726
+        post_setup_sts = self._backend.status_get()
+        if post_setup_sts.get("status") == "maintenance" and not post_setup_sts.get("message"):
+            self._backend.status_set("unknown", "", is_app=False)
         all_ids = list(self._backend._relation_names.items())
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
