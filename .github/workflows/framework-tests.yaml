@@ -67,7 +67,7 @@ jobs:
       - name: Start Pebble
         run: |
           umask 0
-          $HOME/go/bin/pebble run --create-dirs &
+          $HOME/go/bin/pebble run --create-dirs --http=:4000 &
         env:
           PEBBLE: /tmp/pebble
 

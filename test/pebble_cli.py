@@ -57,6 +57,11 @@ def main():
                    choices=[s.value for s in pebble.ChangeState], default='all')
     p.add_argument('--service', help='optional service name to filter on')
 
+    p = subparsers.add_parser('checks', help='show (filtered) checks')
+    p.add_argument('--level', help='check level to filter on, default all levels',
+                   choices=[c.value for c in pebble.CheckLevel], default='')
+    p.add_argument('name', help='check name(s) to filter on', nargs='*')
+
     p = subparsers.add_parser('exec', help='execute a command')
     p.add_argument('--env', help='environment variables to set', action='append',
                    metavar='KEY=VALUE')
@@ -157,6 +162,8 @@ def main():
         elif args.command == 'changes':
             result = client.get_changes(select=pebble.ChangeState(args.select),
                                         service=args.service)
+        elif args.command == 'checks':
+            result = client.get_checks(level=pebble.CheckLevel(args.level), names=args.name)
         elif args.command == 'exec':
             environment = {}
             for env in args.env or []:

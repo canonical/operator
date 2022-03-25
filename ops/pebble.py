@@ -19,6 +19,7 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 
 import binascii
 import cgi
+import copy
 import datetime
 import email.parser
 import enum
@@ -512,13 +513,19 @@ class Change:
 
 
 class Plan:
-    """Represents the effective Pebble configuration."""
+    """Represents the effective Pebble configuration.
+
+    A plan is the combined layer configuration. The layer configuration is
+    documented at https://github.com/canonical/pebble/#layer-specification.
+    """
 
     def __init__(self, raw: str):
         d = yaml.safe_load(raw) or {}
         self._raw = raw
         self._services = {name: Service(name, service)
                           for name, service in d.get('services', {}).items()}
+        self._checks = {name: Check(name, check)
+                        for name, check in d.get('checks', {}).items()}
 
     @property
     def services(self):
@@ -528,14 +535,21 @@ class Plan:
         """
         return self._services
 
+    @property
+    def checks(self):
+        """This plan's checks mapping (maps check name to :class:`Check`).
+
+        This property is currently read-only.
+        """
+        return self._checks
+
     def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this plan to its dict representation."""
-        as_dicts = {name: service.to_dict() for name, service in self._services.items()}
-        if not as_dicts:
-            return {}
-        return {
-            'services': as_dicts,
-        }
+        fields = [
+            ('services', {name: service.to_dict() for name, service in self._services.items()}),
+            ('checks', {name: check.to_dict() for name, check in self._checks.items()}),
+        ]
+        return {name: value for name, value in fields if value}
 
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
@@ -547,13 +561,14 @@ class Plan:
 class Layer:
     """Represents a Pebble configuration layer.
 
-    The format of this is not documented, but is captured in code here:
-    https://github.com/canonical/pebble/blob/master/internal/plan/plan.go
+    The format of this is documented at
+    https://github.com/canonical/pebble/#layer-specification.
 
     Attributes:
         summary: A summary of the purpose of this layer
         description: A long form description of this layer
-        services: A mapping of name: :class:`Service` defined by this layer
+        services: A mapping of name to :class:`Service` defined by this layer
+        checks: A mapping of check to :class:`Check` defined by this layer
     """
 
     # This is how you do type annotations, but it is not supported by Python 3.5
@@ -570,6 +585,8 @@ class Layer:
         self.description = d.get('description', '')
         self.services = {name: Service(name, service)
                          for name, service in d.get('services', {}).items()}
+        self.checks = {name: Check(name, check)
+                       for name, check in d.get('checks', {}).items()}
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
@@ -580,7 +597,8 @@ class Layer:
         fields = [
             ('summary', self.summary),
             ('description', self.description),
-            ('services', {name: service.to_dict() for name, service in self.services.items()})
+            ('services', {name: service.to_dict() for name, service in self.services.items()}),
+            ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
         ]
         return {name: value for name, value in fields if value}
 
@@ -609,8 +627,14 @@ class Service:
         self.user_id = raw.get('user-id')
         self.group = raw.get('group', '')
         self.group_id = raw.get('group-id')
+        self.on_success = raw.get('on-success', '')
+        self.on_failure = raw.get('on-failure', '')
+        self.on_check_failure = dict(raw.get('on-check-failure', {}))
+        self.backoff_delay = raw.get('backoff-delay', '')
+        self.backoff_factor = raw.get('backoff-factor')
+        self.backoff_limit = raw.get('backoff-limit', '')
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         """Convert this service object to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -626,6 +650,12 @@ class Service:
             ('user-id', self.user_id),
             ('group', self.group),
             ('group-id', self.group_id),
+            ('on-success', self.on_success),
+            ('on-failure', self.on_failure),
+            ('on-check-failure', self.on_check_failure),
+            ('backoff-delay', self.backoff_delay),
+            ('backoff-factor', self.backoff_factor),
+            ('backoff-limit', self.backoff_limit),
         ]
         return {name: value for name, value in fields if value}
 
@@ -701,6 +731,78 @@ class ServiceInfo:
                 ).format(self=self)
 
 
+class Check:
+    """Represents a check in a Pebble configuration layer."""
+
+    def __init__(self, name: str, raw: typing.Dict = None):
+        self.name = name
+        raw = raw or {}
+        self.override = raw.get('override', '')
+        try:
+            self.level = CheckLevel(raw.get('level', ''))
+        except ValueError:
+            self.level = raw.get('level')
+        self.period = raw.get('period', '')
+        self.timeout = raw.get('timeout', '')
+        self.threshold = raw.get('threshold')
+
+        http = raw.get('http')
+        if http is not None:
+            http = copy.deepcopy(http)
+        self.http = http
+
+        tcp = raw.get('tcp')
+        if tcp is not None:
+            tcp = copy.deepcopy(tcp)
+        self.tcp = tcp
+
+        exec_ = raw.get('exec')
+        if exec_ is not None:
+            exec_ = copy.deepcopy(exec_)
+        self.exec = exec_
+
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
+        """Convert this check object to its dict representation."""
+        fields = [
+            ('override', self.override),
+            ('level', self.level.value),
+            ('period', self.period),
+            ('timeout', self.timeout),
+            ('threshold', self.threshold),
+            ('http', self.http),
+            ('tcp', self.tcp),
+            ('exec', self.exec),
+        ]
+        return {name: value for name, value in fields if value}
+
+    def __repr__(self) -> str:
+        return 'Check({!r})'.format(self.to_dict())
+
+    def __eq__(self, other: typing.Union[typing.Dict, 'Check']) -> bool:
+        """Compare this check configuration to another."""
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Check):
+            return self.to_dict() == other.to_dict()
+        else:
+            raise ValueError("Cannot compare pebble.Check to {}".format(type(other)))
+
+
+class CheckLevel(enum.Enum):
+    """Enum of check levels."""
+
+    UNSET = ''
+    ALIVE = 'alive'
+    READY = 'ready'
+
+
+class CheckStatus(enum.Enum):
+    """Enum of check statuses."""
+
+    UP = 'up'
+    DOWN = 'down'
+
+
 class FileType(enum.Enum):
     """Enum of file types."""
 
@@ -772,6 +874,68 @@ class FileInfo:
                 'user={self.user!r}, '
                 'group_id={self.group_id}, '
                 'group={self.group!r})'
+                ).format(self=self)
+
+
+class CheckInfo:
+    """Check status information.
+
+    A list of these objects is returned from :meth:`Client.get_checks`.
+
+    Attributes:
+        name: The name of the check.
+        level: The check level: :attr:`CheckLevel.ALIVE`,
+            :attr:`CheckLevel.READY`, or None (level not set).
+        status: The status of the check: :attr:`CheckStatus.UP` means the
+            check is healthy (the number of failures is less than the
+            threshold), :attr:`CheckStatus.DOWN` means the check is unhealthy
+            (the number of failures has reached the threshold).
+        failures: The number of failures since the check last succeeded (reset
+            to zero if the check succeeds).
+        threshold: The failure threshold, that is, how many consecutive
+            failures for the check to be considered "down".
+    """
+
+    def __init__(
+        self,
+        name: str,
+        level: typing.Optional[typing.Union[CheckLevel, str]],
+        status: typing.Union[CheckStatus, str],
+        failures: int = 0,
+        threshold: int = 0,
+    ):
+        self.name = name
+        self.level = level
+        self.status = status
+        self.failures = failures
+        self.threshold = threshold
+
+    @classmethod
+    def from_dict(cls, d: typing.Dict) -> 'CheckInfo':
+        """Create new :class:`CheckInfo` object from dict parsed from JSON."""
+        try:
+            level = CheckLevel(d.get('level', ''))
+        except ValueError:
+            level = d.get('level')
+        try:
+            status = CheckStatus(d['status'])
+        except ValueError:
+            status = d['status']
+        return cls(
+            name=d['name'],
+            level=level,
+            status=status,
+            failures=d.get('failures', 0),
+            threshold=d['threshold'],
+        )
+
+    def __repr__(self):
+        return ('CheckInfo('
+                'name={self.name!r}, '
+                'level={self.level!r}, '
+                'status={self.status}, '
+                'failures={self.failures}, '
+                'threshold={self.threshold!r})'
                 ).format(self=self)
 
 
@@ -1135,7 +1299,7 @@ class Client:
         """Make a request to the Pebble server; return the raw HTTPResponse object."""
         url = self.base_url + path
         if query:
-            url = url + '?' + urllib.parse.urlencode(query)
+            url = url + '?' + urllib.parse.urlencode(query, doseq=True)
 
         # python 3.5 urllib requests require their data to be a bytes object -
         # generators won't work.
@@ -1430,7 +1594,7 @@ class Client:
         self._request('POST', '/v1/layers', body=body)
 
     def get_plan(self) -> Plan:
-        """Get the Pebble plan (currently contains only combined services)."""
+        """Get the Pebble plan (contains combined layer configuration)."""
         resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
         return Plan(resp['result'])
 
@@ -1976,3 +2140,27 @@ class Client:
             'services': services,
         }
         self._request('POST', '/v1/signals', body=body)
+
+    def get_checks(
+        self,
+        level: CheckLevel = None,
+        names: typing.List[str] = None
+    ) -> typing.List[CheckInfo]:
+        """Get the check status for the configured checks.
+
+        Args:
+            level: Optional check level to query for (default is to fetch
+                checks with any level).
+            names: Optional list of check names to query for (default is to
+                fetch checks with any name).
+
+        Returns:
+            List of :class:`CheckInfo` objects.
+        """
+        query = {}
+        if level is not None:
+            query['level'] = level.value
+        if names:
+            query['names'] = names
+        resp = self._request('GET', '/v1/checks', query)
+        return [CheckInfo.from_dict(info) for info in resp['result']]

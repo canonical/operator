@@ -1628,6 +1628,9 @@ ChangeError: cannot perform the following tasks:
                 status='Internal Server Error',
                 message=message)
 
+    def get_checks(self, level=None, names=None):
+        raise NotImplementedError(self.get_checks)
+
 
 class NonAbsolutePathError(Exception):
     """Error raised by _MockFilesystem.
