@@ -28,6 +28,9 @@ import time
 import unittest
 import unittest.mock
 import unittest.util
+import urllib.error
+import urllib.request
+import uuid
 
 import pytest
 
@@ -509,6 +512,22 @@ class TestPlan(unittest.TestCase):
         with self.assertRaises(AttributeError):
             plan.services = {}
 
+    def test_checks(self):
+        plan = pebble.Plan('')
+        self.assertEqual(plan.checks, {})
+
+        plan = pebble.Plan(
+            'checks:\n bar:\n  override: replace\n  http:\n   url: https://example.com/')
+
+        self.assertEqual(len(plan.checks), 1)
+        self.assertEqual(plan.checks['bar'].name, 'bar')
+        self.assertEqual(plan.checks['bar'].override, 'replace')
+        self.assertEqual(plan.checks['bar'].http, {'url': 'https://example.com/'})
+
+        # Should be read-only ("can't set attribute")
+        with self.assertRaises(AttributeError):
+            plan.checks = {}
+
     def test_yaml(self):
         # Starting with nothing, we get the empty result
         plan = pebble.Plan('')
@@ -521,6 +540,11 @@ services:
  foo:
   override: replace
   command: echo foo
+
+checks:
+ bar:
+  http:
+   https://example.com/
 '''
         plan = pebble.Plan(raw)
         reformed = yaml.safe_dump(yaml.safe_load(raw))
@@ -528,9 +552,6 @@ services:
         self.assertEqual(str(plan), reformed)
 
     def test_service_equality(self):
-        plan = pebble.Plan('')
-        self.assertEqual(plan.services, {})
-
         plan = pebble.Plan('services:\n foo:\n  override: replace\n  command: echo foo')
 
         old_service = pebble.Service(name="foo",
@@ -592,7 +613,11 @@ class TestLayer(unittest.TestCase):
         s = pebble.Layer('')
         self._assert_empty(s)
 
-        yaml = """description: The quick brown fox!
+        yaml = """checks:
+  chk:
+    http:
+      url: https://example.com/
+description: The quick brown fox!
 services:
   bar:
     command: echo bar
@@ -624,6 +649,9 @@ summary: Sum Mary
         self.assertEqual(s.services['bar'].user_id, 1000)
         self.assertEqual(s.services['bar'].group, 'staff')
         self.assertEqual(s.services['bar'].group_id, 2000)
+
+        self.assertEqual(s.checks['chk'].name, 'chk')
+        self.assertEqual(s.checks['chk'].http, {'url': 'https://example.com/'})
 
         self.assertEqual(s.to_yaml(), yaml)
         self.assertEqual(str(s), yaml)
@@ -668,6 +696,12 @@ class TestService(unittest.TestCase):
         self.assertIs(service.user_id, None)
         self.assertEqual(service.group, '')
         self.assertIs(service.group_id, None)
+        self.assertEqual(service.on_success, '')
+        self.assertEqual(service.on_failure, '')
+        self.assertEqual(service.on_check_failure, {})
+        self.assertEqual(service.backoff_delay, '')
+        self.assertIs(service.backoff_factor, None)
+        self.assertEqual(service.backoff_limit, '')
         self.assertEqual(service.to_dict(), {})
 
     def test_name_only(self):
@@ -692,6 +726,12 @@ class TestService(unittest.TestCase):
             'user-id': 1000,
             'group': 'staff',
             'group-id': 2000,
+            'on-success': 'restart',
+            'on-failure': 'ignore',
+            'on-check-failure': {'chk1': 'halt'},
+            'backoff-delay': '1s',
+            'backoff-factor': 4,
+            'backoff-limit': '10s',
         }
         s = pebble.Service('Name 2', d)
         self.assertEqual(s.name, 'Name 2')
@@ -707,6 +747,12 @@ class TestService(unittest.TestCase):
         self.assertEqual(s.user_id, 1000)
         self.assertEqual(s.group, 'staff')
         self.assertEqual(s.group_id, 2000)
+        self.assertEqual(s.on_success, 'restart')
+        self.assertEqual(s.on_failure, 'ignore')
+        self.assertEqual(s.on_check_failure, {'chk1': 'halt'})
+        self.assertEqual(s.backoff_delay, '1s')
+        self.assertEqual(s.backoff_factor, 4)
+        self.assertEqual(s.backoff_limit, '10s')
 
         self.assertEqual(s.to_dict(), d)
 
@@ -715,6 +761,7 @@ class TestService(unittest.TestCase):
         s.before.append('b3')
         s.requires.append('r3')
         s.environment['k3'] = 'v3'
+        s.on_check_failure['chk2'] = 'ignore'
         self.assertEqual(s.after, ['a1', 'a2', 'a3'])
         self.assertEqual(s.before, ['b1', 'b2', 'b3'])
         self.assertEqual(s.requires, ['r1', 'r2', 'r3'])
@@ -723,6 +770,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(d['before'], ['b1', 'b2'])
         self.assertEqual(d['requires'], ['r1', 'r2'])
         self.assertEqual(d['environment'], {'k1': 'v1', 'k2': 'v2'})
+        self.assertEqual(d['on-check-failure'], {'chk1': 'halt'})
 
     def test_equality(self):
         d = {
@@ -761,6 +809,82 @@ class TestService(unittest.TestCase):
         }
         self.assertEqual(one, as_dict)
 
+        with self.assertRaises(ValueError):
+            self.assertEqual(one, 5)
+
+
+class TestCheck(unittest.TestCase):
+    def _assert_empty(self, check, name):
+        self.assertEqual(check.name, name)
+        self.assertEqual(check.override, '')
+        self.assertEqual(check.level, pebble.CheckLevel.UNSET)
+        self.assertEqual(check.period, '')
+        self.assertEqual(check.timeout, '')
+        self.assertIs(check.threshold, None)
+        self.assertIs(check.http, None)
+        self.assertIs(check.tcp, None)
+        self.assertIs(check.exec, None)
+
+    def test_name_only(self):
+        check = pebble.Check('chk')
+        self._assert_empty(check, 'chk')
+
+    def test_dict(self):
+        d = {
+            'override': 'replace',
+            'level': 'alive',
+            'period': '10s',
+            'timeout': '3s',
+            'threshold': 5,
+            # Not valid for Pebble to have more than one of http, tcp, and exec,
+            # but it makes things simpler for the unit tests.
+            'http': {'url': 'https://example.com/'},
+            'tcp': {'port': 80},
+            'exec': {'command': 'echo foo'},
+        }
+        check = pebble.Check('chk-http', d)
+        self.assertEqual(check.name, 'chk-http')
+        self.assertEqual(check.override, 'replace')
+        self.assertEqual(check.level, pebble.CheckLevel.ALIVE)
+        self.assertEqual(check.period, '10s')
+        self.assertEqual(check.timeout, '3s')
+        self.assertEqual(check.threshold, 5)
+        self.assertEqual(check.http, {'url': 'https://example.com/'})
+        self.assertEqual(check.tcp, {'port': 80})
+        self.assertEqual(check.exec, {'command': 'echo foo'})
+
+        self.assertEqual(check.to_dict(), d)
+
+        # Ensure pebble.Check has made copies of mutable objects
+        check.http['url'] = 'https://www.google.com'
+        self.assertEqual(d['http'], {'url': 'https://example.com/'})
+        check.tcp['port'] = 81
+        self.assertEqual(d['tcp'], {'port': 80})
+        check.exec['command'] = 'foo'
+        self.assertEqual(d['exec'], {'command': 'echo foo'})
+
+    def test_equality(self):
+        d = {
+            'override': 'replace',
+            'level': 'alive',
+            'period': '10s',
+            'timeout': '3s',
+            'threshold': 5,
+            'http': {'url': 'https://example.com/'},
+        }
+        one = pebble.Check('one', d)
+        two = pebble.Check('two', d)
+        self.assertEqual(one, two)
+        self.assertEqual(one, d)
+        self.assertEqual(two, d)
+        self.assertEqual(one, one.to_dict())
+        self.assertEqual(two, two.to_dict())
+        d['level'] = 'ready'
+        self.assertNotEqual(one, d)
+
+        with self.assertRaises(ValueError):
+            self.assertEqual(one, 5)
+
 
 class TestServiceInfo(unittest.TestCase):
     def test_service_startup(self):
@@ -783,6 +907,14 @@ class TestServiceInfo(unittest.TestCase):
 
     def test_service_info(self):
         s = pebble.ServiceInfo('svc1', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
+        self.assertEqual(s.name, 'svc1')
+        self.assertEqual(s.startup, pebble.ServiceStartup.ENABLED)
+        self.assertEqual(s.current, pebble.ServiceStatus.ACTIVE)
+
+        s = pebble.ServiceInfo(
+            'svc1',
+            pebble.ServiceStartup.ENABLED,
+            pebble.ServiceStatus.ACTIVE)
         self.assertEqual(s.name, 'svc1')
         self.assertEqual(s.startup, pebble.ServiceStartup.ENABLED)
         self.assertEqual(s.current, pebble.ServiceStatus.ACTIVE)
@@ -811,6 +943,76 @@ class TestServiceInfo(unittest.TestCase):
         for current in [pebble.ServiceStatus.INACTIVE, pebble.ServiceStatus.ERROR, 'other']:
             s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, current)
             self.assertFalse(s.is_running())
+
+
+class TestCheckInfo(unittest.TestCase):
+    def test_check_level(self):
+        self.assertEqual(list(pebble.CheckLevel), [
+            pebble.CheckLevel.UNSET,
+            pebble.CheckLevel.ALIVE,
+            pebble.CheckLevel.READY,
+        ])
+        self.assertEqual(pebble.CheckLevel.UNSET.value, '')
+        self.assertEqual(pebble.CheckLevel.ALIVE.value, 'alive')
+        self.assertEqual(pebble.CheckLevel.READY.value, 'ready')
+
+    def test_check_status(self):
+        self.assertEqual(list(pebble.CheckStatus), [
+            pebble.CheckStatus.UP,
+            pebble.CheckStatus.DOWN,
+        ])
+        self.assertEqual(pebble.CheckStatus.UP.value, 'up')
+        self.assertEqual(pebble.CheckStatus.DOWN.value, 'down')
+
+    def test_check_info(self):
+        check = pebble.CheckInfo(
+            name='chk1',
+            level=pebble.CheckLevel.READY,
+            status=pebble.CheckStatus.UP,
+            threshold=3,
+        )
+        self.assertEqual(check.name, 'chk1')
+        self.assertEqual(check.level, pebble.CheckLevel.READY)
+        self.assertEqual(check.status, pebble.CheckStatus.UP)
+        self.assertEqual(check.failures, 0)
+        self.assertEqual(check.threshold, 3)
+
+        check = pebble.CheckInfo(
+            name='chk2',
+            level=pebble.CheckLevel.ALIVE,
+            status=pebble.CheckStatus.DOWN,
+            failures=5,
+            threshold=3,
+        )
+        self.assertEqual(check.name, 'chk2')
+        self.assertEqual(check.level, pebble.CheckLevel.ALIVE)
+        self.assertEqual(check.status, pebble.CheckStatus.DOWN)
+        self.assertEqual(check.failures, 5)
+        self.assertEqual(check.threshold, 3)
+
+        check = pebble.CheckInfo.from_dict({
+            'name': 'chk3',
+            'status': 'up',
+            'threshold': 3,
+        })
+        self.assertEqual(check.name, 'chk3')
+        self.assertEqual(check.level, pebble.CheckLevel.UNSET)
+        self.assertEqual(check.status, pebble.CheckStatus.UP)
+        self.assertEqual(check.failures, 0)
+        self.assertEqual(check.threshold, 3)
+
+        check = pebble.CheckInfo.from_dict({
+            'name': 'chk4',
+            'level': pebble.CheckLevel.UNSET,
+            'status': pebble.CheckStatus.DOWN,
+            'failures': 3,
+            'threshold': 3,
+        })
+        self.assertEqual(check.name, 'chk4')
+        self.assertEqual(check.level, pebble.CheckLevel.UNSET)
+        self.assertEqual(check.status, pebble.CheckStatus.DOWN)
+        self.assertEqual(check.failures, 3)
+        self.assertEqual(check.threshold, 3)
 
 
 class MockClient(pebble.Client):
@@ -891,6 +1093,158 @@ def build_mock_change_dict(change_id='70'):
         ],
         "extra-field": "foo",
     }
+
+
+class TestMultipartParser(unittest.TestCase):
+    class _Case:
+        def __init__(
+                self,
+                name,
+                data,
+                want_headers,
+                want_bodies,
+                want_bodies_done,
+                max_boundary=14,
+                max_lookahead=8 * 1024,
+                error=''):
+            self.name = name
+            self.data = data
+            self.want_headers = want_headers
+            self.want_bodies = want_bodies
+            self.want_bodies_done = want_bodies_done
+            self.max_boundary = max_boundary
+            self.max_lookahead = max_lookahead
+            self.error = error
+
+    def test_multipart_parser(self):
+        tests = [
+            TestMultipartParser._Case(
+                'baseline',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\nfoo bar\r\n--qwerty--\r\n',
+                [b'header foo\r\n\r\n'],
+                [b'foo bar\nfoo bar'],
+                want_bodies_done=[True],
+            ),
+            TestMultipartParser._Case(
+                'incomplete header',
+                b'\r\n--qwerty\r\nheader foo\r\n',
+                [],
+                [],
+                want_bodies_done=[],
+            ),
+            TestMultipartParser._Case(
+                'missing header',
+                b'\r\n--qwerty\r\nheader foo\r\n' + 40 * b' ',
+                [],
+                [],
+                want_bodies_done=[],
+                max_lookahead=40,
+                error='header terminator not found',
+            ),
+            TestMultipartParser._Case(
+                'incomplete body terminator',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\rhello my name is joe and I work in a button factory',  # noqa
+                [b'header foo\r\n\r\n'],
+                [b'foo bar\r\n--qwerty\rhello my name is joe and I work in a '],
+                want_bodies_done=[False],
+            ),
+            TestMultipartParser._Case(
+                'empty body',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\n\r\n--qwerty\r\n',
+                [b'header foo\r\n\r\n'],
+                [b''],
+                want_bodies_done=[True],
+            ),
+            TestMultipartParser._Case(
+                'ignore leading garbage',
+                b'hello my name is joe\r\n\n\n\n\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',  # noqa
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+            ),
+            TestMultipartParser._Case(
+                'ignore trailing garbage',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nhello my name is joe',
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+            ),
+            TestMultipartParser._Case(
+                'boundary allow linear whitespace',
+                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+                max_boundary=20,
+            ),
+            TestMultipartParser._Case(
+                'terminal boundary allow linear whitespace',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty-- \t \r\n',
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+                max_boundary=20,
+            ),
+            TestMultipartParser._Case(
+                'multiple parts',
+                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
+                [b'header foo\r\n\r\n', b'header bar\r\n\r\n'],
+                [b'foo bar', b'foo baz'],
+                want_bodies_done=[True, True],
+            ),
+            TestMultipartParser._Case(
+                'ignore after terminal boundary',
+                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty--\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+            ),
+        ]
+
+        chunk_sizes = [1, 2, 3, 4, 5, 7, 13, 17, 19, 23, 29, 31, 37, 42, 50, 100, 1000]
+        marker = b'qwerty'
+        for i, test in enumerate(tests):
+            for chunk_size in chunk_sizes:
+                headers = []
+                bodies = []
+                bodies_done = []
+
+                def handle_header(data):
+                    headers.append(bytes(data))
+                    bodies.append(bytes())
+                    bodies_done.append(False)
+
+                def handle_body(data, done=False):
+                    bodies[-1] += data
+                    bodies_done[-1] = done
+
+                parser = pebble._MultipartParser(
+                    marker,
+                    handle_header,
+                    handle_body,
+                    max_boundary_length=test.max_boundary,
+                    max_lookahead=test.max_lookahead)
+                src = io.BytesIO(test.data)
+
+                try:
+                    while True:
+                        data = src.read(chunk_size)
+                        if not data:
+                            break
+                        parser.feed(data)
+                except Exception as err:
+                    if not test.error:
+                        self.fail('unexpected error:', err)
+                        break
+                    self.assertEqual(test.error, err.message())
+                else:
+                    if test.error:
+                        self.fail('missing expected error: {!r}'.format(test.error))
+
+                    msg = 'test case {} ({}), chunk size {}'.format(i + 1, test.name, chunk_size)
+                    self.assertEqual(test.want_headers, headers, msg)
+                    self.assertEqual(test.want_bodies, bodies, msg)
+                    self.assertEqual(test.want_bodies_done, bodies_done, msg)
 
 
 class TestClient(unittest.TestCase):
@@ -1478,28 +1832,60 @@ services:
             ('GET', '/v1/services', {'names': 'svc2'}, None),
         ])
 
-    def test_pull_text(self):
+    def test_pull_boundary_spanning_chunk(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80\nfoo\r\nbar' + b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [{"path": "/etc/hosts"}],
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
-        content = self.client.pull('/etc/hosts').read()
+        self.client._chunk_size = 13
+        with self.client.pull('/etc/hosts') as infile:
+            content = infile.read()
+        self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
+    def test_pull_text(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
+""",
+        ))
+
+        with self.client.pull('/etc/hosts') as infile:
+            content = infile.read()
         self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
 
         self.assertEqual(self.client.requests, [
@@ -1510,25 +1896,26 @@ Content-Disposition: form-data; name="response"
     def test_pull_binary(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80\nfoo\r\nbar' + b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [{"path": "/etc/hosts"}],
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
-        content = self.client.pull('/etc/hosts', encoding=None).read()
+        with self.client.pull('/etc/hosts', encoding=None) as infile:
+            content = infile.read()
         self.assertEqual(content, b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar')
 
         self.assertEqual(self.client.requests, [
@@ -1539,10 +1926,10 @@ Content-Disposition: form-data; name="response"
     def test_pull_path_error(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [
         {"path": "/etc/hosts", "error": {"kind": "not-found", "message": "not found"}}
@@ -1550,8 +1937,8 @@ Content-Disposition: form-data; name="response"
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
@@ -1581,26 +1968,35 @@ Content-Disposition: form-data; name="response"
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/bad"
-
-bad path
---01234567890123456789012345678901--
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/bad"\r
+\r
+bad path\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
             self.client.pull('/etc/hosts')
-        self.assertEqual(str(cm.exception), "path not expected: /bad")
+        self.assertEqual(str(cm.exception), "path not expected: '/bad'")
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-bad path
---01234567890123456789012345678901--
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+bad path\r
+--01234567890123456789012345678901--\r
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
@@ -2047,6 +2443,69 @@ bad path
 
         with self.assertRaises(TypeError):
             self.client.send_signal('SIGHUP', [1, 2])
+
+    def test_get_checks_all(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    "name": "chk1",
+                    "status": "up",
+                    "threshold": 2,
+                },
+                {
+                    "name": "chk2",
+                    "level": "alive",
+                    "status": "down",
+                    "failures": 5,
+                    "threshold": 3,
+                }
+            ],
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        checks = self.client.get_checks()
+        self.assertEqual(len(checks), 2)
+        self.assertEqual(checks[0].name, 'chk1')
+        self.assertEqual(checks[0].level, pebble.CheckLevel.UNSET)
+        self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
+        self.assertEqual(checks[0].failures, 0)
+        self.assertEqual(checks[0].threshold, 2)
+        self.assertEqual(checks[1].name, 'chk2')
+        self.assertEqual(checks[1].level, pebble.CheckLevel.ALIVE)
+        self.assertEqual(checks[1].status, pebble.CheckStatus.DOWN)
+        self.assertEqual(checks[1].failures, 5)
+        self.assertEqual(checks[1].threshold, 3)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/checks', {}, None),
+        ])
+
+    def test_get_checks_filters(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    "name": "chk2",
+                    "level": "ready",
+                    "status": "up",
+                    "threshold": 3,
+                },
+            ],
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0].name, 'chk2')
+        self.assertEqual(checks[0].level, pebble.CheckLevel.READY)
+        self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
+        self.assertEqual(checks[0].failures, 0)
+        self.assertEqual(checks[0].threshold, 3)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
+        ])
 
 
 @unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
@@ -2717,7 +3176,7 @@ class TestExec(unittest.TestCase):
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
 # against a real Pebble server. For example, in one terminal, run Pebble:
 #
-# $ PEBBLE=~/pebble pebble run
+# $ PEBBLE=~/pebble pebble run --http=:4000
 # 2021-09-20T04:10:34.934Z [pebble] Started daemon
 #
 # In another terminal, run the tests:
@@ -2735,6 +3194,96 @@ class TestRealPebble(unittest.TestCase):
         assert socket_path, 'PEBBLE or PEBBLE_SOCKET must be set if RUN_REAL_PEBBLE_TESTS set'
 
         self.client = pebble.Client(socket_path=socket_path)
+
+    def test_checks_and_health(self):
+        self.client.add_layer('layer', {
+            'checks': {
+                'bad': {
+                    'override': 'replace',
+                    'level': 'ready',
+                    'period': '50ms',
+                    'threshold': 2,
+                    'exec': {
+                        'command': 'sleep x',
+                    },
+                },
+                'good': {
+                    'override': 'replace',
+                    'level': 'alive',
+                    'period': '50ms',
+                    'exec': {
+                        'command': 'echo foo',
+                    },
+                },
+                'other': {
+                    'override': 'replace',
+                    'exec': {
+                        'command': 'echo bar',
+                    },
+                },
+            },
+        }, combine=True)
+
+        # Checks should all be "up" initially
+        checks = self.client.get_checks()
+        self.assertEqual(len(checks), 3)
+        self.assertEqual(checks[0].name, 'bad')
+        self.assertEqual(checks[0].level, pebble.CheckLevel.READY)
+        self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
+        self.assertEqual(checks[1].name, 'good')
+        self.assertEqual(checks[1].level, pebble.CheckLevel.ALIVE)
+        self.assertEqual(checks[1].status, pebble.CheckStatus.UP)
+        self.assertEqual(checks[2].name, 'other')
+        self.assertEqual(checks[2].level, pebble.CheckLevel.UNSET)
+        self.assertEqual(checks[2].status, pebble.CheckStatus.UP)
+
+        # And /v1/health should return "healthy"
+        health = self._get_health()
+        self.assertEqual(health, {
+            'result': {'healthy': True},
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        # After two retries the "bad" check should go down
+        for i in range(5):
+            checks = self.client.get_checks()
+            bad_check = [c for c in checks if c.name == 'bad'][0]
+            if bad_check.status == pebble.CheckStatus.DOWN:
+                break
+            time.sleep(0.06)
+        else:
+            assert False, 'timed out waiting for "bad" check to go down'
+        self.assertEqual(bad_check.failures, 2)
+        self.assertEqual(bad_check.threshold, 2)
+        good_check = [c for c in checks if c.name == 'good'][0]
+        self.assertEqual(good_check.status, pebble.CheckStatus.UP)
+
+        # And /v1/health should return "unhealthy" (with status HTTP 502)
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self._get_health()
+        self.assertEqual(cm.exception.code, 502)
+        health = pebble._json_loads(cm.exception.read())
+        self.assertEqual(health, {
+            'result': {'healthy': False},
+            'status': 'Bad Gateway',
+            'status-code': 502,
+            'type': 'sync',
+        })
+
+        # Then test filtering by check level and by name
+        checks = self.client.get_checks(level=pebble.CheckLevel.ALIVE)
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0].name, 'good')
+        checks = self.client.get_checks(names=['good', 'bad'])
+        self.assertEqual(len(checks), 2)
+        self.assertEqual(checks[0].name, 'bad')
+        self.assertEqual(checks[1].name, 'good')
+
+    def _get_health(self):
+        f = urllib.request.urlopen('http://localhost:4000/v1/health')
+        return pebble._json_loads(f.read())
 
     def test_exec_wait(self):
         process = self.client.exec(['true'])
@@ -2774,6 +3323,15 @@ class TestRealPebble(unittest.TestCase):
         out, err = process.wait_output()
         self.assertEqual(out, b'FOO\nBAR\n')
         self.assertEqual(err, b'')
+
+    def test_push_pull(self):
+        fname = os.path.join(tempfile.gettempdir(), 'pebbletest-{}'.format(uuid.uuid4()))
+        content = 'foo\nbar\nbaz-42'
+        self.client.push(fname, content)
+        with self.client.pull(fname) as f:
+            data = f.read()
+            self.assertEqual(data, content)
+        os.remove(fname)
 
     def test_exec_timeout(self):
         process = self.client.exec(['sleep', '0.2'], timeout=0.1)
