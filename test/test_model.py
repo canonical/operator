@@ -1106,6 +1106,94 @@ containers:
         with self.assertRaises(RuntimeError):
             self.container.get_service('s1')
 
+    def test_get_checks(self):
+        response_checks = [
+            ops.pebble.CheckInfo.from_dict({
+                'name': 'c1',
+                'status': 'up',
+                'failures': 0,
+                'threshold': 3,
+            }),
+            ops.pebble.CheckInfo.from_dict({
+                'name': 'c2',
+                'level': 'alive',
+                'status': 'down',
+                'failures': 2,
+                'threshold': 2,
+            }),
+        ]
+
+        self.pebble.responses.append(response_checks)
+        checks = self.container.get_checks()
+        self.assertEqual(len(checks), 2)
+        self.assertEqual(checks['c1'].name, 'c1')
+        self.assertEqual(checks['c1'].level, ops.pebble.CheckLevel.UNSET)
+        self.assertEqual(checks['c1'].status, ops.pebble.CheckStatus.UP)
+        self.assertEqual(checks['c1'].failures, 0)
+        self.assertEqual(checks['c1'].threshold, 3)
+        self.assertEqual(checks['c2'].name, 'c2')
+        self.assertEqual(checks['c2'].level, ops.pebble.CheckLevel.ALIVE)
+        self.assertEqual(checks['c2'].status, ops.pebble.CheckStatus.DOWN)
+        self.assertEqual(checks['c2'].failures, 2)
+        self.assertEqual(checks['c2'].threshold, 2)
+
+        self.pebble.responses.append(response_checks[1:2])
+        checks = self.container.get_checks('c1', 'c2', level=ops.pebble.CheckLevel.ALIVE)
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks['c2'].name, 'c2')
+        self.assertEqual(checks['c2'].level, ops.pebble.CheckLevel.ALIVE)
+        self.assertEqual(checks['c2'].status, ops.pebble.CheckStatus.DOWN)
+        self.assertEqual(checks['c2'].failures, 2)
+        self.assertEqual(checks['c2'].threshold, 2)
+
+        self.assertEqual(self.pebble.requests, [
+            ('get_checks', None, None),
+            ('get_checks', ops.pebble.CheckLevel.ALIVE, ('c1', 'c2')),
+        ])
+
+    def test_get_check(self):
+        # Single check returned successfully
+        self.pebble.responses.append([
+            ops.pebble.CheckInfo.from_dict({
+                'name': 'c1',
+                'status': 'up',
+                'failures': 0,
+                'threshold': 3,
+            })
+        ])
+        c = self.container.get_check('c1')
+        self.assertEqual(self.pebble.requests, [('get_checks', None, ('c1', ))])
+        self.assertEqual(c.name, 'c1')
+        self.assertEqual(c.level, ops.pebble.CheckLevel.UNSET)
+        self.assertEqual(c.status, ops.pebble.CheckStatus.UP)
+        self.assertEqual(c.failures, 0)
+        self.assertEqual(c.threshold, 3)
+
+        # If Pebble returns no checks, should be a ModelError
+        self.pebble.responses.append([])
+        with self.assertRaises(ops.model.ModelError) as cm:
+            self.container.get_check('c2')
+        self.assertEqual(str(cm.exception), "check 'c2' not found")
+
+        # If Pebble returns more than one check, RuntimeError is raised
+        self.pebble.responses.append([
+            ops.pebble.CheckInfo.from_dict({
+                'name': 'c1',
+                'status': 'up',
+                'failures': 0,
+                'threshold': 3,
+            }),
+            ops.pebble.CheckInfo.from_dict({
+                'name': 'c2',
+                'level': 'alive',
+                'status': 'down',
+                'failures': 2,
+                'threshold': 2,
+            }),
+        ])
+        with self.assertRaises(RuntimeError):
+            self.container.get_check('c1')
+
     def test_pull(self):
         self.pebble.responses.append('dummy1')
         got = self.container.pull('/path/1')
@@ -1275,6 +1363,10 @@ class MockPebbleClient:
 
     def get_services(self, names=None):
         self.requests.append(('get_services', names))
+        return self.responses.pop(0)
+
+    def get_checks(self, level=None, names=None):
+        self.requests.append(('get_checks', level, names))
         return self.responses.pop(0)
 
     def pull(self, path, *, encoding='utf-8'):
