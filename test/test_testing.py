@@ -885,6 +885,10 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'initial': 'data'})
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
 
+    def test_empty_config_raises(self):
+        with self.assertRaises(AttributeError):
+            Harness(RecordingCharm, config='')
+
     def test_update_config(self):
         harness = Harness(RecordingCharm, config='''
             options:
@@ -2258,6 +2262,48 @@ class TestHarness(unittest.TestCase):
             b_first = [a_first[2], a_first[3], a_first[0], a_first[1]]
             self.assertEqual(changes, b_first)
 
+    def test_begin_with_initial_hooks_unknown_status(self):
+        # Verify that a charm that does not set a status in the install hook will have an
+        # unknown status in the harness.
+        harness = Harness(RecordingCharm, meta='''
+            name: test-app
+            ''', config='''
+          options:
+                foo:
+                    description: a config option
+                    type: string
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        harness.begin_with_initial_hooks()
+
+        self.assertEqual(
+            backend.status_get(is_app=False),
+            {'status': 'unknown', 'message': ''})
+
+        self.assertEqual(
+            backend.status_get(is_app=True),
+            {'status': 'unknown', 'message': ''})
+
+    def test_begin_with_initial_hooks_install_sets_status(self):
+        harness = Harness(RecordingCharm, meta='''
+            name: test-app
+            ''', config='''
+            options:
+                set_status:
+                    description: a config option
+                    type: boolean
+
+            ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        harness.update_config(key_values={"set_status": True})
+        harness.begin_with_initial_hooks()
+
+        self.assertEqual(
+            backend.status_get(is_app=False),
+            {'status': 'maintenance', 'message': 'Status set on install'})
+
     def test_get_pebble_container_plan(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
@@ -2387,6 +2433,8 @@ class RecordingCharm(CharmBase):
         return changes
 
     def _on_install(self, _):
+        if self.config.get('set_status'):
+            self.unit.status = MaintenanceStatus("Status set on install")
         self.changes.append(dict(name='install'))
 
     def _on_start(self, _):
