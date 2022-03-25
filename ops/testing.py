@@ -190,15 +190,18 @@ class Harness(typing.Generic[CharmType]):
         """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
 
         This triggers install, relation-created, config-changed, start, and any relation-joined
-        hooks. Based on what relations have been defined before you called begin().  Note that all
-        of these are fired before returning control to the test suite, so if you want to introspect
-        what happens at each step, you need to fire them directly (eg Charm.on.install.emit()).  In
-        your hook callback functions, you should not assume that workload containers are active;
-        guard such code with checks to Container.can_connect().  You are encouraged to test this by
-        setting the global SIMULATE_CAN_CONNECT variable to True.
+        hooks based on what relations have been defined+added before you called begin. This does
+        NOT trigger a pebble-ready hook. Note that all of these are fired before returning control
+        to the test suite, so if you want to introspect what happens at each step, you need to fire
+        them directly (e.g. Charm.on.install.emit()).  In your hook callback functions, you should
+        not assume that workload containers are active; guard such code with checks to
+        Container.can_connect().  You are encouraged to test this by setting the global
+        SIMULATE_CAN_CONNECT variable to True.
 
         To use this with all the normal hooks, you should instantiate the harness, setup any
-        relations that you want active when the charm starts, and then call this method.
+        relations that you want active when the charm starts, and then call this method.  This
+        method will automatically create and add peer relations that are specified in
+        metadata.yaml.
 
         Example::
 
@@ -533,9 +536,10 @@ class Harness(typing.Generic[CharmType]):
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
 
-        This function creates a relation with an application and will trigger a relation-created
-        hook. To relate units (and trigger relation-joined and relation-changed hooks), you should
-        also call :meth:`.add_relation_unit`.
+        In the case of adding peer relations, `remote_app` is *this* app.  This function creates a
+        relation with an application and will trigger a relation-created hook. To relate units (and
+        trigger relation-joined and relation-changed hooks), you should also call
+        :meth:`.add_relation_unit`.
 
         Args:
             relation_name: The relation on Charm that is being related to
