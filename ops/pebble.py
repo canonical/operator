@@ -34,6 +34,7 @@ import shutil
 import signal
 import socket
 import sys
+import tempfile
 import threading
 import time
 import types
@@ -1636,45 +1637,40 @@ class Client:
         if not boundary:
             raise ProtocolError('invalid boundary {!r}'.format(boundary))
 
-        # We have to manually write the Content-Type with boundary, because
-        # email.parser expects the entire multipart message with headers.
-        parser = email.parser.BytesFeedParser()
-        parser.feed(b'Content-Type: multipart/form-data; boundary='
-                    + boundary.encode('utf-8') + b'\r\n\r\n')
+        parser = _FilesParser(boundary)
 
-        # Then read the rest of the response and feed it to the parser.
         while True:
             chunk = response.read(self._chunk_size)
             if not chunk:
                 break
             parser.feed(chunk)
-        message = parser.close()
 
-        # Walk over the multipart parts and read content and metadata.
-        resp = None
-        content = None
-        for part in message.walk():
-            name = part.get_param('name', header='Content-Disposition')
-            if name == 'response':
-                resp = _json_loads(part.get_payload())
-            elif name == 'files':
-                filename = part.get_filename()
-                if filename != path:
-                    raise ProtocolError('path not expected: {}'.format(filename))
-                # decode=True, ironically, avoids decoding bytes to str
-                content = part.get_payload(decode=True)
-
+        resp = parser.get_response()
         if resp is None:
             raise ProtocolError('no "response" field in multipart body')
         self._raise_on_path_error(resp, path)
 
-        if content is None:
+        filenames = parser.filenames()
+        if not filenames:
             raise ProtocolError('no file content in multipart response')
-        if encoding is not None:
-            reader = io.StringIO(content.decode(encoding))
-        else:
-            reader = io.BytesIO(content)
-        return reader
+        elif len(filenames) > 1:
+            raise ProtocolError('single file request resulted in a multi-file response')
+
+        filename = filenames[0]
+        if filename != path:
+            raise ProtocolError('path not expected: {!r}'.format(filename))
+
+        f = parser.get_file(path, encoding)
+
+        # The opened file remains usable after removing/unlinking on posix
+        # platforms until it is closed.  This prevents callers from
+        # interacting with it on disk.  But e.g. Windows doesn't allow
+        # removing opened files, and so we use the tempfile lib's
+        # helper class to auto-delete on close/gc for us.
+        if os.name != 'posix' or sys.platform == 'cygwin':
+            return tempfile._TemporaryFileWrapper(f, f.name, delete=True)
+        parser.remove_files()
+        return f
 
     @staticmethod
     def _raise_on_path_error(resp, path):
@@ -2164,3 +2160,238 @@ class Client:
             query['names'] = names
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
+
+
+class _FilesParser:
+    """A limited purpose multi-part parser backed by files for memory efficiency."""
+
+    def __init__(self, boundary: typing.Union[bytes, str]):
+        self._response = None
+        self._files = {}
+
+        # Prepare the MIME multipart boundary line patterns.
+        if isinstance(boundary, str):
+            boundary = boundary.encode()
+
+        # State vars, as we may enter the feed() function multiple times.
+        self._headers = None
+        self._part_type = None
+        self._response_data = bytearray()
+
+        self._max_lookahead = 8 * 1024 * 1024
+
+        self._parser = _MultipartParser(
+            boundary,
+            self._process_header,
+            self._process_body,
+            max_lookahead=self._max_lookahead)
+
+        # RFC 2046 says that the boundary string needs to be preceded by a CRLF.
+        # Unfortunately, the request library's header parsing logic strips off one of
+        # these, so we'll prime the parser buffer with that missing sequence.
+        self._parser.feed(b'\r\n')
+
+    def _process_header(self, data: bytes):
+        parser = email.parser.BytesFeedParser()
+        parser.feed(data)
+        self._headers = parser.close()
+
+        content_disposition = self._headers.get_content_disposition()
+        if content_disposition != 'form-data':
+            raise ProtocolError(
+                'unexpected content disposition: {!r}'.format(content_disposition))
+
+        name = self._headers.get_param('name', header='content-disposition')
+        if name == 'files':
+            filename = self._headers.get_filename()
+            if filename is None:
+                raise ProtocolError('multipart "files" part missing filename')
+            self._prepare_tempfile(filename)
+        elif name != 'response':
+            raise ProtocolError(
+                'unexpected name in content-disposition header: {!r}'.format(name))
+
+        self._part_type = name
+
+    def _process_body(self, data: bytes, done=False):
+        if self._part_type == 'response':
+            self._response_data.extend(data)
+            if done:
+                if len(self._response_data) > self._max_lookahead:
+                    raise ProtocolError('response end marker not found')
+                self._response = json.loads(self._response_data.decode())
+                self._response_data = bytearray()
+        elif self._part_type == 'files':
+            if done:
+                # This is the final write.
+                outfile = self._get_open_tempfile()
+                outfile.write(data)
+                outfile.close()
+                self._headers = None
+            else:
+                # Not the end of file data yet. Don't open/close file for intermediate writes
+                outfile = self._get_open_tempfile()
+                outfile.write(data)
+
+    def remove_files(self):
+        """Remove all temporary files on disk."""
+        for file in self._files.values():
+            os.unlink(file.name)
+        self._files.clear()
+
+    def feed(self, data: bytes):
+        """Provide more data to the running parser."""
+        self._parser.feed(data)
+
+    def _prepare_tempfile(self, filename):
+        tf = tempfile.NamedTemporaryFile(delete=False)
+        self._files[filename] = tf
+        self.current_filename = filename
+
+    def _get_open_tempfile(self):
+        return self._files[self.current_filename]
+
+    def get_response(self):
+        """Return the deserialized JSON object from the multipart "response" field."""
+        return self._response
+
+    def filenames(self):
+        """Return a list of filenames from the "files" parts of the response."""
+        return list(self._files.keys())
+
+    def get_file(self, path, encoding):
+        """Return an open file object containing the data."""
+        mode = 'r' if encoding else 'rb'
+        # We're using text-based file I/O purely for file encoding purposes, not for
+        # newline normalization.  newline='' serves the line endings as-is.
+        newline = '' if encoding else None
+        return open(self._files[path].name, mode, encoding=encoding, newline=newline)
+
+
+class _MultipartParser:
+    def __init__(
+            self,
+            marker: bytes,
+            handle_header,
+            handle_body,
+            max_lookahead: int = 0,
+            max_boundary_length: int = 0):
+        r"""Configures a parser for mime multipart messages.
+
+        Args:
+            marker: the multipart boundary marker (i.e. in "\r\n--<marker>--\r\n")
+
+            handle_header(data): called once with the entire contents of a part
+            header as encountered in data fed to the parser
+
+            handle_body(data, done=False): called incrementally as part body
+            data is fed into the parser - its "done" parameter is set to true when
+            the body is complete.
+
+            max_lookahead: maximum amount of bytes to buffer when searching for a complete header.
+
+            max_boundary_length: maximum number of bytes that can make up a part
+            boundary (e.g. \r\n--<marker>--\r\n")
+        """
+        self._marker = marker
+        self._handle_header = handle_header
+        self._handle_body = handle_body
+        self._max_lookahead = max_lookahead
+        self._max_boundary_length = max_boundary_length
+
+        self._buf = bytearray()
+        self._pos = 0  # current position in buf
+        self._done = False  # whether we have found the terminal boundary and are done parsing
+        self._header_terminator = b'\r\n\r\n'
+
+        # RFC 2046 notes optional "linear whitespace" (e.g. [ \t]+) after the boundary pattern
+        # and the optional "--" suffix.  The boundaries strings can be constructed as follows:
+        #
+        #     boundary = \r\n--<marker>[ \t]+\r\n
+        #     terminal_boundary = \r\n--<marker>--[ \t]+\r\n
+        #
+        # 99 is arbitrarily chosen to represent a max number of linear
+        # whitespace characters to help avoid wrongly writing boundary
+        # characters into a (temporary) file.
+        if not max_boundary_length:
+            self._max_boundary_length = len(b'\r\n--' + marker + b'--\r\n') + 99
+
+    def feed(self, data: bytes):
+        """Feeds data incrementally into the parser."""
+        if self._done:
+            return
+        self._buf.extend(data)
+
+        while True:
+            # seek to a boundary if we aren't already on one
+            i, n, self._done = _next_part_boundary(self._buf, self._marker)
+            if i == -1 or self._done:
+                return  # waiting for more data or terminal boundary reached
+
+            if self._pos == 0:
+                # parse the part header
+                if self._max_lookahead and len(self._buf) - self._pos > self._max_lookahead:
+                    raise ProtocolError('header terminator not found')
+                term_index = self._buf.find(self._header_terminator)
+                if term_index == -1:
+                    return  # waiting for more data
+
+                start = i + n
+                # data includes the double CRLF at the end of the header.
+                end = term_index + len(self._header_terminator)
+
+                self._handle_header(self._buf[start:end])
+                self._pos = end
+            else:
+                # parse the part body
+                ii, nn, self._done = _next_part_boundary(self._buf, self._marker, start=self._pos)
+                safe_bound = max(0, len(self._buf) - self._max_boundary_length)
+                if ii != -1:
+                    # part body is finished
+                    self._handle_body(self._buf[self._pos:ii], done=True)
+                    self._buf = self._buf[ii:]
+                    self._pos = 0
+                    if self._done:
+                        return  # terminal boundary reached
+                elif safe_bound > self._pos:
+                    # write partial body data
+                    data = self._buf[self._pos:safe_bound]
+                    self._pos = safe_bound
+                    self._handle_body(data)
+                    return  # waiting for more data
+                else:
+                    return  # waiting for more data
+
+
+def _next_part_boundary(buf, marker, start=0):
+    """Returns the index of the next boundary marker in buf beginning at start.
+
+    Returns:
+        (index, length, is_terminal) or (-1, -1, False) if no boundary is found.
+    """
+    prefix = b'\r\n--' + marker
+    suffix = b'\r\n'
+    terminal_midfix = b'--'
+
+    i = buf.find(prefix, start)
+    if i == -1:
+        return -1, -1, False
+
+    pos = i + len(prefix)
+    is_terminal = False
+    if buf[pos:].startswith(terminal_midfix):
+        is_terminal = True
+        pos += len(terminal_midfix)
+
+    # Note: RFC 2046 notes optional "linear whitespace" (e.g. [ \t]) after the boundary pattern
+    # and the optional "--" suffix.
+    tail = buf[pos:]
+    for c in tail:
+        if c not in b' \t':
+            break
+        pos += 1
+
+    if buf[pos:].startswith(suffix):
+        pos += len(suffix)
+        return i, pos - i, is_terminal
+    return -1, -1, False

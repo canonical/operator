@@ -30,6 +30,7 @@ import unittest.mock
 import unittest.util
 import urllib.error
 import urllib.request
+import uuid
 
 import pytest
 
@@ -1094,6 +1095,158 @@ def build_mock_change_dict(change_id='70'):
     }
 
 
+class TestMultipartParser(unittest.TestCase):
+    class _Case:
+        def __init__(
+                self,
+                name,
+                data,
+                want_headers,
+                want_bodies,
+                want_bodies_done,
+                max_boundary=14,
+                max_lookahead=8 * 1024,
+                error=''):
+            self.name = name
+            self.data = data
+            self.want_headers = want_headers
+            self.want_bodies = want_bodies
+            self.want_bodies_done = want_bodies_done
+            self.max_boundary = max_boundary
+            self.max_lookahead = max_lookahead
+            self.error = error
+
+    def test_multipart_parser(self):
+        tests = [
+            TestMultipartParser._Case(
+                'baseline',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\nfoo bar\r\n--qwerty--\r\n',
+                [b'header foo\r\n\r\n'],
+                [b'foo bar\nfoo bar'],
+                want_bodies_done=[True],
+            ),
+            TestMultipartParser._Case(
+                'incomplete header',
+                b'\r\n--qwerty\r\nheader foo\r\n',
+                [],
+                [],
+                want_bodies_done=[],
+            ),
+            TestMultipartParser._Case(
+                'missing header',
+                b'\r\n--qwerty\r\nheader foo\r\n' + 40 * b' ',
+                [],
+                [],
+                want_bodies_done=[],
+                max_lookahead=40,
+                error='header terminator not found',
+            ),
+            TestMultipartParser._Case(
+                'incomplete body terminator',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\rhello my name is joe and I work in a button factory',  # noqa
+                [b'header foo\r\n\r\n'],
+                [b'foo bar\r\n--qwerty\rhello my name is joe and I work in a '],
+                want_bodies_done=[False],
+            ),
+            TestMultipartParser._Case(
+                'empty body',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\n\r\n--qwerty\r\n',
+                [b'header foo\r\n\r\n'],
+                [b''],
+                want_bodies_done=[True],
+            ),
+            TestMultipartParser._Case(
+                'ignore leading garbage',
+                b'hello my name is joe\r\n\n\n\n\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',  # noqa
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+            ),
+            TestMultipartParser._Case(
+                'ignore trailing garbage',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nhello my name is joe',
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+            ),
+            TestMultipartParser._Case(
+                'boundary allow linear whitespace',
+                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+                max_boundary=20,
+            ),
+            TestMultipartParser._Case(
+                'terminal boundary allow linear whitespace',
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty-- \t \r\n',
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+                max_boundary=20,
+            ),
+            TestMultipartParser._Case(
+                'multiple parts',
+                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
+                [b'header foo\r\n\r\n', b'header bar\r\n\r\n'],
+                [b'foo bar', b'foo baz'],
+                want_bodies_done=[True, True],
+            ),
+            TestMultipartParser._Case(
+                'ignore after terminal boundary',
+                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty--\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
+                [b'header foo\r\n\r\n'],
+                [b'foo bar'],
+                want_bodies_done=[True],
+            ),
+        ]
+
+        chunk_sizes = [1, 2, 3, 4, 5, 7, 13, 17, 19, 23, 29, 31, 37, 42, 50, 100, 1000]
+        marker = b'qwerty'
+        for i, test in enumerate(tests):
+            for chunk_size in chunk_sizes:
+                headers = []
+                bodies = []
+                bodies_done = []
+
+                def handle_header(data):
+                    headers.append(bytes(data))
+                    bodies.append(bytes())
+                    bodies_done.append(False)
+
+                def handle_body(data, done=False):
+                    bodies[-1] += data
+                    bodies_done[-1] = done
+
+                parser = pebble._MultipartParser(
+                    marker,
+                    handle_header,
+                    handle_body,
+                    max_boundary_length=test.max_boundary,
+                    max_lookahead=test.max_lookahead)
+                src = io.BytesIO(test.data)
+
+                try:
+                    while True:
+                        data = src.read(chunk_size)
+                        if not data:
+                            break
+                        parser.feed(data)
+                except Exception as err:
+                    if not test.error:
+                        self.fail('unexpected error:', err)
+                        break
+                    self.assertEqual(test.error, err.message())
+                else:
+                    if test.error:
+                        self.fail('missing expected error: {!r}'.format(test.error))
+
+                    msg = 'test case {} ({}), chunk size {}'.format(i + 1, test.name, chunk_size)
+                    self.assertEqual(test.want_headers, headers, msg)
+                    self.assertEqual(test.want_bodies, bodies, msg)
+                    self.assertEqual(test.want_bodies_done, bodies_done, msg)
+
+
 class TestClient(unittest.TestCase):
     maxDiff = None
 
@@ -1679,28 +1832,60 @@ services:
             ('GET', '/v1/services', {'names': 'svc2'}, None),
         ])
 
-    def test_pull_text(self):
+    def test_pull_boundary_spanning_chunk(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80\nfoo\r\nbar' + b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [{"path": "/etc/hosts"}],
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
-        content = self.client.pull('/etc/hosts').read()
+        self.client._chunk_size = 13
+        with self.client.pull('/etc/hosts') as infile:
+            content = infile.read()
+        self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
+                {'Accept': 'multipart/form-data'}, None),
+        ])
+
+    def test_pull_text(self):
+        self.client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
+""",
+        ))
+
+        with self.client.pull('/etc/hosts') as infile:
+            content = infile.read()
         self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
 
         self.assertEqual(self.client.requests, [
@@ -1711,25 +1896,26 @@ Content-Disposition: form-data; name="response"
     def test_pull_binary(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-127.0.0.1 localhost  # """ + b'\xf0\x9f\x98\x80\nfoo\r\nbar' + b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [{"path": "/etc/hosts"}],
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
-        content = self.client.pull('/etc/hosts', encoding=None).read()
+        with self.client.pull('/etc/hosts', encoding=None) as infile:
+            content = infile.read()
         self.assertEqual(content, b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar')
 
         self.assertEqual(self.client.requests, [
@@ -1740,10 +1926,10 @@ Content-Disposition: form-data; name="response"
     def test_pull_path_error(self):
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="response"
-
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
 {
     "result": [
         {"path": "/etc/hosts", "error": {"kind": "not-found", "message": "not found"}}
@@ -1751,8 +1937,8 @@ Content-Disposition: form-data; name="response"
     "status": "OK",
     "status-code": 200,
     "type": "sync"
-}
---01234567890123456789012345678901--
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
 
@@ -1782,26 +1968,35 @@ Content-Disposition: form-data; name="response"
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/bad"
-
-bad path
---01234567890123456789012345678901--
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/bad"\r
+\r
+bad path\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/etc/hosts"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
             self.client.pull('/etc/hosts')
-        self.assertEqual(str(cm.exception), "path not expected: /bad")
+        self.assertEqual(str(cm.exception), "path not expected: '/bad'")
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
-            b"""
---01234567890123456789012345678901
-Content-Disposition: form-data; name="files"; filename="/etc/hosts"
-
-bad path
---01234567890123456789012345678901--
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
+\r
+bad path\r
+--01234567890123456789012345678901--\r
 """,
         ))
         with self.assertRaises(pebble.ProtocolError) as cm:
@@ -3128,6 +3323,15 @@ class TestRealPebble(unittest.TestCase):
         out, err = process.wait_output()
         self.assertEqual(out, b'FOO\nBAR\n')
         self.assertEqual(err, b'')
+
+    def test_push_pull(self):
+        fname = os.path.join(tempfile.gettempdir(), 'pebbletest-{}'.format(uuid.uuid4()))
+        content = 'foo\nbar\nbaz-42'
+        self.client.push(fname, content)
+        with self.client.pull(fname) as f:
+            data = f.read()
+            self.assertEqual(data, content)
+        os.remove(fname)
 
     def test_exec_timeout(self):
         process = self.client.exec(['sleep', '0.2'], timeout=0.1)
