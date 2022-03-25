@@ -12,7 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Infrastructure to build unittests for Charms using the Operator Framework."""
+"""Infrastructure to build unittests for Charms using the Operator Framework.
+
+Global Variables:
+
+    SIMULATE_CAN_CONNECT: This enables can_connect simulation for the test
+    harness.  It should be set *before* you create Harness instances and not
+    changed after.  You *should* set this to true - it will help your tests be
+    more accurate!  This causes all containers' can_connect states initially
+    be False rather than True and causes the testing with the harness to model
+    and track can_connect state for containers accurately.  This means that
+    calls that require communication with the container API (e.g.
+    Container.push, Container.get_plan, Container.add_layer, etc.) will only
+    succeed if Container.can_connect() returns True and will raise exceptions
+    otherwise.  can_connect state evolves automatically to track with events
+    associated with container state, (e.g.  calling container_pebble_ready).
+    If SIMULATE_CAN_CONNECT is True, can_connect state for containers can also
+    be manually controlled using Harness.set_can_connect.
+"""
+
 
 import datetime
 import fnmatch
@@ -22,12 +40,17 @@ import random
 import signal
 import tempfile
 import typing
+import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
+
+# Toggles Container.can_connect simulation globally for all harness instances.
+# For this to work, it must be set *before* Harness instances are created.
+SIMULATE_CAN_CONNECT = False
 
 # OptionalYAML is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
@@ -100,6 +123,23 @@ class Harness(typing.Generic[CharmType]):
         self._defaults = self._load_config_defaults(config)
         self._update_config(key_values=self._defaults)
 
+        # TODO: If/when we decide to allow breaking changes for a release,
+        # change SIMULATE_CAN_CONNECT default value to True and remove the
+        # warning message below.  This warning was added 2022-03-22
+        if not SIMULATE_CAN_CONNECT:
+            warnings.warn(
+                'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
+                'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
+
+    def set_can_connect(self, container: typing.Union[str, model.Container], val: bool):
+        """Change the simulated can_connect status of a container's underlying pebble client.
+
+        Calling this method raises an exception if SIMULATE_CAN_CONNECT is False.
+        """
+        if isinstance(container, str):
+            container = self.model.unit.get_container(container)
+        self._backend._set_can_connect(container._pebble, val)
+
     @property
     def charm(self) -> CharmType:
         """Return the instance of the charm class that was passed to __init__.
@@ -150,10 +190,12 @@ class Harness(typing.Generic[CharmType]):
         """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
 
         This triggers install, relation-created, config-changed, start, and any relation-joined
-        hooks. Based on what relations have been defined before you called begin().
-        Note that all of these are fired before returning control to the test suite, so if you
-        want to introspect what happens at each step, you need to fire them directly
-        (eg Charm.on.install.emit()).
+        hooks. Based on what relations have been defined before you called begin().  Note that all
+        of these are fired before returning control to the test suite, so if you want to introspect
+        what happens at each step, you need to fire them directly (eg Charm.on.install.emit()).  In
+        your hook callback functions, you should not assume that workload containers are active;
+        guard such code with checks to Container.can_connect().  You are encouraged to test this by
+        setting the global SIMULATE_CAN_CONNECT variable to True.
 
         To use this with all the normal hooks, you should instantiate the harness, setup any
         relations that you want active when the charm starts, and then call this method.
@@ -176,6 +218,7 @@ class Harness(typing.Generic[CharmType]):
             # To be fired.
         """
         self.begin()
+
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
@@ -718,11 +761,16 @@ class Harness(typing.Generic[CharmType]):
     def container_pebble_ready(self, container_name: str):
         """Fire the pebble_ready hook for the associated container.
 
-        This will do nothing if the begin() has not been called.
+        This will do nothing if the begin() has not been called.  If
+        SIMULATE_CAN_CONNECT is True, this will switch the given
+        container's can_connect state to True before the hook
+        function is called.
         """
         if self.charm is None:
             return
         container = self.model.unit.get_container(container_name)
+        if SIMULATE_CAN_CONNECT:
+            self.set_can_connect(container, True)
         self.charm.on[container_name].pebble_ready.emit(container)
 
     def get_workload_version(self) -> str:
@@ -1049,7 +1097,21 @@ class _TestingModelBackend:
         # {socket_path : _TestingPebbleClient}
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
+        self._pebble_clients_can_connect = {}  # type: {_TestingPebbleClient: bool}
         self._planned_units = None
+
+    def _can_connect(self, pebble_client) -> bool:
+        """Returns whether the mock client is active and can support API calls with no errors."""
+        return self._pebble_clients_can_connect[pebble_client]
+
+    def _set_can_connect(self, pebble_client, val):
+        """Manually sets the can_connect state for the given mock client."""
+        if not SIMULATE_CAN_CONNECT:
+            raise RuntimeError('must set SIMULATE_CAN_CONNECT=True before using set_can_connect')
+        if pebble_client not in self._pebble_clients_can_connect:
+            msg = 'cannot set can_connect for the client - are you running a "real" pebble test?'
+            raise RuntimeError(msg)
+        self._pebble_clients_can_connect[pebble_client] = val
 
     def _cleanup(self):
         if self._resource_dir is not None:
@@ -1239,6 +1301,7 @@ class _TestingModelBackend:
         if client is None:
             client = _TestingPebbleClient(self)
             self._pebble_clients[socket_path] = client
+        self._pebble_clients_can_connect[client] = not SIMULATE_CAN_CONNECT
         return client
 
     def planned_units(self):
@@ -1280,9 +1343,15 @@ class _TestingPebbleClient:
         # Has a service been started/stopped?
         self._service_status = {}
         self._fs = _MockFilesystem()
+        self._backend = backend
+
+    def _check_connection(self):
+        if not self._backend._can_connect(self):
+            raise pebble.ConnectionError('cannot connect to pebble')
 
     def get_system_info(self) -> pebble.SystemInfo:
-        return pebble.SystemInfo(version="1.0.0")
+        self._check_connection()
+        return pebble.SystemInfo(version='1.0.0')
 
     def get_warnings(
             self, select: pebble.WarningState = pebble.WarningState.PENDING,
@@ -1304,6 +1373,7 @@ class _TestingPebbleClient:
         raise NotImplementedError(self.abort_change)
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+        self._check_connection()
         for name, service in self._render_services().items():
             # TODO: jam 2021-04-20 This feels awkward that Service.startup might be a string or
             #  might be an enum. Probably should make Service.startup a property rather than an
@@ -1326,6 +1396,8 @@ class _TestingPebbleClient:
         if isinstance(services, str):
             raise TypeError('start_services should take a list of names, not just "{}"'.format(
                 services))
+
+        self._check_connection()
 
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.start() which currently ignores the return value
@@ -1358,6 +1430,9 @@ cannot perform the following tasks:
         if isinstance(services, str):
             raise TypeError('stop_services should take a list of names, not just "{}"'.format(
                 services))
+
+        self._check_connection()
+
         # TODO: handle invalid names
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.stop() which currently ignores the return value
@@ -1386,6 +1461,9 @@ ChangeError: cannot perform the following tasks:
         if isinstance(services, str):
             raise TypeError('restart_services should take a list of names, not just "{}"'.format(
                 services))
+
+        self._check_connection()
+
         # TODO: handle invalid names
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.restart() which currently ignores the return value
@@ -1418,6 +1496,9 @@ ChangeError: cannot perform the following tasks:
         else:
             raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
                 type(layer).__name__))
+
+        self._check_connection()
+
         if label in self._layers:
             # TODO: jam 2021-04-19 These should not be RuntimeErrors but should be proper error
             #  types. https://github.com/canonical/operator/issues/514
@@ -1451,6 +1532,7 @@ ChangeError: cannot perform the following tasks:
         return services
 
     def get_plan(self) -> pebble.Plan:
+        self._check_connection()
         plan = pebble.Plan('{}')
         services = self._render_services()
         if not services:
@@ -1463,6 +1545,8 @@ ChangeError: cannot perform the following tasks:
         if isinstance(names, str):
             raise TypeError('start_services should take a list of names, not just "{}"'.format(
                 names))
+
+        self._check_connection()
         services = self._render_services()
         infos = []
         if names is None:
@@ -1487,12 +1571,14 @@ ChangeError: cannot perform the following tasks:
 
     def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
                                                                           typing.TextIO]:
+        self._check_connection()
         return self._fs.open(path, encoding=encoding)
 
     def push(
             self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
                 'generic-file-error',
@@ -1512,6 +1598,7 @@ ChangeError: cannot perform the following tasks:
 
     def list_files(self, path: str, *, pattern: str = None,
                    itself: bool = False) -> typing.List[pebble.FileInfo]:
+        self._check_connection()
         try:
             files = [self._fs.get_path(path)]
         except FileNotFoundError:
@@ -1552,6 +1639,7 @@ ChangeError: cannot perform the following tasks:
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+        self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
                 'generic-file-error',
@@ -1574,6 +1662,7 @@ ChangeError: cannot perform the following tasks:
             )
 
     def remove_path(self, path: str, *, recursive: bool = False):
+        self._check_connection()
         try:
             file_or_dir = self._fs.get_path(path)
         except FileNotFoundError:
@@ -1594,6 +1683,7 @@ ChangeError: cannot perform the following tasks:
     def send_signal(self, sig: typing.Union[int, str], *service_names: str):
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')
+        self._check_connection()
 
         # Convert signal to str
         if isinstance(sig, int):
