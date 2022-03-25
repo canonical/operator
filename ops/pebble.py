@@ -2137,6 +2137,30 @@ class Client:
         }
         self._request('POST', '/v1/signals', body=body)
 
+    def get_checks(
+        self,
+        level: CheckLevel = None,
+        names: typing.List[str] = None
+    ) -> typing.List[CheckInfo]:
+        """Get the check status for the configured checks.
+
+        Args:
+            level: Optional check level to query for (default is to fetch
+                checks with any level).
+            names: Optional list of check names to query for (default is to
+                fetch checks with any name).
+
+        Returns:
+            List of :class:`CheckInfo` objects.
+        """
+        query = {}
+        if level is not None:
+            query['level'] = level.value
+        if names:
+            query['names'] = names
+        resp = self._request('GET', '/v1/checks', query)
+        return [CheckInfo.from_dict(info) for info in resp['result']]
+
 
 class _FilesParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
@@ -2371,26 +2395,3 @@ def _next_part_boundary(buf, marker, start=0):
         pos += len(suffix)
         return i, pos - i, is_terminal
     return -1, -1, False
-    def get_checks(
-        self,
-        level: CheckLevel = None,
-        names: typing.List[str] = None
-    ) -> typing.List[CheckInfo]:
-        """Get the check status for the configured checks.
-
-        Args:
-            level: Optional check level to query for (default is to fetch
-                checks with any level).
-            names: Optional list of check names to query for (default is to
-                fetch checks with any name).
-
-        Returns:
-            List of :class:`CheckInfo` objects.
-        """
-        query = {}
-        if level is not None:
-            query['level'] = level.value
-        if names:
-            query['names'] = names
-        resp = self._request('GET', '/v1/checks', query)
-        return [CheckInfo.from_dict(info) for info in resp['result']]

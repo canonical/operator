@@ -28,9 +28,9 @@ import time
 import unittest
 import unittest.mock
 import unittest.util
-import uuid
 import urllib.error
 import urllib.request
+import uuid
 
 import pytest
 
