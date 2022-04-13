@@ -660,6 +660,22 @@ class Service:
         ]
         return {name: value for name, value in fields if value}
 
+    def _merge(self, other: 'Service'):
+        """Merges this service object with another service definition.
+
+        For attributes present in both objects, the passed in service
+        attributes take precedence.
+        """
+        for name, value in other.__dict__.items():
+            if not value or name == 'name':
+                continue
+            if name in ['after', 'before', 'requires']:
+                getattr(self, name).extend(value)
+            elif name in ['environment', 'on_check_failure']:
+                getattr(self, name).update(value)
+            else:
+                setattr(self, name, value)
+
     def __repr__(self) -> str:
         return 'Service({!r})'.format(self.to_dict())
 

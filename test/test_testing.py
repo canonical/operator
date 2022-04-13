@@ -2389,30 +2389,30 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(initial_plan.to_yaml(), '{}\n')
         container = harness.model.unit.get_container('foo')
         container.pebble.add_layer('test-ab', '''\
-summary: test-layer
-description: a layer that we can use for testing
-services:
-  a:
-    command: /bin/echo hello from a
-  b:
-    command: /bin/echo hello from b
-''')
+            summary: test-layer
+            description: a layer that we can use for testing
+            services:
+              a:
+                command: /bin/echo hello from a
+              b:
+                command: /bin/echo hello from b
+            ''')
         container.pebble.add_layer('test-c', '''\
-summary: test-for-c
-services:
-  c:
-    command: /bin/echo hello from c
-''')
+            summary: test-for-c
+            services:
+              c:
+                command: /bin/echo hello from c
+            ''')
         plan = container.pebble.get_plan()
-        self.assertEqual(plan.to_yaml(), '''\
-services:
-  a:
-    command: /bin/echo hello from a
-  b:
-    command: /bin/echo hello from b
-  c:
-    command: /bin/echo hello from c
-''')
+        self.assertEqual(plan.to_yaml(), textwrap.dedent('''\
+            services:
+              a:
+                command: /bin/echo hello from a
+              b:
+                command: /bin/echo hello from b
+              c:
+                command: /bin/echo hello from c
+            '''))
         harness_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(harness_plan.to_yaml(), plan.to_yaml())
 
@@ -2781,56 +2781,203 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         self.assertIsInstance(plan, pebble.Plan)
         self.assertEqual('{}\n', plan.to_yaml())
         client.add_layer('foo', pebble.Layer('''\
-summary: Foo
-description: |
-  A longer description about Foo
-services:
-  serv:
-    summary: Serv
-    description: |
-      A description about Serv the amazing service.
-    startup: enabled
-    override: replace
-    command: '/bin/echo hello'
-    environment:
-      KEY: VALUE
-'''))
+            summary: Foo
+            description: |
+              A longer description about Foo
+            services:
+              serv:
+                summary: Serv
+                description: |
+                  A description about Serv the amazing service.
+                startup: enabled
+                override: replace
+                command: '/bin/echo hello'
+                environment:
+                  KEY: VALUE
+            '''))
         plan = client.get_plan()
         # The YAML should be normalized
-        self.assertEqual('''\
-services:
-  serv:
-    command: /bin/echo hello
-    description: 'A description about Serv the amazing service.
+        self.assertEqual(textwrap.dedent('''\
+            services:
+              serv:
+                command: /bin/echo hello
+                description: 'A description about Serv the amazing service.
 
-      '
-    environment:
-      KEY: VALUE
-    override: replace
-    startup: enabled
-    summary: Serv
-''', plan.to_yaml())
+                  '
+                environment:
+                  KEY: VALUE
+                override: replace
+                startup: enabled
+                summary: Serv
+            '''), plan.to_yaml())
+
+    def test_add_layer_merge(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        self.assertIsInstance(plan, pebble.Plan)
+        self.assertEqual('{}\n', plan.to_yaml())
+        client.add_layer('foo', pebble.Layer('''\
+            summary: Foo
+            description: |
+              A longer description about Foo
+            services:
+              serv:
+                summary: Serv
+                description: |
+                  A description about Serv the amazing service.
+                startup: enabled
+                override: replace
+                command: '/bin/echo hello'
+                environment:
+                  KEY1: VALUE1
+                after:
+                - thing1
+                before:
+                - thing1
+                requires:
+                - thing1
+                user: user1
+                user-id: userID1
+                group: group1
+                group-id: groupID1
+                on-failure: thing1
+                on-success: thing1
+                on-check-failure:
+                  KEY1: VALUE1
+                backoff-delay: 1
+                backoff-factor: 2
+                backoff-limit: 1
+            '''))
+        plan = client.get_plan()
+        # The YAML should be normalized
+        self.maxDiff = None
+        self.assertEqual(textwrap.dedent('''\
+            services:
+              serv:
+                after:
+                - thing1
+                backoff-delay: 1
+                backoff-factor: 2
+                backoff-limit: 1
+                before:
+                - thing1
+                command: /bin/echo hello
+                description: 'A description about Serv the amazing service.
+
+                  '
+                environment:
+                  KEY1: VALUE1
+                group: group1
+                group-id: groupID1
+                on-check-failure:
+                  KEY1: VALUE1
+                on-failure: thing1
+                on-success: thing1
+                override: replace
+                requires:
+                - thing1
+                startup: enabled
+                summary: Serv
+                user: user1
+                user-id: userID1
+            '''), plan.to_yaml())
+
+        client.add_layer('foo', pebble.Layer('''\
+            summary: Foo
+            description: |
+              A longer description about Foo
+            services:
+              serv:
+                summary: Serv
+                description: |
+                  A new description of the the amazing Serv service.
+                startup: enabled
+                override: merge
+                command: '/bin/echo hello'
+                environment:
+                  KEY1: VALUE4
+                  KEY2: VALUE2
+                  KEY3: VALUE3
+                after:
+                - thing2
+                before:
+                - thing2
+                requires:
+                - thing2
+                user: user2
+                user-id: userID2
+                group: group2
+                group-id: groupID2
+                on-success: thing2
+                on-failure: thing2
+                on-check-failure:
+                  KEY1: VALUE4
+                  KEY2: VALUE2
+                  KEY3: VALUE3
+                backoff-delay: 2
+                backoff-factor: 3
+                backoff-limit: 2
+            '''), combine=True)
+        plan = client.get_plan()
+        # The YAML should be normalized
+        self.assertEqual(textwrap.dedent('''\
+            services:
+              serv:
+                after:
+                - thing1
+                - thing2
+                backoff-delay: 2
+                backoff-factor: 3
+                backoff-limit: 2
+                before:
+                - thing1
+                - thing2
+                command: /bin/echo hello
+                description: 'A new description of the the amazing Serv service.
+
+                  '
+                environment:
+                  KEY1: VALUE4
+                  KEY2: VALUE2
+                  KEY3: VALUE3
+                group: group2
+                group-id: groupID2
+                on-check-failure:
+                  KEY1: VALUE4
+                  KEY2: VALUE2
+                  KEY3: VALUE3
+                on-failure: thing2
+                on-success: thing2
+                override: merge
+                requires:
+                - thing1
+                - thing2
+                startup: enabled
+                summary: Serv
+                user: user2
+                user-id: userID2
+            '''), plan.to_yaml())
 
     def test_add_layer_not_combined(self):
         client = self.get_testing_client()
         plan = client.get_plan()
         self.assertIsInstance(plan, pebble.Plan)
         self.assertEqual('{}\n', plan.to_yaml())
-        service = '''\
-summary: Foo
-description: |
-  A longer description about Foo
-services:
-  serv:
-    summary: Serv
-    description: |
-      A description about Serv the amazing service.
-    startup: enabled
-    override: replace
-    command: '/bin/echo hello'
-    environment:
-      KEY: VALUE
-'''
+        service = textwrap.dedent('''\
+            summary: Foo
+            description: |
+              A longer description about Foo
+            services:
+              serv:
+                summary: Serv
+                description: |
+                  A description about Serv the amazing service.
+                startup: enabled
+                override: replace
+                command: '/bin/echo hello'
+                environment:
+                  KEY: VALUE
+            ''')
         client.add_layer('foo', pebble.Layer(service))
         # TODO: jam 2021-04-19 We should have a clearer error type for this case. The actual
         #  pebble raises an HTTP exception. See https://github.com/canonical/operator/issues/514
@@ -2842,149 +2989,156 @@ services:
     def test_add_layer_three_services(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    override: replace
-    command: '/bin/echo foo'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                override: replace
+                command: '/bin/echo foo'
+            ''')
         client.add_layer('bar', '''\
-summary: bar
-services:
-  bar:
-    summary: The Great Bar
-    startup: enabled
-    override: replace
-    command: '/bin/echo bar'
-''')
+            summary: bar
+            services:
+              bar:
+                summary: The Great Bar
+                startup: enabled
+                override: replace
+                command: '/bin/echo bar'
+            ''')
         client.add_layer('baz', '''\
-summary: baz
-services:
-  baz:
-    summary: Not Bar, but Baz
-    startup: enabled
-    override: replace
-    command: '/bin/echo baz'
-''')
+            summary: baz
+            services:
+              baz:
+                summary: Not Bar, but Baz
+                startup: enabled
+                override: replace
+                command: '/bin/echo baz'
+            ''')
         plan = client.get_plan()
         self.maxDiff = 1000
         # Alphabetical services, and the YAML should be normalized
-        self.assertEqual('''\
-services:
-  bar:
-    command: /bin/echo bar
-    override: replace
-    startup: enabled
-    summary: The Great Bar
-  baz:
-    command: /bin/echo baz
-    override: replace
-    startup: enabled
-    summary: Not Bar, but Baz
-  foo:
-    command: /bin/echo foo
-    override: replace
-    startup: enabled
-    summary: Foo
-''', plan.to_yaml())
+        self.assertEqual(textwrap.dedent('''\
+            services:
+              bar:
+                command: /bin/echo bar
+                override: replace
+                startup: enabled
+                summary: The Great Bar
+              baz:
+                command: /bin/echo baz
+                override: replace
+                startup: enabled
+                summary: Not Bar, but Baz
+              foo:
+                command: /bin/echo foo
+                override: replace
+                startup: enabled
+                summary: Foo
+            '''), plan.to_yaml())
 
     def test_add_layer_combine_no_override(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-command: '/bin/echo foo'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+            command: '/bin/echo foo'
+            ''')
         # TODO: jam 2021-04-19 Pebble currently raises a HTTP Error 500 Internal Service Error
         #  if you don't supply an override directive. That needs to be fixed and this test
         #  should be updated. https://github.com/canonical/operator/issues/514
         with self.assertRaises(RuntimeError):
             client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    command: '/bin/echo foo'
-''', combine=True)
+                summary: foo
+                services:
+                  foo:
+                    summary: Foo
+                    command: '/bin/echo foo'
+                ''', combine=True)
 
     def test_add_layer_combine_override_replace(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-  foo:
-    summary: Foo
-    command: '/bin/echo foo'
-''')
+            summary: foo
+            services:
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+              foo:
+                summary: Foo
+                command: '/bin/echo foo'
+            ''')
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    command: '/bin/echo foo new'
-    override: replace
-''', combine=True)
-        self.assertEqual('''\
-services:
-  bar:
-    command: /bin/echo bar
-    summary: Bar
-  foo:
-    command: /bin/echo foo new
-    override: replace
-''', client.get_plan().to_yaml())
+            summary: foo
+            services:
+              foo:
+                command: '/bin/echo foo new'
+                override: replace
+            ''', combine=True)
+        self.assertEqual(textwrap.dedent('''\
+            services:
+              bar:
+                command: /bin/echo bar
+                summary: Bar
+              foo:
+                command: /bin/echo foo new
+                override: replace
+            '''), client.get_plan().to_yaml())
 
     def test_add_layer_combine_override_merge(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-  foo:
-    summary: Foo
-    command: '/bin/echo foo'
-''')
-        # TODO: jam 2021-04-19 override: merge should eventually be supported, but if it isn't
-        #  supported by the framework, we should fail rather than do the wrong thing
-        with self.assertRaises(RuntimeError):
-            client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    command: '/bin/echo foob'
-    override: merge
-''', combine=True)
+            summary: foo
+            services:
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+              foo:
+                summary: Foo
+                command: '/bin/echo foo'
+            ''')
+        client.add_layer('foo', '''\
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                command: '/bin/echo foob'
+                override: merge
+            ''', combine=True)
+        self.assertEqual(textwrap.dedent('''\
+            services:
+              bar:
+                command: /bin/echo bar
+                summary: Bar
+              foo:
+                command: /bin/echo foob
+                override: merge
+                summary: Foo
+            '''), client.get_plan().to_yaml())
 
     def test_add_layer_combine_override_unknown(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-  foo:
-    summary: Foo
-    command: '/bin/echo foo'
-''')
+            summary: foo
+            services:
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+              foo:
+                summary: Foo
+                command: '/bin/echo foo'
+            ''')
         with self.assertRaises(RuntimeError):
             client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    command: '/bin/echo foob'
-    override: blah
-''', combine=True)
+                summary: foo
+                services:
+                  foo:
+                    summary: Foo
+                    command: '/bin/echo foob'
+                    override: blah
+                ''', combine=True)
 
     def test_get_services_none(self):
         client = self.get_testing_client()
@@ -2994,16 +3148,16 @@ services:
     def test_get_services_not_started(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
         bar_info = infos[0]
@@ -3021,16 +3175,16 @@ services:
     def test_get_services_autostart(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         client.autostart_services()
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
@@ -3049,16 +3203,16 @@ services:
     def test_get_services_start_stop(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         client.start_services(['bar'])
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
@@ -3082,16 +3236,16 @@ services:
     def test_get_services_bad_request(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         # It is a common mistake to pass just a name vs a list of names, so catch it with a
         # TypeError
         with self.assertRaises(TypeError):
@@ -3100,16 +3254,16 @@ services:
     def test_get_services_subset(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         infos = client.get_services(['foo'])
         self.assertEqual(len(infos), 1)
         foo_info = infos[0]
@@ -3120,16 +3274,16 @@ services:
     def test_get_services_unknown(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         # This doesn't seem to be an error at the moment.
         # pebble_cli.py service just returns an empty list
         # pebble service unknown says "No matching services" (but exits 0)
@@ -3159,13 +3313,13 @@ services:
     def test_mixed_start_service(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+            ''')
         # TODO: jam 2021-04-20 better error type
         with self.assertRaises(RuntimeError):
             client.start_services(['foo', 'unknown'])
@@ -3180,13 +3334,13 @@ services:
     def test_stop_services_unknown(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+            ''')
         client.autostart_services()
         # TODO: jam 2021-04-20 better error type
         with self.assertRaises(RuntimeError):
@@ -3206,16 +3360,16 @@ services:
         # - Start service "serv" (service "serv" was previously started)
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
         with self.assertRaises(pebble.ChangeError):
@@ -3240,16 +3394,16 @@ services:
         # - Stop service "other" (service "other" is not active)
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-summary: foo
-services:
-  foo:
-    summary: Foo
-    startup: enabled
-    command: '/bin/echo foo'
-  bar:
-    summary: Bar
-    command: '/bin/echo bar'
-''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
         with self.assertRaises(pebble.ChangeError):
@@ -3267,20 +3421,20 @@ services:
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
-    @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
+    @ unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self):
         client = self.get_testing_client()
         client.add_layer('foo', '''\
-        summary: foo
-        services:
-          foo:
-            summary: Foo
-            startup: enabled
-            command: '/bin/echo foo'
-          bar:
-            summary: Bar
-            command: '/bin/echo bar'
-        ''')
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                startup: enabled
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
 

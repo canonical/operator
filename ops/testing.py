@@ -1539,11 +1539,15 @@ ChangeError: cannot perform the following tasks:
                 if service.override not in ('merge', 'replace'):
                     raise RuntimeError('500 Internal Server Error: layer "{}" has invalid '
                                        '"override" value on service "{}"'.format(label, name))
-                if service.override != 'replace':
-                    raise RuntimeError(
-                        'override: "{}" unsupported for layer "{}" service "{}"'.format(
-                            service.override, label, name))
-                layer.services[name] = service
+                elif service.override == 'replace':
+                    layer.services[name] = service
+                elif service.override == 'merge':
+                    if combine and name in layer.services:
+                        s = layer.services[name]
+                        s._merge(service)
+                    else:
+                        layer.services[name] = service
+
         else:
             self._layers[label] = layer_obj
 
