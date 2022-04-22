@@ -122,7 +122,11 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_get(rel_id, 'test-app', is_app=True), {})
         self.assertEqual(backend.relation_get(rel_id, 'test-app/0', is_app=False), {})
 
-    def test_can_connect(self):
+    def test_can_connect_legacy(self):
+        # This tests the old behavior where we weren't simulating can_connect status of containers
+        # like it runs in juju.
+        tmp = ops.testing.SIMULATE_CAN_CONNECT
+        ops.testing.SIMULATE_CAN_CONNECT = False
         harness = Harness(CharmBase, meta='''
             name: test-app
             containers:
@@ -136,8 +140,10 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         c = harness.model.unit.get_container('foo')
         self.assertTrue(c.can_connect())
+        ops.testing.SIMULATE_CAN_CONNECT = tmp
 
     def test_simulate_can_connect(self):
+        tmp = ops.testing.SIMULATE_CAN_CONNECT
         ops.testing.SIMULATE_CAN_CONNECT = True
         harness = Harness(CharmBase, meta='''
             name: test-app
@@ -162,7 +168,7 @@ class TestHarness(unittest.TestCase):
         harness.container_pebble_ready('foo')
         self.assertTrue(c.can_connect())
         c.get_plan()
-        ops.testing.SIMULATE_CAN_CONNECT = False
+        ops.testing.SIMULATE_CAN_CONNECT = tmp
 
     def test_add_relation_and_unit(self):
         harness = Harness(CharmBase, meta='''

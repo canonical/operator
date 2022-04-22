@@ -209,7 +209,7 @@ class Harness(typing.Generic[CharmType]):
             harness = Harness(MyCharm)
             # Do initial setup here
             # Add storage if needed before begin_with_initial_hooks() is called
-            storage_id = harness.add_storage('data', count=1)
+            storage_id = harness.add_storage('data', count=1)[0]
             relation_id = harness.add_relation('db', 'postgresql')
             harness.add_relation_unit(relation_id, 'postgresql/0')
             harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
@@ -468,11 +468,13 @@ class Harness(typing.Generic[CharmType]):
         # Model._storages won't return Storage objects for subsequently-added storage.
         self._model._storages._invalidate(storage_name)
 
-        if self.charm is not None and self._hooks_enabled:
-            for storage_index in storage_indices:
-                self.charm.on[storage_name].storage_attached.emit(
-                    model.Storage(storage_name, storage_index, self._backend))
-        return ["{}/{}".format(storage_name, storage_index) for storage_index in storage_indices]
+        ids = []
+        for storage_index in storage_indices:
+            s = model.Storage(storage_name, storage_index, self._backend)
+            ids.append(s.full_id)
+            if self.charm is not None and self._hooks_enabled:
+                self.charm.on[storage_name].storage_attached.emit(s)
+        return ids
 
     def detach_storage(self, storage_id: str) -> None:
         """Detach a storage device.
@@ -482,7 +484,7 @@ class Harness(typing.Generic[CharmType]):
         and is presently marked as attached.
 
         Args:
-            storage_id: The full storage ID of th e storage unit being detached, including the
+            storage_id: The full storage ID of the storage unit being detached, including the
                 storage key, e.g. my-storage/0.
         """
         if self.charm is None:
@@ -512,11 +514,11 @@ class Harness(typing.Generic[CharmType]):
                 model.Storage(storage_name, storage_index, self._backend))
 
     def remove_storage(self, storage_id: str) -> None:
-        """Attach a storage device.
+        """Detach a storage device.
 
         The intent of this function is to simulate a "juju remove-storage" call.
         It will trigger a storage-detaching hook if the storage unit in question exists
-        and is presently marked as detached.  Additionally, it will remove the storage
+        and is presently marked as attached.  Then it will remove the storage
         unit from the testing backend.
 
         Args:
@@ -1104,7 +1106,7 @@ class _TestingModelBackend:
         self._storage_list = {k: {} for k in self._meta.storages}
 
         self._storage_detached = {k: set() for k in self._meta.storages}
-        self._storage_id_counter = 0
+        self._storage_index_counter = 0
         # {socket_path : _TestingPebbleClient}
         # socket_path = '/charm/containers/{container_name}/pebble.socket'
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
@@ -1266,8 +1268,8 @@ class _TestingModelBackend:
             self._storage_list[name] = {}
         result = []
         for i in range(count):
-            index = self._storage_id_counter
-            self._storage_id_counter += 1
+            index = self._storage_index_counter
+            self._storage_index_counter += 1
             self._storage_list[name][index] = {
                 "location": os.path.join(self._harness_tmp_dir.name, name, str(index)),
             }
