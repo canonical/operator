@@ -1039,7 +1039,7 @@ class Storage:
 
     Attributes:
         name: Simple string name of the storage
-        id: The index numbe for storage
+        id: The index number for storage
     """
 
     def __init__(self, storage_name: str, storage_index: int, backend):
