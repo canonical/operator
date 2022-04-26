@@ -1257,7 +1257,7 @@ class _TestingModelBackend:
             raise model.ModelError(
                 'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
 
-    def storage_add(self, name: str, count: int = 1):
+    def storage_add(self, name: str, count: int = 1) -> typing.List[int]:
         if name.startswith('/'):
             raise model.ModelError('test storage name cannot start with "/"')
 
@@ -1787,7 +1787,7 @@ class NonAbsolutePathError(Exception):
     """
 
 
-class _TestingStorage:
+class _TestingStorageMount:
     """Simulates a filesystem backend for storage mounts."""
 
     def __init__(self, location: pathlib.PurePosixPath, src: pathlib.Path):
@@ -1824,13 +1824,20 @@ class _TestingStorage:
             path: pathlib.PurePosixPath,
             make_parents: bool = False,
             **kwargs) -> '_Directory':
+        if not pathlib.PurePosixPath(path).is_absolute():
+            raise NonAbsolutePathError(str(path))
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
+
+        if srcpath.exists() and srcpath.is_dir() and make_parents:
+            return _Directory(path, **kwargs)  # nothing to do
+        if srcpath.exists():
+            raise FileExistsError(str(path))
 
         dirname = srcpath.parent
         if not dirname.exists():
             if not make_parents:
-                raise RuntimeError('no such directory {}'.format(dirname))
+                raise FileNotFoundError(str(path.parent))
             os.makedirs(dirname)
         os.makedirs(srcpath)
         return _Directory(path, **kwargs)
@@ -1849,11 +1856,15 @@ class _TestingStorage:
         dirname = srcpath.parent
         if not dirname.exists():
             if not make_dirs:
-                raise RuntimeError('no such directory {}'.format(dirname))
+                raise FileNotFoundError('no such directory {}'.format(dirname))
             os.makedirs(dirname)
 
-        if not isinstance(data, bytes):
+        if isinstance(data, str):
             data = data.encode(encoding=encoding)
+        elif not isinstance(data, bytes):
+            data = data.getvalue()
+            if isinstance(data, str):
+                data = data.encode()
 
         with open(srcpath, 'wb') as f:
             f.write(data)
@@ -1865,13 +1876,17 @@ class _TestingStorage:
         srcpath = self._srcpath(path)
 
         results = []
+        if not srcpath.exists():
+            raise FileNotFoundError(str(path))
+        if not srcpath.is_dir():
+            raise NotADirectoryError(str(path))
         for fname in os.listdir(srcpath):
             fpath = srcpath / fname
             mountpath = path / fname
             if fpath.is_dir():
                 results.append(_Directory(mountpath))
             elif fpath.is_file():
-                with open(fpath, 'wb') as f:
+                with open(fpath, 'rb') as f:
                     results.append(_File(mountpath, f.read()))
             else:
                 raise RuntimeError('unsupported file type at path {}'.format(fpath))
@@ -1895,6 +1910,8 @@ class _TestingStorage:
         srcpath = self._srcpath(path)
         if srcpath.is_dir():
             return _Directory(path)
+        if not srcpath.exists():
+            raise FileNotFoundError(str(srcpath))
         with open(srcpath, 'rb') as f:
             return _File(path, f.read())
 
@@ -1903,6 +1920,8 @@ class _TestingStorage:
         srcpath = self._srcpath(path)
         if srcpath.exists():
             os.remove(srcpath)
+        else:
+            raise FileNotFoundError(str(srcpath))
 
 
 class _TestingFilesystem:
@@ -1917,7 +1936,7 @@ class _TestingFilesystem:
         self._mounts = {}
 
     def add_mount(self, name, mount_path, backing_src_path):
-        self._mounts[name] = _TestingStorage(
+        self._mounts[name] = _TestingStorageMount(
             pathlib.PurePosixPath(mount_path), pathlib.Path(backing_src_path))
 
     def remove_mount(self, name):

@@ -53,6 +53,7 @@ from ops.testing import (
     _Directory,
     _TestingFilesystem,
     _TestingPebbleClient,
+    _TestingStorageMount,
 )
 
 is_linux = platform.system() == 'Linux'
@@ -3739,27 +3740,14 @@ class _PebbleStorageAPIsTestMixin:
     #   nuance.
 
 
-class TestTestingFilesystem(unittest.TestCase):
-    def setUp(self):
-        self.fs = _TestingFilesystem()
-
-    def test_storage_mount(self):
-        tmpdir = tempfile.TemporaryDirectory()
-        self.fs.add_mount('foo', '/foo', tmpdir.name)
-        self.fs.create_file('/foo/bar/baz.txt', 'quux', make_dirs=True)
-
-        tmppath = os.path.join(tmpdir.name, 'bar/baz.txt')
-        self.assertTrue(os.path.exists(tmppath))
-        with open(tmppath) as f:
-            self.assertEqual(f.read(), 'quux')
-
+class GenericTestingFilesystemTests:
     def test_listdir_root_on_empty_os(self):
         self.assertEqual(self.fs.list_dir('/'), [])
 
     def test_listdir_on_nonexistent_dir(self):
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.list_dir('/etc')
-        self.assertEqual(cm.exception.args[0], '/etc')
+        self.assertTrue('/etc' in cm.exception.args[0])
 
     def test_listdir(self):
         self.fs.create_dir('/opt')
@@ -3777,7 +3765,7 @@ class TestTestingFilesystem(unittest.TestCase):
         self.fs.create_file('/file', 'data')
         with self.assertRaises(NotADirectoryError) as cm:
             self.fs.list_dir('/file')
-        self.assertEqual(cm.exception.args[0], '/file')
+        self.assertTrue('/file' in cm.exception.args[0])
 
     def test_makedir(self):
         d = self.fs.create_dir('/etc')
@@ -3791,7 +3779,7 @@ class TestTestingFilesystem(unittest.TestCase):
         self.fs.create_dir('/etc')
         with self.assertRaises(FileExistsError) as cm:
             self.fs.create_dir('/etc')
-        self.assertEqual(cm.exception.args[0], '/etc')
+        self.assertTrue('/etc' in cm.exception.args[0])
 
     def test_makedir_succeeds_if_already_exists_when_make_parents_true(self):
         d1 = self.fs.create_dir('/etc')
@@ -3802,7 +3790,7 @@ class TestTestingFilesystem(unittest.TestCase):
     def test_makedir_fails_if_parent_dir_doesnt_exist(self):
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.create_dir('/etc/init.d')
-        self.assertEqual(cm.exception.args[0], '/etc')
+        self.assertTrue('/etc' in cm.exception.args[0])
 
     def test_make_and_list_directory(self):
         self.fs.create_dir('/etc')
@@ -3823,7 +3811,7 @@ class TestTestingFilesystem(unittest.TestCase):
     def test_create_file_fails_if_parent_dir_doesnt_exist(self):
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.create_file('/etc/passwd', "foo")
-        self.assertEqual(cm.exception.args[0], '/etc')
+        self.assertTrue('/etc' in cm.exception.args[0])
 
     def test_create_file_succeeds_if_parent_dir_doesnt_exist_when_make_dirs_true(self):
         self.fs.create_file('/test/subdir/testfile', "foo", make_dirs=True)
@@ -3882,7 +3870,7 @@ class TestTestingFilesystem(unittest.TestCase):
         # Deleting deleted files should fail as well
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.delete_path('/test')
-        self.assertEqual(cm.exception.args[0], '/test')
+        self.assertTrue('/test' in cm.exception.args[0])
 
     def test_create_dir_with_extra_args(self):
         d = self.fs.create_dir('/dir1')
@@ -3932,7 +3920,29 @@ class TestTestingFilesystem(unittest.TestCase):
         # gives a closer semantic feeling, in my opinion.
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.get_path('/nonexistent_file')
-        self.assertEqual(cm.exception.args[0], '/nonexistent_file')
+        self.assertTrue('/nonexistent_file' in cm.exception.args[0])
+
+
+class TestTestingFilesystem(GenericTestingFilesystemTests, unittest.TestCase):
+    def setUp(self):
+        self.fs = _TestingFilesystem()
+
+    def test_storage_mount(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        self.fs.add_mount('foo', '/foo', tmpdir.name)
+        self.fs.create_file('/foo/bar/baz.txt', 'quux', make_dirs=True)
+
+        tmppath = os.path.join(tmpdir.name, 'bar/baz.txt')
+        self.assertTrue(os.path.exists(tmppath))
+        with open(tmppath) as f:
+            self.assertEqual(f.read(), 'quux')
+
+
+class TestTestingStorageMount(GenericTestingFilesystemTests, unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.fs = _TestingStorageMount('/', pathlib.Path(self.tmp.name))
 
 
 class TestPebbleStorageAPIsUsingMocks(
