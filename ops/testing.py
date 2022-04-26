@@ -209,7 +209,8 @@ class Harness(typing.Generic[CharmType]):
             harness = Harness(MyCharm)
             # Do initial setup here
             # Add storage if needed before begin_with_initial_hooks() is called
-            storage_id = harness.add_storage('data', count=1)[0]
+            storage_ids = harness.add_storage('data', count=1)[0]
+            storage_id = storage_id[0] # we only added one storage instance
             relation_id = harness.add_relation('db', 'postgresql')
             harness.add_relation_unit(relation_id, 'postgresql/0')
             harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
@@ -1838,7 +1839,7 @@ class _TestingStorage:
             self,
             path: pathlib.PurePosixPath,
             data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
-            encoding: typing.Optional[str] = 'utf-8',
+            encoding: str = 'utf-8',
             make_dirs: bool = False,
             **kwargs
     ) -> '_File':

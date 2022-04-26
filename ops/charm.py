@@ -495,6 +495,10 @@ class StorageEvent(HookEvent):
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
             self.storage = next((s for s in storages if s.index == storage_index), None,)
+            if self.storage is None:
+                msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
+                    .format(storage_name, storage_index)
+                raise RuntimeError(msg)
             self.storage.location = storage_location
 
 
