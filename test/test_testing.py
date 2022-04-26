@@ -51,7 +51,7 @@ from ops.testing import (
     Harness,
     NonAbsolutePathError,
     _Directory,
-    _MockFilesystem,
+    _TestingFilesystem,
     _TestingPebbleClient,
 )
 
@@ -2761,7 +2761,7 @@ class TestTestingModelBackend(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         backend = harness._backend
 
-        client = backend.get_pebble(None, '/custom/socket/path')
+        client = backend.get_pebble('/custom/socket/path')
         self.assertIsInstance(client, _TestingPebbleClient)
 
 
@@ -2773,7 +2773,7 @@ class _TestingPebbleClientMixin:
         self.addCleanup(harness.cleanup)
         backend = harness._backend
 
-        return backend.get_pebble(None, '/custom/socket/path')
+        return backend.get_pebble('/custom/socket/path')
 
 
 # For testing non file ops of the pebble testing client.
@@ -3739,9 +3739,9 @@ class _PebbleStorageAPIsTestMixin:
     #   nuance.
 
 
-class TestMockFilesystem(unittest.TestCase):
+class TestTestingFilesystem(unittest.TestCase):
     def setUp(self):
-        self.fs = _MockFilesystem()
+        self.fs = _TestingFilesystem()
 
     def test_storage_mount(self):
         tmpdir = tempfile.TemporaryDirectory()

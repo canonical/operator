@@ -1097,7 +1097,7 @@ class Container:
 
         if pebble_client is None:
             socket_path = '/charm/containers/{}/pebble.socket'.format(name)
-            pebble_client = backend.get_pebble(name, socket_path)
+            pebble_client = backend.get_pebble(socket_path)
         self._pebble = pebble_client
 
     @property
@@ -1900,7 +1900,7 @@ class _ModelBackend:
         cmd.extend(metric_args)
         self._run(*cmd)
 
-    def get_pebble(self, container: str, socket_path: str) -> 'pebble.Client':
+    def get_pebble(self, socket_path: str) -> 'pebble.Client':
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
 

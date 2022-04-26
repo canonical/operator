@@ -759,8 +759,7 @@ class Harness(typing.Generic[CharmType]):
             for that container name. (should only happen if container is not present in
             metadata.yaml)
         """
-        socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
-        client = self._backend._pebble_clients.get(socket_path)
+        client = self._backend._pebble_clients.get(container_name)
         if client is None:
             raise KeyError('no known pebble client for container "{}"'.format(container_name))
         return client.get_plan()
@@ -1107,12 +1106,9 @@ class _TestingModelBackend:
 
         self._storage_detached = {k: set() for k in self._meta.storages}
         self._storage_index_counter = 0
-        # {socket_path : _TestingPebbleClient}
-        # socket_path = '/charm/containers/{container_name}/pebble.socket'
+        # {container_name : _TestingPebbleClient}
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
         self._pebble_clients_can_connect = {}  # type: {_TestingPebbleClient: bool}
-        # {<container_name>: <client>}
-        self._pebble_containers = {}  # type: {str: _TestingPebbleClient}
         self._planned_units = None
         self._hook_is_running = ''
 
@@ -1271,7 +1267,7 @@ class _TestingModelBackend:
             index = self._storage_index_counter
             self._storage_index_counter += 1
             self._storage_list[name][index] = {
-                "location": os.path.join(self._harness_tmp_dir.name, name, str(index)),
+                'location': os.path.join(self._harness_tmp_dir.name, name, str(index)),
             }
             result.append(index)
         return result
@@ -1294,7 +1290,7 @@ class _TestingModelBackend:
         # ops.model._ModelBackend.
         name, index = storage_id.split('/', 1)
 
-        for container, client in self._pebble_containers.items():
+        for container, client in self._pebble_clients.items():
             for _, mount in self._meta.containers[container].mounts.items():
                 if mount.storage != name:
                     continue
@@ -1344,17 +1340,18 @@ class _TestingModelBackend:
     def juju_log(self, level, msg):
         raise NotImplementedError(self.juju_log)
 
-    def get_pebble(self, container: str, socket_path: str):
-        client = self._pebble_clients.get(socket_path, None)
+    def get_pebble(self, socket_path: str) -> 'pebble.Client':
+        container = socket_path.split('/')[3]  # /charm/containers/<container_name>/pebble.socket
+        client = self._pebble_clients.get(container, None)
         if client is None:
             client = _TestingPebbleClient(self)
-            self._pebble_clients[socket_path] = client
+            self._pebble_clients[container] = client
 
             # we need to know which container a new pebble client belongs to
             # so we can figure out which storage mounts must be simulated on
             # this pebble client's mock file systems when storage is
             # attached/detached later.
-            self._pebble_containers[container] = client
+            self._pebble_clients[container] = client
 
         self._pebble_clients_can_connect[client] = not SIMULATE_CAN_CONNECT
         return client
@@ -1397,7 +1394,7 @@ class _TestingPebbleClient:
         self._layers = {}
         # Has a service been started/stopped?
         self._service_status = {}
-        self._fs = _MockFilesystem()
+        self._fs = _TestingFilesystem()
         self._backend = backend
 
     def _check_connection(self):
@@ -1782,54 +1779,74 @@ ChangeError: cannot perform the following tasks:
 
 
 class NonAbsolutePathError(Exception):
-    """Error raised by _MockFilesystem.
+    """Error raised by _TestingFilesystem.
 
     This error is raised when an absolute path is required but the code instead encountered a
     relative path.
     """
 
 
-class _MockStorage:
-    def __init__(self, location, src):
+class _TestingStorage:
+    """Simulates a filesystem backend for storage mounts."""
+
+    def __init__(self, location: pathlib.PurePosixPath, src: pathlib.Path):
+        """Creates a new simulated storage mount.
+
+        Args:
+            location: The path within simulated filesystem at which this storage will be mounted.
+            src: The temporary on-disk location where the simulated storage will live.
+        """
         self._src = src
         os.makedirs(src, exist_ok=True)
         self._location = location
 
-    def contains(self, path):
-        return str(path).startswith(self._location)
+    def contains(self, path: typing.Union[str, pathlib.PurePosixPath]) -> bool:
+        """Returns true whether path resides within this simulated storage mount's location."""
+        return pathlib.PurePosixPath(path).is_relative_to(self._location)
 
-    def _srcpath(self, path):
-        suffix = path[len(self._location):]
-        if suffix[0] == '/':
-            suffix = suffix[1:]
-        srcpath = os.path.join(self._src, suffix)
-        return srcpath
+    def check_contains(self, path: typing.Union[str,
+                       pathlib.PurePosixPath]) -> pathlib.PurePosixPath:
+        """Raises if path does not reside within this simulated storage mount's location."""
+        if not self.contains(path):
+            msg = 'the provided path "{!s}" does not reside within the mount location "{!s}"' \
+                .format(path, self._location)
+            raise RuntimeError(msg)
+        return pathlib.PurePosixPath(path)
 
-    def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
-        assert(self.contains(path))
+    def _srcpath(self, path: pathlib.PurePosixPath) -> pathlib.Path:
+        """Returns the disk-backed path where the simulated path will actually be stored."""
+        suffix = path.relative_to(self._location)
+        return self._src / suffix
+
+    def create_dir(
+            self,
+            path: pathlib.PurePosixPath,
+            make_parents: bool = False,
+            **kwargs) -> '_Directory':
+        path = self.check_contains(path)
         srcpath = self._srcpath(path)
 
-        dirname = os.path.dirname(srcpath)
-        if not os.path.exists(dirname):
+        dirname = srcpath.parent
+        if not dirname.exists():
             if not make_parents:
                 raise RuntimeError('no such directory {}'.format(dirname))
             os.makedirs(dirname)
         os.makedirs(srcpath)
-        return _Directory(self, path, **kwargs)
+        return _Directory(path, **kwargs)
 
     def create_file(
             self,
-            path: str,
+            path: pathlib.PurePosixPath,
             data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
             encoding: typing.Optional[str] = 'utf-8',
             make_dirs: bool = False,
             **kwargs
     ) -> '_File':
-        assert(self.contains(path))
+        path = self.check_contains(path)
         srcpath = self._srcpath(path)
 
-        dirname = os.path.dirname(srcpath)
-        if not os.path.exists(dirname):
+        dirname = srcpath.parent
+        if not dirname.exists():
             if not make_dirs:
                 raise RuntimeError('no such directory {}'.format(dirname))
             os.makedirs(dirname)
@@ -1840,23 +1857,23 @@ class _MockStorage:
         with open(srcpath, 'wb') as f:
             f.write(data)
 
-        return _File(pathlib.PurePosixPath(path), data, encoding=encoding, **kwargs)
+        return _File(path, data, encoding=encoding, **kwargs)
 
-    def list_dir(self, path) -> typing.List['_File']:
-        assert(self.contains(path))
+    def list_dir(self, path: pathlib.PurePosixPath) -> typing.List['_File']:
+        path = self.check_contains(path)
         srcpath = self._srcpath(path)
 
         results = []
         for fname in os.listdir(srcpath):
-            fpath = os.path.join(srcpath, fname)
-            mountpath = os.path.join(path, fname)
-            if os.is_dir(fpath):
+            fpath = srcpath / fname
+            mountpath = path / fname
+            if fpath.is_dir():
                 results.append(_Directory(mountpath))
-            elif os.is_file(fpath):
+            elif fpath.is_file():
                 with open(fpath, 'wb') as f:
-                    results.append(_File(pathlib.PurePosixPath(mountpath), f.read()))
+                    results.append(_File(mountpath, f.read()))
             else:
-                raise 'unsupported fs thing at path {}'.format(fpath)
+                raise RuntimeError('unsupported file type at path {}'.format(fpath))
         return results
 
     def open(
@@ -1864,7 +1881,7 @@ class _MockStorage:
             path: typing.Union[str, pathlib.PurePosixPath],
             encoding: typing.Optional[str] = 'utf-8',
     ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
-        assert(self.contains(path))
+        path = self.check_contains(path)
 
         file = self.get_path(path)
         if isinstance(file, _Directory):
@@ -1873,21 +1890,21 @@ class _MockStorage:
 
     def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]
                  ) -> typing.Union['_Directory', '_File']:
-        assert(self.contains(path))
+        path = self.check_contains(path)
         srcpath = self._srcpath(path)
-        if os.path.isdir(srcpath):
+        if srcpath.is_dir():
             return _Directory(path)
         with open(srcpath, 'rb') as f:
-            return _File(pathlib.PurePosixPath(path), f.read())
+            return _File(path, f.read())
 
     def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
-        assert(self.contains(path))
+        path = self.check_contains(path)
         srcpath = self._srcpath(path)
-        if os.path.exists(srcpath):
+        if srcpath.exists():
             os.remove(srcpath)
 
 
-class _MockFilesystem:
+class _TestingFilesystem:
     r"""An in-memory mock of a pebble-controlled container's filesystem.
 
     For now, the filesystem is assumed to be a POSIX-style filesytem; Windows-style directories
@@ -1899,7 +1916,8 @@ class _MockFilesystem:
         self._mounts = {}
 
     def add_mount(self, name, mount_path, backing_src_path):
-        self._mounts[name] = _MockStorage(mount_path, backing_src_path)
+        self._mounts[name] = _TestingStorage(
+            pathlib.PurePosixPath(mount_path), pathlib.Path(backing_src_path))
 
     def remove_mount(self, name):
         if name in self._mounts:
