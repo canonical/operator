@@ -1258,8 +1258,8 @@ class _TestingModelBackend:
                 'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
 
     def storage_add(self, name: str, count: int = 1) -> typing.List[int]:
-        if name.startswith('/'):
-            raise model.ModelError('test storage name cannot start with "/"')
+        if '/' in name:
+            raise model.ModelError('storage name cannot contain "/"')
 
         if name not in self._storage_list:
             self._storage_list[name] = {}
@@ -1798,12 +1798,17 @@ class _TestingStorageMount:
             src: The temporary on-disk location where the simulated storage will live.
         """
         self._src = src
-        os.makedirs(src, exist_ok=True)
         self._location = location
+
+        src.mkdir(exist_ok=True, parents=True)
 
     def contains(self, path: typing.Union[str, pathlib.PurePosixPath]) -> bool:
         """Returns true whether path resides within this simulated storage mount's location."""
-        return pathlib.PurePosixPath(path).is_relative_to(self._location)
+        try:
+            pathlib.PurePosixPath(path).relative_to(self._location)
+            return True
+        except Exception:
+            return False
 
     def check_contains(self, path: typing.Union[str,
                        pathlib.PurePosixPath]) -> pathlib.PurePosixPath:
@@ -1838,8 +1843,8 @@ class _TestingStorageMount:
         if not dirname.exists():
             if not make_parents:
                 raise FileNotFoundError(str(path.parent))
-            os.makedirs(dirname)
-        os.makedirs(srcpath)
+            dirname.mkdir(parents=True, exist_ok=True)
+        srcpath.mkdir(exist_ok=True)
         return _Directory(path, **kwargs)
 
     def create_file(
@@ -1856,8 +1861,8 @@ class _TestingStorageMount:
         dirname = srcpath.parent
         if not dirname.exists():
             if not make_dirs:
-                raise FileNotFoundError('no such directory {}'.format(dirname))
-            os.makedirs(dirname)
+                raise FileNotFoundError(str(path.parent))
+            dirname.mkdir(parents=True, exist_ok=True)
 
         if isinstance(data, str):
             data = data.encode(encoding=encoding)
@@ -1866,7 +1871,7 @@ class _TestingStorageMount:
             if isinstance(data, str):
                 data = data.encode()
 
-        with open(srcpath, 'wb') as f:
+        with srcpath.open('wb') as f:
             f.write(data)
 
         return _File(path, data, encoding=encoding, **kwargs)
@@ -1880,13 +1885,12 @@ class _TestingStorageMount:
             raise FileNotFoundError(str(path))
         if not srcpath.is_dir():
             raise NotADirectoryError(str(path))
-        for fname in os.listdir(srcpath):
-            fpath = srcpath / fname
-            mountpath = path / fname
+        for fpath in srcpath.iterdir():
+            mountpath = path / fpath.name
             if fpath.is_dir():
                 results.append(_Directory(mountpath))
             elif fpath.is_file():
-                with open(fpath, 'rb') as f:
+                with fpath.open('rb') as f:
                     results.append(_File(mountpath, f.read()))
             else:
                 raise RuntimeError('unsupported file type at path {}'.format(fpath))
@@ -1911,17 +1915,17 @@ class _TestingStorageMount:
         if srcpath.is_dir():
             return _Directory(path)
         if not srcpath.exists():
-            raise FileNotFoundError(str(srcpath))
-        with open(srcpath, 'rb') as f:
+            raise FileNotFoundError(str(path))
+        with srcpath.open('rb') as f:
             return _File(path, f.read())
 
     def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
         if srcpath.exists():
-            os.remove(srcpath)
+            srcpath.unlink()
         else:
-            raise FileNotFoundError(str(srcpath))
+            raise FileNotFoundError(str(path))
 
 
 class _TestingFilesystem:

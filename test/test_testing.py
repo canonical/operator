@@ -3905,7 +3905,7 @@ class GenericTestingFilesystemTests:
         self.fs.create_dir('/etc/init.d', make_parents=True)
 
         # By path
-        o = self.fs.get_path(pathlib.Path('/etc/init.d'))
+        o = self.fs.get_path(pathlib.PurePosixPath('/etc/init.d'))
         self.assertIsInstance(o, _Directory)
         self.assertEqual(o.path, pathlib.PurePosixPath('/etc/init.d'))
 
