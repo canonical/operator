@@ -952,16 +952,19 @@ class Harness(typing.Generic[CharmType]):
     def set_leader(self, is_leader: bool = True) -> None:
         """Set whether this unit is the leader or not.
 
-        If this charm becomes a leader then `leader_elected` will be triggered.
+        If this charm becomes a leader then `leader_elected` will be triggered.  If Harness.begin()
+        has already been called, then the charm's peer relation should usually be added  *prior* to
+        calling this method (i.e. with Harness.add_relation) to properly initialize and make
+        available relation data that leader elected hooks may want to access.
 
         Args:
             is_leader: True/False as to whether this unit is the leader.
         """
-        was_leader = self._backend._is_leader
         self._backend._is_leader = is_leader
+
         # Note: jam 2020-03-01 currently is_leader is cached at the ModelBackend level, not in
         # the Model objects, so this automatically gets noticed.
-        if is_leader and not was_leader and self._charm is not None and self._hooks_enabled:
+        if is_leader and self._charm is not None and self._hooks_enabled:
             self._charm.on.leader_elected.emit()
 
     def set_planned_units(self, num_units: int) -> None:
@@ -1103,6 +1106,24 @@ class _TestingModelBackend:
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
         self._pebble_clients_can_connect = {}  # type: {_TestingPebbleClient: bool}
         self._planned_units = None
+        self._hook_is_running = ''
+
+    def _validate_relation_access(self, relation_name, relations):
+        """Ensures that the named relation exists/has been added.
+
+        This is called whenever relation data is accessed via model.get_relation(...).
+        """
+        if len(relations) > 0:
+            return
+
+        relations = list(self._meta.peers.keys())
+        relations.extend(self._meta.requires.keys())
+        relations.extend(self._meta.provides.keys())
+        if self._hook_is_running == 'leader_elected' and relation_name in relations:
+            raise RuntimeError(
+                'cannot access relation data without first adding the relation: '
+                'use Harness.add_relation({!r}, <app>) before calling set_leader'
+                .format(relation_name))
 
     def _can_connect(self, pebble_client) -> bool:
         """Returns whether the mock client is active and can support API calls with no errors."""
@@ -1518,11 +1539,15 @@ ChangeError: cannot perform the following tasks:
                 if service.override not in ('merge', 'replace'):
                     raise RuntimeError('500 Internal Server Error: layer "{}" has invalid '
                                        '"override" value on service "{}"'.format(label, name))
-                if service.override != 'replace':
-                    raise RuntimeError(
-                        'override: "{}" unsupported for layer "{}" service "{}"'.format(
-                            service.override, label, name))
-                layer.services[name] = service
+                elif service.override == 'replace':
+                    layer.services[name] = service
+                elif service.override == 'merge':
+                    if combine and name in layer.services:
+                        s = layer.services[name]
+                        s._merge(service)
+                    else:
+                        layer.services[name] = service
+
         else:
             self._layers[label] = layer_obj
 

@@ -776,6 +776,31 @@ class Framework(Object):
         self._reemit()
 
     def _reemit(self, single_event_path=None):
+
+        class EventContext:
+            """Handles toggling the hook-is-running state in backends.
+
+            This allows e.g. harness logic to know if it is executing within a running hook context
+            or not.  It sets backend._hook_is_running equal to the name of the currently running
+            hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
+            is completed.
+            """
+
+            def __init__(self, framework, event_name):
+                self._event = event_name
+                self._backend = None
+                if framework.model is not None:
+                    self._backend = framework.model._backend
+
+            def __enter__(self):
+                if self._backend:
+                    self._backend._hook_is_running = self._event
+                return self
+
+            def __exit__(self, exception_type, exception, traceback):
+                if self._backend:
+                    self._backend._hook_is_running = ''
+
         last_event_path = None
         deferred = True
         for event_path, observer_path, method_name in self._storage.notices(
@@ -804,15 +829,16 @@ class Framework(Object):
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    if (
+                    with EventContext(self, event_handle.kind):
+                        if (
                             event_is_from_juju or event_is_action
-                    ) and self._juju_debug_at.intersection({'all', 'hook'}):
-                        # Present the welcome message and run under PDB.
-                        self._show_debug_code_message()
-                        pdb.runcall(custom_handler, event)
-                    else:
-                        # Regular call to the registered method.
-                        custom_handler(event)
+                        ) and self._juju_debug_at.intersection({'all', 'hook'}):
+                            # Present the welcome message and run under PDB.
+                            self._show_debug_code_message()
+                            pdb.runcall(custom_handler, event)
+                        else:
+                            # Regular call to the registered method.
+                            custom_handler(event)
 
             if event.deferred:
                 deferred = True

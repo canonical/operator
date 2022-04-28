@@ -493,7 +493,9 @@ class RelationMapping(Mapping):
                 is_peer = relation_name in self._peers
                 return Relation(relation_name, relation_id, is_peer,
                                 self._our_unit, self._backend, self._cache)
-        num_related = len(self[relation_name])
+        relations = self[relation_name]
+        num_related = len(relations)
+        self._backend._validate_relation_access(relation_name, relations)
         if num_related == 0:
             return None
         elif num_related == 1:
@@ -1586,6 +1588,7 @@ class _ModelBackend:
 
         self._is_leader = None
         self._leader_check_time = None
+        self._hook_is_running = ''
 
     def _run(self, *args, return_output=False, use_json=False):
         kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)
@@ -1609,6 +1612,14 @@ class _ModelBackend:
     @staticmethod
     def _is_relation_not_found(model_error):
         return 'relation not found' in str(model_error)
+
+    def _validate_relation_access(self, relation_name, relations):
+        """Checks for relation usage inconsistent with the framework/backend state.
+
+        This is used for catching Harness configuration errors and the production implementation
+        here should remain empty.
+        """
+        pass
 
     def relation_ids(self, relation_name):
         relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
