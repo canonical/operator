@@ -128,6 +128,11 @@ class TestHarness(unittest.TestCase):
         # like it runs in juju.
         tmp = ops.testing.SIMULATE_CAN_CONNECT
         ops.testing.SIMULATE_CAN_CONNECT = False
+
+        def reset_can_connect():
+            ops.testing.SIMULATE_CAN_CONNECT = tmp
+        self.addCleanup(reset_can_connect)
+
         harness = Harness(CharmBase, meta='''
             name: test-app
             containers:
@@ -141,11 +146,15 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         c = harness.model.unit.get_container('foo')
         self.assertTrue(c.can_connect())
-        ops.testing.SIMULATE_CAN_CONNECT = tmp
 
     def test_simulate_can_connect(self):
         tmp = ops.testing.SIMULATE_CAN_CONNECT
         ops.testing.SIMULATE_CAN_CONNECT = True
+
+        def reset_can_connect():
+            ops.testing.SIMULATE_CAN_CONNECT = tmp
+        self.addCleanup(reset_can_connect)
+
         harness = Harness(CharmBase, meta='''
             name: test-app
             containers:
@@ -169,7 +178,6 @@ class TestHarness(unittest.TestCase):
         harness.container_pebble_ready('foo')
         self.assertTrue(c.can_connect())
         c.get_plan()
-        ops.testing.SIMULATE_CAN_CONNECT = tmp
 
     def test_add_relation_and_unit(self):
         harness = Harness(CharmBase, meta='''
