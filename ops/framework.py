@@ -33,24 +33,26 @@ from ops import charm
 from ops.storage import NoSnapshotError, SQLiteStorage
 
 if typing.TYPE_CHECKING:
-    from ops.charm import CharmMeta
-    from ops.model import Model
     from pathlib import Path
 
+    from ops.charm import CharmMeta
+    from ops.model import Model
+
     try:
-        from typing import Type, Protocol
+        from typing import Protocol, Type
     except ModuleNotFoundError:
-        from typing_extensions import Type, Protocol
+        from typing_extensions import Protocol, Type
 
     class _HandleLike(Protocol):
         handle = None  # type: Handle
-        def snapshot(self) -> dict: ...
-        def restore(self, snapshot: dict) -> "Object": ...
+        def snapshot(self) -> dict: ...  # noqa: E704
+        def restore(self, snapshot: dict) -> "Object": ...  # noqa: E704
 
     _ObjectType = typing.TypeVar("_ObjectType", bound="Object")
     _EventType = typing.TypeVar("_EventType", bound=Type["EventBase"])
     _Observer = typing.Callable[[typing.Any], None]
     _Path = _Kind = str
+    _ParentType = typing.Union["Handle", _ObjectType]
 
 
 logger = logging.getLogger(__name__)
@@ -70,8 +72,9 @@ class Handle:
     under the same parent and kind may have the same key.
     """
 
-    def __init__(self, parent: typing.Optional[typing.Union["Handle", "Object"]], kind: str, key: str):
-        if parent and not isinstance(parent, Handle):
+    def __init__(self, parent: typing.Optional["_ParentType"], kind: str, key: str):
+        if parent is not None and not isinstance(parent, Handle):
+            # parent must be an Object or subclass
             parent = parent.handle
         self._parent = parent
         self._kind = kind
@@ -87,7 +90,7 @@ class Handle:
             else:
                 self._path = "{}".format(kind)
 
-    def nest(self, kind, key):
+    def nest(self, kind: str, key: str):
         """Create a new handle as child of the current one."""
         return Handle(self, kind, key)
 
@@ -287,7 +290,7 @@ class BoundEvent:
             hex(id(self)),
         )
 
-    def __init__(self, emitter: typing.Union["Handle", "_ObjectType"],
+    def __init__(self, emitter: "_ParentType",
                  event_type: "_EventType", event_kind: str):
         self.emitter = emitter
         self.event_type = event_type
@@ -522,9 +525,13 @@ class Framework(Object):
     on = FrameworkEvents()
 
     # Override properties from Object so that we can set them in __init__.
-    model = None  # type: Model
-    meta = None  # type: CharmMeta
-    charm_dir = None  # type: Path
+    model = None  # type: 'Model'
+    meta = None  # type: 'CharmMeta'
+    charm_dir = None  # type: 'Path'
+
+    if typing.TYPE_CHECKING:
+        # to help the type checker and IDEs:
+        _stored = None  # type: 'StoredStateData'
 
     def __init__(self, storage: SQLiteStorage, charm_dir: "Path",
                  meta: "CharmMeta", model: "Model"):
@@ -534,20 +541,22 @@ class Framework(Object):
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
-        self._observers = []  # type: typing.List[typing.Tuple[_Path, str, _Path, str]]
+        self._observers = []  # type: typing.List[typing.Tuple['_Path', str, '_Path', str]]
         # {observer_path: observer}
-        self._observer = weakref.WeakValueDictionary()  # type: typing.Dict[str, _Observer]
+        self._observer = weakref.WeakValueDictionary()  # type: typing.Dict[str, '_Observer']
         # {object_path: object}
-        self._objects = weakref.WeakValueDictionary()  # type: typing.Dict[str, Object]
+        self._objects = weakref.WeakValueDictionary()  # type: typing.Dict[str, 'Object']
         # {(parent_path, kind): cls}
-        self._type_registry = {}  # type: typing.Dict[typing.Tuple[typing.Optional[_Path], _Kind], Type]
-        self._type_known = set()  # type: typing.Set[Type]
+        # todo find better name for this type; what does it represent?
+        _Predecessor = typing.Tuple[typing.Optional["_Path"], "_Kind"]  # noqa: N806
+        self._type_registry = {}  # type: typing.Dict['_Predecessor', 'Type']
+        self._type_known = set()  # type: typing.Set['Type']
 
         if isinstance(storage, (str, pathlib.Path)):
             logger.warning(
                 "deprecated: Framework now takes a Storage not a path")
             storage = SQLiteStorage(storage)
-        self._storage = storage  # type: SQLiteStorage
+        self._storage = storage  # type: 'SQLiteStorage'
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
@@ -559,11 +568,12 @@ class Framework(Object):
             self._stored['event_count'] = 0
 
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
-        self._breakpoint_welcomed = False
+        self._breakpoint_welcomed = False  # type: bool
 
         # Parse the env var once, which may be used multiple times later
         debug_at = os.environ.get('JUJU_DEBUG_AT')
-        self._juju_debug_at = set(x.strip() for x in debug_at.split(',')) if debug_at else set()
+        self._juju_debug_at = (set(x.strip() for x in debug_at.split(','))
+                               if debug_at else set())  # type: typing.Set[str]
 
     def set_breakpointhook(self):
         """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
@@ -615,7 +625,7 @@ class Framework(Object):
         self.save_snapshot(self._stored)
         self._storage.commit()
 
-    def register_type(self, cls, parent: typing.Optional[typing.Union["_ObjectType", Handle]], kind=None):
+    def register_type(self, cls, parent: typing.Optional["_ParentType"], kind=None):
         """Register a type to a handle."""
         if parent is not None and not isinstance(parent, Handle):
             parent = parent.handle
@@ -648,7 +658,7 @@ class Framework(Object):
 
         self._storage.save_snapshot(value.handle.path, data)
 
-    def load_snapshot(self, handle: Handle) -> Object:
+    def load_snapshot(self, handle: Handle) -> '_ObjectType':
         """Load a persistent snapshot."""
         parent_path = None
         if handle.parent:
@@ -983,8 +993,7 @@ class BoundStoredState:
 
         value = _unwrap_stored(self._data, value)
 
-        if not isinstance(value, (
-        type(None), int, float, str, bytes, list, dict, set)):
+        if not isinstance(value, (type(None), int, float, str, bytes, list, dict, set)):
             raise AttributeError(
                 'attribute {!r} cannot be a {}: must be int/float/dict/list/etc'.format(
                     key, type(value).__name__))

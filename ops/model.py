@@ -36,6 +36,11 @@ import ops.pebble as pebble
 from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
+if typing.TYPE_CHECKING:
+    _RelationMappingType = typing.Mapping[str, typing.List['Relation']]
+    _StorageMappingType = typing.Mapping[str, typing.List['Storage']]
+    _BindingMappingType = typing.Mapping[str, 'Binding']
+
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
@@ -51,13 +56,15 @@ class Model:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
-        self._unit = self.get_unit(self._backend.unit_name) # type: Unit
-        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache) # type: Mapping[str, typing.List[Relation]]
+        self._unit = self.get_unit(self._backend.unit_name)  # type: 'Unit'
+        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache
+                                          )  # type: _RelationMappingType
         self._config = ConfigData(self._backend)
         self._resources = Resources(list(meta.resources), self._backend)
         self._pod = Pod(self._backend)
-        self._storages = StorageMapping(list(meta.storages), self._backend) # type: Mapping[str, typing.List[Storage]]
-        self._bindings = BindingMapping(self._backend) # type: Mapping[str, Binding]
+        self._storages = StorageMapping(list(meta.storages), self._backend
+                                        )  # type: _StorageMappingType
+        self._bindings = BindingMapping(self._backend)  # type: _BindingMappingType
 
     @property
     def unit(self) -> 'Unit':
