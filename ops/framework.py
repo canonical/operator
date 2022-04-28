@@ -43,7 +43,7 @@ if typing.TYPE_CHECKING:
         from typing_extensions import Type, Protocol
 
     class _HandleLike(Protocol):
-        handle: "Handle"
+        handle = None # type: Handle
         def snapshot(self) -> dict: ...
         def restore(self, snapshot: dict) -> "Object": ...
 
@@ -151,11 +151,11 @@ class EventBase:
     # after being loaded from snapshot, or by `BoundEvent.emit()` if this
     # event is being fired for the first time.
     # TODO this is hard to debug, this should be refactored
-    framework: "Framework" = None
+    framework = None # type: Framework
 
     def __init__(self, handle: Handle):
         self.handle = handle
-        self.deferred: bool = False
+        self.deferred = False  # type: bool
 
     def __repr__(self):
         return "<%s via %s>" % (self.__class__.__name__, self.handle)
@@ -370,9 +370,9 @@ class Object(metaclass=_Metaclass):
     been created.
 
     """
-    framework: "Framework"
-    handle: "Handle"
-    handle_kind: str = HandleKind()
+    framework = None # type: Framework
+    handle = None # type: Handle
+    handle_kind = HandleKind() # type: str
 
     def __init__(self, parent, key):
         kind = self.handle_kind
@@ -522,9 +522,9 @@ class Framework(Object):
     on = FrameworkEvents()
 
     # Override properties from Object so that we can set them in __init__.
-    model: "Model" = None
-    meta: "CharmMeta" = None
-    charm_dir: "Path" = None
+    model = None  # type: Model
+    meta = None  # type: CharmMeta
+    charm_dir = None  # type: Path
 
     def __init__(self, storage: SQLiteStorage, charm_dir: "Path",
                  meta: "CharmMeta", model: "Model"):
@@ -533,17 +533,21 @@ class Framework(Object):
         self.charm_dir = charm_dir
         self.meta = meta
         self.model = model
-        self._observers: typing.List[typing.Tuple[_Path, str, _Path, str]] = []  # [(observer_path, method_name, parent_path, event_key)]
-        self._observer = weakref.WeakValueDictionary()  # {observer_path: observer}
-        self._objects = weakref.WeakValueDictionary()
-        self._type_registry: typing.Dict[typing.Tuple[typing.Optional[_Path], _Kind], "Type"] = {}  # {(parent_path, kind): cls}
-        self._type_known: typing.Set["Type"] = set()  # {cls}
+        # [(observer_path, method_name, parent_path, event_key)]
+        self._observers = []  # type: typing.List[typing.Tuple[_Path, str, _Path, str]]
+        # {observer_path: observer}
+        self._observer = weakref.WeakValueDictionary()  # type: typing.Dict[str, _Observer]
+        # {object_path: object}
+        self._objects = weakref.WeakValueDictionary()  # type: typing.Dict[str, Object]
+        # {(parent_path, kind): cls}
+        self._type_registry = {}  # type: typing.Dict[typing.Tuple[typing.Optional[_Path], _Kind], Type]
+        self._type_known = set()  # type: typing.Set[Type]
 
         if isinstance(storage, (str, pathlib.Path)):
             logger.warning(
                 "deprecated: Framework now takes a Storage not a path")
             storage = SQLiteStorage(storage)
-        self._storage: SQLiteStorage = storage
+        self._storage = storage  # type: SQLiteStorage
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)

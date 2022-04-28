@@ -34,7 +34,6 @@ class Charm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.unit.get_container('foo').
         self._stored.set_default(
             try_excepthook=False,
 

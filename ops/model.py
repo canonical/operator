@@ -51,13 +51,13 @@ class Model:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
-        self._unit: 'Unit' = self.get_unit(self._backend.unit_name)
-        self._relations: Mapping[str, typing.List['Relation']] = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
+        self._unit = self.get_unit(self._backend.unit_name) # type: Unit
+        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache) # type: Mapping[str, typing.List[Relation]]
         self._config = ConfigData(self._backend)
         self._resources = Resources(list(meta.resources), self._backend)
         self._pod = Pod(self._backend)
-        self._storages: Mapping[str, typing.List['Storage']] = StorageMapping(list(meta.storages), self._backend)
-        self._bindings: Mapping[str, 'Binding'] = BindingMapping(self._backend)
+        self._storages = StorageMapping(list(meta.storages), self._backend) # type: Mapping[str, typing.List[Storage]]
+        self._bindings = BindingMapping(self._backend) # type: Mapping[str, Binding]
 
     @property
     def unit(self) -> 'Unit':
@@ -295,7 +295,7 @@ class Unit:
         self.name = name
 
         app_name = name.split('/')[0]
-        self.app: Application = cache.get(Application, app_name)
+        self.app = cache.get(Application, app_name) # type: Application
 
         self._backend = backend
         self._cache = cache

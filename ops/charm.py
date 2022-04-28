@@ -773,7 +773,10 @@ class CharmMeta:
 
     """
 
-    def __init__(self, raw: dict = {}, actions_raw: dict = {}):
+    def __init__(self, raw: dict = None, actions_raw: dict = None):
+        raw = raw or {}
+        actions_raw = actions_raw or {}
+
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
