@@ -43,7 +43,7 @@ if typing.TYPE_CHECKING:
         from typing_extensions import Type, Protocol
 
     class _HandleLike(Protocol):
-        handle = None # type: Handle
+        handle = None  # type: Handle
         def snapshot(self) -> dict: ...
         def restore(self, snapshot: dict) -> "Object": ...
 
@@ -151,7 +151,7 @@ class EventBase:
     # after being loaded from snapshot, or by `BoundEvent.emit()` if this
     # event is being fired for the first time.
     # TODO this is hard to debug, this should be refactored
-    framework = None # type: Framework
+    framework = None  # type: Framework
 
     def __init__(self, handle: Handle):
         self.handle = handle
@@ -370,9 +370,9 @@ class Object(metaclass=_Metaclass):
     been created.
 
     """
-    framework = None # type: Framework
-    handle = None # type: Handle
-    handle_kind = HandleKind() # type: str
+    framework = None  # type: Framework
+    handle = None  # type: Handle
+    handle_kind = HandleKind()  # type: str
 
     def __init__(self, parent, key):
         kind = self.handle_kind

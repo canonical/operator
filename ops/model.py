@@ -295,7 +295,7 @@ class Unit:
         self.name = name
 
         app_name = name.split('/')[0]
-        self.app = cache.get(Application, app_name) # type: Application
+        self.app = cache.get(Application, app_name)  # type: Application
 
         self._backend = backend
         self._cache = cache
