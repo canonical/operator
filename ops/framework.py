@@ -38,10 +38,7 @@ if typing.TYPE_CHECKING:
     from ops.charm import CharmMeta
     from ops.model import Model
 
-    try:
-        from typing import Protocol, Type
-    except ModuleNotFoundError:
-        from typing_extensions import Protocol, Type
+    from typing_extensions import Protocol, Type
 
     class _HandleLike(Protocol):
         handle = None  # type: Handle
