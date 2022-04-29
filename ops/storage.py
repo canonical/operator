@@ -23,9 +23,26 @@ from datetime import timedelta
 
 import yaml
 
+if typing.TYPE_CHECKING:
+    from pathlib import Path
 
-def _run(args, **kw):
-    cmd = shutil.which(args[0])
+    _Notice = typing.Tuple[str, str, str]
+    _Notices = typing.List[_Notice]
+
+    _TupleRepresenterType = typing.Callable[[typing.Any, typing.Tuple[typing.Any, ...]], yaml.Node]
+    # from typing_extensions import Protocol
+    #
+    # _RepresenterType = typing.Callable[[typing.Iterable], yaml.SequenceNode]
+    # class _DumperProtocol(Protocol):
+    #     represent_tuple = lambda data: yaml.SequenceNode  # type: _RepresenterType
+    #     def add_representer(self, cls_: typing.Type, repr_: _RepresenterType): ...
+    #
+    # class _LoaderProtocol(Protocol):
+    #     def add_constructor(self, str) -> typing.Any: ...
+
+
+def _run(args: typing.List[str], **kw: typing.Any):
+    cmd = shutil.which(args[0])  # type: typing.Optional[str]
     if cmd is None:
         raise FileNotFoundError(args[0])
     return subprocess.run([cmd, *args[1:]], **kw)
@@ -36,7 +53,7 @@ class SQLiteStorage:
 
     DB_LOCK_TIMEOUT = timedelta(hours=1)
 
-    def __init__(self, filename):
+    def __init__(self, filename: typing.Union['Path', str]):
         # The isolation_level argument is set to None such that the implicit
         # transaction management behavior of the sqlite3 module is disabled.
         self._db = sqlite3.connect(str(filename),
@@ -138,8 +155,8 @@ class SQLiteStorage:
                AND method_name=?
             ''', (event_path, observer_path, method_name))
 
-    def notices(self, event_path: str = None) ->\
-            typing.Generator[typing.Tuple[str, str, str], None, None]:
+    def notices(self, event_path: typing.Optional[str] = None
+                ) -> typing.Generator['_Notice', None, None]:
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -179,10 +196,8 @@ class JujuStorage:
 
     NOTICE_KEY = "#notices#"
 
-    def __init__(self, backend: '_JujuStorageBackend' = None):
-        self._backend = backend
-        if backend is None:
-            self._backend = _JujuStorageBackend()
+    def __init__(self, backend: typing.Optional['_JujuStorageBackend'] = None):
+        self._backend = backend or _JujuStorageBackend()  # type: _JujuStorageBackend
 
     def close(self):
         """Part of the Storage API, close the storage backend.
@@ -206,7 +221,7 @@ class JujuStorage:
         """
         self._backend.set(handle_path, snapshot_data)
 
-    def load_snapshot(self, handle_path):
+    def load_snapshot(self, handle_path: str):
         """Part of the Storage API, retrieve a snapshot that was previously saved.
 
         Args:
@@ -221,7 +236,7 @@ class JujuStorage:
             raise NoSnapshotError(handle_path)
         return content
 
-    def drop_snapshot(self, handle_path):
+    def drop_snapshot(self, handle_path: str):
         """Part of the Storage API, remove a snapshot that was previously saved.
 
         Dropping a snapshot that doesn't exist is treated as a no-op.
@@ -229,18 +244,18 @@ class JujuStorage:
         self._backend.delete(handle_path)
 
     def save_notice(self, event_path: str, observer_path: str, method_name: str):
-        """Part of the Storage API, record an notice (event and observer)."""
+        """Part of the Storage API, record a notice (event and observer)."""
         notice_list = self._load_notice_list()
-        notice_list.append([event_path, observer_path, method_name])
+        notice_list.append((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)
 
     def drop_notice(self, event_path: str, observer_path: str, method_name: str):
         """Part of the Storage API, remove a notice that was previously recorded."""
         notice_list = self._load_notice_list()
-        notice_list.remove([event_path, observer_path, method_name])
+        notice_list.remove((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)
 
-    def notices(self, event_path: str = None):
+    def notices(self, event_path: typing.Optional[str] = None):
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -256,7 +271,7 @@ class JujuStorage:
                 continue
             yield tuple(row)
 
-    def _load_notice_list(self) -> typing.List[typing.Tuple[str]]:
+    def _load_notice_list(self) -> '_Notices':
         """Load a notice list from current key.
 
         Returns:
@@ -270,7 +285,7 @@ class JujuStorage:
             return []
         return notice_list
 
-    def _save_notice_list(self, notices: typing.List[typing.Tuple[str]]) -> None:
+    def _save_notice_list(self, notices: '_Notices') -> None:
         """Save a notice list under current key.
 
         Args:
@@ -279,7 +294,12 @@ class JujuStorage:
         self._backend.set(self.NOTICE_KEY, notices)
 
 
-class _SimpleLoader(getattr(yaml, 'CSafeLoader', yaml.SafeLoader)):
+# we load yaml.CSafeX if available, falling back to slower yaml.SafeX.
+_BaseDumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)  # type: typing.Type[yaml.SafeDumper]
+_BaseLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)  # type: typing.Type[yaml.SafeLoader]
+
+
+class _SimpleLoader(_BaseLoader):
     """Handle a couple basic python types.
 
     yaml.SafeLoader can handle all the basic int/float/dict/set/etc that we want. The only one
@@ -289,23 +309,23 @@ class _SimpleLoader(getattr(yaml, 'CSafeLoader', yaml.SafeLoader)):
     # Taken from the example at:
     # https://stackoverflow.com/questions/9169025/how-can-i-add-a-python-tuple-to-a-yaml-file-using-pyyaml
 
-    construct_python_tuple = yaml.Loader.construct_python_tuple
+    construct_python_tuple = yaml.Loader.construct_python_tuple  # type: ignore
 
 
-_SimpleLoader.add_constructor(
-    u'tag:yaml.org,2002:python/tuple',
-    _SimpleLoader.construct_python_tuple)
+_SimpleLoader.add_constructor(  # type: ignore
+    'tag:yaml.org,2002:python/tuple',
+    _SimpleLoader.construct_python_tuple)  # type: ignore
 
 
-class _SimpleDumper(getattr(yaml, 'CSafeDumper', yaml.SafeDumper)):
+class _SimpleDumper(_BaseDumper):
     """Add types supported by 'marshal'.
 
     YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So
     we want to only support dumping out types that are safe to load.
     """
+    represent_tuple = yaml.Dumper.represent_tuple  # type: _TupleRepresenterType
 
 
-_SimpleDumper.represent_tuple = yaml.Dumper.represent_tuple
 _SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)
 
 
@@ -351,7 +371,7 @@ class _JujuStorageBackend:
         p = _run(["state-get", key], stdout=subprocess.PIPE, check=True, universal_newlines=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
-        return yaml.load(p.stdout, Loader=_SimpleLoader)
+        return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore
 
     def delete(self, key: str) -> None:
         """Remove a key from being tracked.
@@ -367,7 +387,7 @@ class _JujuStorageBackend:
 class NoSnapshotError(Exception):
     """Exception to flag that there is no snapshot for the given handle_path."""
 
-    def __init__(self, handle_path):
+    def __init__(self, handle_path: str):
         self.handle_path = handle_path
 
     def __str__(self):
