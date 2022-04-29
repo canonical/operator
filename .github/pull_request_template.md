@@ -26,3 +26,10 @@ QA steps here
 ## Bug reference
 
 *Please add a link to any bugs that this change is related to, e.g., https://bugs.launchpad.net/juju/+bug/9876543*
+
+## Changelog
+
+*Please include a bulleted list of items here, suitable for inclusion in a release changelog.*
+
+- *Adds feature foo, which allows charm authors to ...*
+- *Fixes bug bar, which means that operators no longer need workaround qux ...*
