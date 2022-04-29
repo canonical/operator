@@ -810,8 +810,7 @@ class Framework(Object):
 
         last_event_path = None
         deferred = True
-        for event_path, observer_path, method_name in self._storage.notices(
-                single_event_path):
+        for event_path, observer_path, method_name in self._storage.notices(single_event_path):
             event_handle = Handle.from_path(event_path)
 
             if last_event_path != event_path:
@@ -823,8 +822,7 @@ class Framework(Object):
             try:
                 event = self.load_snapshot(event_handle)
             except NoTypeError:
-                self._storage.drop_notice(event_path, observer_path,
-                                          method_name)
+                self._storage.drop_notice(event_path, observer_path, method_name)
                 continue
 
             event.deferred = False
@@ -850,8 +848,7 @@ class Framework(Object):
             if event.deferred:
                 deferred = True
             else:
-                self._storage.drop_notice(event_path, observer_path,
-                                          method_name)
+                self._storage.drop_notice(event_path, observer_path, method_name)
             # We intentionally consider this event to be dead and reload it from
             # scratch in the next path.
             self.framework._forget(event)
@@ -882,11 +879,9 @@ class Framework(Object):
             if not isinstance(name, str):
                 raise TypeError('breakpoint names must be strings')
             if name in ('hook', 'all'):
-                raise ValueError(
-                    'breakpoint names "all" and "hook" are reserved')
+                raise ValueError('breakpoint names "all" and "hook" are reserved')
             if not re.match(r'^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$', name):
-                raise ValueError(
-                    'breakpoint names must look like "foo" or "foo-bar"')
+                raise ValueError('breakpoint names must look like "foo" or "foo-bar"')
 
         indicated_breakpoints = self._juju_debug_at
         if not indicated_breakpoints:
@@ -973,8 +968,7 @@ class BoundStoredState:
         self.__dict__["_data"] = data
         self.__dict__["_attr_name"] = attr_name
 
-        parent.framework.observe(parent.framework.on.commit,
-                                 self._data.on_commit)
+        parent.framework.observe(parent.framework.on.commit, self._data.on_commit)
 
     def __getattr__(self, key):
         # "on" is the only reserved key that can't be used in the data map.
@@ -1061,9 +1055,8 @@ class StoredState:
                 if bound is not None:
                     # the StoredState instance is being stored in two different
                     # attributes -> unclear what is expected of us -> bail out
-                    raise RuntimeError(
-                        "StoredState shared by {0}.{1} and {0}.{2}".format(
-                            cls.__name__, self.attr_name, attr_name))
+                    raise RuntimeError("StoredState shared by {0}.{1} and {0}.{2}".format(
+                        cls.__name__, self.attr_name, attr_name))
                 # we've found ourselves for the first time; save where, and bind the object
                 self.attr_name = attr_name
                 self.parent_type = cls
