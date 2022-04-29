@@ -35,10 +35,10 @@ from ops.storage import NoSnapshotError, SQLiteStorage
 if typing.TYPE_CHECKING:
     from pathlib import Path
 
+    from typing_extensions import Protocol, Type
+
     from ops.charm import CharmMeta
     from ops.model import Model
-
-    from typing_extensions import Protocol, Type
 
     class _HandleLike(Protocol):
         handle = None  # type: Handle
