@@ -40,7 +40,7 @@ if typing.TYPE_CHECKING:
     from ops.charm import CharmMeta
     from ops.model import Model
 
-    class _HandleLike(Protocol):
+    class _Serializable(Protocol):
         handle = None  # type: Handle
         def snapshot(self) -> dict: ...  # noqa: E704
         def restore(self, snapshot: dict) -> "Object": ...  # noqa: E704
@@ -544,9 +544,10 @@ class Framework(Object):
         # {object_path: object}
         self._objects = weakref.WeakValueDictionary()  # type: typing.Dict[str, 'Object']
         # {(parent_path, kind): cls}
-        # todo find better name for this type; what does it represent?
-        _Predecessor = typing.Tuple[typing.Optional["_Path"], "_Kind"]  # noqa: N806
-        self._type_registry = {}  # type: typing.Dict['_Predecessor', 'Type']
+        # (parent_path, kind) is the address of _this_ object: the parent path
+        # plus a 'kind' string that is the name of this object.
+        _ObjectPath = typing.Tuple[typing.Optional["_Path"], "_Kind"]  # noqa: N806
+        self._type_registry = {}  # type: typing.Dict['_ObjectPath', 'Type']
         self._type_known = set()  # type: typing.Set['Type']
 
         if isinstance(storage, (str, pathlib.Path)):
@@ -635,7 +636,7 @@ class Framework(Object):
         self._type_registry[(parent_path, kind)] = cls
         self._type_known.add(cls)
 
-    def save_snapshot(self, value: "_HandleLike"):
+    def save_snapshot(self, value: "_Serializable"):
         """Save a persistent snapshot of the provided value."""
         if type(value) not in self._type_known:
             raise RuntimeError(
