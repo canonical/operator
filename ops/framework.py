@@ -47,9 +47,20 @@ if typing.TYPE_CHECKING:
 
     _ObjectType = typing.TypeVar("_ObjectType", bound="Object")
     _EventType = typing.TypeVar("_EventType", bound=Type["EventBase"])
-    _Observer = typing.Callable[[typing.Any], None]
+    _ObserverCallback = typing.Callable[[typing.Any], None]
     _Path = _Kind = str
-    _ParentType = typing.Union["Handle", _ObjectType]
+
+    # This type is used to denote either a Handle instance or an instance of
+    # an Object (or subclass). This is used by methods and classes which can be
+    # called with either of those (they need a Handle, but will accept an Object
+    # from which they will then extract the Handle).
+    _ParentHandle = typing.Union["Handle", _ObjectType]
+
+    # used to type Framework Attributes
+    _ObserverPath = typing.List[typing.Tuple['_Path', str, '_Path', str]]
+    _ObjectPath = typing.Tuple[typing.Optional['_Path'], '_Kind']
+    _PathToObserverMapping = typing.Dict[str, '_ObserverCallback']
+    _PathToObjectMapping = typing.Dict[str, 'Object']
 
 
 logger = logging.getLogger(__name__)
@@ -69,9 +80,9 @@ class Handle:
     under the same parent and kind may have the same key.
     """
 
-    def __init__(self, parent: typing.Optional["_ParentType"], kind: str, key: str):
-        if parent is not None and not isinstance(parent, Handle):
-            # parent must be an Object or subclass
+    def __init__(self, parent: typing.Optional["_ParentHandle"], kind: str, key: str):
+        if isinstance(parent, Object):
+            # if it's not an Object, it will be either a Handle (good) or None (no parent)
             parent = parent.handle
         self._parent = parent
         self._kind = kind
@@ -287,7 +298,7 @@ class BoundEvent:
             hex(id(self)),
         )
 
-    def __init__(self, emitter: "_ParentType",
+    def __init__(self, emitter: "_ObjectType",
                  event_type: "_EventType", event_kind: str):
         self.emitter = emitter
         self.event_type = event_type
@@ -538,16 +549,15 @@ class Framework(Object):
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
-        self._observers = []  # type: typing.List[typing.Tuple['_Path', str, '_Path', str]]
+        self._observers = []  # type: _ObserverPath
         # {observer_path: observer}
-        self._observer = weakref.WeakValueDictionary()  # type: typing.Dict[str, '_Observer']
+        self._observer = weakref.WeakValueDictionary()  # type: _PathToObserverMapping
         # {object_path: object}
-        self._objects = weakref.WeakValueDictionary()  # type: typing.Dict[str, 'Object']
+        self._objects = weakref.WeakValueDictionary()  # type: _PathToObjectMapping
         # {(parent_path, kind): cls}
         # (parent_path, kind) is the address of _this_ object: the parent path
         # plus a 'kind' string that is the name of this object.
-        _ObjectPath = typing.Tuple[typing.Optional["_Path"], "_Kind"]  # noqa: N806
-        self._type_registry = {}  # type: typing.Dict['_ObjectPath', 'Type']
+        self._type_registry = {}  # type: typing.Dict[_ObjectPath, 'Type']
         self._type_known = set()  # type: typing.Set['Type']
 
         if isinstance(storage, (str, pathlib.Path)):
@@ -623,7 +633,7 @@ class Framework(Object):
         self.save_snapshot(self._stored)
         self._storage.commit()
 
-    def register_type(self, cls, parent: typing.Optional["_ParentType"], kind=None):
+    def register_type(self, cls, parent: typing.Optional["_ParentHandle"], kind=None):
         """Register a type to a handle."""
         if parent is not None and not isinstance(parent, Handle):
             parent = parent.handle
@@ -677,7 +687,7 @@ class Framework(Object):
         self._storage.drop_snapshot(handle.path)
 
     def observe(self, bound_event: BoundEvent,
-                observer: "_Observer"):
+                observer: "_ObserverCallback"):
         """Register observer to be called when bound_event is emitted.
 
         The bound_event is generally provided as an attribute of the object that emits

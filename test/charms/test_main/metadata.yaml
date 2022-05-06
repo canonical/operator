@@ -2,13 +2,11 @@ name: main
 summary: A charm used for testing the basic operation of the entrypoint code.
 maintainer: Dmitrii Shcherbakov <dmitrii.shcherbakov@canonical.com>
 description: A charm used for testing the basic operation of the entrypoint code.
-tags:
-    - misc
-series:
-    - bionic
-    - cosmic
-    - disco
-min-juju-version: 2.7.1
+bases:
+  - name: ubuntu
+    channel: focal
+    architectures:
+      - amd64
 provides:
     db:
         interface: db

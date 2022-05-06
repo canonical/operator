@@ -1019,8 +1019,8 @@ class StorageMapping(Mapping):
         storage_list = self._storage_map[storage_name]
         if storage_list is None:
             storage_list = self._storage_map[storage_name] = []
-            for storage_id in self._backend.storage_list(storage_name):
-                storage_list.append(Storage(storage_name, storage_id, self._backend))
+            for storage_index in self._backend.storage_list(storage_name):
+                storage_list.append(Storage(storage_name, storage_index, self._backend))
         return storage_list
 
     def request(self, storage_name: str, count: int = 1):
@@ -1047,20 +1047,36 @@ class Storage:
 
     Attributes:
         name: Simple string name of the storage
-        id: The provider id for storage
+        id: The index number for storage
     """
 
-    def __init__(self, storage_name, storage_id, backend):
+    def __init__(self, storage_name: str, storage_index: int, backend):
         self.name = storage_name
-        self.id = storage_id
+        self._index = storage_index
         self._backend = backend
         self._location = None
+
+    @property
+    def index(self) -> int:
+        """The index associated with the storage (usually 0 for singular storage)."""
+        return self._index
+
+    @property
+    def id(self) -> int:
+        """DEPRECATED (use ".index"): The index associated with the storage."""
+        logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
+        return self.index
+
+    @property
+    def full_id(self) -> str:
+        """Returns the canonical storage name and id/index based identifier."""
+        return '{}/{}'.format(self.name, self._index)
 
     @property
     def location(self) -> Path:
         """Return the location of the storage."""
         if self._location is None:
-            raw = self._backend.storage_get('{}/{}'.format(self.name, self.id), "location")
+            raw = self._backend.storage_get(self.full_id, "location")
             self._location = Path(raw)
         return self._location
 

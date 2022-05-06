@@ -35,6 +35,7 @@ Global Variables:
 import datetime
 import fnmatch
 import inspect
+import os
 import pathlib
 import random
 import signal
@@ -208,7 +209,8 @@ class Harness(typing.Generic[CharmType]):
             harness = Harness(MyCharm)
             # Do initial setup here
             # Add storage if needed before begin_with_initial_hooks() is called
-            storage_id = harness.add_storage('data', count=1)
+            storage_ids = harness.add_storage('data', count=1)[0]
+            storage_id = storage_id[0] # we only added one storage instance
             relation_id = harness.add_relation('db', 'postgresql')
             harness.add_relation_unit(relation_id, 'postgresql/0')
             harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
@@ -467,11 +469,13 @@ class Harness(typing.Generic[CharmType]):
         # Model._storages won't return Storage objects for subsequently-added storage.
         self._model._storages._invalidate(storage_name)
 
-        if self.charm is not None and self._hooks_enabled:
-            for storage_index in storage_indices:
-                self.charm.on[storage_name].storage_attached.emit(
-                    model.Storage(storage_name, storage_index, self._backend))
-        return ["{}/{}".format(storage_name, storage_index) for storage_index in storage_indices]
+        ids = []
+        for storage_index in storage_indices:
+            s = model.Storage(storage_name, storage_index, self._backend)
+            ids.append(s.full_id)
+            if self.charm is not None and self._hooks_enabled:
+                self.charm.on[storage_name].storage_attached.emit(s)
+        return ids
 
     def detach_storage(self, storage_id: str) -> None:
         """Detach a storage device.
@@ -481,7 +485,7 @@ class Harness(typing.Generic[CharmType]):
         and is presently marked as attached.
 
         Args:
-            storage_id: The full storage ID of th e storage unit being detached, including the
+            storage_id: The full storage ID of the storage unit being detached, including the
                 storage key, e.g. my-storage/0.
         """
         if self.charm is None:
@@ -511,11 +515,11 @@ class Harness(typing.Generic[CharmType]):
                 model.Storage(storage_name, storage_index, self._backend))
 
     def remove_storage(self, storage_id: str) -> None:
-        """Attach a storage device.
+        """Detach a storage device.
 
         The intent of this function is to simulate a "juju remove-storage" call.
         It will trigger a storage-detaching hook if the storage unit in question exists
-        and is presently marked as detached.  Additionally, it will remove the storage
+        and is presently marked as attached.  Then it will remove the storage
         unit from the testing backend.
 
         Args:
@@ -756,8 +760,7 @@ class Harness(typing.Generic[CharmType]):
             for that container name. (should only happen if container is not present in
             metadata.yaml)
         """
-        socket_path = '/charm/containers/{}/pebble.socket'.format(container_name)
-        client = self._backend._pebble_clients.get(socket_path)
+        client = self._backend._pebble_clients.get(container_name)
         if client is None:
             raise KeyError('no known pebble client for container "{}"'.format(container_name))
         return client.get_plan()
@@ -1078,6 +1081,8 @@ class _TestingModelBackend:
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
         self.model_uuid = 'f2c1b2a6-e006-11eb-ba80-0242ac130004'
+
+        self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
         self._calls = []
         self._meta = meta
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
@@ -1099,10 +1104,10 @@ class _TestingModelBackend:
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
         self._storage_list = {k: {} for k in self._meta.storages}
+
         self._storage_detached = {k: set() for k in self._meta.storages}
-        self._storage_id_counter = 0
-        # {socket_path : _TestingPebbleClient}
-        # socket_path = '/charm/containers/{container_name}/pebble.socket'
+        self._storage_index_counter = 0
+        # {container_name : _TestingPebbleClient}
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
         self._pebble_clients_can_connect = {}  # type: {_TestingPebbleClient: bool}
         self._planned_units = None
@@ -1252,15 +1257,18 @@ class _TestingModelBackend:
             raise model.ModelError(
                 'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
 
-    def storage_add(self, name: str, count: int = 1):
+    def storage_add(self, name: str, count: int = 1) -> typing.List[int]:
+        if '/' in name:
+            raise model.ModelError('storage name cannot contain "/"')
+
         if name not in self._storage_list:
             self._storage_list[name] = {}
         result = []
         for i in range(count):
-            index = self._storage_id_counter
-            self._storage_id_counter += 1
+            index = self._storage_index_counter
+            self._storage_index_counter += 1
             self._storage_list[name][index] = {
-                "location": "/{}/{}".format(name, index)
+                'location': os.path.join(self._harness_tmp_dir.name, name, str(index)),
             }
             result.append(index)
         return result
@@ -1270,6 +1278,10 @@ class _TestingModelBackend:
         # detachment of a storage unit.  This is not present in ops.model._ModelBackend.
         name, index = storage_id.split('/', 1)
         index = int(index)
+
+        for client in self._pebble_clients.values():
+            client._fs.remove_mount(name)
+
         if self._storage_is_attached(name, index):
             self._storage_detached[name].add(index)
 
@@ -1278,6 +1290,14 @@ class _TestingModelBackend:
         # re-attachment of a storage unit.  This is not present in
         # ops.model._ModelBackend.
         name, index = storage_id.split('/', 1)
+
+        for container, client in self._pebble_clients.items():
+            for _, mount in self._meta.containers[container].mounts.items():
+                if mount.storage != name:
+                    continue
+                for index, store in self._storage_list[mount.storage].items():
+                    client._fs.add_mount(mount.storage, mount.location, store['location'])
+
         index = int(index)
         if not self._storage_is_attached(name, index):
             self._storage_detached[name].remove(index)
@@ -1321,11 +1341,19 @@ class _TestingModelBackend:
     def juju_log(self, level, msg):
         raise NotImplementedError(self.juju_log)
 
-    def get_pebble(self, socket_path: str):
-        client = self._pebble_clients.get(socket_path, None)
+    def get_pebble(self, socket_path: str) -> 'pebble.Client':
+        container = socket_path.split('/')[3]  # /charm/containers/<container_name>/pebble.socket
+        client = self._pebble_clients.get(container, None)
         if client is None:
             client = _TestingPebbleClient(self)
-            self._pebble_clients[socket_path] = client
+            self._pebble_clients[container] = client
+
+            # we need to know which container a new pebble client belongs to
+            # so we can figure out which storage mounts must be simulated on
+            # this pebble client's mock file systems when storage is
+            # attached/detached later.
+            self._pebble_clients[container] = client
+
         self._pebble_clients_can_connect[client] = not SIMULATE_CAN_CONNECT
         return client
 
@@ -1367,7 +1395,7 @@ class _TestingPebbleClient:
         self._layers = {}
         # Has a service been started/stopped?
         self._service_status = {}
-        self._fs = _MockFilesystem()
+        self._fs = _TestingFilesystem()
         self._backend = backend
 
     def _check_connection(self):
@@ -1752,14 +1780,155 @@ ChangeError: cannot perform the following tasks:
 
 
 class NonAbsolutePathError(Exception):
-    """Error raised by _MockFilesystem.
+    """Error raised by _TestingFilesystem.
 
     This error is raised when an absolute path is required but the code instead encountered a
     relative path.
     """
 
 
-class _MockFilesystem:
+class _TestingStorageMount:
+    """Simulates a filesystem backend for storage mounts."""
+
+    def __init__(self, location: pathlib.PurePosixPath, src: pathlib.Path):
+        """Creates a new simulated storage mount.
+
+        Args:
+            location: The path within simulated filesystem at which this storage will be mounted.
+            src: The temporary on-disk location where the simulated storage will live.
+        """
+        self._src = src
+        self._location = location
+
+        src.mkdir(exist_ok=True, parents=True)
+
+    def contains(self, path: typing.Union[str, pathlib.PurePosixPath]) -> bool:
+        """Returns true whether path resides within this simulated storage mount's location."""
+        try:
+            pathlib.PurePosixPath(path).relative_to(self._location)
+            return True
+        except Exception:
+            return False
+
+    def check_contains(self, path: typing.Union[str,
+                       pathlib.PurePosixPath]) -> pathlib.PurePosixPath:
+        """Raises if path does not reside within this simulated storage mount's location."""
+        if not self.contains(path):
+            msg = 'the provided path "{!s}" does not reside within the mount location "{!s}"' \
+                .format(path, self._location)
+            raise RuntimeError(msg)
+        return pathlib.PurePosixPath(path)
+
+    def _srcpath(self, path: pathlib.PurePosixPath) -> pathlib.Path:
+        """Returns the disk-backed path where the simulated path will actually be stored."""
+        suffix = path.relative_to(self._location)
+        return self._src / suffix
+
+    def create_dir(
+            self,
+            path: pathlib.PurePosixPath,
+            make_parents: bool = False,
+            **kwargs) -> '_Directory':
+        if not pathlib.PurePosixPath(path).is_absolute():
+            raise NonAbsolutePathError(str(path))
+        path = self.check_contains(path)
+        srcpath = self._srcpath(path)
+
+        if srcpath.exists() and srcpath.is_dir() and make_parents:
+            return _Directory(path, **kwargs)  # nothing to do
+        if srcpath.exists():
+            raise FileExistsError(str(path))
+
+        dirname = srcpath.parent
+        if not dirname.exists():
+            if not make_parents:
+                raise FileNotFoundError(str(path.parent))
+            dirname.mkdir(parents=True, exist_ok=True)
+        srcpath.mkdir(exist_ok=True)
+        return _Directory(path, **kwargs)
+
+    def create_file(
+            self,
+            path: pathlib.PurePosixPath,
+            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
+            encoding: str = 'utf-8',
+            make_dirs: bool = False,
+            **kwargs
+    ) -> '_File':
+        path = self.check_contains(path)
+        srcpath = self._srcpath(path)
+
+        dirname = srcpath.parent
+        if not dirname.exists():
+            if not make_dirs:
+                raise FileNotFoundError(str(path.parent))
+            dirname.mkdir(parents=True, exist_ok=True)
+
+        if isinstance(data, str):
+            data = data.encode(encoding=encoding)
+        elif not isinstance(data, bytes):
+            data = data.getvalue()
+            if isinstance(data, str):
+                data = data.encode()
+
+        with srcpath.open('wb') as f:
+            f.write(data)
+
+        return _File(path, data, encoding=encoding, **kwargs)
+
+    def list_dir(self, path: pathlib.PurePosixPath) -> typing.List['_File']:
+        path = self.check_contains(path)
+        srcpath = self._srcpath(path)
+
+        results = []
+        if not srcpath.exists():
+            raise FileNotFoundError(str(path))
+        if not srcpath.is_dir():
+            raise NotADirectoryError(str(path))
+        for fpath in srcpath.iterdir():
+            mountpath = path / fpath.name
+            if fpath.is_dir():
+                results.append(_Directory(mountpath))
+            elif fpath.is_file():
+                with fpath.open('rb') as f:
+                    results.append(_File(mountpath, f.read()))
+            else:
+                raise RuntimeError('unsupported file type at path {}'.format(fpath))
+        return results
+
+    def open(
+            self,
+            path: typing.Union[str, pathlib.PurePosixPath],
+            encoding: typing.Optional[str] = 'utf-8',
+    ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
+        path = self.check_contains(path)
+
+        file = self.get_path(path)
+        if isinstance(file, _Directory):
+            raise IsADirectoryError(str(file.path))
+        return file.open(encoding=encoding)
+
+    def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]
+                 ) -> typing.Union['_Directory', '_File']:
+        path = self.check_contains(path)
+        srcpath = self._srcpath(path)
+        if srcpath.is_dir():
+            return _Directory(path)
+        if not srcpath.exists():
+            raise FileNotFoundError(str(path))
+        with srcpath.open('rb') as f:
+            return _File(path, f.read())
+
+    def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
+        path = self.check_contains(path)
+        srcpath = self._srcpath(path)
+        if srcpath.exists():
+            srcpath.unlink()
+        else:
+            raise FileNotFoundError(str(path))
+
+
+class _TestingFilesystem:
     r"""An in-memory mock of a pebble-controlled container's filesystem.
 
     For now, the filesystem is assumed to be a POSIX-style filesytem; Windows-style directories
@@ -1768,10 +1937,22 @@ class _MockFilesystem:
 
     def __init__(self):
         self.root = _Directory(pathlib.PurePosixPath('/'))
+        self._mounts = {}
+
+    def add_mount(self, name, mount_path, backing_src_path):
+        self._mounts[name] = _TestingStorageMount(
+            pathlib.PurePosixPath(mount_path), pathlib.Path(backing_src_path))
+
+    def remove_mount(self, name):
+        if name in self._mounts:
+            del self._mounts[name]
 
     def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
         if not path.startswith('/'):
             raise NonAbsolutePathError(path)
+        for mount in self._mounts.values():
+            if mount.contains(path):
+                return mount.create_dir(path, make_parents, **kwargs)
         current_dir = self.root
         tokens = pathlib.PurePosixPath(path).parts[1:]
         for token in tokens[:-1]:
@@ -1813,6 +1994,9 @@ class _MockFilesystem:
     ) -> '_File':
         if not path.startswith('/'):
             raise NonAbsolutePathError(path)
+        for mount in self._mounts.values():
+            if mount.contains(path):
+                return mount.create_file(path, data, encoding, make_dirs, **kwargs)
         path_obj = pathlib.PurePosixPath(path)
         try:
             dir_ = self.get_path(path_obj.parent)
@@ -1832,6 +2016,9 @@ class _MockFilesystem:
         return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
     def list_dir(self, path) -> typing.List['_File']:
+        for mount in self._mounts.values():
+            if mount.contains(path):
+                return mount.list_dir(path)
         current_dir = self.root
         tokens = pathlib.PurePosixPath(path).parts[1:]
         for token in tokens:
@@ -1852,6 +2039,9 @@ class _MockFilesystem:
             path: typing.Union[str, pathlib.PurePosixPath],
             encoding: typing.Optional[str] = 'utf-8',
     ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
+        for mount in self._mounts.values():
+            if mount.contains(path):
+                return mount.open(path, encoding)
         path = pathlib.PurePosixPath(path)
         file = self.get_path(path)  # warning: no check re: directories
         if isinstance(file, _Directory):
@@ -1860,6 +2050,9 @@ class _MockFilesystem:
 
     def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]) \
             -> typing.Union['_Directory', '_File']:
+        for mount in self._mounts.values():
+            if mount.contains(path):
+                return mount.get_path(path)
         path = pathlib.PurePosixPath(path)
         tokens = path.parts[1:]
         current_object = self.root
@@ -1872,6 +2065,9 @@ class _MockFilesystem:
         return current_object
 
     def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
+        for mount in self._mounts.values():
+            if mount.contains(path):
+                return mount.delete_path(path)
         path = pathlib.PurePosixPath(path)
         parent_dir = self.get_path(path.parent)
         del parent_dir[path.name]
