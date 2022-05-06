@@ -49,12 +49,18 @@ if typing.TYPE_CHECKING:
     _EventType = typing.TypeVar("_EventType", bound=Type["EventBase"])
     _ObserverCallback = typing.Callable[[typing.Any], None]
     _Path = _Kind = str
+
+    # This type is used to denote either a Handle instance or an instance of
+    # an Object (or subclass). This is used by methods and classes which can be
+    # called with either of those (they need a Handle, but will accept an Object
+    # from which they will then extract the Handle).
     _ParentHandle = typing.Union["Handle", _ObjectType]
 
-    # Framework attributes
-    _FrameworkObserver = typing.Dict[str, '_ObserverCallback']
-    _FrameworkObjectPath = typing.Tuple[typing.Optional['_Path'], '_Kind']
-    _FrameworkObjects = typing.Dict[str, 'Object']
+    # used to type Framework Attributes
+    _ObserverPath = typing.List[typing.Tuple['_Path', str, '_Path', str]]
+    _ObjectPath = typing.Tuple[typing.Optional['_Path'], '_Kind']
+    _PathToObserverMapping = typing.Dict[str, '_ObserverCallback']
+    _PathToObjectMapping = typing.Dict[str, 'Object']
 
 
 logger = logging.getLogger(__name__)
@@ -543,15 +549,15 @@ class Framework(Object):
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
-        self._observers = []  # type: typing.List[typing.Tuple['_Path', str, '_Path', str]]
+        self._observers = []  # type: _ObserverPath
         # {observer_path: observer}
-        self._observer = weakref.WeakValueDictionary()  # type: _FrameworkObserver
+        self._observer = weakref.WeakValueDictionary()  # type: _PathToObserverMapping
         # {object_path: object}
-        self._objects = weakref.WeakValueDictionary()  # type: _FrameworkObjects
+        self._objects = weakref.WeakValueDictionary()  # type: _PathToObjectMapping
         # {(parent_path, kind): cls}
         # (parent_path, kind) is the address of _this_ object: the parent path
         # plus a 'kind' string that is the name of this object.
-        self._type_registry = {}  # type: typing.Dict[_FrameworkObjectPath, 'Type']
+        self._type_registry = {}  # type: typing.Dict[_ObjectPath, 'Type']
         self._type_known = set()  # type: typing.Set['Type']
 
         if isinstance(storage, (str, pathlib.Path)):
