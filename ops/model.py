@@ -36,6 +36,11 @@ import ops.pebble as pebble
 from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
+if typing.TYPE_CHECKING:
+    _RelationMappingType = typing.Mapping[str, typing.List['Relation']]
+    _StorageMappingType = typing.Mapping[str, typing.List['Storage']]
+    _BindingMappingType = typing.Mapping[str, 'Binding']
+
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
@@ -51,13 +56,15 @@ class Model:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
-        self._unit = self.get_unit(self._backend.unit_name)
-        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
+        self._unit = self.get_unit(self._backend.unit_name)  # type: 'Unit'
+        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache
+                                          )  # type: _RelationMappingType
         self._config = ConfigData(self._backend)
         self._resources = Resources(list(meta.resources), self._backend)
         self._pod = Pod(self._backend)
-        self._storages = StorageMapping(list(meta.storages), self._backend)
-        self._bindings = BindingMapping(self._backend)
+        self._storages = StorageMapping(list(meta.storages), self._backend
+                                        )  # type: _StorageMappingType
+        self._bindings = BindingMapping(self._backend)  # type: _BindingMappingType
 
     @property
     def unit(self) -> 'Unit':
@@ -65,7 +72,7 @@ class Model:
         return self._unit
 
     @property
-    def app(self):
+    def app(self) -> 'Application':
         """A :class:`Application` that represents the application this unit is a part of."""
         return self._unit.app
 
@@ -171,7 +178,7 @@ class Model:
 
 class _ModelCache:
 
-    def __init__(self, meta, backend):
+    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._meta = meta
         self._backend = backend
         self._weakrefs = weakref.WeakValueDictionary()
@@ -197,7 +204,8 @@ class Application:
             the charm, if the user has deployed it to a different name.
     """
 
-    def __init__(self, name, meta, backend, cache):
+    def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
+                 backend: '_ModelBackend', cache: _ModelCache):
         self.name = name
         self._backend = backend
         self._cache = cache
@@ -294,7 +302,7 @@ class Unit:
         self.name = name
 
         app_name = name.split('/')[0]
-        self.app = cache.get(Application, app_name)
+        self.app = cache.get(Application, app_name)  # type: Application
 
         self._backend = backend
         self._cache = cache
@@ -379,7 +387,7 @@ class Unit:
         self._backend.application_version_set(version)
 
     @property
-    def containers(self) -> 'ContainerMapping':
+    def containers(self) -> typing.Mapping[str, 'Container']:
         """Return a mapping of containers indexed by name."""
         if not self._is_our_unit:
             raise RuntimeError('cannot get container for a remote unit {}'.format(self))

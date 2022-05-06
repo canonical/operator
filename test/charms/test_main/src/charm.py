@@ -34,7 +34,6 @@ class Charm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-
         self._stored.set_default(
             try_excepthook=False,
 
