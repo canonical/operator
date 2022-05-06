@@ -30,15 +30,6 @@ if typing.TYPE_CHECKING:
     _Notices = typing.List[_Notice]
 
     _TupleRepresenterType = typing.Callable[[typing.Any, typing.Tuple[typing.Any, ...]], yaml.Node]
-    # from typing_extensions import Protocol
-    #
-    # _RepresenterType = typing.Callable[[typing.Iterable], yaml.SequenceNode]
-    # class _DumperProtocol(Protocol):
-    #     represent_tuple = lambda data: yaml.SequenceNode  # type: _RepresenterType
-    #     def add_representer(self, cls_: typing.Type, repr_: _RepresenterType): ...
-    #
-    # class _LoaderProtocol(Protocol):
-    #     def add_constructor(self, str) -> typing.Any: ...
 
 
 def _run(args: typing.List[str], **kw: typing.Any):
