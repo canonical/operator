@@ -148,7 +148,7 @@ class SQLiteStorage:
                AND method_name=?
             ''', (event_path, observer_path, method_name))
 
-    def notices(self, event_path: Optional[str] = None) -> _NoticeGenerator:
+    def notices(self, event_path: Optional[str] = None) -> '_NoticeGenerator':
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
