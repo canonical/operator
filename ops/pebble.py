@@ -28,8 +28,6 @@ import io
 import json
 import logging
 import os
-import pathlib
-import pwd
 import re
 import select
 import shutil
@@ -53,73 +51,6 @@ logger = logging.getLogger(__name__)
 
 _not_provided = object()
 
-def _list_recursive(list_func, path, pattern, follow, max_depth, max_files, depth=0):
-    """
-    list_func
-        Function taking 1 path argument that returns a list of FileInfo objects
-        representing files residing directly inside the given path.
-    path
-        Filepath to recursively list.
-    pattern
-        is a filtering/globbing pattern to limit listing.
-    follow
-        Set to True to resolve/follow symlinks.
-    files
-        Recursively accumulating list of files
-    depth
-        the current directory-recursion depth.
-    """
-    files = []
-
-    if depth > max_depth:
-        return files
-
-    for f in list_func(path):
-        if len(files) >= max_files:
-            return files
-
-        if f.type is FileType.DIRECTORY:
-            files.extend(_list_recursive(list_func, f.path, pattern, follow, max_depth, max_files, depth=depth+1))
-        elif f.type is FileType.FILE:
-            if pattern is None or pathlib.PurePath(f.path).match(pattern):
-                files.append(f)
-        elif f.type is FileType.SYMLINK:
-            if follow:
-                raise NotImplementedError('symlink following not supported (yet)')
-            elif pattern is None or pathlib.PurePath(f.path).match(pattern):
-                files.append(f)
-        else:
-            continue
-    return files
-
-def _relpath_all(files, open_func, prefix):
-    """
-    Converts a list of files into a generator returning each opened file (using
-    open_func) and the relative path from prefix to the file's path.
-
-    files
-        Collection/iterable of FileInfo objects to retrieve.
-    open_func
-        Function taking a single filepath argument that returns a file-like object for it.
-    prefix
-        Filepath prefix under which the given files were found/generated.  If
-        None, defaults to root (i.e. '/')  or the drive on windows (e.g.  'c:/')
-    """
-    def next_file():
-        for f in files:
-            path = f
-            if isinstance(info, FileInfo):
-                path = f.path
-            if prefix is None:
-                prefix = '/'
-                if sys.platform == 'win32':
-                    prefix, _ = os.path.splitdrive(path)
-            if not path.startswith(prefix):
-                raise RuntimeError('file "{}" does not have specified prefix "{}"'.format(path, prefix))
-
-            path_suffix = os.path.relpath(prefix, path)
-            yield (open_func(path), path_suffix, f)
-    return next_file
 
 class _UnixSocketConnection(http.client.HTTPConnection):
     """Implementation of HTTPConnection that connects to a named Unix socket."""
@@ -1892,45 +1823,6 @@ class Client:
         resp = self._request('GET', '/v1/files', query)
         result = resp['result'] or []  # in case it's null instead of []
         return [FileInfo.from_dict(d) for d in result]
-
-    def list_recursive(self, path, follow=False, max_depth=50, max_files=10000):
-        return _list_recursive(self.list_files, path, None, follow, max_depth, max_files)
-
-    def push_recursive(self, path, remote_dst, follow=False, max_depth=50, max_files=10000):
-        def local_list(path):
-            files = []
-            for fpath in os.listdir(path):
-                info = os.lstat(fpath)
-                if stat.S_ISDIR(info.st_mode):
-                    ftype = FileType.DIRECTORY
-                elif stat.S_ISREG(info.st_mode):
-                    ftype = FileType.FILE
-                elif stat.S_ISLINK(info.st_mode):
-                    ftype = FileType.SYMLINK
-                else:
-                    continue
-                files.append(FileInfo(fpath, os.path.basename(fpath), ftype, info.st_size, stat.S_IMODE(info.st_mode), info.st_mtime, info.st_uid, pwd.getpwuid(info.st_uid).pw_name, info.st_gid, grp.getgrgid(gid).gr_name))
-            return files
-        files = _list_recursive(local_list, path, None, follow, max_depth, max_files)
-        push_all(files, remote_dst)
-
-    def pull_recursive(self, path, local_dst, follow=False, max_depth=50, max_files=10000):
-        files = _list_recursive(self.list_files, path, None, follow, max_depth, max_files)
-        self.pull_all(files, local_dst, prefix=path)
-
-    def push_all(files, remote_dst, prefix=None):
-        for srcfile, path_suffix, f in _relpath_all(files, open, prefix):
-            with srcfile as src:
-                if isinstance(f, FileInfo):
-                    self.push(os.pathjoin(dst_path, path_suffix), srcfile, permissions=f.permissions, user_id=f.user_id, user=f.user, group_id=f.group_id, group=f.group)
-                else:
-                    self.push(os.pathjoin(dst_path, path_suffix), srcfile)
-
-    def pull_all(self, files, local_dst, prefix=None):
-        for srcfile, path_suffix, _ in _relpath_all(files, self.pull, prefix):
-            with srcfile as src:
-                with open(os.path.join(dst_path, path_suffix), 'wb') as dst:
-                    shutil.copyfileobj(src, dst)
 
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: int = None,

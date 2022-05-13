@@ -1631,15 +1631,6 @@ ChangeError: cannot perform the following tasks:
         self._check_connection()
         return self._fs.open(path, encoding=encoding)
 
-    def pull_all(self, files, dst_path, prefix=None):
-        for srcfile, path_suffix, _ in pebble._relpath_all(files, self.pull, prefix):
-            with srcfile as src:
-                with open(os.path.join(dst_path, path_suffix), 'wb') as dst:
-                    shutil.copyfileobj(src, dst)
-
-    def list_recursive(self, path, follow=False, max_depth=50, max_files=10000):
-        return pebble._list_recursive(self.list_files, path, None, follow, max_depth, max_files)
-
     def push(
             self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
