@@ -27,9 +27,13 @@ import yaml
 if typing.TYPE_CHECKING:
     from pathlib import Path
 
+    # _Notice = Tuple[event_path, observer_path, method_name]
     _Notice = Tuple[str, str, str]
     _Notices = List[_Notice]
 
+    # This is a function that takes a Tuple and returns a yaml node.
+    # it replaces a method, so the first argument passed to the function
+    # (Any) is 'self'.
     _TupleRepresenterType = Callable[[Any, Tuple[Any, ...]], yaml.Node]
     _NoticeGenerator = Generator['_Notice', None, None]
 
