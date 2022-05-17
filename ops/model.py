@@ -643,6 +643,7 @@ class BindingMapping(Mapping[str, 'Binding']):
     def __len__(self):
         raise NotImplementedError()
 
+
 class Binding:
     """Binding to a network space.
 
@@ -883,7 +884,8 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
 class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
 
-    def __init__(self, relation: 'Relation', entity: 'UnitOrApplication', backend: '_ModelBackend'):
+    def __init__(self, relation: 'Relation', entity: 'UnitOrApplication',
+                 backend: '_ModelBackend'):
         self.relation = relation
         self._entity = entity
         self._backend = backend
