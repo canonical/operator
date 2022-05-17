@@ -633,6 +633,15 @@ class BindingMapping(Mapping[str, 'Binding']):
             self._data[binding_key] = binding
         return binding
 
+    # implemented to satisfy the Mapping ABC, but not meant to be used.
+    def __getitem__(self, item):
+        raise NotImplementedError()
+
+    def __iter__(self):
+        raise NotImplementedError()
+
+    def __len__(self):
+        raise NotImplementedError()
 
 class Binding:
     """Binding to a network space.
@@ -853,7 +862,7 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
                 self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
             })
 
-    def __contains__(self, key: UnitOrApplication):
+    def __contains__(self, key: 'UnitOrApplication'):
         return key in self._data
 
     def __len__(self):
@@ -862,7 +871,7 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: UnitOrApplication):
+    def __getitem__(self, key: 'UnitOrApplication'):
         return self._data[key]
 
     def __repr__(self):
@@ -874,13 +883,13 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
 class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
 
-    def __init__(self, relation: 'Relation', entity: UnitOrApplication, backend: '_ModelBackend'):
+    def __init__(self, relation: 'Relation', entity: 'UnitOrApplication', backend: '_ModelBackend'):
         self.relation = relation
         self._entity = entity
         self._backend = backend
         self._is_app = isinstance(entity, Application)  # type: bool
 
-    def _load(self) -> _RawRelationDataContent:
+    def _load(self) -> '_RawRelationDataContent':
         """Load the data from the current entity / relation."""
         try:
             return self._backend.relation_get(self.relation.id, self._entity.name, self._is_app)
@@ -1082,7 +1091,7 @@ class Pod:
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def set_spec(self, spec: _K8sSpec, k8s_resources: Optional[_K8sSpec] = None):
+    def set_spec(self, spec: '_K8sSpec', k8s_resources: Optional['_K8sSpec'] = None):
         """Set the specification for pods that Juju should start in kubernetes.
 
         See `juju help-tool pod-spec-set` for details of what should be passed.
@@ -1301,7 +1310,7 @@ class Container:
         # fixme: remove on pebble.exec signature fix
         self._pebble.stop_services(service_names)  # type: ignore
 
-    def add_layer(self, label: str, layer: _Layer, *, combine: bool = False):
+    def add_layer(self, label: str, layer: '_Layer', *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         Args:
@@ -1892,8 +1901,8 @@ class _ModelBackend:
         out = self._run('resource-get', resource_name, return_output=True)
         return typing.cast(str, out).strip()
 
-    def pod_spec_set(self, spec: Mapping[str, JsonObject],
-                     k8s_resources: Optional[Mapping[str, JsonObject]] = None):
+    def pod_spec_set(self, spec: Mapping[str, 'JsonObject'],
+                     k8s_resources: Optional[Mapping[str, 'JsonObject']] = None):
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
         try:
             spec_path = tmpdir / 'spec.yaml'
@@ -1988,7 +1997,7 @@ class _ModelBackend:
     def action_get(self):
         return self._run('action-get', return_output=True, use_json=True)
 
-    def action_set(self, results: Dict[str, JsonObject]):
+    def action_set(self, results: Dict[str, 'JsonObject']):
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
@@ -2039,7 +2048,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def add_metrics(self, metrics: Mapping[str, Numerical],
+    def add_metrics(self, metrics: Mapping[str, 'Numerical'],
                     labels: Optional[Mapping[str, str]] = None):
         cmd = ['add-metric']  # type: List[str]
         if labels:
