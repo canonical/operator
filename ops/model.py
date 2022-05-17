@@ -252,7 +252,7 @@ class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         if typing.TYPE_CHECKING:
             _weakcachetype = weakref.WeakValueDictionary[
-                Tuple[Any, ...], Optional[UnitOrApplication]]
+                Tuple[Any, ...], Optional['UnitOrApplication']]
 
         self._meta = meta
         self._backend = backend
@@ -659,7 +659,7 @@ class Binding:
 
     def _network_get(self, name: str, relation_id: Optional[int] = None) -> 'Network':
         raw_data = self._backend.network_get(name, relation_id)
-        network_dict = typing.cast(_NetworkDict, raw_data)
+        network_dict = typing.cast('_NetworkDict', raw_data)
         return Network(network_dict)
 
     @property
