@@ -37,6 +37,6 @@ exclude = ["ops/_vendor", ".git", "__pycache__", ".tox", "build", "test",
     "ops/framework.py", "ops/jujuversion.py", "ops/log.py", "ops/main.py",
     "ops/model.py", "ops/pebble.py", "ops/testing.py",
     "ops/version.py", "setup.py", "ops/__init__.py"]
-pythonVersion = 3.5 # check no python > 3.5 features are used
+pythonVersion = "3.5" # check no python > 3.5 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"
