@@ -27,18 +27,16 @@ import time
 import typing
 import weakref
 from abc import ABC, ABCMeta, abstractmethod
-from collections.abc import Mapping as MappingABC
-from collections.abc import MutableMapping as MutableMappingABC
 from pathlib import Path
 from subprocess import PIPE, CalledProcessError, run
 from typing import (
     Any,
     BinaryIO,
     Dict,
-    Generic,
     Iterable,
     List,
     Mapping,
+    MutableMapping,
     Optional,
     Sequence,
     Set,
@@ -491,25 +489,22 @@ class Unit:
             raise ModelError('container {!r} not found'.format(container_name))
 
 
-_KT = TypeVar('_KT')
-_VT = TypeVar('_VT')
-
-
-class LazyMapping(MappingABC[str, str], ABC, Generic[_KT, _VT]):
+class LazyMapping(Mapping[str, str], ABC):
     """Represents a dict that isn't populated until it is accessed.
 
     Charm authors should generally never need to use this directly, but it forms
     the basis for many of the dicts that the framework tracks.
     """
 
-    _lazy_data = None  # type: Optional[Dict[_KT, _VT]]
+    # key-value mapping
+    _lazy_data = None  # type: Optional[Dict[str, str]]
 
     @abstractmethod
-    def _load(self) -> Dict[_KT, _VT]:
+    def _load(self) -> Dict[str, str]:
         raise NotImplementedError()
 
     @property
-    def _data(self) -> Dict[_KT, _VT]:
+    def _data(self) -> Dict[str, str]:
         data = self._lazy_data
         if data is None:
             data = self._lazy_data = self._load()
@@ -518,7 +513,7 @@ class LazyMapping(MappingABC[str, str], ABC, Generic[_KT, _VT]):
     def _invalidate(self):
         self._lazy_data = None
 
-    def __contains__(self, key: _KT) -> bool:
+    def __contains__(self, key: str) -> bool:
         return key in self._data
 
     def __len__(self):
@@ -527,14 +522,14 @@ class LazyMapping(MappingABC[str, str], ABC, Generic[_KT, _VT]):
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: _KT) -> _VT:
+    def __getitem__(self, key: str) -> str:
         return self._data[key]
 
     def __repr__(self):
         return repr(self._data)
 
 
-class RelationMapping(MappingABC[str, List['Relation']]):
+class RelationMapping(Mapping[str, List['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
     def __init__(self, relations_meta: '_RelationsMeta', our_unit: 'Unit',
@@ -828,7 +823,7 @@ class Relation:
                                       self.id)
 
 
-class RelationData(MappingABC['UnitOrApplication', 'RelationDataContent']):
+class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
     """Represents the various data buckets of a given relation.
 
     Each unit and application involved in a relation has their own data bucket.
@@ -876,7 +871,7 @@ class RelationData(MappingABC['UnitOrApplication', 'RelationDataContent']):
 
 # We mix in MutableMapping here to get some convenience implementations, but whether it's actually
 # mutable or not is controlled by the flag.
-class RelationDataContent(LazyMapping[str, str], MutableMappingABC[str, str]):
+class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
 
     def __init__(self, relation: 'Relation', entity: UnitOrApplication, backend: '_ModelBackend'):
@@ -932,7 +927,7 @@ class RelationDataContent(LazyMapping[str, str], MutableMappingABC[str, str]):
         self.__setitem__(key, '')
 
 
-class ConfigData(LazyMapping[str, str]):
+class ConfigData(LazyMapping):
     """Configuration data.
 
     This class should not be created directly. It should be accessed via :attr:`Model.config`.
@@ -1104,7 +1099,7 @@ class Pod:
         self._backend.pod_spec_set(spec, k8s_resources)
 
 
-class StorageMapping(MappingABC[str, List['Storage']]):
+class StorageMapping(Mapping[str, List['Storage']]):
     """Map of storage names to lists of Storage instances."""
 
     def __init__(self, storage_names: Iterable[str], backend: '_ModelBackend'):
@@ -1558,7 +1553,7 @@ class Container:
         self._pebble.send_signal(sig, service_names)  # type: ignore
 
 
-class ContainerMapping(MappingABC[str, Container]):
+class ContainerMapping(Mapping[str, Container]):
     """Map of container names to Container objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
@@ -1581,7 +1576,7 @@ class ContainerMapping(MappingABC[str, Container]):
         return repr(self._containers)
 
 
-class ServiceInfoMapping(MappingABC[str, 'pebble.ServiceInfo']):
+class ServiceInfoMapping(Mapping[str, 'pebble.ServiceInfo']):
     """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
@@ -1604,7 +1599,7 @@ class ServiceInfoMapping(MappingABC[str, 'pebble.ServiceInfo']):
         return repr(self._services)
 
 
-class CheckInfoMapping(MappingABC[str, 'pebble.CheckInfo']):
+class CheckInfoMapping(Mapping[str, 'pebble.CheckInfo']):
     """Map of check names to :class:`ops.pebble.CheckInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
@@ -1705,7 +1700,7 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
         if parent_key:
             key = "{}.{}".format(parent_key, key)
 
-        if isinstance(value, MutableMappingABC):
+        if isinstance(value, MutableMapping):
             value = typing.cast(Dict[str, 'JsonObject'], value)
             output = _format_action_result_dict(value, key, output_)
         elif key in output_:
