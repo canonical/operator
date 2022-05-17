@@ -1867,7 +1867,7 @@ class _ModelBackend:
             yield message[:max_len]
             message = message[max_len:]
 
-    def juju_log(self, level, message):
+    def juju_log(self, level: str, message: str):
         """Pass a log message on to the juju logger."""
         for line in self.log_split(message):
             self._run('juju-log', '--log-level', level, "--", line)
