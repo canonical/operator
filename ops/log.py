@@ -19,9 +19,10 @@ import sys
 import typing
 
 if typing.TYPE_CHECKING:
-    from ops.model import _ModelBackend  # pyright: reportPrivateUsage=false
-    from typing import Type
     from types import TracebackType
+    from typing import Type
+
+    from ops.model import _ModelBackend  # pyright: reportPrivateUsage=false
 
 
 class JujuLogHandler(logging.Handler):
