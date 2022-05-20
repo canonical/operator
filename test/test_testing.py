@@ -2519,17 +2519,6 @@ class TestHarness(unittest.TestCase):
             ]
         )
 
-    def test_upgrade_unknown_status(self):
-        """Unknown status should remain unknown across an upgrade."""
-        harness = Harness(RecordingCharm, meta='''name: test-app''')
-        self.addCleanup(harness.cleanup)
-        backend = harness._backend
-        harness.begin_with_initial_hooks()
-
-        self.assertEqual(backend.status_get(is_app=False), {'status': 'unknown', 'message': ''})
-        harness.upgrade()
-        self.assertEqual(backend.status_get(is_app=False), {'status': 'unknown', 'message': ''})
-
     def test_get_pebble_container_plan(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
