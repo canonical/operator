@@ -2406,7 +2406,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.changes,
             [
-                {'name': 'stop'},
+                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},
@@ -2423,7 +2423,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.changes,
             [
-                {'name': 'stop'},
+                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'leader-settings-changed'},
@@ -2452,7 +2452,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.changes,
             [
-                {'name': 'stop'},
+                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},
@@ -2482,7 +2482,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.changes,
             [
-                {'name': 'stop'},
+                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},
@@ -2512,7 +2512,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(
             harness.charm.changes,
             [
-                {'name': 'stop'},
+                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},

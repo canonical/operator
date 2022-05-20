@@ -199,7 +199,23 @@ class Harness(typing.Generic[CharmType]):
         if self._charm is None:
             raise RuntimeError('cannot call the upgrade method before begin')
 
+
+        # Reinitialize the charm-under-test
         self._charm.on.stop.emit()
+        self._framework = framework.Framework(
+            self._storage, self._charm_dir, self._meta, self._model)
+        self._charm = None
+
+        # self.framework._objects.pop(self._charm.__class__.__name__)
+        # to_remove = []
+        # for key in self.framework._objects:
+        #     if key.startswith(self._charm.__class__.__name__ + "/"):
+        #         to_remove.append(key)
+        # for key in to_remove:
+        #     self.framework._objects.pop(key)
+        # self.framework._observers = []
+
+        self.begin()
         self._charm.on.upgrade_charm.emit()
         self._charm.on.config_changed.emit()
         if not self._backend._is_leader:
