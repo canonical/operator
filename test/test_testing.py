@@ -2519,6 +2519,22 @@ class TestHarness(unittest.TestCase):
             ]
         )
 
+    def test_upgrade_status_consistency(self):
+        """The upgrade sequence itself shouldn't change the status."""
+        harness = Harness(RecordingCharm, meta='''name: test-app''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        harness.begin_with_initial_hooks()
+
+        unit_status_before = backend.status_get(is_app=False)
+        app_status_before = backend.status_get(is_app=True)
+        harness.upgrade()
+        unit_status_after = backend.status_get(is_app=False)
+        app_status_after = backend.status_get(is_app=True)
+
+        self.assertEqual(unit_status_before, unit_status_after)
+        self.assertEqual(app_status_before, app_status_after)
+
     def test_get_pebble_container_plan(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
