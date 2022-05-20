@@ -199,7 +199,6 @@ class Harness(typing.Generic[CharmType]):
         if self._charm is None:
             raise RuntimeError('cannot call the upgrade method before begin')
 
-
         # Reinitialize the charm-under-test
         self._charm.on.stop.emit()
         self._framework = framework.Framework(
