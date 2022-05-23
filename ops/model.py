@@ -764,8 +764,13 @@ class NetworkInterface:
     def __init__(self, name: str, address_info: '_AddressDict'):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
-        # ignore type: FIXME: https://github.com/canonical/operator/issues/753
-        address = address_info.get('value')  # type: ignore
+
+        address = address_info.get('value')
+        if address is None:
+            # Compatibility with Juju <2.9: legacy address_info only had
+            # an 'address' field instead of 'value'.
+            address = address_info.get('address')
+
         # The value field may be empty.
         address_ = ipaddress.ip_address(address) if address else None
         self.address = address_  # type: Optional[_IPAddress]
