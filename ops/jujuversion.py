@@ -17,7 +17,6 @@
 import os
 import re
 from functools import total_ordering
-from typing import cast
 
 
 @total_ordering
@@ -56,14 +55,13 @@ class JujuVersion:
             s += '.{}'.format(self.build)
         return s
 
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other: 'JujuVersion') -> bool:
         if self is other:
             return True
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
             raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
-        other = cast(JujuVersion, other)
         return (
             self.major == other.major
             and self.minor == other.minor
@@ -71,14 +69,13 @@ class JujuVersion:
             and self.build == other.build
             and self.patch == other.patch)
 
-    def __lt__(self, other: object) -> bool:
+    def __lt__(self, other: 'JujuVersion') -> bool:
         if self is other:
             return False
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
             raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
-        other = cast(JujuVersion, other)
         if self.major != other.major:
             return self.major < other.major
         elif self.minor != other.minor:
