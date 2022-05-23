@@ -548,9 +548,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._our_unit = our_unit
         self._backend = backend
         self._cache = cache
-
-        data = {r: None for r in relations_meta}  # type: _RelationMapping_Raw
-        self._data = data
+        self._data = {r: None for r in relations_meta}  # type: _RelationMapping_Raw
 
     def __contains__(self, key: str):
         return key in self._data
@@ -1720,7 +1718,7 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
 
         if isinstance(value, MutableMapping):
             value = typing.cast(Dict[str, 'JsonObject'], value)
-            output = _format_action_result_dict(value, key, output_)
+            output_ = _format_action_result_dict(value, key, output_)
         elif key in output_:
             raise ValueError("duplicate key detected in dictionary passed to 'action-set': {!r}"
                              .format(key))
