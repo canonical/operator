@@ -36,6 +36,11 @@ import ops.pebble as pebble
 from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
+if typing.TYPE_CHECKING:
+    _RelationMappingType = typing.Mapping[str, typing.List['Relation']]
+    _StorageMappingType = typing.Mapping[str, typing.List['Storage']]
+    _BindingMappingType = typing.Mapping[str, 'Binding']
+
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
@@ -51,13 +56,15 @@ class Model:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
-        self._unit = self.get_unit(self._backend.unit_name)
-        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache)
+        self._unit = self.get_unit(self._backend.unit_name)  # type: 'Unit'
+        self._relations = RelationMapping(meta.relations, self.unit, self._backend, self._cache
+                                          )  # type: _RelationMappingType
         self._config = ConfigData(self._backend)
         self._resources = Resources(list(meta.resources), self._backend)
         self._pod = Pod(self._backend)
-        self._storages = StorageMapping(list(meta.storages), self._backend)
-        self._bindings = BindingMapping(self._backend)
+        self._storages = StorageMapping(list(meta.storages), self._backend
+                                        )  # type: _StorageMappingType
+        self._bindings = BindingMapping(self._backend)  # type: _BindingMappingType
 
     @property
     def unit(self) -> 'Unit':
@@ -65,7 +72,7 @@ class Model:
         return self._unit
 
     @property
-    def app(self):
+    def app(self) -> 'Application':
         """A :class:`Application` that represents the application this unit is a part of."""
         return self._unit.app
 
@@ -171,7 +178,7 @@ class Model:
 
 class _ModelCache:
 
-    def __init__(self, meta, backend):
+    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._meta = meta
         self._backend = backend
         self._weakrefs = weakref.WeakValueDictionary()
@@ -197,7 +204,8 @@ class Application:
             the charm, if the user has deployed it to a different name.
     """
 
-    def __init__(self, name, meta, backend, cache):
+    def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
+                 backend: '_ModelBackend', cache: _ModelCache):
         self.name = name
         self._backend = backend
         self._cache = cache
@@ -294,7 +302,7 @@ class Unit:
         self.name = name
 
         app_name = name.split('/')[0]
-        self.app = cache.get(Application, app_name)
+        self.app = cache.get(Application, app_name)  # type: Application
 
         self._backend = backend
         self._cache = cache
@@ -379,7 +387,7 @@ class Unit:
         self._backend.application_version_set(version)
 
     @property
-    def containers(self) -> 'ContainerMapping':
+    def containers(self) -> typing.Mapping[str, 'Container']:
         """Return a mapping of containers indexed by name."""
         if not self._is_our_unit:
             raise RuntimeError('cannot get container for a remote unit {}'.format(self))
@@ -647,7 +655,13 @@ class NetworkInterface:
     def __init__(self, name: str, address_info: dict):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
+
         address = address_info.get('value')
+        if address is None:
+            # Compatibility with Juju <2.9: legacy address_info only had
+            # an 'address' field instead of 'value'.
+            address = address_info.get('address')
+
         # The value field may be empty.
         if address:
             self.address = ipaddress.ip_address(address)
@@ -1011,8 +1025,8 @@ class StorageMapping(Mapping):
         storage_list = self._storage_map[storage_name]
         if storage_list is None:
             storage_list = self._storage_map[storage_name] = []
-            for storage_id in self._backend.storage_list(storage_name):
-                storage_list.append(Storage(storage_name, storage_id, self._backend))
+            for storage_index in self._backend.storage_list(storage_name):
+                storage_list.append(Storage(storage_name, storage_index, self._backend))
         return storage_list
 
     def request(self, storage_name: str, count: int = 1):
@@ -1039,20 +1053,36 @@ class Storage:
 
     Attributes:
         name: Simple string name of the storage
-        id: The provider id for storage
+        id: The index number for storage
     """
 
-    def __init__(self, storage_name, storage_id, backend):
+    def __init__(self, storage_name: str, storage_index: int, backend):
         self.name = storage_name
-        self.id = storage_id
+        self._index = storage_index
         self._backend = backend
         self._location = None
+
+    @property
+    def index(self) -> int:
+        """The index associated with the storage (usually 0 for singular storage)."""
+        return self._index
+
+    @property
+    def id(self) -> int:
+        """DEPRECATED (use ".index"): The index associated with the storage."""
+        logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
+        return self.index
+
+    @property
+    def full_id(self) -> str:
+        """Returns the canonical storage name and id/index based identifier."""
+        return '{}/{}'.format(self.name, self._index)
 
     @property
     def location(self) -> Path:
         """Return the location of the storage."""
         if self._location is None:
-            raw = self._backend.storage_get('{}/{}'.format(self.name, self.id), "location")
+            raw = self._backend.storage_get(self.full_id, "location")
             self._location = Path(raw)
         return self._location
 
@@ -1843,7 +1873,7 @@ class _ModelBackend:
             yield message[:max_len]
             message = message[max_len:]
 
-    def juju_log(self, level, message):
+    def juju_log(self, level: str, message: str):
         """Pass a log message on to the juju logger."""
         for line in self.log_split(message):
             self._run('juju-log', '--log-level', level, "--", line)

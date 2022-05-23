@@ -32,6 +32,37 @@ import weakref
 from ops import charm
 from ops.storage import NoSnapshotError, SQLiteStorage
 
+if typing.TYPE_CHECKING:
+    from pathlib import Path
+
+    from typing_extensions import Protocol, Type
+
+    from ops.charm import CharmMeta
+    from ops.model import Model
+
+    class _Serializable(Protocol):
+        handle = None  # type: Handle
+        def snapshot(self) -> dict: ...  # noqa: E704
+        def restore(self, snapshot: dict) -> "Object": ...  # noqa: E704
+
+    _ObjectType = typing.TypeVar("_ObjectType", bound="Object")
+    _EventType = typing.TypeVar("_EventType", bound=Type["EventBase"])
+    _ObserverCallback = typing.Callable[[typing.Any], None]
+    _Path = _Kind = str
+
+    # This type is used to denote either a Handle instance or an instance of
+    # an Object (or subclass). This is used by methods and classes which can be
+    # called with either of those (they need a Handle, but will accept an Object
+    # from which they will then extract the Handle).
+    _ParentHandle = typing.Union["Handle", _ObjectType]
+
+    # used to type Framework Attributes
+    _ObserverPath = typing.List[typing.Tuple['_Path', str, '_Path', str]]
+    _ObjectPath = typing.Tuple[typing.Optional['_Path'], '_Kind']
+    _PathToObserverMapping = typing.Dict[str, '_ObserverCallback']
+    _PathToObjectMapping = typing.Dict[str, 'Object']
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,8 +80,9 @@ class Handle:
     under the same parent and kind may have the same key.
     """
 
-    def __init__(self, parent, kind, key):
-        if parent and not isinstance(parent, Handle):
+    def __init__(self, parent: typing.Optional["_ParentHandle"], kind: str, key: str):
+        if isinstance(parent, Object):
+            # if it's not an Object, it will be either a Handle (good) or None (no parent)
             parent = parent.handle
         self._parent = parent
         self._kind = kind
@@ -66,7 +98,7 @@ class Handle:
             else:
                 self._path = "{}".format(kind)
 
-    def nest(self, kind, key):
+    def nest(self, kind: str, key: str):
         """Create a new handle as child of the current one."""
         return Handle(self, kind, key)
 
@@ -116,7 +148,7 @@ class Handle:
                     good = True
             if not good:
                 raise RuntimeError("attempted to restore invalid handle path {}".format(path))
-            handle = Handle(handle, kind, key)
+            handle = Handle(handle, kind, key)  # noqa
         return handle
 
 
@@ -126,15 +158,15 @@ class EventBase:
     Inherit this and override 'snapshot' and 'restore' methods to build a custom event.
     """
 
-    # gets patched in by `Framework.restore()`, if this event is being reemitted
+    # gets patched in by `Framework.restore()`, if this event is being re-emitted
     # after being loaded from snapshot, or by `BoundEvent.emit()` if this
     # event is being fired for the first time.
     # TODO this is hard to debug, this should be refactored
-    framework = None
+    framework = None  # type: Framework
 
     def __init__(self, handle: Handle):
         self.handle = handle
-        self.deferred = False
+        self.deferred = False  # type: bool
 
     def __repr__(self):
         return "<%s via %s>" % (self.__class__.__name__, self.handle)
@@ -192,7 +224,7 @@ class EventBase:
         logger.debug("Deferring %s.", self)
         self.deferred = True
 
-    def snapshot(self):
+    def snapshot(self) -> dict:
         """Return the snapshot data that should be persisted.
 
         Subclasses must override to save any custom state.
@@ -266,7 +298,8 @@ class BoundEvent:
             hex(id(self)),
         )
 
-    def __init__(self, emitter, event_type, event_kind):
+    def __init__(self, emitter: "_ObjectType",
+                 event_type: "_EventType", event_kind: str):
         self.emitter = emitter
         self.event_type = event_type
         self.event_kind = event_kind
@@ -348,7 +381,9 @@ class Object(metaclass=_Metaclass):
     been created.
 
     """
-    handle_kind = HandleKind()
+    framework = None  # type: Framework
+    handle = None  # type: Handle
+    handle_kind = HandleKind()  # type: str
 
     def __init__(self, parent, key):
         kind = self.handle_kind
@@ -366,7 +401,7 @@ class Object(metaclass=_Metaclass):
         # TODO Detect conflicting handles here.
 
     @property
-    def model(self):
+    def model(self) -> "Model":
         """Shortcut for more simple access the model."""
         return self.framework.model
 
@@ -489,7 +524,6 @@ More details at https://juju.is/docs/sdk/debugging
 
 """
 
-
 _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 
 
@@ -499,28 +533,38 @@ class Framework(Object):
     on = FrameworkEvents()
 
     # Override properties from Object so that we can set them in __init__.
-    model = None
-    meta = None
-    charm_dir = None
+    model = None  # type: 'Model'
+    meta = None  # type: 'CharmMeta'
+    charm_dir = None  # type: 'Path'
 
-    def __init__(self, storage, charm_dir, meta, model):
+    if typing.TYPE_CHECKING:
+        # to help the type checker and IDEs:
+        _stored = None  # type: 'StoredStateData'
 
+    def __init__(self, storage: SQLiteStorage, charm_dir: "Path",
+                 meta: "CharmMeta", model: "Model"):
         super().__init__(self, None)
 
         self.charm_dir = charm_dir
         self.meta = meta
         self.model = model
-        self._observers = []      # [(observer_path, method_name, parent_path, event_key)]
-        self._observer = weakref.WeakValueDictionary()       # {observer_path: observer}
-        self._objects = weakref.WeakValueDictionary()
-        self._type_registry = {}  # {(parent_path, kind): cls}
-        self._type_known = set()  # {cls}
+        # [(observer_path, method_name, parent_path, event_key)]
+        self._observers = []  # type: _ObserverPath
+        # {observer_path: observer}
+        self._observer = weakref.WeakValueDictionary()  # type: _PathToObserverMapping
+        # {object_path: object}
+        self._objects = weakref.WeakValueDictionary()  # type: _PathToObjectMapping
+        # {(parent_path, kind): cls}
+        # (parent_path, kind) is the address of _this_ object: the parent path
+        # plus a 'kind' string that is the name of this object.
+        self._type_registry = {}  # type: typing.Dict[_ObjectPath, 'Type']
+        self._type_known = set()  # type: typing.Set['Type']
 
         if isinstance(storage, (str, pathlib.Path)):
             logger.warning(
                 "deprecated: Framework now takes a Storage not a path")
             storage = SQLiteStorage(storage)
-        self._storage = storage
+        self._storage = storage  # type: 'SQLiteStorage'
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
@@ -532,11 +576,12 @@ class Framework(Object):
             self._stored['event_count'] = 0
 
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
-        self._breakpoint_welcomed = False
+        self._breakpoint_welcomed = False  # type: bool
 
         # Parse the env var once, which may be used multiple times later
         debug_at = os.environ.get('JUJU_DEBUG_AT')
-        self._juju_debug_at = set(x.strip() for x in debug_at.split(',')) if debug_at else set()
+        self._juju_debug_at = (set(x.strip() for x in debug_at.split(','))
+                               if debug_at else set())  # type: typing.Set[str]
 
     def set_breakpointhook(self):
         """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
@@ -588,9 +633,9 @@ class Framework(Object):
         self.save_snapshot(self._stored)
         self._storage.commit()
 
-    def register_type(self, cls, parent, kind=None):
+    def register_type(self, cls, parent: typing.Optional["_ParentHandle"], kind=None):
         """Register a type to a handle."""
-        if parent and not isinstance(parent, Handle):
+        if parent is not None and not isinstance(parent, Handle):
             parent = parent.handle
         if parent:
             parent_path = parent.path
@@ -601,22 +646,15 @@ class Framework(Object):
         self._type_registry[(parent_path, kind)] = cls
         self._type_known.add(cls)
 
-    def save_snapshot(self, value):
-        """Save a persistent snapshot of the provided value.
-
-        The provided value must implement the following interface:
-
-        value.handle = Handle(...)
-        value.snapshot() => {...}  # Simple builtin types only.
-        value.restore(snapshot)    # Restore custom state from prior snapshot.
-        """
+    def save_snapshot(self, value: "_Serializable"):
+        """Save a persistent snapshot of the provided value."""
         if type(value) not in self._type_known:
             raise RuntimeError(
                 'cannot save {} values before registering that type'.format(type(value).__name__))
         data = value.snapshot()
 
         # Use marshal as a validator, enforcing the use of simple types, as we later the
-        # information is really pickled, which is too error prone for future evolution of the
+        # information is really pickled, which is too error-prone for future evolution of the
         # stored data (e.g. if the developer stores a custom object and later changes its
         # class name; when unpickling the original class will not be there and event
         # data loading will fail).
@@ -628,7 +666,7 @@ class Framework(Object):
 
         self._storage.save_snapshot(value.handle.path, data)
 
-    def load_snapshot(self, handle):
+    def load_snapshot(self, handle: Handle) -> '_ObjectType':
         """Load a persistent snapshot."""
         parent_path = None
         if handle.parent:
@@ -644,11 +682,12 @@ class Framework(Object):
         self._track(obj)
         return obj
 
-    def drop_snapshot(self, handle):
+    def drop_snapshot(self, handle: Handle):
         """Discard a persistent snapshot."""
         self._storage.drop_snapshot(handle.path)
 
-    def observe(self, bound_event: BoundEvent, observer: typing.Callable[[typing.Any], None]):
+    def observe(self, bound_event: BoundEvent,
+                observer: "_ObserverCallback"):
         """Register observer to be called when bound_event is emitted.
 
         The bound_event is generally provided as an attribute of the object that emits
@@ -677,7 +716,8 @@ class Framework(Object):
                     ' with e.g. observe(self.on.{0}, self._on_{0})'.format(
                         bound_event.event_kind))
             raise RuntimeError(
-                'Framework.observe requires a method as third parameter, got {}'.format(observer))
+                'Framework.observe requires a method as third parameter, got {}'.format(
+                    observer))
 
         event_type = bound_event.event_type
         event_kind = bound_event.event_kind
@@ -689,7 +729,8 @@ class Framework(Object):
             emitter_path = emitter.handle.path
         else:
             raise RuntimeError(
-                'event emitter {} must have a "handle" attribute'.format(type(emitter).__name__))
+                'event emitter {} must have a "handle" attribute'.format(
+                    type(emitter).__name__))
 
         # Validate that the method has an acceptable call signature.
         sig = inspect.signature(observer)
@@ -719,7 +760,7 @@ class Framework(Object):
         self._stored['event_count'] += 1
         return str(self._stored['event_count'])
 
-    def _emit(self, event):
+    def _emit(self, event: EventBase):
         """See BoundEvent.emit for the public way to call this."""
         saved = False
         event_path = event.handle.path

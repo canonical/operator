@@ -17,6 +17,20 @@ jobs:
       - name: Run linting
         run: tox -e lint
 
+  static:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3
+        uses: actions/setup-python@v2
+
+      - name: Install tox
+        run: pip install tox
+
+      - name: Run static type checks
+        run: tox -e static
+
   test:
     runs-on: ${{ matrix.os }}
 

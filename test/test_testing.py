@@ -51,8 +51,9 @@ from ops.testing import (
     Harness,
     NonAbsolutePathError,
     _Directory,
-    _MockFilesystem,
+    _TestingFilesystem,
     _TestingPebbleClient,
+    _TestingStorageMount,
 )
 
 is_linux = platform.system() == 'Linux'
@@ -122,7 +123,16 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_get(rel_id, 'test-app', is_app=True), {})
         self.assertEqual(backend.relation_get(rel_id, 'test-app/0', is_app=False), {})
 
-    def test_can_connect(self):
+    def test_can_connect_legacy(self):
+        # This tests the old behavior where we weren't simulating can_connect status of containers
+        # like it runs in juju.
+        tmp = ops.testing.SIMULATE_CAN_CONNECT
+        ops.testing.SIMULATE_CAN_CONNECT = False
+
+        def reset_can_connect():
+            ops.testing.SIMULATE_CAN_CONNECT = tmp
+        self.addCleanup(reset_can_connect)
+
         harness = Harness(CharmBase, meta='''
             name: test-app
             containers:
@@ -138,7 +148,13 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(c.can_connect())
 
     def test_simulate_can_connect(self):
+        tmp = ops.testing.SIMULATE_CAN_CONNECT
         ops.testing.SIMULATE_CAN_CONNECT = True
+
+        def reset_can_connect():
+            ops.testing.SIMULATE_CAN_CONNECT = tmp
+        self.addCleanup(reset_can_connect)
+
         harness = Harness(CharmBase, meta='''
             name: test-app
             containers:
@@ -162,7 +178,6 @@ class TestHarness(unittest.TestCase):
         harness.container_pebble_ready('foo')
         self.assertTrue(c.can_connect())
         c.get_plan()
-        ops.testing.SIMULATE_CAN_CONNECT = False
 
     def test_add_relation_and_unit(self):
         harness = Harness(CharmBase, meta='''
@@ -1285,7 +1300,8 @@ class TestHarness(unittest.TestCase):
         stor_ids = harness.add_storage("test", count=3)
         self.assertSetEqual(set(self._extract_storage_index(stor_id) for stor_id in stor_ids),
                             set(harness._backend.storage_list("test")))
-        self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
+        want = str(pathlib.PurePath('test', '0'))
+        self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
 
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 3)
@@ -1325,7 +1341,8 @@ class TestHarness(unittest.TestCase):
         stor_id = harness.add_storage("test")[0]
         self.assertIn(self._extract_storage_index(stor_id),
                       harness._backend.storage_list("test"))
-        self.assertEqual("/test/0", harness._backend.storage_get(stor_id, "location"))
+        want = str(pathlib.PurePath('test', '0'))
+        self.assertEqual(want, harness._backend.storage_get(stor_id, "location")[-6:])
 
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 1)
@@ -1339,9 +1356,11 @@ class TestHarness(unittest.TestCase):
 
         added_indices = {self._extract_storage_index(stor_id) for stor_id in stor_ids}
         self.assertTrue(added_indices.issubset(set(harness._backend.storage_list("test"))))
-        self.assertEqual("/test/1", harness._backend.storage_get("test/1", "location"))
-        self.assertEqual("/test/2", harness._backend.storage_get("test/2", "location"))
-        self.assertEqual("/test/3", harness._backend.storage_get("test/3", "location"))
+
+        for i in ['1', '2', '3']:
+            storage_name = 'test/' + i
+            want = str(pathlib.PurePath('test', i))
+            self.assertEqual(want, harness._backend.storage_get(storage_name, "location")[-6:])
         self.assertEqual(len(harness.charm.observed_events), 4)
         for i in range(1, 4):
             self.assertTrue(isinstance(harness.charm.observed_events[i], StorageAttachedEvent))
@@ -1456,7 +1475,8 @@ class TestHarness(unittest.TestCase):
         # Verify backend functions return appropriate values.
         # Real backend would return info only for actively attached storage units.
         self.assertIn(self._extract_storage_index(stor_id), harness._backend.storage_list("test"))
-        self.assertEqual("/test/0", harness._backend.storage_get("test/0", "location"))
+        want = str(pathlib.PurePath('test', '0'))
+        self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
 
         # Retry attach
         # Since already detached, no more hooks should fire
@@ -3728,17 +3748,14 @@ class _PebbleStorageAPIsTestMixin:
     #   nuance.
 
 
-class TestMockFilesystem(unittest.TestCase):
-    def setUp(self):
-        self.fs = _MockFilesystem()
-
+class GenericTestingFilesystemTests:
     def test_listdir_root_on_empty_os(self):
         self.assertEqual(self.fs.list_dir('/'), [])
 
     def test_listdir_on_nonexistent_dir(self):
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.list_dir('/etc')
-        self.assertEqual(cm.exception.args[0], '/etc')
+        self.assertTrue('/etc' in cm.exception.args[0])
 
     def test_listdir(self):
         self.fs.create_dir('/opt')
@@ -3756,7 +3773,7 @@ class TestMockFilesystem(unittest.TestCase):
         self.fs.create_file('/file', 'data')
         with self.assertRaises(NotADirectoryError) as cm:
             self.fs.list_dir('/file')
-        self.assertEqual(cm.exception.args[0], '/file')
+        self.assertTrue('/file' in cm.exception.args[0])
 
     def test_makedir(self):
         d = self.fs.create_dir('/etc')
@@ -3770,7 +3787,7 @@ class TestMockFilesystem(unittest.TestCase):
         self.fs.create_dir('/etc')
         with self.assertRaises(FileExistsError) as cm:
             self.fs.create_dir('/etc')
-        self.assertEqual(cm.exception.args[0], '/etc')
+        self.assertTrue('/etc' in cm.exception.args[0])
 
     def test_makedir_succeeds_if_already_exists_when_make_parents_true(self):
         d1 = self.fs.create_dir('/etc')
@@ -3781,7 +3798,7 @@ class TestMockFilesystem(unittest.TestCase):
     def test_makedir_fails_if_parent_dir_doesnt_exist(self):
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.create_dir('/etc/init.d')
-        self.assertEqual(cm.exception.args[0], '/etc')
+        self.assertTrue('/etc' in cm.exception.args[0])
 
     def test_make_and_list_directory(self):
         self.fs.create_dir('/etc')
@@ -3802,7 +3819,7 @@ class TestMockFilesystem(unittest.TestCase):
     def test_create_file_fails_if_parent_dir_doesnt_exist(self):
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.create_file('/etc/passwd', "foo")
-        self.assertEqual(cm.exception.args[0], '/etc')
+        self.assertTrue('/etc' in cm.exception.args[0])
 
     def test_create_file_succeeds_if_parent_dir_doesnt_exist_when_make_dirs_true(self):
         self.fs.create_file('/test/subdir/testfile', "foo", make_dirs=True)
@@ -3861,7 +3878,7 @@ class TestMockFilesystem(unittest.TestCase):
         # Deleting deleted files should fail as well
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.delete_path('/test')
-        self.assertEqual(cm.exception.args[0], '/test')
+        self.assertTrue('/test' in cm.exception.args[0])
 
     def test_create_dir_with_extra_args(self):
         d = self.fs.create_dir('/dir1')
@@ -3896,7 +3913,7 @@ class TestMockFilesystem(unittest.TestCase):
         self.fs.create_dir('/etc/init.d', make_parents=True)
 
         # By path
-        o = self.fs.get_path(pathlib.Path('/etc/init.d'))
+        o = self.fs.get_path(pathlib.PurePosixPath('/etc/init.d'))
         self.assertIsInstance(o, _Directory)
         self.assertEqual(o.path, pathlib.PurePosixPath('/etc/init.d'))
 
@@ -3911,7 +3928,29 @@ class TestMockFilesystem(unittest.TestCase):
         # gives a closer semantic feeling, in my opinion.
         with self.assertRaises(FileNotFoundError) as cm:
             self.fs.get_path('/nonexistent_file')
-        self.assertEqual(cm.exception.args[0], '/nonexistent_file')
+        self.assertTrue('/nonexistent_file' in cm.exception.args[0])
+
+
+class TestTestingFilesystem(GenericTestingFilesystemTests, unittest.TestCase):
+    def setUp(self):
+        self.fs = _TestingFilesystem()
+
+    def test_storage_mount(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        self.fs.add_mount('foo', '/foo', tmpdir.name)
+        self.fs.create_file('/foo/bar/baz.txt', 'quux', make_dirs=True)
+
+        tmppath = os.path.join(tmpdir.name, 'bar/baz.txt')
+        self.assertTrue(os.path.exists(tmppath))
+        with open(tmppath) as f:
+            self.assertEqual(f.read(), 'quux')
+
+
+class TestTestingStorageMount(GenericTestingFilesystemTests, unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.fs = _TestingStorageMount('/', pathlib.Path(self.tmp.name))
 
 
 class TestPebbleStorageAPIsUsingMocks(
@@ -3923,6 +3962,73 @@ class TestPebbleStorageAPIsUsingMocks(
         self.client = self.get_testing_client()
         if self.prefix:
             self.client.make_dir(self.prefix, make_parents=True)
+
+    @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
+    def test_container_storage_mounts(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+                c1:
+                    mounts:
+                        - storage: store1
+                          location: /mounts/foo
+                c2:
+                    mounts:
+                        - storage: store2
+                          location: /mounts/foo
+                c3:
+                    mounts:
+                        - storage: store1
+                          location: /mounts/bar
+            storage:
+                store1:
+                    type: filesystem
+                store2:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        store_id = harness.add_storage('store1')[0]
+        harness.attach_storage(store_id)
+
+        harness.begin()
+
+        # push file to c1 storage mount, check that we can see it in charm container storage path.
+        c1 = harness.model.unit.get_container('c1')
+        c1_fname = 'foo.txt'
+        c1_fpath = os.path.join('/mounts/foo', c1_fname)
+        c1.push(c1_fpath, '42')
+        self.assertTrue(c1.exists(c1_fpath))
+        fpath = os.path.join(str(harness.model.storages['store1'][0].location), 'foo.txt')
+        with open(fpath) as f:
+            self.assertEqual('42', f.read())
+
+        # check that the file is not visible in c2 which has a different storage mount
+        c2 = harness.model.unit.get_container('c2')
+        c2_fpath = os.path.join('/mounts/foo', c1_fname)
+        self.assertFalse(c2.exists(c2_fpath))
+
+        # check that the file is visible in c3 which has the same storage mount
+        c3 = harness.model.unit.get_container('c3')
+        c3_fpath = os.path.join('/mounts/bar', c1_fname)
+        self.assertTrue(c3.exists(c3_fpath))
+        with c3.pull(c3_fpath) as f:
+            self.assertEqual('42', f.read())
+
+        # test all other container file ops
+        with c1.pull(c1_fpath) as f:
+            self.assertEqual('42', f.read())
+        files = c1.list_files(c1_fpath)
+        self.assertEqual([c1_fpath], [fi.path for fi in files])
+        c1.remove_path(c1_fpath)
+        self.assertFalse(c1.exists(c1_fpath))
+
+        # test detaching storage
+        c1.push(c1_fpath, '42')
+        self.assertTrue(c1.exists(c1_fpath))
+        store1_id = harness.model.storages['store1'][0].full_id
+        harness.remove_storage(store1_id)
+        self.assertFalse(c1.exists(c1_fpath))
 
     def test_push_with_ownership(self):
         # Note: To simplify implementation, ownership is simply stored as-is with no verification.
