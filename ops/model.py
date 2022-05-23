@@ -1233,14 +1233,6 @@ class MultiPushPullError(Exception):
     def __repr__(self):
         return 'MultiError({!r}, {} errors)'.format(self.message, len(self.errors))
 
-    def name(self):
-        """Return a string representation of the model plus class."""
-        return '<{}.{}>'.format(type(self).__module__, type(self).__name__)
-
-    def message(self):
-        """Return the message passed as an argument."""
-        return self.message
-
 
 class Container:
     """Represents a named container in a unit.
@@ -1495,13 +1487,14 @@ class Container:
                                        pattern=pattern, itself=itself)  # type: ignore
 
     def push_path(self,
-                  source_path: typing.Union[StrOrPath, typing.List[StrOrPath]],
+                  source_path: typing.Union[StrOrPath, typing.Iterable[StrOrPath]],
                   dest_dir: StrOrPath):
         """Recursively push a local path or files to the remote system.
 
-        Pushing is attempted to completion even if errors occur during the process.  All errors are
-        collected incrementally. After copying has completed, if any errors occurred, a single
-        MultiPushPullError is raised containing details for each error.
+        Only regular files and directories are copied; symbolic links, device files, etc. are
+        skipped.  Pushing is attempted to completion even if errors occur during the process.  All
+        errors are collected incrementally. After copying has completed, if any errors occurred, a
+        single MultiPushPullError is raised containing details for each error.
 
         Assuming the following files exist locally:
 
@@ -1543,7 +1536,10 @@ class Container:
         if os.name == 'nt':
             raise RuntimeError('Container.push_path is not supported on Windows-based systems')
 
-        source_paths = source_path if isinstance(source_path, list) else [source_path]
+        if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
+            source_paths = source_path
+        else:
+            source_paths = [source_path]
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -1555,31 +1551,32 @@ class Container:
         errors = []
         for source_path in source_paths:
             try:
-                for f in Container._list_recursive(local_list, source_path):
-                    srcpath, dstpath = f.path, self._build_destpath(f.path, source_path, dest_dir)
-                    with open(srcpath) as src:
+                for info in Container._list_recursive(local_list, source_path):
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    with open(info.path) as src:
                         self.push(
                             dstpath,
                             src,
                             make_dirs=True,
-                            permissions=f.permissions,
-                            user_id=f.user_id,
-                            user=f.user,
-                            group_id=f.group_id,
-                            group=f.group)
-            except Exception as err:
+                            permissions=info.permissions,
+                            user_id=info.user_id,
+                            user=info.user,
+                            group_id=info.group_id,
+                            group=info.group)
+            except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
-        if len(errors) > 0:
+        if errors:
             raise MultiPushPullError('failed to push one or more files', errors)
 
     def pull_path(self,
-                  source_path: typing.Union[StrOrPath, typing.List[StrOrPath]],
+                  source_path: typing.Union[StrOrPath, typing.Iterable[StrOrPath]],
                   dest_dir: StrOrPath):
         """Recursively pull a remote path or files to the local system.
 
-        Pulling is attempted to completion even if errors occur during the process.  All errors are
-        collected incrementally. After copying has completed, if any errors occurred, a single
-        MultiPushPullError is raised containing details for each error.
+        Only regular files and directories are copied; symbolic links, device files, etc. are
+        skipped.  Pulling is attempted to completion even if errors occur during the process.  All
+        errors are collected incrementally. After copying has completed, if any errors occurred, a
+        single MultiPushPullError is raised containing details for each error.
 
         Assuming the following files exist remotely:
 
@@ -1622,22 +1619,25 @@ class Container:
         if os.name == 'nt':
             raise RuntimeError('Container.pull_path is not supported on Windows-based systems')
 
-        source_paths = source_path if isinstance(source_path, list) else [source_path]
+        if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
+            source_paths = source_path
+        else:
+            source_paths = [source_path]
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
         errors = []
         for source_path in source_paths:
             try:
-                for f in Container._list_recursive(self.list_files, source_path):
-                    srcpath, dstpath = f.path, self._build_destpath(f.path, source_path, dest_dir)
+                for info in Container._list_recursive(self.list_files, source_path):
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
                     dstpath.parent.mkdir(parents=True, exist_ok=True)
-                    with self.pull(srcpath, encoding=None) as src:
+                    with self.pull(info.path, encoding=None) as src:
                         with dstpath.open(mode='wb') as dst:
                             shutil.copyfileobj(src, dst)
-            except Exception as err:
+            except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
-        if len(errors) > 0:
+        if errors:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
@@ -1669,7 +1669,7 @@ class Container:
             group=grp.getgrgid(info.st_gid).gr_name)
 
     @staticmethod
-    def _list_recursive(list_func, path: Path):
+    def _list_recursive(list_func, path: Path) -> typing.Generator[None, 'pebble.FileInfo', None]:
         """Recursively lists all files under path using the given list_func.
 
         Args:
@@ -1682,15 +1682,14 @@ class Container:
             # at destination
             path = path.parent
 
-        for f in list_func(path):
-            if f.type is pebble.FileType.DIRECTORY:
-                yield from Container._list_recursive(list_func, Path(f.path))
-            elif f.type in (pebble.FileType.FILE, pebble.FileType.SYMLINK):
-                yield f
+        for info in list_func(path):
+            if info.type is pebble.FileType.DIRECTORY:
+                yield from Container._list_recursive(list_func, Path(info.path))
+            elif info.type in (pebble.FileType.FILE, pebble.FileType.SYMLINK):
+                yield info
             else:
-                msg = 'skipped unsupported file in Container.[push/pull]_path: {}'.format(
-                    f.path)
-                logger.debug(msg)
+                logger.debug(
+                    'skipped unsupported file in Container.[push/pull]_path: %s', info.path)
 
     @staticmethod
     def _build_destpath(file_path: StrOrPath, source_path: StrOrPath, dest_dir: StrOrPath) -> Path:

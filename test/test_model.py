@@ -765,10 +765,10 @@ class PushPullCase:
     def __init__(self, **vals):
         self.pattern = None
         self.dst = None
-        self.errorlist = []
-        self.wantlist = set()
-        for key in vals:
-            setattr(self, key, vals[key])
+        self.errors = []
+        self.want = set()
+        for key, val in vals.items():
+            setattr(self, key, val)
 
 
 recursive_list_cases = [
@@ -776,19 +776,19 @@ recursive_list_cases = [
         name='basic recursive list',
         path='/',
         files=['/foo/bar.txt', '/baz.txt'],
-        wantlist={'/foo/bar.txt', '/baz.txt'},
+        want={'/foo/bar.txt', '/baz.txt'},
     ),
     PushPullCase(
         name='basic recursive list reverse',
         path='/',
         files=['/baz.txt', '/foo/bar.txt'],
-        wantlist={'/baz.txt', '/foo/bar.txt'},
+        want={'/foo/bar.txt', '/baz.txt'},
     ),
     PushPullCase(
         name='directly list a (non-directory) file',
         path='/baz.txt',
         files=['/baz.txt'],
-        wantlist={'/baz.txt'},
+        want={'/baz.txt'},
     ),
 ]
 
@@ -803,7 +803,8 @@ def test_recursive_list(case):
             'user_id': 0,
             'user': 'foo',
             'group_id': 1024,
-            'group': 'bar'}
+            'group': 'bar',
+        }
         file_infos, dirs = [], set()
         for f in file_list:
             file_infos.append(
@@ -845,7 +846,7 @@ def test_recursive_list(case):
     files = set()
     case.path = os.path.normpath(case.path)
     case.files = [os.path.normpath(f) for f in case.files]
-    case.wantlist = {os.path.normpath(f) for f in case.wantlist}
+    case.want = {os.path.normpath(f) for f in case.want}
     for f in ops.model.Container._list_recursive(
         list_func_gen(
             case.files), pathlib.Path(
@@ -856,8 +857,8 @@ def test_recursive_list(case):
             _, path = f.path, ops.model.Container._build_destpath(
                 f.path, case.path, case.dst)
         files.add(path)
-    assert case.wantlist == files, 'case {!r} has wrong files: want {}, got {}'.format(
-        case.name, case.wantlist, files)
+    assert case.want == files, 'case {!r} has wrong files: want {}, got {}'.format(
+        case.name, case.want, files)
 
 
 recursive_push_pull_cases = [
@@ -866,63 +867,63 @@ recursive_push_pull_cases = [
         path='/foo',
         dst='/baz',
         files=['/foo/bar.txt'],
-        wantlist={'/baz/foo/bar.txt'},
+        want={'/baz/foo/bar.txt'},
     ),
     PushPullCase(
         name='push/pull - trailing slash',
         path='/foo/',
         dst='/baz',
         files=['/foo/bar.txt'],
-        wantlist={'/baz/foo/bar.txt'},
+        want={'/baz/foo/bar.txt'},
     ),
     PushPullCase(
         name='basic push/pull - root',
         path='/',
         dst='/baz',
         files=['/foo/bar.txt'],
-        wantlist={'/baz/foo/bar.txt'},
+        want={'/baz/foo/bar.txt'},
     ),
     PushPullCase(
         name='basic push/pull - multicomponent path',
         path='/foo/bar',
         dst='/baz',
         files=['/foo/bar/baz.txt'],
-        wantlist={'/baz/bar/baz.txt'},
+        want={'/baz/bar/baz.txt'},
     ),
     PushPullCase(
         name='push/pull contents',
         path='/foo/*',
         dst='/baz',
         files=['/foo/bar.txt'],
-        wantlist={'/baz/bar.txt'},
+        want={'/baz/bar.txt'},
     ),
     PushPullCase(
         name='directly push/pull a specific file',
         path='/foo/bar.txt',
         dst='/baz',
         files=['/foo/bar.txt'],
-        wantlist={'/baz/bar.txt'},
+        want={'/baz/bar.txt'},
     ),
     PushPullCase(
         name='error on push/pull non-existing file',
         path='/foo/bar.txt',
         dst='/baz',
         files=[],
-        errorlist={'/foo/bar.txt'},
+        errors={'/foo/bar.txt'},
     ),
     PushPullCase(
         name='push/pull multiple non-existing files',
         path=['/foo/bar.txt', '/boo/far.txt'],
         dst='/baz',
         files=[],
-        errorlist={'/foo/bar.txt', '/boo/far.txt'},
+        errors={'/foo/bar.txt', '/boo/far.txt'},
     ),
     PushPullCase(
         name='push/pull file and dir combo',
         path=['/foo/foobar.txt', '/foo/bar'],
         dst='/baz',
         files=['/foo/bar/baz.txt', '/foo/foobar.txt', '/quux.txt'],
-        wantlist={'/baz/foobar.txt', '/baz/bar/baz.txt'},
+        want={'/baz/foobar.txt', '/baz/bar/baz.txt'},
     ),
 ]
 
@@ -964,13 +965,13 @@ def test_recursive_push_and_pull(case):
         print(push_path, case.dst)
         c.push_path(push_path, case.dst)
     except ops.model.MultiPushPullError as err:
-        if not case.errorlist:
+        if not case.errors:
             raise
         errors = {src[len(push_src.name):] for src, _ in err.errors}
 
-    assert case.errorlist == errors, \
-        'push_path gave wrong expected errors: want {}, got {}'.format(case.errorlist, errors)
-    for fpath in case.wantlist:
+    assert case.errors == errors, \
+        'push_path gave wrong expected errors: want {}, got {}'.format(case.errors, errors)
+    for fpath in case.want:
 
         for f in ops.model.Container._list_recursive(c.list_files, pathlib.Path('/')):
             print(f)
@@ -986,13 +987,13 @@ def test_recursive_push_and_pull(case):
     try:
         c.pull_path(case.path, os.path.join(pull_dst.name, case.dst[1:]))
     except ops.model.MultiPushPullError as err:
-        if not case.errorlist:
+        if not case.errors:
             raise
         errors = {src for src, _ in err.errors}
 
-    assert case.errorlist == errors, \
-        'pull_path gave wrong expected errors: want {}, got {}'.format(case.errorlist, errors)
-    for fpath in case.wantlist:
+    assert case.errors == errors, \
+        'pull_path gave wrong expected errors: want {}, got {}'.format(case.errors, errors)
+    for fpath in case.want:
         assert c.exists(fpath), 'pull_path failed: file {} missing at destination'.format(fpath)
 
 
