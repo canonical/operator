@@ -17,34 +17,18 @@ jobs:
       - name: Run linting
         run: tox -e lint
 
-  static-python3-latest:
+  static:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python 3 Latest
+      - name: Set up Python 3
         uses: actions/setup-python@v2
 
       - name: Install tox
         run: pip install tox
 
-      - name: Run static type checks for latest python version
-        run: tox -e static
-
-  static-python3-legacy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python 3.5 (earliest supported version)
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.5
-
-      - name: Install tox
-        run: pip install tox
-
-      - name: Run static type checks for python 3.5
+      - name: Run static type checks
         run: tox -e static
 
   test:
