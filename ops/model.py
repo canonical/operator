@@ -655,7 +655,13 @@ class NetworkInterface:
     def __init__(self, name: str, address_info: dict):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
+
         address = address_info.get('value')
+        if address is None:
+            # Compatibility with Juju <2.9: legacy address_info only had
+            # an 'address' field instead of 'value'.
+            address = address_info.get('address')
+
         # The value field may be empty.
         if address:
             self.address = ipaddress.ip_address(address)
