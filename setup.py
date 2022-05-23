@@ -29,6 +29,10 @@ def _read_me() -> str:
 def _get_version() -> str:
     """Get the version via ops/version.py, without loading ops/__init__.py."""
     spec = spec_from_file_location('ops.version', 'ops/version.py')
+    if spec is None:
+        raise ModuleNotFoundError('could not find /ops/version.py')
+    if spec.loader is None:
+        raise AttributeError('loader', spec, 'invalid module')
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
 

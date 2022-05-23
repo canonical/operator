@@ -16,16 +16,23 @@
 
 import logging
 import sys
+import typing
+
+if typing.TYPE_CHECKING:
+    from types import TracebackType
+    from typing import Type
+
+    from ops.model import _ModelBackend  # pyright: reportPrivateUsage=false
 
 
 class JujuLogHandler(logging.Handler):
     """A handler for sending logs to Juju via juju-log."""
 
-    def __init__(self, model_backend, level=logging.DEBUG):
+    def __init__(self, model_backend: "_ModelBackend", level: int = logging.DEBUG):
         super().__init__(level)
         self.model_backend = model_backend
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord):
         """Send the specified logging record to the Juju backend.
 
         This method is not used directly by the Operator Framework code, but by
@@ -34,7 +41,7 @@ class JujuLogHandler(logging.Handler):
         self.model_backend.juju_log(record.levelname, self.format(record))
 
 
-def setup_root_logging(model_backend, debug=False):
+def setup_root_logging(model_backend: "_ModelBackend", debug: bool = False):
     """Setup python logging to forward messages to juju-log.
 
     By default, logging is set to DEBUG level, and messages will be filtered by Juju.
@@ -55,5 +62,9 @@ def setup_root_logging(model_backend, debug=False):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    sys.excepthook = lambda etype, value, tb: logger.error(
-        "Uncaught exception while in charm code:", exc_info=(etype, value, tb))
+    def except_hook(etype: "Type[BaseException]", value: BaseException, tb: "TracebackType"):
+        logger.error(
+            "Uncaught exception while in charm code:",
+            exc_info=(etype, value, tb))
+
+    sys.excepthook = except_hook
