@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """Representations of Juju's model, application, unit, and other entities."""
-
 import datetime
 import ipaddress
 import json
@@ -26,7 +25,7 @@ import tempfile
 import time
 import typing
 import weakref
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from pathlib import Path
 from subprocess import PIPE, CalledProcessError, run
 from typing import (
@@ -75,12 +74,12 @@ if typing.TYPE_CHECKING:
     _LayerDict = Dict[str, '_LayerDict']
     _Layer = Union[str, _LayerDict, pebble.Layer]
 
-    # mapping from relation name to a list of relations
-    _RawRelationMapping = Dict[str, Optional[List['Relation']]]
+    # mapping from relation name to a list of relation objects
+    _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
     # mapping from relation name to relation metadata
-    _RelationsMeta = Dict[str, ops.charm.RelationMeta]
+    _RelationsMeta_Raw = Dict[str, ops.charm.RelationMeta]
     # mapping from container name to container metadata
-    _ContainerMeta = Dict[str, ops.charm.ContainerMeta]
+    _ContainerMeta_Raw = Dict[str, ops.charm.ContainerMeta]
     _IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
     _Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
@@ -88,8 +87,9 @@ if typing.TYPE_CHECKING:
 
     # relation data is a string key: string value mapping so far as the
     # controller is concerned
-    _RawRelationDataContent = Dict[str, str]
+    _RelationDataContent_Raw = Dict[str, str]
     UnitOrApplication = Union['Unit', 'Application']
+    UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
 
     _AddressDict = TypedDict('_AddressDict', {
         'address': str,
@@ -121,9 +121,9 @@ class Model:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
-        self._unit = self.get_unit(self._backend.unit_name)  # type: 'Unit'
+        self._unit = self.get_unit(self._backend.unit_name)
         # fixme: remove cast after typing charm.py
-        relations = typing.cast('_RelationsMeta', meta.relations)  # type: ignore
+        relations = typing.cast('_RelationsMeta_Raw', meta.relations)  # type: ignore
         self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
         self._config = ConfigData(self._backend)
         # fixme: remove cast after typing charm.py
@@ -251,20 +251,30 @@ _T = TypeVar('_T', bound='UnitOrApplication')
 class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         if typing.TYPE_CHECKING:
+            # (entity type, name): instance.
             _weakcachetype = weakref.WeakValueDictionary[
-                Tuple[Any, ...], Optional['UnitOrApplication']]
+                Tuple['UnitOrApplicationType', str],
+                Optional['UnitOrApplication']]
 
         self._meta = meta
         self._backend = backend
         self._weakrefs = weakref.WeakValueDictionary()  # type: _weakcachetype
 
-    def get(self, entity_type: Type['_T'], *args: Any) -> '_T':
-        key = (entity_type,) + args
+    @typing.overload
+    def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...  # noqa
+    @typing.overload
+    def get(self, entity_type: Type['Application'], name: str) -> 'Application': ...  # noqa
+
+    def get(self, entity_type: 'UnitOrApplicationType', name: str):
+        """Fetch the cached entity of type `entity_type` with name `name`."""
+        key = (entity_type, name)
         entity = self._weakrefs.get(key)
-        if entity is None:
-            entity = entity_type(*args, meta=self._meta, backend=self._backend, cache=self)
-            self._weakrefs[key] = entity
-        return entity  # type: ignore
+        if entity is not None:
+            return entity
+
+        new_entity = entity_type(name, meta=self._meta, backend=self._backend, cache=self)
+        self._weakrefs[key] = new_entity
+        return typing.cast('_T', new_entity)
 
 
 class Application:
@@ -334,11 +344,8 @@ class Application:
         if not self._backend.is_leader():
             raise RuntimeError('cannot set application status as a non-leader unit')
 
-        # we can set the status to any StatusBase subclass, provided it has overridden
-        # value.name
-        if not (isinstance(value.name, str) and isinstance(value.message, str)):
-            raise RuntimeError('status.name and status.message cannot be None')
-
+        for _key in {'name', 'message'}:
+            assert isinstance(getattr(value, _key), str), 'status.%s must be a string' % _key
         self._backend.status_set(value.name, value.message, is_app=True)
         self._status = value
 
@@ -392,7 +399,7 @@ class Unit:
 
         if self._is_our_unit and hasattr(meta, "containers"):
             # fixme: remove cast when charm.py is typed
-            containers = typing.cast('_ContainerMeta', meta.containers)  # type: ignore
+            containers = typing.cast('_ContainerMeta_Raw', meta.containers)  # type: ignore
             self._containers = ContainerMapping(iter(containers), backend)
 
     def _invalidate(self):
@@ -432,7 +439,7 @@ class Unit:
         if not self._is_our_unit:
             raise RuntimeError('cannot set status for a remote unit {}'.format(self))
 
-        # fixme: if value.essages
+        # fixme: if value.messages
         self._backend.status_set(value.name, value.message, is_app=False)
         self._status = value
 
@@ -532,7 +539,7 @@ class LazyMapping(Mapping[str, str], ABC):
 class RelationMapping(Mapping[str, List['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
-    def __init__(self, relations_meta: '_RelationsMeta', our_unit: 'Unit',
+    def __init__(self, relations_meta: '_RelationsMeta_Raw', our_unit: 'Unit',
                  backend: '_ModelBackend', cache: '_ModelCache'):
         self._peers = set()  # type: Set[str]
         for name, relation_meta in relations_meta.items():
@@ -542,7 +549,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._backend = backend
         self._cache = cache
 
-        data = {r: None for r in relations_meta}  # type: _RawRelationMapping
+        data = {r: None for r in relations_meta}  # type: _RelationMapping_Raw
         self._data = data
 
     def __contains__(self, key: str):
@@ -634,13 +641,13 @@ class BindingMapping(Mapping[str, 'Binding']):
         return binding
 
     # implemented to satisfy the Mapping ABC, but not meant to be used.
-    def __getitem__(self, item):
+    def __getitem__(self, item: Union[str, 'Relation']) -> 'Binding':
         raise NotImplementedError()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterable['Binding']:
         raise NotImplementedError()
 
-    def __len__(self):
+    def __len__(self) -> int:
         raise NotImplementedError()
 
 
@@ -658,9 +665,7 @@ class Binding:
         self._network = None
 
     def _network_get(self, name: str, relation_id: Optional[int] = None) -> 'Network':
-        raw_data = self._backend.network_get(name, relation_id)
-        network_dict = typing.cast('_NetworkDict', raw_data)
-        return Network(network_dict)
+        return Network(self._backend.network_get(name, relation_id))
 
     @property
     def network(self) -> 'Network':
@@ -891,7 +896,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._backend = backend
         self._is_app = isinstance(entity, Application)  # type: bool
 
-    def _load(self) -> '_RawRelationDataContent':
+    def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
         try:
             return self._backend.relation_get(self.relation.id, self._entity.name, self._is_app)
@@ -951,7 +956,7 @@ class ConfigData(LazyMapping):
         return self._backend.config_get()
 
 
-class StatusBase(metaclass=ABCMeta):
+class StatusBase:
     """Status values specific to applications and units.
 
     To access a status by name, see :meth:`StatusBase.from_name`, most use cases will just
@@ -960,14 +965,11 @@ class StatusBase(metaclass=ABCMeta):
 
     _statuses = {}  # type: Dict[str, Type[StatusBase]]
 
+    # Subclasses should override this attribute and make it a string.
+    name = NotImplemented
+
     def __init__(self, message: str = ''):
         self.message = message
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Subclasses should override this attribute and make it a string."""
-        pass
 
     def __new__(cls, *args: Any, **kwargs: Dict[Any, Any]):
         """Forbid the usage of StatusBase directly."""
@@ -995,10 +997,10 @@ class StatusBase(metaclass=ABCMeta):
     @classmethod
     def register(cls, child: Type['StatusBase']):
         """Register a Status for the child's name."""
-        name = typing.cast(Optional[str], child.name)
-        if name is None:
-            raise AttributeError('cannot register a Status which has no name')
-        cls._statuses[name] = child
+        if not isinstance(getattr(child, 'name'), str):
+            raise TypeError("Can't register StatusBase subclass %s: " % child,
+                            "missing required `name: str` class attribute")
+        cls._statuses[child.name] = child
         return child
 
 
@@ -1010,7 +1012,7 @@ class UnknownStatus(StatusBase):
     charm has not called status-set yet.
 
     """
-    name = 'unknown'  # type: ignore  # not a property
+    name = 'unknown'
 
     def __init__(self):
         # Unknown status cannot be set and does not have a message associated with it.
@@ -1026,7 +1028,7 @@ class ActiveStatus(StatusBase):
 
     The unit believes it is correctly offering all the services it has been asked to offer.
     """
-    name = 'active'  # type: ignore  # not a property
+    name = 'active'
 
     def __init__(self, message: str = ''):
         super().__init__(message)
@@ -1038,7 +1040,7 @@ class BlockedStatus(StatusBase):
 
     An operator has to manually intervene to unblock the unit and let it proceed.
     """
-    name = 'blocked'  # type: ignore  # not a property
+    name = 'blocked'
 
 
 @StatusBase.register
@@ -1050,7 +1052,7 @@ class MaintenanceStatus(StatusBase):
     reflects activity on the unit itself, not on peers or related units.
 
     """
-    name = 'maintenance'  # type: ignore  # not a property
+    name = 'maintenance'
 
 
 @StatusBase.register
@@ -1061,7 +1063,7 @@ class WaitingStatus(StatusBase):
     it is related is not running.
 
     """
-    name = 'waiting'  # type: ignore  # not a property
+    name = 'waiting'
 
 
 class Resources:
@@ -1739,17 +1741,16 @@ class _ModelBackend:
     def __init__(self, unit_name: Optional[str] = None,
                  model_name: Optional[str] = None,
                  model_uuid: Optional[str] = None):
-        def _load_from_env_if_none(value: Optional[str], env_key: str,
-                                   check_not_none: bool = False) -> str:
-            if value is None:
-                value_ = os.environ.get(env_key)
-                if check_not_none:
-                    assert value_ is not None
-                return typing.cast(str, value_)
-            return value
-        self.unit_name = _load_from_env_if_none(unit_name, 'JUJU_UNIT_NAME', check_not_none=True)
-        self.model_name = _load_from_env_if_none(model_name, 'JUJU_MODEL_NAME')
-        self.model_uuid = _load_from_env_if_none(model_uuid, 'JUJU_MODEL_UUID')
+
+        # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
+        unit_name_ = unit_name or os.getenv('JUJU_UNIT_NAME')
+        if unit_name_ is None:
+            raise ValueError('JUJU_UNIT_NAME not set')
+        self.unit_name = unit_name_  # type: str
+
+        # we can cast to str because these envvars are guaranteed to be set
+        self.model_name = model_name or typing.cast(str, os.getenv('JUJU_MODEL_NAME'))  # type: str
+        self.model_uuid = model_uuid or typing.cast(str, os.getenv('JUJU_MODEL_UUID'))  # type: str
         self.app_name = self.unit_name.split('/')[0]  # type: str
 
         self._is_leader = None  # type: Optional[bool]
@@ -1832,7 +1833,7 @@ class _ModelBackend:
             raise
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool
-                     ) -> '_RawRelationDataContent':
+                     ) -> '_RelationDataContent_Raw':
         if not isinstance(is_app, bool):   # pyright:
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
@@ -1848,7 +1849,7 @@ class _ModelBackend:
 
         try:
             raw_data_content = self._run(*args, return_output=True, use_json=True)
-            return typing.cast('_RawRelationDataContent', raw_data_content)
+            return typing.cast('_RelationDataContent_Raw', raw_data_content)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
@@ -2033,7 +2034,7 @@ class _ModelBackend:
         for line in self.log_split(message):
             self._run('juju-log', '--log-level', level, "--", line)
 
-    def network_get(self, binding_name: str, relation_id: Optional[int] = None):
+    def network_get(self, binding_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
         """Return network info provided by network-get for a given binding.
 
         Args:
@@ -2044,7 +2045,8 @@ class _ModelBackend:
         if relation_id is not None:
             cmd.extend(['-r', str(relation_id)])
         try:
-            return self._run(*cmd, return_output=True, use_json=True)
+            network = self._run(*cmd, return_output=True, use_json=True)
+            return typing.cast('_NetworkDict', network)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
