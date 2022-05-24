@@ -92,7 +92,8 @@ if typing.TYPE_CHECKING:
     UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
 
     _AddressDict = TypedDict('_AddressDict', {
-        'address': str,
+        'address': str,  # Juju < 2.9
+        'value': str,  # Juju >= 2.9
         'cidr': str
     })
     _BindAddressDict = TypedDict('_BindAddressDict', {
@@ -274,7 +275,7 @@ class _ModelCache:
 
         new_entity = entity_type(name, meta=self._meta, backend=self._backend, cache=self)
         self._weakrefs[key] = new_entity
-        return typing.cast('_T', new_entity)
+        return new_entity
 
 
 class Application:
