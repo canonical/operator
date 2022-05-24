@@ -2460,7 +2460,7 @@ class TestHarness(unittest.TestCase):
         )
 
     def test_upgrade_with_one_relation(self):
-        """No relation hooks should fire on upgrade."""
+        """No relation hooks should fire on upgrade, and relation data must be retained."""
         class CharmWithDB(RelationEventCharm):
             def __init__(self, framework):
                 super().__init__(framework)
@@ -2476,6 +2476,7 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0')
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'data'})
+        harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
         harness.begin_with_initial_hooks()
         harness.charm.changes = []  # Clean up records to have a fresh count for `upgrade`
         harness.upgrade()
@@ -2488,6 +2489,13 @@ class TestHarness(unittest.TestCase):
                 {'name': 'start'},
             ]
         )
+
+        # Pre-existing relations must be retained
+        self.assertEqual(harness._backend._relation_names, {rel_id: 'db'})
+
+        # Pre-existing relation data must be retained
+        self.assertEqual(harness.get_relation_data(rel_id, 'postgresql/0'), {'new': 'data'})
+        self.assertEqual(harness.get_relation_data(rel_id, 'postgresql'), {'app': 'data'})
 
     def test_upgrade_with_multiple_units(self):
         """No relation hooks should fire on upgrade."""
