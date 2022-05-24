@@ -2401,12 +2401,16 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.set_leader(True)
         harness.begin_with_initial_hooks()
-        harness.charm.changes = []  # Clean up records to have a fresh count for `upgrade`
+
+        # The "stop" record is going to be dropped after charm re-init inside the upgrade method,
+        # so holding on to the charm to assert later
+        dying_charm = harness.charm
         harness.upgrade()
+
+        self.assertEqual(dying_charm.changes[-1], {'name': 'stop'})
         self.assertEqual(
             harness.charm.changes,
             [
-                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},
@@ -2418,12 +2422,10 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.set_leader(False)
         harness.begin_with_initial_hooks()
-        harness.charm.changes = []  # Clean up records to have a fresh count for `upgrade`
         harness.upgrade()
         self.assertEqual(
             harness.charm.changes,
             [
-                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'leader-settings-changed'},
@@ -2447,12 +2449,10 @@ class TestHarness(unittest.TestCase):
         harness.set_leader()
         harness.add_relation('peer', 'test-app')
         harness.begin_with_initial_hooks()
-        harness.charm.changes = []  # Clean up records to have a fresh count for `upgrade`
         harness.upgrade()
         self.assertEqual(
             harness.charm.changes,
             [
-                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},
@@ -2478,12 +2478,10 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'data'})
         harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
         harness.begin_with_initial_hooks()
-        harness.charm.changes = []  # Clean up records to have a fresh count for `upgrade`
         harness.upgrade()
         self.assertEqual(
             harness.charm.changes,
             [
-                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},
@@ -2515,12 +2513,10 @@ class TestHarness(unittest.TestCase):
         harness.add_relation_unit(rel_id, 'postgresql/0')
         harness.add_relation_unit(rel_id, 'postgresql/1')
         harness.begin_with_initial_hooks()
-        harness.charm.changes = []  # Clean up records to have a fresh count for `upgrade`
         harness.upgrade()
         self.assertEqual(
             harness.charm.changes,
             [
-                # {'name': 'stop'},  # the "stop" record is dropped due to charm reinit on upgrade
                 {'name': 'upgrade-charm'},
                 {'name': 'config-changed', 'data': {}},
                 {'name': 'start'},
