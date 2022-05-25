@@ -1627,8 +1627,11 @@ class Client:
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
-                                                                          typing.TextIO]:
+    def pull(self,
+             path: str,
+             *,
+             encoding: typing.Optional[str] = 'utf-8') -> typing.Union[typing.BinaryIO,
+                                                                       typing.TextIO]:
         """Read a file's content from the remote system.
 
         Args:

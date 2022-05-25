@@ -32,7 +32,9 @@ from subprocess import PIPE, CalledProcessError, run
 from typing import (
     Any,
     BinaryIO,
+    Callable,
     Dict,
+    Generator,
     Iterable,
     List,
     Mapping,
@@ -1215,7 +1217,7 @@ class Storage:
 class MultiPushPullError(Exception):
     """Aggregates multiple push/pull related exceptions into one."""
 
-    def __init__(self, message: str, errors: typing.List[typing.Tuple[str, ops.pebble.Error]]):
+    def __init__(self, message: str, errors: List[Tuple[str, Exception]]):
         """Create an aggregation of several push/pull errors.
 
         Args:
@@ -1415,7 +1417,8 @@ class Container:
             raise RuntimeError('expected 1 check, got {}'.format(len(checks)))
         return checks[check_name]
 
-    def pull(self, path: StrOrPath, *, encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
+    def pull(self, path: StrOrPath, *,
+             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
         Args:
@@ -1432,7 +1435,7 @@ class Container:
 
     def push(self,
              path: StrOrPath,
-             source: typing.Union[bytes, str, BinaryIO, TextIO],
+             source: Union[bytes, str, BinaryIO, TextIO],
              *,
              encoding: str = 'utf-8',
              make_dirs: Optional[bool] = False,
@@ -1467,7 +1470,7 @@ class Container:
                           user_id=user_id, user=user,  # type: ignore
                           group_id=group_id, group=group)   # type: ignore
 
-    def list_files(self, path: StrOrPath, *, pattern: str = None,
+    def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['pebble.FileInfo']:
         """Return list of directory entries from given path on remote system.
 
@@ -1487,7 +1490,7 @@ class Container:
                                        pattern=pattern, itself=itself)  # type: ignore
 
     def push_path(self,
-                  source_path: typing.Union[StrOrPath, typing.Iterable[StrOrPath]],
+                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
                   dest_dir: StrOrPath):
         """Recursively push a local path or files to the remote system.
 
@@ -1502,7 +1505,7 @@ class Container:
             * /foo/foobar.txt
             * /quux.txt
 
-        You could push the following ways:
+        You could push the following ways::
 
             # copy one file
             container.push_path('/foo/foobar.txt', '/dst')
@@ -1537,18 +1540,18 @@ class Container:
             raise RuntimeError('Container.push_path is not supported on Windows-based systems')
 
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = source_path
+            source_paths = typing.cast(Iterable[StrOrPath], source_path)
         else:
-            source_paths = [source_path]
+            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
-        def local_list(source_path: Path) -> typing.List[pebble.FileInfo]:
+        def local_list(source_path: Path) -> List[pebble.FileInfo]:
             paths = source_path.iterdir() if source_path.is_dir() else [source_path]
             files = [self._build_fileinfo(source_path / f) for f in paths]
             return files
 
-        errors = []
+        errors = []  # type: List[Tuple[str, Exception]]
         for source_path in source_paths:
             try:
                 for info in Container._list_recursive(local_list, source_path):
@@ -1569,7 +1572,7 @@ class Container:
             raise MultiPushPullError('failed to push one or more files', errors)
 
     def pull_path(self,
-                  source_path: typing.Union[StrOrPath, typing.Iterable[StrOrPath]],
+                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
                   dest_dir: StrOrPath):
         """Recursively pull a remote path or files to the local system.
 
@@ -1584,7 +1587,7 @@ class Container:
             * /foo/foobar.txt
             * /quux.txt
 
-        You could pull the following ways:
+        You could pull the following ways::
 
             # copy one file
             container.pull_path('/foo/foobar.txt', '/dst')
@@ -1620,13 +1623,13 @@ class Container:
             raise RuntimeError('Container.pull_path is not supported on Windows-based systems')
 
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = source_path
+            source_paths = typing.cast(Iterable[StrOrPath], source_path)
         else:
-            source_paths = [source_path]
+            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
-        errors = []
+        errors = []  # type: List[Tuple[str, Exception]]
         for source_path in source_paths:
             try:
                 for info in Container._list_recursive(self.list_files, source_path):
@@ -1634,14 +1637,14 @@ class Container:
                     dstpath.parent.mkdir(parents=True, exist_ok=True)
                     with self.pull(info.path, encoding=None) as src:
                         with dstpath.open(mode='wb') as dst:
-                            shutil.copyfileobj(src, dst)
+                            shutil.copyfileobj(typing.cast(BinaryIO, src), dst)
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: StrOrPath) -> ops.pebble.FileInfo:
+    def _build_fileinfo(path: StrOrPath) -> 'pebble.FileInfo':
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
@@ -1661,15 +1664,17 @@ class Container:
             name=path.name,
             type=ftype,
             size=info.st_size,
-            permissions=stat.S_IMODE(info.st_mode),
-            last_modified=info.st_mtime,
+            permissions=stat.S_IMODE(info.st_mode),  # type: ignore
+            last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pwd.getpwuid(info.st_uid).pw_name,
             group_id=info.st_gid,
             group=grp.getgrgid(info.st_gid).gr_name)
 
     @staticmethod
-    def _list_recursive(list_func, path: Path) -> typing.Generator[None, 'pebble.FileInfo', None]:
+    def _list_recursive(list_func: Callable[[Path],
+                        Iterable['pebble.FileInfo']],
+                        path: Path) -> Generator['pebble.FileInfo', None, None]:
         """Recursively lists all files under path using the given list_func.
 
         Args:
