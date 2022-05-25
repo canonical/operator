@@ -188,6 +188,7 @@ class Harness(typing.Generic[CharmType]):
         self._charm = TestCharm(self._framework)
 
     def reinitialize_charm(self) -> None:
+        """Re-initialize the charm under test."""
         if self._charm is None:
             raise RuntimeError('cannot call the reinitialize_charm method before begin')
 
