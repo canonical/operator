@@ -21,6 +21,7 @@ import math
 import os
 import re
 import shutil
+import stat
 import tempfile
 import time
 import typing
@@ -31,7 +32,9 @@ from subprocess import PIPE, CalledProcessError, run
 from typing import (
     Any,
     BinaryIO,
+    Callable,
     Dict,
+    Generator,
     Iterable,
     List,
     Mapping,
@@ -106,6 +109,8 @@ if typing.TYPE_CHECKING:
         'egress-subnets': List[str]
     })
 
+
+StrOrPath = typing.Union[str, Path]
 
 logger = logging.getLogger(__name__)
 
@@ -1209,6 +1214,28 @@ class Storage:
         self._location = Path(location)
 
 
+class MultiPushPullError(Exception):
+    """Aggregates multiple push/pull related exceptions into one."""
+
+    def __init__(self, message: str, errors: List[Tuple[str, Exception]]):
+        """Create an aggregation of several push/pull errors.
+
+        Args:
+            message: error message
+            errors: list of errors with each represented by a tuple (<source_path>,<exception>)
+                where source_path is the path being pushed/pulled from.
+        """
+        self.errors = errors
+        self.message = message
+
+    def __str__(self):
+        return '{} ({} errors): {}, ...'.format(
+            self.message, len(self.errors), self.errors[0][1])
+
+    def __repr__(self):
+        return 'MultiError({!r}, {} errors)'.format(self.message, len(self.errors))
+
+
 class Container:
     """Represents a named container in a unit.
 
@@ -1390,7 +1417,8 @@ class Container:
             raise RuntimeError('expected 1 check, got {}'.format(len(checks)))
         return checks[check_name]
 
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
+    def pull(self, path: StrOrPath, *,
+             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
         Args:
@@ -1403,17 +1431,19 @@ class Container:
             objects decoded according to the specified encoding, or bytes if
             encoding is None.
         """
-        return self._pebble.pull(path, encoding=encoding)
+        return self._pebble.pull(str(path), encoding=encoding)
 
-    def push(
-            self, path: str, source: Union[bytes, str, BinaryIO, TextIO], *,
-            encoding: str = 'utf-8',
-            make_dirs: Optional[bool] = False,
-            permissions: Optional[int] = None,
-            user_id: Optional[int] = None,
-            user: Optional[str] = None,
-            group_id: Optional[int] = None,
-            group: Optional[str] = None):
+    def push(self,
+             path: StrOrPath,
+             source: Union[bytes, str, BinaryIO, TextIO],
+             *,
+             encoding: str = 'utf-8',
+             make_dirs: Optional[bool] = False,
+             permissions: Optional[int] = None,
+             user_id: Optional[int] = None,
+             user: Optional[str] = None,
+             group_id: Optional[int] = None,
+             group: Optional[str] = None):
         """Write content to a given file path on the remote system.
 
         Args:
@@ -1433,14 +1463,14 @@ class Container:
             group: Group name for file. Group's GID must match group_id if
                 both are specified.
         """
-        self._pebble.push(path, source, encoding=encoding,
+        self._pebble.push(str(path), source, encoding=encoding,
                           # fixme: remove these ignores on pebble.exec signature fix
                           make_dirs=make_dirs,  # type: ignore
                           permissions=permissions,   # type: ignore
                           user_id=user_id, user=user,  # type: ignore
                           group_id=group_id, group=group)   # type: ignore
 
-    def list_files(self, path: str, *, pattern: Optional[str] = None,
+    def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['pebble.FileInfo']:
         """Return list of directory entries from given path on remote system.
 
@@ -1455,9 +1485,239 @@ class Container:
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
         """
-        return self._pebble.list_files(path,
+        return self._pebble.list_files(str(path),
                                        # fixme: remove on pebble.exec signature fix
                                        pattern=pattern, itself=itself)  # type: ignore
+
+    def push_path(self,
+                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
+                  dest_dir: StrOrPath):
+        """Recursively push a local path or files to the remote system.
+
+        Only regular files and directories are copied; symbolic links, device files, etc. are
+        skipped.  Pushing is attempted to completion even if errors occur during the process.  All
+        errors are collected incrementally. After copying has completed, if any errors occurred, a
+        single MultiPushPullError is raised containing details for each error.
+
+        Assuming the following files exist locally:
+
+            * /foo/bar/baz.txt
+            * /foo/foobar.txt
+            * /quux.txt
+
+        You could push the following ways::
+
+            # copy one file
+            container.push_path('/foo/foobar.txt', '/dst')
+            # Destination results: /dst/foobar.txt
+
+            # copy a directory
+            container.push_path('/foo', '/dst')
+            # Destination results: /dst/foo/bar/baz.txt, /dst/foo/foobar.txt
+
+            # copy a directory's contents
+            container.push_path('/foo/*', '/dst')
+            # Destination results: /dst/bar/baz.txt, /dst/foobar.txt
+
+            # copy multiple files
+            container.push_path(['/foo/bar/baz.txt', 'quux.txt'], '/dst')
+            # Destination results: /dst/baz.txt, /dst/quux.txt
+
+            # copy a file and a directory
+            container.push_path(['/foo/bar', '/quux.txt'], '/dst')
+            # Destination results: /dst/bar/baz.txt, /dst/quux.txt
+
+        Args:
+            source_path: A single path or list of paths to push to the remote system.  The
+                paths can be either a file or a directory.  If source_path is a directory, the
+                directory base name is attached to the destination directory - i.e. the source path
+                directory is placed inside the destination directory.  If a source path ends with a
+                trailing "/*" it will have its *contents* placed inside the destination directory.
+            dest_dir: Remote destination directory inside which the source dir/files will be
+                placed.  This must be an absolute path.
+        """
+        if os.name == 'nt':
+            raise RuntimeError('Container.push_path is not supported on Windows-based systems')
+
+        if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
+            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+        else:
+            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+        source_paths = [Path(p) for p in source_paths]
+        dest_dir = Path(dest_dir)
+
+        def local_list(source_path: Path) -> List[pebble.FileInfo]:
+            paths = source_path.iterdir() if source_path.is_dir() else [source_path]
+            files = [self._build_fileinfo(source_path / f) for f in paths]
+            return files
+
+        errors = []  # type: List[Tuple[str, Exception]]
+        for source_path in source_paths:
+            try:
+                for info in Container._list_recursive(local_list, source_path):
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    with open(info.path) as src:
+                        self.push(
+                            dstpath,
+                            src,
+                            make_dirs=True,
+                            permissions=info.permissions,
+                            user_id=info.user_id,
+                            user=info.user,
+                            group_id=info.group_id,
+                            group=info.group)
+            except (OSError, pebble.Error) as err:
+                errors.append((str(source_path), err))
+        if errors:
+            raise MultiPushPullError('failed to push one or more files', errors)
+
+    def pull_path(self,
+                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
+                  dest_dir: StrOrPath):
+        """Recursively pull a remote path or files to the local system.
+
+        Only regular files and directories are copied; symbolic links, device files, etc. are
+        skipped.  Pulling is attempted to completion even if errors occur during the process.  All
+        errors are collected incrementally. After copying has completed, if any errors occurred, a
+        single MultiPushPullError is raised containing details for each error.
+
+        Assuming the following files exist remotely:
+
+            * /foo/bar/baz.txt
+            * /foo/foobar.txt
+            * /quux.txt
+
+        You could pull the following ways::
+
+            # copy one file
+            container.pull_path('/foo/foobar.txt', '/dst')
+            # Destination results: /dst/foobar.txt
+
+            # copy a directory
+            container.pull_path('/foo', '/dst')
+            # Destination results: /dst/foo/bar/baz.txt, /dst/foo/foobar.txt
+
+            # copy a directory's contents
+            container.pull_path('/foo/*', '/dst')
+            # Destination results: /dst/bar/baz.txt, /dst/foobar.txt
+
+            # copy multiple files
+            container.pull_path(['/foo/bar/baz.txt', 'quux.txt'], '/dst')
+            # Destination results: /dst/baz.txt, /dst/quux.txt
+
+            # copy a file and a directory
+            container.pull_path(['/foo/bar', '/quux.txt'], '/dst')
+            # Destination results: /dst/bar/baz.txt, /dst/quux.txt
+
+        Args:
+            source_path: A single path or list of paths to pull from the remote system.  The
+                paths can be either a file or a directory but must be absolute paths.  If
+                source_path is a directory, the directory base name is attached to the destination
+                directory - i.e.  the source path directory is placed inside the destination
+                directory.  If a source path ends with a trailing "/*" it will have its *contents*
+                placed inside the destination directory.
+            dest_dir: Local destination directory inside which the source dir/files will be
+                placed.
+        """
+        if os.name == 'nt':
+            raise RuntimeError('Container.pull_path is not supported on Windows-based systems')
+
+        if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
+            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+        else:
+            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+        source_paths = [Path(p) for p in source_paths]
+        dest_dir = Path(dest_dir)
+
+        errors = []  # type: List[Tuple[str, Exception]]
+        for source_path in source_paths:
+            try:
+                for info in Container._list_recursive(self.list_files, source_path):
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    dstpath.parent.mkdir(parents=True, exist_ok=True)
+                    with self.pull(info.path, encoding=None) as src:
+                        with dstpath.open(mode='wb') as dst:
+                            shutil.copyfileobj(typing.cast(BinaryIO, src), dst)
+            except (OSError, pebble.Error) as err:
+                errors.append((str(source_path), err))
+        if errors:
+            raise MultiPushPullError('failed to pull one or more files', errors)
+
+    @staticmethod
+    def _build_fileinfo(path: StrOrPath) -> 'pebble.FileInfo':
+        """Constructs a FileInfo object by stat'ing a local path."""
+        path = Path(path)
+        if path.is_symlink():
+            ftype = pebble.FileType.SYMLINK
+        elif path.is_dir():
+            ftype = pebble.FileType.DIRECTORY
+        elif path.is_file():
+            ftype = pebble.FileType.FILE
+        else:
+            ftype = pebble.FileType.UNKNOWN
+
+        import grp
+        import pwd
+        info = path.lstat()
+        return pebble.FileInfo(
+            path=str(path),
+            name=path.name,
+            type=ftype,
+            size=info.st_size,
+            permissions=stat.S_IMODE(info.st_mode),  # type: ignore
+            last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
+            user_id=info.st_uid,
+            user=pwd.getpwuid(info.st_uid).pw_name,
+            group_id=info.st_gid,
+            group=grp.getgrgid(info.st_gid).gr_name)
+
+    @staticmethod
+    def _list_recursive(list_func: Callable[[Path],
+                        Iterable['pebble.FileInfo']],
+                        path: Path) -> Generator['pebble.FileInfo', None, None]:
+        """Recursively lists all files under path using the given list_func.
+
+        Args:
+            list_func: Function taking 1 Path argument that returns a list of FileInfo objects
+                representing files residing directly inside the given path.
+            path: Filepath to recursively list.
+        """
+        if path.name == '*':
+            # ignore trailing '/*' that we just use for determining how to build paths
+            # at destination
+            path = path.parent
+
+        for info in list_func(path):
+            if info.type is pebble.FileType.DIRECTORY:
+                yield from Container._list_recursive(list_func, Path(info.path))
+            elif info.type in (pebble.FileType.FILE, pebble.FileType.SYMLINK):
+                yield info
+            else:
+                logger.debug(
+                    'skipped unsupported file in Container.[push/pull]_path: %s', info.path)
+
+    @staticmethod
+    def _build_destpath(file_path: StrOrPath, source_path: StrOrPath, dest_dir: StrOrPath) -> Path:
+        """Converts a source file and destination dir into a full destination filepath.
+
+        file_path:
+            Full source-side path for the file being copied to dest_dir.
+        source_path
+            Source prefix under which the given file_path was found.
+        dest_dir
+            Destination directory to place file_path into.
+        """
+        # select between the two following src+dst combos via trailing '/*'
+        # /src/* --> /dst/*
+        # /src --> /dst/src
+        file_path, source_path, dest_dir = Path(file_path), Path(source_path), Path(dest_dir)
+        prefix = str(source_path.parent)
+        if os.path.commonprefix([prefix, str(file_path)]) != prefix:
+            raise RuntimeError(
+                'file "{}" does not have specified prefix "{}"'.format(
+                    file_path, prefix))
+        path_suffix = os.path.relpath(str(file_path), prefix)
+        return dest_dir / path_suffix
 
     def exists(self, path: str) -> bool:
         """Return true if the path exists on the container filesystem."""
