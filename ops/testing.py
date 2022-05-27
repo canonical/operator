@@ -445,7 +445,7 @@ class Harness(typing.Generic[CharmType]):
         return rel_id
 
     def add_storage(self, storage_name: str, count: int = 1,
-                    attach: bool = False) -> typing.List[str]:
+                    *, attach: bool = False) -> typing.List[str]:
         """Create a new storage device and attach it to this unit.
 
         To have repeatable tests, each device will be initialized with
