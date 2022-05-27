@@ -2396,45 +2396,20 @@ class TestHarness(unittest.TestCase):
             backend.status_get(is_app=False),
             {'status': 'maintenance', 'message': 'Status set on install'})
 
-    def test_upgrade_no_relations(self):
+    def test_reinitialize_retains_leadership_status(self):
         harness = Harness(RecordingCharm, meta='''name: test-app''')
         self.addCleanup(harness.cleanup)
+
         harness.set_leader(True)
         harness.begin_with_initial_hooks()
+        harness.reinitialize_charm()
+        self.assertTrue(harness.charm.unit.is_leader())
 
-        # The "stop" record is going to be dropped after charm re-init inside the upgrade method,
-        # so holding on to the charm to assert later
-        dying_charm = harness.charm
-        harness.upgrade()
-
-        self.assertEqual(dying_charm.changes[-1], {'name': 'stop'})
-        self.assertEqual(
-            harness.charm.changes,
-            [
-                {'name': 'upgrade-charm'},
-                {'name': 'config-changed', 'data': {}},
-                {'name': 'start'},
-            ]
-        )
-
-    def test_upgrade_no_relations_not_leader(self):
-        harness = Harness(RecordingCharm, meta='''name: test-app''')
-        self.addCleanup(harness.cleanup)
         harness.set_leader(False)
-        harness.begin_with_initial_hooks()
-        harness.upgrade()
-        self.assertEqual(
-            harness.charm.changes,
-            [
-                {'name': 'upgrade-charm'},
-                {'name': 'config-changed', 'data': {}},
-                {'name': 'leader-settings-changed'},
-                {'name': 'start'},
-            ]
-        )
+        harness.reinitialize_charm()
+        self.assertFalse(harness.charm.unit.is_leader())
 
-    def test_upgrade_with_peer_relation(self):
-        """No relation hooks should fire on upgrade."""
+    def test_reinitialize_retains_peer_relations(self):
         class PeerCharm(RelationEventCharm):
             def __init__(self, framework):
                 super().__init__(framework)
@@ -2449,18 +2424,11 @@ class TestHarness(unittest.TestCase):
         harness.set_leader()
         harness.add_relation('peer', 'test-app')
         harness.begin_with_initial_hooks()
-        harness.upgrade()
-        self.assertEqual(
-            harness.charm.changes,
-            [
-                {'name': 'upgrade-charm'},
-                {'name': 'config-changed', 'data': {}},
-                {'name': 'start'},
-            ]
-        )
+        relations_before = harness._backend._relation_names.copy()
+        harness.reinitialize_charm()
+        self.assertEqual(relations_before, harness._backend._relation_names)
 
-    def test_upgrade_with_one_relation(self):
-        """No relation hooks should fire on upgrade, and relation data must be retained."""
+    def test_reinitialize_retains_regular_relations(self):
         class CharmWithDB(RelationEventCharm):
             def __init__(self, framework):
                 super().__init__(framework)
@@ -2478,15 +2446,7 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'data'})
         harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
         harness.begin_with_initial_hooks()
-        harness.upgrade()
-        self.assertEqual(
-            harness.charm.changes,
-            [
-                {'name': 'upgrade-charm'},
-                {'name': 'config-changed', 'data': {}},
-                {'name': 'start'},
-            ]
-        )
+        harness.reinitialize_charm()
 
         # Pre-existing relations must be retained
         self.assertEqual(harness._backend._relation_names, {rel_id: 'db'})
@@ -2495,49 +2455,17 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.get_relation_data(rel_id, 'postgresql/0'), {'new': 'data'})
         self.assertEqual(harness.get_relation_data(rel_id, 'postgresql'), {'app': 'data'})
 
-    def test_upgrade_with_multiple_units(self):
-        """No relation hooks should fire on upgrade."""
-        class CharmWithDB(RelationEventCharm):
-            def __init__(self, framework):
-                super().__init__(framework)
-                self.observe_relation_events('db')
-        harness = Harness(CharmWithDB, meta='''
-            name: test-app
-            requires:
-              db:
-                interface: sql
-            ''')
-        self.addCleanup(harness.cleanup)
-        harness.set_leader()
-        rel_id = harness.add_relation('db', 'postgresql')
-        harness.add_relation_unit(rel_id, 'postgresql/0')
-        harness.add_relation_unit(rel_id, 'postgresql/1')
-        harness.begin_with_initial_hooks()
-        harness.upgrade()
-        self.assertEqual(
-            harness.charm.changes,
-            [
-                {'name': 'upgrade-charm'},
-                {'name': 'config-changed', 'data': {}},
-                {'name': 'start'},
-            ]
-        )
-
-    def test_upgrade_status_consistency(self):
-        """The upgrade sequence itself shouldn't change the status."""
+    def test_reinitialize_retains_status(self):
         harness = Harness(RecordingCharm, meta='''name: test-app''')
         self.addCleanup(harness.cleanup)
-        backend = harness._backend
+        harness.set_leader()
         harness.begin_with_initial_hooks()
 
-        unit_status_before = backend.status_get(is_app=False)
-        app_status_before = backend.status_get(is_app=True)
-        harness.upgrade()
-        unit_status_after = backend.status_get(is_app=False)
-        app_status_after = backend.status_get(is_app=True)
-
-        self.assertEqual(unit_status_before, unit_status_after)
-        self.assertEqual(app_status_before, app_status_after)
+        harness.charm.unit.status = ActiveStatus("unit before reinit")
+        harness.charm.app.status = ActiveStatus("app before reinit")
+        harness.reinitialize_charm()
+        self.assertEqual(harness.charm.unit.status, ActiveStatus("unit before reinit"))
+        self.assertEqual(harness.charm.app.status, ActiveStatus("app before reinit"))
 
     def test_get_pebble_container_plan(self):
         harness = Harness(CharmBase, meta='''

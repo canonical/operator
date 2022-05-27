@@ -197,26 +197,6 @@ class Harness(typing.Generic[CharmType]):
         self._charm = None
         self.begin()
 
-    def upgrade(self) -> None:
-        """Simulate a charm upgrade.
-
-        This triggers stop, upgrade-charm, config-changed, leader_settings_changed and start hooks.
-        This does NOT trigger a pebble-ready hook (use :meth:`.container_pebble_ready` for that).
-
-        Before calling :meth:`upgrade`, a Charm instance must exist, so you must call
-        :meth:`.begin` or :meth:`.begin_with_initial_hooks` first.
-        """
-        if self._charm is None:
-            raise RuntimeError('cannot call the upgrade method before begin')
-
-        self._charm.on.stop.emit()
-        self.reinitialize_charm()
-        self._charm.on.upgrade_charm.emit()
-        self._charm.on.config_changed.emit()
-        if not self._backend._is_leader:
-            self._charm.on.leader_settings_changed.emit()
-        self._charm.on.start.emit()
-
     def begin_with_initial_hooks(self) -> None:
         """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
 
