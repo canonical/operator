@@ -1175,9 +1175,21 @@ class _TestingModelBackend:
         if relation_id not in self._relation_app_and_units:
             # Non-existent or dead relation
             return None
+        if 'relation_broken' in self._hook_is_running:
+            # TODO: if juju ever starts setting JUJU_REMOTE_APP in relation-broken hooks runs,
+            # then we should kill this if clause.
+            # See https://bugs.launchpad.net/juju/+bug/1960934
+            return None
         return self._relation_app_and_units[relation_id]['app']
 
     def relation_get(self, relation_id, member_name, is_app):
+        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
+                relation_id):
+            # TODO: if juju gets fixed to set JUJU_REMOTE_APP for this case, then we may opt to
+            # allow charms to read/get that (stale) relation data.
+            # See https://bugs.launchpad.net/juju/+bug/1960934
+            raise RuntimeError(
+                'remote-side relation data cannot be accessed during a relation-broken event')
         if is_app and '/' in member_name:
             member_name = member_name.split('/')[0]
         if relation_id not in self._relation_data:
@@ -1185,6 +1197,10 @@ class _TestingModelBackend:
         return self._relation_data[relation_id][member_name].copy()
 
     def relation_set(self, relation_id, key, value, is_app):
+        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
+                relation_id):
+            raise RuntimeError(
+                'remote-side relation data cannot be accessed during a relation-broken event')
         relation = self._relation_data[relation_id]
         if is_app:
             bucket_key = self.app_name

@@ -2081,7 +2081,7 @@ class _ModelBackend:
             event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
             if relation_id == event_relation_id:
                 # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
-                return os.environ['JUJU_REMOTE_APP']
+                return os.environ['JUJU_REMOTE_APP'] or None
 
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
@@ -2110,6 +2110,13 @@ class _ModelBackend:
             if not version.has_app_data():
                 raise RuntimeError(
                     'getting application data is not supported on Juju version {}'.format(version))
+        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
+                relation_id):
+            # TODO: if juju gets fixed to set JUJU_REMOTE_APP for this case, then we may opt to
+            # allow charms to read/get that (stale) relation data.
+            # See https://bugs.launchpad.net/juju/+bug/1960934
+            raise RuntimeError(
+                'remote-side relation data cannot be accessed during a relation-broken event')
 
         args = ['relation-get', '-r', str(relation_id), '-', member_name]
         if is_app:
@@ -2132,6 +2139,10 @@ class _ModelBackend:
             if not version.has_app_data():
                 raise RuntimeError(
                     'setting application data is not supported on Juju version {}'.format(version))
+        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
+                relation_id):
+            raise RuntimeError(
+                'remote-side relation data cannot be accessed during a relation-broken event')
 
         args = ['relation-set', '-r', str(relation_id), '{}={}'.format(key, value)]
         if is_app:

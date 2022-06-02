@@ -318,6 +318,30 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(len(harness.charm.observed_events), 1)
         self.assertIsInstance(harness.charm.observed_events[0], RelationEvent)
 
+    def test_relation_get_when_broken(self):
+        harness = Harness(RelationBrokenTester, meta='''
+            name: test-app
+            requires:
+                foo:
+                    interface: foofoo
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('foo')
+
+        # First create a relation
+        rel_id = harness.add_relation('foo', 'fooapp')
+        harness.add_relation_unit(rel_id, 'fooapp/0')
+        try:
+            harness.remove_relation(rel_id)
+        except RuntimeError as err:
+            assert 'remote-side relation data cannot be accessed' in str(err), \
+                'got wrong exception'
+        except Exception:
+            assert False, 'got wrong exception type'
+        else:
+            assert False, 'expected exception not raised'
+
     def test_remove_relation(self):
         harness = Harness(RelationEventCharm, meta='''
             name: test-app
@@ -2565,6 +2589,7 @@ class RelationEventCharm(RecordingCharm):
         self.record_relation_data_on_events = False
 
     def observe_relation_events(self, relation_name):
+        self.relation_name = relation_name
         self.framework.observe(self.on[relation_name].relation_created, self._on_relation_created)
         self.framework.observe(self.on[relation_name].relation_joined, self._on_relation_joined)
         self.framework.observe(self.on[relation_name].relation_changed, self._on_relation_changed)
@@ -2605,6 +2630,16 @@ class RelationEventCharm(RecordingCharm):
             }})
 
         self.changes.append(recording)
+
+
+class RelationBrokenTester(RelationEventCharm):
+    """Access inaccessible relation data."""
+
+    def __init__(self, framework):
+        super().__init__(framework)
+
+    def _on_relation_broken(self, event):
+        print(event.relation.data[event.app]['bar'])
 
 
 class ContainerEventCharm(RecordingCharm):

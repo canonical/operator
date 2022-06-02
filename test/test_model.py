@@ -1896,6 +1896,23 @@ class TestModelBackend(unittest.TestCase):
             self._backend = ops.model._ModelBackend('myapp/0')
         return self._backend
 
+    def test_relation_get_when_broken(self):
+        # No is_app provided.
+        os.environ['JUJU_REMOTE_APP'] = ''
+        os.environ['JUJU_RELATION_ID'] = 'foo:1'
+
+        # Invalid types for is_app.
+        self.backend._hook_is_running = 'foo_relation_broken'
+        try:
+            self.backend.relation_get(1, 'foo', is_app=False)
+        except RuntimeError as err:
+            assert 'remote-side relation data cannot be accessed' in str(err), \
+                'got wrong exception'
+        except Exception:
+            assert False, 'got wrong exception type'
+        else:
+            assert False, 'expected exception not raised'
+
     def test_relation_get_set_is_app_arg(self):
         # No is_app provided.
         with self.assertRaises(TypeError):
