@@ -177,6 +177,7 @@ class EventBase(metaclass=_EventMeta):
     """The base for all the different Events.
 
     Inherit this and override 'snapshot' and 'restore' methods to build a custom event.
+    If you forget to override `snapshot` or `restore`, you will get a runtime warning.
     """
 
     # gets patched in by `Framework.restore()`, if this event is being re-emitted
@@ -248,14 +249,16 @@ class EventBase(metaclass=_EventMeta):
     def snapshot(self) -> dict:
         """Return the snapshot data that should be persisted.
 
-        Subclasses must override to save any custom state.
+        Subclasses must override to save any custom state. If you forget
+        to do so, you will get a warning.
         """
         return None
 
     def restore(self, snapshot):
         """Restore the value state from the given snapshot.
 
-        Subclasses must override to restore their custom state.
+        Subclasses must override to restore their custom state. If you forget
+        to do so, you will get a warning.
         """
         self.deferred = False
 
