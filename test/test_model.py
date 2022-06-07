@@ -690,7 +690,6 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([])
 
     def test_storage(self):
-        # TODO: (jam) 2020-05-07 Harness doesn't yet expose storage-get issue #263
         meta = ops.charm.CharmMeta()
         meta.storages = {'disks': None, 'data': None}
         model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
@@ -716,6 +715,13 @@ class TestModel(unittest.TestCase):
         self.assertEqual(len(model.storages), 2)
         self.assertEqual(model.storages.keys(), meta.storages.keys())
         self.assertIn('disks', model.storages)
+        try:
+            model.storages['does-not-exist']
+        except KeyError as err:
+            assert 'Did you mean' in str(err), 'got wrong error message'
+        except Exception as err:
+            assert False, 'got wrong exception type: ' + str(err)
+
         test_cases = {
             0: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/0')},
             1: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/1')},

@@ -1139,6 +1139,10 @@ class StorageMapping(Mapping[str, List['Storage']]):
         return iter(self._storage_map)
 
     def __getitem__(self, storage_name: str) -> List['Storage']:
+        if storage_name not in self._storage_map:
+            meant = ', or '.join(['{!r}'.format(k) for k in self._storage_map.keys()])
+            raise KeyError(
+                'Storage {!r} not found. Did you mean {}?'.format(storage_name, meant))
         storage_list = self._storage_map[storage_name]
         if storage_list is None:
             storage_list = self._storage_map[storage_name] = []
