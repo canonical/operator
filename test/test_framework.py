@@ -24,11 +24,11 @@ import tempfile
 import unittest
 from pathlib import Path
 from test.test_helpers import BaseTestCase, fake_script
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import logassert
 
-from ops import charm
+from ops import charm, framework
 from ops.framework import (
     _BREAKPOINT_WELCOME_MESSAGE,
     BoundStoredState,
@@ -1875,3 +1875,79 @@ class DebugHookTests(BaseTestCase):
                 publisher.install.emit()
                 self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
         self.assertEqual(mock.call_count, 2)
+
+
+class TestEventSubclass(unittest.TestCase):
+    warning_msg_template = "The EventBase subclass {} has added some attributes ({})" \
+        "but does not override EventBase.snapshot. This is " \
+        "probably a bug. To silence this warning, add the class " \
+        "attribute _SUPPRESS_SNAPSHOT_CHECK=True to your subclass."
+    warning_msg = warning_msg_template.format('MyEventSubclass', 'a')
+
+    def test_event_subclass_warning(self):
+        framework.logger.warning = MagicMock(return_value=None)
+
+        class MyEventSubclass(EventBase):
+
+            def __init__(self):
+                self.a = 2
+
+        MyEventSubclass()
+        framework.logger.warning.assert_called_with(self.warning_msg)
+
+    def test_event_subclass_override_snapshot(self):
+        framework.logger.warning = MagicMock(return_value=None)
+
+        class MyEventSubclass(EventBase):
+
+            def __init__(self):
+                self.a = 2
+
+            def snapshot(self):
+                pass
+
+        MyEventSubclass()
+        framework.logger.warning.assert_called_with(self.warning_msg)
+
+    def test_event_subclass_override_restore(self):
+        framework.logger.warning = MagicMock(return_value=None)
+
+        class MyEventSubclass(EventBase):
+
+            def __init__(self):
+                self.a = 2
+
+            def restore(self):
+                pass
+
+        MyEventSubclass()
+        framework.logger.warning.assert_called_with(self.warning_msg)
+
+    def test_event_subclass_override_all(self):
+        framework.logger.warning = MagicMock(return_value=None)
+
+        class MyEventSubclass(EventBase):
+
+            def __init__(self):
+                self.a = 2
+
+            def snapshot(self):
+                pass
+
+            def restore(self):
+                pass
+
+        MyEventSubclass()
+        framework.logger.warning.assert_not_called()
+
+    def test_event_subclass_silenced(self):
+        framework.logger.warning = MagicMock(return_value=None)
+
+        class MyEventSubclass(EventBase):
+            _SUPPRESS_SNAPSHOT_CHECK = 1
+
+            def __init__(self):
+                self.a = 2
+
+        MyEventSubclass()
+        framework.logger.warning.assert_not_called()

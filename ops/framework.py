@@ -28,6 +28,7 @@ import sys
 import types
 import typing
 import weakref
+from typing import Any
 
 from ops import charm
 from ops.storage import NoSnapshotError, SQLiteStorage
@@ -152,7 +153,27 @@ class Handle:
         return handle
 
 
-class EventBase:
+class _EventMeta(type):
+    _BUILT_IN_ATTRS = {"framework", "handle", "deferred"}
+
+    def __call__(cls, *args: Any, **kwds: Any) -> Any:
+        inst = super().__call__(*args, **kwds)
+
+        attrs = set(vars(inst)) - _EventMeta._BUILT_IN_ATTRS
+        if attrs and not getattr(cls, '_SUPPRESS_SNAPSHOT_CHECK', False):
+            if getattr(cls, "snapshot") is EventBase.snapshot or \
+                    getattr(cls, "restore") is EventBase.restore:
+                msg = "The EventBase subclass {} has added some attributes ({})" \
+                    "but does not override EventBase.snapshot. This is " \
+                    "probably a bug. To silence this warning, add the class " \
+                    "attribute _SUPPRESS_SNAPSHOT_CHECK=True to your subclass."
+
+                logger.warning(msg.format(cls.__name__, ', '.join(attrs)))
+
+        return inst
+
+
+class EventBase(metaclass=_EventMeta):
     """The base for all the different Events.
 
     Inherit this and override 'snapshot' and 'restore' methods to build a custom event.
