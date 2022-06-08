@@ -25,6 +25,7 @@ import textwrap
 import unittest
 from io import BytesIO, StringIO
 
+import pytest
 import yaml
 
 import ops.testing
@@ -329,18 +330,12 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         harness.charm.observe_relation_events('foo')
 
-        # First create a relation
-        rel_id = harness.add_relation('foo', 'fooapp')
-        harness.add_relation_unit(rel_id, 'fooapp/0')
-        try:
+        # relation remote app is None to mirror production juju behavior where juju doesn't
+        # communicate the remote app to ops.
+        rel_id = harness.add_relation('foo', None)
+
+        with pytest.raises(KeyError, match='trying to access remote app data'):
             harness.remove_relation(rel_id)
-        except RuntimeError as err:
-            assert 'remote-side relation data cannot be accessed' in str(err), \
-                'got wrong exception'
-        except Exception:
-            assert False, 'got wrong exception type'
-        else:
-            assert False, 'expected exception not raised'
 
     def test_remove_relation(self):
         harness = Harness(RelationEventCharm, meta='''
@@ -2639,7 +2634,7 @@ class RelationBrokenTester(RelationEventCharm):
         super().__init__(framework)
 
     def _on_relation_broken(self, event):
-        print(event.relation.data[event.app]['bar'])
+        print(event.relation.data[event.relation.app]['bar'])
 
 
 class ContainerEventCharm(RecordingCharm):

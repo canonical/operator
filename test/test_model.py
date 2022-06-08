@@ -716,9 +716,8 @@ class TestModel(unittest.TestCase):
         self.assertEqual(model.storages.keys(), meta.storages.keys())
         self.assertIn('disks', model.storages)
 
-        with self.assertRaises(KeyError) as cm:
+        with pytest.raises(KeyError, match='Did you mean'):
             model.storages['does-not-exist']
-        assert 'Did you mean' in str(cm.exception)
 
         test_cases = {
             0: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/0')},
@@ -1889,18 +1888,6 @@ class TestModelBackend(unittest.TestCase):
         if self._backend is None:
             self._backend = ops.model._ModelBackend('myapp/0')
         return self._backend
-
-    def test_relation_get_when_broken(self):
-        # No is_app provided.
-        os.environ['JUJU_REMOTE_APP'] = ''
-        os.environ['JUJU_RELATION_ID'] = 'foo:1'
-
-        # Invalid types for is_app.
-        self.backend._hook_is_running = 'foo_relation_broken'
-
-        with self.assertRaises(RuntimeError) as cm:
-            self.backend.relation_get(1, 'foo', is_app=False)
-        assert 'remote-side relation data cannot be accessed' in str(cm.exception)
 
     def test_relation_get_set_is_app_arg(self):
         # No is_app provided.
