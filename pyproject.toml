@@ -38,3 +38,4 @@ pythonVersion = "3.5" # check no python > 3.5 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"
 reportIncompatibleMethodOverride = false
+reportImportCycles = false
