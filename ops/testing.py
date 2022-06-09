@@ -944,8 +944,9 @@ class Harness(typing.Generic[CharmType]):
 
         Args:
             key_values: A Mapping of key:value pairs to update in config.
-            unset: An iterable of keys to remove from Config. (Note that this does
-                not currently reset the config values to the default defined in config.yaml.)
+            unset: An iterable of keys to remove from Config.
+                This sets the value to the default if defined,
+                otherwise removes the key altogether.
         """
         self._update_config(key_values, unset)
         if self._charm is None or not self._hooks_enabled:
