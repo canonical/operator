@@ -887,6 +887,15 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
         return iter(self._data)
 
     def __getitem__(self, key: 'UnitOrApplication'):
+        if key is None and self.relation.app is None:
+            # NOTE: if juju gets fixed to set JUJU_REMOTE_APP for relation-broken events, then that
+            # should fix the only case in which we expect key to be None - potentially removing the
+            # need for this error in future ops versions (i.e. if relation.app is guaranteed to not
+            # be None. See https://bugs.launchpad.net/juju/+bug/1960934.
+            raise KeyError(
+                'Cannot index relation data with "None".'
+                ' Are you trying to access remote app data during a relation-broken event?'
+                ' This is not allowed.')
         return self._data[key]
 
     def __repr__(self):
@@ -2081,7 +2090,7 @@ class _ModelBackend:
             event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
             if relation_id == event_relation_id:
                 # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
-                return os.environ['JUJU_REMOTE_APP']
+                return os.getenv('JUJU_REMOTE_APP') or None
 
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.

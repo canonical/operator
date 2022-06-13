@@ -715,12 +715,9 @@ class TestModel(unittest.TestCase):
         self.assertEqual(len(model.storages), 2)
         self.assertEqual(model.storages.keys(), meta.storages.keys())
         self.assertIn('disks', model.storages)
-        try:
+
+        with pytest.raises(KeyError, match='Did you mean'):
             model.storages['does-not-exist']
-        except KeyError as err:
-            assert 'Did you mean' in str(err), 'got wrong error message'
-        except Exception as err:
-            assert False, 'got wrong exception type: ' + str(err)
 
         test_cases = {
             0: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/0')},
@@ -968,7 +965,6 @@ def test_recursive_push_and_pull(case):
 
     errors = []
     try:
-        print(push_path, case.dst)
         c.push_path(push_path, case.dst)
     except ops.model.MultiPushPullError as err:
         if not case.errors:
@@ -978,9 +974,6 @@ def test_recursive_push_and_pull(case):
     assert case.errors == errors, \
         'push_path gave wrong expected errors: want {}, got {}'.format(case.errors, errors)
     for fpath in case.want:
-
-        for f in ops.model.Container._list_recursive(c.list_files, pathlib.Path('/')):
-            print(f)
         assert c.exists(fpath), 'push_path failed: file {} missing at destination'.format(fpath)
 
     # create pull test case filesystem structure
