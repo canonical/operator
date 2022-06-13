@@ -1259,7 +1259,7 @@ class TestClient(unittest.TestCase):
 
     def test_client_init(self):
         pebble.Client(socket_path='foo')  # test that constructor runs
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             pebble.Client()  # socket_path arg required
 
     def test_get_system_info(self):

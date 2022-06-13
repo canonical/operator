@@ -55,6 +55,7 @@ from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
+    from pebble import _LayerDict  # pyright: reportMissingTypeStubs=false
     from typing_extensions import TypedDict
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
@@ -73,8 +74,6 @@ if typing.TYPE_CHECKING:
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
-    # todo: replace with pebble._LayerDict (a TypedDict) when pebble.py is typed
-    _LayerDict = Dict[str, '_LayerDict']
     _Layer = Union[str, _LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
@@ -1314,8 +1313,7 @@ class Container:
         if not service_names:
             raise TypeError('start expected at least 1 argument, got 0')
 
-        # fixme: remove on pebble.exec signature fix
-        self._pebble.start_services(service_names)   # type: ignore
+        self._pebble.start_services(service_names)
 
     def restart(self, *service_names: str):
         """Restart the given service(s) by name."""
@@ -1323,8 +1321,7 @@ class Container:
             raise TypeError('restart expected at least 1 argument, got 0')
 
         try:
-            # fixme: remove on pebble.exec signature fix
-            self._pebble.restart_services(service_names)  # type: ignore
+            self._pebble.restart_services(service_names)
         except pebble.APIError as e:
             if e.code != 400:
                 raise e
@@ -1332,18 +1329,15 @@ class Container:
             stop = tuple(s.name for s in self.get_services(*service_names).values(
             ) if s.is_running())  # type: Tuple[str, ...]
             if stop:
-                # fixme: remove on pebble.exec signature fix
-                self._pebble.stop_services(stop)   # type: ignore
-            # fixme: remove on pebble.exec signature fix
-            self._pebble.start_services(service_names)  # type: ignore
+                self._pebble.stop_services(stop)
+            self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
         if not service_names:
             raise TypeError('stop expected at least 1 argument, got 0')
 
-        # fixme: remove on pebble.exec signature fix
-        self._pebble.stop_services(service_names)  # type: ignore
+        self._pebble.stop_services(service_names)
 
     def add_layer(self, label: str, layer: '_Layer', *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -1359,8 +1353,7 @@ class Container:
                 are combined into a single one considering the layer override
                 rules; if the layer doesn't exist, it is added as usual.
         """
-        # fixme: remove ignore once pebble.py is typed
-        self._pebble.add_layer(label, layer, combine=combine)  # type: ignore
+        self._pebble.add_layer(label, layer, combine=combine)
 
     def get_plan(self) -> 'pebble.Plan':
         """Get the current effective pebble configuration."""
@@ -1373,8 +1366,7 @@ class Container:
         services, otherwise return information for only the given services.
         """
         names = service_names or None
-        # fixme: remove on pebble.exec signature fix
-        services = self._pebble.get_services(names)   # type: ignore
+        services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
     def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
@@ -1401,8 +1393,7 @@ class Container:
             level: Optional check level to query for. If not specified, fetch
                 checks with any level.
         """
-        # fixme: remove on pebble.exec signature fix
-        checks = self._pebble.get_checks(names=check_names or None, level=level)  # type: ignore
+        checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
     def get_check(self, check_name: str) -> 'pebble.CheckInfo':
@@ -1438,7 +1429,7 @@ class Container:
              source: Union[bytes, str, BinaryIO, TextIO],
              *,
              encoding: str = 'utf-8',
-             make_dirs: Optional[bool] = False,
+             make_dirs: bool = False,
              permissions: Optional[int] = None,
              user_id: Optional[int] = None,
              user: Optional[str] = None,
@@ -1464,11 +1455,10 @@ class Container:
                 both are specified.
         """
         self._pebble.push(str(path), source, encoding=encoding,
-                          # fixme: remove these ignores on pebble.exec signature fix
-                          make_dirs=make_dirs,  # type: ignore
-                          permissions=permissions,   # type: ignore
-                          user_id=user_id, user=user,  # type: ignore
-                          group_id=group_id, group=group)   # type: ignore
+                          make_dirs=make_dirs,
+                          permissions=permissions,
+                          user_id=user_id, user=user,
+                          group_id=group_id, group=group)
 
     def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['pebble.FileInfo']:
@@ -1486,8 +1476,7 @@ class Container:
                 directory itself, rather than its contents.
         """
         return self._pebble.list_files(str(path),
-                                       # fixme: remove on pebble.exec signature fix
-                                       pattern=pattern, itself=itself)  # type: ignore
+                                       pattern=pattern, itself=itself)
 
     def push_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
@@ -1659,12 +1648,13 @@ class Container:
         import grp
         import pwd
         info = path.lstat()
+        permissions = stat.S_IMODE(info.st_mode)  # type: ignore  # stat isn't typed
         return pebble.FileInfo(
             path=str(path),
             name=path.name,
             type=ftype,
             size=info.st_size,
-            permissions=stat.S_IMODE(info.st_mode),  # type: ignore
+            permissions=typing.cast(int, permissions),
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pwd.getpwuid(info.st_uid).pw_name,
@@ -1757,11 +1747,10 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        # fixme: remove ignores on pebble.exec signature fix
         self._pebble.make_dir(path, make_parents=make_parents,
-                              permissions=permissions,  # type: ignore
-                              user_id=user_id, user=user,  # type: ignore
-                              group_id=group_id, group=group)  # type: ignore
+                              permissions=permissions,
+                              user_id=user_id, user=user,
+                              group_id=group_id, group=group)
 
     def remove_path(self, path: str, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
@@ -1796,19 +1785,18 @@ class Container:
         """
         return self._pebble.exec(
             command,
-            # fixme: remove ignores on pebble.py typing fix
-            environment=environment,  # type: ignore
-            working_dir=working_dir,  # type: ignore
-            timeout=timeout,  # type: ignore
-            user_id=user_id,  # type: ignore
-            user=user,  # type: ignore
-            group_id=group_id,  # type: ignore
-            group=group,  # type: ignore
-            stdin=stdin,  # type: ignore
-            stdout=stdout,  # type: ignore
-            stderr=stderr,  # type: ignore
-            encoding=encoding,  # type: ignore
-            combine_stderr=combine_stderr,  # type: ignore
+            environment=environment,
+            working_dir=working_dir,
+            timeout=timeout,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            encoding=encoding,
+            combine_stderr=combine_stderr,
         )
 
     def send_signal(self, sig: Union[int, str], *service_names: str):
@@ -1826,8 +1814,7 @@ class Container:
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')
 
-        # fixme: remove ignore once pebble.send_signature signature is fixed
-        self._pebble.send_signal(sig, service_names)  # type: ignore
+        self._pebble.send_signal(sig, service_names)
 
 
 class ContainerMapping(Mapping[str, Container]):
