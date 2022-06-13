@@ -957,14 +957,10 @@ class Check:
         dct = raw or {}  # type: _CheckDict
         self.override = dct.get('override', '')  # type: str
         try:
-            level = CheckLevel(dct.get('level', ''))
+            level = CheckLevel(dct.get('level', ''))  # type: Union[CheckLevel, str]
         except ValueError:
-            level = dct.get('level')
-            # in to_dict we assume self.level is a CheckLevel instance,
-            # so we better make sure it is:
-            assert isinstance(level, CheckLevel), 'unable to ' \
-                                                  'determine level from %s' % level
-        self.level = level  # type: CheckLevel
+            level = dct.get('level', '')
+        self.level = level
         self.period = dct.get('period', '')  # type: Optional[str]
         self.timeout = dct.get('timeout', '')  # type: Optional[str]
         self.threshold = dct.get('threshold')  # type: Optional[int]
@@ -986,9 +982,10 @@ class Check:
 
     def to_dict(self) -> '_CheckDict':
         """Convert this check object to its dict representation."""
+        level = self.level.value if isinstance(self.level, CheckLevel) else self.level  # type: str
         fields = [
             ('override', self.override),
-            ('level', self.level.value),
+            ('level', level),
             ('period', self.period),
             ('timeout', self.timeout),
             ('threshold', self.threshold),
@@ -1475,8 +1472,8 @@ class Client:
         unless a custom opener is provided).
         """
         if not isinstance(socket_path, str):
-            raise TypeError('socket_path should be a string; '
-                            'gotten: {}'.format(type(socket_path)))
+            raise TypeError('`socket_path` should be a string, '
+                            'not: {}'.format(type(socket_path)))
         if opener is None:
             opener = self._get_default_opener(socket_path)
         self.socket_path = socket_path
