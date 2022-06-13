@@ -294,32 +294,21 @@ class EventSource(Generic[_EventType]):
     attribute which is a BoundEvent and may be used to emit and observe the event.
     """
 
-    if TYPE_CHECKING:
-        # to help the type checker and IDEs:
-        # these attributes are only present on the bound descriptor object
-        @property
-        def event_kind(self) -> str: ...  # noqa
-        @event_kind.setter
-        def event_kind(self, val: str) -> None: ...  # noqa
-        @property
-        def emitter_type(self) -> 'Type[Object]': ...  # noqa
-        @emitter_type.setter
-        def emitter_type(self, val: 'Type[Object]') -> None: ...  # noqa
-
     def __init__(self, event_type: 'Type[_EventType]'):
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
             raise RuntimeError(
                 'Event requires a subclass of EventBase as an argument, got {}'.format(event_type))
-        self.event_type = event_type
-        self.event_kind = None
-        self.emitter_type = None
+        self.event_type = event_type  # type: Type[_EventType]
+        self.event_kind = None  # type: Optional[str]  # noqa
+        self.emitter_type = None  # type: Optional[Type[Object]]  # noqa
 
     def _set_name(self, emitter_type: 'Type[Object]', event_kind: str):
         if self.event_kind is not None:
             raise RuntimeError(
                 'EventSource({}) reused as {}.{} and {}.{}'.format(
                     self.event_type.__name__,
-                    self.emitter_type.__name__,
+                    # emitter_type could still be None
+                    getattr(self.emitter_type, '__name__', self.emitter_type),
                     self.event_kind,
                     emitter_type.__name__,
                     event_kind,
@@ -442,19 +431,12 @@ class Object(metaclass=_Metaclass):
         # to help the type checker and IDEs:
         # all these are guaranteed to be set at runtime.
         @property
-        def framework(self) -> 'Framework': ...  # noqa
-        @framework.setter
-        def framework(self, val: 'Framework'): ...  # noqa
-        @property
-        def handle(self) -> 'Handle': ...  # noqa
-        @handle.setter
-        def handle(self, val: 'Handle'): ...  # noqa
-        @property
         def on(self) -> 'ObjectEvents': ...  # noqa
-        @on.setter
-        def on(self, val: 'ObjectEvents'): ...  # noqa
 
-    def __init__(self, parent: Union['Framework', 'Object'], key: str):
+    def __init__(self, parent: Union['Framework', 'Object'], key: Optional[str]):
+        self.framework = None  # type: Framework # noqa
+        self.handle = None  # type: Handle # noqa
+
         kind = self.handle_kind
         if isinstance(parent, Framework):
             self.framework = parent
@@ -540,7 +522,7 @@ class ObjectEvents(Object):
                 event_kinds.append(attr_name)
         return event_kinds
 
-    def events(self) -> Dict[str, EventSource[Any]]:
+    def events(self) -> Dict[str, EventSource[EventBase]]:
         """Return a mapping of event_kinds to bound_events for all available events."""
         return {event_kind: getattr(self, event_kind) for event_kind in self._event_kinds()}
 
@@ -610,10 +592,10 @@ class Framework(Object):
     meta = None  # type: 'CharmMeta' # pyright: reportGeneralTypeIssues=false
     charm_dir = None  # type: 'Path' # pyright: reportGeneralTypeIssues=false
 
+    # to help the type checker and IDEs:
+
     if TYPE_CHECKING:
-        # to help the type checker and IDEs:
-        @property
-        def _stored(self) -> 'StoredStateData': ...  # noqa
+        _stored = None  # type: 'StoredStateData'
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
@@ -627,9 +609,9 @@ class Framework(Object):
         # [(observer_path, method_name, parent_path, event_key)]
         self._observers = []  # type: _ObserverPath
         # {observer_path: observing Object}
-        self._observer = weakref.WeakValueDictionary()  # type: _PathToObjectMapping
+        self._observer = weakref.WeakValueDictionary()  # type: _PathToObjectMapping  # noqa
         # {object_path: object}
-        self._objects = weakref.WeakValueDictionary()  # type: _PathToSerializableMapping
+        self._objects = weakref.WeakValueDictionary()  # type: _PathToSerializableMapping  # noqa
         # {(parent_path, kind): cls}
         # (parent_path, kind) is the address of _this_ object: the parent path
         # plus a 'kind' string that is the name of this object.
@@ -646,9 +628,9 @@ class Framework(Object):
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
         stored_handle = Handle(None, StoredStateData.handle_kind, '_stored')
         try:
-            self._stored = typing.cast(StoredStateData, self.load_snapshot(stored_handle))
+            self._stored = typing.cast(StoredStateData, self.load_snapshot(stored_handle))  # noqa
         except NoSnapshotError:
-            self._stored = StoredStateData(self, '_stored')
+            self._stored = StoredStateData(self, '_stored')  # noqa
             self._stored['event_count'] = 0
 
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
@@ -712,12 +694,12 @@ class Framework(Object):
     def register_type(self, cls: 'Type[_Serializable]', parent: Optional['_ParentHandle'],
                       kind: str = None):
         """Register a type to a handle."""
-        if parent is not None and not isinstance(parent, Handle):
-            assert isinstance(parent, Object), parent  # type guard
-            parent = parent.handle
+        parent_path = None  # type: Optional[str]
+        if isinstance(parent, Object):
+            parent_path = parent.handle.path
+        elif isinstance(parent, Handle):
+            parent_path = parent.path
 
-        assert isinstance(parent, (type(None), Handle)), parent  # type guard
-        parent_path = parent.path if parent else None  # type: Optional[str]
         kind = kind or cls.handle_kind  # type: str
         self._type_registry[(parent_path, kind)] = cls
         self._type_known.add(cls)
