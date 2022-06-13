@@ -1521,7 +1521,7 @@ class Client:
 
     @staticmethod
     def _ensure_content_type(headers: 'Message',
-                             expected: Literal['multipart/form-data', 'application/json']):
+                             expected: 'Literal["multipart/form-data", "application/json"]'):
         """Parse Content-Type header from headers and ensure it's equal to expected.
 
         Return a dict of any options in the header, e.g., {'boundary': ...}.
