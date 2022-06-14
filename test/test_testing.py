@@ -1317,15 +1317,39 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         stor_ids = harness.add_storage("test", count=3)
-        self.assertSetEqual(set(self._extract_storage_index(stor_id) for stor_id in stor_ids),
-                            set(harness._backend.storage_list("test")))
-        want = str(pathlib.PurePath('test', '0'))
-        self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
+        for s in stor_ids:
+            # before begin, adding storage does not attach it.
+            self.assertNotIn(s, harness._backend.storage_list("test"))
+
+        with self.assertRaises(ops.model.ModelError):
+            harness._backend.storage_get("test/0", "location")[-6:]
+
+    def test_add_storage_then_harness_begin(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                    multiple:
+                        range: 1-3
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        harness.add_storage("test", count=3)
+
+        with self.assertRaises(ops.model.ModelError):
+            harness._backend.storage_get("test/0", "location")[-6:]
 
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 3)
         for i in range(3):
             self.assertTrue(isinstance(harness.charm.observed_events[i], StorageAttachedEvent))
+
+        want = str(pathlib.PurePath('test', '0'))
+        self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
 
     def test_add_storage_without_metadata_key_fails(self):
         harness = Harness(CharmBase, meta='''
@@ -1357,18 +1381,13 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         # Set up initial storage
-        stor_id = harness.add_storage("test")[0]
-        self.assertIn(self._extract_storage_index(stor_id),
-                      harness._backend.storage_list("test"))
-        want = str(pathlib.PurePath('test', '0'))
-        self.assertEqual(want, harness._backend.storage_get(stor_id, "location")[-6:])
-
+        harness.add_storage("test")[0]
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 1)
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
 
         # Add additional storage
-        stor_ids = harness.add_storage("test", count=3)
+        stor_ids = harness.add_storage("test", count=3, attach=True)
         # NOTE: stor_id now reflects the 4th ID.  The 2nd and 3rd IDs are created and
         # used, but not returned by Harness.add_storage.
         # (Should we consider changing its return type?)
@@ -1379,7 +1398,7 @@ class TestHarness(unittest.TestCase):
         for i in ['1', '2', '3']:
             storage_name = 'test/' + i
             want = str(pathlib.PurePath('test', i))
-            self.assertEqual(want, harness._backend.storage_get(storage_name, "location")[-6:])
+            self.assertTrue(harness._backend.storage_get(storage_name, "location").endswith(want))
         self.assertEqual(len(harness.charm.observed_events), 4)
         for i in range(1, 4):
             self.assertTrue(isinstance(harness.charm.observed_events[i], StorageAttachedEvent))
@@ -1459,7 +1478,7 @@ class TestHarness(unittest.TestCase):
         # Set up initial storage
         harness.begin()
         helper = StorageWithHyphensHelper(harness.charm, "helper")
-        harness.add_storage("test-with-hyphens")[0]
+        harness.add_storage("test-with-hyphens", attach=True)[0]
 
         self.assertEqual(len(helper.changes), 1)
 
