@@ -464,9 +464,6 @@ class Harness(typing.Generic[CharmType]):
         if storage_name not in self._meta.storages:
             raise RuntimeError(
                 "the key '{}' is not specified as a storage key in metadata".format(storage_name))
-        if not self.charm and attach:
-            msg = 'cannot run add_storage with attach=True before calling Harness.begin()'
-            raise RuntimeError(msg)
 
         storage_indices = self._backend.storage_add(storage_name, count)
 
