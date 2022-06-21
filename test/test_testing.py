@@ -23,6 +23,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import uuid
 from io import BytesIO, StringIO
 
 import yaml
@@ -2650,6 +2651,14 @@ class TestTestingModelBackend(unittest.TestCase):
         mb_methods = get_public_methods(_ModelBackend)
         backend_methods = get_public_methods(backend)
         self.assertEqual(mb_methods, backend_methods)
+
+    def test_model_uuid_is_uuid_v4(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+        ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        self.assertEqual(uuid.UUID(backend.model_uuid).version, 4)
 
     def test_status_set_get_unit(self):
         harness = Harness(CharmBase, meta='''

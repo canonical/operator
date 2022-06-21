@@ -41,6 +41,7 @@ import random
 import signal
 import tempfile
 import typing
+import uuid
 import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
@@ -1080,7 +1081,7 @@ class _TestingModelBackend:
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
-        self.model_uuid = 'f2c1b2a6-e006-11eb-ba80-0242ac130004'
+        self.model_uuid = str(uuid.uuid4())
 
         self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
         self._calls = []
