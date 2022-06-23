@@ -98,13 +98,6 @@ if TYPE_CHECKING:
     _TextOrBinaryIO = Union[TextIO, BinaryIO]
     _IOSource = Union[str, bytes, _AnyStrFileLikeIO]
 
-    _WarningDict = TypedDict('_WarningDict',
-                             {'message': str,
-                              'first-added': str,
-                              'last-added': str,
-                              'last-shown': Optional[str],
-                              'expire-after': str,
-                              'repeat-after': str})
     _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
     _InfoDict = TypedDict('_InfoDict',
                           {"name": str,
@@ -504,6 +497,14 @@ class SystemInfo:
 
 class Warning:
     """Warning object."""
+    if typing.TYPE_CHECKING:
+        _WarningDict = TypedDict('_WarningDict',
+                                 {'message': str,
+                                  'first-added': str,
+                                  'last-added': str,
+                                  'last-shown': Optional[str],
+                                  'expire-after': str,
+                                  'repeat-after': str})
 
     def __init__(
         self,
@@ -1554,7 +1555,7 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                body = typing.cast(Dict[str, Any], (_json_loads(e.read())))
+                body = _json_loads(e.read())  # type: Dict[str, Any]
                 message = body['result']['message']  # type: str
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
@@ -1752,14 +1753,13 @@ class Client:
 
     def _wait_change_using_wait(self, change_id: ChangeID, timeout: Optional[float]):
         """Wait for a change to be ready using the wait-change API."""
-        deadline = time.time() + timeout if timeout is not None else None
+        deadline = time.time() + timeout if timeout is not None else 0
 
         # Hit the wait endpoint every Client.timeout-1 seconds to avoid long
         # requests (the -1 is to ensure it wakes up before the socket timeout)
         while True:
             this_timeout = max(self.timeout - 1, 1)  # minimum of 1 second
             if timeout is not None:
-                assert isinstance(deadline, (float, int)), deadline  # typeguard to help pyright
                 time_remaining = deadline - time.time()
                 if time_remaining <= 0:
                     break
@@ -1796,9 +1796,9 @@ class Client:
     def _wait_change_using_polling(self, change_id: ChangeID, timeout: Optional[float],
                                    delay: float):
         """Wait for a change to be ready by polling the get-change API."""
-        deadline = time.time() + timeout if timeout is not None else None
+        deadline = time.time() + timeout if timeout is not None else 0
 
-        while timeout is None or time.time() < deadline:  # type: ignore
+        while timeout is None or time.time() < deadline:
             change = self.get_change(change_id)
             if change.ready:
                 return change
@@ -1916,8 +1916,8 @@ class Client:
         # removing opened files, and so we use the tempfile lib's
         # helper class to auto-delete on close/gc for us.
         if os.name != 'posix' or sys.platform == 'cygwin':
-            return tempfile._TemporaryFileWrapper(  # type: ignore # noqa
-                f, f.name, delete=True)  # type: ignore # noqa
+            return tempfile._TemporaryFileWrapper(  # type: ignore
+                f, f.name, delete=True)  # type: ignore
         parser.remove_files()
         return f
 
@@ -2002,14 +2002,12 @@ class Client:
                           source: '_IOSource', encoding: str):
         # Python's stdlib mime/multipart handling is screwy and doesn't handle
         # binary properly, so roll our own.
-        def _get_source_io() -> '_AnyStrFileLikeIO':
-            if isinstance(source, str):
-                return io.StringIO(source)  # type: ignore  # protocol unhappy
-            elif isinstance(source, bytes):
-                return io.BytesIO(source)  # type: ignore  # protocol unhappy
-            return source
-
-        source_io = _get_source_io()
+        if isinstance(source, str):
+            source_io = io.StringIO(source)  # type: _AnyStrFileLikeIO
+        elif isinstance(source, bytes):
+            source_io = io.BytesIO(source)  # type: _AnyStrFileLikeIO
+        else:
+            source_io = source  # type: _AnyStrFileLikeIO
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
         content_type = 'multipart/form-data; boundary="' + boundary.decode('utf-8') + '"'

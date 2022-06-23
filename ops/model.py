@@ -1661,13 +1661,12 @@ class Container:
         import grp
         import pwd
         info = path.lstat()
-        permissions = stat.S_IMODE(info.st_mode)  # type: ignore  # stat isn't typed
         return pebble.FileInfo(
             path=str(path),
             name=path.name,
             type=ftype,
             size=info.st_size,
-            permissions=typing.cast(int, permissions),
+            permissions=typing.cast(int, stat.S_IMODE(info.st_mode)),  # type: ignore
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pwd.getpwuid(info.st_uid).pw_name,
