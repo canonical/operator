@@ -690,7 +690,6 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([])
 
     def test_storage(self):
-        # TODO: (jam) 2020-05-07 Harness doesn't yet expose storage-get issue #263
         meta = ops.charm.CharmMeta()
         meta.storages = {'disks': None, 'data': None}
         model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
@@ -716,6 +715,10 @@ class TestModel(unittest.TestCase):
         self.assertEqual(len(model.storages), 2)
         self.assertEqual(model.storages.keys(), meta.storages.keys())
         self.assertIn('disks', model.storages)
+
+        with pytest.raises(KeyError, match='Did you mean'):
+            model.storages['does-not-exist']
+
         test_cases = {
             0: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/0')},
             1: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/1')},
@@ -962,7 +965,6 @@ def test_recursive_push_and_pull(case):
 
     errors = []
     try:
-        print(push_path, case.dst)
         c.push_path(push_path, case.dst)
     except ops.model.MultiPushPullError as err:
         if not case.errors:
@@ -972,9 +974,6 @@ def test_recursive_push_and_pull(case):
     assert case.errors == errors, \
         'push_path gave wrong expected errors: want {}, got {}'.format(case.errors, errors)
     for fpath in case.want:
-
-        for f in ops.model.Container._list_recursive(c.list_files, pathlib.Path('/')):
-            print(f)
         assert c.exists(fpath), 'push_path failed: file {} missing at destination'.format(fpath)
 
     # create pull test case filesystem structure
