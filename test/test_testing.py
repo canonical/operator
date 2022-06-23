@@ -23,8 +23,10 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import uuid
 from io import BytesIO, StringIO
 
+import pytest
 import yaml
 
 import ops.testing
@@ -317,6 +319,24 @@ class TestHarness(unittest.TestCase):
         self.assertEqual({'k': 'v3'}, backend.relation_get(rel_id, 'test-app', is_app=True))
         self.assertTrue(len(harness.charm.observed_events), 1)
         self.assertIsInstance(harness.charm.observed_events[0], RelationEvent)
+
+    def test_relation_get_when_broken(self):
+        harness = Harness(RelationBrokenTester, meta='''
+            name: test-app
+            requires:
+                foo:
+                    interface: foofoo
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_relation_events('foo')
+
+        # relation remote app is None to mirror production juju behavior where juju doesn't
+        # communicate the remote app to ops.
+        rel_id = harness.add_relation('foo', None)
+
+        with pytest.raises(KeyError, match='trying to access remote app data'):
+            harness.remove_relation(rel_id)
 
     def test_remove_relation(self):
         harness = Harness(RelationEventCharm, meta='''
@@ -1298,15 +1318,39 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         stor_ids = harness.add_storage("test", count=3)
-        self.assertSetEqual(set(self._extract_storage_index(stor_id) for stor_id in stor_ids),
-                            set(harness._backend.storage_list("test")))
-        want = str(pathlib.PurePath('test', '0'))
-        self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
+        for s in stor_ids:
+            # before begin, adding storage does not attach it.
+            self.assertNotIn(s, harness._backend.storage_list("test"))
+
+        with self.assertRaises(ops.model.ModelError):
+            harness._backend.storage_get("test/0", "location")[-6:]
+
+    def test_add_storage_then_harness_begin(self):
+        harness = Harness(StorageTester, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+                    multiple:
+                        range: 1-3
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        harness.add_storage("test", count=3)
+
+        with self.assertRaises(ops.model.ModelError):
+            harness._backend.storage_get("test/0", "location")[-6:]
 
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 3)
         for i in range(3):
             self.assertTrue(isinstance(harness.charm.observed_events[i], StorageAttachedEvent))
+
+        want = str(pathlib.PurePath('test', '0'))
+        self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
 
     def test_add_storage_without_metadata_key_fails(self):
         harness = Harness(CharmBase, meta='''
@@ -1338,18 +1382,13 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         # Set up initial storage
-        stor_id = harness.add_storage("test")[0]
-        self.assertIn(self._extract_storage_index(stor_id),
-                      harness._backend.storage_list("test"))
-        want = str(pathlib.PurePath('test', '0'))
-        self.assertEqual(want, harness._backend.storage_get(stor_id, "location")[-6:])
-
+        harness.add_storage("test")[0]
         harness.begin_with_initial_hooks()
         self.assertEqual(len(harness.charm.observed_events), 1)
         self.assertTrue(isinstance(harness.charm.observed_events[0], StorageAttachedEvent))
 
         # Add additional storage
-        stor_ids = harness.add_storage("test", count=3)
+        stor_ids = harness.add_storage("test", count=3, attach=True)
         # NOTE: stor_id now reflects the 4th ID.  The 2nd and 3rd IDs are created and
         # used, but not returned by Harness.add_storage.
         # (Should we consider changing its return type?)
@@ -1360,7 +1399,7 @@ class TestHarness(unittest.TestCase):
         for i in ['1', '2', '3']:
             storage_name = 'test/' + i
             want = str(pathlib.PurePath('test', i))
-            self.assertEqual(want, harness._backend.storage_get(storage_name, "location")[-6:])
+            self.assertTrue(harness._backend.storage_get(storage_name, "location").endswith(want))
         self.assertEqual(len(harness.charm.observed_events), 4)
         for i in range(1, 4):
             self.assertTrue(isinstance(harness.charm.observed_events[i], StorageAttachedEvent))
@@ -1440,7 +1479,7 @@ class TestHarness(unittest.TestCase):
         # Set up initial storage
         harness.begin()
         helper = StorageWithHyphensHelper(harness.charm, "helper")
-        harness.add_storage("test-with-hyphens")[0]
+        harness.add_storage("test-with-hyphens", attach=True)[0]
 
         self.assertEqual(len(helper.changes), 1)
 
@@ -2565,6 +2604,7 @@ class RelationEventCharm(RecordingCharm):
         self.record_relation_data_on_events = False
 
     def observe_relation_events(self, relation_name):
+        self.relation_name = relation_name
         self.framework.observe(self.on[relation_name].relation_created, self._on_relation_created)
         self.framework.observe(self.on[relation_name].relation_joined, self._on_relation_joined)
         self.framework.observe(self.on[relation_name].relation_changed, self._on_relation_changed)
@@ -2605,6 +2645,16 @@ class RelationEventCharm(RecordingCharm):
             }})
 
         self.changes.append(recording)
+
+
+class RelationBrokenTester(RelationEventCharm):
+    """Access inaccessible relation data."""
+
+    def __init__(self, framework):
+        super().__init__(framework)
+
+    def _on_relation_broken(self, event):
+        print(event.relation.data[event.relation.app]['bar'])
 
 
 class ContainerEventCharm(RecordingCharm):
@@ -2650,6 +2700,14 @@ class TestTestingModelBackend(unittest.TestCase):
         mb_methods = get_public_methods(_ModelBackend)
         backend_methods = get_public_methods(backend)
         self.assertEqual(mb_methods, backend_methods)
+
+    def test_model_uuid_is_uuid_v4(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+        ''')
+        self.addCleanup(harness.cleanup)
+        backend = harness._backend
+        self.assertEqual(uuid.UUID(backend.model_uuid).version, 4)
 
     def test_status_set_get_unit(self):
         harness = Harness(CharmBase, meta='''
