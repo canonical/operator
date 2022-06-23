@@ -461,16 +461,11 @@ class ObjectEvents(Object):
     """Convenience type to allow defining .on attributes at class level."""
 
     handle_kind = "on"
-    if TYPE_CHECKING:
-        # to help the type checker and IDEs:
-        @property
-        def _cache(self) -> weakref.WeakKeyDictionary[Object, 'ObjectEvents']: ...  # noqa
 
     def __init__(self, parent: Optional[Object] = None, key: Optional[str] = None):
         if parent is not None:
             super().__init__(parent, key)
-        else:
-            self._cache = weakref.WeakKeyDictionary()  # noqa
+        self._cache = weakref.WeakKeyDictionary()  # type: weakref.WeakKeyDictionary[Object, 'ObjectEvents']  # noqa
 
     def __get__(self, emitter: Object, emitter_type: 'Type[Object]'):
         if emitter is None:
