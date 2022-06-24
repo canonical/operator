@@ -565,9 +565,9 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_names[rel_id] = relation_name
         self._backend._relation_list_map[rel_id] = []
         self._backend._relation_data[rel_id] = {
-            remote_app: {},
-            self._backend.unit_name: {},
-            self._backend.app_name: {},
+            remote_app: _TestingRelationDataContents(),
+            self._backend.unit_name: _TestingRelationDataContents(),
+            self._backend.app_name: _TestingRelationDataContents(),
         }
         self._backend._relation_app_and_units[rel_id] = {
             "app": remote_app,
@@ -1073,6 +1073,17 @@ class _ResourceEntry:
 
     def __init__(self, resource_name):
         self.name = resource_name
+
+
+class _TestingRelationDataContents(dict):
+    def __setitem__(self, key, value):
+        if not (isinstance(key, str) and isinstance(value, str)):
+            raise TypeError('relation data is a str:str mapping. '
+                            '(cannot store {}:{})'.format(*(type(x).__name__ for x in (key, value))))
+        super().__setitem__(key, value)
+
+    def copy(self):
+        return _TestingRelationDataContents(super().copy())
 
 
 @_copy_docstrings(model._ModelBackend)
