@@ -30,7 +30,7 @@ import pytest
 import yaml
 
 import ops.testing
-from ops import pebble
+from ops import pebble, model
 from ops.charm import (
     CharmBase,
     PebbleReadyEvent,
@@ -1729,7 +1729,7 @@ class TestHarness(unittest.TestCase):
         harness.set_leader(False)
         rel_id = harness.add_relation('db', 'postgresql')
         for invalid_value in (1, 1.2, {}, [], set(), True, object(), type):
-            with self.assertRaises(TypeError):
+            with self.assertRaises(model.RelationDataError):
                 harness.update_relation_data(rel_id, 'test-charm/0',
                                              {'foo': invalid_value})
 

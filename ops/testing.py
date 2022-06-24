@@ -47,6 +47,7 @@ from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
 
+import ops.model
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 
@@ -1077,9 +1078,10 @@ class _ResourceEntry:
 
 class _TestingRelationDataContents(dict):
     def __setitem__(self, key, value):
-        if not (isinstance(key, str) and isinstance(value, str)):
-            raise TypeError('relation data is a str:str mapping. '
-                            '(cannot store {}:{})'.format(*(type(x).__name__ for x in (key, value))))
+        if not isinstance(key, str):
+            raise model.RelationDataError('relation data keys must be strings')
+        if not isinstance(value, str):
+            raise model.RelationDataError('relation data values must be strings')
         super().__setitem__(key, value)
 
     def copy(self):
