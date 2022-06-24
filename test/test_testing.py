@@ -1711,6 +1711,22 @@ class TestHarness(unittest.TestCase):
         del rel.data[harness.charm.model.unit]['foo']
         self.assertEqual({}, harness.get_relation_data(rel_id, 'test-charm/0'))
 
+    def test_relation_set_nonstring(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.set_leader(False)
+        rel_id = harness.add_relation('db', 'postgresql')
+        for invalid_value in (1, 1.2, {}, [], set(), True, object(), type):
+            with self.assertRaises(TypeError):
+                harness.update_relation_data(rel_id, 'test-charm/0',
+                                             {'foo': invalid_value})
+
     def test_set_workload_version(self):
         harness = Harness(CharmBase, meta='''
             name: app
