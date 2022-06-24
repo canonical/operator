@@ -40,5 +40,5 @@ Full developer documentation is available at https://juju.is/docs/sdk.
 """
 
 # Import here the bare minimum to break the circular import between modules
-from . import charm  # noqa: F401 (imported but unused)
-from .version import version as __version__  # noqa: F401 (imported but unused)
+from . import charm  # type: ignore # noqa
+from .version import version as __version__  # type: ignore # noqa

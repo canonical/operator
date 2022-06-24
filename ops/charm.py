@@ -18,6 +18,7 @@ import enum
 import os
 import pathlib
 import typing
+from typing import TYPE_CHECKING
 
 from ops import model
 from ops._private import yaml
@@ -669,8 +670,12 @@ class CharmBase(Object):
 
     # note that without the #: below, sphinx will copy the whole of CharmEvents
     # docstring inline which is less than ideal.
-    #: Used to set up event handlers; see :class:`CharmEvents`.
+    # Used to set up event handlers; see :class:`CharmEvents`.
     on = CharmEvents()
+    if TYPE_CHECKING:
+        # to help the type checker and IDEs:
+        @property
+        def on(self) -> CharmEvents: ... # noqa
 
     def __init__(self, framework: Framework, key: typing.Optional = None):
         super().__init__(framework, None)
