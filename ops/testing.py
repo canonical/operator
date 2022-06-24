@@ -47,7 +47,6 @@ from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
 
-import ops.model
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 
@@ -650,7 +649,8 @@ class Harness(typing.Generic[CharmType]):
             None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        self._backend._relation_data[relation_id][remote_unit_name] = {}
+        rel_data = self._backend._relation_data
+        rel_data[relation_id][remote_unit_name] = _TestingRelationDataContents()
         # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
         #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
         self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)

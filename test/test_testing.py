@@ -30,7 +30,7 @@ import pytest
 import yaml
 
 import ops.testing
-from ops import pebble, model
+from ops import model, pebble
 from ops.charm import (
     CharmBase,
     PebbleReadyEvent,
