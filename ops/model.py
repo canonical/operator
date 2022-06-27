@@ -942,6 +942,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             raise RelationDataError('cannot set relation data for {}'.format(self._entity.name))
         if not isinstance(value, str):
             raise RelationDataError('relation data values must be strings')
+        if not isinstance(key, str):
+            raise RelationDataError('relation data keys must be strings')
 
         self._backend.relation_set(self.relation.id, key, value, self._is_app)
 

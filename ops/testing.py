@@ -649,8 +649,8 @@ class Harness(typing.Generic[CharmType]):
             None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        rel_data = self._backend._relation_data
-        rel_data[relation_id][remote_unit_name] = _TestingRelationDataContents()
+        self._backend._relation_data[relation_id][
+            remote_unit_name] = _TestingRelationDataContents()
         # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
         #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
         self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
@@ -854,6 +854,7 @@ class Harness(typing.Generic[CharmType]):
             rel_data._invalidate()
 
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
+        assert isinstance(new_values, _TestingRelationDataContents), new_values
         values_have_changed = False
         for k, v in key_values.items():
             if v == '':
