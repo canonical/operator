@@ -116,14 +116,13 @@ class Harness(typing.Generic[CharmType]):
         self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
-        self._backend = _TestingModelBackend(self._unit_name, self._meta)
+        config_ = self._get_config(config)
+        self._backend = _TestingModelBackend(self._unit_name, self._meta, config_)
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
         self._oci_resources = {}
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
-        self._defaults = self._load_config_defaults(config)
-        self._update_config(key_values=self._defaults)
 
         # TODO: If/when we decide to allow breaking changes for a release,
         # change SIMULATE_CAN_CONNECT default value to True and remove the
@@ -325,10 +324,10 @@ class Harness(typing.Generic[CharmType]):
 
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
 
-    def _load_config_defaults(self, charm_config):
-        """Load default values from config.yaml.
+    def _get_config(self, charm_config: typing.Optional[dict]):
+        """If the user passed a config to Harness, use it.
 
-        Handle the case where a user doesn't supply explicit config snippets.
+        Otherwise, attempt to load one from charm_dir/config.yaml.
         """
         filename = inspect.getfile(self._charm_cls)
         charm_dir = pathlib.Path(filename).parents[1]
@@ -344,8 +343,10 @@ class Harness(typing.Generic[CharmType]):
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
         charm_config = yaml.safe_load(charm_config)
-        charm_config = charm_config.get('options', {})
-        return {key: value.get('default', None) for key, value in charm_config.items()}
+
+        if not isinstance(charm_config, dict):
+            raise TypeError(charm_config)
+        return charm_config
 
     def add_oci_resource(self, resource_name: str,
                          contents: typing.Mapping[str, str] = None) -> None:
@@ -924,23 +925,23 @@ class Harness(typing.Generic[CharmType]):
         config = self._backend._config
         if key_values is not None:
             for key, value in key_values.items():
-                if key in self._defaults:
+                if key in config._defaults:
                     if value is not None:
-                        config[key] = value
+                        config._config_set(key, value)
                 else:
                     raise ValueError("unknown config option: '{}'".format(key))
 
         for key in unset:
             # When the key is unset, revert to the default if one exists
-            default = self._defaults.get(key, None)
+            default = config._defaults.get(key, None)
             if default is not None:
-                config[key] = default
+                config._config_set(key, default)
             else:
                 config.pop(key, None)
 
     def update_config(
             self,
-            key_values: typing.Mapping[str, str] = None,
+            key_values: typing.Mapping[str, typing.Union[str, float, int, bool]] = None,
             unset: typing.Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
@@ -1075,6 +1076,75 @@ class _ResourceEntry:
         self.name = resource_name
 
 
+@_record_calls
+class _TestingConfig(dict):
+    """Represents the Juju Config."""
+    _supported_types = {
+        'string': str,
+        'boolean': bool,
+        'int': int,
+        'float': float
+    }
+
+    def __init__(self, config: dict):
+        super().__init__()
+        self._spec = config
+        self._defaults = self._load_defaults(config)
+
+        for key, value in self._defaults.items():
+            if value is None:
+                continue
+            self._config_set(key, value)
+
+    @staticmethod
+    def _load_defaults(charm_config: dict):
+        """Load default values from config.yaml.
+
+        Handle the case where a user doesn't supply explicit config snippets.
+        """
+        if not charm_config:
+            return {}
+        charm_config = charm_config.get('options', {})
+        return {key: value.get('default', None) for key, value in charm_config.items()}
+
+    def _config_set(self, key, value):
+        # this is only called by the harness itself
+        # we don't do real serialization/deserialization, but we do check that the value
+        # has the expected type.
+        if type(value) not in self._supported_types.values():
+            raise RuntimeError('cannot set {} to {}; type {} is not '
+                               'supported by juju'.format(key, value, type(value)))
+
+        option = self._spec.get('options', {}).get(key)
+        if not option:
+            raise RuntimeError('Unknown config option {}; '
+                               'not declared in `config.yaml`.'
+                               'Check https://juju.is/docs/sdk/config for the '
+                               'spec.'.format(key))
+
+        declared_type = option.get('type')
+        if not declared_type:
+            raise RuntimeError('Incorrectly formatted `options.yaml`, option {} '
+                               'is expected to declare a `type`.'.format(key))
+
+        if declared_type not in self._supported_types:
+            raise RuntimeError(
+                'Incorrectly formatted `options.yaml`: `type` needs to be one '
+                'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type))
+
+        if type(value) != self._supported_types[declared_type]:
+            raise RuntimeError('Config option {} is supposed to be of type '
+                               '{}, not `{}`.'.format(key, declared_type,
+                                                      type(value).__name__))
+
+        # call 'normal' setattr.
+        dict.__setitem__(self, key, value)
+
+    def __setitem__(self, key, value):
+        # if a charm attempts to config[foo] = bar:
+        raise TypeError("'ConfigData' object does not support item assignment")
+
+
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
@@ -1085,7 +1155,7 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name, meta):
+    def __init__(self, unit_name, meta, config):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
@@ -1100,7 +1170,7 @@ class _TestingModelBackend:
         self._relation_data = {}  # {relation_id: {name: data}}
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
         self._relation_app_and_units = {}
-        self._config = {}
+        self._config = _TestingConfig(config)
         self._is_leader = False
         self._resources_map = {}  # {resource_name: resource_content}
         self._pod_spec = None
