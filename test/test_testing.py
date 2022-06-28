@@ -33,6 +33,7 @@ from ops import pebble
 from ops.charm import (
     CharmBase,
     PebbleReadyEvent,
+    RelationDepartedEvent,
     RelationEvent,
     StorageAttachedEvent,
     StorageDetachingEvent,
@@ -350,6 +351,7 @@ class TestHarness(unittest.TestCase):
                           'relation': 'db',
                           'data': {'app': 'postgresql',
                                    'unit': 'postgresql/0',
+                                   'departing_unit': 'postgresql/0',
                                    'relation_id': 0}})
         self.assertEqual(changes[1],
                          {'name': 'relation-broken',
@@ -403,6 +405,7 @@ class TestHarness(unittest.TestCase):
                           'relation': 'db',
                           'data': {'app': 'postgresql',
                                    'unit': 'postgresql/1',
+                                   'departing_unit': 'postgresql/1',
                                    'relation_id': rel_id_2}})
         self.assertEqual(changes[1],
                          {'name': 'relation-broken',
@@ -476,6 +479,7 @@ class TestHarness(unittest.TestCase):
                           'relation': 'db',
                           'data': {'app': 'postgresql',
                                    'unit': 'postgresql/0',
+                                   'departing_unit': 'postgresql/0',
                                    'relation_id': 0,
                                    'relation_data': {'test-app/0': {},
                                                      'test-app': {},
@@ -579,6 +583,7 @@ class TestHarness(unittest.TestCase):
                           'relation': 'db',
                           'data': {'app': 'postgresql',
                                    'unit': 'postgresql/0',
+                                   'departing_unit': 'postgresql/0',
                                    'relation_id': rel_id}})
 
     def test_removing_relation_unit_does_not_remove_other_unit_and_data(self):
@@ -624,6 +629,7 @@ class TestHarness(unittest.TestCase):
                           'relation': 'db',
                           'data': {'app': 'postgresql',
                                    'unit': 'postgresql/1',
+                                   'departing_unit': 'postgresql/1',
                                    'relation_id': rel_id}})
 
     def test_relation_events(self):
@@ -2596,8 +2602,11 @@ class RelationEventCharm(RecordingCharm):
         if event.app is not None:
             app_name = event.app.name
 
-        recording = dict(name=event_name, relation=event.relation.name,
-                         data=dict(app=app_name, unit=unit_name, relation_id=event.relation.id))
+        data = dict(app=app_name, unit=unit_name, relation_id=event.relation.id)
+        if isinstance(event, RelationDepartedEvent):
+            data['departing_unit'] = event.departing_unit.name
+
+        recording = dict(name=event_name, relation=event.relation.name, data=data)
 
         if self.record_relation_data_on_events:
             recording["data"].update({'relation_data': {
