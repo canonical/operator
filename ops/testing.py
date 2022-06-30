@@ -726,7 +726,7 @@ class Harness(typing.Generic[CharmType]):
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(relation, app, unit)
+        self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)
 
     def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
