@@ -1111,10 +1111,6 @@ class _TestingConfig(dict):
         # this is only called by the harness itself
         # we don't do real serialization/deserialization, but we do check that the value
         # has the expected type.
-        if type(value) not in self._supported_types.values():
-            raise RuntimeError('cannot set {} to {}; type {} is not '
-                               'supported by juju'.format(key, value, type(value)))
-
         option = self._spec.get('options', {}).get(key)
         if not option:
             raise RuntimeError('Unknown config option {}; '
