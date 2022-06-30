@@ -566,9 +566,9 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_names[rel_id] = relation_name
         self._backend._relation_list_map[rel_id] = []
         self._backend._relation_data[rel_id] = {
-            remote_app: {},
-            self._backend.unit_name: {},
-            self._backend.app_name: {},
+            remote_app: _TestingRelationDataContents(),
+            self._backend.unit_name: _TestingRelationDataContents(),
+            self._backend.app_name: _TestingRelationDataContents(),
         }
         self._backend._relation_app_and_units[rel_id] = {
             "app": remote_app,
@@ -650,7 +650,8 @@ class Harness(typing.Generic[CharmType]):
             None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        self._backend._relation_data[relation_id][remote_unit_name] = {}
+        rel_data = self._backend._relation_data
+        rel_data[relation_id][remote_unit_name] = _TestingRelationDataContents()
         # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
         #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
         self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
@@ -726,7 +727,7 @@ class Harness(typing.Generic[CharmType]):
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(relation, app, unit)
+        self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)
 
     def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
@@ -1139,6 +1140,18 @@ class _TestingConfig(dict):
     def __setitem__(self, key, value):
         # if a charm attempts to config[foo] = bar:
         raise TypeError("'ConfigData' object does not support item assignment")
+
+
+class _TestingRelationDataContents(dict):
+    def __setitem__(self, key, value):
+        if not isinstance(key, str):
+            raise model.RelationDataError('relation data keys must be strings')
+        if not isinstance(value, str):
+            raise model.RelationDataError('relation data values must be strings')
+        super().__setitem__(key, value)
+
+    def copy(self):
+        return _TestingRelationDataContents(super().copy())
 
 
 @_copy_docstrings(model._ModelBackend)
