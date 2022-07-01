@@ -33,7 +33,7 @@ docstring-convention = "google"
 
 [tool.pyright]
 include = ["ops/jujuversion.py", "ops/log.py", "ops/model.py", "ops/version.py",
-    "ops/__init__.py", "ops/framework.py", "opps/pebble.py"]
+    "ops/__init__.py", "ops/framework.py", "opps/pebble.py", "ops/charm.py"]
 pythonVersion = "3.5" # check no python > 3.5 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"
