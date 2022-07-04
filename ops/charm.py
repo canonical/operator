@@ -17,40 +17,49 @@
 import enum
 import os
 import pathlib
-from typing import TYPE_CHECKING, Dict, Mapping, Optional, Union, TextIO, \
-    List, Any, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    TextIO,
+    Union,
+    cast,
+)
 
 from ops import model
 from ops._private import yaml
-from ops.framework import EventBase, EventSource, Framework, Object, \
-    ObjectEvents
+from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 if TYPE_CHECKING:
-    from ops.framework import _SerializedData, JsonObject, Handle
-    from ops.model import Numerical, Storage, Container, Relation, Application, Unit
-    from typing_extensions import TypedDict, Literal
+    from typing_extensions import Literal, Required, TypedDict
+
+    from ops.framework import Handle, JsonObject
+    from ops.model import Container, Numerical, Relation, Storage
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
     _ActionMetaDict = TypedDict(
         '_ActionMetaDict', {
             'title': str,
-            'description': Optional[str],
+            'description': str,
             'params': Dict[str, _ActionParam],
-            'required': Optional[List[str]]},
+            'required': List[str]},
         total=False)
 
     _Scopes = Literal['global', 'container']
     _RelationMetaDict = TypedDict(
         '_RelationMetaDict', {
-            'interface': str,
-            'limit': Optional[int],
-            'scope': Optional[_Scopes]},
+            'interface': Required[str],
+            'limit': int,
+            'scope': _Scopes},
         total=False)
 
     _MultipleRange = TypedDict('_MultipleRange', {'range': str})
     _StorageMetaDict = TypedDict('_StorageMetaDict', {
-        'type': str,
+        'type': Required[str],
         'description': int,
         'shared': bool,
         'read-only': bool,
@@ -62,25 +71,25 @@ if TYPE_CHECKING:
 
     _ResourceMetaDict = TypedDict(
         '_ResourceMetaDict', {
-            'type': str,
-            'filename': Optional[str],
-            'description': Optional[str]},
+            'type': Required[str],
+            'filename': str,
+            'description': str},
         total=False)
 
     _PayloadMetaDict = TypedDict('_PayloadMetaDict', {'type': str})
 
     _MountDict = TypedDict(
-        '_MountDict', {'storage': Optional[str],
-                       'location': Optional[str]},
+        '_MountDict', {'storage': Required[str],
+                       'location': str},
         total=False)
     _ContainerMetaDict = TypedDict(
         '_ContainerMetaDict', {'mounts': List[_MountDict]})
 
     _CharmMetaDict = TypedDict(
         '_CharmMetaDict', {  # all are optional
-            'name': str,
-            'summary': str,
-            'description': str,
+            'name': Required[str],
+            'summary': Required[str],
+            'description': Required[str],
             'maintainer': str,
             'maintainers': List[str],
             'tags': List[str],
@@ -97,6 +106,25 @@ if TYPE_CHECKING:
             'extra-bindings': Dict[str, Any],  # fixme: _BindingDict?
             'containers': Dict[str, '_ContainerMetaDict']
         }, total=False)
+
+    # can't put in *Event because *Event.snapshot needs it.
+    _WorkloadEventSnapshot = TypedDict('_WorkloadEventSnapshot', {
+        'container_name': str
+    }, total=False)
+
+    _RelationDepartedEventSnapshot = TypedDict('_RelationDepartedEventSnapshot', {
+        'relation_name': str,
+        'relation_id': int,
+        'app_name': Optional[str],
+        'unit_name': Optional[str],
+        'departing_unit': Optional[str]
+    }, total=False)
+
+    _StorageEventSnapshot = TypedDict('_StorageEventSnapshot', {
+        'storage_name': str,
+        'storage_index': int,
+        'storage_location': str,
+    }, total=False)
 
 
 class HookEvent(EventBase):
@@ -155,7 +183,7 @@ class ActionEvent(EventBase):
             raise RuntimeError('action event kind does not match current action')
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
-        self.params = self.framework.model._backend.action_get()  # pyright: reportPrivateUsage=false
+        self.params = self.framework.model._backend.action_get()  # type:ignore
 
     def set_results(self, results: Dict[str, 'JsonObject']):
         """Report the result of the action.
@@ -163,7 +191,8 @@ class ActionEvent(EventBase):
         Args:
             results: The result of the action as a Dict
         """
-        self.framework.model._backend.action_set(results)  # pyright: reportPrivateUsage=false
+        # fixme (type): for some reason JsonObject complains here.
+        self.framework.model._backend.action_set(results)  # type: ignore
 
     def log(self, message: str):
         """Send a message that a user will see while the action is running.
@@ -171,7 +200,7 @@ class ActionEvent(EventBase):
         Args:
             message: The message for the user.
         """
-        self.framework.model._backend.action_log(message)  # pyright: reportPrivateUsage=false
+        self.framework.model._backend.action_log(message)  # type:ignore
 
     def fail(self, message: str = ''):
         """Report that this action has failed.
@@ -179,7 +208,7 @@ class ActionEvent(EventBase):
         Args:
             message: Optional message to record why it has failed.
         """
-        self.framework.model._backend.action_fail(message)  # pyright: reportPrivateUsage=false
+        self.framework.model._backend.action_fail(message)  # type:ignore
 
 
 class InstallEvent(HookEvent):
@@ -346,7 +375,7 @@ class CollectMetricsEvent(HookEvent):
             labels: {key:value} strings that can be applied to the
                 metrics that are being gathered
         """
-        self.framework.model._backend.add_metrics(metrics, labels)  # pyright: reportPrivateUsage=false
+        self.framework.model._backend.add_metrics(metrics, labels)  # type:ignore
 
 
 class RelationEvent(HookEvent):
@@ -370,15 +399,15 @@ class RelationEvent(HookEvent):
     """
     if TYPE_CHECKING:
         _RelationEventSnapshot = TypedDict('_RelationEventSnapshot', {
-            'relation_name': str,
-            'relation_id': int,
+            'relation_name': Required[str],
+            'relation_id': Required[int],
             'app_name': Optional[str],
             'unit_name': Optional[str]
         }, total=False)
 
-    def __init__(self, handle: Handle, relation: 'Relation',
-                 app: Optional[Application] = None,
-                 unit: Optional[Unit] = None):
+    def __init__(self, handle: 'Handle', relation: 'Relation',
+                 app: Optional[model.Application] = None,
+                 unit: Optional[model.Unit] = None):
         super().__init__(handle)
 
         if unit is not None and unit.app != app:
@@ -397,7 +426,7 @@ class RelationEvent(HookEvent):
         snapshot = {
             'relation_name': self.relation.name,
             'relation_id': self.relation.id,
-        }
+        }  # type: 'RelationEvent._RelationEventSnapshot'
         if self.app:
             snapshot['app_name'] = self.app.name
         if self.unit:
@@ -409,8 +438,13 @@ class RelationEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        self.relation = self.framework.model.get_relation(
+        relation = self.framework.model.get_relation(
             snapshot['relation_name'], snapshot['relation_id'])
+        if relation is None:
+            raise TypeError(
+                'Unable to restore {}: relation {} (id={}) not found.'.format(
+                    self, snapshot['relation_name'], snapshot['relation_id']))
+        self.relation = relation
 
         app_name = snapshot.get('app_name')
         if app_name:
@@ -490,22 +524,24 @@ class RelationDepartedEvent(RelationEvent):
             can facilitate determining e.g. whether *you* are the departing
             unit.
     """
-    if TYPE_CHECKING:
-        _RelationDepartedEventSnapshot = TypedDict('_RelationDepartedEventSnapshot', {
-            'relation_name': str,
-            'relation_id': int,
-            'app_name': Optional[str],
-            'unit_name': Optional[str],
-            'departing_unit_name': Optional[str]
-        }, total=False)
 
-    def __init__(self, handle: Handle, relation: 'Relation',
-                 app: Optional['Application'] = None,
-                 unit: Optional['Unit'] = None,
+    def __init__(self, handle: 'Handle', relation: 'Relation',
+                 app: Optional[model.Application] = None,
+                 unit: Optional[model.Unit] = None,
                  departing_unit_name: Optional[str] = None):
         super().__init__(handle, relation, app=app, unit=unit)
 
         self._departing_unit_name = departing_unit_name
+
+    def snapshot(self) -> '_RelationDepartedEventSnapshot':
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        snapshot = cast('_RelationDepartedEventSnapshot', super().snapshot())
+        if self._departing_unit_name:
+            snapshot['departing_unit'] = self._departing_unit_name
+        return snapshot
 
     @property
     def departing_unit(self) -> Optional[model.Unit]:
@@ -516,22 +552,12 @@ class RelationDepartedEvent(RelationEvent):
             return None
         return self.framework.model.get_unit(self._departing_unit_name)
 
-    def snapshot(self) -> '_RelationDepartedEventSnapshot':
-        """Used by the framework to serialize the event to disk.
-
-        Not meant to be called by charm code.
-        """
-        snapshot = super().snapshot()
-        if self._departing_unit_name:
-            snapshot['departing_unit'] = self.departing_unit.name
-        return snapshot
-
     def restore(self, snapshot: '_RelationDepartedEventSnapshot'):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
         """
-        super().restore(snapshot)
+        super().restore(snapshot)  # type: ignore
 
         self._departing_unit_name = snapshot.get('departing_unit')
 
@@ -560,31 +586,24 @@ class StorageEvent(HookEvent):
     allocated from Juju. Changes in state of storage trigger sub-types
     of :class:`StorageEvent`.
     """
-    if TYPE_CHECKING:
-        _StorageEventSnapshot = TypedDict('_StorageEventSnapshot', {
-            'storage_name': str,
-            'storage_index': int,
-            'storage_location': str,
-        }, total=False)
 
     def __init__(self, handle: 'Handle', storage: 'Storage'):
         super().__init__(handle)
         self.storage = storage
 
-    def snapshot(self) -> '_SerializedData':
+    def snapshot(self) -> '_StorageEventSnapshot':
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
-        snapshot = {}
-
+        snapshot = {}  # type: '_StorageEventSnapshot'
         if isinstance(self.storage, model.Storage):
             snapshot["storage_name"] = self.storage.name
             snapshot["storage_index"] = self.storage.index
             snapshot["storage_location"] = str(self.storage.location)
         return snapshot
 
-    def restore(self, snapshot: '_SerializedData'):
+    def restore(self, snapshot: '_StorageEventSnapshot'):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -600,6 +619,7 @@ class StorageEvent(HookEvent):
                 msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
                     .format(storage_name, storage_index)
                 raise RuntimeError(msg)
+            assert storage_location  # type guard
             self.storage.location = storage_location
 
 
@@ -646,10 +666,6 @@ class WorkloadEvent(HookEvent):
                   be other types that represent the specific workload type e.g.
                   a Machine.
     """
-    if TYPE_CHECKING:
-        _WorkloadEventSnapshot = TypedDict('_WorkloadEventSnapshot', {
-            'container_name': str
-        }, total=False)
 
     def __init__(self, handle: 'Handle', workload: 'Container'):
         super().__init__(handle)
@@ -661,7 +677,7 @@ class WorkloadEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        snapshot = {}
+        snapshot = {}  # type: "_WorkloadEventSnapshot"
         if isinstance(self.workload, model.Container):
             snapshot['container_name'] = self.workload.name
         return snapshot
@@ -775,13 +791,13 @@ class CharmBase(Object):
     # note that without the #: below, sphinx will copy the whole of CharmEvents
     # docstring inline which is less than ideal.
     # Used to set up event handlers; see :class:`CharmEvents`.
-    on = CharmEvents()
+    on = CharmEvents()  # type: ignore
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
-        def on(self) -> CharmEvents: ... # noqa
+        def on(self) -> CharmEvents: ...  # noqa
 
-    def __init__(self, framework: Framework, key: Optional = None):
+    def __init__(self, framework: Framework, key: Optional[str] = None):
         super().__init__(framework, None)
 
         for relation_name in self.framework.meta.relations:
@@ -892,13 +908,13 @@ class CharmMeta:
                  raw: Optional['_CharmMetaDict'] = None,  # type: ignore
                  actions_raw: '_ActionsRaw' = None  # type: ignore
                  ):
-        raw = raw or {}  # type: _CharmMetaDict
+        raw = raw or cast('_CharmMetaDict', {})  # type: _CharmMetaDict
         actions_raw = actions_raw or {}  # type: Dict[str, _ActionMetaDict]
 
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
-        self.maintainers = []
+        self.maintainers = []  # type: List[str]
         if 'maintainer' in raw:
             self.maintainers.append(raw['maintainer'])
         if 'maintainers' in raw:
@@ -914,7 +930,7 @@ class CharmMeta:
                          for name, rel in raw.get('provides', {}).items()}
         self.peers = {name: RelationMeta(RelationRole.peer, name, rel)
                       for name, rel in raw.get('peers', {}).items()}
-        self.relations = {}
+        self.relations = {}  # type: Dict[str, RelationMeta]
         self.relations.update(self.requires)
         self.relations.update(self.provides)
         self.relations.update(self.peers)
@@ -991,7 +1007,7 @@ class RelationMeta:
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        if not isinstance(role, RelationRole):  # pyright: reportUnnecessaryIsinstance:false
+        if not isinstance(role, RelationRole):  # pyright: reportUnnecessaryIsInstance=false
             raise TypeError("role should be a Role, not {!r}".format(role))
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
@@ -999,7 +1015,7 @@ class RelationMeta:
         self.interface_name = raw['interface']
 
         self.limit = raw.get('limit')
-        if self.limit and not isinstance(self.limit, int):  # pyright: reportUnnecessaryIsinstance:false
+        if self.limit and not isinstance(self.limit, int):  # pyright: reportUnnecessaryIsInstance=false  # noqa
             raise TypeError("limit should be an int, not {}".format(type(self.limit)))
 
         self.scope = raw.get('scope') or self._default_scope
@@ -1048,7 +1064,7 @@ class ResourceMeta:
         description: A text description of resource
     """
 
-    def __init__(self, name: str, raw: _ResourceMetaDict):
+    def __init__(self, name: str, raw: '_ResourceMetaDict'):
         self.resource_name = name
         self.type = raw['type']
         self.filename = raw.get('filename', None)

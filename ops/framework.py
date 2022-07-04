@@ -60,18 +60,17 @@ if TYPE_CHECKING:
         @property
         def handle(self) -> 'Handle': ...  # noqa
         @handle.setter
-        def handle(self, val: 'Handle'): ... # noqa
+        def handle(self, val: 'Handle'): ...  # noqa
         def snapshot(self) -> Dict[str, '_StorableType']: ...  # noqa
         def restore(self, snapshot: Dict[str, '_StorableType']) -> None: ...  # noqa
 
     class _StoredObject(Protocol):
-        _under = None # type: Any  # noqa
+        _under = None  # type: Any  # noqa
 
     # all types that can be (de) serialized to json(/yaml) fom Python builtins
-    JsonObject = Union[int, float, bool, str,
+    JsonObject = Union[int, float, bool, str, None,
                        Dict[str, 'JsonObject'],
-                       List['JsonObject'],
-                       Tuple['JsonObject', ...]]
+                       List['JsonObject']]
 
     # serialized data structure
     _SerializedData = Dict[str, 'JsonObject']
