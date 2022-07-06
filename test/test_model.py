@@ -403,12 +403,19 @@ class TestModel(unittest.TestCase):
         self.resetBackendCalls()
 
         rel_db1 = self.model.get_relation('db1')
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = 1
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = {'foo': 'bar'}
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = None
+        for key, value in (
+                ('foo', 1),
+                ('foo', None),
+                ('foo', {'foo': 'bar'}),
+                (1, 'foo'),
+                (None, 'foo'),
+                (('foo', 'bar'), 'foo'),
+                (1, 1),
+                (None, None)
+        ):
+            with self.assertRaises(ops.model.RelationDataError):
+                rel_db1.data[self.model.unit][key] = value
+
         # No data has actually been changed
         self.assertEqual(dict(rel_db1.data[self.model.unit]), {'host': 'myapp-0'})
 
