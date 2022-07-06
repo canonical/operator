@@ -1080,9 +1080,11 @@ class _ResourceEntry:
 class _TestingRelationDataContents(dict):
     def __setitem__(self, key, value):
         if not isinstance(key, str):
-            raise model.RelationDataError('relation data keys must be strings')
+            raise model.RelationDataError(
+                'relation data keys must be strings, not {}'.format(type(key)))
         if not isinstance(value, str):
-            raise model.RelationDataError('relation data values must be strings')
+            raise model.RelationDataError(
+                'relation data values must be strings, not {}'.format(type(value)))
         super().__setitem__(key, value)
 
     def copy(self):
@@ -1218,11 +1220,15 @@ class _TestingModelBackend:
             raise model.RelationNotFoundError()
         return self._relation_data[relation_id][member_name].copy()
 
-    def relation_set(self, relation_id, key, value, is_app):
+    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+        if not isinstance(is_app, bool):
+            raise TypeError('is_app parameter to relation_set must be a boolean')
+
         if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
                 relation_id):
             raise RuntimeError(
                 'remote-side relation data cannot be accessed during a relation-broken event')
+
         relation = self._relation_data[relation_id]
         if is_app:
             bucket_key = self.app_name
