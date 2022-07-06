@@ -921,7 +921,19 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # Dead relations tell no tales (and have no data).
             return {}
 
-    def _is_mutable(self):
+    def _is_readable(self):
+        """Return if the data content can be read."""
+        # Leader units cannot read their own application databag.
+        # Only the follower local units (and all remote ones) can.
+        if (
+                self._is_app  # this is an app databag...
+                and self._backend.app_name == self._entity.name  # ...the databag of OUR app
+                and self._backend.is_leader()  # and I am leader
+        ):
+            return False
+        return True
+
+    def _is_writable(self):
         """Return if the data content can be modified."""
         if self._is_app:
             is_our_app = self._backend.app_name == self._entity.name  # type: bool
@@ -938,10 +950,12 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return False
 
     def __setitem__(self, key: str, value: str):
-        if not self._is_mutable():
+        if not self._is_writable():
             raise RelationDataError('cannot set relation data for {}'.format(self._entity.name))
         if not isinstance(value, str):
             raise RelationDataError('relation data values must be strings')
+        if not isinstance(key, str):
+            raise RelationDataError('relation data keys must be strings')
 
         self._backend.relation_set(self.relation.id, key, value, self._is_app)
 
@@ -954,10 +968,21 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             else:
                 self._data[key] = value
 
+    def __getitem__(self, key: str) -> str:
+        if not self._is_readable():
+            raise RelationDataError(
+                'Cannot read relation data for for {}'.format(self._entity.name))
+        return super().__getitem__(key)
+
     def __delitem__(self, key: str):
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
+
+    def __repr__(self):
+        if not self._is_readable():
+            return '<n/a>'
+        return super().__repr__()
 
 
 class ConfigData(LazyMapping):

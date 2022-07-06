@@ -418,6 +418,83 @@ class TestModel(unittest.TestCase):
             ('relation_get', relation_id, 'myapp/0', False),
         ])
 
+    def test_relation_local_app_data_readability_leader(self):
+        relation_id = self.harness.add_relation('db1', 'remoteapp1')
+        self.harness.update_relation_data(relation_id, 'remoteapp1',
+                                          {'secret': 'cafedeadbeef'})
+        self.harness.update_relation_data(relation_id, 'myapp',
+                                          {'local': 'data'})
+
+        self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
+        self.harness.update_relation_data(relation_id, 'remoteapp1/0',
+                                          {'host': 'remoteapp1/0'})
+        self.model.relations._invalidate('db1')
+        self.resetBackendCalls()
+
+        rel_db1 = self.model.get_relation('db1')
+        self.harness.begin()
+        self.harness.set_leader(True)
+        self.resetBackendCalls()
+
+        local_app = self.harness.charm.app
+        # addressing the object is OK
+        local_app_data = rel_db1.data[local_app]
+
+        # attempting to read it is not
+        with self.assertRaises(ops.model.RelationDataError):
+            # 'local' is there, but still:
+            data = rel_db1.data[local_app]['local']
+
+        # we can't see it but repr() works
+        self.assertEqual(repr(rel_db1.data[local_app]), '<n/a>')
+        # as well as relation data repr() in general:
+        self.assertIsInstance(repr(rel_db1.data), str)
+
+        self.assertBackendCalls([('is_leader',),
+             ('is_leader',),
+             ('relation_get', 1, 'myapp/0', False),
+             ('is_leader',),
+             ('relation_get', 1, 'remoteapp1/0', False),
+             ('relation_get', 1, 'remoteapp1', True)])
+
+    def test_relation_local_app_data_readability_follower(self):
+        relation_id = self.harness.add_relation('db1', 'remoteapp1')
+        self.harness.update_relation_data(relation_id, 'remoteapp1',
+                                          {'secret': 'cafedeadbeef'})
+        self.harness.update_relation_data(relation_id, 'myapp',
+                                          {'local': 'data'})
+
+        self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
+        self.harness.update_relation_data(relation_id, 'remoteapp1/0',
+                                          {'host': 'remoteapp1/0'})
+        self.model.relations._invalidate('db1')
+        self.resetBackendCalls()
+
+        rel_db1 = self.model.get_relation('db1')
+        self.harness.begin()
+        self.harness.set_leader(False)
+        self.resetBackendCalls()
+
+        local_app = self.harness.charm.app
+        # addressing the object is OK
+        local_app_data = rel_db1.data[local_app]
+        # nonleader units CAN read their local app databag
+        self.assertEqual(rel_db1.data[local_app]['local'], 'data')
+
+        # we can't see it but repr() works
+        self.assertEqual(repr(rel_db1.data[local_app]), repr({'local': 'data'}))
+        # as well as relation data repr() in general:
+        self.assertIsInstance(repr(rel_db1.data), str)
+
+        self.assertBackendCalls([
+            ('is_leader',),
+            ('relation_get', 1, 'myapp', True),
+            ('is_leader',),
+            ('relation_get', 1, 'myapp/0', False),
+            ('is_leader',),
+            ('relation_get', 1, 'remoteapp1/0', False),
+            ('relation_get', 1, 'remoteapp1', True)])
+
     def test_relation_no_units(self):
         self.harness.add_relation('db1', 'remoteapp1')
         rel = self.model.get_relation('db1')

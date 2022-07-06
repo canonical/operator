@@ -565,9 +565,13 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_names[rel_id] = relation_name
         self._backend._relation_list_map[rel_id] = []
         self._backend._relation_data[rel_id] = {
-            remote_app: _TestingRelationDataContents(),
+            remote_app: _TestingRelationDataContents(_write=False),
             self._backend.unit_name: _TestingRelationDataContents(),
-            self._backend.app_name: _TestingRelationDataContents(),
+            # leaders can write their app databag but not read it
+            # followers can read it but not write it
+            self._backend.app_name: _TestingRelationDataContents(
+                _read=not self._backend.is_leader,
+                _write=self._backend.is_leader),
         }
         self._backend._relation_app_and_units[rel_id] = {
             "app": remote_app,
@@ -650,7 +654,8 @@ class Harness(typing.Generic[CharmType]):
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
         rel_data = self._backend._relation_data
-        rel_data[relation_id][remote_unit_name] = _TestingRelationDataContents()
+        rel_data[relation_id][remote_unit_name] = _TestingRelationDataContents(
+            _write=False)
         # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
         #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
         self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
@@ -854,6 +859,10 @@ class Harness(typing.Generic[CharmType]):
             rel_data._invalidate()
 
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
+        # ensure that WE as harness can temporarily write the databag
+        old_write_access = new_values._writeable
+        new_values._writeable = True
+
         values_have_changed = False
         for k, v in key_values.items():
             if v == '':
@@ -864,8 +873,9 @@ class Harness(typing.Generic[CharmType]):
                     new_values[k] = v
                     values_have_changed = True
 
+        new_values._writeable = old_write_access
         # Update the relation data in any case to avoid spurious references
-        # by an test to an updated value to be invalidated by a lack of assignment
+        # by a test to an updated value to be invalidated by a lack of assignment
         self._backend._relation_data[relation_id][app_or_unit] = new_values
 
         if not values_have_changed:
@@ -1077,15 +1087,48 @@ class _ResourceEntry:
 
 
 class _TestingRelationDataContents(dict):
+    def __init__(self, *args,
+                 _read: typing.Union[typing.Callable[[], bool], bool] = True,
+                 _write: typing.Union[typing.Callable[[], bool], bool] = True,
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+        # these attributes need to be dynamic because
+        # harness can switch leadership at runtime
+        self._readable = _read
+        self._writeable = _write
+
+    @property
+    def _can_write(self) -> bool:
+        if callable(self._writeable):
+            return self._writeable()
+        return self._writeable
+
+    @property
+    def _can_read(self) -> bool:
+        if callable(self._readable):
+            return self._readable()
+        return self._readable
+
     def __setitem__(self, key, value):
         if not isinstance(key, str):
             raise model.RelationDataError('relation data keys must be strings')
         if not isinstance(value, str):
             raise model.RelationDataError('relation data values must be strings')
+        if not self._can_write:
+            raise model.RelationDataError("cannot set this entity's relation data.")
         super().__setitem__(key, value)
 
+    def __getitem__(self, item):
+        if not self._can_read:
+            raise model.RelationDataError("cannot read this entity's relation data.")
+        return super().__getitem__(item)
+
+    def data(self) -> typing.Dict[str, str]:
+        return super().copy()
+
     def copy(self):
-        return _TestingRelationDataContents(super().copy())
+        return _TestingRelationDataContents(
+            super().copy(), _read=self._readable, _write=self._writeable)
 
 
 @_copy_docstrings(model._ModelBackend)
@@ -1215,7 +1258,7 @@ class _TestingModelBackend:
             member_name = member_name.split('/')[0]
         if relation_id not in self._relation_data:
             raise model.RelationNotFoundError()
-        return self._relation_data[relation_id][member_name].copy()
+        return self._relation_data[relation_id][member_name].data()
 
     def relation_set(self, relation_id, key, value, is_app):
         if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
