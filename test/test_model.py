@@ -18,6 +18,7 @@ import ipaddress
 import json
 import os
 import pathlib
+import sys
 import tempfile
 import unittest
 from collections import OrderedDict
@@ -549,20 +550,26 @@ class TestModel(unittest.TestCase):
 
             # we didn't even get to relation-get
             self.assertBackendCalls([('is_leader', )])
-            self.resetBackendCalls()
 
             # we can't see it but repr() works
             self.assertEqual(repr(rel_db1.data[local_app]), '<n/a>')
             self.assertBackendCalls([('is_leader', )])
-            self.resetBackendCalls()
 
             # as well as relation data repr() in general:
             self.assertIsInstance(repr(rel_db1.data), str)
-            self.assertBackendCalls(
-                [('relation_get', 1, 'myapp/0', False),
-                 ('is_leader',),
-                 ('relation_get', 1, 'remoteapp1/0', False),
-                 ('relation_get', 1, 'remoteapp1', True)])
+
+            expected_backend_calls = [
+                ('relation_get', 1, 'myapp/0', False),
+                ('is_leader',),
+                ('relation_get', 1, 'remoteapp1/0', False),
+                ('relation_get', 1, 'remoteapp1', True)]
+            # in < 3.5 dicts are unsorted
+            major, minor, *_ = sys.version_info
+            if (major, minor) > (3, 5):
+                self.assertBackendCalls(expected_backend_calls)
+
+            backend_calls = set(self.harness._get_backend_calls())
+            self.assertEqual(backend_calls, set(expected_backend_calls))
 
     def test_relation_no_units(self):
         self.harness.add_relation('db1', 'remoteapp1')
