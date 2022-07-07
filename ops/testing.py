@@ -113,7 +113,6 @@ class Harness(typing.Generic[CharmType]):
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
         self._unit_name = self._meta.name + '/0'
-        self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
         self._backend = _TestingModelBackend(self._unit_name, self._meta)
@@ -132,6 +131,58 @@ class Harness(typing.Generic[CharmType]):
             warnings.warn(
                 'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
+
+        # expose event_context at Harness level
+    def event_context(self, event_name: str):
+        """Configures the Harness to behave as if an event hook were running.
+
+        This means that the Harness will perform strict access control of relation data.
+
+        Example usage:
+
+        # this is how we test that attempting to write a remote app's
+        # databag will raise RelationDataError.
+        >>> with harness.event_context('foo'):
+        >>>     with pytest.raises(ops.model.RelationDataError):
+        >>>         my_relation.data[remote_app]['foo'] = 'bar'
+
+        # this is how we test with 'realistic conditions' how an event handler behaves
+        # when we call it directly -- i.e. without going through harness.add_relation
+        >>> def test_foo():
+        >>>     class MyCharm:
+        >>>         ...
+        >>>         def event_handler(self, event):
+        >>>             # this is expected to raise an exception
+        >>>             event.relation.data[event.relation.app]['foo'] = 'bar'
+        >>>
+        >>>     harness = Harness(MyCharm)
+        >>>     event = MagicMock()
+        >>>     event.relation = harness.charm.model.relations[0]
+        >>>
+        >>>     with harness.event_context('my_relation_joined'):
+        >>>         with pytest.raises(ops.model.RelationDataError):
+        >>>             harness.charm.event_handler(event)
+
+
+        If event_name == '', conversely, the Harness will believe that no hook
+        is running, allowing you to temporarily have unrestricted access to read/write
+        a relation's databags even if you're inside an event handler.
+        >>> def test_foo():
+        >>>     class MyCharm:
+        >>>         ...
+        >>>         def event_handler(self, event):
+        >>>             # this is expected to raise an exception since we're not leader
+        >>>             event.relation.data[self.app]['foo'] = 'bar'
+        >>>
+        >>>     harness = Harness(MyCharm)
+        >>>     event = MagicMock()
+        >>>     event.relation = harness.charm.model.relations[0]
+        >>>
+        >>>     with harness.event_context('my_relation_joined'):
+        >>>         harness.charm.event_handler(event)
+
+        """
+        return self._framework.event_context(event_name)
 
     def set_can_connect(self, container: typing.Union[str, model.Container], val: bool):
         """Change the simulated can_connect status of a container's underlying pebble client.
@@ -564,14 +615,26 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
         self._backend._relation_names[rel_id] = relation_name
         self._backend._relation_list_map[rel_id] = []
+
+        # leaders can write their app databag but not read it
+        def _can_read_local_app_data():
+            if self._backend._hook_is_running:
+                return not self._backend.is_leader()
+            return True
+
+        # followers can read it but not write it
+        def _can_write_local_app_data():
+            if self._backend._hook_is_running:
+                return self._backend.is_leader()
+            return True
+
         self._backend._relation_data[rel_id] = {
-            remote_app: _TestingRelationDataContents(_write=False),
+            remote_app: _TestingRelationDataContents(
+                _write=lambda: not self._backend._hook_is_running),
             self._backend.unit_name: _TestingRelationDataContents(),
-            # leaders can write their app databag but not read it
-            # followers can read it but not write it
             self._backend.app_name: _TestingRelationDataContents(
-                _read=not self._backend.is_leader,
-                _write=self._backend.is_leader),
+                _read=_can_read_local_app_data,
+                _write=_can_write_local_app_data)
         }
         self._backend._relation_app_and_units[rel_id] = {
             "app": remote_app,
@@ -654,8 +717,9 @@ class Harness(typing.Generic[CharmType]):
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
         rel_data = self._backend._relation_data
+        # we can write remote unit data iff we are not in a hook env
         rel_data[relation_id][remote_unit_name] = _TestingRelationDataContents(
-            _write=False)
+            _write=lambda: not self._backend._hook_is_running)
         # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
         #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
         self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)

@@ -913,6 +913,13 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._backend = backend
         self._is_app = isinstance(entity, Application)  # type: bool
 
+    @property
+    def _strict_access_control(self) -> bool:
+        # this flag controls whether the access we have to RelationDataContent
+        # is 'strict' aka the same as a deployed charm would have, or whether it is
+        # unrestricted, allowing test code to read/write databags at will.
+        return bool(self._backend._hook_is_running)  # pyright: reportPrivateUsage=false
+
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
         try:
@@ -923,18 +930,22 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _is_readable(self):
         """Return if the data content can be read."""
-        # Leader units cannot read their own application databag.
-        # Only the follower local units (and all remote ones) can.
-        if (
-                self._is_app  # this is an app databag...
-                and self._backend.app_name == self._entity.name  # ...the databag of OUR app
-                and self._backend.is_leader()  # and I am leader
-        ):
-            return False
-        return True
+        if not self._strict_access_control:
+            return True
+
+        # Only remote units (and the leader unit) can read *this* app databag.
+        # so not-leaders can read it in any case:
+        if not self._backend.is_leader():
+            return True
+        # and otherwise, we can only read this databag if we're a
+        # unit of the remote app i.e. not THIS app.
+        return self._backend.app_name != self._entity.name
 
     def _is_writable(self):
         """Return if the data content can be modified."""
+        if not self._strict_access_control:
+            return True
+
         if self._is_app:
             is_our_app = self._backend.app_name == self._entity.name  # type: bool
             if not is_our_app:
@@ -971,7 +982,9 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     def __getitem__(self, key: str) -> str:
         if not self._is_readable():
             raise RelationDataError(
-                'Cannot read relation data for for {}'.format(self._entity.name))
+                '{} is not a leader unit, and cannot read the '
+                'application databag of {}'.format(self._entity.name,
+                                                   self._backend.app_name))
         return super().__getitem__(key)
 
     def __delitem__(self, key: str):

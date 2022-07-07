@@ -22,9 +22,11 @@ import shutil
 import sys
 import tempfile
 import textwrap
+import typing
 import unittest
 import uuid
 from io import BytesIO, StringIO
+from unittest.mock import MagicMock
 
 import pytest
 import yaml
@@ -39,7 +41,7 @@ from ops.charm import (
     StorageAttachedEvent,
     StorageDetachingEvent,
 )
-from ops.framework import Object
+from ops.framework import Framework, Object
 from ops.model import (
     ActiveStatus,
     Application,
@@ -528,8 +530,9 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation(rel_id)
         # Check relation and app data are removed
         self.assertEqual(backend.relation_ids('db'), [])
-        self.assertRaises(RelationNotFoundError, backend.relation_get,
-                          rel_id, remote_app, is_app=True)
+        with harness.event_context('foo'):
+            self.assertRaises(RelationNotFoundError, backend.relation_get,
+                              rel_id, remote_app, is_app=True)
 
     def test_removing_relation_refreshes_charm_model(self):
         # language=YAML
@@ -1095,8 +1098,9 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0')
         rel = harness.charm.model.get_relation('db')
-        with self.assertRaises(ModelError):
-            rel.data[harness.charm.app]['foo'] = 'bar'
+        with harness.event_context('foo'):
+            with self.assertRaises(ModelError):
+                rel.data[harness.charm.app]['foo'] = 'bar'
         # The data has not actually been changed
         self.assertEqual(harness.get_relation_data(rel_id, 'test-charm'), {})
         harness.set_leader(True)
@@ -1699,6 +1703,65 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         self.assertEqual(list(harness.framework.meta.actions), ['test-action'])
+
+    def test_event_context(self):
+        class MyCharm(CharmBase):
+            def event_handler(self, evt):
+                evt.relation.data[evt.relation.app]['foo'] = 'bar'
+
+        harness = Harness(MyCharm, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+        rel_id = harness.add_relation('db', 'postgresql')
+        rel = harness.charm.model.get_relation('db', rel_id)
+
+        event = MagicMock()
+        event.relation = rel
+
+        with harness.event_context('my_relation_joined'):
+            with self.assertRaises(ops.model.RelationDataError):
+                harness.charm.event_handler(event)
+
+    def test_event_context_inverse(self):
+        class MyCharm(CharmBase):
+            def __init__(self, framework: Framework,
+                         key: typing.Optional = None):
+                super().__init__(framework, key)
+                self.framework.observe(self.on.db_relation_joined,
+                                       self._join_db)
+
+            def _join_db(self, event):
+                # do things with APIs we cannot easily mock
+                raise NotImplementedError
+
+        harness = Harness(MyCharm, meta='''
+            name: test-charm
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        harness.begin()
+
+        def mock_join_db(event):
+            # the harness thinks we're inside a db_relation_joined hook
+            # but we want to mock the remote data here:
+            with harness.event_context(''):
+                # pretend for a moment we're not in a hook context,
+                # so the harness will let us:
+                print(event.relation.app)
+                event.relation.data[harness.charm.app]['foo'] = 'bar'
+
+        harness.charm._join_db = mock_join_db
+        rel_id = harness.add_relation('db', 'remote')
+        harness.add_relation_unit(rel_id, 'remote/0')
+        rel = harness.charm.model.get_relation('db', rel_id)
+        self.assertEqual({'foo': 'bar'},
+                         harness.get_relation_data(rel_id, 'test-charm'))
+        assert rel.data[harness.charm.app]['foo'] == 'bar'
 
     def test_relation_set_deletes(self):
         harness = Harness(CharmBase, meta='''
