@@ -193,6 +193,19 @@ class TestModel(unittest.TestCase):
                 'remoteapp1/0',
                 {'foo': 42})
 
+    def test_get_app_relation_data(self):
+        self.harness.begin()
+        relation_id = self.harness.add_relation('db1', 'remote')
+        self.harness.add_relation_unit(relation_id, 'remote/0')
+        local_app = self.harness.model.app.name
+        self.harness.update_relation_data(
+            relation_id,
+            local_app,
+            {'foo': 'bar'})
+        assert self.harness.get_relation_data(
+            relation_id, self.harness.model.app) == self.harness.get_relation_data(
+            relation_id, local_app) == {'foo': 'bar'}
+
     def test_unit_relation_data(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')

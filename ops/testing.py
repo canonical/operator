@@ -815,7 +815,9 @@ class Harness(typing.Generic[CharmType]):
         """
         if hasattr(app_or_unit, 'name'):
             app_or_unit = app_or_unit.name
-        return self._backend._relation_data[relation_id].get(app_or_unit, None)
+        with self.event_context(''):
+            # disable strict access control
+            return self._backend._relation_data[relation_id].get(app_or_unit, None)
 
     def get_pod_spec(self) -> (typing.Mapping, typing.Mapping):
         """Return the content of the pod spec as last set by the charm.
@@ -923,22 +925,20 @@ class Harness(typing.Generic[CharmType]):
             rel_data._invalidate()
 
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
-        # ensure that WE as harness can temporarily write the databag
-        old_write_access = new_values._writeable
-        new_values._writeable = True
-
         assert isinstance(new_values, _TestingRelationDataContents), new_values
-        values_have_changed = False
-        for k, v in key_values.items():
-            if v == '':
-                if new_values.pop(k, None) != v:
-                    values_have_changed = True
-            else:
-                if k not in new_values or new_values[k] != v:
-                    new_values[k] = v
-                    values_have_changed = True
 
-        new_values._writeable = old_write_access
+        # ensure that WE as harness can temporarily write the databag
+        with self.event_context(''):
+            values_have_changed = False
+            for k, v in key_values.items():
+                if v == '':
+                    if new_values.pop(k, None) != v:
+                        values_have_changed = True
+                else:
+                    if k not in new_values or new_values[k] != v:
+                        new_values[k] = v
+                        values_have_changed = True
+
         # Update the relation data in any case to avoid spurious references
         # by a test to an updated value to be invalidated by a lack of assignment
         self._backend._relation_data[relation_id][app_or_unit] = new_values
