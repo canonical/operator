@@ -941,7 +941,14 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             if self._backend.app_name == self._entity.name:
                 # are we minions?
                 if not self._backend.is_leader():
-                    return False
+                    # type guard; we should not be accessing relation data
+                    # if the remote app does not exist.
+                    app = self.relation.app
+                    assert app is not None
+
+                    # is this a non-peer relation?
+                    if app.name != self._entity.name:
+                        return False
         return True
 
     def _is_writable(self):

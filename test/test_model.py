@@ -350,6 +350,26 @@ class TestModel(unittest.TestCase):
                                  ('relation_get', 1, 'myapp', True),
                                  ('is_leader',)])
 
+    def test_relation_data_access_peer_leader(self):
+        r_id = self.harness.add_relation('db2', 'myapp')
+        self.harness.add_relation_unit(r_id, 'myapp/1')  # peer!
+        self.harness.update_relation_data(r_id, 'myapp', {'foo': 'bar'})
+        with self.harness.event_context('foo'):
+            # leaders can read
+            self.harness.set_leader(True)
+            relation = self.harness.model.get_relation('db2')
+            self.assertEqual(relation.data[relation.app]['foo'], 'bar')
+
+    def test_relation_data_access_peer_minion(self):
+        r_id = self.harness.add_relation('db2', 'myapp')
+        self.harness.add_relation_unit(r_id, 'myapp/1')  # peer!
+        self.harness.update_relation_data(r_id, 'myapp', {'foo': 'bar'})
+        with self.harness.event_context('foo'):
+            # nonleaders can read
+            self.harness.set_leader(False)
+            relation = self.harness.model.get_relation('db2')
+            self.assertEqual(relation.data[relation.app]['foo'], 'bar')
+
     def test_relation_data_del_key(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
