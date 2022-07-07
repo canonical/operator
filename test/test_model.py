@@ -273,7 +273,7 @@ class TestModel(unittest.TestCase):
         self.assertCountEqual(
             repr(rel_db1.data)[1:-1].split(', '),
             ["<ops.model.Unit myapp/0>: {}",
-             "<ops.model.Application myapp>: {}",
+             "<ops.model.Application myapp>: <n/a>",
              "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}",
              "<ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}"])
 
@@ -470,20 +470,16 @@ class TestModel(unittest.TestCase):
         with self.harness.event_context('foo'):
             self.resetBackendCalls()
 
-            # attempting to read it is not
-            with self.assertRaises(ops.model.RelationDataError):
-                # 'local' is there, but still:
-                rel_db1.data[local_app]['local']
+            self.assertEqual(rel_db1.data[local_app]['local'], 'data')
 
-            # relation-get is NOT called:
-            self.assertBackendCalls([('is_leader',)])
+            self.assertBackendCalls([('is_leader',),
+                                     ('relation_get', 1, 'myapp', True)])
 
             self.resetBackendCalls()
 
-            # we can't see it but repr() works
-            self.assertEqual(repr(rel_db1.data[local_app]), '<n/a>')
+            self.assertEqual(repr(rel_db1.data[local_app]), repr({'local': 'data'}))
 
-            # relation-get is NOT called:
+            # we don't get the data, because we're lazy
             self.assertBackendCalls([('is_leader',)])
 
             # as well as relation data repr() in general:
@@ -505,25 +501,35 @@ class TestModel(unittest.TestCase):
         rel_db1 = self.model.get_relation('db1')
         self.harness.begin()
         self.harness.set_leader(False)
-        self.resetBackendCalls()
 
         local_app = self.harness.charm.app
         # addressing the object is OK
         rel_db1.data[local_app]
-        # nonleader units CAN read their local app databag
-        self.assertEqual(rel_db1.data[local_app]['local'], 'data')
+        # nonleader units cannot read their local app databag
+        # attempting to read it is not
+        with self.harness.event_context('foo'):
+            self.resetBackendCalls()
 
-        # we can't see it but repr() works
-        self.assertEqual(repr(rel_db1.data[local_app]), repr({'local': 'data'}))
-        # as well as relation data repr() in general:
-        self.assertIsInstance(repr(rel_db1.data), str)
+            with self.assertRaises(ops.model.RelationDataError):
+                # 'local' is there, but still:
+                rel_db1.data[local_app]['local']
 
-        self.assertBackendCalls(
-            [('relation_get', 1, 'myapp', True),
-             ('relation_get', 1, 'myapp/0', False),
-             ('relation_get', 1, 'remoteapp1/0', False),
-             ('relation_get', 1, 'remoteapp1', True)]
-        )
+            # we didn't even get to relation-get
+            self.assertBackendCalls([('is_leader', )])
+            self.resetBackendCalls()
+
+            # we can't see it but repr() works
+            self.assertEqual(repr(rel_db1.data[local_app]), '<n/a>')
+            self.assertBackendCalls([('is_leader', )])
+            self.resetBackendCalls()
+
+            # as well as relation data repr() in general:
+            self.assertIsInstance(repr(rel_db1.data), str)
+            self.assertBackendCalls(
+                [('relation_get', 1, 'myapp/0', False),
+                 ('is_leader',),
+                 ('relation_get', 1, 'remoteapp1/0', False),
+                 ('relation_get', 1, 'remoteapp1', True)])
 
     def test_relation_no_units(self):
         self.harness.add_relation('db1', 'remoteapp1')

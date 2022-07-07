@@ -934,12 +934,15 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             return True
 
         # Only remote units (and the leader unit) can read *this* app databag.
-        # so not-leaders can read it in any case:
-        if not self._backend.is_leader():
-            return True
-        # and otherwise, we can only read this databag if we're a
-        # unit of the remote app i.e. not THIS app.
-        return self._backend.app_name != self._entity.name
+
+        # is this an app databag?
+        if self._is_app:
+            # is this a LOCAL app databag?
+            if self._backend.app_name == self._entity.name:
+                # are we minions?
+                if not self._backend.is_leader():
+                    return False
+        return True
 
     def _is_writable(self):
         """Return if the data content can be modified."""
