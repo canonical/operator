@@ -567,9 +567,9 @@ class TestModel(unittest.TestCase):
             major, minor, *_ = sys.version_info
             if (major, minor) > (3, 5):
                 self.assertBackendCalls(expected_backend_calls)
-
-            backend_calls = set(self.harness._get_backend_calls())
-            self.assertEqual(backend_calls, set(expected_backend_calls))
+            else:
+                backend_calls = set(self.harness._get_backend_calls())
+                self.assertEqual(backend_calls, set(expected_backend_calls))
 
     def test_relation_no_units(self):
         self.harness.add_relation('db1', 'remoteapp1')
