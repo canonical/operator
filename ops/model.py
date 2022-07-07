@@ -962,11 +962,14 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __setitem__(self, key: str, value: str):
         if not self._is_writable():
-            raise RelationDataError('cannot set relation data for {}'.format(self._entity.name))
-        if not isinstance(value, str):
-            raise RelationDataError('relation data values must be strings')
+            raise RelationDataError(
+                'cannot set relation data for {}'.format(self._entity.name))
         if not isinstance(key, str):
-            raise RelationDataError('relation data keys must be strings')
+            raise RelationDataError(
+                'relation data keys must be strings, not {}'.format(type(key)))
+        if not isinstance(value, str):
+            raise RelationDataError(
+                'relation data values must be strings, not {}'.format(type(value)))
 
         self._backend.relation_set(self.relation.id, key, value, self._is_app)
 
