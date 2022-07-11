@@ -28,7 +28,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import logassert
-import yaml
 
 from ops.charm import (
     ActionEvent,
@@ -68,10 +67,6 @@ TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
 VERSION_LOGLINE = [
     'juju-log', '--log-level', 'DEBUG', '--',
     'Operator Framework {} up and running.'.format(version),
-]
-SLOW_YAML_LOGLINE = [
-    'juju-log', '--log-level', 'DEBUG', '--',
-    'yaml does not have libyaml extensions, using slower pure Python yaml loader',
 ]
 
 logger = logging.getLogger(__name__)
@@ -604,19 +599,10 @@ class _TestMain(abc.ABC):
 
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: {} already exists'.format(self.CHARM_STATE_FILE)],
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
         ]
-        if not yaml.__with_libyaml__:
-            expected.insert(1, SLOW_YAML_LOGLINE)
         calls = fake_script_calls(self)
-
-        if self.has_dispatch:
-            expected.insert(1, [
-                'juju-log', '--log-level', 'DEBUG', '--',
-                'Legacy {} does not exist.'.format(Path('hooks/collect-metrics'))])
 
         self.assertEqual(calls, expected)
 
@@ -656,16 +642,6 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script_calls(self)]
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
-
-        if self.has_dispatch:
-            self.assertEqual(
-                calls.pop(0),
-                'juju-log --log-level DEBUG -- Legacy {} does not exist.'.format(
-                    Path("hooks/install")))
-
-        if not yaml.__with_libyaml__:
-            self.assertEqual(calls.pop(0), ' '.join(SLOW_YAML_LOGLINE))
-
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
 
         self.maxDiff = None
@@ -888,8 +864,6 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
-        if not yaml.__with_libyaml__:
-            expected.insert(3, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
 
     @unittest.skipIf(is_windows, "this is UNIXish; TODO: write equivalent windows test")
@@ -908,8 +882,6 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
-        if not yaml.__with_libyaml__:
-            expected.insert(2, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
 
     def test_hook_and_dispatch_with_failing_hook(self):
@@ -995,8 +967,6 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
-        if not yaml.__with_libyaml__:
-            expected.insert(5, SLOW_YAML_LOGLINE)
         self.assertEqual(fake_script_calls(self), expected)
 
 
@@ -1154,4 +1124,3 @@ class TestStorageHeuristics(unittest.TestCase):
         meta = CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}), tempfile.NamedTemporaryFile() as fd:
             self.assertFalse(_should_use_controller_storage(Path(fd.name), meta))
-            self.assertLogged('Using local storage: {} already exists'.format(fd.name))
