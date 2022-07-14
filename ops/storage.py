@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Structures to offer storage to the charm (through Juju or locally)."""
-
+import logging
 import pickle
 import shutil
 import sqlite3
@@ -23,6 +23,9 @@ from datetime import timedelta
 from typing import Any, Callable, Generator, List, Optional, Tuple, Type, Union
 
 import yaml
+
+logger = logging.getLogger()
+
 
 if typing.TYPE_CHECKING:
     from pathlib import Path
@@ -53,6 +56,11 @@ class SQLiteStorage:
     def __init__(self, filename: Union['Path', str]):
         # The isolation_level argument is set to None such that the implicit
         # transaction management behavior of the sqlite3 module is disabled.
+
+        if not Path(filename).exists():
+            # sqlite3.connect creates the file silently if it does not exist
+            logger.debug("Initializing SQLite local storage: {}.".format(filename))
+
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
                                    timeout=self.DB_LOCK_TIMEOUT.total_seconds())
