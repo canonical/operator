@@ -48,6 +48,7 @@ from io import BytesIO, StringIO
 from textwrap import dedent
 
 from ops import charm, framework, model, pebble, storage
+from ops.model import RelationNotFoundError, RelationDataContent
 from ops._private import yaml
 
 # Toggles Container.can_connect simulation globally for all harness instances.
@@ -611,40 +612,33 @@ class Harness(typing.Generic[CharmType]):
         Return:
             The relation_id created by this add_relation.
         """
-        rel_id = self._next_relation_id()
-        self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
-        self._backend._relation_names[rel_id] = relation_name
-        self._backend._relation_list_map[rel_id] = []
-
-        # leaders can write their app databag but not read it
-        def _can_read_local_app_data():
-            if self._backend._hook_is_running:
-                return not self._backend.is_leader()
-            return True
-
-        # followers can read it but not write it
-        def _can_write_local_app_data():
-            if self._backend._hook_is_running:
-                return self._backend.is_leader()
-            return True
-
-        self._backend._relation_data[rel_id] = {
-            remote_app: _TestingRelationDataContents(
-                _write=lambda: not self._backend._hook_is_running),
-            self._backend.unit_name: _TestingRelationDataContents(),
-            self._backend.app_name: _TestingRelationDataContents(
-                _read=_can_read_local_app_data,
-                _write=_can_write_local_app_data)
+        relation_id = self._next_relation_id()
+        self._backend._relation_ids_map.setdefault(relation_name, []).append(relation_id)
+        self._backend._relation_names[relation_id] = relation_name
+        self._backend._relation_list_map[relation_id] = []
+        relation = self._model.get_relation(relation_name, relation_id)
+        self._backend._relation_data[relation_id] = {
+            remote_app: RelationDataContent(
+                relation, self.model.unit, self._backend),
+            self._backend.unit_name: RelationDataContent(
+                relation, self.model.unit, self._backend),
+            self._backend.app_name: RelationDataContent(
+                relation, self.model.unit, self._backend)
         }
-        self._backend._relation_app_and_units[rel_id] = {
+        self._backend._relation_data_raw[relation_id] = {
+            remote_app: {},
+            self._backend.unit_name: {},
+            self._backend.app_name: {}}
+
+        self._backend._relation_app_and_units[relation_id] = {
             "app": remote_app,
             "units": [],
         }
         # Reload the relation_ids list
         if self._model is not None:
             self._model.relations._invalidate(relation_name)
-        self._emit_relation_created(relation_name, rel_id, remote_app)
-        return rel_id
+        self._emit_relation_created(relation_name, relation_id, remote_app)
+        return relation_id
 
     def remove_relation(self, relation_id: int) -> None:
         """Remove a relation.
@@ -670,6 +664,7 @@ class Harness(typing.Generic[CharmType]):
 
         self._backend._relation_app_and_units.pop(relation_id)
         self._backend._relation_data.pop(relation_id)
+        self._backend._relation_data_raw.pop(relation_id)
         self._backend._relation_list_map.pop(relation_id)
         self._backend._relation_ids_map[relation_name].remove(relation_id)
         self._backend._relation_names.pop(relation_id)
@@ -718,16 +713,21 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
         rel_data = self._backend._relation_data
         # we can write remote unit data iff we are not in a hook env
-        rel_data[relation_id][remote_unit_name] = _TestingRelationDataContents(
-            _write=lambda: not self._backend._hook_is_running)
-        # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
-        #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
-        self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
         relation_name = self._backend._relation_names[relation_id]
+        relation = self._model.get_relation(relation_name, relation_id)
+        self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
+        rel_data[relation_id][remote_unit_name] = RelationDataContent(
+            relation, self.model.unit, self._backend)
+        if not remote_unit_name.startswith(relation.app.name):
+            raise ValueError(
+                'Remote unit name invalid: the remote application of {} is called {!r}; '
+                'the remote unit name should be {}/<some-number>, not {!r}.'
+                ''.format(relation_name, relation.app.name,
+                          relation.app.name, remote_unit_name))
+        self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
         remote_unit = self._model.get_unit(remote_unit_name)
-        relation = self._model.get_relation(relation_name, relation_id)
         unit_cache = relation.data.get(remote_unit, None)
         if unit_cache is not None:
             unit_cache._invalidate()
@@ -778,6 +778,7 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_list_map[relation_id].remove(remote_unit_name)
         self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)
         self._backend._relation_data[relation_id].pop(remote_unit_name)
+        self._backend._relation_data_raw[relation_id].pop(remote_unit_name)
         self.model._relations._invalidate(relation_name=relation.name)
 
         if unit_cache is not None:
@@ -815,9 +816,8 @@ class Harness(typing.Generic[CharmType]):
         """
         if hasattr(app_or_unit, 'name'):
             app_or_unit = app_or_unit.name
-        with self.event_context(''):
-            # disable strict access control
-            return self._backend._relation_data[relation_id].get(app_or_unit, None)
+        # bypass access control by going directly to raw
+        return self._backend._relation_data_raw[relation_id].get(app_or_unit, None)
 
     def get_pod_spec(self) -> (typing.Mapping, typing.Mapping):
         """Return the content of the pod spec as last set by the charm.
@@ -924,8 +924,10 @@ class Harness(typing.Generic[CharmType]):
             # Note, this won't cause the data to be loaded if it wasn't already.
             rel_data._invalidate()
 
-        new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
-        assert isinstance(new_values, _TestingRelationDataContents), new_values
+        # we manipulate directly the 'raw' relation data, no need
+        # to go via relation_set/get (and bypass access control)
+        new_values = self._backend._relation_data_raw[relation_id][app_or_unit].copy()
+        assert isinstance(new_values, dict), new_values
 
         # ensure that WE as harness can temporarily write the databag
         with self.event_context(''):
@@ -941,7 +943,7 @@ class Harness(typing.Generic[CharmType]):
 
         # Update the relation data in any case to avoid spurious references
         # by a test to an updated value to be invalidated by a lack of assignment
-        self._backend._relation_data[relation_id][app_or_unit] = new_values
+        self._backend._relation_data_raw[relation_id][app_or_unit] = new_values
 
         if not values_have_changed:
             # Do not issue a relation changed event if the data bags have not changed
@@ -1151,54 +1153,6 @@ class _ResourceEntry:
         self.name = resource_name
 
 
-class _TestingRelationDataContents(dict):
-    def __init__(self, *args,
-                 _read: typing.Union[typing.Callable[[], bool], bool] = True,
-                 _write: typing.Union[typing.Callable[[], bool], bool] = True,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        # these attributes need to be dynamic because
-        # harness can switch leadership at runtime
-        self._readable = _read
-        self._writeable = _write
-
-    @property
-    def _can_write(self) -> bool:
-        if callable(self._writeable):
-            return self._writeable()
-        return self._writeable
-
-    @property
-    def _can_read(self) -> bool:
-        if callable(self._readable):
-            return self._readable()
-        return self._readable
-
-    def __setitem__(self, key, value):
-        if not self._can_write:
-            raise model.RelationDataError(
-                "cannot set this entity's relation data.")
-        if not isinstance(key, str):
-            raise model.RelationDataError(
-                'relation data keys must be strings, not {}'.format(type(key)))
-        if not isinstance(value, str):
-            raise model.RelationDataError(
-                'relation data values must be strings, not {}'.format(type(value)))
-        super().__setitem__(key, value)
-
-    def __getitem__(self, item):
-        if not self._can_read:
-            raise model.RelationDataError("cannot read this entity's relation data.")
-        return super().__getitem__(item)
-
-    def data(self) -> typing.Dict[str, str]:
-        return super().copy()
-
-    def copy(self):
-        return _TestingRelationDataContents(
-            super().copy(), _read=self._readable, _write=self._writeable)
-
-
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
@@ -1221,7 +1175,8 @@ class _TestingModelBackend:
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
         self._relation_names = {}  # reverse map from relation_id to relation_name
         self._relation_list_map = {}  # relation_id: [unit_name,...]
-        self._relation_data = {}  # {relation_id: {name: data}}
+        self._relation_data_raw = {}  # {relation_id: {name: Dict[str: str]}}
+        self._relation_data = {}  # {relation_id: {name: RelationDataContents}}
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
         self._relation_app_and_units = {}
         self._config = {}
@@ -1324,9 +1279,9 @@ class _TestingModelBackend:
                 'remote-side relation data cannot be accessed during a relation-broken event')
         if is_app and '/' in member_name:
             member_name = member_name.split('/')[0]
-        if relation_id not in self._relation_data:
+        if relation_id not in self._relation_data_raw:
             raise model.RelationNotFoundError()
-        return self._relation_data[relation_id][member_name].data()
+        return self._relation_data_raw[relation_id][member_name]
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
         if not isinstance(is_app, bool):
@@ -1337,7 +1292,10 @@ class _TestingModelBackend:
             raise RuntimeError(
                 'remote-side relation data cannot be accessed during a relation-broken event')
 
-        relation = self._relation_data[relation_id]
+        if relation_id not in self._relation_data_raw:
+            raise RelationNotFoundError(relation_id)
+
+        relation = self._relation_data_raw[relation_id]
         if is_app:
             bucket_key = self.app_name
         else:

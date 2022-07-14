@@ -914,7 +914,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._is_app = isinstance(entity, Application)  # type: bool
 
     @property
-    def _strict_access_control(self) -> bool:
+    def _hook_is_running(self) -> bool:
         # this flag controls whether the access we have to RelationDataContent
         # is 'strict' aka the same as a deployed charm would have, or whether it is
         # unrestricted, allowing test code to read/write databags at will.
@@ -930,7 +930,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _is_readable(self):
         """Return if the data content can be read."""
-        if not self._strict_access_control:
+        if not self._hook_is_running:
             return True
 
         # Only remote units (and the leader unit) can read *this* app databag.
@@ -953,7 +953,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _is_writable(self):
         """Return if the data content can be modified."""
-        if not self._strict_access_control:
+        if not self._hook_is_running:
             return True
 
         if self._is_app:
@@ -973,7 +973,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     def __setitem__(self, key: str, value: str):
         if not self._is_writable():
             raise RelationDataError(
-                'cannot set relation data for {}'.format(self._entity.name))
+                '{} cannot write the application databag of {}. It could be that '
+                'the databag belongs to a remote unit/application, or that you '
+                'are attempting to write app data from a non-leader unit.'
+                ''.format(self._entity.name, self._backend.app_name))
         if not isinstance(key, str):
             raise RelationDataError(
                 'relation data keys must be strings, not {}'.format(type(key)))
@@ -996,8 +999,9 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if not self._is_readable():
             raise RelationDataError(
                 '{} is not a leader unit, and cannot read the '
-                'application databag of {}'.format(self._entity.name,
-                                                   self._backend.app_name))
+                'application databag of {}'.format(
+                    self._entity.name, self._backend.app_name))
+
         return super().__getitem__(key)
 
     def __delitem__(self, key: str):

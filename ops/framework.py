@@ -869,8 +869,8 @@ class Framework(Object):
             yield  # context does nothing in this case
             return
 
-        backend._hook_is_running = event_name
         old = backend._hook_is_running
+        backend._hook_is_running = event_name
         yield
         backend._hook_is_running = old
 

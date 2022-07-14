@@ -1761,6 +1761,9 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db', rel_id)
         self.assertEqual({'foo': 'bar'},
                          harness.get_relation_data(rel_id, 'test-charm'))
+
+        # now we're outside of the hook context:
+        assert not harness._backend._hook_is_running
         assert rel.data[harness.charm.app]['foo'] == 'bar'
 
     def test_relation_set_deletes(self):
@@ -2895,6 +2898,9 @@ class TestTestingModelBackend(unittest.TestCase):
     def test_relation_remote_app_name(self):
         harness = Harness(CharmBase, meta='''
             name: test-charm
+            requires:
+               db:
+                 interface: foo
             ''')
         self.addCleanup(harness.cleanup)
         backend = harness._backend
