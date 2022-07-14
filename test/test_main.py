@@ -643,6 +643,7 @@ class _TestMain(abc.ABC):
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
         self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
+        self.assertRegex(calls.pop(0), 'Initializing SQLite local storage: ')
 
         self.maxDiff = None
         self.assertRegex(
