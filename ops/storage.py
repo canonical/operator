@@ -14,6 +14,7 @@
 
 """Structures to offer storage to the charm (through Juju or locally)."""
 import logging
+import os
 import pickle
 import shutil
 import sqlite3
@@ -56,7 +57,7 @@ class SQLiteStorage:
         # The isolation_level argument is set to None such that the implicit
         # transaction management behavior of the sqlite3 module is disabled.
 
-        if not Path(filename).exists():
+        if not os.path.exists(str(filename)):
             # sqlite3.connect creates the file silently if it does not exist
             logger.debug("Initializing SQLite local storage: {}.".format(filename))
 
