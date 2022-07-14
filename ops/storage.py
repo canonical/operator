@@ -20,6 +20,7 @@ import sqlite3
 import subprocess
 import typing
 from datetime import timedelta
+from pathlib import Path
 from typing import Any, Callable, Generator, List, Optional, Tuple, Type, Union
 
 import yaml
@@ -28,8 +29,6 @@ logger = logging.getLogger()
 
 
 if typing.TYPE_CHECKING:
-    from pathlib import Path
-
     # _Notice = Tuple[event_path, observer_path, method_name]
     _Notice = Tuple[str, str, str]
     _Notices = List[_Notice]
