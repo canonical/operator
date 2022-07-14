@@ -865,7 +865,9 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
-        self.assertEqual(fake_script_calls(self), expected)
+        calls = fake_script_calls(self)
+        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+        self.assertEqual(calls, expected)
 
     @unittest.skipIf(is_windows, "this is UNIXish; TODO: write equivalent windows test")
     def test_non_executable_hook_and_dispatch(self):
@@ -883,7 +885,9 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
-        self.assertEqual(fake_script_calls(self), expected)
+        calls = fake_script_calls(self)
+        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+        self.assertEqual(calls, expected)
 
     def test_hook_and_dispatch_with_failing_hook(self):
         self.stdout = self.stderr = tempfile.TemporaryFile()
@@ -968,7 +972,10 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
-        self.assertEqual(fake_script_calls(self), expected)
+        calls = fake_script_calls(self)
+        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+
+        self.assertEqual(calls, expected)
 
 
 # NOTE
