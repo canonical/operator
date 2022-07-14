@@ -1,0 +1,12 @@
+# Copyright 2022 Penelope Valentine Gale
+# See LICENSE file for licensing details.
+
+# For a complete list of supported options, see:
+# https://juju.is/docs/sdk/metadata-reference
+name: smoke
+display-name: |
+  smoke
+description: |
+  smoke test charm
+summary: |
+  basic minimal charm for running smoke tests
