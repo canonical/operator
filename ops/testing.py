@@ -48,8 +48,8 @@ from io import BytesIO, StringIO
 from textwrap import dedent
 
 from ops import charm, framework, model, pebble, storage
-from ops.model import RelationNotFoundError, RelationDataContent
 from ops._private import yaml
+from ops.model import RelationDataContent, RelationNotFoundError
 
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
