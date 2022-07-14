@@ -936,19 +936,33 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # Only remote units (and the leader unit) can read *this* app databag.
 
         # is this an app databag?
-        if self._is_app:
-            # is this a LOCAL app databag?
-            if self._backend.app_name == self._entity.name:
-                # are we minions?
-                if not self._backend.is_leader():
-                    # type guard; we should not be accessing relation data
-                    # if the remote app does not exist.
-                    app = self.relation.app
-                    assert app is not None
+        if not self._is_app:
+            # all unit databags are publicly readable
+            return True
 
-                    # is this a non-peer relation?
-                    if app.name != self._entity.name:
-                        return False
+        # Am I leader?
+        if self._backend.is_leader():
+            # leaders have no read restrictions
+            return True
+
+        # type guard; we should not be accessing relation data
+        # if the remote app does not exist.
+        app = self.relation.app
+        assert app is not None
+
+        # is this a peer relation?
+        if app.name == self._entity.name:
+            # per relation data is always publicly readable
+            return True
+
+        # if we're here it means: this is not a peer relation,
+        # this is an app databag, and we don't have leadership.
+
+        # is this a LOCAL app databag?
+        if self._backend.app_name == self._entity.name:
+            # minions can't read local app databags
+            return False
+
         return True
 
     def _is_writable(self):
