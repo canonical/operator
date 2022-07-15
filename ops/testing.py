@@ -688,7 +688,7 @@ class Harness(typing.Generic[CharmType]):
 
         Args:
             relation_id: The integer relation identifier (as returned by add_relation).
-            remote_unit_name: A string representing the remote unit that is being added.
+            remote_unit_name: A string representing the remote unit that is being removed.
 
         Raises:
             KeyError: if relation_id or remote_unit_name is not valid
