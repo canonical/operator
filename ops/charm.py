@@ -148,18 +148,20 @@ class RemoveEvent(HookEvent):
 
 
 class ConfigChangedEvent(HookEvent):
-    """Event triggered when a configuration change is requested.
+    """Event triggered when a configuration change occurs.
 
-    This event fires in several different situations.
+    This event can fire in several situations.
 
-    - immediately after the :class:`install <InstallEvent>` event.
-    - after a :class:`relation is created <RelationCreatedEvent>`.
-    - after a :class:`leader is elected <LeaderElectedEvent>`.
-    - after changing charm configuration using the GUI or command line
-      interface
-    - when the charm :class:`starts <StartEvent>`.
-    - when a new unit :class:`joins a relation <RelationJoinedEvent>`.
-    - when there is a :class:`change to an existing relation <RelationChangedEvent>`.
+    - Right between a :class:`install <InstallEvent>` and a
+      :class:`starts <StartEvent>` during the startup sequence
+      (when you first deploy a unit). This event notifies the charm of
+      its initial configuration.
+    - When the cloud admin reconfigures the charm via the juju CLI, i.e.
+      `juju config my-charm foo=bar`. This event notifies the charm of
+      its new configuration. (The event itself, however, is now aware of *what*
+      specifically has changed in the config).
+    - When networking changes (if the machine reboots and comes up
+      with a different IP).
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
