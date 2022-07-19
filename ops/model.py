@@ -28,7 +28,7 @@ import typing
 import weakref
 from abc import ABC, abstractmethod
 from pathlib import Path
-from subprocess import PIPE, CalledProcessError, run
+from subprocess import PIPE, CalledProcessError, CompletedProcess, run
 from typing import (
     Any,
     BinaryIO,
@@ -114,7 +114,6 @@ StrOrPath = typing.Union[str, Path]
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
-MAX_RELATION_SET_LINE_LEN = 131000  # Max length of relation key-value data
 
 
 class Model:
@@ -2039,14 +2038,18 @@ class _ModelBackend:
         if use_json:
             args += ('--format=json',)
         try:
-            result = run(args, **kwargs)  # type subprocess.CompletedProcess
+            result = run(args, **kwargs)
+
+            # pyright infers the first match when argument overloading/unpacking is used,
+            # so this needs to be coerced into the right type
+            result = typing.cast(CompletedProcess[bytes], result)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
             if result.stdout is None:
                 return ''
             else:
-                text = result.stdout.decode('utf8')  # type: str
+                text = result.stdout.decode('utf8')
                 if use_json:
                     return json.loads(text)
                 else:
