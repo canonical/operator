@@ -15,10 +15,8 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import logging
-from pathlib import Path
 
 from pytest_operator.plugin import OpsTest
-
 
 logger = logging.getLogger(__name__)
 
