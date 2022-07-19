@@ -114,6 +114,7 @@ StrOrPath = typing.Union[str, Path]
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
+MAX_RELATION_SET_LINE_LEN = 131000  # Max length of relation key-value data
 
 
 class Model:
@@ -2025,9 +2026,12 @@ class _ModelBackend:
         self._leader_check_time = None
         self._hook_is_running = ''
 
-    def _run(self, *args: str, return_output: bool = False, use_json: bool = False
+    def _run(self, *args: str, return_output: bool = False,
+             use_json: bool = False, input_stream: Optional[bytes] = None
              ) -> Union[str, 'JsonObject', None]:
-        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)
+        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)  # type: Dict[str, Any]
+        if input_stream:
+            kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
         if which_cmd is None:
             raise RuntimeError('command not found: {}'.format(args[0]))
@@ -2035,14 +2039,14 @@ class _ModelBackend:
         if use_json:
             args += ('--format=json',)
         try:
-            result = run(args, **kwargs)
+            result = run(args, **kwargs)  # type subprocess.CompletedProcess
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
             if result.stdout is None:
                 return ''
             else:
-                text = result.stdout.decode('utf8')
+                text = result.stdout.decode('utf8')  # type: str
                 if use_json:
                     return json.loads(text)
                 else:
@@ -2133,12 +2137,14 @@ class _ModelBackend:
                 raise RuntimeError(
                     'setting application data is not supported on Juju version {}'.format(version))
 
-        args = ['relation-set', '-r', str(relation_id), '{}={}'.format(key, value)]
+        args = ['relation-set', '-r', str(relation_id)]
         if is_app:
             args.append('--app')
+        args.extend(["--file", "-"])
 
         try:
-            return self._run(*args)
+            content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
+            return self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
