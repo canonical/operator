@@ -150,7 +150,7 @@ class RemoveEvent(HookEvent):
 class ConfigChangedEvent(HookEvent):
     """Event triggered when a configuration change occurs.
 
-    This event can fire in several situations.
+    This event can fire in several situations:
 
     - Right between a :class:`install <InstallEvent>` and a
       :class:`starts <StartEvent>` during the startup sequence
