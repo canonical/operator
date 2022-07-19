@@ -2042,7 +2042,7 @@ class _ModelBackend:
 
             # pyright infers the first match when argument overloading/unpacking is used,
             # so this needs to be coerced into the right type
-            result = typing.cast(CompletedProcess[bytes], result)
+            result = typing.cast('CompletedProcess[bytes]', result)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
