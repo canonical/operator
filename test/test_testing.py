@@ -495,8 +495,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(len(harness.charm.model.get_relation('db').units), 0)
         self.assertFalse(rel_unit in harness.charm.model.get_relation('db').data)
         # Check relation departed was raised with correct data
-        self.assertEqual(harness.charm.get_changes()[0],
-                         {'name': 'relation-departed',
+        self.assertEqual({'name': 'relation-departed',
                           'relation': 'db',
                           'data': {'app': 'postgresql',
                                    'unit': 'postgresql/0',
@@ -505,7 +504,8 @@ class TestHarness(unittest.TestCase):
                                    'relation_data': {'test-app/0': {},
                                                      'test-app': {},
                                                      'postgresql/0': {'foo': 'bar'},
-                                                     'postgresql': {}}}})
+                                                     'postgresql': {}}}},
+                         harness.charm.get_changes()[0])
 
     def test_removing_relation_removes_remote_app_data(self):
         # language=YAML
@@ -530,7 +530,7 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation(rel_id)
         # Check relation and app data are removed
         self.assertEqual(backend.relation_ids('db'), [])
-        with harness.event_context('foo'):
+        with harness._event_context('foo'):
             self.assertRaises(RelationNotFoundError, backend.relation_get,
                               rel_id, remote_app, is_app=True)
 
@@ -1098,7 +1098,7 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0')
         rel = harness.charm.model.get_relation('db')
-        with harness.event_context('foo'):
+        with harness._event_context('foo'):
             with self.assertRaises(ModelError):
                 rel.data[harness.charm.app]['foo'] = 'bar'
         # The data has not actually been changed
@@ -1722,7 +1722,7 @@ class TestHarness(unittest.TestCase):
         event = MagicMock()
         event.relation = rel
 
-        with harness.event_context('my_relation_joined'):
+        with harness._event_context('my_relation_joined'):
             with self.assertRaises(ops.model.RelationDataError):
                 harness.charm.event_handler(event)
 
@@ -1749,7 +1749,7 @@ class TestHarness(unittest.TestCase):
         def mock_join_db(event):
             # the harness thinks we're inside a db_relation_joined hook
             # but we want to mock the remote data here:
-            with harness.event_context(''):
+            with harness._event_context(''):
                 # pretend for a moment we're not in a hook context,
                 # so the harness will let us:
                 print(event.relation.app)
@@ -1824,11 +1824,15 @@ class TestHarness(unittest.TestCase):
         # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         self.assertEqual(
-            harness._get_backend_calls(reset=True), [
+            [
                 ('relation_ids', 'db'),
                 ('relation_list', rel_id),
                 ('relation_remote_app_name', 0),
-            ])
+            ] * 2 + [  # fixme: is this duplication OK?
+                ('relation_get', 0, 'test-charm/0', False),
+                ('relation_set', 0, 'foo', 'bar', False)
+            ],
+            harness._get_backend_calls(reset=True))
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
         harness.add_relation_unit(rel_id, 'postgresql/0')
         self.assertEqual([], harness._get_backend_calls(reset=False))
@@ -1838,12 +1842,16 @@ class TestHarness(unittest.TestCase):
             harness._get_backend_calls(reset=False), [
                 ('relation_ids', 'db'),
                 ('relation_list', rel_id),
+                ('relation_get', 0, 'postgresql/0', False),
+                ('relation_set', 0, 'foo', 'bar', False)
             ])
         # If we check again, they are still there, but now we reset it
         self.assertEqual(
             harness._get_backend_calls(reset=True), [
                 ('relation_ids', 'db'),
                 ('relation_list', rel_id),
+                ('relation_get', 0, 'postgresql/0', False),
+                ('relation_set', 0, 'foo', 'bar', False)
             ])
         # And the calls are gone
         self.assertEqual(harness._get_backend_calls(), [])
@@ -2293,7 +2301,6 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
         harness.begin_with_initial_hooks()
         self.assertEqual(
-            harness.charm.changes,
             [
                 {'name': 'install'},
                 {'name': 'relation-created',
@@ -2327,7 +2334,8 @@ class TestHarness(unittest.TestCase):
                      'unit': 'postgresql/0',
                      'app': 'postgresql',
                  }},
-            ])
+            ],
+            harness.charm.changes)
 
     def test_begin_with_initial_hooks_with_multiple_units(self):
         class CharmWithDB(RelationEventCharm):

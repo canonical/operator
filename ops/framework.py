@@ -862,6 +862,12 @@ class Framework(Object):
         or not.  It sets backend._hook_is_running equal to the name of the currently running
         hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
         is completed.
+
+        Usage:
+            >>> with harness._event_context('db-relation-changed'):
+            >>>     print('Harness thinks it is running an event hook.')
+            >>> with harness._event_context(''):
+            >>>     print('harness thinks it is not running an event hook.')
         """
         backend = self.model._backend if self.model else None  # type: Optional[_ModelBackend]
 

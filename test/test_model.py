@@ -37,7 +37,6 @@ from ops.pebble import APIError, FileInfo, FileType, ServiceInfo
 
 
 class TestModel(unittest.TestCase):
-
     def setUp(self):
         self.harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
             name: myapp
@@ -270,7 +269,7 @@ class TestModel(unittest.TestCase):
         self.assertIn('host', rel_db1.data[remoteapp1_0])
         self.assertEqual(repr(rel_db1.data[remoteapp1_0]), "{'host': 'remoteapp1/0'}")
 
-        with self.harness.event_context('foo'):
+        with self.harness._event_context('foo'):
             with self.assertRaises(ops.model.RelationDataError):
                 rel_db1.data[remoteapp1_0]['foo'] = 'bar'
         self.assertNotIn('foo', rel_db1.data[remoteapp1_0])
@@ -341,7 +340,7 @@ class TestModel(unittest.TestCase):
         rel_db1 = self.model.get_relation('db1')
         self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
 
-        with self.harness.event_context('foo'):
+        with self.harness._event_context('foo'):
             # if we were inside an event context, we'd get:
             with self.assertRaises(ops.model.RelationDataError):
                 rel_db1.data[local_app]['password'] = 'foobar'
@@ -355,7 +354,7 @@ class TestModel(unittest.TestCase):
         r_id = self.harness.add_relation('db2', 'myapp')
         self.harness.add_relation_unit(r_id, 'myapp/1')  # peer!
         self.harness.update_relation_data(r_id, 'myapp', {'foo': 'bar'})
-        with self.harness.event_context('foo'):
+        with self.harness._event_context('foo'):
             # leaders can read
             self.harness.set_leader(True)
             relation = self.harness.model.get_relation('db2')
@@ -365,7 +364,7 @@ class TestModel(unittest.TestCase):
         r_id = self.harness.add_relation('db2', 'myapp')
         self.harness.add_relation_unit(r_id, 'myapp/1')  # peer!
         self.harness.update_relation_data(r_id, 'myapp', {'foo': 'bar'})
-        with self.harness.event_context('foo'):
+        with self.harness._event_context('foo'):
             # nonleaders can read
             self.harness.set_leader(False)
             relation = self.harness.model.get_relation('db2')
@@ -501,7 +500,7 @@ class TestModel(unittest.TestCase):
 
         self.assertBackendCalls([])
 
-        with self.harness.event_context('foo'):
+        with self.harness._event_context('foo'):
             self.resetBackendCalls()
 
             self.assertEqual(rel_db1.data[local_app]['local'], 'data')
@@ -541,7 +540,7 @@ class TestModel(unittest.TestCase):
         rel_db1.data[local_app]
         # nonleader units cannot read their local app databag
         # attempting to read it is not
-        with self.harness.event_context('foo'):
+        with self.harness._event_context('foo'):
             self.resetBackendCalls()
 
             with self.assertRaises(ops.model.RelationDataError):

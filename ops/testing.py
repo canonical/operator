@@ -43,6 +43,7 @@ import tempfile
 import typing
 import uuid
 import warnings
+from typing import Dict
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
@@ -133,8 +134,7 @@ class Harness(typing.Generic[CharmType]):
                 'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
 
-        # expose event_context at Harness level
-    def event_context(self, event_name: str):
+    def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
 
         This means that the Harness will perform strict access control of relation data.
@@ -143,7 +143,7 @@ class Harness(typing.Generic[CharmType]):
 
         # this is how we test that attempting to write a remote app's
         # databag will raise RelationDataError.
-        >>> with harness.event_context('foo'):
+        >>> with harness._event_context('foo'):
         >>>     with pytest.raises(ops.model.RelationDataError):
         >>>         my_relation.data[remote_app]['foo'] = 'bar'
 
@@ -160,7 +160,7 @@ class Harness(typing.Generic[CharmType]):
         >>>     event = MagicMock()
         >>>     event.relation = harness.charm.model.relations[0]
         >>>
-        >>>     with harness.event_context('my_relation_joined'):
+        >>>     with harness._event_context('my_relation_joined'):
         >>>         with pytest.raises(ops.model.RelationDataError):
         >>>             harness.charm.event_handler(event)
 
@@ -179,7 +179,7 @@ class Harness(typing.Generic[CharmType]):
         >>>     event = MagicMock()
         >>>     event.relation = harness.charm.model.relations[0]
         >>>
-        >>>     with harness.event_context('my_relation_joined'):
+        >>>     with harness._event_context('my_relation_joined'):
         >>>         harness.charm.event_handler(event)
 
         """
@@ -329,7 +329,7 @@ class Harness(typing.Generic[CharmType]):
             # relation-joined for the same unit.
             # Juju only fires relation-changed (app) if there is data for the related application
             relation = self._model.get_relation(rel_name, rel_id)
-            if self._backend._relation_data[rel_id].get(app_name):
+            if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
                 self._charm.on[rel_name].relation_changed.emit(
                     relation, app, None)
@@ -617,14 +617,6 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_names[relation_id] = relation_name
         self._backend._relation_list_map[relation_id] = []
         relation = self._model.get_relation(relation_name, relation_id)
-        self._backend._relation_data[relation_id] = {
-            remote_app: RelationDataContent(
-                relation, self.model.unit, self._backend),
-            self._backend.unit_name: RelationDataContent(
-                relation, self.model.unit, self._backend),
-            self._backend.app_name: RelationDataContent(
-                relation, self.model.unit, self._backend)
-        }
         self._backend._relation_data_raw[relation_id] = {
             remote_app: {},
             self._backend.unit_name: {},
@@ -663,7 +655,6 @@ class Harness(typing.Generic[CharmType]):
             self._model.relations._invalidate(relation_name)
 
         self._backend._relation_app_and_units.pop(relation_id)
-        self._backend._relation_data.pop(relation_id)
         self._backend._relation_data_raw.pop(relation_id)
         self._backend._relation_list_map.pop(relation_id)
         self._backend._relation_ids_map[relation_name].remove(relation_id)
@@ -711,13 +702,10 @@ class Harness(typing.Generic[CharmType]):
             None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        rel_data = self._backend._relation_data
         # we can write remote unit data iff we are not in a hook env
         relation_name = self._backend._relation_names[relation_id]
         relation = self._model.get_relation(relation_name, relation_id)
         self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
-        rel_data[relation_id][remote_unit_name] = RelationDataContent(
-            relation, self.model.unit, self._backend)
         if not remote_unit_name.startswith(relation.app.name):
             raise ValueError(
                 'Remote unit name invalid: the remote application of {} is called {!r}; '
@@ -777,7 +765,6 @@ class Harness(typing.Generic[CharmType]):
         # remove the relation data for the departed unit now that the event has happened
         self._backend._relation_list_map[relation_id].remove(remote_unit_name)
         self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)
-        self._backend._relation_data[relation_id].pop(remote_unit_name)
         self._backend._relation_data_raw[relation_id].pop(remote_unit_name)
         self.model._relations._invalidate(relation_name=relation.name)
 
@@ -924,26 +911,21 @@ class Harness(typing.Generic[CharmType]):
             # Note, this won't cause the data to be loaded if it wasn't already.
             rel_data._invalidate()
 
-        # we manipulate directly the 'raw' relation data, no need
-        # to go via relation_set/get (and bypass access control)
-        new_values = self._backend._relation_data_raw[relation_id][app_or_unit].copy()
-        assert isinstance(new_values, dict), new_values
+        old_values = self._backend._relation_data_raw[relation_id][app_or_unit].copy()
+        assert isinstance(old_values, dict), old_values
 
+        databag = self.model.relations._get_unique(relation.name, relation_id).data[entity]
         # ensure that WE as harness can temporarily write the databag
-        with self.event_context(''):
+        with self._event_context(''):
             values_have_changed = False
             for k, v in key_values.items():
                 if v == '':
-                    if new_values.pop(k, None) != v:
+                    if databag.pop(k, None) != v:
                         values_have_changed = True
                 else:
-                    if k not in new_values or new_values[k] != v:
-                        new_values[k] = v
+                    if k not in databag or databag[k] != v:
+                        databag[k] = v
                         values_have_changed = True
-
-        # Update the relation data in any case to avoid spurious references
-        # by a test to an updated value to be invalidated by a lack of assignment
-        self._backend._relation_data_raw[relation_id][app_or_unit] = new_values
 
         if not values_have_changed:
             # Do not issue a relation changed event if the data bags have not changed
@@ -1175,8 +1157,8 @@ class _TestingModelBackend:
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
         self._relation_names = {}  # reverse map from relation_id to relation_name
         self._relation_list_map = {}  # relation_id: [unit_name,...]
-        self._relation_data_raw = {}  # {relation_id: {name: Dict[str: str]}}
-        self._relation_data = {}  # {relation_id: {name: RelationDataContents}}
+        # {relation_id: {name: Dict[str: str]}}
+        self._relation_data_raw = {}  # type: Dict[int, Dict[str, Dict[str, str]]]
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
         self._relation_app_and_units = {}
         self._config = {}
@@ -1307,6 +1289,8 @@ class _TestingModelBackend:
             bucket.pop(key, None)
         else:
             bucket[key] = value
+
+        print(bucket)
 
     def config_get(self):
         return self._config
