@@ -1946,17 +1946,17 @@ class TestModelBackend(unittest.TestCase):
             lambda: fake_script(self, 'relation-set', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.ModelError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', '--file', '-']],
         ), (
             lambda: fake_script(self, 'relation-set', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', '--file', '-']],
         ), (
             lambda: None,
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=True),
             ops.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar', '--app']],
+            [['relation-set', '-r', '3', '--app', '--file', '-']],
         ), (
             lambda: fake_script(self, 'relation-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
@@ -2004,15 +2004,25 @@ class TestModelBackend(unittest.TestCase):
     def test_relation_set_juju_version_quirks(self):
         self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
 
-        fake_script(self, 'relation-set', 'exit 0')
-
         # on 2.7.0+, things proceed as expected
         for v in ['2.8.0', '2.7.0']:
             with self.subTest(v):
-                os.environ['JUJU_VERSION'] = v
-                self.backend.relation_set(1, 'foo', 'bar', is_app=True)
-                calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
-                self.assertEqual(calls, ['relation-set -r 1 foo=bar --app'])
+                t = tempfile.NamedTemporaryFile()
+                try:
+                    fake_script(self, 'relation-set', dedent("""
+                        cat >> {}
+                        """).format(pathlib.Path(t.name).as_posix()))
+                    os.environ['JUJU_VERSION'] = v
+                    self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+                    calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
+                    self.assertEqual(calls, ['relation-set -r 1 --app --file -'])
+                    t.seek(0)
+                    content = t.read()
+                finally:
+                    t.close()
+                self.assertEqual(content.decode('utf-8'), dedent("""\
+                    foo: bar
+                    """))
 
         # before 2.7.0, it just fails always (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'
