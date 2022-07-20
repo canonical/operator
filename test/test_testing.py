@@ -999,7 +999,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(viewer.changes, [{'initial': 'data'}])
 
     def test_empty_config_raises(self):
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(TypeError):
             Harness(RecordingCharm, config='')
 
     def test_update_config(self):
@@ -1039,12 +1039,66 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(ValueError):
             harness.update_config(key_values={'nonexistent': 'foo'})
 
+    def test_update_config_bad_type(self):
+        harness = Harness(RecordingCharm, config='''
+            options:
+                a:
+                    description: a config option
+                    type: boolean
+                    default: false
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        with self.assertRaises(RuntimeError):
+            # cannot cast to bool
+            harness.update_config(key_values={'a': 'foo'})
+
+        with self.assertRaises(RuntimeError):
+            # cannot cast to float
+            harness.update_config(key_values={'a': 42.42})
+
+        with self.assertRaises(RuntimeError):
+            # cannot cast to int
+            harness.update_config(key_values={'a': 42})
+
+        # can cast to bool!
+        harness.update_config(key_values={'a': False})
+
+    def test_bad_config_option_type(self):
+        with self.assertRaises(RuntimeError):
+            Harness(RecordingCharm, config='''
+                options:
+                    a:
+                        description: a config option
+                        type: gibberish
+                        default: False
+                ''')
+
+    def test_no_config_option_type(self):
+        with self.assertRaises(RuntimeError):
+            Harness(RecordingCharm, config='''
+                options:
+                    a:
+                        description: a config option
+                        default: False
+                ''')
+
+    def test_uncastable_config_option_type(self):
+        with self.assertRaises(RuntimeError):
+            Harness(RecordingCharm, config='''
+                options:
+                    a:
+                        description: a config option
+                        type: boolean
+                        default: peek-a-bool!
+                ''')
+
     def test_update_config_unset_boolean(self):
         harness = Harness(RecordingCharm, config='''
             options:
                 a:
                     description: a config option
-                    type: bool
+                    type: boolean
                     default: False
             ''')
         self.addCleanup(harness.cleanup)
@@ -1255,8 +1309,8 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.model.config['opt_float'], 1.0)
         self.assertIsInstance(harness.model.config['opt_float'], float)
         self.assertFalse('opt_null' in harness.model.config)
-        self.assertIsNone(harness._defaults['opt_null'])
-        self.assertIsNone(harness._defaults['opt_no_default'])
+        self.assertIsNone(harness._backend._config._defaults['opt_null'])
+        self.assertIsNone(harness._backend._config._defaults['opt_no_default'])
 
     def test_set_model_name(self):
         harness = Harness(CharmBase, meta='''

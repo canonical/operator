@@ -24,8 +24,6 @@ import typing
 import warnings
 from pathlib import Path
 
-import yaml
-
 import ops.charm
 import ops.framework
 import ops.model
@@ -251,7 +249,6 @@ class _Dispatcher:
 
         dispatch_path = _exe_path(self._charm_dir / self._dispatch_path)
         if dispatch_path is None:
-            logger.debug("Legacy %s does not exist.", self._dispatch_path)
             return
 
         # super strange that there isn't an is_executable
@@ -326,7 +323,6 @@ def _should_use_controller_storage(db_path: Path, meta: ops.charm.CharmMeta) -> 
     """Figure out whether we want to use controller storage or not."""
     # if you've previously used local state, carry on using that
     if db_path.exists():
-        logger.debug("Using local storage: %s already exists", db_path)
         return False
 
     # if you're not in k8s you don't need controller storage
@@ -374,8 +370,6 @@ def main(charm_class: typing.Type[ops.charm.CharmBase], use_juju_for_storage: bo
     else:
         actions_metadata = None
 
-    if not yaml.__with_libyaml__:
-        logger.debug('yaml does not have libyaml extensions, using slower pure Python yaml loader')
     meta = ops.charm.CharmMeta.from_yaml(metadata, actions_metadata)
     model = ops.model.Model(meta, model_backend)
 
