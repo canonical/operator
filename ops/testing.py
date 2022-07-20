@@ -650,8 +650,8 @@ class Harness(typing.Generic[CharmType]):
             None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        rel_data = self._backend._relation_data
-        rel_data[relation_id][remote_unit_name] = _TestingRelationDataContents()
+        self._backend._relation_data[relation_id][
+            remote_unit_name] = _TestingRelationDataContents()
         # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
         #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
         self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
@@ -689,7 +689,7 @@ class Harness(typing.Generic[CharmType]):
 
         Args:
             relation_id: The integer relation identifier (as returned by add_relation).
-            remote_unit_name: A string representing the remote unit that is being added.
+            remote_unit_name: A string representing the remote unit that is being removed.
 
         Raises:
             KeyError: if relation_id or remote_unit_name is not valid
@@ -855,6 +855,7 @@ class Harness(typing.Generic[CharmType]):
             rel_data._invalidate()
 
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
+        assert isinstance(new_values, _TestingRelationDataContents), new_values
         values_have_changed = False
         for k, v in key_values.items():
             if v == '':
@@ -1145,9 +1146,11 @@ class _TestingConfig(dict):
 class _TestingRelationDataContents(dict):
     def __setitem__(self, key, value):
         if not isinstance(key, str):
-            raise model.RelationDataError('relation data keys must be strings')
+            raise model.RelationDataError(
+                'relation data keys must be strings, not {}'.format(type(key)))
         if not isinstance(value, str):
-            raise model.RelationDataError('relation data values must be strings')
+            raise model.RelationDataError(
+                'relation data values must be strings, not {}'.format(type(value)))
         super().__setitem__(key, value)
 
     def copy(self):
@@ -1283,11 +1286,15 @@ class _TestingModelBackend:
             raise model.RelationNotFoundError()
         return self._relation_data[relation_id][member_name].copy()
 
-    def relation_set(self, relation_id, key, value, is_app):
+    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+        if not isinstance(is_app, bool):
+            raise TypeError('is_app parameter to relation_set must be a boolean')
+
         if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
                 relation_id):
             raise RuntimeError(
                 'remote-side relation data cannot be accessed during a relation-broken event')
+
         relation = self._relation_data[relation_id]
         if is_app:
             bucket_key = self.app_name

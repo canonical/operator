@@ -29,6 +29,7 @@ import pytest
 import ops.charm
 import ops.model
 import ops.testing
+from ops import model
 from ops._private import yaml
 from ops.charm import RelationMeta, RelationRole
 from ops.pebble import APIError, FileInfo, FileType, ServiceInfo
@@ -175,6 +176,22 @@ class TestModel(unittest.TestCase):
     def test_our_unit_is_our(self):
         self.assertTrue(self.model.unit._is_our_unit)
         self.assertTrue(self.model.unit.app._is_our_app)
+
+    def test_invalid_type_relation_data(self):
+        relation_id = self.harness.add_relation('db1', 'remoteapp1')
+        self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
+
+        with self.assertRaises(model.RelationDataError):
+            self.harness.update_relation_data(
+                relation_id,
+                'remoteapp1/0',
+                {42: 'remoteapp1-0'})
+
+        with self.assertRaises(model.RelationDataError):
+            self.harness.update_relation_data(
+                relation_id,
+                'remoteapp1/0',
+                {'foo': 42})
 
     def test_unit_relation_data(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
@@ -403,12 +420,19 @@ class TestModel(unittest.TestCase):
         self.resetBackendCalls()
 
         rel_db1 = self.model.get_relation('db1')
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = 1
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = {'foo': 'bar'}
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = None
+        for key, value in (
+                ('foo', 1),
+                ('foo', None),
+                ('foo', {'foo': 'bar'}),
+                (1, 'foo'),
+                (None, 'foo'),
+                (('foo', 'bar'), 'foo'),
+                (1, 1),
+                (None, None)
+        ):
+            with self.assertRaises(ops.model.RelationDataError):
+                rel_db1.data[self.model.unit][key] = value
+
         # No data has actually been changed
         self.assertEqual(dict(rel_db1.data[self.model.unit]), {'host': 'myapp-0'})
 
