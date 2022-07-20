@@ -152,16 +152,19 @@ class ConfigChangedEvent(HookEvent):
 
     This event can fire in several situations:
 
-    - Right between a :class:`install <InstallEvent>` and a
-      :class:`starts <StartEvent>` during the startup sequence
-      (when you first deploy a unit). This event notifies the charm of
-      its initial configuration.
+    - Right after the unit starts up for the first time.
+      This event notifies the charm of its initial configuration.
+      Typically, this event will fire between a :class:`install <InstallEvent>`
+      and a :class:`starts <StartEvent>` during the startup sequence
+      (when you first deploy a unit), but more in general it will fire whenever
+      the unit is (re)started, e.g. after pod churn on kubernetes, on unit
+      rescheduling, on unit upgrade/refresh, etc...
+    - As a specific instance of the above point: when networking changes
+      (if the machine reboots and comes up with a different IP).
     - When the cloud admin reconfigures the charm via the juju CLI, i.e.
       `juju config my-charm foo=bar`. This event notifies the charm of
       its new configuration. (The event itself, however, is now aware of *what*
       specifically has changed in the config).
-    - When networking changes (if the machine reboots and comes up
-      with a different IP).
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
