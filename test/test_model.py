@@ -59,7 +59,7 @@ class TestModel(unittest.TestCase):
             bar:
                 type: int
             qux:
-                type: bool
+                type: boolean
         ''')
         self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
