@@ -13,21 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import ipaddress
 import json
 import os
 import pathlib
+import tempfile
 import unittest
 from collections import OrderedDict
 from test.test_helpers import fake_script, fake_script_calls
 from textwrap import dedent
 
+import pytest
+
 import ops.charm
 import ops.model
 import ops.testing
+from ops import model
 from ops._private import yaml
 from ops.charm import RelationMeta, RelationRole
-from ops.pebble import APIError, ServiceInfo
+from ops.pebble import APIError, FileInfo, FileType, ServiceInfo
 
 
 class TestModel(unittest.TestCase):
@@ -54,7 +59,7 @@ class TestModel(unittest.TestCase):
             bar:
                 type: int
             qux:
-                type: bool
+                type: boolean
         ''')
         self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
@@ -171,6 +176,22 @@ class TestModel(unittest.TestCase):
     def test_our_unit_is_our(self):
         self.assertTrue(self.model.unit._is_our_unit)
         self.assertTrue(self.model.unit.app._is_our_app)
+
+    def test_invalid_type_relation_data(self):
+        relation_id = self.harness.add_relation('db1', 'remoteapp1')
+        self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
+
+        with self.assertRaises(model.RelationDataError):
+            self.harness.update_relation_data(
+                relation_id,
+                'remoteapp1/0',
+                {42: 'remoteapp1-0'})
+
+        with self.assertRaises(model.RelationDataError):
+            self.harness.update_relation_data(
+                relation_id,
+                'remoteapp1/0',
+                {'foo': 42})
 
     def test_unit_relation_data(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
@@ -399,12 +420,19 @@ class TestModel(unittest.TestCase):
         self.resetBackendCalls()
 
         rel_db1 = self.model.get_relation('db1')
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = 1
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = {'foo': 'bar'}
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[self.model.unit]['foo'] = None
+        for key, value in (
+                ('foo', 1),
+                ('foo', None),
+                ('foo', {'foo': 'bar'}),
+                (1, 'foo'),
+                (None, 'foo'),
+                (('foo', 'bar'), 'foo'),
+                (1, 1),
+                (None, None)
+        ):
+            with self.assertRaises(ops.model.RelationDataError):
+                rel_db1.data[self.model.unit][key] = value
+
         # No data has actually been changed
         self.assertEqual(dict(rel_db1.data[self.model.unit]), {'host': 'myapp-0'})
 
@@ -686,7 +714,6 @@ class TestModel(unittest.TestCase):
         self.assertBackendCalls([])
 
     def test_storage(self):
-        # TODO: (jam) 2020-05-07 Harness doesn't yet expose storage-get issue #263
         meta = ops.charm.CharmMeta()
         meta.storages = {'disks': None, 'data': None}
         model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
@@ -712,6 +739,10 @@ class TestModel(unittest.TestCase):
         self.assertEqual(len(model.storages), 2)
         self.assertEqual(model.storages.keys(), meta.storages.keys())
         self.assertIn('disks', model.storages)
+
+        with pytest.raises(KeyError, match='Did you mean'):
+            model.storages['does-not-exist']
+
         test_cases = {
             0: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/0')},
             1: {'name': 'disks', 'location': pathlib.Path('/var/srv/disks/1')},
@@ -753,6 +784,240 @@ class TestModel(unittest.TestCase):
 
     def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
+
+
+class PushPullCase:
+    """Test case for table-driven tests."""
+
+    def __init__(self, **vals):
+        self.pattern = None
+        self.dst = None
+        self.errors = []
+        self.want = set()
+        for key, val in vals.items():
+            setattr(self, key, val)
+
+
+recursive_list_cases = [
+    PushPullCase(
+        name='basic recursive list',
+        path='/',
+        files=['/foo/bar.txt', '/baz.txt'],
+        want={'/foo/bar.txt', '/baz.txt'},
+    ),
+    PushPullCase(
+        name='basic recursive list reverse',
+        path='/',
+        files=['/baz.txt', '/foo/bar.txt'],
+        want={'/foo/bar.txt', '/baz.txt'},
+    ),
+    PushPullCase(
+        name='directly list a (non-directory) file',
+        path='/baz.txt',
+        files=['/baz.txt'],
+        want={'/baz.txt'},
+    ),
+]
+
+
+@pytest.mark.parametrize('case', recursive_list_cases)
+def test_recursive_list(case):
+    def list_func_gen(file_list):
+        args = {
+            'last_modified': datetime.time(),
+            'permissions': 0o777,
+            'size': 42,
+            'user_id': 0,
+            'user': 'foo',
+            'group_id': 1024,
+            'group': 'bar',
+        }
+        file_infos, dirs = [], set()
+        for f in file_list:
+            file_infos.append(
+                FileInfo(
+                    path=f,
+                    name=os.path.basename(f),
+                    type=FileType.FILE,
+                    **args))
+
+            # collect all the directories for the test case's files
+            dirpath = os.path.dirname(f)
+            if dirpath != '' and dirpath not in dirs:
+                dirs.update(dirpath)
+                file_infos.append(
+                    FileInfo(
+                        path=dirpath,
+                        name=os.path.basename(dirpath),
+                        type=FileType.DIRECTORY,
+                        **args))
+
+        def inner(path):
+            path = str(path)
+            matches = []
+            for info in file_infos:
+                # exclude file infos for separate trees and also
+                # for the directory we are listing itself - we only want its contents.
+                if not info.path.startswith(path) or (
+                        info.type == FileType.DIRECTORY and path == info.path):
+                    continue
+                # exclude file infos for files that are in subdirectories of path.
+                # we only want files that are directly in path.
+                if info.path[len(path):].find('/') > 0:
+                    continue
+                matches.append(info)
+            return matches
+        return inner
+
+    # test raw business logic for recursion and dest path construction
+    files = set()
+    case.path = os.path.normpath(case.path)
+    case.files = [os.path.normpath(f) for f in case.files]
+    case.want = {os.path.normpath(f) for f in case.want}
+    for f in ops.model.Container._list_recursive(
+        list_func_gen(
+            case.files), pathlib.Path(
+            case.path)):
+        path = f.path
+        if case.dst is not None:
+            # test destination path construction
+            _, path = f.path, ops.model.Container._build_destpath(
+                f.path, case.path, case.dst)
+        files.add(path)
+    assert case.want == files, 'case {!r} has wrong files: want {}, got {}'.format(
+        case.name, case.want, files)
+
+
+recursive_push_pull_cases = [
+    PushPullCase(
+        name='basic push/pull',
+        path='/foo',
+        dst='/baz',
+        files=['/foo/bar.txt'],
+        want={'/baz/foo/bar.txt'},
+    ),
+    PushPullCase(
+        name='push/pull - trailing slash',
+        path='/foo/',
+        dst='/baz',
+        files=['/foo/bar.txt'],
+        want={'/baz/foo/bar.txt'},
+    ),
+    PushPullCase(
+        name='basic push/pull - root',
+        path='/',
+        dst='/baz',
+        files=['/foo/bar.txt'],
+        want={'/baz/foo/bar.txt'},
+    ),
+    PushPullCase(
+        name='basic push/pull - multicomponent path',
+        path='/foo/bar',
+        dst='/baz',
+        files=['/foo/bar/baz.txt'],
+        want={'/baz/bar/baz.txt'},
+    ),
+    PushPullCase(
+        name='push/pull contents',
+        path='/foo/*',
+        dst='/baz',
+        files=['/foo/bar.txt'],
+        want={'/baz/bar.txt'},
+    ),
+    PushPullCase(
+        name='directly push/pull a specific file',
+        path='/foo/bar.txt',
+        dst='/baz',
+        files=['/foo/bar.txt'],
+        want={'/baz/bar.txt'},
+    ),
+    PushPullCase(
+        name='error on push/pull non-existing file',
+        path='/foo/bar.txt',
+        dst='/baz',
+        files=[],
+        errors={'/foo/bar.txt'},
+    ),
+    PushPullCase(
+        name='push/pull multiple non-existing files',
+        path=['/foo/bar.txt', '/boo/far.txt'],
+        dst='/baz',
+        files=[],
+        errors={'/foo/bar.txt', '/boo/far.txt'},
+    ),
+    PushPullCase(
+        name='push/pull file and dir combo',
+        path=['/foo/foobar.txt', '/foo/bar'],
+        dst='/baz',
+        files=['/foo/bar/baz.txt', '/foo/foobar.txt', '/quux.txt'],
+        want={'/baz/foobar.txt', '/baz/bar/baz.txt'},
+    ),
+]
+
+
+@unittest.skipIf(os.name == 'nt', "These pebble ops are not supported on windows")
+@pytest.mark.parametrize('case', recursive_push_pull_cases)
+def test_recursive_push_and_pull(case):
+    # full "integration" test of push+pull
+    harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
+        name: test-app
+        containers:
+          foo:
+            resource: foo-image
+        ''')
+    harness.begin()
+    c = harness.model.unit.containers['foo']
+
+    # create push test case filesystem structure
+    push_src = tempfile.TemporaryDirectory()
+    for file in case.files:
+        fpath = os.path.join(push_src.name, file[1:])
+        os.makedirs(os.path.dirname(fpath), exist_ok=True)
+        with open(fpath, 'w') as f:
+            f.write('hello')
+
+    # test push
+    if isinstance(case.path, list):
+        # swap slash for dummy dir on root dir so Path.parent doesn't return tmpdir path component
+        # otherwise remove leading slash so we can do the path join properly.
+        push_path = [os.path.join(push_src.name, p[1:] if len(p) > 1 else 'foo')
+                     for p in case.path]
+    else:
+        # swap slash for dummy dir on root dir so Path.parent doesn't return tmpdir path component
+        # otherwise remove leading slash so we can do the path join properly.
+        push_path = os.path.join(push_src.name, case.path[1:] if len(case.path) > 1 else 'foo')
+
+    errors = []
+    try:
+        c.push_path(push_path, case.dst)
+    except ops.model.MultiPushPullError as err:
+        if not case.errors:
+            raise
+        errors = {src[len(push_src.name):] for src, _ in err.errors}
+
+    assert case.errors == errors, \
+        'push_path gave wrong expected errors: want {}, got {}'.format(case.errors, errors)
+    for fpath in case.want:
+        assert c.exists(fpath), 'push_path failed: file {} missing at destination'.format(fpath)
+
+    # create pull test case filesystem structure
+    pull_dst = tempfile.TemporaryDirectory()
+    for fpath in case.files:
+        c.push(fpath, 'hello', make_dirs=True)
+
+    # test pull
+    errors = []
+    try:
+        c.pull_path(case.path, os.path.join(pull_dst.name, case.dst[1:]))
+    except ops.model.MultiPushPullError as err:
+        if not case.errors:
+            raise
+        errors = {src for src, _ in err.errors}
+
+    assert case.errors == errors, \
+        'pull_path gave wrong expected errors: want {}, got {}'.format(case.errors, errors)
+    for fpath in case.want:
+        assert c.exists(fpath), 'pull_path failed: file {} missing at destination'.format(fpath)
 
 
 class TestApplication(unittest.TestCase):
@@ -1704,17 +1969,17 @@ class TestModelBackend(unittest.TestCase):
             lambda: fake_script(self, 'relation-set', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.ModelError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', '--file', '-']],
         ), (
             lambda: fake_script(self, 'relation-set', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', '--file', '-']],
         ), (
             lambda: None,
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=True),
             ops.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar', '--app']],
+            [['relation-set', '-r', '3', '--app', '--file', '-']],
         ), (
             lambda: fake_script(self, 'relation-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
@@ -1762,15 +2027,25 @@ class TestModelBackend(unittest.TestCase):
     def test_relation_set_juju_version_quirks(self):
         self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
 
-        fake_script(self, 'relation-set', 'exit 0')
-
         # on 2.7.0+, things proceed as expected
         for v in ['2.8.0', '2.7.0']:
             with self.subTest(v):
-                os.environ['JUJU_VERSION'] = v
-                self.backend.relation_set(1, 'foo', 'bar', is_app=True)
-                calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
-                self.assertEqual(calls, ['relation-set -r 1 foo=bar --app'])
+                t = tempfile.NamedTemporaryFile()
+                try:
+                    fake_script(self, 'relation-set', dedent("""
+                        cat >> {}
+                        """).format(pathlib.Path(t.name).as_posix()))
+                    os.environ['JUJU_VERSION'] = v
+                    self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+                    calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
+                    self.assertEqual(calls, ['relation-set -r 1 --app --file -'])
+                    t.seek(0)
+                    content = t.read()
+                finally:
+                    t.close()
+                self.assertEqual(content.decode('utf-8'), dedent("""\
+                    foo: bar
+                    """))
 
         # before 2.7.0, it just fails always (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'

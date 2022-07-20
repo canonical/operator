@@ -18,6 +18,7 @@ import enum
 import os
 import pathlib
 import typing
+from typing import TYPE_CHECKING
 
 from ops import model
 from ops._private import yaml
@@ -147,18 +148,23 @@ class RemoveEvent(HookEvent):
 
 
 class ConfigChangedEvent(HookEvent):
-    """Event triggered when a configuration change is requested.
+    """Event triggered when a configuration change occurs.
 
-    This event fires in several different situations.
+    This event can fire in several situations:
 
-    - immediately after the :class:`install <InstallEvent>` event.
-    - after a :class:`relation is created <RelationCreatedEvent>`.
-    - after a :class:`leader is elected <LeaderElectedEvent>`.
-    - after changing charm configuration using the GUI or command line
-      interface
-    - when the charm :class:`starts <StartEvent>`.
-    - when a new unit :class:`joins a relation <RelationJoinedEvent>`.
-    - when there is a :class:`change to an existing relation <RelationChangedEvent>`.
+    - Right after the unit starts up for the first time.
+      This event notifies the charm of its initial configuration.
+      Typically, this event will fire between a :class:`install <InstallEvent>`
+      and a :class:`starts <StartEvent>` during the startup sequence
+      (when you first deploy a unit), but more in general it will fire whenever
+      the unit is (re)started, e.g. after pod churn on kubernetes, on unit
+      rescheduling, on unit upgrade/refresh, etc...
+    - As a specific instance of the above point: when networking changes
+      (if the machine reboots and comes up with a different IP).
+    - When the cloud admin reconfigures the charm via the juju CLI, i.e.
+      `juju config my-charm foo=bar`. This event notifies the charm of
+      its new configuration. (The event itself, however, is now aware of *what*
+      specifically has changed in the config).
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
@@ -669,8 +675,12 @@ class CharmBase(Object):
 
     # note that without the #: below, sphinx will copy the whole of CharmEvents
     # docstring inline which is less than ideal.
-    #: Used to set up event handlers; see :class:`CharmEvents`.
+    # Used to set up event handlers; see :class:`CharmEvents`.
     on = CharmEvents()
+    if TYPE_CHECKING:
+        # to help the type checker and IDEs:
+        @property
+        def on(self) -> CharmEvents: ... # noqa
 
     def __init__(self, framework: Framework, key: typing.Optional = None):
         super().__init__(framework, None)

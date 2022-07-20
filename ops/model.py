@@ -21,17 +21,20 @@ import math
 import os
 import re
 import shutil
+import stat
 import tempfile
 import time
 import typing
 import weakref
 from abc import ABC, abstractmethod
 from pathlib import Path
-from subprocess import PIPE, CalledProcessError, run
+from subprocess import PIPE, CalledProcessError, CompletedProcess, run
 from typing import (
     Any,
     BinaryIO,
+    Callable,
     Dict,
+    Generator,
     Iterable,
     List,
     Mapping,
@@ -52,6 +55,7 @@ from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
+    from pebble import _LayerDict  # pyright: reportMissingTypeStubs=false
     from typing_extensions import TypedDict
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
@@ -70,8 +74,6 @@ if typing.TYPE_CHECKING:
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
-    # todo: replace with pebble._LayerDict (a TypedDict) when pebble.py is typed
-    _LayerDict = Dict[str, '_LayerDict']
     _Layer = Union[str, _LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
@@ -106,6 +108,8 @@ if typing.TYPE_CHECKING:
         'egress-subnets': List[str]
     })
 
+
+StrOrPath = typing.Union[str, Path]
 
 logger = logging.getLogger(__name__)
 
@@ -882,6 +886,15 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
         return iter(self._data)
 
     def __getitem__(self, key: 'UnitOrApplication'):
+        if key is None and self.relation.app is None:
+            # NOTE: if juju gets fixed to set JUJU_REMOTE_APP for relation-broken events, then that
+            # should fix the only case in which we expect key to be None - potentially removing the
+            # need for this error in future ops versions (i.e. if relation.app is guaranteed to not
+            # be None. See https://bugs.launchpad.net/juju/+bug/1960934.
+            raise KeyError(
+                'Cannot index relation data with "None".'
+                ' Are you trying to access remote app data during a relation-broken event?'
+                ' This is not allowed.')
         return self._data[key]
 
     def __repr__(self):
@@ -926,9 +939,14 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __setitem__(self, key: str, value: str):
         if not self._is_mutable():
-            raise RelationDataError('cannot set relation data for {}'.format(self._entity.name))
+            raise RelationDataError(
+                'cannot set relation data for {}'.format(self._entity.name))
+        if not isinstance(key, str):
+            raise RelationDataError(
+                'relation data keys must be strings, not {}'.format(type(key)))
         if not isinstance(value, str):
-            raise RelationDataError('relation data values must be strings')
+            raise RelationDataError(
+                'relation data values must be strings, not {}'.format(type(value)))
 
         self._backend.relation_set(self.relation.id, key, value, self._is_app)
 
@@ -1134,6 +1152,10 @@ class StorageMapping(Mapping[str, List['Storage']]):
         return iter(self._storage_map)
 
     def __getitem__(self, storage_name: str) -> List['Storage']:
+        if storage_name not in self._storage_map:
+            meant = ', or '.join(['{!r}'.format(k) for k in self._storage_map.keys()])
+            raise KeyError(
+                'Storage {!r} not found. Did you mean {}?'.format(storage_name, meant))
         storage_list = self._storage_map[storage_name]
         if storage_list is None:
             storage_list = self._storage_map[storage_name] = []
@@ -1207,6 +1229,28 @@ class Storage:
         the actual details are gone from Juju by the time of a dynamic lookup.
         """
         self._location = Path(location)
+
+
+class MultiPushPullError(Exception):
+    """Aggregates multiple push/pull related exceptions into one."""
+
+    def __init__(self, message: str, errors: List[Tuple[str, Exception]]):
+        """Create an aggregation of several push/pull errors.
+
+        Args:
+            message: error message
+            errors: list of errors with each represented by a tuple (<source_path>,<exception>)
+                where source_path is the path being pushed/pulled from.
+        """
+        self.errors = errors
+        self.message = message
+
+    def __str__(self):
+        return '{} ({} errors): {}, ...'.format(
+            self.message, len(self.errors), self.errors[0][1])
+
+    def __repr__(self):
+        return 'MultiError({!r}, {} errors)'.format(self.message, len(self.errors))
 
 
 class Container:
@@ -1287,8 +1331,7 @@ class Container:
         if not service_names:
             raise TypeError('start expected at least 1 argument, got 0')
 
-        # fixme: remove on pebble.exec signature fix
-        self._pebble.start_services(service_names)   # type: ignore
+        self._pebble.start_services(service_names)
 
     def restart(self, *service_names: str):
         """Restart the given service(s) by name."""
@@ -1296,8 +1339,7 @@ class Container:
             raise TypeError('restart expected at least 1 argument, got 0')
 
         try:
-            # fixme: remove on pebble.exec signature fix
-            self._pebble.restart_services(service_names)  # type: ignore
+            self._pebble.restart_services(service_names)
         except pebble.APIError as e:
             if e.code != 400:
                 raise e
@@ -1305,18 +1347,15 @@ class Container:
             stop = tuple(s.name for s in self.get_services(*service_names).values(
             ) if s.is_running())  # type: Tuple[str, ...]
             if stop:
-                # fixme: remove on pebble.exec signature fix
-                self._pebble.stop_services(stop)   # type: ignore
-            # fixme: remove on pebble.exec signature fix
-            self._pebble.start_services(service_names)  # type: ignore
+                self._pebble.stop_services(stop)
+            self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
         if not service_names:
             raise TypeError('stop expected at least 1 argument, got 0')
 
-        # fixme: remove on pebble.exec signature fix
-        self._pebble.stop_services(service_names)  # type: ignore
+        self._pebble.stop_services(service_names)
 
     def add_layer(self, label: str, layer: '_Layer', *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -1332,8 +1371,7 @@ class Container:
                 are combined into a single one considering the layer override
                 rules; if the layer doesn't exist, it is added as usual.
         """
-        # fixme: remove ignore once pebble.py is typed
-        self._pebble.add_layer(label, layer, combine=combine)  # type: ignore
+        self._pebble.add_layer(label, layer, combine=combine)
 
     def get_plan(self) -> 'pebble.Plan':
         """Get the current effective pebble configuration."""
@@ -1346,8 +1384,7 @@ class Container:
         services, otherwise return information for only the given services.
         """
         names = service_names or None
-        # fixme: remove on pebble.exec signature fix
-        services = self._pebble.get_services(names)   # type: ignore
+        services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
     def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
@@ -1374,8 +1411,7 @@ class Container:
             level: Optional check level to query for. If not specified, fetch
                 checks with any level.
         """
-        # fixme: remove on pebble.exec signature fix
-        checks = self._pebble.get_checks(names=check_names or None, level=level)  # type: ignore
+        checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
     def get_check(self, check_name: str) -> 'pebble.CheckInfo':
@@ -1390,7 +1426,8 @@ class Container:
             raise RuntimeError('expected 1 check, got {}'.format(len(checks)))
         return checks[check_name]
 
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
+    def pull(self, path: StrOrPath, *,
+             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
         Args:
@@ -1403,17 +1440,19 @@ class Container:
             objects decoded according to the specified encoding, or bytes if
             encoding is None.
         """
-        return self._pebble.pull(path, encoding=encoding)
+        return self._pebble.pull(str(path), encoding=encoding)
 
-    def push(
-            self, path: str, source: Union[bytes, str, BinaryIO, TextIO], *,
-            encoding: str = 'utf-8',
-            make_dirs: Optional[bool] = False,
-            permissions: Optional[int] = None,
-            user_id: Optional[int] = None,
-            user: Optional[str] = None,
-            group_id: Optional[int] = None,
-            group: Optional[str] = None):
+    def push(self,
+             path: StrOrPath,
+             source: Union[bytes, str, BinaryIO, TextIO],
+             *,
+             encoding: str = 'utf-8',
+             make_dirs: bool = False,
+             permissions: Optional[int] = None,
+             user_id: Optional[int] = None,
+             user: Optional[str] = None,
+             group_id: Optional[int] = None,
+             group: Optional[str] = None):
         """Write content to a given file path on the remote system.
 
         Args:
@@ -1433,14 +1472,13 @@ class Container:
             group: Group name for file. Group's GID must match group_id if
                 both are specified.
         """
-        self._pebble.push(path, source, encoding=encoding,
-                          # fixme: remove these ignores on pebble.exec signature fix
-                          make_dirs=make_dirs,  # type: ignore
-                          permissions=permissions,   # type: ignore
-                          user_id=user_id, user=user,  # type: ignore
-                          group_id=group_id, group=group)   # type: ignore
+        self._pebble.push(str(path), source, encoding=encoding,
+                          make_dirs=make_dirs,
+                          permissions=permissions,
+                          user_id=user_id, user=user,
+                          group_id=group_id, group=group)
 
-    def list_files(self, path: str, *, pattern: Optional[str] = None,
+    def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['pebble.FileInfo']:
         """Return list of directory entries from given path on remote system.
 
@@ -1455,9 +1493,238 @@ class Container:
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
         """
-        return self._pebble.list_files(path,
-                                       # fixme: remove on pebble.exec signature fix
-                                       pattern=pattern, itself=itself)  # type: ignore
+        return self._pebble.list_files(str(path),
+                                       pattern=pattern, itself=itself)
+
+    def push_path(self,
+                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
+                  dest_dir: StrOrPath):
+        """Recursively push a local path or files to the remote system.
+
+        Only regular files and directories are copied; symbolic links, device files, etc. are
+        skipped.  Pushing is attempted to completion even if errors occur during the process.  All
+        errors are collected incrementally. After copying has completed, if any errors occurred, a
+        single MultiPushPullError is raised containing details for each error.
+
+        Assuming the following files exist locally:
+
+            * /foo/bar/baz.txt
+            * /foo/foobar.txt
+            * /quux.txt
+
+        You could push the following ways::
+
+            # copy one file
+            container.push_path('/foo/foobar.txt', '/dst')
+            # Destination results: /dst/foobar.txt
+
+            # copy a directory
+            container.push_path('/foo', '/dst')
+            # Destination results: /dst/foo/bar/baz.txt, /dst/foo/foobar.txt
+
+            # copy a directory's contents
+            container.push_path('/foo/*', '/dst')
+            # Destination results: /dst/bar/baz.txt, /dst/foobar.txt
+
+            # copy multiple files
+            container.push_path(['/foo/bar/baz.txt', 'quux.txt'], '/dst')
+            # Destination results: /dst/baz.txt, /dst/quux.txt
+
+            # copy a file and a directory
+            container.push_path(['/foo/bar', '/quux.txt'], '/dst')
+            # Destination results: /dst/bar/baz.txt, /dst/quux.txt
+
+        Args:
+            source_path: A single path or list of paths to push to the remote system.  The
+                paths can be either a file or a directory.  If source_path is a directory, the
+                directory base name is attached to the destination directory - i.e. the source path
+                directory is placed inside the destination directory.  If a source path ends with a
+                trailing "/*" it will have its *contents* placed inside the destination directory.
+            dest_dir: Remote destination directory inside which the source dir/files will be
+                placed.  This must be an absolute path.
+        """
+        if os.name == 'nt':
+            raise RuntimeError('Container.push_path is not supported on Windows-based systems')
+
+        if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
+            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+        else:
+            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+        source_paths = [Path(p) for p in source_paths]
+        dest_dir = Path(dest_dir)
+
+        def local_list(source_path: Path) -> List[pebble.FileInfo]:
+            paths = source_path.iterdir() if source_path.is_dir() else [source_path]
+            files = [self._build_fileinfo(source_path / f) for f in paths]
+            return files
+
+        errors = []  # type: List[Tuple[str, Exception]]
+        for source_path in source_paths:
+            try:
+                for info in Container._list_recursive(local_list, source_path):
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    with open(info.path) as src:
+                        self.push(
+                            dstpath,
+                            src,
+                            make_dirs=True,
+                            permissions=info.permissions,
+                            user_id=info.user_id,
+                            user=info.user,
+                            group_id=info.group_id,
+                            group=info.group)
+            except (OSError, pebble.Error) as err:
+                errors.append((str(source_path), err))
+        if errors:
+            raise MultiPushPullError('failed to push one or more files', errors)
+
+    def pull_path(self,
+                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
+                  dest_dir: StrOrPath):
+        """Recursively pull a remote path or files to the local system.
+
+        Only regular files and directories are copied; symbolic links, device files, etc. are
+        skipped.  Pulling is attempted to completion even if errors occur during the process.  All
+        errors are collected incrementally. After copying has completed, if any errors occurred, a
+        single MultiPushPullError is raised containing details for each error.
+
+        Assuming the following files exist remotely:
+
+            * /foo/bar/baz.txt
+            * /foo/foobar.txt
+            * /quux.txt
+
+        You could pull the following ways::
+
+            # copy one file
+            container.pull_path('/foo/foobar.txt', '/dst')
+            # Destination results: /dst/foobar.txt
+
+            # copy a directory
+            container.pull_path('/foo', '/dst')
+            # Destination results: /dst/foo/bar/baz.txt, /dst/foo/foobar.txt
+
+            # copy a directory's contents
+            container.pull_path('/foo/*', '/dst')
+            # Destination results: /dst/bar/baz.txt, /dst/foobar.txt
+
+            # copy multiple files
+            container.pull_path(['/foo/bar/baz.txt', 'quux.txt'], '/dst')
+            # Destination results: /dst/baz.txt, /dst/quux.txt
+
+            # copy a file and a directory
+            container.pull_path(['/foo/bar', '/quux.txt'], '/dst')
+            # Destination results: /dst/bar/baz.txt, /dst/quux.txt
+
+        Args:
+            source_path: A single path or list of paths to pull from the remote system.  The
+                paths can be either a file or a directory but must be absolute paths.  If
+                source_path is a directory, the directory base name is attached to the destination
+                directory - i.e.  the source path directory is placed inside the destination
+                directory.  If a source path ends with a trailing "/*" it will have its *contents*
+                placed inside the destination directory.
+            dest_dir: Local destination directory inside which the source dir/files will be
+                placed.
+        """
+        if os.name == 'nt':
+            raise RuntimeError('Container.pull_path is not supported on Windows-based systems')
+
+        if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
+            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+        else:
+            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+        source_paths = [Path(p) for p in source_paths]
+        dest_dir = Path(dest_dir)
+
+        errors = []  # type: List[Tuple[str, Exception]]
+        for source_path in source_paths:
+            try:
+                for info in Container._list_recursive(self.list_files, source_path):
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    dstpath.parent.mkdir(parents=True, exist_ok=True)
+                    with self.pull(info.path, encoding=None) as src:
+                        with dstpath.open(mode='wb') as dst:
+                            shutil.copyfileobj(typing.cast(BinaryIO, src), dst)
+            except (OSError, pebble.Error) as err:
+                errors.append((str(source_path), err))
+        if errors:
+            raise MultiPushPullError('failed to pull one or more files', errors)
+
+    @staticmethod
+    def _build_fileinfo(path: StrOrPath) -> 'pebble.FileInfo':
+        """Constructs a FileInfo object by stat'ing a local path."""
+        path = Path(path)
+        if path.is_symlink():
+            ftype = pebble.FileType.SYMLINK
+        elif path.is_dir():
+            ftype = pebble.FileType.DIRECTORY
+        elif path.is_file():
+            ftype = pebble.FileType.FILE
+        else:
+            ftype = pebble.FileType.UNKNOWN
+
+        import grp
+        import pwd
+        info = path.lstat()
+        return pebble.FileInfo(
+            path=str(path),
+            name=path.name,
+            type=ftype,
+            size=info.st_size,
+            permissions=typing.cast(int, stat.S_IMODE(info.st_mode)),  # type: ignore
+            last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
+            user_id=info.st_uid,
+            user=pwd.getpwuid(info.st_uid).pw_name,
+            group_id=info.st_gid,
+            group=grp.getgrgid(info.st_gid).gr_name)
+
+    @staticmethod
+    def _list_recursive(list_func: Callable[[Path],
+                        Iterable['pebble.FileInfo']],
+                        path: Path) -> Generator['pebble.FileInfo', None, None]:
+        """Recursively lists all files under path using the given list_func.
+
+        Args:
+            list_func: Function taking 1 Path argument that returns a list of FileInfo objects
+                representing files residing directly inside the given path.
+            path: Filepath to recursively list.
+        """
+        if path.name == '*':
+            # ignore trailing '/*' that we just use for determining how to build paths
+            # at destination
+            path = path.parent
+
+        for info in list_func(path):
+            if info.type is pebble.FileType.DIRECTORY:
+                yield from Container._list_recursive(list_func, Path(info.path))
+            elif info.type in (pebble.FileType.FILE, pebble.FileType.SYMLINK):
+                yield info
+            else:
+                logger.debug(
+                    'skipped unsupported file in Container.[push/pull]_path: %s', info.path)
+
+    @staticmethod
+    def _build_destpath(file_path: StrOrPath, source_path: StrOrPath, dest_dir: StrOrPath) -> Path:
+        """Converts a source file and destination dir into a full destination filepath.
+
+        file_path:
+            Full source-side path for the file being copied to dest_dir.
+        source_path
+            Source prefix under which the given file_path was found.
+        dest_dir
+            Destination directory to place file_path into.
+        """
+        # select between the two following src+dst combos via trailing '/*'
+        # /src/* --> /dst/*
+        # /src --> /dst/src
+        file_path, source_path, dest_dir = Path(file_path), Path(source_path), Path(dest_dir)
+        prefix = str(source_path.parent)
+        if os.path.commonprefix([prefix, str(file_path)]) != prefix:
+            raise RuntimeError(
+                'file "{}" does not have specified prefix "{}"'.format(
+                    file_path, prefix))
+        path_suffix = os.path.relpath(str(file_path), prefix)
+        return dest_dir / path_suffix
 
     def exists(self, path: str) -> bool:
         """Return true if the path exists on the container filesystem."""
@@ -1497,11 +1764,10 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        # fixme: remove ignores on pebble.exec signature fix
         self._pebble.make_dir(path, make_parents=make_parents,
-                              permissions=permissions,  # type: ignore
-                              user_id=user_id, user=user,  # type: ignore
-                              group_id=group_id, group=group)  # type: ignore
+                              permissions=permissions,
+                              user_id=user_id, user=user,
+                              group_id=group_id, group=group)
 
     def remove_path(self, path: str, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
@@ -1536,19 +1802,18 @@ class Container:
         """
         return self._pebble.exec(
             command,
-            # fixme: remove ignores on pebble.py typing fix
-            environment=environment,  # type: ignore
-            working_dir=working_dir,  # type: ignore
-            timeout=timeout,  # type: ignore
-            user_id=user_id,  # type: ignore
-            user=user,  # type: ignore
-            group_id=group_id,  # type: ignore
-            group=group,  # type: ignore
-            stdin=stdin,  # type: ignore
-            stdout=stdout,  # type: ignore
-            stderr=stderr,  # type: ignore
-            encoding=encoding,  # type: ignore
-            combine_stderr=combine_stderr,  # type: ignore
+            environment=environment,
+            working_dir=working_dir,
+            timeout=timeout,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            encoding=encoding,
+            combine_stderr=combine_stderr,
         )
 
     def send_signal(self, sig: Union[int, str], *service_names: str):
@@ -1566,8 +1831,7 @@ class Container:
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')
 
-        # fixme: remove ignore once pebble.send_signature signature is fixed
-        self._pebble.send_signal(sig, service_names)  # type: ignore
+        self._pebble.send_signal(sig, service_names)
 
 
 class ContainerMapping(Mapping[str, Container]):
@@ -1761,9 +2025,12 @@ class _ModelBackend:
         self._leader_check_time = None
         self._hook_is_running = ''
 
-    def _run(self, *args: str, return_output: bool = False, use_json: bool = False
+    def _run(self, *args: str, return_output: bool = False,
+             use_json: bool = False, input_stream: Optional[bytes] = None
              ) -> Union[str, 'JsonObject', None]:
-        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)
+        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)  # type: Dict[str, Any]
+        if input_stream:
+            kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
         if which_cmd is None:
             raise RuntimeError('command not found: {}'.format(args[0]))
@@ -1772,6 +2039,10 @@ class _ModelBackend:
             args += ('--format=json',)
         try:
             result = run(args, **kwargs)
+
+            # pyright infers the first match when argument overloading/unpacking is used,
+            # so this needs to be coerced into the right type
+            result = typing.cast('CompletedProcess[bytes]', result)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
@@ -1817,7 +2088,7 @@ class _ModelBackend:
             event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
             if relation_id == event_relation_id:
                 # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
-                return os.environ['JUJU_REMOTE_APP']
+                return os.getenv('JUJU_REMOTE_APP') or None
 
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
@@ -1869,12 +2140,14 @@ class _ModelBackend:
                 raise RuntimeError(
                     'setting application data is not supported on Juju version {}'.format(version))
 
-        args = ['relation-set', '-r', str(relation_id), '{}={}'.format(key, value)]
+        args = ['relation-set', '-r', str(relation_id)]
         if is_app:
             args.append('--app')
+        args.extend(["--file", "-"])
 
         try:
-            return self._run(*args)
+            content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
+            return self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e

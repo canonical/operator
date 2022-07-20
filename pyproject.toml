@@ -32,11 +32,10 @@ per-file-ignores = ["test/*:D100,D101,D102,D103,D104"]
 docstring-convention = "google"
 
 [tool.pyright]
-exclude = ["ops/_vendor", ".git", "__pycache__", ".tox", "build", "test",
-    "ops/lib", "ops/_private", "dist", "*.egg_info", "venv", "ops/charm.py",
-    "ops/framework.py", "ops/main.py", "ops/pebble.py",
-    "ops/testing.py", "ops/__init__.py"]
+include = ["ops/jujuversion.py", "ops/log.py", "ops/model.py", "ops/version.py",
+    "ops/__init__.py", "ops/framework.py", "opps/pebble.py"]
 pythonVersion = "3.5" # check no python > 3.5 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"
 reportIncompatibleMethodOverride = false
+reportImportCycles = false

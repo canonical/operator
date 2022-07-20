@@ -41,6 +41,7 @@ import random
 import signal
 import tempfile
 import typing
+import uuid
 import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
@@ -115,14 +116,13 @@ class Harness(typing.Generic[CharmType]):
         self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
-        self._backend = _TestingModelBackend(self._unit_name, self._meta)
+        config_ = self._get_config(config)
+        self._backend = _TestingModelBackend(self._unit_name, self._meta, config_)
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
         self._oci_resources = {}
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
-        self._defaults = self._load_config_defaults(config)
-        self._update_config(key_values=self._defaults)
 
         # TODO: If/when we decide to allow breaking changes for a release,
         # change SIMULATE_CAN_CONNECT default value to True and remove the
@@ -237,11 +237,9 @@ class Harness(typing.Generic[CharmType]):
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
-            for storage_index in self._backend.storage_list(storage_name):
-                storage_name = storage_name.replace('-', '_')
-                # Storage device(s) detected, emit storage-attached event(s)
-                self._charm.on[storage_name].storage_attached.emit(
-                    model.Storage(storage_name, storage_index, self._backend))
+            for storage_index in self._backend.storage_list(storage_name, include_detached=True):
+                s = model.Storage(storage_name, storage_index, self._backend)
+                self.attach_storage(s.full_id)
         # Storage done, emit install event
         self._charm.on.install.emit()
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
@@ -336,10 +334,10 @@ class Harness(typing.Generic[CharmType]):
 
         return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
 
-    def _load_config_defaults(self, charm_config):
-        """Load default values from config.yaml.
+    def _get_config(self, charm_config: typing.Optional[dict]):
+        """If the user passed a config to Harness, use it.
 
-        Handle the case where a user doesn't supply explicit config snippets.
+        Otherwise, attempt to load one from charm_dir/config.yaml.
         """
         filename = inspect.getfile(self._charm_cls)
         charm_dir = pathlib.Path(filename).parents[1]
@@ -355,8 +353,10 @@ class Harness(typing.Generic[CharmType]):
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
         charm_config = yaml.safe_load(charm_config)
-        charm_config = charm_config.get('options', {})
-        return {key: value.get('default', None) for key, value in charm_config.items()}
+
+        if not isinstance(charm_config, dict):
+            raise TypeError(charm_config)
+        return charm_config
 
     def add_oci_resource(self, resource_name: str,
                          contents: typing.Mapping[str, str] = None) -> None:
@@ -456,16 +456,19 @@ class Harness(typing.Generic[CharmType]):
         self._relation_id_counter += 1
         return rel_id
 
-    def add_storage(self, storage_name: str, count: int = 1) -> typing.List[str]:
-        """Declare a new storage device attached to this unit.
+    def add_storage(self, storage_name: str, count: int = 1,
+                    *, attach: bool = False) -> typing.List[str]:
+        """Create a new storage device and attach it to this unit.
 
         To have repeatable tests, each device will be initialized with
-        location set to /<storage_name>N, where N is the counter and
-        will be a number from [0,total_num_disks-1]
+        location set to /[tmpdir]/<storage_name>N, where N is the counter and
+        will be a number from [0,total_num_disks-1].
 
         Args:
             storage_name: The storage backend name on the Charm
             count: Number of disks being added
+            attach: True to also attach the storage mount and emit storage-attached if
+                harness.begin() has been called.
 
         Return:
             A list of storage IDs, e.g. ["my-storage/1", "my-storage/2"].
@@ -473,6 +476,7 @@ class Harness(typing.Generic[CharmType]):
         if storage_name not in self._meta.storages:
             raise RuntimeError(
                 "the key '{}' is not specified as a storage key in metadata".format(storage_name))
+
         storage_indices = self._backend.storage_add(storage_name, count)
 
         # Reset associated cached value in the storage mappings.  If we don't do this,
@@ -483,8 +487,8 @@ class Harness(typing.Generic[CharmType]):
         for storage_index in storage_indices:
             s = model.Storage(storage_name, storage_index, self._backend)
             ids.append(s.full_id)
-            if self.charm is not None and self._hooks_enabled:
-                self.charm.on[storage_name].storage_attached.emit(s)
+            if attach:
+                self.attach_storage(s.full_id)
         return ids
 
     def detach_storage(self, storage_id: str) -> None:
@@ -518,11 +522,16 @@ class Harness(typing.Generic[CharmType]):
             storage_id: The full storage ID of the storage unit being attached, including the
                 storage key, e.g. my-storage/0.
         """
-        if self._backend._storage_attach(storage_id) and self._hooks_enabled:
-            storage_name, storage_index = storage_id.split('/', 1)
-            storage_index = int(storage_index)
-            self.charm.on[storage_name].storage_attached.emit(
-                model.Storage(storage_name, storage_index, self._backend))
+        if not self._backend._storage_attach(storage_id):
+            return  # storage was already attached
+        if not self.charm or not self._hooks_enabled:
+            return  # don't need to run hook callback
+
+        storage_name, storage_index = storage_id.split('/', 1)
+
+        storage_index = int(storage_index)
+        self.charm.on[storage_name].storage_attached.emit(
+            model.Storage(storage_name, storage_index, self._backend))
 
     def remove_storage(self, storage_id: str) -> None:
         """Detach a storage device.
@@ -567,9 +576,9 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_names[rel_id] = relation_name
         self._backend._relation_list_map[rel_id] = []
         self._backend._relation_data[rel_id] = {
-            remote_app: {},
-            self._backend.unit_name: {},
-            self._backend.app_name: {},
+            remote_app: _TestingRelationDataContents(),
+            self._backend.unit_name: _TestingRelationDataContents(),
+            self._backend.app_name: _TestingRelationDataContents(),
         }
         self._backend._relation_app_and_units[rel_id] = {
             "app": remote_app,
@@ -651,7 +660,8 @@ class Harness(typing.Generic[CharmType]):
             None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        self._backend._relation_data[relation_id][remote_unit_name] = {}
+        self._backend._relation_data[relation_id][
+            remote_unit_name] = _TestingRelationDataContents()
         # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
         #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
         self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
@@ -689,7 +699,7 @@ class Harness(typing.Generic[CharmType]):
 
         Args:
             relation_id: The integer relation identifier (as returned by add_relation).
-            remote_unit_name: A string representing the remote unit that is being added.
+            remote_unit_name: A string representing the remote unit that is being removed.
 
         Raises:
             KeyError: if relation_id or remote_unit_name is not valid
@@ -727,7 +737,7 @@ class Harness(typing.Generic[CharmType]):
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(relation, app, unit)
+        self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)
 
     def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
@@ -855,6 +865,7 @@ class Harness(typing.Generic[CharmType]):
             rel_data._invalidate()
 
         new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
+        assert isinstance(new_values, _TestingRelationDataContents), new_values
         values_have_changed = False
         for k, v in key_values.items():
             if v == '':
@@ -926,23 +937,23 @@ class Harness(typing.Generic[CharmType]):
         config = self._backend._config
         if key_values is not None:
             for key, value in key_values.items():
-                if key in self._defaults:
+                if key in config._defaults:
                     if value is not None:
-                        config[key] = value
+                        config._config_set(key, value)
                 else:
                     raise ValueError("unknown config option: '{}'".format(key))
 
         for key in unset:
             # When the key is unset, revert to the default if one exists
-            default = self._defaults.get(key, None)
+            default = config._defaults.get(key, None)
             if default is not None:
-                config[key] = default
+                config._config_set(key, default)
             else:
                 config.pop(key, None)
 
     def update_config(
             self,
-            key_values: typing.Mapping[str, str] = None,
+            key_values: typing.Mapping[str, typing.Union[str, float, int, bool]] = None,
             unset: typing.Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
@@ -954,8 +965,9 @@ class Harness(typing.Generic[CharmType]):
 
         Args:
             key_values: A Mapping of key:value pairs to update in config.
-            unset: An iterable of keys to remove from Config. (Note that this does
-                not currently reset the config values to the default defined in config.yaml.)
+            unset: An iterable of keys to remove from Config.
+                This sets the value to the default if defined,
+                otherwise removes the key altogether.
         """
         self._update_config(key_values, unset)
         if self._charm is None or not self._hooks_enabled:
@@ -1076,6 +1088,85 @@ class _ResourceEntry:
         self.name = resource_name
 
 
+@_record_calls
+class _TestingConfig(dict):
+    """Represents the Juju Config."""
+    _supported_types = {
+        'string': str,
+        'boolean': bool,
+        'int': int,
+        'float': float
+    }
+
+    def __init__(self, config: dict):
+        super().__init__()
+        self._spec = config
+        self._defaults = self._load_defaults(config)
+
+        for key, value in self._defaults.items():
+            if value is None:
+                continue
+            self._config_set(key, value)
+
+    @staticmethod
+    def _load_defaults(charm_config: dict):
+        """Load default values from config.yaml.
+
+        Handle the case where a user doesn't supply explicit config snippets.
+        """
+        if not charm_config:
+            return {}
+        charm_config = charm_config.get('options', {})
+        return {key: value.get('default', None) for key, value in charm_config.items()}
+
+    def _config_set(self, key, value):
+        # this is only called by the harness itself
+        # we don't do real serialization/deserialization, but we do check that the value
+        # has the expected type.
+        option = self._spec.get('options', {}).get(key)
+        if not option:
+            raise RuntimeError('Unknown config option {}; '
+                               'not declared in `config.yaml`.'
+                               'Check https://juju.is/docs/sdk/config for the '
+                               'spec.'.format(key))
+
+        declared_type = option.get('type')
+        if not declared_type:
+            raise RuntimeError('Incorrectly formatted `options.yaml`, option {} '
+                               'is expected to declare a `type`.'.format(key))
+
+        if declared_type not in self._supported_types:
+            raise RuntimeError(
+                'Incorrectly formatted `options.yaml`: `type` needs to be one '
+                'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type))
+
+        if type(value) != self._supported_types[declared_type]:
+            raise RuntimeError('Config option {} is supposed to be of type '
+                               '{}, not `{}`.'.format(key, declared_type,
+                                                      type(value).__name__))
+
+        # call 'normal' setattr.
+        dict.__setitem__(self, key, value)
+
+    def __setitem__(self, key, value):
+        # if a charm attempts to config[foo] = bar:
+        raise TypeError("'ConfigData' object does not support item assignment")
+
+
+class _TestingRelationDataContents(dict):
+    def __setitem__(self, key, value):
+        if not isinstance(key, str):
+            raise model.RelationDataError(
+                'relation data keys must be strings, not {}'.format(type(key)))
+        if not isinstance(value, str):
+            raise model.RelationDataError(
+                'relation data values must be strings, not {}'.format(type(value)))
+        super().__setitem__(key, value)
+
+    def copy(self):
+        return _TestingRelationDataContents(super().copy())
+
+
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
@@ -1086,11 +1177,11 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name, meta):
+    def __init__(self, unit_name, meta, config):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
-        self.model_uuid = 'f2c1b2a6-e006-11eb-ba80-0242ac130004'
+        self.model_uuid = str(uuid.uuid4())
 
         self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
         self._calls = []
@@ -1101,7 +1192,7 @@ class _TestingModelBackend:
         self._relation_data = {}  # {relation_id: {name: data}}
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
         self._relation_app_and_units = {}
-        self._config = {}
+        self._config = _TestingConfig(config)
         self._is_leader = False
         self._resources_map = {}  # {resource_name: resource_content}
         self._pod_spec = None
@@ -1115,7 +1206,7 @@ class _TestingModelBackend:
         # Initialize the _storage_list with values present on metadata.yaml
         self._storage_list = {k: {} for k in self._meta.storages}
 
-        self._storage_detached = {k: set() for k in self._meta.storages}
+        self._storage_attached = {k: set() for k in self._meta.storages}
         self._storage_index_counter = 0
         # {container_name : _TestingPebbleClient}
         self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
@@ -1184,16 +1275,36 @@ class _TestingModelBackend:
         if relation_id not in self._relation_app_and_units:
             # Non-existent or dead relation
             return None
+        if 'relation_broken' in self._hook_is_running:
+            # TODO: if juju ever starts setting JUJU_REMOTE_APP in relation-broken hooks runs,
+            # then we should kill this if clause.
+            # See https://bugs.launchpad.net/juju/+bug/1960934
+            return None
         return self._relation_app_and_units[relation_id]['app']
 
     def relation_get(self, relation_id, member_name, is_app):
+        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
+                relation_id):
+            # TODO: if juju gets fixed to set JUJU_REMOTE_APP for this case, then we may opt to
+            # allow charms to read/get that (stale) relation data.
+            # See https://bugs.launchpad.net/juju/+bug/1960934
+            raise RuntimeError(
+                'remote-side relation data cannot be accessed during a relation-broken event')
         if is_app and '/' in member_name:
             member_name = member_name.split('/')[0]
         if relation_id not in self._relation_data:
             raise model.RelationNotFoundError()
         return self._relation_data[relation_id][member_name].copy()
 
-    def relation_set(self, relation_id, key, value, is_app):
+    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+        if not isinstance(is_app, bool):
+            raise TypeError('is_app parameter to relation_set must be a boolean')
+
+        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
+                relation_id):
+            raise RuntimeError(
+                'remote-side relation data cannot be accessed during a relation-broken event')
+
         relation = self._relation_data[relation_id]
         if is_app:
             bucket_key = self.app_name
@@ -1251,15 +1362,21 @@ class _TestingModelBackend:
         else:
             self._unit_status = {'status': status, 'message': message}
 
-    def storage_list(self, name):
+    def storage_list(self, name: str, include_detached: bool = False):
+        """Returns a list of all attached storage mounts for the given storage name.
+
+        Args:
+            name: name (i.e. from metadata.yaml).
+            include_detached: True to include unattached storage mounts as well.
+        """
         return list(index for index in self._storage_list[name]
-                    if self._storage_is_attached(name, index))
+                    if all or self._storage_is_attached(name, index))
 
     def storage_get(self, storage_name_id, attribute):
         name, index = storage_name_id.split("/", 1)
         index = int(index)
         try:
-            if index in self._storage_detached[name]:
+            if index not in self._storage_attached[name]:
                 raise KeyError()  # Pretend the key isn't there
             else:
                 return self._storage_list[name][index][attribute]
@@ -1293,9 +1410,10 @@ class _TestingModelBackend:
             client._fs.remove_mount(name)
 
         if self._storage_is_attached(name, index):
-            self._storage_detached[name].add(index)
+            self._storage_attached[name].remove(index)
 
     def _storage_attach(self, storage_id: str):
+        """Mark the named storage_id as attached and return True if it was previously detached."""
         # NOTE: This is an extra function for _TestingModelBackend to simulate
         # re-attachment of a storage unit.  This is not present in
         # ops.model._ModelBackend.
@@ -1310,12 +1428,12 @@ class _TestingModelBackend:
 
         index = int(index)
         if not self._storage_is_attached(name, index):
-            self._storage_detached[name].remove(index)
+            self._storage_attached[name].add(index)
             return True
         return False
 
     def _storage_is_attached(self, storage_name, storage_index):
-        return storage_index not in self._storage_detached[storage_name]
+        return storage_index in self._storage_attached[storage_name]
 
     def _storage_remove(self, storage_id: str):
         # NOTE: This is an extra function for _TestingModelBackend to simulate
