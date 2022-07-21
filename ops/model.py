@@ -985,6 +985,19 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return False
 
     def __setitem__(self, key: str, value: str):
+        self._validate_write(key, value)
+        self._commit(key, value)
+        self._update(key, value)
+
+    def _commit(self, key, value):
+        self._backend.update_relation_data(self.relation.id, self._entity, key, value)
+
+    def _validate_write(self, key: str, value: str):
+        """Validate writing key:value to this databag.
+
+        1) that key: value is a valid str:str pair
+        2) that we have write access to this databag
+        """
         if not self._is_writable():
             raise RelationDataError(
                 '{} cannot write the application databag of {}. It could be that '
@@ -998,8 +1011,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             raise RelationDataError(
                 'relation data values must be strings, not {}'.format(type(value)))
 
-        self._backend.relation_set(self.relation.id, key, value, self._is_app)
-
+    def _update(self, key: str, value: str):
+        """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
@@ -2421,6 +2434,8 @@ class _ModelBackend:
         # Planned units can be zero. We don't need to do error checking here.
         return len(app_state.get('units', []))
 
+    def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication', key: str, value: str):
+        self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
 class _ModelBackendValidator:
     """Provides facilities for validating inputs and formatting them for model backends."""

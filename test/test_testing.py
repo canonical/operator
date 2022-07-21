@@ -1821,16 +1821,22 @@ class TestHarness(unittest.TestCase):
         # No calls to the backend yet
         self.assertEqual(harness._get_backend_calls(), [])
         rel_id = harness.add_relation('db', 'postgresql')
-        # update_relation_data ensures the cached data for the relation is wiped
-        harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
+
         self.assertEqual(
             [
                 ('relation_ids', 'db'),
                 ('relation_list', rel_id),
                 ('relation_remote_app_name', 0),
-            ] * 2 + [  # fixme: is this duplication OK?
+            ] * 2, # fixme: why this duplication?
+            harness._get_backend_calls())
+
+        # update_relation_data ensures the cached data for the relation is wiped
+        harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
+        test_charm_unit = harness.model.get_unit('test-charm/0')
+        self.assertEqual(
+             [
                 ('relation_get', 0, 'test-charm/0', False),
-                ('relation_set', 0, 'foo', 'bar', False)
+                ('update_relation_data', 0, test_charm_unit, 'foo', 'bar')
             ],
             harness._get_backend_calls(reset=True))
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
@@ -1838,12 +1844,14 @@ class TestHarness(unittest.TestCase):
         self.assertEqual([], harness._get_backend_calls(reset=False))
         # however, update_relation_data does, because we are preparing relation-changed
         harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
+        pgql_unit = harness.model.get_unit('postgresql/0')
+
         self.assertEqual(
             harness._get_backend_calls(reset=False), [
                 ('relation_ids', 'db'),
                 ('relation_list', rel_id),
                 ('relation_get', 0, 'postgresql/0', False),
-                ('relation_set', 0, 'foo', 'bar', False)
+                ('update_relation_data', 0, pgql_unit, 'foo', 'bar')
             ])
         # If we check again, they are still there, but now we reset it
         self.assertEqual(
@@ -1851,7 +1859,7 @@ class TestHarness(unittest.TestCase):
                 ('relation_ids', 'db'),
                 ('relation_list', rel_id),
                 ('relation_get', 0, 'postgresql/0', False),
-                ('relation_set', 0, 'foo', 'bar', False)
+                ('update_relation_data', 0, pgql_unit, 'foo', 'bar')
             ])
         # And the calls are gone
         self.assertEqual(harness._get_backend_calls(), [])

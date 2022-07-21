@@ -43,7 +43,7 @@ import tempfile
 import typing
 import uuid
 import warnings
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
@@ -51,6 +51,9 @@ from textwrap import dedent
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.model import RelationDataContent, RelationNotFoundError
+
+if TYPE_CHECKING:
+    from ops.model import UnitOrApplication
 
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
@@ -924,7 +927,7 @@ class Harness(typing.Generic[CharmType]):
                         values_have_changed = True
                 else:
                     if k not in databag or databag[k] != v:
-                        databag[k] = v
+                        databag[k] = v  # this triggers relation-set
                         values_have_changed = True
 
         if not values_have_changed:
@@ -1265,6 +1268,15 @@ class _TestingModelBackend:
             raise model.RelationNotFoundError()
         return self._relation_data_raw[relation_id][member_name]
 
+    def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
+                              key: str, value: str):
+        # this is where the 'real' backend would call relation-set.
+        raw_data = self._relation_data_raw[relation_id][_entity.name]
+        if value == '':
+            del raw_data[key]
+        else:
+            raw_data[key] = value
+
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
@@ -1289,8 +1301,6 @@ class _TestingModelBackend:
             bucket.pop(key, None)
         else:
             bucket[key] = value
-
-        print(bucket)
 
     def config_get(self):
         return self._config
