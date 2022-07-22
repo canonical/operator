@@ -97,6 +97,7 @@ class TestCharm(unittest.TestCase):
 
     def test_observe_decorated_method(self):
         events = []
+
         def dec(fn):
             @functools.wraps(fn)
             def wrapper(charm, evt):
