@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import functools
 import os
 import shutil
 import tempfile
@@ -94,6 +94,29 @@ class TestCharm(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "observer methods must now be explicitly provided"):
             framework.observe(charm.on.start, charm)
+
+    def test_observe_decorated_method(self):
+        events = []
+        def dec(fn):
+            @functools.wraps(fn)
+            def wrapper(charm, evt):
+                events.append(evt)
+                fn(charm, evt)
+            return wrapper
+
+        class MyCharm(CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                framework.observe(self.on.start, self._on_start)
+
+            @dec
+            def _on_start(self, event):
+                pass
+
+        framework = self.create_framework()
+        charm = MyCharm(framework)
+        charm.on.start.emit()
+        self.assertEqual(1, len(events))
 
     def test_empty_action(self):
         meta = CharmMeta.from_yaml('name: my-charm', '')
