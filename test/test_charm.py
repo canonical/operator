@@ -24,6 +24,7 @@ from ops.charm import (
     CharmMeta,
     ContainerMeta,
     ContainerStorageMeta,
+    StartEvent,
 )
 from ops.framework import EventBase, EventSource, Framework
 from ops.model import Model, Storage, _ModelBackend
@@ -96,9 +97,17 @@ class TestCharm(unittest.TestCase):
             framework.observe(charm.on.start, charm)
 
     def test_observe_decorated_method(self):
+        # we test that charm methods decorated with @functools.wraps(wrapper)
+        # can be observed by Framework. Simpler decorators won't work because
+        # Framework searches for __self__ and other method things; functools.wraps
+        # is more careful and it still works, this test is here to ensure that
+        # it keeps working in future releases, as this is presently the only
+        # way we know of to cleanly decorate charm event observers.
         events = []
 
         def dec(fn):
+            # simple decorator that appends to the nonlocal
+            # `events` list all events it receives
             @functools.wraps(fn)
             def wrapper(charm, evt):
                 events.append(evt)
@@ -109,15 +118,19 @@ class TestCharm(unittest.TestCase):
             def __init__(self, *args):
                 super().__init__(*args)
                 framework.observe(self.on.start, self._on_start)
+                self.seen = None
 
             @dec
             def _on_start(self, event):
-                pass
+                self.seen = event
 
         framework = self.create_framework()
         charm = MyCharm(framework)
         charm.on.start.emit()
+        # check that the event has been seen by the decorator
         self.assertEqual(1, len(events))
+        # check that the event has been seen by the observer
+        self.assertIsInstance(charm.seen, StartEvent)
 
     def test_empty_action(self):
         meta = CharmMeta.from_yaml('name: my-charm', '')
