@@ -58,6 +58,8 @@ if typing.TYPE_CHECKING:
     from pebble import _LayerDict  # pyright: reportMissingTypeStubs=false
     from typing_extensions import TypedDict
 
+    from ops.framework import _SerializedData
+
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
     Numerical = Union[int, float]
@@ -2268,7 +2270,7 @@ class _ModelBackend:
     def action_get(self):
         return self._run('action-get', return_output=True, use_json=True)
 
-    def action_set(self, results: Dict[str, 'JsonObject']):
+    def action_set(self, results: '_SerializedData'):
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)

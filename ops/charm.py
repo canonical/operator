@@ -36,7 +36,7 @@ from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvent
 if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
-    from ops.framework import Handle, JsonObject
+    from ops.framework import Handle, JsonObject, _SerializedData
     from ops.model import Container, Numerical, Relation, Storage
 
     # CharmMeta also needs these.
@@ -183,16 +183,15 @@ class ActionEvent(EventBase):
             raise RuntimeError('action event kind does not match current action')
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
-        self.params = self.framework.model._backend.action_get()  # type:ignore
+        self.params = self.framework.model._backend.action_get()  # pyright: reportPrivateUsage=false  # noqa
 
-    def set_results(self, results: Dict[str, 'JsonObject']):
+    def set_results(self, results: '_SerializedData'):
         """Report the result of the action.
 
         Args:
             results: The result of the action as a Dict
         """
-        # fixme (type): for some reason JsonObject complains here.
-        self.framework.model._backend.action_set(results)  # type: ignore
+        self.framework.model._backend.action_set(results)   # pyright: reportPrivateUsage=false
 
     def log(self, message: str):
         """Send a message that a user will see while the action is running.
@@ -200,7 +199,7 @@ class ActionEvent(EventBase):
         Args:
             message: The message for the user.
         """
-        self.framework.model._backend.action_log(message)  # type:ignore
+        self.framework.model._backend.action_log(message)  # pyright: reportPrivateUsage=false
 
     def fail(self, message: str = ''):
         """Report that this action has failed.
@@ -208,7 +207,7 @@ class ActionEvent(EventBase):
         Args:
             message: Optional message to record why it has failed.
         """
-        self.framework.model._backend.action_fail(message)  # type:ignore
+        self.framework.model._backend.action_fail(message)  # pyright: reportPrivateUsage=false
 
 
 class InstallEvent(HookEvent):
@@ -441,7 +440,7 @@ class RelationEvent(HookEvent):
         relation = self.framework.model.get_relation(
             snapshot['relation_name'], snapshot['relation_id'])
         if relation is None:
-            raise TypeError(
+            raise ValueError(
                 'Unable to restore {}: relation {} (id={}) not found.'.format(
                     self, snapshot['relation_name'], snapshot['relation_id']))
         self.relation = relation
@@ -619,7 +618,12 @@ class StorageEvent(HookEvent):
                 msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
                     .format(storage_name, storage_index)
                 raise RuntimeError(msg)
-            assert storage_location  # type guard
+            if storage_location is None:
+                raise RuntimeError(
+                    'failed loading storage location from snapshot.'
+                    '(name={!r}, index={!r}, storage_location=None)'
+                    .format(storage_name, storage_index))
+
             self.storage.location = storage_location
 
 
@@ -1007,16 +1011,14 @@ class RelationMeta:
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        if not isinstance(role, RelationRole):  # pyright: reportUnnecessaryIsInstance=false
-            raise TypeError("role should be a Role, not {!r}".format(role))
+        assert isinstance(role, RelationRole), "role should be one of {!r}, not {!r}".format(list(RelationRole), role)  # noqa
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
         self.interface_name = raw['interface']
 
-        self.limit = raw.get('limit')
-        if self.limit and not isinstance(self.limit, int):  # pyright: reportUnnecessaryIsInstance=false  # noqa
-            raise TypeError("limit should be an int, not {}".format(type(self.limit)))
+        self.limit = limit = raw.get('limit')
+        assert isinstance(limit, int) or limit is None, "limit should be an int, not {}".format(type(limit))  # pyright: reportUnnecessaryIsInstance=false  # noqa
 
         self.scope = raw.get('scope') or self._default_scope
         if self.scope not in self.VALID_SCOPES:
