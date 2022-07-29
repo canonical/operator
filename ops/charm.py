@@ -1022,8 +1022,9 @@ class RelationMeta:
         self.relation_name = relation_name
         self.interface_name = raw['interface']
 
-        self.limit = limit = raw.get('limit')
-        assert isinstance(limit, int) or limit is None, "limit should be an int, not {}".format(type(limit))  # pyright: reportUnnecessaryIsInstance=false  # noqa
+        self.limit = limit = raw.get('limit', None)
+        if limit is not None and not isinstance(limit, int):
+            raise TypeError("limit should be an int, not {}".format(type(limit)))  # pyright: reportUnnecessaryIsInstance=false  # noqa
 
         self.scope = raw.get('scope') or self._default_scope
         if self.scope not in self.VALID_SCOPES:
