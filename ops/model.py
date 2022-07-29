@@ -2149,7 +2149,7 @@ class _ModelBackend:
 
         try:
             content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
-            return self._run(*args, input_stream=content)
+            return self._run(*args, input_stream=content)  # type: ignore
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
