@@ -28,7 +28,7 @@ import typing
 import weakref
 from abc import ABC, abstractmethod
 from pathlib import Path
-from subprocess import PIPE, CalledProcessError, run
+from subprocess import PIPE, CalledProcessError, CompletedProcess, run
 from typing import (
     Any,
     BinaryIO,
@@ -57,6 +57,8 @@ from ops.jujuversion import JujuVersion
 if typing.TYPE_CHECKING:
     from pebble import _LayerDict  # pyright: reportMissingTypeStubs=false
     from typing_extensions import TypedDict
+
+    from ops.framework import _SerializedData
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
@@ -2133,9 +2135,12 @@ class _ModelBackend:
         self._leader_check_time = None
         self._hook_is_running = ''
 
-    def _run(self, *args: str, return_output: bool = False, use_json: bool = False
+    def _run(self, *args: str, return_output: bool = False,
+             use_json: bool = False, input_stream: Optional[bytes] = None
              ) -> Union[str, 'JsonObject', None]:
-        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)
+        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)  # type: Dict[str, Any]
+        if input_stream:
+            kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
         if which_cmd is None:
             raise RuntimeError('command not found: {}'.format(args[0]))
@@ -2144,6 +2149,10 @@ class _ModelBackend:
             args += ('--format=json',)
         try:
             result = run(args, **kwargs)
+
+            # pyright infers the first match when argument overloading/unpacking is used,
+            # so this needs to be coerced into the right type
+            result = typing.cast('CompletedProcess[bytes]', result)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
@@ -2241,12 +2250,14 @@ class _ModelBackend:
                 raise RuntimeError(
                     'setting application data is not supported on Juju version {}'.format(version))
 
-        args = ['relation-set', '-r', str(relation_id), '{}={}'.format(key, value)]
+        args = ['relation-set', '-r', str(relation_id)]
         if is_app:
             args.append('--app')
+        args.extend(["--file", "-"])
 
         try:
-            return self._run(*args)
+            content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
+            return self._run(*args, input_stream=content)  # type: ignore
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
@@ -2376,7 +2387,7 @@ class _ModelBackend:
     def action_get(self):
         return self._run('action-get', return_output=True, use_json=True)
 
-    def action_set(self, results: Dict[str, 'JsonObject']):
+    def action_set(self, results: '_SerializedData'):
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
