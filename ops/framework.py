@@ -53,25 +53,19 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, Protocol, Type
 
     from ops.charm import CharmMeta
-    from ops.model import Model, _ModelBackend
+    from ops.model import JsonObject, Model, _ModelBackend
 
     class _Serializable(Protocol):
         handle_kind = ''
         @property
         def handle(self) -> 'Handle': ...  # noqa
         @handle.setter
-        def handle(self, val: 'Handle'): ... # noqa
+        def handle(self, val: 'Handle'): ...  # noqa
         def snapshot(self) -> Dict[str, '_StorableType']: ...  # noqa
         def restore(self, snapshot: Dict[str, '_StorableType']) -> None: ...  # noqa
 
     class _StoredObject(Protocol):
-        _under = None # type: Any  # noqa
-
-    # all types that can be (de) serialized to json(/yaml) fom Python builtins
-    JsonObject = Union[int, float, bool, str,
-                       Dict[str, 'JsonObject'],
-                       List['JsonObject'],
-                       Tuple['JsonObject', ...]]
+        _under = None  # type: Any  # noqa
 
     # serialized data structure
     _SerializedData = Dict[str, 'JsonObject']
