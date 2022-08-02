@@ -1827,14 +1827,14 @@ class TestHarness(unittest.TestCase):
                 ('relation_ids', 'db'),
                 ('relation_list', rel_id),
                 ('relation_remote_app_name', 0),
-            ] * 2, # fixme: why this duplication?
+            ],
             harness._get_backend_calls())
 
         # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         test_charm_unit = harness.model.get_unit('test-charm/0')
         self.assertEqual(
-             [
+            [
                 ('relation_get', 0, 'test-charm/0', False),
                 ('update_relation_data', 0, test_charm_unit, 'foo', 'bar')
             ],

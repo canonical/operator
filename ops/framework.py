@@ -855,7 +855,7 @@ class Framework(Object):
         self._reemit()
 
     @contextmanager
-    def event_context(self, event_name: str):
+    def _event_context(self, event_name: str):
         """Handles toggling the hook-is-running state in backends.
 
         This allows e.g. harness logic to know if it is executing within a running hook context
@@ -908,7 +908,7 @@ class Framework(Object):
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    with self.event_context(event_handle.kind):
+                    with self._event_context(event_handle.kind):
                         if (
                             event_is_from_juju or event_is_action
                         ) and self._juju_debug_at.intersection({'all', 'hook'}):

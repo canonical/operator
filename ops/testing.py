@@ -43,14 +43,14 @@ import tempfile
 import typing
 import uuid
 import warnings
-from typing import Dict, TYPE_CHECKING
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
+from typing import TYPE_CHECKING, Dict
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
-from ops.model import RelationDataContent, RelationNotFoundError
+from ops.model import RelationNotFoundError
 
 if TYPE_CHECKING:
     from ops.model import UnitOrApplication
@@ -186,7 +186,7 @@ class Harness(typing.Generic[CharmType]):
         >>>         harness.charm.event_handler(event)
 
         """
-        return self._framework.event_context(event_name)
+        return self._framework._event_context(event_name)
 
     def set_can_connect(self, container: typing.Union[str, model.Container], val: bool):
         """Change the simulated can_connect status of a container's underlying pebble client.
@@ -619,7 +619,6 @@ class Harness(typing.Generic[CharmType]):
         self._backend._relation_ids_map.setdefault(relation_name, []).append(relation_id)
         self._backend._relation_names[relation_id] = relation_name
         self._backend._relation_list_map[relation_id] = []
-        relation = self._model.get_relation(relation_name, relation_id)
         self._backend._relation_data_raw[relation_id] = {
             remote_app: {},
             self._backend.unit_name: {},
@@ -1269,11 +1268,11 @@ class _TestingModelBackend:
         return self._relation_data_raw[relation_id][member_name]
 
     def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
-                              key: str, value: str):
+                             key: str, value: str):
         # this is where the 'real' backend would call relation-set.
         raw_data = self._relation_data_raw[relation_id][_entity.name]
         if value == '':
-            del raw_data[key]
+            raw_data.pop(key, None)
         else:
             raw_data[key] = value
 
