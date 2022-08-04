@@ -40,37 +40,39 @@ import pathlib
 import random
 import signal
 import tempfile
-import typing
 import uuid
 import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
-
+from typing import (TypeVar, Generic, Type, AnyStr, Iterable, Optional, Mapping,
+                    BinaryIO, TextIO, List, Union, Iterator, Tuple, Any)
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
+from ops.charm import CharmMeta
+
 SIMULATE_CAN_CONNECT = False
 
-# OptionalYAML is something like metadata.yaml or actions.yaml. You can
+# YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
-OptionalYAML = typing.Optional[typing.Union[str, typing.TextIO]]
+YAMLStringOrFile = Union[str, TextIO]
 
 
 # An instance of an Application or Unit, or the name of either.
 # This is done here to avoid a scoping issue with the `model` property
 # of the Harness class below.
-AppUnitOrName = typing.Union[str, model.Application, model.Unit]
+AppUnitOrName = Union[str, model.Application, model.Unit]
 
 
 # CharmType represents user charms that are derived from CharmBase.
-CharmType = typing.TypeVar('CharmType', bound=charm.CharmBase)
+CharmType = TypeVar('CharmType', bound=charm.CharmBase)
 
 
 # noinspection PyProtectedMember
-class Harness(typing.Generic[CharmType]):
+class Harness(Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
     The model that is created is from the viewpoint of the charm that you are testing.
@@ -103,25 +105,24 @@ class Harness(typing.Generic[CharmType]):
 
     def __init__(
             self,
-            charm_cls: typing.Type[CharmType],
+            charm_cls: Type[CharmType],
             *,
-            meta: OptionalYAML = None,
-            actions: OptionalYAML = None,
-            config: OptionalYAML = None):
+            meta: Optional[YAMLStringOrFile] = None,
+            actions: Optional[YAMLStringOrFile] = None,
+            config: Optional[YAMLStringOrFile] = None):
         self._charm_cls = charm_cls
         self._charm = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
-        self._unit_name = self._meta.name + '/0'
-        self._framework = None
-        self._hooks_enabled = True
-        self._relation_id_counter = 0
+        self._unit_name = self._meta.name + '/0'  # type: str
+        self._framework = None  # type: Optional[framework.Framework]
+        self._hooks_enabled = True  # type: bool
+        self._relation_id_counter = 0  # type: int
         self._backend = _TestingModelBackend(self._unit_name, self._meta)
-        self._model = model.Model(self._meta, self._backend)
+        self._model = model.Model(self._meta, self._backend)  # type: ignore
         self._storage = storage.SQLiteStorage(':memory:')
-        self._oci_resources = {}
         self._framework = framework.Framework(
-            self._storage, self._charm_dir, self._meta, self._model)
+            self._storage, pathlib.Path(self._charm_dir), self._meta, self._model)
         self._defaults = self._load_config_defaults(config)
         self._update_config(key_values=self._defaults)
 
@@ -133,7 +134,7 @@ class Harness(typing.Generic[CharmType]):
                 'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
 
-    def set_can_connect(self, container: typing.Union[str, model.Container], val: bool):
+    def set_can_connect(self, container: Union[str, model.Container], val: bool):
         """Change the simulated can_connect status of a container's underlying pebble client.
 
         Calling this method raises an exception if SIMULATE_CAN_CONNECT is False.
@@ -296,7 +297,8 @@ class Harness(typing.Generic[CharmType]):
         """
         self._backend._cleanup()
 
-    def _create_meta(self, charm_metadata, action_metadata):
+    def _create_meta(self, charm_metadata: Optional[YAMLStringOrFile],
+                     action_metadata: Optional[YAMLStringOrFile]) -> CharmMeta:
         """Create a CharmMeta object.
 
         Handle the cases where a user doesn't supply explicit metadata snippets.
@@ -323,7 +325,7 @@ class Harness(typing.Generic[CharmType]):
         elif isinstance(action_metadata, str):
             action_metadata = dedent(action_metadata)
 
-        return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
+        return CharmMeta.from_yaml(charm_metadata, action_metadata)
 
     def _load_config_defaults(self, charm_config):
         """Load default values from config.yaml.
@@ -343,12 +345,12 @@ class Harness(typing.Generic[CharmType]):
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        charm_config = yaml.safe_load(charm_config)
+        charm_config = cast(ConfigRaw, yaml.safe_load(charm_config)
         charm_config = charm_config.get('options', {})
         return {key: value.get('default', None) for key, value in charm_config.items()}
 
     def add_oci_resource(self, resource_name: str,
-                         contents: typing.Mapping[str, str] = None) -> None:
+                         contents: Mapping[str, str] = None) -> None:
         """Add oci resources to the backend.
 
         This will register an oci resource and create a temporary file for processing metadata
@@ -372,7 +374,7 @@ class Harness(typing.Generic[CharmType]):
         as_yaml = yaml.safe_dump(contents)
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
 
-    def add_resource(self, resource_name: str, content: typing.AnyStr) -> None:
+    def add_resource(self, resource_name: str, content: AnyStr) -> None:
         """Add content for a resource to the backend.
 
         This will register the content, so that a call to `Model.resources.fetch(resource_name)`
@@ -446,7 +448,7 @@ class Harness(typing.Generic[CharmType]):
         return rel_id
 
     def add_storage(self, storage_name: str, count: int = 1,
-                    *, attach: bool = False) -> typing.List[str]:
+                    *, attach: bool = False) -> List[str]:
         """Create a new storage device and attach it to this unit.
 
         To have repeatable tests, each device will be initialized with
@@ -728,7 +730,7 @@ class Harness(typing.Generic[CharmType]):
             raise ValueError('Invalid Unit Name')
         self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)
 
-    def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> typing.Mapping:
+    def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
 
         This ignores all of the safety checks of who can and can't see data in relations (eg,
@@ -748,7 +750,7 @@ class Harness(typing.Generic[CharmType]):
             app_or_unit = app_or_unit.name
         return self._backend._relation_data[relation_id].get(app_or_unit, None)
 
-    def get_pod_spec(self) -> (typing.Mapping, typing.Mapping):
+    def get_pod_spec(self) -> Tuple[Mapping[Any, Any], Mapping[Any, Any]]:
         """Return the content of the pod spec as last set by the charm.
 
         This returns both the pod spec and any k8s_resources that were supplied.
@@ -829,7 +831,7 @@ class Harness(typing.Generic[CharmType]):
             self,
             relation_id: int,
             app_or_unit: str,
-            key_values: typing.Mapping,
+            key_values: Mapping,
     ) -> None:
         """Update the relation data for a given unit or application in a given relation.
 
@@ -905,8 +907,8 @@ class Harness(typing.Generic[CharmType]):
 
     def _update_config(
             self,
-            key_values: typing.Mapping[str, str] = None,
-            unset: typing.Iterable[str] = (),
+            key_values: Mapping[str, str] = None,
+            unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
 
@@ -942,8 +944,8 @@ class Harness(typing.Generic[CharmType]):
 
     def update_config(
             self,
-            key_values: typing.Mapping[str, str] = None,
-            unset: typing.Iterable[str] = (),
+            key_values: Mapping[str, str] = None,
+            unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
 
@@ -1133,8 +1135,8 @@ class _TestingModelBackend:
         self._storage_attached = {k: set() for k in self._meta.storages}
         self._storage_index_counter = 0
         # {container_name : _TestingPebbleClient}
-        self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
-        self._pebble_clients_can_connect = {}  # type: {_TestingPebbleClient: bool}
+        self._pebble_clients = {}  # type: Dict[str, _TestingPebbleClient]
+        self._pebble_clients_can_connect = {}  # type: Dict[_TestingPebbleClient, bool]
         self._planned_units = None
         self._hook_is_running = ''
 
@@ -1195,7 +1197,7 @@ class _TestingModelBackend:
         except KeyError as e:
             raise model.RelationNotFoundError from e
 
-    def relation_remote_app_name(self, relation_id: int) -> typing.Optional[str]:
+    def relation_remote_app_name(self, relation_id: int) -> Optional[str]:
         if relation_id not in self._relation_app_and_units:
             # Non-existent or dead relation
             return None
@@ -1308,7 +1310,7 @@ class _TestingModelBackend:
             raise model.ModelError(
                 'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
 
-    def storage_add(self, name: str, count: int = 1) -> typing.List[int]:
+    def storage_add(self, name: str, count: int = 1) -> List[int]:
         if '/' in name:
             raise model.ModelError('storage name cannot contain "/"')
 
@@ -1460,7 +1462,7 @@ class _TestingPebbleClient:
 
     def get_warnings(
             self, select: pebble.WarningState = pebble.WarningState.PENDING,
-    ) -> typing.List['pebble.Warning']:
+    ) -> List['pebble.Warning']:
         raise NotImplementedError(self.get_warnings)
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
@@ -1468,7 +1470,7 @@ class _TestingPebbleClient:
 
     def get_changes(
             self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS, service: str = None,
-    ) -> typing.List[pebble.Change]:
+    ) -> List[pebble.Change]:
         raise NotImplementedError(self.get_changes)
 
     def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
@@ -1494,7 +1496,7 @@ class _TestingPebbleClient:
         return self.autostart_services(timeout, delay)
 
     def start_services(
-            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> pebble.ChangeID:
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
@@ -1529,7 +1531,7 @@ cannot perform the following tasks:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def stop_services(
-            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> pebble.ChangeID:
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
@@ -1560,7 +1562,7 @@ ChangeError: cannot perform the following tasks:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
 
     def restart_services(
-            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
+            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
     ) -> pebble.ChangeID:
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
@@ -1587,7 +1589,7 @@ ChangeError: cannot perform the following tasks:
         raise NotImplementedError(self.wait_change)
 
     def add_layer(
-            self, label: str, layer: typing.Union[str, dict, pebble.Layer], *,
+            self, label: str, layer: Union[str, dict, pebble.Layer], *,
             combine: bool = False):
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
@@ -1631,7 +1633,7 @@ ChangeError: cannot perform the following tasks:
         else:
             self._layers[label] = layer_obj
 
-    def _render_services(self) -> typing.Mapping[str, pebble.Service]:
+    def _render_services(self) -> Mapping[str, pebble.Service]:
         services = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
@@ -1650,7 +1652,7 @@ ChangeError: cannot perform the following tasks:
             plan.services[name] = services[name]
         return plan
 
-    def get_services(self, names: typing.List[str] = None) -> typing.List[pebble.ServiceInfo]:
+    def get_services(self, names: List[str] = None) -> List[pebble.ServiceInfo]:
         if isinstance(names, str):
             raise TypeError('start_services should take a list of names, not just "{}"'.format(
                 names))
@@ -1678,13 +1680,13 @@ ChangeError: cannot perform the following tasks:
             infos.append(info)
         return infos
 
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
-                                                                          typing.TextIO]:
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> Union[BinaryIO,
+                                                                          TextIO]:
         self._check_connection()
         return self._fs.open(path, encoding=encoding)
 
     def push(
-            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
+            self, path: str, source: Union[bytes, str, BinaryIO, TextIO], *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
             user_id: int = None, user: str = None, group_id: int = None, group: str = None):
         self._check_connection()
@@ -1706,7 +1708,7 @@ ChangeError: cannot perform the following tasks:
             )
 
     def list_files(self, path: str, *, pattern: str = None,
-                   itself: bool = False) -> typing.List[pebble.FileInfo]:
+                   itself: bool = False) -> List[pebble.FileInfo]:
         self._check_connection()
         try:
             files = [self._fs.get_path(path)]
@@ -1789,7 +1791,7 @@ ChangeError: cannot perform the following tasks:
     def exec(self, command, **kwargs):
         raise NotImplementedError(self.exec)
 
-    def send_signal(self, sig: typing.Union[int, str], *service_names: str):
+    def send_signal(self, sig: Union[int, str], *service_names: str):
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')
         self._check_connection()
@@ -1854,7 +1856,7 @@ class _TestingStorageMount:
 
         src.mkdir(exist_ok=True, parents=True)
 
-    def contains(self, path: typing.Union[str, pathlib.PurePosixPath]) -> bool:
+    def contains(self, path: Union[str, pathlib.PurePosixPath]) -> bool:
         """Returns true whether path resides within this simulated storage mount's location."""
         try:
             pathlib.PurePosixPath(path).relative_to(self._location)
@@ -1862,7 +1864,7 @@ class _TestingStorageMount:
         except Exception:
             return False
 
-    def check_contains(self, path: typing.Union[str,
+    def check_contains(self, path: Union[str,
                        pathlib.PurePosixPath]) -> pathlib.PurePosixPath:
         """Raises if path does not reside within this simulated storage mount's location."""
         if not self.contains(path):
@@ -1902,7 +1904,7 @@ class _TestingStorageMount:
     def create_file(
             self,
             path: pathlib.PurePosixPath,
-            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
+            data: Union[bytes, str, BinaryIO, TextIO],
             encoding: str = 'utf-8',
             make_dirs: bool = False,
             **kwargs
@@ -1928,7 +1930,7 @@ class _TestingStorageMount:
 
         return _File(path, data, encoding=encoding, **kwargs)
 
-    def list_dir(self, path: pathlib.PurePosixPath) -> typing.List['_File']:
+    def list_dir(self, path: pathlib.PurePosixPath) -> List['_File']:
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
 
@@ -1950,9 +1952,9 @@ class _TestingStorageMount:
 
     def open(
             self,
-            path: typing.Union[str, pathlib.PurePosixPath],
-            encoding: typing.Optional[str] = 'utf-8',
-    ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
+            path: Union[str, pathlib.PurePosixPath],
+            encoding: Optional[str] = 'utf-8',
+    ) -> Union[BinaryIO, TextIO]:
         path = self.check_contains(path)
 
         file = self.get_path(path)
@@ -1960,8 +1962,8 @@ class _TestingStorageMount:
             raise IsADirectoryError(str(file.path))
         return file.open(encoding=encoding)
 
-    def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]
-                 ) -> typing.Union['_Directory', '_File']:
+    def get_path(self, path: Union[str, pathlib.PurePosixPath]
+                 ) -> Union['_Directory', '_File']:
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
         if srcpath.is_dir():
@@ -1971,7 +1973,7 @@ class _TestingStorageMount:
         with srcpath.open('rb') as f:
             return _File(path, f.read())
 
-    def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
+    def delete_path(self, path: Union[str, pathlib.PurePosixPath]) -> None:
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
         if srcpath.exists():
@@ -2039,8 +2041,8 @@ class _TestingFilesystem:
     def create_file(
             self,
             path: str,
-            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
-            encoding: typing.Optional[str] = 'utf-8',
+            data: Union[bytes, str, BinaryIO, TextIO],
+            encoding: Optional[str] = 'utf-8',
             make_dirs: bool = False,
             **kwargs
     ) -> '_File':
@@ -2067,7 +2069,7 @@ class _TestingFilesystem:
                 'generic-file-error', 'parent is not a directory: {}'.format(str(dir_)))
         return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
-    def list_dir(self, path) -> typing.List['_File']:
+    def list_dir(self, path) -> List['_File']:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.list_dir(path)
@@ -2088,9 +2090,9 @@ class _TestingFilesystem:
 
     def open(
             self,
-            path: typing.Union[str, pathlib.PurePosixPath],
-            encoding: typing.Optional[str] = 'utf-8',
-    ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
+            path: Union[str, pathlib.PurePosixPath],
+            encoding: Optional[str] = 'utf-8',
+    ) -> Union[BinaryIO, TextIO]:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.open(path, encoding)
@@ -2100,8 +2102,8 @@ class _TestingFilesystem:
             raise IsADirectoryError(str(file.path))
         return file.open(encoding=encoding)
 
-    def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]) \
-            -> typing.Union['_Directory', '_File']:
+    def get_path(self, path: Union[str, pathlib.PurePosixPath]) \
+            -> Union['_Directory', '_File']:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.get_path(path)
@@ -2116,7 +2118,7 @@ class _TestingFilesystem:
                 raise FileNotFoundError(str(current_object.path / token))
         return current_object
 
-    def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
+    def delete_path(self, path: Union[str, pathlib.PurePosixPath]) -> None:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.delete_path(path)
@@ -2141,10 +2143,10 @@ class _Directory:
     def __contains__(self, child: str) -> bool:
         return child in self._children
 
-    def __iter__(self) -> typing.Iterator[typing.Union['_File', '_Directory']]:
+    def __iter__(self) -> Iterator[Union['_File', '_Directory']]:
         return (value for value in self._children.values())
 
-    def __getitem__(self, key: str) -> typing.Union['_File', '_Directory']:
+    def __getitem__(self, key: str) -> Union['_File', '_Directory']:
         return self._children[key]
 
     def __delitem__(self, key: str) -> None:
@@ -2163,8 +2165,8 @@ class _Directory:
     def create_file(
             self,
             name: str,
-            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
-            encoding: typing.Optional[str] = 'utf-8',
+            data: Union[bytes, str, BinaryIO, TextIO],
+            encoding: Optional[str] = 'utf-8',
             **kwargs
     ) -> '_File':
         self._children[name] = _File(self.path / name, data, encoding=encoding, **kwargs)
@@ -2175,8 +2177,8 @@ class _File:
     def __init__(
             self,
             path: pathlib.PurePosixPath,
-            data: typing.Union[str, bytes, typing.BinaryIO, typing.TextIO],
-            encoding: typing.Optional[str] = 'utf-8',
+            data: Union[str, bytes, BinaryIO, TextIO],
+            encoding: Optional[str] = 'utf-8',
             **kwargs):
 
         if hasattr(data, 'read'):
@@ -2197,8 +2199,8 @@ class _File:
 
     def open(
             self,
-            encoding: typing.Optional[str] = 'utf-8',
-    ) -> typing.Union[typing.TextIO, typing.BinaryIO]:
+            encoding: Optional[str] = 'utf-8',
+    ) -> Union[TextIO, BinaryIO]:
         if encoding is None:
             return BytesIO(self.data)
         else:
