@@ -46,7 +46,7 @@ from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
 from typing import (TypeVar, Generic, Type, AnyStr, Iterable, Optional, Mapping,
-                    BinaryIO, TextIO, List, Union, Iterator, Tuple, Any)
+                    BinaryIO, TextIO, List, Union, Iterator, Tuple, Any, cast)
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 
@@ -345,7 +345,7 @@ class Harness(Generic[CharmType]):
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        charm_config = cast(ConfigRaw, yaml.safe_load(charm_config)
+        charm_config = cast(ConfigRaw, yaml.safe_load(charm_config))
         charm_config = charm_config.get('options', {})
         return {key: value.get('default', None) for key, value in charm_config.items()}
 
@@ -1121,7 +1121,7 @@ class _TestingModelBackend:
         self._config = {}
         self._is_leader = False
         self._resources_map = {}  # {resource_name: resource_content}
-        self._pod_spec = None
+        self._pod_spec = None  # type: Optional[_PodSpec]
         self._app_status = {'status': 'unknown', 'message': ''}
         self._unit_status = {'status': 'maintenance', 'message': ''}
         self._workload_version = None
