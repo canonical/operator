@@ -46,9 +46,14 @@ import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
+from typing import TYPE_CHECKING, Dict
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
+from ops.model import RelationNotFoundError
+
+if TYPE_CHECKING:
+    from ops.model import UnitOrApplication
 
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
@@ -113,7 +118,6 @@ class Harness(typing.Generic[CharmType]):
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
         self._unit_name = self._meta.name + '/0'
-        self._framework = None
         self._hooks_enabled = True
         self._relation_id_counter = 0
         config_ = self._get_config(config)
@@ -131,6 +135,57 @@ class Harness(typing.Generic[CharmType]):
             warnings.warn(
                 'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
+
+    def _event_context(self, event_name: str):
+        """Configures the Harness to behave as if an event hook were running.
+
+        This means that the Harness will perform strict access control of relation data.
+
+        Example usage:
+
+        # this is how we test that attempting to write a remote app's
+        # databag will raise RelationDataError.
+        >>> with harness._event_context('foo'):
+        >>>     with pytest.raises(ops.model.RelationDataError):
+        >>>         my_relation.data[remote_app]['foo'] = 'bar'
+
+        # this is how we test with 'realistic conditions' how an event handler behaves
+        # when we call it directly -- i.e. without going through harness.add_relation
+        >>> def test_foo():
+        >>>     class MyCharm:
+        >>>         ...
+        >>>         def event_handler(self, event):
+        >>>             # this is expected to raise an exception
+        >>>             event.relation.data[event.relation.app]['foo'] = 'bar'
+        >>>
+        >>>     harness = Harness(MyCharm)
+        >>>     event = MagicMock()
+        >>>     event.relation = harness.charm.model.relations[0]
+        >>>
+        >>>     with harness._event_context('my_relation_joined'):
+        >>>         with pytest.raises(ops.model.RelationDataError):
+        >>>             harness.charm.event_handler(event)
+
+
+        If event_name == '', conversely, the Harness will believe that no hook
+        is running, allowing you to temporarily have unrestricted access to read/write
+        a relation's databags even if you're inside an event handler.
+        >>> def test_foo():
+        >>>     class MyCharm:
+        >>>         ...
+        >>>         def event_handler(self, event):
+        >>>             # this is expected to raise an exception since we're not leader
+        >>>             event.relation.data[self.app]['foo'] = 'bar'
+        >>>
+        >>>     harness = Harness(MyCharm)
+        >>>     event = MagicMock()
+        >>>     event.relation = harness.charm.model.relations[0]
+        >>>
+        >>>     with harness._event_context('my_relation_joined'):
+        >>>         harness.charm.event_handler(event)
+
+        """
+        return self._framework._event_context(event_name)
 
     def set_can_connect(self, container: typing.Union[str, model.Container], val: bool):
         """Change the simulated can_connect status of a container's underlying pebble client.
@@ -276,7 +331,7 @@ class Harness(typing.Generic[CharmType]):
             # relation-joined for the same unit.
             # Juju only fires relation-changed (app) if there is data for the related application
             relation = self._model.get_relation(rel_name, rel_id)
-            if self._backend._relation_data[rel_id].get(app_name):
+            if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
                 self._charm.on[rel_name].relation_changed.emit(
                     relation, app, None)
@@ -561,24 +616,24 @@ class Harness(typing.Generic[CharmType]):
         Return:
             The relation_id created by this add_relation.
         """
-        rel_id = self._next_relation_id()
-        self._backend._relation_ids_map.setdefault(relation_name, []).append(rel_id)
-        self._backend._relation_names[rel_id] = relation_name
-        self._backend._relation_list_map[rel_id] = []
-        self._backend._relation_data[rel_id] = {
-            remote_app: _TestingRelationDataContents(),
-            self._backend.unit_name: _TestingRelationDataContents(),
-            self._backend.app_name: _TestingRelationDataContents(),
-        }
-        self._backend._relation_app_and_units[rel_id] = {
+        relation_id = self._next_relation_id()
+        self._backend._relation_ids_map.setdefault(relation_name, []).append(relation_id)
+        self._backend._relation_names[relation_id] = relation_name
+        self._backend._relation_list_map[relation_id] = []
+        self._backend._relation_data_raw[relation_id] = {
+            remote_app: {},
+            self._backend.unit_name: {},
+            self._backend.app_name: {}}
+
+        self._backend._relation_app_and_units[relation_id] = {
             "app": remote_app,
             "units": [],
         }
         # Reload the relation_ids list
         if self._model is not None:
             self._model.relations._invalidate(relation_name)
-        self._emit_relation_created(relation_name, rel_id, remote_app)
-        return rel_id
+        self._emit_relation_created(relation_name, relation_id, remote_app)
+        return relation_id
 
     def remove_relation(self, relation_id: int) -> None:
         """Remove a relation.
@@ -603,7 +658,7 @@ class Harness(typing.Generic[CharmType]):
             self._model.relations._invalidate(relation_name)
 
         self._backend._relation_app_and_units.pop(relation_id)
-        self._backend._relation_data.pop(relation_id)
+        self._backend._relation_data_raw.pop(relation_id)
         self._backend._relation_list_map.pop(relation_id)
         self._backend._relation_ids_map[relation_name].remove(relation_id)
         self._backend._relation_names.pop(relation_id)
@@ -650,16 +705,20 @@ class Harness(typing.Generic[CharmType]):
             None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
-        self._backend._relation_data[relation_id][
-            remote_unit_name] = _TestingRelationDataContents()
-        # TODO: jam 2020-08-03 This is where we could assert that the unit name matches the
-        #  application name (eg you don't have a relation to 'foo' but add units of 'bar/0'
-        self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
+        # we can write remote unit data iff we are not in a hook env
         relation_name = self._backend._relation_names[relation_id]
+        relation = self._model.get_relation(relation_name, relation_id)
+        self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
+        if not remote_unit_name.startswith(relation.app.name):
+            raise ValueError(
+                'Remote unit name invalid: the remote application of {} is called {!r}; '
+                'the remote unit name should be {}/<some-number>, not {!r}.'
+                ''.format(relation_name, relation.app.name,
+                          relation.app.name, remote_unit_name))
+        self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
         remote_unit = self._model.get_unit(remote_unit_name)
-        relation = self._model.get_relation(relation_name, relation_id)
         unit_cache = relation.data.get(remote_unit, None)
         if unit_cache is not None:
             unit_cache._invalidate()
@@ -709,7 +768,7 @@ class Harness(typing.Generic[CharmType]):
         # remove the relation data for the departed unit now that the event has happened
         self._backend._relation_list_map[relation_id].remove(remote_unit_name)
         self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)
-        self._backend._relation_data[relation_id].pop(remote_unit_name)
+        self._backend._relation_data_raw[relation_id].pop(remote_unit_name)
         self.model._relations._invalidate(relation_name=relation.name)
 
         if unit_cache is not None:
@@ -747,7 +806,8 @@ class Harness(typing.Generic[CharmType]):
         """
         if hasattr(app_or_unit, 'name'):
             app_or_unit = app_or_unit.name
-        return self._backend._relation_data[relation_id].get(app_or_unit, None)
+        # bypass access control by going directly to raw
+        return self._backend._relation_data_raw[relation_id].get(app_or_unit, None)
 
     def get_pod_spec(self) -> (typing.Mapping, typing.Mapping):
         """Return the content of the pod spec as last set by the charm.
@@ -854,21 +914,21 @@ class Harness(typing.Generic[CharmType]):
             # Note, this won't cause the data to be loaded if it wasn't already.
             rel_data._invalidate()
 
-        new_values = self._backend._relation_data[relation_id][app_or_unit].copy()
-        assert isinstance(new_values, _TestingRelationDataContents), new_values
-        values_have_changed = False
-        for k, v in key_values.items():
-            if v == '':
-                if new_values.pop(k, None) != v:
-                    values_have_changed = True
-            else:
-                if k not in new_values or new_values[k] != v:
-                    new_values[k] = v
-                    values_have_changed = True
+        old_values = self._backend._relation_data_raw[relation_id][app_or_unit].copy()
+        assert isinstance(old_values, dict), old_values
 
-        # Update the relation data in any case to avoid spurious references
-        # by an test to an updated value to be invalidated by a lack of assignment
-        self._backend._relation_data[relation_id][app_or_unit] = new_values
+        databag = self.model.relations._get_unique(relation.name, relation_id).data[entity]
+        # ensure that WE as harness can temporarily write the databag
+        with self._event_context(''):
+            values_have_changed = False
+            for k, v in key_values.items():
+                if v == '':
+                    if databag.pop(k, None) != v:
+                        values_have_changed = True
+                else:
+                    if k not in databag or databag[k] != v:
+                        databag[k] = v  # this triggers relation-set
+                        values_have_changed = True
 
         if not values_have_changed:
             # Do not issue a relation changed event if the data bags have not changed
@@ -1179,7 +1239,8 @@ class _TestingModelBackend:
         self._relation_ids_map = {}  # relation name to [relation_ids,...]
         self._relation_names = {}  # reverse map from relation_id to relation_name
         self._relation_list_map = {}  # relation_id: [unit_name,...]
-        self._relation_data = {}  # {relation_id: {name: data}}
+        # {relation_id: {name: Dict[str: str]}}
+        self._relation_data_raw = {}  # type: Dict[int, Dict[str, Dict[str, str]]]
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
         self._relation_app_and_units = {}
         self._config = _TestingConfig(config)
@@ -1282,9 +1343,18 @@ class _TestingModelBackend:
                 'remote-side relation data cannot be accessed during a relation-broken event')
         if is_app and '/' in member_name:
             member_name = member_name.split('/')[0]
-        if relation_id not in self._relation_data:
+        if relation_id not in self._relation_data_raw:
             raise model.RelationNotFoundError()
-        return self._relation_data[relation_id][member_name].copy()
+        return self._relation_data_raw[relation_id][member_name]
+
+    def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
+                             key: str, value: str):
+        # this is where the 'real' backend would call relation-set.
+        raw_data = self._relation_data_raw[relation_id][_entity.name]
+        if value == '':
+            raw_data.pop(key, None)
+        else:
+            raw_data[key] = value
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
         if not isinstance(is_app, bool):
@@ -1295,7 +1365,10 @@ class _TestingModelBackend:
             raise RuntimeError(
                 'remote-side relation data cannot be accessed during a relation-broken event')
 
-        relation = self._relation_data[relation_id]
+        if relation_id not in self._relation_data_raw:
+            raise RelationNotFoundError(relation_id)
+
+        relation = self._relation_data_raw[relation_id]
         if is_app:
             bucket_key = self.app_name
         else:

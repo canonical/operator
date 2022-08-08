@@ -28,6 +28,7 @@ import sys
 import types
 import typing
 import weakref
+from contextlib import contextmanager
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -847,34 +848,33 @@ class Framework(Object):
         """
         self._reemit()
 
+    @contextmanager
+    def _event_context(self, event_name: str):
+        """Handles toggling the hook-is-running state in backends.
+
+        This allows e.g. harness logic to know if it is executing within a running hook context
+        or not.  It sets backend._hook_is_running equal to the name of the currently running
+        hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
+        is completed.
+
+        Usage:
+            >>> with harness._event_context('db-relation-changed'):
+            >>>     print('Harness thinks it is running an event hook.')
+            >>> with harness._event_context(''):
+            >>>     print('harness thinks it is not running an event hook.')
+        """
+        backend = self.model._backend if self.model else None  # type: Optional[_ModelBackend]
+
+        if not backend:
+            yield  # context does nothing in this case
+            return
+
+        old = backend._hook_is_running
+        backend._hook_is_running = event_name
+        yield
+        backend._hook_is_running = old
+
     def _reemit(self, single_event_path: str = None):
-
-        class EventContext:
-            """Handles toggling the hook-is-running state in backends.
-
-            This allows e.g. harness logic to know if it is executing within a running hook context
-            or not.  It sets backend._hook_is_running equal to the name of the currently running
-            hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
-            is completed.
-            """
-
-            def __init__(self, framework: Framework, event_name: str):
-                self._event = event_name
-                backend = None
-                if framework.model is not None:
-                    backend = framework.model._backend  # noqa
-                self._backend = backend  # type: Optional[_ModelBackend]
-
-            def __enter__(self):
-                if self._backend:
-                    self._backend._hook_is_running = self._event
-                return self
-
-            def __exit__(self, exception_type: 'Type[Exception]',
-                         exception: Exception, traceback: Any):
-                if self._backend:
-                    self._backend._hook_is_running = ''
-
         last_event_path = None
         deferred = True
         for event_path, observer_path, method_name in self._storage.notices(single_event_path):
@@ -902,7 +902,7 @@ class Framework(Object):
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    with EventContext(self, event_handle.kind):
+                    with self._event_context(event_handle.kind):
                         if (
                             event_is_from_juju or event_is_action
                         ) and self._juju_debug_at.intersection({'all', 'hook'}):
