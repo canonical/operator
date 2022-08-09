@@ -204,6 +204,16 @@ class ActionEvent(EventBase):
             Note that the resulting keys must start and end with lowercase
             alphanumeric, and can only contain lowercase alphanumeric, hyphens
             and periods.
+
+            If any exceptions occur whilst the action is being handled, juju will
+            gather any stdout/stderr data (and the return code) and inject them into the
+            results object. Thus, the results object might contain the following keys,
+            additionally to those specified by the charm code:
+             - Stdout
+             - Stderr
+             - Stdout-encoding
+             - Stderr-encoding
+             - ReturnCode
         """
         self.framework.model._backend.action_set(results)   # pyright: reportPrivateUsage=false
 
