@@ -189,7 +189,6 @@ class ActionEvent(EventBase):
     def set_results(self, results: '_SerializedData'):
         """Report the result of the action.
 
-
         Args:
             results: The result of the action as a Dict
             Juju eventually only accepts a str:str mapping, so we will attempt
