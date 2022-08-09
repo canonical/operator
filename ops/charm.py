@@ -180,7 +180,8 @@ class ActionEvent(EventBase):
         event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
         if event_action_name != env_action_name:
             # This could only happen if the dev manually emits the action, or from a bug.
-            raise RuntimeError('action event kind does not match current action')
+            raise RuntimeError('action event kind ({}) does not match current '
+                               'action ({})'.format(event_action_name, env_action_name))
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()  # pyright: reportPrivateUsage=false  # noqa
@@ -188,8 +189,21 @@ class ActionEvent(EventBase):
     def set_results(self, results: '_SerializedData'):
         """Report the result of the action.
 
+
         Args:
             results: The result of the action as a Dict
+            Juju eventually only accepts a str:str mapping, so we will attempt
+            to flatten any more complex data structure like so:
+            >>> {'a': 'b'} # becomes: 'a'='b'
+            >>> {'a': {'b': 'c'}} # becomes: 'a.b'='c'
+            >>> {'a': {'b': 'c', 'd': 'e'}} # becomes: 'a.b'='c', 'a.d' = 'e'
+            >>> {'a.b': 'c', 'a.d': 'e'} # equivalent to previous
+            Note that duplicate keys are not allowed, so
+            >>> {'a': {'b': 'c'}, 'a.b': 'c'} # invalid!
+
+            Note that the resulting keys must start and end with lowercase
+            alphanumeric, and can only contain lowercase alphanumeric, hyphens
+            and periods.
         """
         self.framework.model._backend.action_set(results)   # pyright: reportPrivateUsage=false
 
