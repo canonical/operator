@@ -21,9 +21,6 @@ from pytest_operator.plugin import OpsTest
 logger = logging.getLogger(__name__)
 
 
-CURRENT_CHANNEL = '20.04'  # Focal
-
-
 async def test_smoke(ops_test: OpsTest):
     # Verify that we can deploy charms from supported series.
 

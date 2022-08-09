@@ -6,4 +6,6 @@ A simple test charm for running smoke tests.
 
 ## Usage
 
-Run `tox -e smoke` in the root directory of this repository to build and deploy this charm.
+Make sure that you are on a box with charmcraft and juju installed, and that you are connected to a "machine" controller, such as a local lxd cloud. 
+
+Then, from the root directory of this repository, execute `tox -e smoke` to build and deploy this charm.
