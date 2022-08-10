@@ -11,3 +11,8 @@ venv
 .vscode
 .coverage
 /.tox
+
+# Smoke test artifacts
+*.tar.gz
+*.charm
+test/charms/test_smoke/requirements.txt
