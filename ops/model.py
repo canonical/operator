@@ -58,6 +58,8 @@ if typing.TYPE_CHECKING:
     from pebble import _LayerDict  # pyright: reportMissingTypeStubs=false
     from typing_extensions import TypedDict
 
+    from ops.framework import _SerializedData
+
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
     Numerical = Union[int, float]
@@ -913,6 +915,13 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._backend = backend
         self._is_app = isinstance(entity, Application)  # type: bool
 
+    @property
+    def _hook_is_running(self) -> bool:
+        # this flag controls whether the access we have to RelationDataContent
+        # is 'strict' aka the same as a deployed charm would have, or whether it is
+        # unrestricted, allowing test code to read/write databags at will.
+        return bool(self._backend._hook_is_running)  # pyright: reportPrivateUsage=false
+
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
         try:
@@ -921,35 +930,110 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # Dead relations tell no tales (and have no data).
             return {}
 
-    def _is_mutable(self):
-        """Return if the data content can be modified."""
+    def _validate_read(self):
+        """Return if the data content can be read."""
+        # if we're not in production (we're testing): we skip access control rules
+        if not self._hook_is_running:
+            return
+
+        # Only remote units (and the leader unit) can read *this* app databag.
+
+        # is this an app databag?
+        if not self._is_app:
+            # all unit databags are publicly readable
+            return
+
+        # Am I leader?
+        if self._backend.is_leader():
+            # leaders have no read restrictions
+            return
+
+        # type guard; we should not be accessing relation data
+        # if the remote app does not exist.
+        app = self.relation.app
+        if app is None:
+            raise RelationDataAccessError(
+                "Remote application instance cannot be retrieved for {}.".format(
+                    self.relation
+                )
+            )
+
+        # is this a peer relation?
+        if app.name == self._entity.name:
+            # peer relation data is always publicly readable
+            return
+
+        # if we're here it means: this is not a peer relation,
+        # this is an app databag, and we don't have leadership.
+
+        # is this a LOCAL app databag?
+        if self._backend.app_name == self._entity.name:
+            # minions can't read local app databags
+            raise RelationDataAccessError(
+                "{} is not leader and cannot read its own application databag".format(
+                    self._backend.unit_name
+                )
+            )
+
+        return True
+
+    def _validate_write(self, key: str, value: str):
+        """Validate writing key:value to this databag.
+
+        1) that key: value is a valid str:str pair
+        2) that we have write access to this databag
+        """
+        # firstly, we validate WHAT we're trying to write.
+        # this is independent of whether we're in testing code or production.
+        if not isinstance(key, str):
+            raise RelationDataTypeError(
+                'relation data keys must be strings, not {}'.format(type(key)))
+        if not isinstance(value, str):
+            raise RelationDataTypeError(
+                'relation data values must be strings, not {}'.format(type(value)))
+
+        # if we're not in production (we're testing): we skip access control rules
+        if not self._hook_is_running:
+            return
+
+        # finally, we check whether we have permissions to write this databag
         if self._is_app:
             is_our_app = self._backend.app_name == self._entity.name  # type: bool
             if not is_our_app:
-                return False
+                raise RelationDataAccessError(
+                    "{} cannot write the data of remote application {}".format(
+                        self._backend.app_name, self._entity.name
+                    ))
             # Whether the application data bag is mutable or not depends on
             # whether this unit is a leader or not, but this is not guaranteed
             # to be always true during the same hook execution.
-            return self._backend.is_leader()
+            if self._backend.is_leader():
+                return  # all good
+            raise RelationDataAccessError(
+                "{} is not leader and cannot write application data.".format(
+                    self._backend.unit_name
+                )
+            )
         else:
-            is_our_unit = self._backend.unit_name == self._entity.name
-            if is_our_unit:
-                return True
-        return False
+            # we are attempting to write a unit databag
+            # is it OUR UNIT's?
+            if self._backend.unit_name != self._entity.name:
+                raise RelationDataAccessError(
+                    "{} cannot write databag of {}: not the same unit.".format(
+                        self._backend.unit_name, self._entity.name
+                    )
+                )
 
     def __setitem__(self, key: str, value: str):
-        if not self._is_mutable():
-            raise RelationDataError(
-                'cannot set relation data for {}'.format(self._entity.name))
-        if not isinstance(key, str):
-            raise RelationDataError(
-                'relation data keys must be strings, not {}'.format(type(key)))
-        if not isinstance(value, str):
-            raise RelationDataError(
-                'relation data values must be strings, not {}'.format(type(value)))
+        self._validate_write(key, value)
+        self._commit(key, value)
+        self._update(key, value)
 
-        self._backend.relation_set(self.relation.id, key, value, self._is_app)
+    def _commit(self, key: str, value: str):
+        self._backend.update_relation_data(self.relation.id, self._entity, key, value)
 
+    def _update(self, key: str, value: str):
+        """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
@@ -959,10 +1043,22 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             else:
                 self._data[key] = value
 
+    def __getitem__(self, key: str) -> str:
+        self._validate_read()
+        return super().__getitem__(key)
+
     def __delitem__(self, key: str):
+        self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
+
+    def __repr__(self):
+        try:
+            self._validate_read()
+        except RelationDataAccessError:
+            return '<n/a>'
+        return super().__repr__()
 
 
 class ConfigData(LazyMapping):
@@ -1920,11 +2016,25 @@ class TooManyRelatedAppsError(ModelError):
 
 
 class RelationDataError(ModelError):
-    """Raised by ``Relation.data[entity][key] = 'foo'`` if the data is invalid.
+    """Raised when a relation data read/write is invalid.
 
     This is raised if you're either trying to set a value to something that isn't a string,
     or if you are trying to set a value in a bucket that you don't have access to. (eg,
     another application/unit or setting your application data but you aren't the leader.)
+    Also raised when you attempt to read a databag you don't have access to
+    (i.e. a local app databag if you're not the leader).
+    """
+
+
+class RelationDataTypeError(RelationDataError):
+    """Raised by ``Relation.data[entity][key] = value`` if `key` or `value` are not strings."""
+
+
+class RelationDataAccessError(RelationDataError):
+    """Raised by ``Relation.data[entity][key] = value`` if you don't have access.
+
+    This typically means that you don't have permission to write read/write the databag,
+    but in some cases it is raised when attempting to read/write from a deceased remote entity.
     """
 
 
@@ -2147,7 +2257,7 @@ class _ModelBackend:
 
         try:
             content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
-            return self._run(*args, input_stream=content)
+            return self._run(*args, input_stream=content)  # type: ignore
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
@@ -2277,7 +2387,7 @@ class _ModelBackend:
     def action_get(self):
         return self._run('action-get', return_output=True, use_json=True)
 
-    def action_set(self, results: Dict[str, 'JsonObject']):
+    def action_set(self, results: '_SerializedData'):
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
@@ -2365,6 +2475,10 @@ class _ModelBackend:
         app_state = typing.cast(Dict[str, List[str]], app_state)
         # Planned units can be zero. We don't need to do error checking here.
         return len(app_state.get('units', []))
+
+    def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
+                             key: str, value: str):
+        self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
 
 class _ModelBackendValidator:
