@@ -18,6 +18,7 @@ import ipaddress
 import json
 import os
 import pathlib
+import sys
 import tempfile
 import unittest
 from collections import OrderedDict
@@ -36,7 +37,6 @@ from ops.pebble import APIError, FileInfo, FileType, ServiceInfo
 
 
 class TestModel(unittest.TestCase):
-
     def setUp(self):
         self.harness = ops.testing.Harness(ops.charm.CharmBase, meta='''
             name: myapp
@@ -59,10 +59,11 @@ class TestModel(unittest.TestCase):
             bar:
                 type: int
             qux:
-                type: bool
+                type: boolean
         ''')
         self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
+        self.harness._get_backend_calls(reset=True)
         self.model = self.harness.model
 
     def test_model_attributes(self):
@@ -182,24 +183,41 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
 
         with self.assertRaises(model.RelationDataError):
-            self.harness.update_relation_data(
-                relation_id,
-                'remoteapp1/0',
-                {42: 'remoteapp1-0'})
+            with self.harness._event_context('foo_event'):
+                self.harness.update_relation_data(
+                    relation_id,
+                    'remoteapp1/0',
+                    {42: 'remoteapp1-0'})
 
         with self.assertRaises(model.RelationDataError):
+            with self.harness._event_context('foo_event'):
+                self.harness.update_relation_data(
+                    relation_id,
+                    'remoteapp1/0',
+                    {'foo': 42})
+
+    def test_get_app_relation_data(self):
+        self.harness.begin()
+        relation_id = self.harness.add_relation('db1', 'remote')
+        self.harness.add_relation_unit(relation_id, 'remote/0')
+        local_app = self.harness.model.app.name
+        with self.harness._event_context('foo_event'):
             self.harness.update_relation_data(
                 relation_id,
-                'remoteapp1/0',
-                {'foo': 42})
+                local_app,
+                {'foo': 'bar'})
+            assert self.harness.get_relation_data(
+                relation_id, self.harness.model.app) == self.harness.get_relation_data(
+                relation_id, local_app) == {'foo': 'bar'}
 
     def test_unit_relation_data(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
-        self.harness.update_relation_data(
-            relation_id,
-            'remoteapp1/0',
-            {'host': 'remoteapp1-0'})
+        with self.harness._event_context('foo_event'):
+            self.harness.update_relation_data(
+                relation_id,
+                'remoteapp1/0',
+                {'host': 'remoteapp1-0'})
         self.model.relations._invalidate('db1')
         self.resetBackendCalls()
 
@@ -219,7 +237,9 @@ class TestModel(unittest.TestCase):
 
     def test_remote_app_relation_data(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
-        self.harness.update_relation_data(relation_id, 'remoteapp1', {'secret': 'cafedeadbeef'})
+        with self.harness._event_context('foo_event'):
+            self.harness.update_relation_data(relation_id, 'remoteapp1',
+                                              {'secret': 'cafedeadbeef'})
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
         self.resetBackendCalls()
@@ -243,9 +263,12 @@ class TestModel(unittest.TestCase):
 
     def test_relation_data_modify_remote(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
-        self.harness.update_relation_data(relation_id, 'remoteapp1', {'secret': 'cafedeadbeef'})
-        self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
-        self.harness.update_relation_data(relation_id, 'remoteapp1/0', {'host': 'remoteapp1/0'})
+        with self.harness._event_context('foo_event'):
+            self.harness.update_relation_data(relation_id, 'remoteapp1',
+                                              {'secret': 'cafedeadbeef'})
+            self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
+            self.harness.update_relation_data(relation_id, 'remoteapp1/0',
+                                              {'host': 'remoteapp1/0'})
         self.model.relations._invalidate('db1')
         self.resetBackendCalls()
 
@@ -256,8 +279,9 @@ class TestModel(unittest.TestCase):
         self.assertIn('host', rel_db1.data[remoteapp1_0])
         self.assertEqual(repr(rel_db1.data[remoteapp1_0]), "{'host': 'remoteapp1/0'}")
 
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[remoteapp1_0]['foo'] = 'bar'
+        with self.harness._event_context('foo_event'):
+            with self.assertRaises(ops.model.RelationDataError):
+                rel_db1.data[remoteapp1_0]['foo'] = 'bar'
         self.assertNotIn('foo', rel_db1.data[remoteapp1_0])
 
         self.assertBackendCalls([
@@ -267,29 +291,35 @@ class TestModel(unittest.TestCase):
         ])
 
         # this will fire more backend calls
+        with self.harness._event_context('foo_event'):
+            data_repr = repr(rel_db1.data)
         # the CountEqual and weird (and brittle) splitting is to accommodate python 3.5
         # TODO: switch to assertEqual when we drop 3.5
         self.assertCountEqual(
-            repr(rel_db1.data)[1:-1].split(', '),
+            data_repr[1:-1].split(', '),
             ["<ops.model.Unit myapp/0>: {}",
-             "<ops.model.Application myapp>: {}",
+             "<ops.model.Application myapp>: <n/a>",
              "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}",
              "<ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}"])
 
     def test_relation_data_modify_our(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
+
         self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'nothing'})
         self.resetBackendCalls()
-
-        rel_db1 = self.model.get_relation('db1')
-        # Force memory cache to be loaded.
-        self.assertIn('host', rel_db1.data[self.model.unit])
-        rel_db1.data[self.model.unit]['host'] = 'bar'
-        self.assertEqual(rel_db1.data[self.model.unit]['host'], 'bar')
+        with self.harness._event_context('foo_event'):
+            rel_db1 = self.model.get_relation('db1')
+            # update_relation_data will also trigger relation-get, so we
+            # invalidate the cache to ensure it will be reloaded
+            rel_db1.data[self.model.unit]._invalidate()
+            # Force memory cache to be loaded.
+            self.assertIn('host', rel_db1.data[self.model.unit])
+            rel_db1.data[self.model.unit]['host'] = 'bar'
+            self.assertEqual(rel_db1.data[self.model.unit]['host'], 'bar')
 
         self.assertBackendCalls([
             ('relation_get', relation_id, 'myapp/0', False),
-            ('relation_set', relation_id, 'host', 'bar', False),
+            ('update_relation_data', relation_id, self.model.unit, 'host', 'bar'),
         ])
 
     def test_app_relation_data_modify_local_as_leader(self):
@@ -308,13 +338,11 @@ class TestModel(unittest.TestCase):
 
         self.assertEqual(rel_db1.data[local_app]['password'], 'foo')
 
-        self.assertBackendCalls([
-            ('relation_ids', 'db1'),
-            ('relation_list', relation_id),
-            ('relation_get', relation_id, 'myapp', True),
-            ('is_leader',),
-            ('relation_set', relation_id, 'password', 'foo', True),
-        ])
+        self.assertBackendCalls(
+            [('relation_ids', 'db1'),
+             ('relation_list', 1),
+             ('relation_get', 1, 'myapp', True),
+             ('update_relation_data', 1, self.model.app, 'password', 'foo')])
 
     def test_app_relation_data_modify_local_as_minion(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
@@ -328,19 +356,40 @@ class TestModel(unittest.TestCase):
         rel_db1 = self.model.get_relation('db1')
         self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
 
-        with self.assertRaises(ops.model.RelationDataError):
-            rel_db1.data[local_app]['password'] = 'foobar'
+        with self.harness._event_context('foo_event'):
+            # if we were inside an event context, we'd get:
+            with self.assertRaises(ops.model.RelationDataError):
+                rel_db1.data[local_app]['password'] = 'foobar'
 
-        self.assertBackendCalls([
-            ('relation_ids', 'db1'),
-            ('relation_list', relation_id),
-            ('relation_get', relation_id, 'myapp', True),
-            ('is_leader',),
-        ])
+        self.assertBackendCalls([('relation_ids', 'db1'),
+                                 ('relation_list', 1),
+                                 ('relation_get', 1, 'myapp', True),
+                                 ('is_leader',)])
+
+    def test_relation_data_access_peer_leader(self):
+        r_id = self.harness.add_relation('db2', 'myapp')
+        self.harness.add_relation_unit(r_id, 'myapp/1')  # peer!
+        self.harness.update_relation_data(r_id, 'myapp', {'foo': 'bar'})
+        with self.harness._event_context('foo_event'):
+            # leaders can read
+            self.harness.set_leader(True)
+            relation = self.harness.model.get_relation('db2')
+            self.assertEqual(relation.data[relation.app]['foo'], 'bar')
+
+    def test_relation_data_access_peer_minion(self):
+        r_id = self.harness.add_relation('db2', 'myapp')
+        self.harness.add_relation_unit(r_id, 'myapp/1')  # peer!
+        self.harness.update_relation_data(r_id, 'myapp', {'foo': 'bar'})
+        with self.harness._event_context('foo_event'):
+            # nonleaders can read
+            self.harness.set_leader(False)
+            relation = self.harness.model.get_relation('db2')
+            self.assertEqual(relation.data[relation.app]['foo'], 'bar')
 
     def test_relation_data_del_key(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
-        self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
+        with self.harness._event_context('foo_event'):
+            self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
@@ -355,32 +404,37 @@ class TestModel(unittest.TestCase):
             ('relation_ids', 'db1'),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
-            ('relation_set', relation_id, 'host', '', False),
+            ('update_relation_data', relation_id, self.model.unit, 'host', ''),
         ])
 
     def test_relation_data_del_missing_key(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
-        self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
+        with self.harness._event_context('foo_event'):
+            self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
         rel_db1 = self.model.get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
-        rel_db1.data[self.model.unit]['port'] = ''   # Same as a delete, should not fail.
+        with self.harness._event_context('foo_event'):
+            rel_db1.data[self.model.unit]['port'] = ''   # Same as a delete, should not fail.
         self.assertNotIn('port', rel_db1.data[self.model.unit])
-        self.assertEqual({'host': 'bar'}, self.harness.get_relation_data(relation_id, 'myapp/0'))
+        with self.harness._event_context('foo_event'):
+            self.assertEqual({'host': 'bar'},
+                             self.harness.get_relation_data(relation_id, 'myapp/0'))
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
-            ('relation_set', relation_id, 'port', '', False),
+            ('update_relation_data', relation_id, self.model.unit, 'port', ''),
         ])
 
     def test_relation_set_fail(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
-        self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'myapp-0'})
+        with self.harness._event_context('foo_event'):
+            self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'myapp-0'})
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
@@ -390,27 +444,29 @@ class TestModel(unittest.TestCase):
         #       but there was nothing illegal about the data that was being set,
         #       for us to properly test the side effects of relation-set failing.
 
-        def broken_relation_set(relation_id, key, value, is_app):
-            backend._calls.append(('relation_set', relation_id, key, value, is_app))
+        def broken_update_relation_data(relation_id, entity, key, value):
+            backend._calls.append(('update_relation_data', relation_id, entity, key, value))
             raise ops.model.ModelError()
-        backend.relation_set = broken_relation_set
+        backend.update_relation_data = broken_update_relation_data
 
         rel_db1 = self.model.get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
-        with self.assertRaises(ops.model.ModelError):
-            rel_db1.data[self.model.unit]['host'] = 'bar'
-        self.assertEqual(rel_db1.data[self.model.unit]['host'], 'myapp-0')
-        with self.assertRaises(ops.model.ModelError):
-            del rel_db1.data[self.model.unit]['host']
-        self.assertIn('host', rel_db1.data[self.model.unit])
+
+        with self.harness._event_context('foo_event'):
+            with self.assertRaises(ops.model.ModelError):
+                rel_db1.data[self.model.unit]['host'] = 'bar'
+            self.assertEqual(rel_db1.data[self.model.unit]['host'], 'myapp-0')
+            with self.assertRaises(ops.model.ModelError):
+                del rel_db1.data[self.model.unit]['host']
+            self.assertIn('host', rel_db1.data[self.model.unit])
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
-            ('relation_set', relation_id, 'host', 'bar', False),
-            ('relation_set', relation_id, 'host', '', False),
+            ('update_relation_data', relation_id, self.model.unit, 'host', 'bar'),
+            ('update_relation_data', relation_id, self.model.unit, 'host', ''),
         ])
 
     def test_relation_data_type_check(self):
@@ -431,7 +487,8 @@ class TestModel(unittest.TestCase):
                 (None, None)
         ):
             with self.assertRaises(ops.model.RelationDataError):
-                rel_db1.data[self.model.unit][key] = value
+                with self.harness.framework._event_context('foo_event'):
+                    rel_db1.data[self.model.unit][key] = value
 
         # No data has actually been changed
         self.assertEqual(dict(rel_db1.data[self.model.unit]), {'host': 'myapp-0'})
@@ -441,6 +498,104 @@ class TestModel(unittest.TestCase):
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
         ])
+
+    def test_relation_local_app_data_readability_leader(self):
+        relation_id = self.harness.add_relation('db1', 'remoteapp1')
+        self.harness.update_relation_data(relation_id, 'remoteapp1',
+                                          {'secret': 'cafedeadbeef'})
+        self.harness.update_relation_data(relation_id, 'myapp',
+                                          {'local': 'data'})
+
+        self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
+        self.harness.update_relation_data(relation_id, 'remoteapp1/0',
+                                          {'host': 'remoteapp1/0'})
+        self.model.relations._invalidate('db1')
+        self.resetBackendCalls()
+
+        rel_db1 = self.model.get_relation('db1')
+        self.harness.begin()
+        self.harness.set_leader(True)
+        self.resetBackendCalls()
+
+        local_app = self.harness.charm.app
+        self.resetBackendCalls()
+
+        # addressing the object is OK
+        rel_db1.data[local_app]
+
+        self.assertBackendCalls([])
+
+        with self.harness._event_context('foo_event'):
+            self.resetBackendCalls()
+
+            self.assertEqual(rel_db1.data[local_app]['local'], 'data')
+
+            self.assertBackendCalls([('is_leader',),
+                                     ('relation_get', 1, 'myapp', True)])
+
+            self.resetBackendCalls()
+
+            self.assertEqual(repr(rel_db1.data[local_app]), repr({'local': 'data'}))
+
+            # we don't get the data, because we're lazy
+            self.assertBackendCalls([('is_leader',)])
+
+            # as well as relation data repr() in general:
+            self.assertIsInstance(repr(rel_db1.data), str)
+
+    def test_relation_local_app_data_readability_follower(self):
+        relation_id = self.harness.add_relation('db1', 'remoteapp1')
+        with self.harness._event_context('foo_event'):
+            self.harness.update_relation_data(relation_id, 'remoteapp1',
+                                              {'secret': 'cafedeadbeef'})
+            self.harness.update_relation_data(relation_id, 'myapp',
+                                              {'local': 'data'})
+
+            self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
+            self.harness.update_relation_data(relation_id, 'remoteapp1/0',
+                                              {'host': 'remoteapp1/0'})
+        self.model.relations._invalidate('db1')
+        self.resetBackendCalls()
+
+        rel_db1 = self.model.get_relation('db1')
+        self.harness.begin()
+        self.harness.set_leader(False)
+
+        local_app = self.harness.charm.app
+        # addressing the object is OK
+        rel_db1.data[local_app]
+        # nonleader units cannot read their local app databag
+        # attempting to read it is not
+        with self.harness._event_context('foo_event'):
+            self.resetBackendCalls()
+
+            with self.assertRaises(ops.model.RelationDataError):
+                # 'local' is there, but still:
+                rel_db1.data[local_app]['local']
+
+            # we didn't even get to relation-get
+            self.assertBackendCalls([('is_leader', )])
+
+            # we can't see it but repr() works
+            self.assertEqual(repr(rel_db1.data[local_app]), '<n/a>')
+            self.assertBackendCalls([('is_leader', )])
+
+            # as well as relation data repr() in general:
+            self.assertIsInstance(repr(rel_db1.data), str)
+
+            expected_backend_calls = [
+                ('relation_get', 1, 'myapp/0', False),
+                ('is_leader',),
+                ('relation_get', 1, 'remoteapp1/0', False),
+                ('is_leader',),
+                ('relation_get', 1, 'remoteapp1', True)]
+            # in < 3.5 dicts are unsorted
+            major, minor, *_ = sys.version_info
+            if (major, minor) > (3, 5):
+                self.assertBackendCalls(expected_backend_calls)
+            else:
+                backend_calls = set(self.harness._get_backend_calls())
+                self.assertEqual(backend_calls, set(expected_backend_calls))
 
     def test_relation_no_units(self):
         self.harness.add_relation('db1', 'remoteapp1')
@@ -454,6 +609,7 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_config(self):
+        self.harness._get_backend_calls(reset=True)
         self.harness.update_config({'foo': 'foo', 'bar': 1, 'qux': True})
         self.assertEqual(self.model.config, {
             'foo': 'foo',
@@ -588,6 +744,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(ops.model.ActiveStatus().message, '')
 
     def test_local_set_valid_unit_status(self):
+        self.harness._get_backend_calls(reset=True)
         test_cases = [(
             'active',
             ops.model.ActiveStatus('Green'),
@@ -1969,17 +2126,17 @@ class TestModelBackend(unittest.TestCase):
             lambda: fake_script(self, 'relation-set', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.ModelError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', '--file', '-']],
         ), (
             lambda: fake_script(self, 'relation-set', 'echo {} >&2 ; exit 2'.format(err_msg)),
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
             ops.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar']],
+            [['relation-set', '-r', '3', '--file', '-']],
         ), (
             lambda: None,
             lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=True),
             ops.model.RelationNotFoundError,
-            [['relation-set', '-r', '3', 'foo=bar', '--app']],
+            [['relation-set', '-r', '3', '--app', '--file', '-']],
         ), (
             lambda: fake_script(self, 'relation-get', 'echo fooerror >&2 ; exit 1'),
             lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
@@ -2027,15 +2184,25 @@ class TestModelBackend(unittest.TestCase):
     def test_relation_set_juju_version_quirks(self):
         self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
 
-        fake_script(self, 'relation-set', 'exit 0')
-
         # on 2.7.0+, things proceed as expected
         for v in ['2.8.0', '2.7.0']:
             with self.subTest(v):
-                os.environ['JUJU_VERSION'] = v
-                self.backend.relation_set(1, 'foo', 'bar', is_app=True)
-                calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
-                self.assertEqual(calls, ['relation-set -r 1 foo=bar --app'])
+                t = tempfile.NamedTemporaryFile()
+                try:
+                    fake_script(self, 'relation-set', dedent("""
+                        cat >> {}
+                        """).format(pathlib.Path(t.name).as_posix()))
+                    os.environ['JUJU_VERSION'] = v
+                    self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+                    calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
+                    self.assertEqual(calls, ['relation-set -r 1 --app --file -'])
+                    t.seek(0)
+                    content = t.read()
+                finally:
+                    t.close()
+                self.assertEqual(content.decode('utf-8'), dedent("""\
+                    foo: bar
+                    """))
 
         # before 2.7.0, it just fails always (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'
