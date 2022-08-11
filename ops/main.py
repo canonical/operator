@@ -65,7 +65,7 @@ def _get_charm_dir():
 
 
 def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource[Any]',
-                       link_to: Union[str, os.PathLike[str]]):
+                       link_to: Union[str, Path]):
     """Create a symlink for a particular event.
 
     Args:
@@ -102,7 +102,7 @@ def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource[Any]',
         event_path.symlink_to(target_path)
 
 
-def _setup_event_links(charm_dir: Path, charm: CharmBase):
+def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
     """Set up links for supported events that originate from Juju.
 
     Whether a charm can handle an event or not can be determined by
