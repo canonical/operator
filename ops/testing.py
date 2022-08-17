@@ -244,6 +244,15 @@ class Harness(typing.Generic[CharmType]):
         self._charm = TestCharm(self._framework)
 
     def begin_with_initial_hooks(self) -> None:
+        """Deprecated method; use `simulate_setup_sequence` instead."""
+        logging.warning('begin_with_initial_hooks is being deprecated;'
+                        'call `simulate_setup_sequence()` instead.')
+
+        if not self.charm:
+            self.begin()
+        self.simulate_setup_sequence(begin=True)
+
+    def simulate_setup_sequence(self, begin=True) -> None:
         """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
 
         This triggers install, relation-created, config-changed, start, and any relation-joined
@@ -264,7 +273,7 @@ class Harness(typing.Generic[CharmType]):
 
             harness = Harness(MyCharm)
             # Do initial setup here
-            # Add storage if needed before begin_with_initial_hooks() is called
+            # Add storage if needed before simulate_setup_sequence() is called
             storage_ids = harness.add_storage('data', count=1)[0]
             storage_id = storage_id[0] # we only added one storage instance
             relation_id = harness.add_relation('db', 'postgresql')
@@ -272,20 +281,15 @@ class Harness(typing.Generic[CharmType]):
             harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
             harness.set_leader(True)
             harness.update_config({'initial': 'config'})
-            harness.begin_with_initial_hooks()
+            harness.simulate_setup_sequence()
             # This will cause
             # install, db-relation-created('postgresql'), leader-elected, config-changed, start
             # db-relation-joined('postrgesql/0'), db-relation-changed('postgresql/0')
             # To be fired.
         """
-        logging.warning('begin_with_initial_hooks is being deprecated;'
-                        'call `begin()` and then `simulate_setup_sequence()`')
 
-        if not self.charm:
+        if begin and not self.charm:
             self.begin()
-        self.simulate_setup_sequence()
-
-    def simulate_setup_sequence(self) -> None:
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
@@ -349,7 +353,7 @@ class Harness(typing.Generic[CharmType]):
                 self._charm.on[rel_name].relation_changed.emit(
                     relation, remote_unit.app, remote_unit)
 
-    def simulate_teardown_sequence(self):
+    def simulate_teardown_sequence(self, end=True):
         """Simulates the sequence of events fired during the teardown phase.
 
         During the teardown phase, the charm will:
@@ -390,6 +394,8 @@ class Harness(typing.Generic[CharmType]):
 
         self._charm.on.stop.emit()
         self._charm.on.remove.emit()
+        if end:
+            self.end()
 
     def end(self):
         """Remove the charm instance reference."""
