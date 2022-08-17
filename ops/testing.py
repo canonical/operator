@@ -35,6 +35,7 @@ Global Variables:
 import datetime
 import fnmatch
 import inspect
+import logging
 import os
 import pathlib
 import random
@@ -277,8 +278,14 @@ class Harness(typing.Generic[CharmType]):
             # db-relation-joined('postrgesql/0'), db-relation-changed('postgresql/0')
             # To be fired.
         """
-        self.begin()
+        logging.warning('begin_with_initial_hooks is being deprecated;'
+                        'call `begin()` and then `simulate_setup_sequence()`')
 
+        if not self.charm:
+            self.begin()
+        self.simulate_setup_sequence()
+
+    def simulate_setup_sequence(self) -> None:
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
@@ -341,6 +348,52 @@ class Harness(typing.Generic[CharmType]):
                     relation, remote_unit.app, remote_unit)
                 self._charm.on[rel_name].relation_changed.emit(
                     relation, remote_unit.app, remote_unit)
+
+    def simulate_teardown_sequence(self):
+        """Simulates the sequence of events fired during the teardown phase.
+
+        During the teardown phase, the charm will:
+         - receive a `stop` event.
+         - for all established relations, it will receive:
+           - a `relation-departed` event for each remote unit
+           - a `relation-broken` event
+         - for all attached storages, it will receive `storage-detaching`
+         - receive a `remove`
+        """
+
+        storage_names = list(self._meta.storages)
+        random.shuffle(storage_names)
+        # fire all storage-detaching events
+        for storage_name in storage_names:
+            for storage_index in self._backend.storage_list(storage_name, include_detached=True):
+                s = model.Storage(storage_name, storage_index, self._backend)
+                self.detach_storage(s.full_id)
+
+        # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
+        # guarantee a stable ordering between relation events. It *does* give a stable ordering
+        # of joined units for a given relation.
+        # fire relation-departed for all remote units, and relation-broken
+        relations = list(self._backend._relation_names.items())
+        random.shuffle(relations)
+        for rel_id, rel_name in relations:
+            rel_app_and_units = self._backend._relation_app_and_units[rel_id]
+            app_name = rel_app_and_units["app"]
+            relation = self._model.get_relation(rel_name, rel_id)
+
+            for unit_name in sorted(rel_app_and_units["units"]):
+                remote_unit = self._model.get_unit(unit_name)
+                self.remove_relation_unit(relation.id, remote_unit.name)
+
+            if self._backend._relation_data[rel_id].get(app_name):
+                app = self._model.get_app(app_name)
+                self.remove_relation(relation.id)
+
+        self._charm.on.stop.emit()
+        self._charm.on.remove.emit()
+
+    def end(self):
+        """Remove the charm instance reference."""
+        self._charm = None
 
     def cleanup(self) -> None:
         """Called by your test infrastructure to cleanup any temporary directories/files/etc.
