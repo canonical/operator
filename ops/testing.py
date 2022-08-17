@@ -46,7 +46,7 @@ from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
 from typing import (TypeVar, Generic, Type, AnyStr, Iterable, Optional, Mapping,
-                    BinaryIO, TextIO, List, Union, Iterator, Tuple, Any, cast)
+                    BinaryIO, TextIO, List, Union, Iterator, Dict, Tuple, Any, cast, TYPE_CHECKING)
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.model import RelationNotFoundError
@@ -1122,7 +1122,7 @@ def _copy_docstrings(source_cls):
     __doc__ for that method.
     """
     def decorator(target_cls):
-        for meth_name, orig_method in target_cls.__dict__.items():
+        for meth_name, _ in target_cls.__dict__.items():
             if meth_name.startswith('_'):
                 continue
             source_method = source_cls.__dict__.get(meth_name)
@@ -1130,13 +1130,6 @@ def _copy_docstrings(source_cls):
                 target_cls.__dict__[meth_name].__doc__ = source_method.__doc__
         return target_cls
     return decorator
-
-
-class _ResourceEntry:
-    """Tracks the contents of a Resource."""
-
-    def __init__(self, resource_name):
-        self.name = resource_name
 
 
 @_record_calls
@@ -1455,7 +1448,7 @@ class _TestingModelBackend:
         if name not in self._storage_list:
             self._storage_list[name] = {}
         result = []
-        for i in range(count):
+        for _ in range(count):
             index = self._storage_index_counter
             self._storage_index_counter += 1
             self._storage_list[name][index] = {
@@ -1511,26 +1504,26 @@ class _TestingModelBackend:
     def action_get(self):
         raise NotImplementedError(self.action_get)
 
-    def action_set(self, results):
+    def action_set(self, results):  # type:ignore
         raise NotImplementedError(self.action_set)
 
-    def action_log(self, message):
+    def action_log(self, message):  # type:ignore
         raise NotImplementedError(self.action_log)
 
     def action_fail(self, message=''):
         raise NotImplementedError(self.action_fail)
 
-    def network_get(self, endpoint_name, relation_id=None):
+    def network_get(self, endpoint_name, relation_id=None):  # type:ignore
         raise NotImplementedError(self.network_get)
 
-    def add_metrics(self, metrics, labels=None):
+    def add_metrics(self, metrics, labels=None):  # type:ignore
         raise NotImplementedError(self.add_metrics)
 
     @classmethod
-    def log_split(cls, message, max_len):
+    def log_split(cls, message, max_len):  # type:ignore
         raise NotImplementedError(cls.log_split)
 
-    def juju_log(self, level, msg):
+    def juju_log(self, level, msg):  # type:ignore
         raise NotImplementedError(self.juju_log)
 
     def get_pebble(self, socket_path: str) -> 'pebble.Client':
@@ -1584,9 +1577,9 @@ class _TestingPebbleClient:
 
     def __init__(self, backend: _TestingModelBackend):
         self._backend = _TestingModelBackend
-        self._layers = {}
+        self._layers = {}  # type: Dict[str, pebble.Layer]
         # Has a service been started/stopped?
-        self._service_status = {}
+        self._service_status = {}  # type: Dict[str, pebble.ServiceStatus]
         self._fs = _TestingFilesystem()
         self._backend = backend
 
@@ -1745,8 +1738,6 @@ ChangeError: cannot perform the following tasks:
         self._check_connection()
 
         if label in self._layers:
-            # TODO: jam 2021-04-19 These should not be RuntimeErrors but should be proper error
-            #  types. https://github.com/canonical/operator/issues/514
             if not combine:
                 raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
             layer = self._layers[label]
@@ -1818,8 +1809,8 @@ ChangeError: cannot perform the following tasks:
             infos.append(info)
         return infos
 
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> Union[BinaryIO,
-                                                                          TextIO]:
+    def pull(self, path: str, *,
+             encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
         self._check_connection()
         return self._fs.open(path, encoding=encoding)
 
@@ -1994,7 +1985,7 @@ class _TestingStorageMount:
 
         src.mkdir(exist_ok=True, parents=True)
 
-    def contains(self, path: Union[str, pathlib.PurePosixPath]) -> bool:
+    def contains(self, path: Union[str, pathlib.PurePosixPath, pathlib.Path]) -> bool:
         """Returns true whether path resides within this simulated storage mount's location."""
         try:
             pathlib.PurePosixPath(path).relative_to(self._location)
@@ -2041,19 +2032,19 @@ class _TestingStorageMount:
 
     def create_file(
             self,
-            path: pathlib.PurePosixPath,
+            path: Union[str, pathlib.PurePosixPath],
             data: Union[bytes, str, BinaryIO, TextIO],
             encoding: str = 'utf-8',
             make_dirs: bool = False,
             **kwargs
     ) -> '_File':
-        path = self.check_contains(path)
-        srcpath = self._srcpath(path)
+        posixpath = self.check_contains(path)  # type: pathlib.PurePosixPath
+        srcpath = self._srcpath(posixpath)
 
         dirname = srcpath.parent
         if not dirname.exists():
             if not make_dirs:
-                raise FileNotFoundError(str(path.parent))
+                raise FileNotFoundError(str(posixpath.parent))
             dirname.mkdir(parents=True, exist_ok=True)
 
         if isinstance(data, str):
@@ -2066,7 +2057,7 @@ class _TestingStorageMount:
         with srcpath.open('wb') as f:
             f.write(data)
 
-        return _File(path, data, encoding=encoding, **kwargs)
+        return _File(posixpath, data, encoding=encoding, **kwargs)
 
     def list_dir(self, path: pathlib.PurePosixPath) -> List['_File']:
         path = self.check_contains(path)
@@ -2123,13 +2114,13 @@ class _TestingStorageMount:
 class _TestingFilesystem:
     r"""An in-memory mock of a pebble-controlled container's filesystem.
 
-    For now, the filesystem is assumed to be a POSIX-style filesytem; Windows-style directories
+    For now, the filesystem is assumed to be a POSIX-style filesystem; Windows-style directories
     (e.g. \, \foo\bar, C:\foo\bar) are not supported.
     """
 
     def __init__(self):
         self.root = _Directory(pathlib.PurePosixPath('/'))
-        self._mounts = {}
+        self._mounts = {}  # type: Dict[str, _TestingStorageMount]
 
     def add_mount(self, name, mount_path, backing_src_path):
         self._mounts[name] = _TestingStorageMount(
@@ -2207,7 +2198,7 @@ class _TestingFilesystem:
                 'generic-file-error', 'parent is not a directory: {}'.format(str(dir_)))
         return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
-    def list_dir(self, path) -> List['_File']:
+    def list_dir(self, path: pathlib.Path) -> List['_File']:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.list_dir(path)
@@ -2251,7 +2242,8 @@ class _TestingFilesystem:
         for token in tokens:
             # ASSUMPTION / TESTME: object might be file
             if token in current_object:
-                current_object = current_object[token]
+                current_object = cast(Union['_Directory', '_File'],
+                                      current_object[token])
             else:
                 raise FileNotFoundError(str(current_object.path / token))
         return current_object
@@ -2266,9 +2258,9 @@ class _TestingFilesystem:
 
 
 class _Directory:
-    def __init__(self, path: pathlib.PurePosixPath, **kwargs):
+    def __init__(self, path: pathlib.PurePosixPath, **kwargs: Any):
         self.path = path
-        self._children = {}
+        self._children = {}  # type: Dict[str, Union[_Directory, _File]]
         self.last_modified = datetime.datetime.now()
         self.kwargs = kwargs
 
@@ -2296,19 +2288,21 @@ class _Directory:
     def __len__(self):
         return len(self._children)
 
-    def create_dir(self, name: str, **kwargs) -> '_Directory':
-        self._children[name] = _Directory(self.path / name, **kwargs)
-        return self._children[name]
+    def create_dir(self, name: str, **kwargs: Any) -> '_Directory':
+        dirc = _Directory(self.path / name, **kwargs)
+        self._children[name] = dirc
+        return dirc
 
     def create_file(
             self,
             name: str,
             data: Union[bytes, str, BinaryIO, TextIO],
             encoding: Optional[str] = 'utf-8',
-            **kwargs
+            **kwargs: Any
     ) -> '_File':
-        self._children[name] = _File(self.path / name, data, encoding=encoding, **kwargs)
-        return self._children[name]
+        file = _File(self.path / name, data, encoding=encoding, **kwargs)
+        self._children[name] = file
+        return file
 
 
 class _File:
@@ -2317,7 +2311,7 @@ class _File:
             path: pathlib.PurePosixPath,
             data: Union[str, bytes, BinaryIO, TextIO],
             encoding: Optional[str] = 'utf-8',
-            **kwargs):
+            **kwargs: Any):
 
         if hasattr(data, 'read'):
             data = data.read()
@@ -2340,6 +2334,7 @@ class _File:
             encoding: Optional[str] = 'utf-8',
     ) -> Union[TextIO, BinaryIO]:
         if encoding is None:
-            return BytesIO(self.data)
+            return BytesIO(cast(bytes, self.data))
         else:
-            return StringIO(self.data.decode(encoding))
+            raw = self.data.decode(encoding)  # type: ignore
+            return StringIO(cast(str, raw))
