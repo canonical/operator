@@ -17,6 +17,7 @@
 import os
 import re
 from functools import total_ordering
+from typing import Union
 
 
 @total_ordering
@@ -55,12 +56,12 @@ class JujuVersion:
             s += '.{}'.format(self.build)
         return s
 
-    def __eq__(self, other: 'JujuVersion') -> bool:
+    def __eq__(self, other: Union[str, 'JujuVersion']) -> bool:
         if self is other:
             return True
         if isinstance(other, str):
             other = type(self)(other)
-        elif not isinstance(other, JujuVersion):
+        elif not isinstance(other, JujuVersion):  # pyright: reportUnnecessaryIsInstance=false
             raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
         return (
             self.major == other.major
