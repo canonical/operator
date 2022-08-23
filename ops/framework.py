@@ -46,7 +46,7 @@ from typing import (
 )
 
 from ops import charm
-from ops.storage import NoSnapshotError, SQLiteStorage
+from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -589,7 +589,7 @@ class Framework(Object):
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
-    def __init__(self, storage: SQLiteStorage, charm_dir: 'Path',
+    def __init__(self, storage: Union[SQLiteStorage, JujuStorage], charm_dir: 'Path',
                  meta: 'CharmMeta', model: 'Model'):
         super().__init__(self, None)
 
