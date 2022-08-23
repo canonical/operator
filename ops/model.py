@@ -2230,15 +2230,6 @@ class _ModelBackend:
         """
         pass
 
-    def secret_ids: strs(self, label: Optional[str] = None) -> List[str]:
-        raise RuntimeError('unimplemented')
-        _ = self._run('secret-ids', ...)
-    def secret_get(self, secret_id: str, key: str, label: Optional[str] = None) -> str:
-        raise RuntimeError('unimplemented')
-        _ = self._run('secret-get', ...)
-    def secret_meta(self, secret_id: str) -> Dict[str,str]: # secret-get --metadata
-        raise RuntimeError('unimplemented')
-        _ = self._run('secret-get', '--metadata', ...)
     def secret_update(self, secret_id: str, description: Optional[str] = None, label: Optional[str] = None, **keysvals):
         raise RuntimeError('unimplemented')
         _ = self._run('secret-update', ...)
@@ -2251,9 +2242,38 @@ class _ModelBackend:
     def secret_revoke(self, secret_id: str, relation_id: int, unit_id: Optional[str] = None):
         raise RuntimeError('unimplemented')
         _ = self._run('secret-revoke', ...)
-    def secret_add(self, owner: str = 'application', description: Optional[str] = None, label: Optional[str] = None, **keysvals) -> Secret:
+    def secret_add(self, owner: str = 'application', description: Optional[str] = None, label: Optional[str] = None, expire: Optional[datetime.datetime] = None, rotate: str = 'never', **keysvals) -> Secret:
+        args = ['secret-add']
+        if description:
+            args += ['--description', description]
+        if label:
+            args += ['--label', label]
+        if expire:
+            args += ['--expire', expire.isoformat()]
+        if rotate:
+            args += ['--rotate', rotate]
+
+        for key, val in keysvals:
+            args.append('{}={}'.format(key, val))
+
+        self._run(*args)
+
+    def secret_ids(self, label: Optional[str] = None) -> List[str]:
+        return self._run('secret-ids', return_output=True, use_json=True)
+
+    def secret_get(self, secret_id: str, key: Optional[str] = None, label: Optional[str] = None, update: bool = False) -> str:
         raise RuntimeError('unimplemented')
-        _ = self._run('secret-add', ...)
+        args = ['secret-get', secret_id]
+        if label:
+            args += ['--label', label]
+        if key:
+            args.append(key)
+        if update:
+            args.append('--update')
+        return self._run(*args, return_output=True, use_json=key is None)
+
+    def secret_meta(self, secret_id: str) -> Dict[str,str]:
+        return self._run('secret-get', secret_id, '--metadata', return_output=True, use_json=True)
 
     def relation_ids(self, relation_name: str) -> List[int]:
         relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
