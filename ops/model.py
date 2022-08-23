@@ -796,6 +796,54 @@ class NetworkInterface:
         self.subnet = subnet  # type: Optional[_Network]
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
+class Secret:
+    def __init__(self, id: str, relation: Optional['Relation'] = None, label: Optional[str] = None, revision: Optional[str] = None, am_owner: bool = False):
+        self.id = id
+        self.label = label
+        self._relation = relation
+        self._revision = revision
+        self._am_owner = am_owner
+
+    def __str__(self):
+        if self.label:
+            return '<{}({})>'.format(self.id, self.label)
+        return '<{}>'.format(self.id)
+
+    def update(self, **keysvals):
+        if not self._am_owner:
+            raise RuntimeError('cannot update secret {} which is owned by a different unit'.format(self))
+        raise RuntimeError('unimplemented')
+
+    def grant(self, relation: 'Relation', unit: Optional[Unit] = None):
+        if not self._am_owner:
+            raise RuntimeError('cannot grant secret {} which is owned by a different unit'.format(self))
+        raise RuntimeError('unimplemented')
+
+    def revoke(self, relation: 'Relation', unit: Optional[Unit] = None):
+        if not self._am_owner:
+            raise RuntimeError('cannot revoke secret {} which is owned by a different unit'.format(self))
+        raise RuntimeError('unimplemented')
+
+    def prune(self):
+        if not self._am_owner:
+            raise RuntimeError('cannot prune secret {} which is owned by a different unit'.format(self))
+        raise RuntimeError('unimplemented')
+
+    def remove(self):
+        if not self._am_owner:
+            raise RuntimeError('cannot remove secret {} which is owned by a different unit'.format(self))
+        raise RuntimeError('unimplemented')
+
+    def refresh(self):
+        if self._am_owner:
+            raise RuntimeError('cannot refresh secret {} which is owned by this unit'.format(self))
+        raise RuntimeError('unimplemented')
+
+    def get(self, key: str) -> str:
+        if self._am_owner:
+            raise RuntimeError('cannot get payload for secret {} which is owned by this unit'.format(self))
+        raise RuntimeError('unimplemented')
+
 
 class Relation:
     """Represents an established relation between this application and another application.
@@ -2181,6 +2229,31 @@ class _ModelBackend:
         here should remain empty.
         """
         pass
+
+    def secret_ids: strs(self, label: Optional[str] = None) -> List[str]:
+        raise RuntimeError('unimplemented')
+        _ = self._run('secret-ids', ...)
+    def secret_get(self, secret_id: str, key: str, label: Optional[str] = None) -> str:
+        raise RuntimeError('unimplemented')
+        _ = self._run('secret-get', ...)
+    def secret_meta(self, secret_id: str) -> Dict[str,str]: # secret-get --metadata
+        raise RuntimeError('unimplemented')
+        _ = self._run('secret-get', '--metadata', ...)
+    def secret_update(self, secret_id: str, description: Optional[str] = None, label: Optional[str] = None, **keysvals):
+        raise RuntimeError('unimplemented')
+        _ = self._run('secret-update', ...)
+    def secret_remove(self, secret_id: str, revision: Optional[int] = None):
+        raise RuntimeError('unimplemented')
+        _ = self._run('secret-remove', ...)
+    def secret_grant(self, secret_id: str, relation_id: int, unit_id: Optional[str] = None):
+        raise RuntimeError('unimplemented')
+        _ = self._run('secret-grant', ...)
+    def secret_revoke(self, secret_id: str, relation_id: int, unit_id: Optional[str] = None):
+        raise RuntimeError('unimplemented')
+        _ = self._run('secret-revoke', ...)
+    def secret_add(self, owner: str = 'application', description: Optional[str] = None, label: Optional[str] = None, **keysvals) -> Secret:
+        raise RuntimeError('unimplemented')
+        _ = self._run('secret-add', ...)
 
     def relation_ids(self, relation_name: str) -> List[int]:
         relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)

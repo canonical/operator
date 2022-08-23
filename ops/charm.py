@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
     from ops.framework import Handle, JsonObject, _SerializedData
-    from ops.model import Container, Numerical, Relation, Storage
+    from ops.model import Container, Numerical, Relation, Storage, Secret
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
@@ -146,6 +146,70 @@ class HookEvent(EventBase):
     - Metric events
     """
 
+class SecretEvent(EventBase):
+    if TYPE_CHECKING:
+        _SecretEventSnapshot = TypedDict('_SecretEventSnapshot', {
+            'secret_id': Required[str],
+        }, total=False)
+
+    def __init__(self, handle: 'Handle', secret: model.Secret):
+        super().__init__(handle)
+        self.secret = secret
+
+    def snapshot(self) -> '_SecretEventSnapshot':
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        return {
+            'id': self.secret.id,
+            'label': self.secret.label,
+            'revision': self.secret._revision,
+            'am_owner': self.secret._am_owner,
+            'relation_name': self.secret._relation.name,
+            'relation_id': self.secret._relation.id,
+        }  # type: 'SecretEvent._SecretEventSnapshot'
+
+    def restore(self, snapshot: '_SecretEventSnapshot'):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        relation = self.framework.model.get_relation(snapshot['relation_name'], snapshot['relation_id'])
+        self.secret = model.Secret(
+            snapshot['id'],
+            relation=relation,
+            label=snapshot['label'],
+            revision=snapshot['revision'],
+            am_owner=snapshot['am_owner'])
+
+class SecretChangedEvent(SecretEvent):
+    """TODO: ...
+    """
+
+class SecretRemoveEvent(SecretEvent):
+    """TODO: ...
+    """
+
+class SecretRotateEvent(SecretEvent):
+    """TODO: ...
+    """
+    def defer(self):
+        """Secret rotation events are not deferable.
+
+        Juju handles re-invocation when necessary.
+        """
+        raise RuntimeError('cannot defer secret rotation events')
+
+class SecretExpiredEvent(SecretEvent):
+    """TODO: ...
+    """
+    def defer(self):
+        """Secret expiration events are not deferable.
+
+        Juju handles re-invocation when necessary.
+        """
+        raise RuntimeError('cannot defer secret expiration events')
 
 class ActionEvent(EventBase):
     """Events raised by Juju when an administrator invokes a Juju Action.
@@ -756,6 +820,11 @@ class CharmEvents(ObjectEvents):
     leader_elected = EventSource(LeaderElectedEvent)
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
     collect_metrics = EventSource(CollectMetricsEvent)
+
+    secret_changed = EventSource(SecretChangedEvent)
+    secret_expired = EventSource(SecretExpiredEvent)
+    secret_rotate = EventSource(SecretRotateEvent)
+    secret_remove = EventSource(SecretRemoveEvent)
 
 
 class CharmBase(Object):
