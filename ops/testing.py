@@ -46,7 +46,7 @@ from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
 from typing import (TypeVar, Generic, Type, AnyStr, Iterable, Optional, Mapping,
-                    BinaryIO, TextIO, List, Union, Iterator, Dict, Tuple, Any, cast, TYPE_CHECKING)
+                    BinaryIO, TextIO, List, Union, Iterator, TypedDict, Dict, Tuple, Any, cast, TYPE_CHECKING)
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.model import RelationNotFoundError
@@ -54,6 +54,17 @@ from ops.model import RelationNotFoundError
 if TYPE_CHECKING:
     from ops.model import UnitOrApplication
 
+    ReadableBuffer = Union[bytes, str]
+    _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
+    _FileOrDir = Union['_File', '_Directory']
+    _FileKwargs = TypedDict('_FileKwargs', {
+        'permissions': int,
+        'last_modified': datetime.datetime,
+        'user_id': Optional[int],
+        'user': Optional[str],
+        'group_id': Optional[int],
+        'group': Optional[str],
+    }, total=False)
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
 from ops.charm import CharmMeta
@@ -1249,7 +1260,7 @@ class _TestingModelBackend:
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
-        self._storage_list = {k: {} for k in self._meta.storages}
+        self._storage_list = {k: {} for k in self._meta.storages}  # type: Dict[str, Dict[int, Any]]
 
         self._storage_attached = {k: set() for k in self._meta.storages}
         self._storage_index_counter = 0
@@ -1429,7 +1440,7 @@ class _TestingModelBackend:
         return list(index for index in self._storage_list[name]
                     if all or self._storage_is_attached(name, index))
 
-    def storage_get(self, storage_name_id, attribute):
+    def storage_get(self, storage_name_id: str, attribute: str) -> Any:
         name, index = storage_name_id.split("/", 1)
         index = int(index)
         try:
@@ -1447,7 +1458,7 @@ class _TestingModelBackend:
 
         if name not in self._storage_list:
             self._storage_list[name] = {}
-        result = []
+        result = []  # type: List[int]
         for _ in range(count):
             index = self._storage_index_counter
             self._storage_index_counter += 1
@@ -1464,7 +1475,7 @@ class _TestingModelBackend:
         index = int(index)
 
         for client in self._pebble_clients.values():
-            client._fs.remove_mount(name)
+            client._fs.remove_mount(name)  # pyright: ReportPrivateUsage=false
 
         if self._storage_is_attached(name, index):
             self._storage_attached[name].remove(index)
@@ -1489,7 +1500,7 @@ class _TestingModelBackend:
             return True
         return False
 
-    def _storage_is_attached(self, storage_name, storage_index):
+    def _storage_is_attached(self, storage_name: str, storage_index: int):
         return storage_index in self._storage_attached[storage_name]
 
     def _storage_remove(self, storage_id: str):
@@ -1501,30 +1512,30 @@ class _TestingModelBackend:
         index = int(index)
         self._storage_list[name].pop(index, None)
 
-    def action_get(self):
-        raise NotImplementedError(self.action_get)
+    def action_get(self):  # type:ignore
+        raise NotImplementedError(self.action_get)  # type:ignore
 
     def action_set(self, results):  # type:ignore
-        raise NotImplementedError(self.action_set)
+        raise NotImplementedError(self.action_set)  # type:ignore
 
     def action_log(self, message):  # type:ignore
-        raise NotImplementedError(self.action_log)
+        raise NotImplementedError(self.action_log)  # type:ignore
 
-    def action_fail(self, message=''):
-        raise NotImplementedError(self.action_fail)
+    def action_fail(self, message=''):  # type:ignore
+        raise NotImplementedError(self.action_fail)  # type:ignore
 
     def network_get(self, endpoint_name, relation_id=None):  # type:ignore
-        raise NotImplementedError(self.network_get)
+        raise NotImplementedError(self.network_get)  # type:ignore
 
     def add_metrics(self, metrics, labels=None):  # type:ignore
-        raise NotImplementedError(self.add_metrics)
+        raise NotImplementedError(self.add_metrics)  # type:ignore
 
     @classmethod
     def log_split(cls, message, max_len):  # type:ignore
-        raise NotImplementedError(cls.log_split)
+        raise NotImplementedError(cls.log_split)  # type:ignore
 
     def juju_log(self, level, msg):  # type:ignore
-        raise NotImplementedError(self.juju_log)
+        raise NotImplementedError(self.juju_log)  # type:ignore
 
     def get_pebble(self, socket_path: str) -> 'pebble.Client':
         container = socket_path.split('/')[3]  # /charm/containers/<container_name>/pebble.socket
@@ -1816,8 +1827,12 @@ ChangeError: cannot perform the following tasks:
 
     def push(
             self, path: str, source: Union[bytes, str, BinaryIO, TextIO], *,
-            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
-            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: Optional[int] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None
+    ) -> None:
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
@@ -1836,7 +1851,7 @@ ChangeError: cannot perform the following tasks:
                 'paths must be absolute, got {!r}'.format(e.args[0])
             )
 
-    def list_files(self, path: str, *, pattern: str = None,
+    def list_files(self, path: str, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List[pebble.FileInfo]:
         self._check_connection()
         try:
@@ -1860,11 +1875,19 @@ ChangeError: cannot perform the following tasks:
             _File: pebble.FileType.FILE,
             _Directory: pebble.FileType.DIRECTORY,
         }
+
+        def get_pebble_file_type(file: '_FileOrDir') -> pebble.FileType:
+            pebble_type = type_mappings.get(type(file))
+            if not pebble_type:
+                raise ValueError('unable to convert file {} '
+                                 '(type not one of {})'.format(file, type_mappings))
+            return pebble_type
+
         return [
             pebble.FileInfo(
                 path=str(file.path),
                 name=file.name,
-                type=type_mappings.get(type(file)),
+                type=get_pebble_file_type(file),
                 size=file.size if isinstance(file, _File) else None,
                 permissions=file.kwargs.get('permissions'),
                 last_modified=file.last_modified,
@@ -1877,8 +1900,14 @@ ChangeError: cannot perform the following tasks:
         ]
 
     def make_dir(
-            self, path: str, *, make_parents: bool = False, permissions: int = None,
-            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+            self, path: str, *,
+            make_parents: bool = False,
+            permissions: Optional[int] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None
+    ) -> None:
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
@@ -1917,8 +1946,8 @@ ChangeError: cannot perform the following tasks:
                 'generic-file-error', 'cannot remove non-empty directory without recursive=True')
         self._fs.delete_path(path)
 
-    def exec(self, command, **kwargs):
-        raise NotImplementedError(self.exec)
+    def exec(self, command, **kwargs):  # type:ignore
+        raise NotImplementedError(self.exec)  # type:ignore
 
     def send_signal(self, sig: Union[int, str], *service_names: str):
         if not service_names:
@@ -1958,8 +1987,8 @@ ChangeError: cannot perform the following tasks:
                 status='Internal Server Error',
                 message=message)
 
-    def get_checks(self, level=None, names=None):
-        raise NotImplementedError(self.get_checks)
+    def get_checks(self, level=None, names=None):  # type:ignore
+        raise NotImplementedError(self.get_checks)  # type:ignore
 
 
 class NonAbsolutePathError(Exception):
@@ -1985,7 +2014,7 @@ class _TestingStorageMount:
 
         src.mkdir(exist_ok=True, parents=True)
 
-    def contains(self, path: Union[str, pathlib.PurePosixPath, pathlib.Path]) -> bool:
+    def contains(self, path: '_StringOrPath') -> bool:
         """Returns true whether path resides within this simulated storage mount's location."""
         try:
             pathlib.PurePosixPath(path).relative_to(self._location)
@@ -1993,8 +2022,7 @@ class _TestingStorageMount:
         except Exception:
             return False
 
-    def check_contains(self, path: Union[str,
-                       pathlib.PurePosixPath]) -> pathlib.PurePosixPath:
+    def check_contains(self, path: '_StringOrPath') -> pathlib.PurePosixPath:
         """Raises if path does not reside within this simulated storage mount's location."""
         if not self.contains(path):
             msg = 'the provided path "{!s}" does not reside within the mount location "{!s}"' \
@@ -2009,9 +2037,9 @@ class _TestingStorageMount:
 
     def create_dir(
             self,
-            path: pathlib.PurePosixPath,
+            path: '_StringOrPath',
             make_parents: bool = False,
-            **kwargs) -> '_Directory':
+            **kwargs: Any) -> '_Directory':
         if not pathlib.PurePosixPath(path).is_absolute():
             raise NonAbsolutePathError(str(path))
         path = self.check_contains(path)
@@ -2032,11 +2060,11 @@ class _TestingStorageMount:
 
     def create_file(
             self,
-            path: Union[str, pathlib.PurePosixPath],
-            data: Union[bytes, str, BinaryIO, TextIO],
+            path: '_StringOrPath',
+            data: 'ReadableBuffer',
             encoding: str = 'utf-8',
             make_dirs: bool = False,
-            **kwargs
+            **kwargs: Any
     ) -> '_File':
         posixpath = self.check_contains(path)  # type: pathlib.PurePosixPath
         srcpath = self._srcpath(posixpath)
@@ -2059,17 +2087,17 @@ class _TestingStorageMount:
 
         return _File(posixpath, data, encoding=encoding, **kwargs)
 
-    def list_dir(self, path: pathlib.PurePosixPath) -> List['_File']:
-        path = self.check_contains(path)
-        srcpath = self._srcpath(path)
+    def list_dir(self, path: '_StringOrPath') -> List['_FileOrDir']:
+        _path = self.check_contains(path)
+        srcpath = self._srcpath(_path)
 
-        results = []
+        results = []  # type: List[_FileOrDir]
         if not srcpath.exists():
-            raise FileNotFoundError(str(path))
+            raise FileNotFoundError(str(_path))
         if not srcpath.is_dir():
-            raise NotADirectoryError(str(path))
+            raise NotADirectoryError(str(_path))
         for fpath in srcpath.iterdir():
-            mountpath = path / fpath.name
+            mountpath = _path / fpath.name
             if fpath.is_dir():
                 results.append(_Directory(mountpath))
             elif fpath.is_file():
@@ -2081,7 +2109,7 @@ class _TestingStorageMount:
 
     def open(
             self,
-            path: Union[str, pathlib.PurePosixPath],
+            path: '_StringOrPath',
             encoding: Optional[str] = 'utf-8',
     ) -> Union[BinaryIO, TextIO]:
         path = self.check_contains(path)
@@ -2091,8 +2119,7 @@ class _TestingStorageMount:
             raise IsADirectoryError(str(file.path))
         return file.open(encoding=encoding)
 
-    def get_path(self, path: Union[str, pathlib.PurePosixPath]
-                 ) -> Union['_Directory', '_File']:
+    def get_path(self, path: '_StringOrPath') -> '_FileOrDir':
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
         if srcpath.is_dir():
@@ -2102,7 +2129,7 @@ class _TestingStorageMount:
         with srcpath.open('rb') as f:
             return _File(path, f.read())
 
-    def delete_path(self, path: Union[str, pathlib.PurePosixPath]) -> None:
+    def delete_path(self, path: '_StringOrPath') -> None:
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
         if srcpath.exists():
@@ -2122,15 +2149,16 @@ class _TestingFilesystem:
         self.root = _Directory(pathlib.PurePosixPath('/'))
         self._mounts = {}  # type: Dict[str, _TestingStorageMount]
 
-    def add_mount(self, name, mount_path, backing_src_path):
+    def add_mount(self, name: str, mount_path: Union[str, pathlib.Path],
+                  backing_src_path: Union[str, pathlib.Path]):
         self._mounts[name] = _TestingStorageMount(
             pathlib.PurePosixPath(mount_path), pathlib.Path(backing_src_path))
 
-    def remove_mount(self, name):
+    def remove_mount(self, name: str):
         if name in self._mounts:
             del self._mounts[name]
 
-    def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
+    def create_dir(self, path: str, make_parents: bool = False, **kwargs: Any) -> '_Directory':
         if not path.startswith('/'):
             raise NonAbsolutePathError(path)
         for mount in self._mounts.values():
@@ -2170,10 +2198,10 @@ class _TestingFilesystem:
     def create_file(
             self,
             path: str,
-            data: Union[bytes, str, BinaryIO, TextIO],
-            encoding: Optional[str] = 'utf-8',
+            data: 'ReadableBuffer',
+            encoding: str = 'utf-8',
             make_dirs: bool = False,
-            **kwargs
+            **kwargs: Any
     ) -> '_File':
         if not path.startswith('/'):
             raise NonAbsolutePathError(path)
@@ -2198,7 +2226,7 @@ class _TestingFilesystem:
                 'generic-file-error', 'parent is not a directory: {}'.format(str(dir_)))
         return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
-    def list_dir(self, path: pathlib.Path) -> List['_File']:
+    def list_dir(self, path: '_StringOrPath') -> List['_FileOrDir']:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.list_dir(path)
@@ -2211,15 +2239,14 @@ class _TestingFilesystem:
                 raise FileNotFoundError(str(current_dir.path / token))
             if isinstance(current_dir, _File):
                 raise NotADirectoryError(str(current_dir.path))
-            if not isinstance(current_dir, _Directory):
+            if not isinstance(current_dir, _Directory):  # pyright: reportUnnecessaryIsInstance=false
                 # For now, ignoring other possible cases besides File and Directory (e.g. Symlink).
                 raise NotImplementedError()
-
-        return [child for child in current_dir]
+        return list(current_dir)
 
     def open(
             self,
-            path: Union[str, pathlib.PurePosixPath],
+            path: '_StringOrPath',
             encoding: Optional[str] = 'utf-8',
     ) -> Union[BinaryIO, TextIO]:
         for mount in self._mounts.values():
@@ -2231,8 +2258,7 @@ class _TestingFilesystem:
             raise IsADirectoryError(str(file.path))
         return file.open(encoding=encoding)
 
-    def get_path(self, path: Union[str, pathlib.PurePosixPath]) \
-            -> Union['_Directory', '_File']:
+    def get_path(self, path: '_StringOrPath') -> '_FileOrDir':
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.get_path(path)
@@ -2241,19 +2267,25 @@ class _TestingFilesystem:
         current_object = self.root
         for token in tokens:
             # ASSUMPTION / TESTME: object might be file
+            if isinstance(current_object, _File):
+                raise RuntimeError('cannot expand path {!r} from {!r}: '
+                                   'not a directory'.format(token, current_object))
             if token in current_object:
-                current_object = cast(Union['_Directory', '_File'],
-                                      current_object[token])
+                current_object = current_object[token]
             else:
                 raise FileNotFoundError(str(current_object.path / token))
         return current_object
 
-    def delete_path(self, path: Union[str, pathlib.PurePosixPath]) -> None:
+    def delete_path(self, path: '_StringOrPath') -> None:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.delete_path(path)
         path = pathlib.PurePosixPath(path)
         parent_dir = self.get_path(path.parent)
+        if not isinstance(parent_dir, _Directory):
+            # todo: or should we be casting instead?
+            raise RuntimeError('cannot delete {}: parent {!r}'
+                               'is not a directory'.format(path.name, parent_dir))
         del parent_dir[path.name]
 
 
@@ -2262,7 +2294,7 @@ class _Directory:
         self.path = path
         self._children = {}  # type: Dict[str, Union[_Directory, _File]]
         self.last_modified = datetime.datetime.now()
-        self.kwargs = kwargs
+        self.kwargs = cast('_FileKwargs', kwargs)  # type: _FileKwargs
 
     @property
     def name(self) -> str:
@@ -2273,10 +2305,10 @@ class _Directory:
     def __contains__(self, child: str) -> bool:
         return child in self._children
 
-    def __iter__(self) -> Iterator[Union['_File', '_Directory']]:
+    def __iter__(self) -> Iterator['_FileOrDir']:
         return (value for value in self._children.values())
 
-    def __getitem__(self, key: str) -> Union['_File', '_Directory']:
+    def __getitem__(self, key: str) -> '_FileOrDir':
         return self._children[key]
 
     def __delitem__(self, key: str) -> None:
@@ -2296,7 +2328,7 @@ class _Directory:
     def create_file(
             self,
             name: str,
-            data: Union[bytes, str, BinaryIO, TextIO],
+            data: 'ReadableBuffer',
             encoding: Optional[str] = 'utf-8',
             **kwargs: Any
     ) -> '_File':
@@ -2309,21 +2341,23 @@ class _File:
     def __init__(
             self,
             path: pathlib.PurePosixPath,
-            data: Union[str, bytes, BinaryIO, TextIO],
+            data: Union['ReadableBuffer', BytesIO, StringIO],
             encoding: Optional[str] = 'utf-8',
             **kwargs: Any):
 
-        if hasattr(data, 'read'):
-            data = data.read()
-        if isinstance(data, str):
-            data = data.encode(encoding)
-        data_size = len(data)
+        if hasattr(data, 'read'):  # if BytesIO/StringIO:
+            data = data.read()  # type: ignore
+        if isinstance(data, str):  # if str/StringIO
+            data = data.encode(encoding)  # type: ignore
+
+        byte_data = cast(bytes, data)  # it's bytes by now; pyright doesn't like redeclaring vars
+        data_size = len(byte_data)
 
         self.path = path
-        self.data = data
+        self.data = byte_data
         self.size = data_size
         self.last_modified = datetime.datetime.now()
-        self.kwargs = kwargs
+        self.kwargs = kwargs  # type: '_FileKwargs'
 
     @property
     def name(self) -> str:
@@ -2334,7 +2368,7 @@ class _File:
             encoding: Optional[str] = 'utf-8',
     ) -> Union[TextIO, BinaryIO]:
         if encoding is None:
-            return BytesIO(cast(bytes, self.data))
+            return BytesIO(self.data)
         else:
-            raw = self.data.decode(encoding)  # type: ignore
-            return StringIO(cast(str, raw))
+            raw = self.data.decode(encoding)
+            return StringIO(raw)
