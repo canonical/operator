@@ -166,8 +166,6 @@ class SecretEvent(EventBase):
             'label': self.secret.label,
             'revision': self.secret._revision,
             'am_owner': self.secret._am_owner,
-            'relation_name': self.secret._relation.name,
-            'relation_id': self.secret._relation.id,
         }  # type: 'SecretEvent._SecretEventSnapshot'
 
     def restore(self, snapshot: '_SecretEventSnapshot'):
@@ -175,10 +173,9 @@ class SecretEvent(EventBase):
 
         Not meant to be called by charm code.
         """
-        relation = self.framework.model.get_relation(snapshot['relation_name'], snapshot['relation_id'])
         self.secret = model.Secret(
+            self.framework.model._backend,
             snapshot['id'],
-            relation=relation,
             label=snapshot['label'],
             revision=snapshot['revision'],
             am_owner=snapshot['am_owner'])

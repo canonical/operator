@@ -160,6 +160,12 @@ def _get_event_args(charm: 'CharmBase',
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
         return [container], {}
+    elif issubclass(event_type, ops.charm.SecretEvent):
+        kwargs = {
+            'label': os.getenv('JUJU_SECRET_LABEL') or None,
+            'revision': os.getenv('JUJU_SECRET_REVISION') or None,
+        }
+        return [os.environ['JUJU_SECRET_ID']], kwargs
     elif issubclass(event_type, ops.charm.StorageEvent):
         storage_id = os.environ.get("JUJU_STORAGE_ID", "")
         if storage_id:

@@ -148,6 +148,31 @@ class Model:
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
 
+    def get_secret(self, specifier: str): # TODO: this should be statically typed to a (yet-to-be-determined) secret id type or a label/str
+        my_secrets = self._backend.secret_ids()
+        am_owner = bool(specifier in my_secrets)
+
+        if specifier in my_secrets:
+            # we own this secret
+            sec_id = specifier
+            meta = self._backend.secret_meta(sec_id)
+            # Note: we explicitly don't set the revision here in order to disallow pruning outside
+            # of a secret-remove event context.
+            return Secret(self._backend, sec_id, label=meta.get('label'), am_owner=True)
+
+        # check if the specifier is a label for an owned secret
+        for sec_id in my_secrets:
+            meta = self._backend.secret_meta(sec_id)
+            if meta.get('label') == specifier:
+                # Note: we explicitly don't set the revision here in order to disallow pruning outside
+                # of a secret-remove event context.
+                return Secret(self._backend, sec_id, label=meta.get('label'), am_owner=True)
+
+        # We must not own this secret.  The specifier must be a secret id - see if we have been granted access:
+        sec_id = specifier
+        self._backend.secret_get(sec_id)
+        return Secret(self._backend, sec_id, am_owner=False)
+
     @property
     def unit(self) -> 'Unit':
         """A :class:`Unit` that represents the unit that is running this code (eg yourself)."""
@@ -313,6 +338,9 @@ class Application:
     def _invalidate(self):
         self._status = None
 
+    def add_secret(self, label: str, description: str = None, expire: datetime.datetime = None, rotate: str='never', **keysvals):
+        self._backend.secret_add(owner='application', description=description, label=label, expire=expire, rotate=rotate, **keysvals)
+
     @property
     def status(self) -> 'StatusBase':
         """Used to report or read the status of the overall application.
@@ -413,6 +441,9 @@ class Unit:
         if self._is_our_unit and hasattr(meta, "containers"):
             containers = meta.containers  # type: _ContainerMeta_Raw
             self._containers = ContainerMapping(iter(containers), backend)
+
+    def add_secret(self, label: str, description: str = None, expire: datetime.datetime = None, rotate: str='never', **keysvals):
+        self._backend.secret_add(owner='unit', description=description, label=label, expire=expire, rotate=rotate, **keysvals)
 
     def _invalidate(self):
         self._status = None
@@ -797,10 +828,11 @@ class NetworkInterface:
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 class Secret:
-    def __init__(self, id: str, relation: Optional['Relation'] = None, label: Optional[str] = None, revision: Optional[str] = None, am_owner: bool = False):
+    def __init__(self, backend: '_ModelBackend', id: str, label: Optional[str] = None, revision: Optional[str] = None, am_owner: bool = False):
+        self._backend = backend
+
         self.id = id
         self.label = label
-        self._relation = relation
         self._revision = revision
         self._am_owner = am_owner
 
@@ -809,40 +841,61 @@ class Secret:
             return '<{}({})>'.format(self.id, self.label)
         return '<{}>'.format(self.id)
 
-    def update(self, **keysvals):
+    def set(self, **keysvals):
         if not self._am_owner:
-            raise RuntimeError('cannot update secret {} which is owned by a different unit'.format(self))
-        raise RuntimeError('unimplemented')
+            raise RuntimeError('cannot set on secret {} which is owned by a different unit'.format(self))
+        self._backend.secret_set(self.id, **keysvals)
 
-    def grant(self, relation: 'Relation', unit: Optional[Unit] = None):
+    def grant(self, target: Union['Relation', Unit, Application], relation: Optional['Relation'] = None):
         if not self._am_owner:
-            raise RuntimeError('cannot grant secret {} which is owned by a different unit'.format(self))
-        raise RuntimeError('unimplemented')
+            raise RuntimeError('cannot grant for secret {} which is owned by a different unit'.format(self))
+        if relation is None and not isinstance(target, Relation):
+            raise RuntimeError('granting secret access to a unit or application target requires a relation to be specified')
 
-    def revoke(self, relation: 'Relation', unit: Optional[Unit] = None):
+        relation = relation or target
+        unit = target.name if isinstance(target, Unit) else None
+        self._backend.secret_grant(self.id, relation.id, unit_id=unit)
+
+    def revoke(self, target: Union['Relation', Unit, Application], relation: 'Relation', unit: Optional[Unit] = None):
         if not self._am_owner:
-            raise RuntimeError('cannot revoke secret {} which is owned by a different unit'.format(self))
-        raise RuntimeError('unimplemented')
+            raise RuntimeError('cannot grant for secret {} which is owned by a different unit'.format(self))
+        if relation is None and not isinstance(target, Relation):
+            raise RuntimeError('granting secret access to a unit or application target requires a relation to be specified')
+        if isinstance(target, Application) and relation.app != target:
+            raise RuntimeError('cannot revoke secret access from application that is not remote to the specified relation')
+
+        relation = relation or target
+        unit = target.name if isinstance(target, Unit) else None
+        self._backend.secret_revoke(self.id, relation.id, unit_id=unit)
 
     def prune(self):
         if not self._am_owner:
             raise RuntimeError('cannot prune secret {} which is owned by a different unit'.format(self))
-        raise RuntimeError('unimplemented')
+        if self._revision is None:
+            raise RuntimeError('secret {} has no revision to prune - are you outside a secret-remove hook call?')
+        self._backend.secret_remove(self.id, revision=self._revision)
 
     def remove(self):
         if not self._am_owner:
             raise RuntimeError('cannot remove secret {} which is owned by a different unit'.format(self))
-        raise RuntimeError('unimplemented')
+        self._backend.secret_remove(self.id)
 
-    def refresh(self):
+    def update(self):
         if self._am_owner:
-            raise RuntimeError('cannot refresh secret {} which is owned by this unit'.format(self))
-        raise RuntimeError('unimplemented')
+            raise RuntimeError('cannot update secret {} which is owned by this unit - did you mean to call Secret.set?'.format(self))
+        self._backend.secret_get(self.id, update=True)
+
+    def set_label(self, label: str):
+        if self._am_owner:
+            self._backend.secret_set(self.id, label=label)
+        else:
+            self._backend.secret_get(self.id,label=label)
+        self.label = label
 
     def get(self, key: str) -> str:
         if self._am_owner:
             raise RuntimeError('cannot get payload for secret {} which is owned by this unit'.format(self))
-        raise RuntimeError('unimplemented')
+        self._backend.secret_get(self.id, key)
 
 
 class Relation:
@@ -2230,21 +2283,26 @@ class _ModelBackend:
         """
         pass
 
-    def secret_update(self, secret_id: str, description: Optional[str] = None, label: Optional[str] = None, **keysvals):
-        raise RuntimeError('unimplemented')
-        _ = self._run('secret-update', ...)
+    def secret_set(self, secret_id: str, description: Optional[str] = None, label: Optional[str] = None, **keysvals):
+        self._run('secret-update', ...) # TODO: update this to "secret-set when juju does
     def secret_remove(self, secret_id: str, revision: Optional[int] = None):
-        raise RuntimeError('unimplemented')
-        _ = self._run('secret-remove', ...)
+        args = ['secret-remove', secret_id]
+        if revision is not None:
+            args += ['--revision', str(revision)]
+        self._run(*args)
     def secret_grant(self, secret_id: str, relation_id: int, unit_id: Optional[str] = None):
-        raise RuntimeError('unimplemented')
-        _ = self._run('secret-grant', ...)
+        args = ['secret-grant', secret_id, '--relation', relation_id]
+        if unit_id is not None:
+            args += ['--unit', str(unit_id)]
+        self._run(*args)
     def secret_revoke(self, secret_id: str, relation_id: int, unit_id: Optional[str] = None):
-        raise RuntimeError('unimplemented')
-        _ = self._run('secret-revoke', ...)
+        args = ['secret-revoke', secret_id, '--relation', relation_id]
+        if unit_id is not None:
+            args += ['--unit', str(unit_id)]
+        self._run(*args)
     def secret_add(self, owner: str = 'application', description: Optional[str] = None, label: Optional[str] = None, expire: Optional[datetime.datetime] = None, rotate: str = 'never', **keysvals) -> Secret:
         args = ['secret-add']
-        if description:
+        if description is not None:
             args += ['--description', description]
         if label:
             args += ['--label', label]
@@ -2257,21 +2315,18 @@ class _ModelBackend:
             args.append('{}={}'.format(key, val))
 
         self._run(*args)
-
-    def secret_ids(self, label: Optional[str] = None) -> List[str]:
+    def secret_ids(self) -> List[str]:
         return self._run('secret-ids', return_output=True, use_json=True)
-
     def secret_get(self, secret_id: str, key: Optional[str] = None, label: Optional[str] = None, update: bool = False) -> str:
         raise RuntimeError('unimplemented')
         args = ['secret-get', secret_id]
-        if label:
+        if label is not None:
             args += ['--label', label]
-        if key:
+        if key is not None:
             args.append(key)
-        if update:
+        if update is not None:
             args.append('--update')
         return self._run(*args, return_output=True, use_json=key is None)
-
     def secret_meta(self, secret_id: str) -> Dict[str,str]:
         return self._run('secret-get', secret_id, '--metadata', return_output=True, use_json=True)
 
