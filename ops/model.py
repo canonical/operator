@@ -339,7 +339,8 @@ class Application:
         self._status = None
 
     def add_secret(self, label: str, description: str = None, expire: datetime.datetime = None, rotate: str='never', **keysvals):
-        self._backend.secret_add(owner='application', description=description, label=label, expire=expire, rotate=rotate, **keysvals)
+        sec_id = self._backend.secret_add(owner='application', description=description, label=label, expire=expire, rotate=rotate, **keysvals)
+        return Secret(self._backend,sec_id, am_owner=True)
 
     @property
     def status(self) -> 'StatusBase':
@@ -443,7 +444,8 @@ class Unit:
             self._containers = ContainerMapping(iter(containers), backend)
 
     def add_secret(self, label: str, description: str = None, expire: datetime.datetime = None, rotate: str='never', **keysvals):
-        self._backend.secret_add(owner='unit', description=description, label=label, expire=expire, rotate=rotate, **keysvals)
+        sec_id = self._backend.secret_add(owner='unit', description=description, label=label, expire=expire, rotate=rotate, **keysvals)
+        return Secret(self._backend,sec_id, am_owner=True)
 
     def _invalidate(self):
         self._status = None
@@ -2311,10 +2313,10 @@ class _ModelBackend:
         if rotate:
             args += ['--rotate', rotate]
 
-        for key, val in keysvals:
+        for key, val in keysvals.items():
             args.append('{}={}'.format(key, val))
 
-        self._run(*args)
+        return self._run(*args, return_output=True)
     def secret_ids(self) -> List[str]:
         return self._run('secret-ids', return_output=True, use_json=True)
     def secret_get(self, secret_id: str, key: Optional[str] = None, label: Optional[str] = None, update: bool = False) -> str:
