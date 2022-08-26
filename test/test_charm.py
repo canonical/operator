@@ -34,23 +34,18 @@ from ops.storage import SQLiteStorage
 from .test_helpers import fake_script, fake_script_calls
 
 def test_secret_event_snapshots():
-    class TestRelation:
-        def __init__(self, name, id):
-            self.name = name
-            self.id = id
-
-        def __eq__(self, other):
-            return self.name == other.name and self.id == other.id
     class TestFramework:
         class TestModel:
-            def get_relation(self, name, id):
-                return TestRelation(name, id)
+            class TestBackend():
+                pass
+            def __init__(self):
+                self._backend = TestFramework.TestModel.TestBackend()
         def __init__(self):
             self.model = TestFramework.TestModel()
 
     framework = TestFramework()
-    rel = framework.model.get_relation('foo', 42)
-    sec = Secret('secret:1234567', relation=rel, label='bar', revision=7, am_owner=True)
+
+    sec = Secret(framework.model._backend, 'secret:1234567', label='bar', revision=7, am_owner=True)
     e1 = SecretChangedEvent('', sec)
     e2 = SecretChangedEvent('', None)
     e2.framework = framework
