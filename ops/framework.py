@@ -1027,6 +1027,7 @@ class BoundStoredState:
         @property
         def _data(self) -> StoredStateData:  # noqa
             pass  # pyright: reportGeneralTypeIssues=false
+
         @property  # noqa
         def _attr_name(self) -> str:  # noqa
             pass  # pyright: reportGeneralTypeIssues=false
