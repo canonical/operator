@@ -2273,18 +2273,6 @@ class _ModelBackend:
                 else:
                     return text
 
-    @staticmethod
-    def _is_relation_not_found(model_error: Exception) -> bool:
-        return 'relation not found' in str(model_error)
-
-    def _validate_relation_access(self, relation_name: str, relations: Sequence['Relation']):
-        """Checks for relation usage inconsistent with the framework/backend state.
-
-        This is used for catching Harness configuration errors and the production implementation
-        here should remain empty.
-        """
-        pass
-
     def secret_set(self, secret_id: str, description: Optional[str] = None, label: Optional[str] = None, **keysvals):
         self._run('secret-update', ...) # TODO: update this to "secret-set when juju does
     def secret_remove(self, secret_id: str, revision: Optional[int] = None):
@@ -2320,7 +2308,6 @@ class _ModelBackend:
     def secret_ids(self) -> List[str]:
         return self._run('secret-ids', return_output=True, use_json=True)
     def secret_get(self, secret_id: str, key: Optional[str] = None, label: Optional[str] = None, update: bool = False) -> str:
-        raise RuntimeError('unimplemented')
         args = ['secret-get', secret_id]
         if label is not None:
             args += ['--label', label]
@@ -2331,6 +2318,18 @@ class _ModelBackend:
         return self._run(*args, return_output=True, use_json=key is None)
     def secret_meta(self, secret_id: str) -> Dict[str,str]:
         return self._run('secret-get', secret_id, '--metadata', return_output=True, use_json=True)
+
+    @staticmethod
+    def _is_relation_not_found(model_error: Exception) -> bool:
+        return 'relation not found' in str(model_error)
+
+    def _validate_relation_access(self, relation_name: str, relations: Sequence['Relation']):
+        """Checks for relation usage inconsistent with the framework/backend state.
+
+        This is used for catching Harness configuration errors and the production implementation
+        here should remain empty.
+        """
+        pass
 
     def relation_ids(self, relation_name: str) -> List[int]:
         relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
