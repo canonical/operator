@@ -74,7 +74,7 @@ if TYPE_CHECKING:
     _ObserverCallback = Callable[[Any], None]
 
     # types that can be stored natively
-    _StorableType = Union[int, float, str, bytes, Literal[None],
+    _StorableType = Union[int, bool, float, str, bytes, Literal[None],
                           List['_StorableType'],
                           Dict[str, '_StorableType'],
                           Set['_StorableType']]
@@ -1068,7 +1068,7 @@ class BoundStoredState:
 
         self._data[key] = unwrapped
 
-    def set_default(self, **kwargs: Dict[str, '_StorableType']):
+    def set_default(self, **kwargs: '_StorableType'):
         """Set the value of any given key if it has not already been set."""
         for k, v in kwargs.items():
             if k not in self._data:
@@ -1104,8 +1104,25 @@ class StoredState:
         self.parent_type = None  # type: Optional[Type[Any]]
         self.attr_name = None  # type: Optional[str]
 
-    def __get__(self, parent: '_ObjectType', parent_type: 'Type[_ObjectType]'
-                ) -> Union['StoredState', BoundStoredState]:
+    if TYPE_CHECKING:
+        @typing.overload
+        def __get__(
+                self,
+                parent: Literal[None],
+                parent_type: 'Type[_ObjectType]') -> 'StoredState':
+            pass
+
+        @typing.overload
+        def __get__(
+                self,
+                parent: '_ObjectType',
+                parent_type: 'Type[_ObjectType]') -> BoundStoredState:
+            pass
+
+    def __get__(self,
+                parent: '_ObjectType',
+                parent_type: 'Type[_ObjectType]') -> Union['StoredState',
+                                                           BoundStoredState]:
         if self.parent_type is not None and self.parent_type not in parent_type.mro():
             # the StoredState instance is being shared between two unrelated classes
             # -> unclear what is expected of us -> bail out
