@@ -71,7 +71,8 @@ if typing.TYPE_CHECKING:
                        Tuple['JsonObject', ...]]
 
     # a k8s spec is a mapping from names/"types" to json/yaml spec objects
-    _K8sSpec = Mapping[str, JsonObject]
+    # public since it is used in ops.testing
+    K8sSpec = Mapping[str, JsonObject]
 
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 

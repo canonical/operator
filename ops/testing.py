@@ -40,13 +40,16 @@ import pathlib
 import random
 import signal
 import tempfile
+import typing
 import uuid
 import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
 from typing import (TypeVar, Generic, Type, AnyStr, Iterable, Optional, Mapping,
-                    BinaryIO, TextIO, List, Union, Iterator, TypedDict, Dict, Tuple, Any, cast, TYPE_CHECKING)
+                    BinaryIO, TextIO, List, Union, Iterator, Dict, Tuple, Any,
+                    cast, TYPE_CHECKING, Set)
+from typing_extensions import TypedDict, Literal
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.model import RelationNotFoundError
@@ -54,7 +57,7 @@ from ops.model import RelationNotFoundError
 if TYPE_CHECKING:
     from ops.model import UnitOrApplication
 
-    ReadableBuffer = Union[bytes, str]
+    ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
     _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
     _FileOrDir = Union['_File', '_Directory']
     _FileKwargs = TypedDict('_FileKwargs', {
@@ -64,7 +67,24 @@ if TYPE_CHECKING:
         'user': Optional[str],
         'group_id': Optional[int],
         'group': Optional[str],
-    }, total=False)
+    })
+
+    _RelationEntities = TypedDict('_RelationEntities', {
+        'app': str,
+        'units': List[str]
+    })
+
+    _ConfigOption = TypedDict('_ConfigOption', {
+        'type': Literal['string', 'int', 'float', 'boolean'],
+        'description': str,
+        'default': Union[str, int, float, bool]
+    })
+    _RawStatus = TypedDict('_RawStatus', {
+        'status': Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting'],
+        'message': str,
+    })
+    RawConfig = Dict[str, _ConfigOption]
+
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
 from ops.charm import CharmMeta
@@ -409,11 +429,11 @@ class Harness(Generic[CharmType]):
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        charm_config = cast(ConfigRaw, yaml.safe_load(charm_config))
+        config = cast(RawConfig, yaml.safe_load(charm_config))
 
-        if not isinstance(charm_config, dict):
-            raise TypeError(charm_config)
-        return charm_config
+        if not isinstance(config, dict):
+            raise TypeError(config)
+        return config
 
     def add_oci_resource(self, resource_name: str,
                          contents: Mapping[str, str] = None) -> None:
@@ -1153,7 +1173,7 @@ class _TestingConfig(dict):
         'float': float
     }
 
-    def __init__(self, config: dict):
+    def __init__(self, config: RawConfig):
         super().__init__()
         self._spec = config
         self._defaults = self._load_defaults(config)
@@ -1232,7 +1252,7 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name, meta, config):
+    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: Dict[]):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
@@ -1241,21 +1261,27 @@ class _TestingModelBackend:
         self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
         self._calls = []
         self._meta = meta
-        self._relation_ids_map = {}  # relation name to [relation_ids,...]
-        self._relation_names = {}  # reverse map from relation_id to relation_name
-        self._relation_list_map = {}  # relation_id: [unit_name,...]
+        # relation name to [relation_ids,...]
+        self._relation_ids_map = {}   # type: Dict[str, List[int]]
+        # reverse map from relation_id to relation_name
+        self._relation_names = {}  # type: Dict[int, str]
+        # relation_id: [unit_name,...]
+        self._relation_list_map = {}  # type:Dict[int, List[str]]
         # {relation_id: {name: Dict[str: str]}}
         self._relation_data_raw = {}  # type: Dict[int, Dict[str, Dict[str, str]]]
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
-        self._relation_app_and_units = {}
+        self._relation_app_and_units = {}  # Dict[int, _RelationEntities]
         self._config = _TestingConfig(config)
-        self._is_leader = False
-        self._resources_map = {}  # {resource_name: resource_content}
-        self._pod_spec = None  # type: Optional[_PodSpec]
-        self._app_status = {'status': 'unknown', 'message': ''}
-        self._unit_status = {'status': 'maintenance', 'message': ''}
-        self._workload_version = None
-        self._resource_dir = None
+        self._is_leader = False  # type: bool
+        # {resource_name: resource_content}
+        # where resource_content is (path, content)
+        self._resources_map = {}  # type: Dict[str, Tuple[str, Union[str, bytes]]]
+        # fixme: understand how this is used and adjust the type
+        self._pod_spec = None  # type: Optional[Tuple[model.K8sSpec, Any]]
+        self._app_status = {'status': 'unknown', 'message': ''}  #type: _RawStatus
+        self._unit_status = {'status': 'maintenance', 'message': ''}  #type: _RawStatus
+        self._workload_version = None  # type: Optional[str]
+        self._resource_dir = None # type: Optional[str]
         # Format:
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
         # <ID1>: device id that is key for given storage_name
@@ -1267,7 +1293,7 @@ class _TestingModelBackend:
         # {container_name : _TestingPebbleClient}
         self._pebble_clients = {}  # type: Dict[str, _TestingPebbleClient]
         self._pebble_clients_can_connect = {}  # type: Dict[_TestingPebbleClient, bool]
-        self._planned_units = None
+        self._planned_units = None  # type: Optional[int]
         self._hook_is_running = ''
 
     def _validate_relation_access(self, relation_name, relations):
@@ -1287,7 +1313,7 @@ class _TestingModelBackend:
                 'use Harness.add_relation({!r}, <app>) before calling set_leader'
                 .format(relation_name))
 
-    def _can_connect(self, pebble_client) -> bool:
+    def _can_connect(self, pebble_client: '_TestingPebbleClient') -> bool:
         """Returns whether the mock client is active and can support API calls with no errors."""
         return self._pebble_clients_can_connect[pebble_client]
 
@@ -1392,10 +1418,10 @@ class _TestingModelBackend:
     def is_leader(self):
         return self._is_leader
 
-    def application_version_set(self, version):
+    def application_version_set(self, version: str):
         self._workload_version = version
 
-    def resource_get(self, resource_name):
+    def resource_get(self, resource_name: str):
         if resource_name not in self._resources_map:
             raise model.ModelError(
                 "ERROR could not download resource: HTTP request failed: "
@@ -1415,7 +1441,7 @@ class _TestingModelBackend:
                 resource_file.write(contents)
         return resource_filename
 
-    def pod_spec_set(self, spec, k8s_resources):
+    def pod_spec_set(self, spec: 'model.K8sSpec', k8s_resources: Any):  # fixme: any
         self._pod_spec = (spec, k8s_resources)
 
     def status_get(self, *, is_app=False):
@@ -1424,7 +1450,7 @@ class _TestingModelBackend:
         else:
             return self._unit_status
 
-    def status_set(self, status, message='', *, is_app=False):
+    def status_set(self, status: str, message: str='', *, is_app: bool=False):
         if is_app:
             self._app_status = {'status': status, 'message': message}
         else:
@@ -1492,7 +1518,8 @@ class _TestingModelBackend:
                 if mount.storage != name:
                     continue
                 for index, store in self._storage_list[mount.storage].items():
-                    client._fs.add_mount(mount.storage, mount.location, store['location'])
+                    fs = client._fs  # type:ignore
+                    fs.add_mount(mount.storage, mount.location, store['location'])
 
         index = int(index)
         if not self._storage_is_attached(name, index):
@@ -1537,7 +1564,7 @@ class _TestingModelBackend:
     def juju_log(self, level, msg):  # type:ignore
         raise NotImplementedError(self.juju_log)  # type:ignore
 
-    def get_pebble(self, socket_path: str) -> 'pebble.Client':
+    def get_pebble(self, socket_path: str) -> '_TestingPebbleClient':
         container = socket_path.split('/')[3]  # /charm/containers/<container_name>/pebble.socket
         client = self._pebble_clients.get(container, None)
         if client is None:
@@ -1553,7 +1580,7 @@ class _TestingModelBackend:
         self._pebble_clients_can_connect[client] = not SIMULATE_CAN_CONNECT
         return client
 
-    def planned_units(self):
+    def planned_units(self) -> int:
         """Simulate fetching the number of planned application units from the model.
 
         If self._planned_units is None, then we simulate what the Juju controller will do, which is
@@ -1564,17 +1591,15 @@ class _TestingModelBackend:
         if self._planned_units is not None:
             return self._planned_units
 
-        units = []
-        peer_names = set(self._meta.peers.keys())
+        units = set()  # type: Set[str]
+        peer_names = set(self._meta.peers.keys())  # type: Set[str]
         for peer_id, peer_name in self._relation_names.items():
             if peer_name not in peer_names:
                 continue
             peer_units = self._relation_list_map[peer_id]
-            units += peer_units
+            units.update(peer_units)
 
-        count = len(set(units))  # de-dupe and get length.
-
-        return count + 1  # Account for this unit.
+        return len(units) + 1  # Account for this unit.
 
 
 @_copy_docstrings(pebble.Client)
@@ -1595,7 +1620,7 @@ class _TestingPebbleClient:
         self._backend = backend
 
     def _check_connection(self):
-        if not self._backend._can_connect(self):
+        if not self._backend._can_connect(self):  # type: ignore # noqa
             raise pebble.ConnectionError('cannot connect to pebble')
 
     def get_system_info(self) -> pebble.SystemInfo:
@@ -1621,7 +1646,7 @@ class _TestingPebbleClient:
     def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
         raise NotImplementedError(self.abort_change)
 
-    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1):
         self._check_connection()
         for name, service in self._render_services().items():
             # TODO: jam 2021-04-20 This feels awkward that Service.startup might be a string or
@@ -1634,12 +1659,12 @@ class _TestingPebbleClient:
             if startup == pebble.ServiceStartup.ENABLED:
                 self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
-    def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+    def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
         return self.autostart_services(timeout, delay)
 
     def start_services(
             self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
-    ) -> pebble.ChangeID:
+    ):
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
@@ -1664,7 +1689,7 @@ class _TestingPebbleClient:
                 raise pebble.ChangeError('''\
 cannot perform the following tasks:
 - Start service "{}" (service "{}" was previously started)
-'''.format(name, name), change=1234)  # the change id is not respected
+'''.format(name, name), change=1234)  # type:ignore # the change id is not respected
         for name in services:
             # If you try to start a service which is started, you get a ChangeError:
             # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
@@ -1674,7 +1699,7 @@ cannot perform the following tasks:
 
     def stop_services(
             self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
-    ) -> pebble.ChangeID:
+    ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
             raise TypeError('stop_services should take a list of names, not just "{}"'.format(
@@ -1699,13 +1724,13 @@ cannot perform the following tasks:
                 raise pebble.ChangeError('''\
 ChangeError: cannot perform the following tasks:
 - Stop service "{}" (service "{}" is not active)
-'''.format(name, name), change=1234)  # the change id is not respected
+'''.format(name, name), change=1234)  # type: ignore # the change id is not respected
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
 
     def restart_services(
             self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
-    ) -> pebble.ChangeID:
+    ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
             raise TypeError('restart_services should take a list of names, not just "{}"'.format(
@@ -1731,7 +1756,7 @@ ChangeError: cannot perform the following tasks:
         raise NotImplementedError(self.wait_change)
 
     def add_layer(
-            self, label: str, layer: Union[str, dict, pebble.Layer], *,
+            self, label: str, layer: Union[str, 'pebble.LayerDict', pebble.Layer], *,
             combine: bool = False):
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
@@ -1766,15 +1791,15 @@ ChangeError: cannot perform the following tasks:
                 elif service.override == 'merge':
                     if combine and name in layer.services:
                         s = layer.services[name]
-                        s._merge(service)
+                        s._merge(service)  # type: ignore # noqa
                     else:
                         layer.services[name] = service
 
         else:
             self._layers[label] = layer_obj
 
-    def _render_services(self) -> Mapping[str, pebble.Service]:
-        services = {}
+    def _render_services(self) -> Dict[str, pebble.Service]:
+        services = {}  # type: Dict[str, pebble.Service]
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
@@ -1784,7 +1809,7 @@ ChangeError: cannot perform the following tasks:
 
     def get_plan(self) -> pebble.Plan:
         self._check_connection()
-        plan = pebble.Plan('{}')
+        plan = pebble.Plan('{}')  # type: pebble.Plan
         services = self._render_services()
         if not services:
             return plan
@@ -1799,7 +1824,7 @@ ChangeError: cannot perform the following tasks:
 
         self._check_connection()
         services = self._render_services()
-        infos = []
+        infos = []  # type: List[pebble.ServiceInfo]
         if names is None:
             names = sorted(services.keys())
         for name in sorted(names):
@@ -1826,7 +1851,7 @@ ChangeError: cannot perform the following tasks:
         return self._fs.open(path, encoding=encoding)
 
     def push(
-            self, path: str, source: Union[bytes, str, BinaryIO, TextIO], *,
+            self, path: str, source: 'ReadableBuffer', *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: Optional[int] = None,
             user_id: Optional[int] = None,
             user: Optional[str] = None,
@@ -1889,12 +1914,12 @@ ChangeError: cannot perform the following tasks:
                 name=file.name,
                 type=get_pebble_file_type(file),
                 size=file.size if isinstance(file, _File) else None,
-                permissions=file.kwargs.get('permissions'),
+                permissions=file.kwargs['permissions'],
                 last_modified=file.last_modified,
-                user_id=file.kwargs.get('user_id'),
-                user=file.kwargs.get('user'),
-                group_id=file.kwargs.get('group_id'),
-                group=file.kwargs.get('group'),
+                user_id=file.kwargs['user_id'],
+                user=file.kwargs['user'],
+                group_id=file.kwargs['group_id'],
+                group=file.kwargs['group'],
             )
             for file in files
         ]
@@ -2077,15 +2102,17 @@ class _TestingStorageMount:
 
         if isinstance(data, str):
             data = data.encode(encoding=encoding)
-        elif not isinstance(data, bytes):
+        elif isinstance(data, (StringIO, BytesIO)):
             data = data.getvalue()
             if isinstance(data, str):
                 data = data.encode()
 
-        with srcpath.open('wb') as f:
-            f.write(data)
+        byte_data = cast(bytes, data)
 
-        return _File(posixpath, data, encoding=encoding, **kwargs)
+        with srcpath.open('wb') as f:
+            f.write(byte_data)
+
+        return _File(posixpath, byte_data, encoding=encoding, **kwargs)
 
     def list_dir(self, path: '_StringOrPath') -> List['_FileOrDir']:
         _path = self.check_contains(path)
@@ -2294,7 +2321,7 @@ class _Directory:
         self.path = path
         self._children = {}  # type: Dict[str, Union[_Directory, _File]]
         self.last_modified = datetime.datetime.now()
-        self.kwargs = cast('_FileKwargs', kwargs)  # type: _FileKwargs
+        self.kwargs = cast('_FileKwargs', kwargs)
 
     @property
     def name(self) -> str:
@@ -2341,7 +2368,7 @@ class _File:
     def __init__(
             self,
             path: pathlib.PurePosixPath,
-            data: Union['ReadableBuffer', BytesIO, StringIO],
+            data: 'ReadableBuffer',
             encoding: Optional[str] = 'utf-8',
             **kwargs: Any):
 
@@ -2357,7 +2384,7 @@ class _File:
         self.data = byte_data
         self.size = data_size
         self.last_modified = datetime.datetime.now()
-        self.kwargs = kwargs  # type: '_FileKwargs'
+        self.kwargs = cast('_FileKwargs', kwargs)
 
     @property
     def name(self) -> str:
