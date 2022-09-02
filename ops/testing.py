@@ -1336,7 +1336,7 @@ class _TestingModelBackend:
 
     def relation_get(self, relation_id, member_name, is_app):
         if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
-                relation_id):
+                relation_id) and member_name != self.app_name and member_name != self.unit_name:
             # TODO: if juju gets fixed to set JUJU_REMOTE_APP for this case, then we may opt to
             # allow charms to read/get that (stale) relation data.
             # See https://bugs.launchpad.net/juju/+bug/1960934
