@@ -675,6 +675,9 @@ class TestFramework(BaseTestCase):
         class MyFoo(EventBase):
             pass
 
+        class MyFoo2(EventBase):
+            pass
+
         class MyBar(EventBase):
             pass
 
@@ -707,9 +710,11 @@ class TestFramework(BaseTestCase):
         with self.assertRaises(RuntimeError):
             pub.on_a.define_event("None", NoneEvent)
 
-        # Try to override an existing attribute.
-        with self.assertRaises(RuntimeError):
-            pub.on_a.define_event("foo", MyFoo)
+        # Try to override an existing attribute;
+        # Weird asserts because isinstance doesn't seem to like this case.
+        self.assertEqual(pub.on_a.foo.event_type.__class__, MyFoo.__class__)
+        pub.on_a.define_event("foo", MyFoo2)
+        self.assertEqual(pub.on_a.foo.event_type.__class__, MyFoo2.__class__)
 
     def test_event_key_roundtrip(self):
         class MyEvent(EventBase):

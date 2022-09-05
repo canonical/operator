@@ -476,11 +476,14 @@ class ObjectEvents(Object):
     def define_event(cls, event_kind: str, event_type: 'Type[EventBase]'):
         """Define an event on this type at runtime.
 
+        If `event_kind` has been previously defined,
+        it will be overwritten with this one.
+
         cls: a type to define an event on.
 
         event_kind: an attribute name that will be used to access the
-                    event. Must be a valid python identifier, not be a keyword
-                    or an existing attribute.
+                    event. Must be a valid python identifier,
+                    and not be a keyword.
 
         event_type: a type of the event to define.
 
@@ -490,12 +493,6 @@ class ObjectEvents(Object):
             raise RuntimeError(prefix + 'is not a valid python identifier: ' + event_kind)
         elif keyword.iskeyword(event_kind):
             raise RuntimeError(prefix + 'is a python keyword: ' + event_kind)
-        try:
-            getattr(cls, event_kind)
-            raise RuntimeError(
-                prefix + 'overlaps with an existing type {} attribute: {}'.format(cls, event_kind))
-        except AttributeError:
-            pass
 
         event_descriptor = EventSource(event_type)
         event_descriptor._set_name(cls, event_kind)  # noqa
