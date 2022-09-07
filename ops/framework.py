@@ -1047,6 +1047,11 @@ class BoundStoredState:
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)  # type: ignore
 
+    if TYPE_CHECKING:
+        @typing.overload
+        def __getattr__(self, key: Literal['on']) -> ObjectEvents:
+            pass
+
     def __getattr__(self, key: str) -> Union['_StorableType', 'StoredObject', ObjectEvents]:
         # "on" is the only reserved key that can't be used in the data map.
         if key == "on":
@@ -1055,7 +1060,7 @@ class BoundStoredState:
             raise AttributeError("attribute '{}' is not stored".format(key))
         return _wrap_stored(self._data, self._data[key])
 
-    def __setattr__(self, key: str, value: '_StoredObject'):
+    def __setattr__(self, key: str, value: Union['_StorableType', '_StoredObject']):
         if key == "on":
             raise AttributeError("attribute 'on' is reserved and cannot be set")
 
