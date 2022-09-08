@@ -20,6 +20,7 @@ exclude = "ops/_vendor/**"
 [tool.isort]
 profile = "black"
 skip = "ops/_vendor"
+force_single_line = true
 
 # Linting tools configuration
 [tool.flake8]
