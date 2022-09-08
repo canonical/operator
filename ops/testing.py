@@ -79,8 +79,9 @@ if TYPE_CHECKING:
         'description': str,
         'default': Union[str, int, float, bool]
     })
+    _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
     _RawStatus = TypedDict('_RawStatus', {
-        'status': Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting'],
+        'status': _StatusName,
         'message': str,
     })
     RawConfig = Dict[str, _ConfigOption]
@@ -1450,7 +1451,7 @@ class _TestingModelBackend:
         else:
             return self._unit_status
 
-    def status_set(self, status: str, message: str='', *, is_app: bool=False):
+    def status_set(self, status: '_StatusName', message: str='', *, is_app: bool=False):
         if is_app:
             self._app_status = {'status': status, 'message': message}
         else:
