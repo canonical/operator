@@ -102,13 +102,13 @@ right thing in different scenarios, without having to create a full deployment.
 ```python
 harness = Harness(MyCharm)
 # Do initial setup here
-relation_id = harness.add_relation('db', 'postgresql')
+relation_id = harness.add_relation("db", "postgresql")
 # Now instantiate the charm to see events as the model changes
 harness.begin()
-harness.add_relation_unit(relation_id, 'postgresql/0')
-harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
+harness.add_relation_unit(relation_id, "postgresql/0")
+harness.update_relation_data(relation_id, "postgresql/0", {"key": "val"})
 # Check that charm has properly handled the relation_joined event for postgresql/0
-self.assertEqual(harness.charm. ...)
+self.assertEqual(harness.charm, "...")
 ```
 
 ## Talk to us

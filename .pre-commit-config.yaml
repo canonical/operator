@@ -1,0 +1,31 @@
+exclude: _vendor
+repos:
+  - repo: https://github.com/PyCQA/autoflake
+    rev: v1.5.3
+    hooks:
+      - id: autoflake
+        args: ["-i", "--remove-all-unused-imports"]
+
+  - repo: https://github.com/pre-commit/mirrors-autopep8
+    rev: v1.7.0
+    hooks:
+      - id: autopep8
+
+  - repo: https://github.com/asottile/blacken-docs
+    rev: v1.12.1
+    hooks:
+      - id: blacken-docs
+        additional_dependencies: [black]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.10.1
+    hooks:
+      - id: isort
+        name: isort (python)
+        args: ["--force-single-line-imports", "--profile", "black"]
+
+#  - repo: https://github.com/pycqa/flake8
+#    rev: 5.0.4
+#    hooks:
+#      - id: flake8
+#        name: flake8

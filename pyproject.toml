@@ -9,6 +9,7 @@ omit = ["ops/_vendor/**"]
 
 # Formatting tools configuration
 [tool.autopep8]
+in-place = true
 max-line-length = 99
 ignore = ["E203", "W503"]
 recursive = true
