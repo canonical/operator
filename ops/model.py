@@ -26,30 +26,28 @@ import tempfile
 import time
 import typing
 import weakref
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from pathlib import Path
-from subprocess import PIPE
-from subprocess import CalledProcessError
-from subprocess import CompletedProcess
-from subprocess import run
-from typing import Any
-from typing import BinaryIO
-from typing import Callable
-from typing import Dict
-from typing import Generator
-from typing import Iterable
-from typing import List
-from typing import Mapping
-from typing import MutableMapping
-from typing import Optional
-from typing import Sequence
-from typing import Set
-from typing import TextIO
-from typing import Tuple
-from typing import Type
-from typing import TypeVar
-from typing import Union
+from subprocess import PIPE, CalledProcessError, CompletedProcess, run
+from typing import (
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Set,
+    TextIO,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import ops
 import ops.pebble as pebble
@@ -58,13 +56,15 @@ from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
     from pebble import CheckInfo  # pyright: reportMissingTypeStubs=false
-    from pebble import CheckLevel
-    from pebble import Client
-    from pebble import ExecProcess
-    from pebble import FileInfo
-    from pebble import Plan
-    from pebble import ServiceInfo
-    from pebble import _LayerDict
+    from pebble import (
+        CheckLevel,
+        Client,
+        ExecProcess,
+        FileInfo,
+        Plan,
+        ServiceInfo,
+        _LayerDict,
+    )
     from typing_extensions import TypedDict
 
     from ops.framework import _SerializedData

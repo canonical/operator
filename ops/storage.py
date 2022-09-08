@@ -22,14 +22,7 @@ import subprocess
 import typing
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Generator
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Type
-from typing import Union
+from typing import Any, Callable, Generator, List, Optional, Tuple, Type, Union
 
 import yaml
 

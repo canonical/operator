@@ -17,36 +17,27 @@
 import enum
 import os
 import pathlib
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Mapping
-from typing import Optional
-from typing import TextIO
-from typing import Union
-from typing import cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    TextIO,
+    Union,
+    cast,
+)
 
 from ops import model
 from ops._private import yaml
-from ops.framework import EventBase
-from ops.framework import EventSource
-from ops.framework import Framework
-from ops.framework import Object
-from ops.framework import ObjectEvents
+from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 if TYPE_CHECKING:
-    from typing_extensions import Literal
-    from typing_extensions import Required
-    from typing_extensions import TypedDict
+    from typing_extensions import Literal, Required, TypedDict
 
-    from ops.framework import Handle
-    from ops.framework import JsonObject
-    from ops.framework import _SerializedData
-    from ops.model import Container
-    from ops.model import Numerical
-    from ops.model import Relation
-    from ops.model import Storage
+    from ops.framework import Handle, JsonObject, _SerializedData
+    from ops.model import Container, Numerical, Relation, Storage
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>

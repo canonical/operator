@@ -29,36 +29,32 @@ import types
 import typing
 import weakref
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import Generic
-from typing import Hashable
-from typing import Iterable
-from typing import List
-from typing import Optional
-from typing import Set
-from typing import Tuple
-from typing import TypeVar
-from typing import Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from ops import charm
-from ops.storage import JujuStorage
-from ops.storage import NoSnapshotError
-from ops.storage import SQLiteStorage
+from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from typing_extensions import Literal
-    from typing_extensions import Protocol
-    from typing_extensions import Type
+    from typing_extensions import Literal, Protocol, Type
 
     from ops.charm import CharmMeta
-    from ops.model import JsonObject
-    from ops.model import Model
-    from ops.model import _ModelBackend
+    from ops.model import JsonObject, Model, _ModelBackend
 
     class _Serializable(Protocol):
         handle_kind = ''

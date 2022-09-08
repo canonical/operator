@@ -22,8 +22,7 @@ import sys
 import tempfile
 import unittest
 from collections import OrderedDict
-from test.test_helpers import fake_script
-from test.test_helpers import fake_script_calls
+from test.test_helpers import fake_script, fake_script_calls
 from textwrap import dedent
 
 import pytest
@@ -33,12 +32,8 @@ import ops.model
 import ops.testing
 from ops import model
 from ops._private import yaml
-from ops.charm import RelationMeta
-from ops.charm import RelationRole
-from ops.pebble import APIError
-from ops.pebble import FileInfo
-from ops.pebble import FileType
-from ops.pebble import ServiceInfo
+from ops.charm import RelationMeta, RelationRole
+from ops.pebble import APIError, FileInfo, FileType, ServiceInfo
 
 
 class TestModel(unittest.TestCase):

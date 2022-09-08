@@ -29,36 +29,34 @@ from unittest.mock import patch
 
 import logassert
 
-from ops.charm import ActionEvent
-from ops.charm import CharmBase
-from ops.charm import CharmEvents
-from ops.charm import CharmMeta
-from ops.charm import CollectMetricsEvent
-from ops.charm import ConfigChangedEvent
-from ops.charm import HookEvent
-from ops.charm import InstallEvent
-from ops.charm import LeaderSettingsChangedEvent
-from ops.charm import PebbleReadyEvent
-from ops.charm import RelationBrokenEvent
-from ops.charm import RelationChangedEvent
-from ops.charm import RelationDepartedEvent
-from ops.charm import RelationEvent
-from ops.charm import RelationJoinedEvent
-from ops.charm import StartEvent
-from ops.charm import StorageAttachedEvent
-from ops.charm import UpdateStatusEvent
-from ops.charm import UpgradeCharmEvent
-from ops.charm import WorkloadEvent
-from ops.framework import Framework
-from ops.framework import StoredStateData
-from ops.main import CHARM_STATE_FILE
-from ops.main import _should_use_controller_storage
-from ops.main import main
+from ops.charm import (
+    ActionEvent,
+    CharmBase,
+    CharmEvents,
+    CharmMeta,
+    CollectMetricsEvent,
+    ConfigChangedEvent,
+    HookEvent,
+    InstallEvent,
+    LeaderSettingsChangedEvent,
+    PebbleReadyEvent,
+    RelationBrokenEvent,
+    RelationChangedEvent,
+    RelationDepartedEvent,
+    RelationEvent,
+    RelationJoinedEvent,
+    StartEvent,
+    StorageAttachedEvent,
+    UpdateStatusEvent,
+    UpgradeCharmEvent,
+    WorkloadEvent,
+)
+from ops.framework import Framework, StoredStateData
+from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
 from ops.storage import SQLiteStorage
 from ops.version import version
 
-from .test_helpers import fake_script
-from .test_helpers import fake_script_calls
+from .test_helpers import fake_script, fake_script_calls
 
 is_windows = platform.system() == 'Windows'
 

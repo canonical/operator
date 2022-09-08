@@ -14,12 +14,10 @@
 
 """Setup script for the Operator Framework."""
 
-from importlib.util import module_from_spec
-from importlib.util import spec_from_file_location
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-from setuptools import find_packages
-from setuptools import setup
+from setuptools import find_packages, setup
 
 
 def _read_me() -> str:

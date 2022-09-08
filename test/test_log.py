@@ -20,8 +20,7 @@ import unittest
 from unittest.mock import patch
 
 import ops.log
-from ops.model import MAX_LOG_LINE_LEN
-from ops.model import _ModelBackend
+from ops.model import MAX_LOG_LINE_LEN, _ModelBackend
 
 
 class FakeModelBackend:

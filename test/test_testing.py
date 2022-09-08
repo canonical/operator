@@ -25,38 +25,41 @@ import textwrap
 import typing
 import unittest
 import uuid
-from io import BytesIO
-from io import StringIO
+from io import BytesIO, StringIO
 from unittest.mock import MagicMock
 
 import pytest
 import yaml
 
 import ops.testing
-from ops import model
-from ops import pebble
-from ops.charm import CharmBase
-from ops.charm import PebbleReadyEvent
-from ops.charm import RelationDepartedEvent
-from ops.charm import RelationEvent
-from ops.charm import StorageAttachedEvent
-from ops.charm import StorageDetachingEvent
-from ops.framework import Framework
-from ops.framework import Object
-from ops.model import ActiveStatus
-from ops.model import Application
-from ops.model import MaintenanceStatus
-from ops.model import ModelError
-from ops.model import RelationNotFoundError
-from ops.model import Unit
-from ops.model import UnknownStatus
-from ops.model import _ModelBackend
-from ops.testing import Harness
-from ops.testing import NonAbsolutePathError
-from ops.testing import _Directory
-from ops.testing import _TestingFilesystem
-from ops.testing import _TestingPebbleClient
-from ops.testing import _TestingStorageMount
+from ops import model, pebble
+from ops.charm import (
+    CharmBase,
+    PebbleReadyEvent,
+    RelationDepartedEvent,
+    RelationEvent,
+    StorageAttachedEvent,
+    StorageDetachingEvent,
+)
+from ops.framework import Framework, Object
+from ops.model import (
+    ActiveStatus,
+    Application,
+    MaintenanceStatus,
+    ModelError,
+    RelationNotFoundError,
+    Unit,
+    UnknownStatus,
+    _ModelBackend,
+)
+from ops.testing import (
+    Harness,
+    NonAbsolutePathError,
+    _Directory,
+    _TestingFilesystem,
+    _TestingPebbleClient,
+    _TestingStorageMount,
+)
 
 is_linux = platform.system() == 'Linux'
 
