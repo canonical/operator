@@ -557,10 +557,6 @@ class Harness(Generic[CharmType]):
 
         storage_indices = self._backend.storage_add(storage_name, count)
 
-        # Reset associated cached value in the storage mappings.  If we don't do this,
-        # Model._storages won't return Storage objects for subsequently-added storage.
-        self._model._storages._invalidate(storage_name)
-
         ids = []
         for storage_index in storage_indices:
             s = model.Storage(storage_name, storage_index, self._backend)
@@ -606,6 +602,10 @@ class Harness(Generic[CharmType]):
             return  # don't need to run hook callback
 
         storage_name, storage_index = storage_id.split('/', 1)
+
+        # Reset associated cached value in the storage mappings.  If we don't do this,
+        # Model._storages won't return Storage objects for subsequently-added storage.
+        self._model._storages._invalidate(storage_name)
 
         storage_index = int(storage_index)
         self.charm.on[storage_name].storage_attached.emit(
@@ -1465,7 +1465,7 @@ class _TestingModelBackend:
             include_detached: True to include unattached storage mounts as well.
         """
         return list(index for index in self._storage_list[name]
-                    if all or self._storage_is_attached(name, index))
+                    if include_detached or self._storage_is_attached(name, index))
 
     def storage_get(self, storage_name_id: str, attribute: str) -> Any:
         name, index = storage_name_id.split("/", 1)

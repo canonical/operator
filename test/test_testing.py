@@ -1416,6 +1416,23 @@ class TestHarness(unittest.TestCase):
         want = str(pathlib.PurePath('test', '0'))
         self.assertEqual(want, harness._backend.storage_get("test/0", "location")[-6:])
 
+    def test_add_storage_not_attached_default(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            storage:
+                test:
+                    type: filesystem
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        harness.add_storage('test')
+        harness.begin()
+        assert len(harness.model.storages['test']) == 0, \
+            'storage should start in detached state and be excluded from storage listing'
+
     def test_add_storage_without_metadata_key_fails(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
