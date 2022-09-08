@@ -18,19 +18,22 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ops.charm import (
-    CharmBase,
-    CharmEvents,
-    CharmMeta,
-    ContainerMeta,
-    ContainerStorageMeta,
-    StartEvent,
-)
-from ops.framework import EventBase, EventSource, Framework
-from ops.model import Model, Storage, _ModelBackend
+from ops.charm import CharmBase
+from ops.charm import CharmEvents
+from ops.charm import CharmMeta
+from ops.charm import ContainerMeta
+from ops.charm import ContainerStorageMeta
+from ops.charm import StartEvent
+from ops.framework import EventBase
+from ops.framework import EventSource
+from ops.framework import Framework
+from ops.model import Model
+from ops.model import Storage
+from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
 
-from .test_helpers import fake_script, fake_script_calls
+from .test_helpers import fake_script
+from .test_helpers import fake_script_calls
 
 
 class TestCharm(unittest.TestCase):

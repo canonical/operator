@@ -14,7 +14,10 @@
 
 """Internal YAML helpers."""
 
-from typing import Any, Optional, TextIO, Union
+from typing import Any
+from typing import Optional
+from typing import TextIO
+from typing import Union
 
 import yaml
 

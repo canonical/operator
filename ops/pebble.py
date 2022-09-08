@@ -43,21 +43,19 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    BinaryIO,
-    Callable,
-    Dict,
-    Generator,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    TextIO,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import BinaryIO
+from typing import Callable
+from typing import Dict
+from typing import Generator
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Sequence
+from typing import TextIO
+from typing import Tuple
+from typing import Union
 
 from ops._private import yaml
 from ops._vendor import websocket
@@ -65,7 +63,9 @@ from ops._vendor import websocket
 if TYPE_CHECKING:
     from email.message import Message
 
-    from typing_extensions import Literal, Protocol, TypedDict
+    from typing_extensions import Literal
+    from typing_extensions import Protocol
+    from typing_extensions import TypedDict
 
     # callback types for _MultiParser header and body handlers
     class _BodyHandler(Protocol):

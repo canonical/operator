@@ -19,12 +19,15 @@ import os
 import pathlib
 import sys
 import tempfile
-from test.test_helpers import BaseTestCase, fake_script, fake_script_calls
+from test.test_helpers import BaseTestCase
+from test.test_helpers import fake_script
+from test.test_helpers import fake_script_calls
 from textwrap import dedent
 
 import yaml
 
-from ops import framework, storage
+from ops import framework
+from ops import storage
 
 
 class StoragePermutations(abc.ABC):

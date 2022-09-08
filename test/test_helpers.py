@@ -21,7 +21,8 @@ import unittest
 
 from ops.charm import CharmMeta
 from ops.framework import Framework
-from ops.model import Model, _ModelBackend
+from ops.model import Model
+from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
 
 

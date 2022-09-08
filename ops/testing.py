@@ -44,11 +44,17 @@ import typing
 import uuid
 import warnings
 from contextlib import contextmanager
-from io import BytesIO, StringIO
+from io import BytesIO
+from io import StringIO
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
+from typing import Dict
 
-from ops import charm, framework, model, pebble, storage
+from ops import charm
+from ops import framework
+from ops import model
+from ops import pebble
+from ops import storage
 from ops._private import yaml
 from ops.model import RelationNotFoundError
 

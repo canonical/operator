@@ -24,8 +24,9 @@ repos:
         name: isort (python)
         args: ["--force-single-line-imports", "--profile", "black"]
 
-#  - repo: https://github.com/pycqa/flake8
-#    rev: 5.0.4
-#    hooks:
-#      - id: flake8
-#        name: flake8
+  # official flake8 doesn't support pyproject.toml configuration.
+  - repo: https://github.com/csachs/pyproject-flake8
+    rev: 10ce82f40319e62c3e0db7f25106d9823df347ef
+    hooks:
+      - id: pyproject-flake8
+        name: pyproject-flake8

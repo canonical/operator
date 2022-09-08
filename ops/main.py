@@ -22,7 +22,15 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Type
+from typing import Union
+from typing import cast
 
 import ops.charm
 import ops.framework
@@ -34,7 +42,8 @@ from ops.log import setup_root_logging
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
-    from ops.framework import BoundEvent, EventSource
+    from ops.framework import BoundEvent
+    from ops.framework import EventSource
     from ops.model import Relation
 
 CHARM_STATE_FILE = '.unit-state.db'

@@ -6,8 +6,9 @@
 
 # -- Path setup --------------------------------------------------------------
 
-from pathlib import Path
 import sys
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
@@ -32,9 +33,9 @@ nitpick_ignore = [
     ('py:class', 'TextIO'),  # typing.TextIO confuses the nitpicker
     ('py:class', 'method'),  # types.Method confuses the nitpicker
     ('py:class', '_ModelBackend'),  # private
-    ('py:class', '_ModelCache'), # private
-    ('py:class', 'ipaddress.ip_address'), # fake (AFAIK there is no ABC)
-    ('py:class', 'ipaddress.ip_network'), # ditto
+    ('py:class', '_ModelCache'),  # private
+    ('py:class', 'ipaddress.ip_address'),  # fake (AFAIK there is no ABC)
+    ('py:class', 'ipaddress.ip_network'),  # ditto
 ]
 
 # Add any Sphinx extension module names here, as strings. They can be
