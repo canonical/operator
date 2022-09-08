@@ -63,7 +63,7 @@ if typing.TYPE_CHECKING:
         FileInfo,
         Plan,
         ServiceInfo,
-        _LayerDict,
+        LayerDict,
     )
     from typing_extensions import TypedDict
 
@@ -86,7 +86,7 @@ if typing.TYPE_CHECKING:
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
-    _Layer = Union[str, _LayerDict, pebble.Layer]
+    _Layer = Union[str, LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
     _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -1219,7 +1219,7 @@ class Pod:
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def set_spec(self, spec: '_K8sSpec', k8s_resources: Optional['_K8sSpec'] = None):
+    def set_spec(self, spec: 'K8sSpec', k8s_resources: Optional['K8sSpec'] = None):
         """Set the specification for pods that Juju should start in kubernetes.
 
         See `juju help-tool pod-spec-set` for details of what should be passed.

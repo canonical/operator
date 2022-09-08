@@ -40,7 +40,6 @@ import pathlib
 import random
 import signal
 import tempfile
-import typing
 import uuid
 import warnings
 from contextlib import contextmanager
@@ -53,6 +52,10 @@ from typing_extensions import TypedDict, Literal
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.model import RelationNotFoundError
+from ops.charm import CharmMeta, CharmBase
+
+T = TypeVar("T")
+M = TypeVar("M")
 
 if TYPE_CHECKING:
     from ops.model import UnitOrApplication
@@ -74,21 +77,21 @@ if TYPE_CHECKING:
         'units': List[str]
     })
 
+    _ConfigValue = Union[str, int, float, bool]
     _ConfigOption = TypedDict('_ConfigOption', {
         'type': Literal['string', 'int', 'float', 'boolean'],
         'description': str,
-        'default': Union[str, int, float, bool]
+        'default': _ConfigValue
     })
     _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
     _RawStatus = TypedDict('_RawStatus', {
         'status': _StatusName,
         'message': str,
     })
-    RawConfig = Dict[str, _ConfigOption]
+    RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
 
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
-from ops.charm import CharmMeta
 
 SIMULATE_CAN_CONNECT = False
 
@@ -229,11 +232,11 @@ class Harness(Generic[CharmType]):
         self._backend._set_can_connect(container._pebble, val)
 
     @property
-    def charm(self) -> CharmType:
+    def charm(self) -> Optional[CharmType]:
         """Return the instance of the charm class that was passed to __init__.
 
         Note that the Charm is not instantiated until you have called
-        :meth:`.begin()`.
+        :meth:`.begin()`. Until then, this property will return None.
         """
         return self._charm
 
@@ -266,7 +269,7 @@ class Harness(Generic[CharmType]):
 
         TestEvents.__name__ = self._charm_cls.on.__class__.__name__
 
-        class TestCharm(self._charm_cls):
+        class TestCharm(self._charm_cls):  # type: ignore
             on = TestEvents()
 
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
@@ -310,15 +313,15 @@ class Harness(Generic[CharmType]):
             # To be fired.
         """
         self.begin()
-
+        my_charm = cast(CharmBase, self._charm)
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
             for storage_index in self._backend.storage_list(storage_name, include_detached=True):
-                s = model.Storage(storage_name, storage_index, self._backend)
+                s = model.Storage(storage_name, storage_index, self._backend)  # type: ignore
                 self.attach_storage(s.full_id)
         # Storage done, emit install event
-        self._charm.on.install.emit()
+        my_charm.on.install.emit()
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
         # of joined units for a given relation.
@@ -343,17 +346,17 @@ class Harness(Generic[CharmType]):
                     app_name = self._backend._relation_app_and_units[rel_id]["app"]
                     self._emit_relation_created(relname, rel_id, app_name)
         if self._backend._is_leader:
-            self._charm.on.leader_elected.emit()
+            my_charm.on.leader_elected.emit()
         else:
-            self._charm.on.leader_settings_changed.emit()
-        self._charm.on.config_changed.emit()
-        self._charm.on.start.emit()
+            my_charm.on.leader_settings_changed.emit()
+        my_charm.on.config_changed.emit()
+        my_charm.on.start.emit()
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
         if post_setup_sts.get("status") == "maintenance" and not post_setup_sts.get("message"):
             self._backend.status_set("unknown", "", is_app=False)
-        all_ids = list(self._backend._relation_names.items())
+        all_ids = list(self._backend._relation_names.items())  # pyright:ReportPrivateUsage=false
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
             rel_app_and_units = self._backend._relation_app_and_units[rel_id]
@@ -365,13 +368,13 @@ class Harness(Generic[CharmType]):
             relation = self._model.get_relation(rel_name, rel_id)
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
-                self._charm.on[rel_name].relation_changed.emit(
+                my_charm.on[rel_name].relation_changed.emit(  # type:ignore
                     relation, app, None)
             for unit_name in sorted(rel_app_and_units["units"]):
                 remote_unit = self._model.get_unit(unit_name)
-                self._charm.on[rel_name].relation_joined.emit(
+                my_charm.on[rel_name].relation_joined.emit(  # type:ignore
                     relation, remote_unit.app, remote_unit)
-                self._charm.on[rel_name].relation_changed.emit(
+                my_charm.on[rel_name].relation_changed.emit(  # type:ignore
                     relation, remote_unit.app, remote_unit)
 
     def cleanup(self) -> None:
@@ -412,7 +415,7 @@ class Harness(Generic[CharmType]):
 
         return CharmMeta.from_yaml(charm_metadata, action_metadata)
 
-    def _get_config(self, charm_config: typing.Optional[dict]):
+    def _get_config(self, charm_config: Optional['YAMLStringOrFile']):
         """If the user passed a config to Harness, use it.
 
         Otherwise, attempt to load one from charm_dir/config.yaml.
@@ -430,14 +433,14 @@ class Harness(Generic[CharmType]):
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        config = cast(RawConfig, yaml.safe_load(charm_config))
+        config = cast(RawConfig, yaml.safe_load(cast(str, charm_config)))
 
         if not isinstance(config, dict):
             raise TypeError(config)
         return config
 
     def add_oci_resource(self, resource_name: str,
-                         contents: Mapping[str, str] = None) -> None:
+                         contents: Optional[Mapping[str, str]] = None) -> None:
         """Add oci resources to the backend.
 
         This will register an oci resource and create a temporary file for processing metadata
@@ -458,7 +461,7 @@ class Harness(Generic[CharmType]):
         if self._meta.resources[resource_name].type != "oci-image":
             raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
 
-        as_yaml = yaml.safe_dump(contents)
+        as_yaml = yaml.safe_dump(contents)  # type: ignore  # it's a str
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
 
     def add_resource(self, resource_name: str, content: AnyStr) -> None:
@@ -557,7 +560,7 @@ class Harness(Generic[CharmType]):
 
         storage_indices = self._backend.storage_add(storage_name, count)
 
-        ids = []
+        ids = []  # type: List[str]
         for storage_index in storage_indices:
             s = model.Storage(storage_name, storage_index, self._backend)
             ids.append(s.full_id)
@@ -580,10 +583,10 @@ class Harness(Generic[CharmType]):
             raise RuntimeError('cannot detach storage before Harness is initialised')
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
-        if self._backend._storage_is_attached(storage_name, storage_index) and self._hooks_enabled:
-            self.charm.on[storage_name].storage_detaching.emit(
-                model.Storage(storage_name, storage_index, self._backend))
-        self._backend._storage_detach(storage_id)
+        if self._backend._storage_is_attached(storage_name, storage_index) and self._hooks_enabled:  # pyright:ReportPrivateUsage=false
+            self.charm.on[storage_name].storage_detaching.emit(  # type: ignore
+                model.Storage(storage_name, storage_index, self._backend))  # type: ignore
+        self._backend._storage_detach(storage_id)  # pyright:ReportPrivateUsage=false
 
     def attach_storage(self, storage_id: str) -> None:
         """Attach a storage device.
@@ -608,8 +611,8 @@ class Harness(Generic[CharmType]):
         self._model._storages._invalidate(storage_name)
 
         storage_index = int(storage_index)
-        self.charm.on[storage_name].storage_attached.emit(
-            model.Storage(storage_name, storage_index, self._backend))
+        self.charm.on[storage_name].storage_attached.emit(  # type:ignore
+            model.Storage(storage_name, storage_index, self._backend))  # type: ignore
 
     def remove_storage(self, storage_id: str) -> None:
         """Detach a storage device.
@@ -628,11 +631,11 @@ class Harness(Generic[CharmType]):
         if storage_name not in self._meta.storages:
             raise RuntimeError(
                 "the key '{}' is not specified as a storage key in metadata".format(storage_name))
-        is_attached = self._backend._storage_is_attached(storage_name, storage_index)
+        is_attached = self._backend._storage_is_attached(storage_name, storage_index)  # pyright:ReportPrivateUsage=false
         if self.charm is not None and self._hooks_enabled and is_attached:
-            self.charm.on[storage_name].storage_detaching.emit(
-                model.Storage(storage_name, storage_index, self._backend))
-        self._backend._storage_remove(storage_id)
+            self.charm.on[storage_name].storage_detaching.emit(  # type: ignore
+                model.Storage(storage_name, storage_index, self._backend))  # type: ignore
+        self._backend._storage_remove(storage_id)  # pyright:ReportPrivateUsage=false
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
@@ -650,21 +653,21 @@ class Harness(Generic[CharmType]):
             The relation_id created by this add_relation.
         """
         relation_id = self._next_relation_id()
-        self._backend._relation_ids_map.setdefault(relation_name, []).append(relation_id)
-        self._backend._relation_names[relation_id] = relation_name
-        self._backend._relation_list_map[relation_id] = []
-        self._backend._relation_data_raw[relation_id] = {
+        self._backend._relation_ids_map.setdefault(relation_name, []).append(relation_id)  # pyright:ReportPrivateUsage=false
+        self._backend._relation_names[relation_id] = relation_name  # pyright:ReportPrivateUsage=false
+        self._backend._relation_list_map[relation_id] = []  # pyright:ReportPrivateUsage=false
+        self._backend._relation_data_raw[relation_id] = {  # pyright:ReportPrivateUsage=false
             remote_app: {},
             self._backend.unit_name: {},
             self._backend.app_name: {}}
 
-        self._backend._relation_app_and_units[relation_id] = {
+        self._backend._relation_app_and_units[relation_id] = {  # pyright:ReportPrivateUsage=false
             "app": remote_app,
             "units": [],
         }
         # Reload the relation_ids list
         if self._model is not None:
-            self._model.relations._invalidate(relation_name)
+            self._model.relations._invalidate(relation_name)  # pyright:ReportPrivateUsage=false
         self._emit_relation_created(relation_name, relation_id, remote_app)
         return relation_id
 
@@ -678,23 +681,23 @@ class Harness(Generic[CharmType]):
             RelationNotFoundError: if relation id is not valid
         """
         try:
-            relation_name = self._backend._relation_names[relation_id]
-            remote_app = self._backend.relation_remote_app_name(relation_id)
+            relation_name = self._backend._relation_names[relation_id]  # pyright:ReportPrivateUsage=false
+            remote_app = self._backend.relation_remote_app_name(relation_id)  # pyright:ReportPrivateUsage=false
         except KeyError as e:
             raise model.RelationNotFoundError from e
 
-        for unit_name in self._backend._relation_list_map[relation_id].copy():
+        for unit_name in self._backend._relation_list_map[relation_id].copy():  # pyright:ReportPrivateUsage=false
             self.remove_relation_unit(relation_id, unit_name)
 
         self._emit_relation_broken(relation_name, relation_id, remote_app)
         if self._model is not None:
-            self._model.relations._invalidate(relation_name)
+            self._model.relations._invalidate(relation_name)  # pyright:ReportPrivateUsage=false
 
-        self._backend._relation_app_and_units.pop(relation_id)
-        self._backend._relation_data_raw.pop(relation_id)
-        self._backend._relation_list_map.pop(relation_id)
-        self._backend._relation_ids_map[relation_name].remove(relation_id)
-        self._backend._relation_names.pop(relation_id)
+        self._backend._relation_app_and_units.pop(relation_id)  # pyright:ReportPrivateUsage=false
+        self._backend._relation_data_raw.pop(relation_id)  # pyright:ReportPrivateUsage=false
+        self._backend._relation_list_map.pop(relation_id)  # pyright:ReportPrivateUsage=false
+        self._backend._relation_ids_map[relation_name].remove(relation_id)  # pyright:ReportPrivateUsage=false
+        self._backend._relation_names.pop(relation_id)  # pyright:ReportPrivateUsage=false
 
     def _emit_relation_created(self, relation_name: str, relation_id: int,
                                remote_app: str) -> None:
@@ -703,7 +706,7 @@ class Harness(Generic[CharmType]):
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_created.emit(
+        self._charm.on[relation_name].relation_created.emit(  # type:ignore
             relation, app)
 
     def _emit_relation_broken(self, relation_name: str, relation_id: int,
@@ -713,7 +716,7 @@ class Harness(Generic[CharmType]):
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_broken.emit(
+        self._charm.on[relation_name].relation_broken.emit(  # type: ignore
             relation, app)
 
     def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
@@ -741,14 +744,20 @@ class Harness(Generic[CharmType]):
         # we can write remote unit data iff we are not in a hook env
         relation_name = self._backend._relation_names[relation_id]
         relation = self._model.get_relation(relation_name, relation_id)
+
+        if not relation:
+            raise RuntimeError('Relation id {} is mapped to relation name {},'
+                               'but no relation matching that name was found.')
+
         self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
-        if not remote_unit_name.startswith(relation.app.name):
+        app = cast(model.Application, relation.app)  # should not be None since we're testing
+        if not remote_unit_name.startswith(app.name):
             raise ValueError(
                 'Remote unit name invalid: the remote application of {} is called {!r}; '
                 'the remote unit name should be {}/<some-number>, not {!r}.'
-                ''.format(relation_name, relation.app.name,
-                          relation.app.name, remote_unit_name))
-        self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
+                ''.format(relation_name, app.name,
+                          app.name, remote_unit_name))
+        self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)  # pyright: ReportPrivateUsage=false
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
         remote_unit = self._model.get_unit(remote_unit_name)
@@ -758,7 +767,7 @@ class Harness(Generic[CharmType]):
         self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return
-        self._charm.on[relation_name].relation_joined.emit(
+        self._charm.on[relation_name].relation_joined.emit(  # type: ignore
             relation, remote_unit.app, remote_unit)
 
     def remove_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
@@ -787,11 +796,19 @@ class Harness(Generic[CharmType]):
             KeyError: if relation_id or remote_unit_name is not valid
             ValueError: if remote_unit_name is not valid
         """
-        relation_name = self._backend._relation_names[relation_id]
+        relation_name = self._backend._relation_names[relation_id]  # pyright: reportPrivateUsage=false
 
         # gather data to invalidate cache later
         remote_unit = self._model.get_unit(remote_unit_name)
         relation = self._model.get_relation(relation_name, relation_id)
+
+        if not relation:
+            # This should not really happen, since there being a relation name mapped
+            # to this ID in _relation_names should guarantee that you created the relation
+            # following the proper path, but still...
+            raise RuntimeError('Relation id {} is mapped to relation name {},'
+                               'but no relation matching that name was found.')
+
         unit_cache = relation.data.get(remote_unit, None)
 
         # remove the unit from the list of units in the relation
@@ -799,15 +816,15 @@ class Harness(Generic[CharmType]):
 
         self._emit_relation_departed(relation_id, remote_unit_name)
         # remove the relation data for the departed unit now that the event has happened
-        self._backend._relation_list_map[relation_id].remove(remote_unit_name)
-        self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)
-        self._backend._relation_data_raw[relation_id].pop(remote_unit_name)
-        self.model._relations._invalidate(relation_name=relation.name)
+        self._backend._relation_list_map[relation_id].remove(remote_unit_name)  # pyright: reportPrivateUsage=false
+        self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)  # pyright: reportPrivateUsage=false
+        self._backend._relation_data_raw[relation_id].pop(remote_unit_name)  # pyright: reportPrivateUsage=false
+        self.model._relations._invalidate(relation_name=relation.name)  # pyright: reportPrivateUsage=false
 
         if unit_cache is not None:
-            unit_cache._invalidate()
+            unit_cache._invalidate()  # pyright: reportPrivateUsage=false
 
-    def _emit_relation_departed(self, relation_id, unit_name):
+    def _emit_relation_departed(self, relation_id: int, unit_name: str):
         """Trigger relation-departed event for a given relation id and unit."""
         if self._charm is None or not self._hooks_enabled:
             return
@@ -819,9 +836,9 @@ class Harness(Generic[CharmType]):
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)
+        self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)  # type: ignore
 
-    def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> Mapping:
+    def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> Mapping[str, str]:
         """Get the relation data bucket for a single app or unit in a given relation.
 
         This ignores all of the safety checks of who can and can't see data in relations (eg,
@@ -837,10 +854,17 @@ class Harness(Generic[CharmType]):
         Raises:
             KeyError: if relation_id doesn't exist
         """
-        if hasattr(app_or_unit, 'name'):
-            app_or_unit = app_or_unit.name
+        if isinstance(app_or_unit, model.Application):
+            name = app_or_unit.name
+        elif isinstance(app_or_unit, model.Unit):
+            name = app_or_unit.name
+        elif isinstance(app_or_unit, str):  # str
+            name = app_or_unit
+        else:
+            raise TypeError('Expected Application | Unit | str, got {}'.format(type(app_or_unit)))
+
         # bypass access control by going directly to raw
-        return self._backend._relation_data_raw[relation_id].get(app_or_unit, None)
+        return self._backend._relation_data_raw[relation_id].get(name, None)
 
     def get_pod_spec(self) -> Tuple[Mapping[Any, Any], Mapping[Any, Any]]:
         """Return the content of the pod spec as last set by the charm.
@@ -881,13 +905,13 @@ class Harness(Generic[CharmType]):
         container = self.model.unit.get_container(container_name)
         if SIMULATE_CAN_CONNECT:
             self.set_can_connect(container, True)
-        self.charm.on[container_name].pebble_ready.emit(container)
+        self.charm.on[container_name].pebble_ready.emit(container)  # type: ignore  #darkmagic
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
 
-    def set_model_info(self, name: str = None, uuid: str = None) -> None:
+    def set_model_info(self, name: Optional[str] = None, uuid: Optional[str] = None) -> None:
         """Set the name and uuid of the Model that this is representing.
 
         This cannot be called once begin() has been called. But it lets you set the value that
@@ -899,7 +923,7 @@ class Harness(Generic[CharmType]):
         self.set_model_name(name)
         self.set_model_uuid(uuid)
 
-    def set_model_name(self, name: str) -> None:
+    def set_model_name(self, name: Optional[str]) -> None:
         """Set the name of the Model that this is representing.
 
         This cannot be called once begin() has been called. But it lets you set the value that
@@ -909,7 +933,7 @@ class Harness(Generic[CharmType]):
             raise RuntimeError('cannot set the Model name after begin()')
         self._backend.model_name = name
 
-    def set_model_uuid(self, uuid: str) -> None:
+    def set_model_uuid(self, uuid: Optional[str]) -> None:
         """Set the uuid of the Model that this is representing.
 
         This cannot be called once begin() has been called. But it lets you set the value that
@@ -923,7 +947,7 @@ class Harness(Generic[CharmType]):
             self,
             relation_id: int,
             app_or_unit: str,
-            key_values: Mapping,
+            key_values: Mapping[str, str],
     ) -> None:
         """Update the relation data for a given unit or application in a given relation.
 
@@ -941,16 +965,24 @@ class Harness(Generic[CharmType]):
             entity = self._model.get_unit(app_or_unit)
         else:
             entity = self._model.get_app(app_or_unit)
+
+        if not relation:
+            raise RuntimeError('Relation id {} is mapped to relation name {},'
+                               'but no relation matching that name was found.')
+
         rel_data = relation.data.get(entity, None)
         if rel_data is not None:
             # rel_data may have cached now-stale data, so _invalidate() it.
             # Note, this won't cause the data to be loaded if it wasn't already.
-            rel_data._invalidate()
+            rel_data._invalidate()  # pyright: reportPrivateUsage=false
 
-        old_values = self._backend._relation_data_raw[relation_id][app_or_unit].copy()
+        old_values = self._backend._relation_data_raw[relation_id][app_or_unit].copy()  # pyright: reportPrivateUsage=false
         assert isinstance(old_values, dict), old_values
 
-        databag = self.model.relations._get_unique(relation.name, relation_id).data[entity]
+        # get a new relation instance to ensure a clean state
+        new_relation_instance = self.model.relations._get_unique(relation.name, relation_id)  # pyright: reportPrivateUsage=false
+        assert new_relation_instance is not None  # type guard; this passed before...
+        databag = new_relation_instance.data[entity]
         # ensure that WE as harness can temporarily write the databag
         with self._event_context(''):
             values_have_changed = False
@@ -980,7 +1012,7 @@ class Harness(Generic[CharmType]):
                 return
         self._emit_relation_changed(relation_id, app_or_unit)
 
-    def _emit_relation_changed(self, relation_id, app_or_unit):
+    def _emit_relation_changed(self, relation_id: int, app_or_unit: str):
         if self._charm is None or not self._hooks_enabled:
             return
         rel_name = self._backend._relation_names[relation_id]
@@ -995,11 +1027,11 @@ class Harness(Generic[CharmType]):
             app_name = app_or_unit
             app = self.model.get_app(app_name)
             args = (relation, app)
-        self._charm.on[rel_name].relation_changed.emit(*args)
+        self._charm.on[rel_name].relation_changed.emit(*args)  # type: ignore
 
     def _update_config(
             self,
-            key_values: Mapping[str, str] = None,
+            key_values: Optional[Mapping[str, '_ConfigValue']] = None,
             unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
@@ -1036,7 +1068,7 @@ class Harness(Generic[CharmType]):
 
     def update_config(
             self,
-            key_values: Mapping[str, Union[str, float, int, bool]] = None,
+            key_values: Optional[Mapping[str, '_ConfigValue']] = None,
             unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
@@ -1101,7 +1133,7 @@ class Harness(Generic[CharmType]):
         """
         self._backend._planned_units = None
 
-    def _get_backend_calls(self, reset: bool = True) -> list:
+    def _get_backend_calls(self, reset: bool = True) -> List[Tuple[Any, ...]]:
         """Return the calls that we have made to the TestingModelBackend.
 
         This is useful mostly for testing the framework itself, so that we can assert that we
@@ -1120,7 +1152,7 @@ class Harness(Generic[CharmType]):
         return calls
 
 
-def _record_calls(cls):
+def _record_calls(cls: Any):
     """Replace methods on cls with methods that record that they have been called.
 
     Iterate all attributes of cls, and for public methods, replace them with a wrapped method
@@ -1130,8 +1162,8 @@ def _record_calls(cls):
         if meth_name.startswith('_'):
             continue
 
-        def decorator(orig_method):
-            def wrapped(self, *args, **kwargs):
+        def decorator(orig_method: Any):
+            def wrapped(self: _TestingModelBackend, *args: Any, **kwargs: Any):
                 full_args = (orig_method.__name__,) + args
                 if kwargs:
                     full_args = full_args + (kwargs,)
@@ -1143,7 +1175,7 @@ def _record_calls(cls):
     return cls
 
 
-def _copy_docstrings(source_cls):
+def _copy_docstrings(source_cls: Any):
     """Copy the docstrings from source_cls to target_cls.
 
     Use this as:
@@ -1153,7 +1185,7 @@ def _copy_docstrings(source_cls):
     And for any public method that exists on both classes, it will copy the
     __doc__ for that method.
     """
-    def decorator(target_cls):
+    def decorator(target_cls: Any):
         for meth_name, _ in target_cls.__dict__.items():
             if meth_name.startswith('_'):
                 continue
@@ -1165,7 +1197,7 @@ def _copy_docstrings(source_cls):
 
 
 @_record_calls
-class _TestingConfig(dict):
+class _TestingConfig(Dict[str, '_ConfigValue']):
     """Represents the Juju Config."""
     _supported_types = {
         'string': str,
@@ -1174,7 +1206,7 @@ class _TestingConfig(dict):
         'float': float
     }
 
-    def __init__(self, config: RawConfig):
+    def __init__(self, config: 'RawConfig'):
         super().__init__()
         self._spec = config
         self._defaults = self._load_defaults(config)
@@ -1185,17 +1217,17 @@ class _TestingConfig(dict):
             self._config_set(key, value)
 
     @staticmethod
-    def _load_defaults(charm_config: dict):
+    def _load_defaults(charm_config: 'RawConfig') -> Dict[str, '_ConfigValue']:
         """Load default values from config.yaml.
 
         Handle the case where a user doesn't supply explicit config snippets.
         """
         if not charm_config:
             return {}
-        charm_config = charm_config.get('options', {})
-        return {key: value.get('default', None) for key, value in charm_config.items()}
+        cfg = charm_config.get('options', {})  # type: Dict[str, '_ConfigOption']
+        return {key: value.get('default', None) for key, value in cfg.items()}
 
-    def _config_set(self, key, value):
+    def _config_set(self, key: str, value: '_ConfigValue'):
         # this is only called by the harness itself
         # we don't do real serialization/deserialization, but we do check that the value
         # has the expected type.
@@ -1222,15 +1254,15 @@ class _TestingConfig(dict):
                                                       type(value).__name__))
 
         # call 'normal' setattr.
-        dict.__setitem__(self, key, value)
+        dict.__setitem__(self, key, value)  # type: ignore
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Any, value: Any):
         # if a charm attempts to config[foo] = bar:
         raise TypeError("'ConfigData' object does not support item assignment")
 
 
-class _TestingRelationDataContents(dict):
-    def __setitem__(self, key, value):
+class _TestingRelationDataContents(Dict[str, str]):
+    def __setitem__(self, key: str, value: str):
         if not isinstance(key, str):
             raise model.RelationDataError(
                 'relation data keys must be strings, not {}'.format(type(key)))
@@ -1253,25 +1285,26 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: Dict[]):
+    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: 'RawConfig'):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
         self.model_uuid = str(uuid.uuid4())
 
         self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
-        self._calls = []
+        # this is used by the _record_calls decorator
+        self._calls = []  # type: List[Tuple[Any, ...]]
         self._meta = meta
         # relation name to [relation_ids,...]
         self._relation_ids_map = {}   # type: Dict[str, List[int]]
         # reverse map from relation_id to relation_name
         self._relation_names = {}  # type: Dict[int, str]
         # relation_id: [unit_name,...]
-        self._relation_list_map = {}  # type:Dict[int, List[str]]
+        self._relation_list_map = {}  # type: Dict[int, List[str]]
         # {relation_id: {name: Dict[str: str]}}
         self._relation_data_raw = {}  # type: Dict[int, Dict[str, Dict[str, str]]]
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
-        self._relation_app_and_units = {}  # Dict[int, _RelationEntities]
+        self._relation_app_and_units = {}  # type: Dict[int, _RelationEntities]
         self._config = _TestingConfig(config)
         self._is_leader = False  # type: bool
         # {resource_name: resource_content}
@@ -1282,14 +1315,14 @@ class _TestingModelBackend:
         self._app_status = {'status': 'unknown', 'message': ''}  #type: _RawStatus
         self._unit_status = {'status': 'maintenance', 'message': ''}  #type: _RawStatus
         self._workload_version = None  # type: Optional[str]
-        self._resource_dir = None # type: Optional[str]
+        self._resource_dir = None # type: Optional[tempfile.TemporaryDirectory[Any]]
         # Format:
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
-        self._storage_list = {k: {} for k in self._meta.storages}  # type: Dict[str, Dict[int, Any]]
+        self._storage_list = {k: {} for k in self._meta.storages}  # type: Dict[str, Dict[int, Dict[str, Any]]]
 
-        self._storage_attached = {k: set() for k in self._meta.storages}
+        self._storage_attached = {k: set() for k in self._meta.storages} # type: Dict[str, Set[int]]
         self._storage_index_counter = 0
         # {container_name : _TestingPebbleClient}
         self._pebble_clients = {}  # type: Dict[str, _TestingPebbleClient]
@@ -1297,7 +1330,7 @@ class _TestingModelBackend:
         self._planned_units = None  # type: Optional[int]
         self._hook_is_running = ''
 
-    def _validate_relation_access(self, relation_name, relations):
+    def _validate_relation_access(self, relation_name: str, relations:List[model.Relation]):
         """Ensures that the named relation exists/has been added.
 
         This is called whenever relation data is accessed via model.get_relation(...).
@@ -1305,10 +1338,10 @@ class _TestingModelBackend:
         if len(relations) > 0:
             return
 
-        relations = list(self._meta.peers.keys())
-        relations.extend(self._meta.requires.keys())
-        relations.extend(self._meta.provides.keys())
-        if self._hook_is_running == 'leader_elected' and relation_name in relations:
+        valid_relation_endpoints = list(self._meta.peers.keys())  # type: List[str]
+        valid_relation_endpoints.extend(self._meta.requires.keys())
+        valid_relation_endpoints.extend(self._meta.provides.keys())
+        if self._hook_is_running == 'leader_elected' and relation_name in valid_relation_endpoints:
             raise RuntimeError(
                 'cannot access relation data without first adding the relation: '
                 'use Harness.add_relation({!r}, <app>) before calling set_leader'
@@ -1318,7 +1351,7 @@ class _TestingModelBackend:
         """Returns whether the mock client is active and can support API calls with no errors."""
         return self._pebble_clients_can_connect[pebble_client]
 
-    def _set_can_connect(self, pebble_client, val):
+    def _set_can_connect(self, pebble_client: '_TestingPebbleClient', val: bool):
         """Manually sets the can_connect state for the given mock client."""
         if not SIMULATE_CAN_CONNECT:
             raise RuntimeError('must set SIMULATE_CAN_CONNECT=True before using set_can_connect')
@@ -1338,17 +1371,19 @@ class _TestingModelBackend:
             # $AGENT_DIR/resources/$RESOURCE_NAME/$RESOURCE_FILENAME
             # However, charms shouldn't depend on this.
             self._resource_dir = tempfile.TemporaryDirectory(prefix='tmp-ops-test-resource-')
-        return pathlib.Path(self._resource_dir.name)
+        res_dir_name = cast(str, self._resource_dir.name)
+        return pathlib.Path(res_dir_name)
 
-    def relation_ids(self, relation_name):
+    def relation_ids(self, relation_name: str) -> List[int]:
         try:
             return self._relation_ids_map[relation_name]
         except KeyError as e:
             if relation_name not in self._meta.relations:
                 raise model.ModelError('{} is not a known relation'.format(relation_name)) from e
-            return []
+            no_ids = []  # type: List[int]
+            return no_ids
 
-    def relation_list(self, relation_id):
+    def relation_list(self, relation_id: int):
         try:
             return self._relation_list_map[relation_id]
         except KeyError as e:
@@ -1365,7 +1400,7 @@ class _TestingModelBackend:
             return None
         return self._relation_app_and_units[relation_id]['app']
 
-    def relation_get(self, relation_id, member_name, is_app):
+    def relation_get(self, relation_id: int, member_name: str, is_app: bool):
         if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
                 relation_id):
             # TODO: if juju gets fixed to set JUJU_REMOTE_APP for this case, then we may opt to
@@ -1413,7 +1448,7 @@ class _TestingModelBackend:
         else:
             bucket[key] = value
 
-    def config_get(self):
+    def config_get(self) -> _TestingConfig:
         return self._config
 
     def is_leader(self):
@@ -1445,7 +1480,7 @@ class _TestingModelBackend:
     def pod_spec_set(self, spec: 'model.K8sSpec', k8s_resources: Any):  # fixme: any
         self._pod_spec = (spec, k8s_resources)
 
-    def status_get(self, *, is_app=False):
+    def status_get(self, *, is_app: bool = False):
         if is_app:
             return self._app_status
         else:
@@ -1637,7 +1672,8 @@ class _TestingPebbleClient:
         raise NotImplementedError(self.ack_warnings)
 
     def get_changes(
-            self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS, service: str = None,
+            self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS,
+            service: Optional[str] = None,
     ) -> List[pebble.Change]:
         raise NotImplementedError(self.get_changes)
 
@@ -1818,7 +1854,7 @@ ChangeError: cannot perform the following tasks:
             plan.services[name] = services[name]
         return plan
 
-    def get_services(self, names: List[str] = None) -> List[pebble.ServiceInfo]:
+    def get_services(self, names: Optional[List[str]] = None) -> List[pebble.ServiceInfo]:
         if isinstance(names, str):
             raise TypeError('start_services should take a list of names, not just "{}"'.format(
                 names))
