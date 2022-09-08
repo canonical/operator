@@ -1981,12 +1981,12 @@ ChangeError: cannot perform the following tasks:
                 name=file.name,
                 type=get_pebble_file_type(file),
                 size=file.size if isinstance(file, _File) else None,
-                permissions=file.kwargs['permissions'],
+                permissions=file.kwargs.get('permissions'),
                 last_modified=file.last_modified,
-                user_id=file.kwargs['user_id'],
-                user=file.kwargs['user'],
-                group_id=file.kwargs['group_id'],
-                group=file.kwargs['group'],
+                user_id=file.kwargs.get('user_id'),
+                user=file.kwargs.get('user'),
+                group_id=file.kwargs.get('group_id'),
+                group=file.kwargs.get('group'),
             )
             for file in files
         ]
