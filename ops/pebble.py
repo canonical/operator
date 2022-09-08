@@ -201,11 +201,11 @@ if TYPE_CHECKING:
                           total=False)
     # public as it is accessed by ops.testing
     LayerDict = TypedDict('LayerDict',
-                           {'summary': str,
-                            'description': str,
-                            'services': Dict[str, _ServiceDict],
-                            'checks': Dict[str, _CheckDict]},
-                           total=False)
+                          {'summary': str,
+                           'description': str,
+                           'services': Dict[str, _ServiceDict],
+                           'checks': Dict[str, _CheckDict]},
+                          total=False)
 
     _Error = TypedDict('_Error',
                        {'kind': str,

@@ -61,9 +61,9 @@ if typing.TYPE_CHECKING:
         Client,
         ExecProcess,
         FileInfo,
+        LayerDict,
         Plan,
         ServiceInfo,
-        LayerDict,
     )
     from typing_extensions import TypedDict
 

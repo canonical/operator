@@ -24,7 +24,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Generator, List, Optional, Tuple, Type, Union
 
-import yaml
+import yaml  # pyright: reportMissingModuleSource=false
 
 logger = logging.getLogger()
 

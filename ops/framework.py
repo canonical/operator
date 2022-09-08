@@ -589,11 +589,19 @@ class Framework(Object):
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
-    def __init__(self, storage: Union[SQLiteStorage, JujuStorage], charm_dir: Union[str, Path],
+    def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
+                 charm_dir: Union[str, pathlib.Path],
                  meta: 'CharmMeta', model: 'Model'):
         super().__init__(self, None)
 
-        self.charm_dir = Path(charm_dir)
+        # an old, deprecated __init__ interface accepted an Optional charm_dir,
+        #  so we have to keep supporting it:
+        if charm_dir is None:
+            logger.warning('Deprecation warning: charm_dir should not be `None`')
+            self.charm_dir = None  # type: ignore
+        else:
+            self.charm_dir = pathlib.Path(charm_dir)
+
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
