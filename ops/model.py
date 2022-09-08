@@ -55,8 +55,8 @@ from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
-    from pebble import CheckInfo  # pyright: reportMissingTypeStubs=false
-    from pebble import (
+    from pebble import (  # pyright: reportMissingTypeStubs=false
+        CheckInfo,
         CheckLevel,
         Client,
         ExecProcess,
