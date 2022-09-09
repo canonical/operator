@@ -1755,6 +1755,17 @@ class TestModelBindings(unittest.TestCase):
             self.assertEqual(binding.network.interfaces[i].address, ipaddress.ip_address(address))
             self.assertEqual(binding.network.interfaces[i].subnet, ipaddress.ip_network(subnet))
 
+        for (i, (name, address, subnet)) in enumerate([
+                ('lo', '192.0.2.2', '192.0.2.0/24'),
+                ('lo', 'dead:beef::1', 'dead:beef::/64'),
+                ('tun', '192.0.3.3', '192.0.3.3/32'),
+                ('tun', '2001:db8::3', '2001:db8::3/128'),
+                ('tun', 'fe80::1:1', 'fe80::/64')]):
+            self.assertEqual(binding.network.interfaces[i].name, name)
+            self.assertEqual(binding.network.interfaces[i].address, ipaddress.ip_address(address))
+            self.assertEqual(binding.network.interfaces[i].subnet, ipaddress.ip_network(subnet))
+
+
     def test_invalid_keys(self):
         # Basic validation for passing invalid keys.
         for name in (object, 0):
@@ -1900,6 +1911,18 @@ class TestModelBindings(unittest.TestCase):
         binding_name = 'db0'
         binding = self.model.get_binding(self.model.get_relation(binding_name))
         self.assertEqual(binding.network.egress_subnets, [])
+
+    def test_unresolved_ingress_addresses(self):
+        network_data = json.dumps({
+            'ingress-addresses': [
+               'foo.bar.baz.com'
+            ],
+        })
+        fake_script(self, 'network-get',
+                    '''[ "$1" = db0 ] && echo '{}' || exit 1'''.format(network_data))
+        binding_name = 'db0'
+        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        self.assertEqual(binding.network.ingress_addresses, ['foo.bar.baz.com'])
 
 
 class TestModelBackend(unittest.TestCase):
