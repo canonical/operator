@@ -1765,7 +1765,6 @@ class TestModelBindings(unittest.TestCase):
             self.assertEqual(binding.network.interfaces[i].address, ipaddress.ip_address(address))
             self.assertEqual(binding.network.interfaces[i].subnet, ipaddress.ip_network(subnet))
 
-
     def test_invalid_keys(self):
         # Basic validation for passing invalid keys.
         for name in (object, 0):
@@ -1913,9 +1912,11 @@ class TestModelBindings(unittest.TestCase):
         self.assertEqual(binding.network.egress_subnets, [])
 
     def test_unresolved_ingress_addresses(self):
+        # sometimes juju fails to resolve an url to an IP, in which case
+        # ingress-addresses will be the 'raw' url instead of an IP.
         network_data = json.dumps({
             'ingress-addresses': [
-               'foo.bar.baz.com'
+                'foo.bar.baz.com'
             ],
         })
         fake_script(self, 'network-get',
