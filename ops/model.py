@@ -93,7 +93,7 @@ if typing.TYPE_CHECKING:
     _RelationsMeta_Raw = Dict[str, ops.charm.RelationMeta]
     # mapping from container name to container metadata
     _ContainerMeta_Raw = Dict[str, ops.charm.ContainerMeta]
-    _IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+    _NetworkAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]
     _Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
     _ServiceInfoMapping = Mapping[str, pebble.ServiceInfo]
@@ -692,6 +692,17 @@ class Binding:
         return self._network
 
 
+def _cast_network_address(raw: str) -> '_NetworkAddress':
+    # fields marked as network addresses need not be IPs; they could be
+    # hostnames that juju failed to resolve. In that case, we'll log a
+    # debug message and leave it as-is.
+    try:
+        return ipaddress.ip_address(raw)
+    except ValueError:
+        logger.debug("could not cast {} to IPv4/v6 address".format(raw))
+        return raw
+
+
 class Network:
     """Network space details.
 
@@ -725,15 +736,15 @@ class Network:
             if addrs is not None:
                 for address_info in addrs:
                     self.interfaces.append(NetworkInterface(interface_name, address_info))
-        self.ingress_addresses = []  # type: List[_IPAddress]
+        self.ingress_addresses = []  # type: List[_NetworkAddress]
         for address in network_info.get('ingress-addresses', []):
-            self.ingress_addresses.append(ipaddress.ip_address(address))
+            self.ingress_addresses.append(_cast_network_address(address))
         self.egress_subnets = []  # type: List[_Network]
         for subnet in network_info.get('egress-subnets', []):
             self.egress_subnets.append(ipaddress.ip_network(subnet))
 
     @property
-    def bind_address(self) -> Optional['_IPAddress']:
+    def bind_address(self) -> Optional['_NetworkAddress']:
         """A single address that your application should bind() to.
 
         For the common case where there is a single answer. This represents a single
@@ -746,7 +757,7 @@ class Network:
             return None
 
     @property
-    def ingress_address(self):
+    def ingress_address(self) -> Optional['_NetworkAddress']:
         """The address other applications should use to connect to your unit.
 
         Due to things like public/private addresses, NAT and tunneling, the address you bind()
@@ -782,8 +793,8 @@ class NetworkInterface:
             address = address_info.get('address')
 
         # The value field may be empty.
-        address_ = ipaddress.ip_address(address) if address else None
-        self.address = address_  # type: Optional[_IPAddress]
+        address_ = _cast_network_address(address) if address else None
+        self.address = address_  # type: Optional[_NetworkAddress]
         cidr = address_info.get('cidr')  # type: str
         # The cidr field may be empty, see LP: #1864102.
         if cidr:
