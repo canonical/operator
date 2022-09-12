@@ -28,6 +28,7 @@ import sys
 import types
 import typing
 import weakref
+from contextlib import contextmanager
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -45,7 +46,7 @@ from typing import (
 )
 
 from ops import charm
-from ops.storage import NoSnapshotError, SQLiteStorage
+from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -73,7 +74,7 @@ if TYPE_CHECKING:
     _ObserverCallback = Callable[[Any], None]
 
     # types that can be stored natively
-    _StorableType = Union[int, float, str, bytes, Literal[None],
+    _StorableType = Union[int, bool, float, str, bytes, Literal[None],
                           List['_StorableType'],
                           Dict[str, '_StorableType'],
                           Set['_StorableType']]
@@ -588,7 +589,7 @@ class Framework(Object):
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
-    def __init__(self, storage: SQLiteStorage, charm_dir: 'Path',
+    def __init__(self, storage: Union[SQLiteStorage, JujuStorage], charm_dir: 'Path',
                  meta: 'CharmMeta', model: 'Model'):
         super().__init__(self, None)
 
@@ -847,34 +848,33 @@ class Framework(Object):
         """
         self._reemit()
 
+    @contextmanager
+    def _event_context(self, event_name: str):
+        """Handles toggling the hook-is-running state in backends.
+
+        This allows e.g. harness logic to know if it is executing within a running hook context
+        or not.  It sets backend._hook_is_running equal to the name of the currently running
+        hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
+        is completed.
+
+        Usage:
+            >>> with harness._event_context('db-relation-changed'):
+            >>>     print('Harness thinks it is running an event hook.')
+            >>> with harness._event_context(''):
+            >>>     print('harness thinks it is not running an event hook.')
+        """
+        backend = self.model._backend if self.model else None  # type: Optional[_ModelBackend]
+
+        if not backend:
+            yield  # context does nothing in this case
+            return
+
+        old = backend._hook_is_running
+        backend._hook_is_running = event_name
+        yield
+        backend._hook_is_running = old
+
     def _reemit(self, single_event_path: str = None):
-
-        class EventContext:
-            """Handles toggling the hook-is-running state in backends.
-
-            This allows e.g. harness logic to know if it is executing within a running hook context
-            or not.  It sets backend._hook_is_running equal to the name of the currently running
-            hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
-            is completed.
-            """
-
-            def __init__(self, framework: Framework, event_name: str):
-                self._event = event_name
-                backend = None
-                if framework.model is not None:
-                    backend = framework.model._backend  # noqa
-                self._backend = backend  # type: Optional[_ModelBackend]
-
-            def __enter__(self):
-                if self._backend:
-                    self._backend._hook_is_running = self._event
-                return self
-
-            def __exit__(self, exception_type: 'Type[Exception]',
-                         exception: Exception, traceback: Any):
-                if self._backend:
-                    self._backend._hook_is_running = ''
-
         last_event_path = None
         deferred = True
         for event_path, observer_path, method_name in self._storage.notices(single_event_path):
@@ -902,7 +902,7 @@ class Framework(Object):
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    with EventContext(self, event_handle.kind):
+                    with self._event_context(event_handle.kind):
                         if (
                             event_is_from_juju or event_is_action
                         ) and self._juju_debug_at.intersection({'all', 'hook'}):
@@ -1027,6 +1027,7 @@ class BoundStoredState:
         @property
         def _data(self) -> StoredStateData:  # noqa
             pass  # pyright: reportGeneralTypeIssues=false
+
         @property  # noqa
         def _attr_name(self) -> str:  # noqa
             pass  # pyright: reportGeneralTypeIssues=false
@@ -1046,6 +1047,11 @@ class BoundStoredState:
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)  # type: ignore
 
+    if TYPE_CHECKING:
+        @typing.overload
+        def __getattr__(self, key: Literal['on']) -> ObjectEvents:
+            pass
+
     def __getattr__(self, key: str) -> Union['_StorableType', 'StoredObject', ObjectEvents]:
         # "on" is the only reserved key that can't be used in the data map.
         if key == "on":
@@ -1054,7 +1060,7 @@ class BoundStoredState:
             raise AttributeError("attribute '{}' is not stored".format(key))
         return _wrap_stored(self._data, self._data[key])
 
-    def __setattr__(self, key: str, value: '_StoredObject'):
+    def __setattr__(self, key: str, value: Union['_StorableType', '_StoredObject']):
         if key == "on":
             raise AttributeError("attribute 'on' is reserved and cannot be set")
 
@@ -1067,7 +1073,7 @@ class BoundStoredState:
 
         self._data[key] = unwrapped
 
-    def set_default(self, **kwargs: Dict[str, '_StorableType']):
+    def set_default(self, **kwargs: '_StorableType'):
         """Set the value of any given key if it has not already been set."""
         for k, v in kwargs.items():
             if k not in self._data:
@@ -1103,8 +1109,25 @@ class StoredState:
         self.parent_type = None  # type: Optional[Type[Any]]
         self.attr_name = None  # type: Optional[str]
 
-    def __get__(self, parent: '_ObjectType', parent_type: 'Type[_ObjectType]'
-                ) -> Union['StoredState', BoundStoredState]:
+    if TYPE_CHECKING:
+        @typing.overload
+        def __get__(
+                self,
+                parent: Literal[None],
+                parent_type: 'Type[_ObjectType]') -> 'StoredState':
+            pass
+
+        @typing.overload
+        def __get__(
+                self,
+                parent: '_ObjectType',
+                parent_type: 'Type[_ObjectType]') -> BoundStoredState:
+            pass
+
+    def __get__(self,
+                parent: '_ObjectType',
+                parent_type: 'Type[_ObjectType]') -> Union['StoredState',
+                                                           BoundStoredState]:
         if self.parent_type is not None and self.parent_type not in parent_type.mro():
             # the StoredState instance is being shared between two unrelated classes
             # -> unclear what is expected of us -> bail out

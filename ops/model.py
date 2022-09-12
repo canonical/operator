@@ -55,7 +55,16 @@ from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
-    from pebble import _LayerDict  # pyright: reportMissingTypeStubs=false
+    from pebble import (  # pyright: reportMissingTypeStubs=false
+        CheckInfo,
+        CheckLevel,
+        Client,
+        ExecProcess,
+        FileInfo,
+        Plan,
+        ServiceInfo,
+        _LayerDict,
+    )
     from typing_extensions import TypedDict
 
     from ops.framework import _SerializedData
@@ -129,16 +138,13 @@ class Model:
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
-        # fixme: remove cast after typing charm.py
-        relations = typing.cast('_RelationsMeta_Raw', meta.relations)  # type: ignore
+        relations = meta.relations  # type: _RelationsMeta_Raw
         self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
         self._config = ConfigData(self._backend)
-        # fixme: remove cast after typing charm.py
-        resources = typing.cast(Iterable[str], meta.resources)  # type: ignore
+        resources = meta.resources  # type: Iterable[str]
         self._resources = Resources(list(resources), self._backend)
         self._pod = Pod(self._backend)
-        # fixme: remove cast after typing charm.py
-        storages = typing.cast(Iterable[str], meta.storages)  # type: ignore
+        storages = meta.storages  # type: Iterable[str]
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
 
@@ -405,8 +411,7 @@ class Unit:
         self._status = None
 
         if self._is_our_unit and hasattr(meta, "containers"):
-            # fixme: remove cast when charm.py is typed
-            containers = typing.cast('_ContainerMeta_Raw', meta.containers)  # type: ignore
+            containers = meta.containers  # type: _ContainerMeta_Raw
             self._containers = ContainerMapping(iter(containers), backend)
 
     def _invalidate(self):
@@ -926,6 +931,13 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._backend = backend
         self._is_app = isinstance(entity, Application)  # type: bool
 
+    @property
+    def _hook_is_running(self) -> bool:
+        # this flag controls whether the access we have to RelationDataContent
+        # is 'strict' aka the same as a deployed charm would have, or whether it is
+        # unrestricted, allowing test code to read/write databags at will.
+        return bool(self._backend._hook_is_running)  # pyright: reportPrivateUsage=false
+
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
         try:
@@ -934,35 +946,110 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # Dead relations tell no tales (and have no data).
             return {}
 
-    def _is_mutable(self):
-        """Return if the data content can be modified."""
+    def _validate_read(self):
+        """Return if the data content can be read."""
+        # if we're not in production (we're testing): we skip access control rules
+        if not self._hook_is_running:
+            return
+
+        # Only remote units (and the leader unit) can read *this* app databag.
+
+        # is this an app databag?
+        if not self._is_app:
+            # all unit databags are publicly readable
+            return
+
+        # Am I leader?
+        if self._backend.is_leader():
+            # leaders have no read restrictions
+            return
+
+        # type guard; we should not be accessing relation data
+        # if the remote app does not exist.
+        app = self.relation.app
+        if app is None:
+            raise RelationDataAccessError(
+                "Remote application instance cannot be retrieved for {}.".format(
+                    self.relation
+                )
+            )
+
+        # is this a peer relation?
+        if app.name == self._entity.name:
+            # peer relation data is always publicly readable
+            return
+
+        # if we're here it means: this is not a peer relation,
+        # this is an app databag, and we don't have leadership.
+
+        # is this a LOCAL app databag?
+        if self._backend.app_name == self._entity.name:
+            # minions can't read local app databags
+            raise RelationDataAccessError(
+                "{} is not leader and cannot read its own application databag".format(
+                    self._backend.unit_name
+                )
+            )
+
+        return True
+
+    def _validate_write(self, key: str, value: str):
+        """Validate writing key:value to this databag.
+
+        1) that key: value is a valid str:str pair
+        2) that we have write access to this databag
+        """
+        # firstly, we validate WHAT we're trying to write.
+        # this is independent of whether we're in testing code or production.
+        if not isinstance(key, str):
+            raise RelationDataTypeError(
+                'relation data keys must be strings, not {}'.format(type(key)))
+        if not isinstance(value, str):
+            raise RelationDataTypeError(
+                'relation data values must be strings, not {}'.format(type(value)))
+
+        # if we're not in production (we're testing): we skip access control rules
+        if not self._hook_is_running:
+            return
+
+        # finally, we check whether we have permissions to write this databag
         if self._is_app:
             is_our_app = self._backend.app_name == self._entity.name  # type: bool
             if not is_our_app:
-                return False
+                raise RelationDataAccessError(
+                    "{} cannot write the data of remote application {}".format(
+                        self._backend.app_name, self._entity.name
+                    ))
             # Whether the application data bag is mutable or not depends on
             # whether this unit is a leader or not, but this is not guaranteed
             # to be always true during the same hook execution.
-            return self._backend.is_leader()
+            if self._backend.is_leader():
+                return  # all good
+            raise RelationDataAccessError(
+                "{} is not leader and cannot write application data.".format(
+                    self._backend.unit_name
+                )
+            )
         else:
-            is_our_unit = self._backend.unit_name == self._entity.name
-            if is_our_unit:
-                return True
-        return False
+            # we are attempting to write a unit databag
+            # is it OUR UNIT's?
+            if self._backend.unit_name != self._entity.name:
+                raise RelationDataAccessError(
+                    "{} cannot write databag of {}: not the same unit.".format(
+                        self._backend.unit_name, self._entity.name
+                    )
+                )
 
     def __setitem__(self, key: str, value: str):
-        if not self._is_mutable():
-            raise RelationDataError(
-                'cannot set relation data for {}'.format(self._entity.name))
-        if not isinstance(key, str):
-            raise RelationDataError(
-                'relation data keys must be strings, not {}'.format(type(key)))
-        if not isinstance(value, str):
-            raise RelationDataError(
-                'relation data values must be strings, not {}'.format(type(value)))
+        self._validate_write(key, value)
+        self._commit(key, value)
+        self._update(key, value)
 
-        self._backend.relation_set(self.relation.id, key, value, self._is_app)
+    def _commit(self, key: str, value: str):
+        self._backend.update_relation_data(self.relation.id, self._entity, key, value)
 
+    def _update(self, key: str, value: str):
+        """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
@@ -972,10 +1059,22 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             else:
                 self._data[key] = value
 
+    def __getitem__(self, key: str) -> str:
+        self._validate_read()
+        return super().__getitem__(key)
+
     def __delitem__(self, key: str):
+        self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
+
+    def __repr__(self):
+        try:
+            self._validate_read()
+        except RelationDataAccessError:
+            return '<n/a>'
+        return super().__repr__()
 
 
 class ConfigData(LazyMapping):
@@ -1277,16 +1376,16 @@ class Container:
     """
 
     def __init__(self, name: str, backend: '_ModelBackend',
-                 pebble_client: Optional['pebble.Client'] = None):
+                 pebble_client: Optional['Client'] = None):
         self.name = name
 
         if pebble_client is None:
             socket_path = '/charm/containers/{}/pebble.socket'.format(name)
             pebble_client = backend.get_pebble(socket_path)
-        self._pebble = pebble_client  # type: 'pebble.Client'
+        self._pebble = pebble_client  # type: 'Client'
 
     @property
-    def pebble(self) -> 'pebble.Client':
+    def pebble(self) -> 'Client':
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
@@ -1386,7 +1485,7 @@ class Container:
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
-    def get_plan(self) -> 'pebble.Plan':
+    def get_plan(self) -> 'Plan':
         """Get the current effective pebble configuration."""
         return self._pebble.get_plan()
 
@@ -1400,7 +1499,7 @@ class Container:
         services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
-    def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
+    def get_service(self, service_name: str) -> 'ServiceInfo':
         """Get status information for a single named service.
 
         Raises :class:`ModelError` if service_name is not found.
@@ -1415,7 +1514,7 @@ class Container:
     def get_checks(
             self,
             *check_names: str,
-            level: Optional['pebble.CheckLevel'] = None) -> 'CheckInfoMapping':
+            level: Optional['CheckLevel'] = None) -> 'CheckInfoMapping':
         """Fetch and return a mapping of check information indexed by check name.
 
         Args:
@@ -1427,7 +1526,7 @@ class Container:
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
-    def get_check(self, check_name: str) -> 'pebble.CheckInfo':
+    def get_check(self, check_name: str) -> 'CheckInfo':
         """Get check information for a single named check.
 
         Raises :class:`ModelError` if check_name is not found.
@@ -1492,7 +1591,7 @@ class Container:
                           group_id=group_id, group=group)
 
     def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List['pebble.FileInfo']:
+                   itself: bool = False) -> List['FileInfo']:
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -1664,7 +1763,7 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: StrOrPath) -> 'pebble.FileInfo':
+    def _build_fileinfo(path: StrOrPath) -> 'FileInfo':
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
@@ -1693,8 +1792,8 @@ class Container:
 
     @staticmethod
     def _list_recursive(list_func: Callable[[Path],
-                        Iterable['pebble.FileInfo']],
-                        path: Path) -> Generator['pebble.FileInfo', None, None]:
+                        Iterable['FileInfo']],
+                        path: Path) -> Generator['FileInfo', None, None]:
         """Recursively lists all files under path using the given list_func.
 
         Args:
@@ -1807,7 +1906,7 @@ class Container:
         stderr: Optional[Union[TextIO, BinaryIO]] = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False
-    ) -> 'pebble.ExecProcess':
+    ) -> 'ExecProcess':
         """Execute the given command on the remote system.
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
@@ -1870,14 +1969,14 @@ class ContainerMapping(Mapping[str, Container]):
         return repr(self._containers)
 
 
-class ServiceInfoMapping(Mapping[str, 'pebble.ServiceInfo']):
+class ServiceInfoMapping(Mapping[str, 'ServiceInfo']):
     """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, services: Iterable['pebble.ServiceInfo']):
+    def __init__(self, services: Iterable['ServiceInfo']):
         self._services = {s.name: s for s in services}
 
     def __getitem__(self, key: str):
@@ -1893,14 +1992,14 @@ class ServiceInfoMapping(Mapping[str, 'pebble.ServiceInfo']):
         return repr(self._services)
 
 
-class CheckInfoMapping(Mapping[str, 'pebble.CheckInfo']):
+class CheckInfoMapping(Mapping[str, 'CheckInfo']):
     """Map of check names to :class:`ops.pebble.CheckInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, checks: Iterable['pebble.CheckInfo']):
+    def __init__(self, checks: Iterable['CheckInfo']):
         self._checks = {c.name: c for c in checks}
 
     def __getitem__(self, key: str):
@@ -1933,11 +2032,25 @@ class TooManyRelatedAppsError(ModelError):
 
 
 class RelationDataError(ModelError):
-    """Raised by ``Relation.data[entity][key] = 'foo'`` if the data is invalid.
+    """Raised when a relation data read/write is invalid.
 
     This is raised if you're either trying to set a value to something that isn't a string,
     or if you are trying to set a value in a bucket that you don't have access to. (eg,
     another application/unit or setting your application data but you aren't the leader.)
+    Also raised when you attempt to read a databag you don't have access to
+    (i.e. a local app databag if you're not the leader).
+    """
+
+
+class RelationDataTypeError(RelationDataError):
+    """Raised by ``Relation.data[entity][key] = value`` if `key` or `value` are not strings."""
+
+
+class RelationDataAccessError(RelationDataError):
+    """Raised by ``Relation.data[entity][key] = value`` if you don't have access.
+
+    This typically means that you don't have permission to write read/write the databag,
+    but in some cases it is raised when attempting to read/write from a deceased remote entity.
     """
 
 
@@ -2361,7 +2474,7 @@ class _ModelBackend:
         cmd.extend(metric_args)
         self._run(*cmd)
 
-    def get_pebble(self, socket_path: str) -> 'pebble.Client':
+    def get_pebble(self, socket_path: str) -> 'Client':
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
 
@@ -2378,6 +2491,10 @@ class _ModelBackend:
         app_state = typing.cast(Dict[str, List[str]], app_state)
         # Planned units can be zero. We don't need to do error checking here.
         return len(app_state.get('units', []))
+
+    def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
+                             key: str, value: str):
+        self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
 
 class _ModelBackendValidator:
