@@ -25,32 +25,13 @@ from ops.charm import (
     ContainerMeta,
     ContainerStorageMeta,
     StartEvent,
-    SecretChangedEvent,
 )
 from ops.framework import EventBase, EventSource, Framework
-from ops.model import Model, Storage, _ModelBackend, Secret
+from ops.model import Model, Storage, _ModelBackend
 from ops.storage import SQLiteStorage
 
 from .test_helpers import fake_script, fake_script_calls
 
-def test_secret_event_snapshots():
-    class TestFramework:
-        class TestModel:
-            class TestBackend():
-                pass
-            def __init__(self):
-                self._backend = TestFramework.TestModel.TestBackend()
-        def __init__(self):
-            self.model = TestFramework.TestModel()
-
-    framework = TestFramework()
-
-    sec = Secret(framework.model._backend, 'secret:1234567', label='bar', revision=7, am_owner=True)
-    e1 = SecretChangedEvent('', sec)
-    e2 = SecretChangedEvent('', None)
-    e2.framework = framework
-    e2.restore(e1.snapshot())
-    assert e1.secret.__dict__ == e2.secret.__dict__
 
 class TestCharm(unittest.TestCase):
 

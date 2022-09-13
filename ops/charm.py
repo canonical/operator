@@ -146,6 +146,7 @@ class HookEvent(EventBase):
     - Metric events
     """
 
+
 class SecretEvent(EventBase):
     if TYPE_CHECKING:
         _SecretEventSnapshot = TypedDict('_SecretEventSnapshot', {
@@ -164,8 +165,8 @@ class SecretEvent(EventBase):
         return {
             'id': self.secret.id,
             'label': self.secret.label,
-            'revision': self.secret._revision,
-            'am_owner': self.secret._am_owner,
+            'revision': self.secret._revision,  # pyright: PrivateMemberAccess=false
+            'am_owner': self.secret._am_owner,  # pyright: PrivateMemberAccess=false
         }  # type: 'SecretEvent._SecretEventSnapshot'
 
     def restore(self, snapshot: '_SecretEventSnapshot'):
@@ -174,39 +175,83 @@ class SecretEvent(EventBase):
         Not meant to be called by charm code.
         """
         self.secret = model.Secret(
-            self.framework.model._backend,
+            self.framework.model._backend,  # pyright: PrivateMemberAccess=false
             snapshot['id'],
             label=snapshot['label'],
             revision=snapshot['revision'],
             am_owner=snapshot['am_owner'])
 
+
 class SecretChangedEvent(SecretEvent):
-    """TODO: ...
+    """Event raised by juju when the owner of a secret has changed its contents.
+
+    When the owner of a secret creates a new revision, all units/applications
+    that are tracking this secret will be notified by means of this event that a new
+    revision is available.
+
+    Typically, you will want to update the secret (i.e. fetch the new
+
+    Typically, you will want to `Secret.prune()` to remove all orphaned revisions
+    when you receive this event.
+
+
     """
+
 
 class SecretRemoveEvent(SecretEvent):
-    """TODO: ...
+    """Event raised by juju when an expired/outdated secret revision can be removed.
+
+    When the owner of a secret creates a new revision, and after all applications
+    consuming it have updated to the new revision, a secret-remove event will be fired
+    to inform the secret owner that the old revision can be removed.
+
+    Typically, you will want to `Secret.prune()` to remove all orphaned revisions
+    when you receive this event.
+
+    Attributes:
+        secret:class:`Secret`, the Secret instance this event is about.
+
+    Examples:
+        >>> def _on_secret_remove(self, event: SecretRemoveEvent):
+        >>>     event.secret.prune()
     """
+
 
 class SecretRotateEvent(SecretEvent):
-    """TODO: ...
+    """Event raised by juju when a secret's rotation policy times out.
+
+    This event is fired on the secret owner to inform it that the secret
+    must be rotated. The event will keep firing until the owner creates a
+    new revision by calling `Secret.set()`.
     """
     def defer(self):
-        """Secret rotation events are not deferable.
+        """Secret rotation events are not deferrable.
 
         Juju handles re-invocation when necessary.
         """
-        raise RuntimeError('cannot defer secret rotation events')
+        raise RuntimeError(
+            'Cannot defer secret rotation events. '
+            'Juju will keep firing this event until you remove '
+            'the outdated revision(s).')
+
 
 class SecretExpiredEvent(SecretEvent):
-    """TODO: ...
+    """Event raised by juju when a secret's expiration policy times out.
+
+    This event is fired on the secret owner to inform it that the secret
+    must be rotated. The event will keep firing until the owner creates a
+    new revision by calling `Secret.set()`.
     """
     def defer(self):
-        """Secret expiration events are not deferable.
+        """Secret expiration events are not deferrable.
 
         Juju handles re-invocation when necessary.
         """
-        raise RuntimeError('cannot defer secret expiration events')
+        raise RuntimeError(
+            'Cannot defer secret rotation events. '
+            'Juju will keep firing this event until you remove '
+            'the outdated revision(s).')
+
 
 class ActionEvent(EventBase):
     """Events raised by Juju when an administrator invokes a Juju Action.
