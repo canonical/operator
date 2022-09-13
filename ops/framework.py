@@ -484,6 +484,14 @@ class ObjectEvents(Object):
 
         event_type: a type of the event to define.
 
+        ops uses a labeling system to track and reconstruct events between hook
+        executions (each time a hook runs, the Juju Agent invokes a fresh
+        instance of ops; there is no ops process that persists on the host
+        between hooks).
+        Having duplicate Python objects creates duplicate labels, which
+        increases the risk of ops running the "wrong" code after
+        something has been deferred.
+
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
