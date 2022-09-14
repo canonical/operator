@@ -46,14 +46,29 @@ import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Optional, List, Dict, TypedDict, Union, Set, Literal
+from collections import defaultdict
+from contextlib import contextmanager
+from functools import wraps
+from itertools import count, chain
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
-from ops.model import RelationNotFoundError
+from ops.model import RelationNotFoundError, ModelError, InvalidSecretIDError
 
 if TYPE_CHECKING:
     from ops.model import UnitOrApplication
+    RelationID = int
+    SecretID = str
+    UnitName = str
+    SecretMetadata = TypedDict('SecretMetadata', {
+        'label': str,
+        'description': str,
+        'expire': str,
+        'rotate': str,
+        'owner': Literal['unit', 'application'],
+        'content': Dict[str, str],
+    })
 
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
@@ -1098,6 +1113,7 @@ def _record_calls(cls):
             continue
 
         def decorator(orig_method):
+            @wraps(orig_method)
             def wrapped(self, *args, **kwargs):
                 full_args = (orig_method.__name__,) + args
                 if kwargs:
@@ -1108,6 +1124,14 @@ def _record_calls(cls):
 
         setattr(cls, meth_name, decorator(orig_method))
     return cls
+
+
+def _copy_signature(source_method):
+    """Decorator to copy the signature of wrapped methods."""
+    def decorator(fn):
+        fn.__signature__ = inspect.signature(source_method)
+        return fn
+    return decorator
 
 
 def _copy_docstrings(source_cls):
@@ -1216,86 +1240,272 @@ class _TestingRelationDataContents(dict):
     def copy(self):
         return _TestingRelationDataContents(super().copy())
 
-class _TestSecret:
-    class Revision:
-        def __init__(self, label, description, payload):
-            self.label = label
-            self.description = description
-            self.payload = payload
-            self.removed = False
-    class Access:
-        def __init__(self, target: str, relation_id: int):
-            self.target = target
-            self.relation_id = relation_id
-        def can_see(self, app: str, unit: str) -> bool:
-            return (self.target in (app, unit))
 
-    def __init__(self, backend, unit, app, owner, description=None, rotate: str = None, expire=None, label=None, **keysvals):
+# we inherit from ModelError to allow for uniform excepts in model.py
+class NoRevisionsError(ModelError):
+    """Raised when attempting to get a secret without revisions."""
+
+
+class NoOwnerError(ModelError):
+    """Raised when no owner can be found for a secret ID."""
+
+
+class _TestingSecretManager:
+    RETRACTED = object()
+    ALL = object()
+
+
+    def __init__(self, this_unit: str, backend: '_TestingModelBackend'):
         self._backend = backend
-        self.id = 'secret:{}'.format(uuid.uuid4())
-        self.owner = owner
-        self.unit = unit
-        self.app = app
-        self.rotate = rotate
-        self.expire = expire
-        self._expired = False
+        self.unit_name = this_unit
+        self.app_name = this_unit.split('/')[0]
 
-        self.revisions = OrderedDict()  # type: OrderedDict[int, _TestSecret.Revision]
-        self.revisions[0] = Revision(description, keysvals)
-        self.access = []  # type: List[_TestSecret.Access]
+        self._secret_ids = set()  # type: Set[SecretID]
+        self._scopes = defaultdict(lambda: defaultdict(
+            list))  # type: Dict[SecretID, Dict[RelationID, Optional[List[UnitName]]]]  # noqa
+        self._revisions = defaultdict(
+            list)  # type: Dict[SecretID, List[Union[SecretMetadata, _TestingSecretManager.RETRACTED]]]
+        self._owners = {}  # type: Dict[SecretID, UnitName]
 
-        # tracks the which revision of the secret each entity (app/unit) with access is subscribed to.
-        self.unit_revisions = {}  # type: Dict[str, int]
-        self.unit_labels = {unit: label}  # type: Dict[str, str]
+        # Which revision are we tracking, for every secret we know (but don't own)?
+        self._tracking = {}  # type: Dict[SecretID, int]
+        self._labels = {}  # type: Dict[SecretID, str]
 
-    def grant(self, target: str, relation_id: int):
-        self.access.append(_TestSecret.Access(target, relation_id))
-    def revoke(self, target: str, relation_id: int):
-        for i, a in enumerate(self.access):
-            if a.target == target:
-                del self.access[i]
-    def remove(self, revision: int = None):
-        if revision is not None:
-            self._revisions[revision].removed = True
+        # mapping from relation ID to remote units
+        self._relation_list_mock = {}  # type: Dict[int, UnitName]
+
+        # other managers to be aware of.
+        # used in testing, to represent distinct secret owners.
+        self._other_managers = set()  # type: Set[_TestingSecretManager]
+        # labels we assign to someone else's secrets
+        self._foreign_labels = {}  # type: Dict[SecretID, str]
+
+    def _bind(self, other: '_TestingSecretManager'):
+        self._other_managers.add(other)
+
+    def _unbind(self, other: '_TestingSecretManager'):
+        self._other_managers.remove(other)
+
+    def _has_access(self, unit: str, secret_id: str, relation_id: int):
+        # does unit have access to secret id within this scope?
+        mgr = self._get_mgr(secret_id)
+        scopes = mgr._scopes[secret_id][relation_id]
+        for scope in scopes:
+            if scope is _TestingSecretManager.ALL:
+                return True
+            # each scope represents a unit or an app that's been granted access
+            if '/' in scope:
+                return unit == scope
+            else:
+                # app scope
+                return scope == unit.split('/')[0]
+        return False
+
+    @property
+    def _hook_is_running(self) -> bool:
+        # used to check whether the manager has to enforce permission checks or not
+        #   True -> 'god mode' -> no permission checks and all
+        #   False -> 'charm mode' -> permission checks enforced!
+        #       the backend will behave as a 'real' backend would.
+
+        # see _check_access decorator for usage
+        return self._backend._hook_is_running  # noqa
+
+    def relation_list(self, relation_id: int):
+        return self._relation_list_mock[relation_id]
+
+    @property
+    def _relation_ids(self):
+        return list(self._relation_list_mock)
+
+    @staticmethod
+    def _new_secret_id():
+        # generate a unique secret ID.
+        return "secret:{}".format(uuid.uuid4())
+
+    def _get_mgr(self, secret_id) -> '_TestingSecretManager':
+        for secret_mgr in (self, *self._other_managers):
+            if secret_id in secret_mgr._secret_ids:
+                return secret_mgr
+        raise NoOwnerError('secret {!r} not owned by this '
+                           'or any bound SecretsManager.'.format(secret_id))
+
+    def _get_owner(self, secret_id: str):
+        # get the unit or app name owning this secret
+        try:
+            return self._get_mgr(secret_id)._owners[secret_id]
+        except NoOwnerError as e:
+            raise InvalidSecretIDError(secret_id) from e
+
+    def _check_permissions(self, fn: str, secret_id: str):
+        if self._owns(secret_id):
+            return True
+
+        for relation_id in self._relation_ids:
+            # are we granted access within the scope of any relation?
+            if self._has_access(self.unit_name, secret_id, relation_id):
+                return True
+
+        raise model.SecretNotGrantedError(secret_id)
+
+    def _owns(self, secret_id:str):
+        return self._get_owner(secret_id) in {self.unit_name, self.app_name}
+
+    def _check_ownership(self, fn: str, secret_id: str, should_own: bool):
+        owns = self._owns(secret_id)
+
+        if should_own and not owns:
+            raise model.OwnershipError(
+                "You cannot call {!r} unless you own {!r}".format(fn, secret_id))
+        elif not should_own and owns:
+            raise model.OwnershipError(
+                "You cannot call {!r} as an owner of {!r}".format(fn, secret_id))
+
+    def _check_relation(self, fn: str, secret_id: str, relation_id: int):
+        if relation_id not in self._relation_ids:
+            raise RuntimeError('({}) cannot grant secret {!r}: '
+                               'not in relation {}'.format(fn, secret_id, relation_id))
+
+    def _check_access(self, fn: str,
+                      secret_id: str,
+                      own: bool = None,
+                      read: bool = False,
+                      relation_id: int = None):
+        if not self._hook_is_running:
+            return  # god mode!
+
+        # some things we can only do as owners,
+        # some others only as holders ("grantees"?)
+        if own is not None:
+            self._check_ownership(fn, secret_id, should_own=own)
+        if read:
+            # if you don't own a secret, you need read access to be able to
+            self._check_permissions(fn, secret_id)
+        if relation_id:
+            self._check_relation(fn, secret_id, relation_id)
+
+    def secret_remove(self, secret_id: str,
+                      revision: Optional[int] = None):
+        self._check_access('secret_remove', secret_id=secret_id, own=True)
+        if revision is None:
+            self._secret_ids.remove(secret_id)
+            del self._revisions[secret_id]
         else:
-            del self._backend.secrets[self.id]
-    def expire(self):
-        self._expired = True
-    def update(self, unit):
-        self.unit_revisions[target] = self.revisions.keys()[-1]
-    def set(self, description: Optional[str] = None, label: Optional[str] = None, **keysvals):
-        if not self.am_owner(self.app_name, self.unit_name):
-            raise ModelError("can't modify a secret you don't own")
+            self._revisions[secret_id][revision] = _TestingSecretManager.RETRACTED
 
-        prev_rev = self.revisions[-1]
-        self.revisions.append(copy.copy(prev_rev))
-        rev = self.revisions[-1]
-        for k, v in keysvals.items():
-            rev.payload[k] = v
+    def secret_grant(self, secret_id: str, relation_id: int,
+                     unit_id: Optional[str] = None):
+        self._check_access('secret_grant', secret_id=secret_id, own=True,
+                           relation_id=relation_id)
+        readers = self._scopes[secret_id][relation_id]
+        if _TestingSecretManager.ALL in readers:
+            raise RuntimeError(f'cannot grant further access to {secret_id}: {relation_id}; '
+                               f'access is already ALL')
+        readers.append(unit_id or _TestingSecretManager.ALL)
+
+    def secret_revoke(self, secret_id: str,
+                      relation_id: int,
+                      unit_id: Optional[str] = None):
+        self._check_access('secret_revoke', secret_id=secret_id, own=True,
+                           relation_id=relation_id)
+        if not unit_id:
+            del self._scopes[secret_id][relation_id]
+        else:
+            self._scopes[secret_id][relation_id].remove(unit_id)
+
+    @_copy_signature(model._ModelBackend.secret_add)
+    def secret_add(self, label=None, **kwargs) -> str:
+        # no checks: anyone can add a secret
+        secret_id = self._new_secret_id()
+        self._secret_ids.add(secret_id)
+        self._owners[secret_id] = self.unit_name if kwargs['owner'] == 'unit' else self.app_name
+        self._revisions[secret_id].append(kwargs)
+        if label:
+            self._labels[secret_id] = label
+        return secret_id
+
+    @_copy_signature(model._ModelBackend.secret_set)
+    def secret_set(self, secret_id: str, label=None, **kwargs):
+        self._check_access('secret_set', secret_id=secret_id, own=True)
+        new_revision = self.secret_meta(secret_id)[secret_id]
+        new_revision.update(kwargs)
+
+        if label == "":
+            del self._labels[secret_id]
+        elif label:
+            self._labels[secret_id] = label
+
+        self._revisions[secret_id].append(new_revision)
+
+    def secret_ids(self) -> List[str]:
+        return list(self._secret_ids)
+        # return list(chain(*(mgr._secret_ids for mgr in (self, *self._other_managers))))
+
+    def secret_get(self, secret_id: str, key: Optional[str] = None,
+                   label: Optional[str] = None,
+                   update: bool = False,
+                   peek: bool = False) -> Union[str, Dict[str, str]]:
+        self._check_access('secret_get', secret_id=secret_id,
+                           own=False, read=True)
+        owner_mgr = self._get_mgr(secret_id)
+
         if label is not None:
-            self.unit_labels[self.unit] = label
-        if description is not None:
-            rev.description = description
-    def am_owner(self, app: str, unit: str):
-        if self.owner == 'unit' and unit != self.unit:
-            return False
-        elif owner == 'application' and app != self.app:
-            return False
-        return True
-    def set_label(self, unit: str, label: str):
-        self.unit_labels[unit] = label
-    def get(self, app: str, unit: str, key: str) -> str:
-        if self._expired or datetime.datetime.now() > self.expire:
-            raise ModelError("secret has expired")
-        for a in self.access:
-            if a.can_see(app, unit):
-                if unit not in self.unit_revisions:
-                    self.update(unit)
-                rev = self.revisions[self.unit_revisions[unit]]
-                if rev.removed:
-                    raise ModelError('cannot access removed secret revision')
-                return rev.payload[key]
-        raise ModelError("you don't have access to this secret")
+            self._foreign_labels[secret_id] = label
+
+        latest_revision = len(owner_mgr._revisions[secret_id]) - 1
+        if latest_revision < 0:
+            raise NoRevisionsError('Secret {!r} has no revisions yet'.format(secret_id))
+
+        # implicitly update if we're not tracking any specific revision yet
+        if not self._tracking.get(secret_id) or update:
+            self._tracking[secret_id] = latest_revision
+
+        revision = latest_revision if peek else self._tracking[secret_id]
+
+        content = owner_mgr._get_content(secret_id, revision)
+        if key:
+            return content[key]
+        return content
+
+    def _get_content(self, secret_id: str, revision: int):
+        return self._get_mgr(secret_id)._revisions[secret_id][revision]['content']
+
+    def secret_meta(self, secret_id: str, _local=True) -> Dict[str, Dict[str, str]]:
+        self._check_access('secret_meta', secret_id, read=True)
+        mgr = self._get_mgr(secret_id)
+        revisions = mgr._revisions[secret_id]
+        latest = revisions[-1]
+
+        if mgr is self:
+            label = self._labels.get(secret_id)
+        else:
+            label = self._foreign_labels.get(secret_id)
+
+        return {
+            secret_id: {
+                "label": label,
+                "revision": len(revisions) - 1,
+                "expires": latest.get('expire'),
+                "rotation": latest.get('rotate'),
+                "rotates": "2022-08-31T12:31:56Z"  # not implemented
+            }
+        }
+
+    def secret_label_to_id(self, label: str):
+        # is this label assigned to one of MY secrets?
+        for sec_id, revisions in self._revisions.items():
+            for revision in revisions:
+                if revision.get('label') == label:
+                    return sec_id
+
+        # is this label assigned to some other secret out there?
+        for k, v in self._foreign_labels.items():
+            if v == label:
+                return k
+
+        # TODO: uniform with juju error msg when known
+        raise ModelError('no secret found with label {!r}'.format(label))
+
 
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
@@ -1344,47 +1554,43 @@ class _TestingModelBackend:
         self._pebble_clients_can_connect = {}  # type: {_TestingPebbleClient: bool}
         self._planned_units = None
         self._hook_is_running = ''
-        self._secrets = {}  # type: Dict[str, List[_TestSecret]]
+        self._secrets = _TestingSecretManager(unit_name, self)
 
-    def secret_set(self, secret_id: str, description: Optional[str] = None, label: Optional[str] = None, **keysvals):
-        if secret_id not in self._secrets:
-            raise ModelError('unknown secret id {}'.format(secret_id))
-        self._secrets[secret_id].set(description=description, label=label, **keysvals)
-    def secret_remove(self, secret_id: str, revision: Optional[int] = None):
-        if secret_id not in self._secrets:
-            raise ModelError('unknown secret id {}'.format(secret_id))
-        self._secrets[secret_id].remove(revision=revision)
-    def secret_grant(self, secret_id: str, relation_id: int, unit_id: Optional[str] = None):
-        if secret_id not in self._secrets:
-            raise ModelError('unknown secret id {}'.format(secret_id))
-        target = unit_id or self._relation_app_and_units[relation_id]['app']
-        self._secrets[secret_id].grant(target, relation_id)
-    def secret_revoke(self, secret_id: str, relation_id: int, unit_id: Optional[str] = None):
-        if secret_id not in self._secrets:
-            raise ModelError('unknown secret id {}'.format(secret_id))
-        target = unit_id or self._relation_app_and_units[relation_id]['app']
-        self._secrets[secret_id].revoke(target, relation_id)
-    def secret_add(self, owner: str = 'application', description: Optional[str] = None, label: Optional[str] = None, expire: Optional[datetime.datetime] = None, rotate: str = 'never', **keysvals) -> Secret:
-        if owner not in ('unit', 'application'):
-            raise ModelError('invalid secret owner type {!r}'.format(owner))
-        s = _TestSecret(self.unit_name, self.app_name, owner, label=label, rotate=rotate, expire=expire, **keysvals)
-        self._secrets[s.id] = s
-        return s.id
-    def secret_ids(self) -> List[str]:
-        return [s.id for s in self._secrets.values() if s.am_owner(self.app_name, self.unit_name)]
-    def secret_get(self, secret_id: str, key: Optional[str] = None, label: Optional[str] = None, update: bool = False) -> str:
-        if secret_id not in self._secrets:
-            raise ModelError('unknown secret id {}'.format(secret_id))
-        s = self._secrets[secret_id]
-        if update:
-            s.update(self.unit_name)
-        if label is not None:
-            s.set_label(self.unit, label)
-        if key is not None:
-            return s.get(self.app_name, self.unit_name, key)
-        return None
-    def secret_meta(self, secret_id: str) -> Dict[str,str]:
-        raise RuntimeError('unimplemened')
+    @_copy_signature(model._ModelBackend.secret_set)
+    def secret_set(self, *args, **kwargs):
+        return self._secrets.secret_set(*args, **kwargs)
+
+    @_copy_signature(model._ModelBackend.secret_remove)
+    def secret_remove(self, *args, **kwargs):
+        return self._secrets.secret_remove(*args, **kwargs)
+
+    @_copy_signature(model._ModelBackend.secret_label_to_id)
+    def secret_label_to_id(self, *args, **kwargs):
+        return self._secrets.secret_label_to_id(*args, **kwargs)
+
+    @_copy_signature(model._ModelBackend.secret_grant)
+    def secret_grant(self, *args, **kwargs):
+        return self._secrets.secret_grant(*args, **kwargs)
+
+    @_copy_signature(model._ModelBackend.secret_revoke)
+    def secret_revoke(self, *args, **kwargs):
+        return self._secrets.secret_revoke(*args, **kwargs)
+
+    @_copy_signature(model._ModelBackend.secret_add)
+    def secret_add(self, *args, **kwargs) -> str:
+        return self._secrets.secret_add(*args, **kwargs)
+
+    @_copy_signature(model._ModelBackend.secret_ids)
+    def secret_ids(self, *args, **kwargs) -> List[str]:
+        return self._secrets.secret_ids(*args, **kwargs)
+
+    @_copy_signature(model._ModelBackend.secret_get)
+    def secret_get(self, *args, **kwargs) -> Union[str, Dict[str, str]]:
+        return self._secrets.secret_get(*args, **kwargs)
+
+    @_copy_signature(model._ModelBackend.secret_meta)
+    def secret_meta(self, *args, **kwargs) -> Dict[str, str]:
+        return self._secrets.secret_meta(*args, **kwargs)
 
     def _validate_relation_access(self, relation_name, relations):
         """Ensures that the named relation exists/has been added.

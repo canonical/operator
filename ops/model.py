@@ -122,12 +122,17 @@ if typing.TYPE_CHECKING:
     _SecretRotationPolicy = Literal['never', 'hourly', 'daily', 'weekly',
                                     'monthly', 'quarterly', 'yearly']
 
+    SecretID, SecretLabel = str, str
 
 StrOrPath = typing.Union[str, Path]
 
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
+
+
+class InvalidSecretIDError(RuntimeError):
+    """Raised when one attempts to get a secret by ID but that ID is not known to juju."""
 
 
 class Model:
@@ -151,32 +156,68 @@ class Model:
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
 
-    def get_secret(self, specifier: str):
-        # TODO: this should be statically typed to a (yet-to-be-determined) secret
-        #  id type or a label/str
-        my_secrets = self._backend.secret_ids()
-        am_owner = bool(specifier in my_secrets)
+    @overload
+    def get_secret(self, specifier: 'SecretID', label: 'SecretLabel') -> 'Secret':
+        ...
 
+    @overload
+    def get_secret(self, specifier: 'SecretLabel', label: None = None) -> 'Secret':
+        ...
+
+    def get_secret(self,
+                   specifier: Union['SecretID', 'SecretLabel'],
+                   label: Optional['SecretLabel'] = None) -> 'Secret':
+        """Fetch Secret instance from a label or a secret ID.
+
+        Note that, especially if you have *lots* of secrets, passing a label is
+        a relatively expensive operation, as we need to generate all secrets and check
+        if the label matches.
+        """
+        my_secrets = self._backend.secret_ids()
         if specifier in my_secrets:
             # we own this secret
-            sec_id = specifier
-            meta = self._backend.secret_meta(sec_id)
+            old_label = self._backend.secret_meta(specifier).get('label')
+            current_label = label if label is not None else old_label
+
             # Note: we explicitly don't set the revision here in order to disallow pruning outside
             # of a secret-remove event context.
-            return Secret(self._backend, sec_id, label=meta.get('label'), am_owner=True)
+            secret = Secret(self._backend, specifier, label=current_label, am_owner=True)
+
+            if old_label and old_label != label:
+                # we're relabelling the secret?
+                logger.warning('Relabelling {!r}: {!r} --> {!r}'.format(
+                    specifier, old_label, label))
+                secret.set()
 
         # check if the specifier is a label for an owned secret
-        for sec_id in my_secrets:
-            meta = self._backend.secret_meta(sec_id)
-            if meta.get('label') == specifier:
+        for my_secret_id in my_secrets:
+            meta = self._backend.secret_meta(my_secret_id)
+            if meta[my_secret_id].get('label') == specifier:
                 # Note: we explicitly don't set the revision here in order to disallow pruning outside
                 # of a secret-remove event context.
-                return Secret(self._backend, sec_id, label=meta.get('label'), am_owner=True)
+                return Secret(self._backend, my_secret_id,
+                              label=specifier, am_owner=True)
 
-        # We must not own this secret.  The specifier must be a secret id - see if we have been granted access:
-        sec_id = specifier
-        self._backend.secret_get(sec_id)
-        return Secret(self._backend, sec_id, am_owner=False)
+        # We must not own this secret.
+        # The specifier could still be a label.
+        try:
+            #  this will raise an exception if we DO own the secret, (OwnershipError)
+            #  or if we do not have access (SecretNotGrantedError)
+            #  or if this secret id is invalid = does not identify a secret
+            #   juju (or the testing env) knows of (InvalidSecretIDError).
+            self._backend.secret_get(specifier, label=label)
+            secret_id = specifier
+
+        # we allow (SecretNotGrantedError, OwnershipError) to raise
+        except InvalidSecretIDError as e1:
+            try:
+                secret_id = self._backend.secret_label_to_id(specifier)
+            except (ModelError, IndexError) as e2:
+                raise InvalidSecretIDError(
+                    "The provided specifier {!r} is not a "
+                    "known secret ID nor a known label.") from e2
+
+        return Secret(self._backend, secret_id, am_owner=False)
 
     @property
     def unit(self) -> 'Unit':
@@ -304,9 +345,12 @@ class _ModelCache:
         self._weakrefs = weakref.WeakValueDictionary()  # type: _weakcachetype
 
     @typing.overload
-    def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...  # noqa
+    def get(self, entity_type: Type['Unit'], name: str) -> 'Unit':
+        ...  # noqa
+
     @typing.overload
-    def get(self, entity_type: Type['Application'], name: str) -> 'Application': ...  # noqa
+    def get(self, entity_type: Type['Application'], name: str) -> 'Application':
+        ...  # noqa
 
     def get(self, entity_type: 'UnitOrApplicationType', name: str):
         """Fetch the cached entity of type `entity_type` with name `name`."""
@@ -347,7 +391,7 @@ class Application:
                    content: Dict[str, str],
                    description: str = None,
                    expire: datetime.datetime = None,
-                   rotate: '_SecretRotationPolicy' = 'never'):
+                   rotate: '_SecretRotationPolicy' = 'never') -> 'Secret':
         """Create a juju secret owned by this application.
         Parameters:
             label: Label by which this secret will be known by units of
@@ -502,8 +546,8 @@ class Unit:
                 rotate='never')
         """
         sec_id = self._backend.secret_add(content=content,
-            owner='unit', description=description, label=label,
-            expire=expire, rotate=rotate)
+                                          owner='unit', description=description, label=label,
+                                          expire=expire, rotate=rotate)
         return Secret(self._backend, sec_id, am_owner=True)
 
     def _invalidate(self):
@@ -891,6 +935,7 @@ class NetworkInterface:
 
 class Secret:
     """Secret object."""
+
     def __init__(self, backend: '_ModelBackend', id: str, label: Optional[str] = None,
                  revision: Optional[int] = None, am_owner: bool = False):
         self._backend = backend
@@ -910,7 +955,9 @@ class Secret:
             return '<{}({})>'.format(self.id, self.label)
         return '<{}>'.format(self.id)
 
-    def set(self, **content: str):
+    def set(self, content: Dict[str, str] = None,
+            description: Optional[str] = None,
+            label: Optional[str] = None):
         """Update the contents of this secret.
 
         This will create a new revision, and notify all units tracking this secret
@@ -923,12 +970,20 @@ class Secret:
 
         Parameters
         ----------
-        content: the secret payload (username/password pairs, etc...) to be associated
-            with the new revision
+        label: Label by which this secret will be known by units of
+            this application. This will not be visible by the consumers of the secret.
+            Use it to distinguish multiple secrets owned by the same unit/application.
+        content: The payload of the secret: a [str:str] key-value mapping
+            containing the actual secret contents, e.g. credential pairs.
+        description: An optional string to describe the content of the secret.
         """
         if not self._am_owner:
-            raise RuntimeError('cannot set on secret {} which is owned by a different unit'.format(self))
-        self._backend.secret_set(self.id, content=content)
+            raise RuntimeError(
+                'cannot set on secret {} which is owned by a different unit'.format(self))
+        self._backend.secret_set(self.id,
+                                 content=content,
+                                 description=description,
+                                 label=label)
 
     def grant(self, target: Union['Relation', Unit, Application],
               relation: Optional['Relation'] = None):
@@ -945,11 +1000,14 @@ class Secret:
             If the target is a Unit or Application, this argument is required.
         """
         if not self._am_owner:
-            raise RuntimeError('cannot grant for secret {} which is owned by a different unit'.format(self))
+            raise RuntimeError(
+                'cannot grant for secret {} which is owned by a different unit'.format(self))
         if relation is None and not isinstance(target, Relation):
-            raise RuntimeError('granting secret access to a unit or application target requires a relation to be specified')
+            raise RuntimeError(
+                'granting secret access to a unit or application target requires a relation to be specified')
         if relation and isinstance(target, Application) and relation.app is not target:
-            raise RuntimeError('cannot grant secret access to application that is not remote to the specified relation')
+            raise RuntimeError(
+                'cannot grant secret access to application that is not remote to the specified relation')
 
         relation = relation or target
         assert isinstance(relation, Relation)  # type guard
@@ -966,11 +1024,14 @@ class Secret:
         """
 
         if not self._am_owner:
-            raise RuntimeError('cannot revoke secret {} which is owned by a different unit'.format(self))
+            raise RuntimeError(
+                'cannot revoke secret {} which is owned by a different unit'.format(self))
         if relation is None and not isinstance(target, Relation):
-            raise RuntimeError('revoking secret access to a unit or application target requires a relation to be specified')
+            raise RuntimeError(
+                'revoking secret access to a unit or application target requires a relation to be specified')
         if isinstance(target, Application) and relation.app != target:
-            raise RuntimeError('cannot revoke secret access from application that is not remote to the specified relation')
+            raise RuntimeError(
+                'cannot revoke secret access from application that is not remote to the specified relation')
 
         relation = relation or target
         assert isinstance(relation, Relation)  # type guard
@@ -986,9 +1047,11 @@ class Secret:
         some remote units.
         """
         if not self._am_owner:
-            raise RuntimeError('cannot prune secret {} which is owned by a different unit'.format(self))
+            raise RuntimeError(
+                'cannot prune secret {} which is owned by a different unit'.format(self))
         if self._revision is None:
-            raise RuntimeError('secret {} has no revision to prune - are you outside a secret-remove hook call?')
+            raise RuntimeError(
+                'secret {} has no revision to prune - are you outside a secret-remove hook call?')
         self._backend.secret_remove(self.id, revision=self._revision)
 
     def remove(self):
@@ -1000,7 +1063,8 @@ class Secret:
         """
 
         if not self._am_owner:
-            raise RuntimeError('cannot remove secret {} which is owned by a different unit'.format(self))
+            raise RuntimeError(
+                'cannot remove secret {} which is owned by a different unit'.format(self))
         self._backend.secret_remove(self.id)
 
     def update(self):
@@ -1009,11 +1073,23 @@ class Secret:
         After this is called, you should be able to get(
         """
         if self._am_owner:
-            raise RuntimeError('cannot update secret {} which is owned by this unit - did you mean to call Secret.set?'.format(self))
+            raise RuntimeError(
+                'cannot update secret {} which is owned by this unit - did you mean to call Secret.set?'.format(
+                    self))
         self._backend.secret_get(self.id, update=True)
 
-    def set_label(self, label: str):
-        """Assign a label to this secret.
+    @overload
+    def get(self, key: None = None, label: str = None) -> Dict[str, str]:
+        ...
+
+    @overload
+    def get(self, key: str, label: str = None) -> str:
+        ...
+
+    def get(self, key: str = None, label: str = None) -> Union[str, Dict[str, str]]:
+        """Get the secret contents.
+
+        The `label` argument can be used to assign a label to this secret, or update it.
 
         This secret will be henceforth associated **locally** with this label:
         you can use the label to identify the different secrets that this unit has access to.
@@ -1023,16 +1099,6 @@ class Secret:
         their own label to it.
 
         Passing `label=""` will remove the label.
-        """
-        self._backend.secret_set(self.id, label=label)
-        self.label = label
-
-    @overload
-    def get(self, key: None, label: str = None) -> Dict[str, str]: ...
-    @overload
-    def get(self, key: str, label: str = None) -> str: ...
-    def get(self, key: str = None, label: str = None) -> Union[str, Dict[str, str]]:
-        """Get the secret contents.
 
         Parameters
         ----------
@@ -1041,7 +1107,9 @@ class Secret:
             label: update the label associated with this secret.
         """
         if self._am_owner:
-            raise RuntimeError('cannot get contents for secret {} which is owned by this unit'.format(self))
+            raise OwnershipError(
+                'cannot get contents for secret {} which is owned by this unit'.format(self))
+        self.label = label
         return self._backend.secret_get(self.id, key=key, label=label)
 
 
@@ -2029,7 +2097,7 @@ class Container:
 
     @staticmethod
     def _list_recursive(list_func: Callable[[Path],
-                        Iterable['FileInfo']],
+                                            Iterable['FileInfo']],
                         path: Path) -> Generator['FileInfo', None, None]:
         """Recursively lists all files under path using the given list_func.
 
@@ -2128,21 +2196,21 @@ class Container:
         self._pebble.remove_path(path, recursive=recursive)
 
     def exec(
-        self,
-        command: List[str],
-        *,
-        environment: Optional[Dict[str, str]] = None,
-        working_dir: Optional[str] = None,
-        timeout: Optional[float] = None,
-        user_id: Optional[int] = None,
-        user: Optional[str] = None,
-        group_id: Optional[int] = None,
-        group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
-        stdout: Optional[Union[TextIO, BinaryIO]] = None,
-        stderr: Optional[Union[TextIO, BinaryIO]] = None,
-        encoding: str = 'utf-8',
-        combine_stderr: bool = False
+            self,
+            command: List[str],
+            *,
+            environment: Optional[Dict[str, str]] = None,
+            working_dir: Optional[str] = None,
+            timeout: Optional[float] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None,
+            stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+            stdout: Optional[Union[TextIO, BinaryIO]] = None,
+            stderr: Optional[Union[TextIO, BinaryIO]] = None,
+            encoding: str = 'utf-8',
+            combine_stderr: bool = False
     ) -> 'ExecProcess':
         """Execute the given command on the remote system.
 
@@ -2291,6 +2359,14 @@ class RelationDataAccessError(RelationDataError):
     """
 
 
+class OwnershipError(ModelError):
+    """Raised when a secret operation is forbidden by your access level."""
+
+
+class SecretNotGrantedError(ModelError):
+    """Raised when one attempts to get a secret it's not been granted access to."""
+
+
 class RelationNotFoundError(ModelError):
     """Backend error when querying juju for a given relation and that relation doesn't exist."""
 
@@ -2418,13 +2494,48 @@ class _ModelBackend:
                 else:
                     return text
 
+    def _update_secret(self, command, **kwargs):
+        args = []
+        for flag, argname in (
+                ('--description', 'description'),
+                ('--label', 'label'),
+                ('--expire', 'expire'),
+                ('--rotate', 'rotate'),
+                ('--owner', 'owner')
+        ):
+            arg = kwargs.pop(argname, None)
+            if arg:
+                args.extend((flag, arg))
+
+        if kwargs:
+            raise ValueError('unprocessed kwargs: {}'.format(kwargs))
+        return self._run(command, *args, return_output=True)
+
     def secret_set(self, secret_id: str,
                    content: Optional[Dict[str, str]] = None,
                    description: Optional[str] = None,
                    label: Optional[str] = None):
-
         # TODO: update this to "secret-set when juju does
-        self._run('secret-update', ...)
+        return self._update_secret('secret-update',
+                                   secret_id=secret_id,
+                                   content=content,
+                                   description=description,
+                                   label=label)
+
+    def secret_add(self,
+                   content: Dict[str, str],
+                   owner: str = 'application',
+                   description: Optional[str] = None,
+                   label: Optional[str] = None,
+                   expire: Optional[datetime.datetime] = None,
+                   rotate: '_SecretRotationPolicy' = 'never') -> str:
+        return self._update_secret('secret-add',
+                                   content=content,
+                                   owner=owner,
+                                   description=description,
+                                   label=label,
+                                   expire=expire,
+                                   rotate=rotate)
 
     def secret_remove(self, secret_id: str, revision: Optional[int] = None):
         args = ['secret-remove', secret_id]
@@ -2444,29 +2555,6 @@ class _ModelBackend:
             args += ['--unit', str(unit_id)]
         self._run(*args)
 
-    def secret_add(self,
-                   content: Dict[str, str],
-                   owner: str = 'application',
-                   description: Optional[str] = None,
-                   label: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: '_SecretRotationPolicy' = 'never') -> str:
-        args = ['secret-add']
-        if description is not None:
-            args += ['--description', description]
-        if label:
-            args += ['--label', label]
-        if expire:
-            args += ['--expire', expire.isoformat()]
-        if owner:
-            args += ['--owner', owner]
-        if rotate:
-            args += ['--rotate', rotate]
-
-        for key, val in content.items():
-            args.append('{}={}'.format(key, val))
-        return self._run(*args, return_output=True)
-
     def secret_ids(self) -> List[str]:
         return self._run('secret-ids', return_output=True, use_json=True)
 
@@ -2474,7 +2562,7 @@ class _ModelBackend:
                    label: Optional[str] = None,
                    update: bool = False,
                    peek: bool = False
-                   ) -> str:
+                   ) -> Union[str, Dict[str, str]]:
         args = ['secret-get', secret_id]
         if label is not None:
             args += ['--label', label]
@@ -2486,7 +2574,18 @@ class _ModelBackend:
             args.append('--peek')
         return self._run(*args, return_output=True, use_json=key is None)
 
-    def secret_meta(self, secret_id: str) -> Dict[str, str]:
+    def secret_label_to_id(self, label: str) -> str:
+        return list(self._run(
+            'secret-get', '--label', label, '--metadata',
+            return_output=True, use_json=True).keys())[0]
+
+    def secret_id_to_label(self, secret_id: str) -> Optional[str]:
+        return self.secret_meta(secret_id)[secret_id].get('label')
+
+    def secret_meta(self, secret_id: str) -> Dict[str, Dict[str, str]]:
+        # TODO: label may be used instead of ID to fetch the secret
+        #  in that case we can pass --label <label> instead of <secret_id>
+        #  but that means that we need to know what what we've been passed is
         return self._run('secret-get', secret_id, '--metadata',
                          return_output=True, use_json=True)
 
@@ -2544,7 +2643,7 @@ class _ModelBackend:
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool
                      ) -> '_RelationDataContent_Raw':
-        if not isinstance(is_app, bool):   # pyright:
+        if not isinstance(is_app, bool):  # pyright:
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if is_app:
