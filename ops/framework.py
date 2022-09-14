@@ -491,7 +491,7 @@ class ObjectEvents(Object):
         there is no ops process that persists on the host between hooks).
         Having duplicate Python objects creates duplicate labels. Overwriting a
         previously created label means that only the latter code path will be
-        ran when the current event, if it does get deferred, is reemitted. This
+        run when the current event, if it does get deferred, is reemitted. This
         is usually not what is desired, and is error-prone and ambigous.
         """
         prefix = 'unable to define an event with event_kind that '
