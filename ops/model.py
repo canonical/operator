@@ -1080,6 +1080,7 @@ class Secret:
                     self))
         self._backend.secret_get(self.id, update=True)
 
+    # TODO: remove this usage; keep (key: str) -> str
     @overload
     def get(self, key: None = None, label: str = None) -> Dict[str, str]:
         ...
@@ -1112,7 +1113,15 @@ class Secret:
             raise OwnershipError(
                 'cannot get contents for secret {} which is owned by this unit'.format(self))
         self.label = label
-        return self._backend.secret_get(self.id, key=key, label=label)
+        return self._backend.secret_get(self.id, label=label)
+
+
+    # TODO remove label:str from set() and get()
+    def set_label(self, label: str):
+        if self._am_owner:
+            return self.set(label=label)
+        else:
+            return self._backend.secret_get(self.id, label=label)
 
 
 class Relation:

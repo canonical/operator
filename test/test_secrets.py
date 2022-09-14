@@ -254,3 +254,7 @@ def test_owner_create_secret(owner, holder):
         assert holder.model.get_secret('other_label') == secret
 
         assert secret.get('a') == 'b'
+
+
+# TODO: write some charm-perspective tests (use _TestSecret object)
+#  map _TestSecret backend calls

@@ -1248,6 +1248,45 @@ class NoOwnerError(ModelError):
     """Raised when no owner can be found for a secret ID."""
 
 
+class _TestSecret:
+    def __init__(self, mgr: '_TestingSecretManager',
+                 secret_id: str,
+                 revision: int,
+                 relation_id: int,
+                 owner: str = None):
+        assert revision > 0, "invalid revision: {}".format(revision)
+        self._mgr = mgr
+        self._secret_id = secret_id
+        self._revision = revision
+        self._relation_id = relation_id
+        self._owner = owner or mgr.unit_name
+        self._meta = self._mgr._revisions[revision]
+
+    @_copy_signature(model.Secret.set)
+    def set(self, **kwargs):
+        return self._mgr.secret_set(self._secret_id, **kwargs)
+
+    @property
+    def current(self):
+        latest_rev = len(self._mgr._revisions[self._secret_id]) - 1
+        return _TestSecret(self._mgr, self._secret_id, latest_rev)
+
+    def grant(self, entity: str = None):
+        """Grant this secret to that entity (or self)."""
+
+        self._mgr.secret_grant(self._secret_id, self._relation_id,
+                               entity or self._mgr.unit_name)
+
+    def revoke(self, entity: str = None):
+        """Revoke this secret."""
+        self._mgr.secret_revoke(self._secret_id, self._relation_id,
+                                entity or self._mgr.unit_name)
+
+    def remove(self, revision: int = None):
+        """Revoke this secret."""
+        self._mgr.secret_remove(self._secret_id, revision)
+
+
 class _TestingSecretManager:
     RETRACTED = object()
     ALL = object()
