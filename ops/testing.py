@@ -43,14 +43,12 @@ import tempfile
 import typing
 import uuid
 import warnings
-from contextlib import contextmanager
-from io import BytesIO, StringIO
-from textwrap import dedent
-from typing import TYPE_CHECKING, Optional, List, Dict, TypedDict, Union, Set, Literal
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import wraps
-from itertools import count, chain
+from io import BytesIO, StringIO
+from textwrap import dedent
+from typing import TYPE_CHECKING, Optional, List, Dict, TypedDict, Union, Set, Literal
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
@@ -1348,7 +1346,7 @@ class _TestingSecretManager:
 
         raise model.SecretNotGrantedError(secret_id)
 
-    def _owns(self, secret_id:str):
+    def _owns(self, secret_id: str):
         return self._get_owner(secret_id) in {self.unit_name, self.app_name}
 
     def _check_ownership(self, fn: str, secret_id: str, should_own: bool):

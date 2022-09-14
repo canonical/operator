@@ -209,7 +209,7 @@ class Model:
             secret_id = specifier
 
         # we allow (SecretNotGrantedError, OwnershipError) to raise
-        except InvalidSecretIDError as e1:
+        except InvalidSecretIDError:
             try:
                 secret_id = self._backend.secret_label_to_id(specifier)
             except (ModelError, IndexError) as e2:
@@ -393,7 +393,9 @@ class Application:
                    expire: datetime.datetime = None,
                    rotate: '_SecretRotationPolicy' = 'never') -> 'Secret':
         """Create a juju secret owned by this application.
+
         Parameters:
+        -----------
             label: Label by which this secret will be known by units of
                 this application. This will not be visible by the consumers of the secret.
                 Use it to distinguish multiple secrets owned by the same unit/application.
@@ -968,8 +970,8 @@ class Secret:
         will receive a `secret-remove` event to give it a chance to prune the
         orphaned revisions that are not being used any longer.
 
-        Parameters
-        ----------
+        Parameters:
+        -----------
         label: Label by which this secret will be known by units of
             this application. This will not be visible by the consumers of the secret.
             Use it to distinguish multiple secrets owned by the same unit/application.

@@ -30,8 +30,10 @@ def test_testing_secrets_manager_api_completeness(method):
     tsm_sig = inspect.signature(getattr(testing._TestingSecretManager, method))
     tmb_sig = inspect.signature(getattr(_TestingModelBackend, method))
 
-    assert tsm_sig == mmb_sig, 'the _TestingSecretManager and _ModelBackend signatures have diverged'
-    assert tmb_sig == mmb_sig, 'the _TestingModelBackend and _ModelBackend signatures have diverged'
+    assert tsm_sig == mmb_sig, 'the _TestingSecretManager and ' \
+                               '_ModelBackend signatures have diverged'
+    assert tmb_sig == mmb_sig, 'the _TestingModelBackend and ' \
+                               '_ModelBackend signatures have diverged'
 
 
 class _TestingSecretManager(testing._TestingSecretManager):
@@ -45,7 +47,8 @@ class _TestingSecretManager(testing._TestingSecretManager):
     def _hook_is_running(self) -> bool:
         # used to switch the backend between
         #   'god mode' -> no permission checks and all
-        #   'charm mode' -> permission checks enforced! the backend will behave as a 'real' backend would.
+        #   'charm mode' -> permission checks enforced!
+        #       the backend will behave as a 'real' backend would.
         return not self._god_mode
 
     @contextmanager
@@ -124,7 +127,7 @@ def test_secret_event_snapshot(backend):
     e1 = SecretChangedEvent('', sec)
     e2 = SecretChangedEvent('', None)
 
-    e2.framework = fw = Mock(model=Mock(_backend=backend))
+    e2.framework = Mock(model=Mock(_backend=backend))
     e2.restore(e1.snapshot())
     assert e1.secret.__dict__ == e2.secret.__dict__
 
@@ -135,7 +138,7 @@ def charm_type():
         pass
 
     class SecretTesterCharm(CharmBase):
-        def __init__(self, framework, key = None):
+        def __init__(self, framework, key=None):
             super().__init__(framework, key)
             self._callback = None
             self.on.define_event('invoke', InvokeEvent)
@@ -171,7 +174,7 @@ def owner(owner_harness):
 
 @pytest.fixture(scope='function')
 def holder_harness():
-    return Harness(charm_type(),meta=yaml.safe_dump({'name': 'holder'}))
+    return Harness(charm_type(), meta=yaml.safe_dump({'name': 'holder'}))
 
 
 @pytest.fixture(scope='function')
@@ -231,7 +234,7 @@ def test_owner_create_secret(owner, holder):
             assert holder.model.get_secret('my_label')
 
         with pytest.raises(ops.model.SecretNotGrantedError):
-            secret = holder.model.get_secret(sec_id, label='other_label')
+            holder.model.get_secret(sec_id, label='other_label')
 
     @owner.run
     def grant_access():
@@ -251,4 +254,3 @@ def test_owner_create_secret(owner, holder):
         assert holder.model.get_secret('other_label') == secret
 
         assert secret.get('a') == 'b'
-
