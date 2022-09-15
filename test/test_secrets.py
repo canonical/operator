@@ -1,4 +1,5 @@
 import inspect
+from collections import defaultdict
 from contextlib import contextmanager
 from unittest.mock import Mock
 
@@ -7,8 +8,8 @@ import yaml
 
 import ops.model
 from ops import testing
-from ops.charm import SecretChangedEvent, CharmBase
-from ops.framework import EventBase
+from ops.charm import SecretChangedEvent, CharmBase, SecretRotateEvent, SecretRemoveEvent
+from ops.framework import EventBase, BoundEvent
 from ops.model import Secret
 from ops.testing import _TestingModelBackend, Harness
 
@@ -42,6 +43,14 @@ class _TestingSecretManager(testing._TestingSecretManager):
     def __init__(self, this_unit: str, _god_mode: bool = False):
         super().__init__(this_unit, None)
         self._god_mode = _god_mode
+        self._backend = Mock(_relation_ids_map=self._mock_relation_ids_map)
+
+    def relation_list(self, relation_id):
+        # allows to pass this manager as _ModelBackend so far as Relations are concerned
+        try:
+            return self._mock_relation_ids_map[relation_id]
+        except KeyError as e:
+            raise model.RelationNotFoundError from e
 
     @property
     def _hook_is_running(self) -> bool:
@@ -92,26 +101,26 @@ def test_cannot_get_removed_secret(model):
 
 def test_grant_secret(model, backend):
     secret = model.unit.add_secret('hey', {'foo': 'bar'})
-    backend._relation_list_mock[1] = 'remote/0'
+    backend._mock_relation_ids_map[1] = 'remote/0'
     secret.grant('remote/0',
                  ops.model.Relation('db', 1, is_peer=False,
                                     backend=backend, cache=model._cache,
                                     our_unit=model.unit))
 
     with backend._god_mode_ctx(True):
-        with pytest.raises(RuntimeError):  # raised by Model, not Backend!
-            secret.get()
+        with pytest.raises(ops.model.ModelError):  # raised by Model, not Backend!
+            secret.get('a')
 
         backend.secret_get(secret.id)  # this works in god mode
 
     with backend._god_mode_ctx(False):
-        with pytest.raises(testing.OwnershipError):
+        with pytest.raises(ops.model.OwnershipError):
             backend.secret_get(secret.id)
 
 
 def test_cannot_get_revoked_secret(model, backend):
     secret = model.unit.add_secret('hey', {'foo': 'bar'})
-    backend._relation_list_mock[1] = 'remote/0'
+    backend._mock_relation_ids_map[1] = 'remote/0'
     secret.grant('remote/0',
                  ops.model.Relation('db', 1, is_peer=False,
                                     backend=backend, cache=model._cache,
@@ -120,6 +129,7 @@ def test_cannot_get_revoked_secret(model, backend):
 
     with pytest.raises(Exception):  # todo: exceptions
         secret.get()
+
 
 def test_secret_event_snapshot(backend):
     sec = Secret(backend, 'secret:1234567',
@@ -132,7 +142,6 @@ def test_secret_event_snapshot(backend):
     assert e1.secret.__dict__ == e2.secret.__dict__
 
 
-
 def charm_type():
     class InvokeEvent(EventBase):
         pass
@@ -143,6 +152,15 @@ def charm_type():
             self._callback = None
             self.on.define_event('invoke', InvokeEvent)
             self.framework.observe(self.on.invoke, self._on_invoke)
+
+            self._listeners = {}
+            self._listener_calls = []
+
+        def get_calls(self, clear=False):
+            calls = self._listener_calls
+            if clear:
+                self._listener_calls = []
+            return calls
 
         def run(self, fn):
             if self._callback:
@@ -157,6 +175,21 @@ def charm_type():
 
         def _on_invoke(self, event):
             self._callback()
+
+        def listener(self, event: str):
+            def wrapper(callback):
+                self.register_listener(event, callback)
+                return callback
+            return wrapper
+
+        def register_listener(self, event: BoundEvent, callback):
+            self._listeners[event.event_kind] = callback
+            self.framework.observe(event, self._call_listener)
+
+        def _call_listener(self, evt: EventBase):
+            listener = self._listeners[evt.handle.kind]
+            self._listener_calls.append(listener)
+            listener(evt)
 
     return SecretTesterCharm
 
@@ -174,7 +207,9 @@ def owner(owner_harness):
 
 @pytest.fixture(scope='function')
 def holder_harness():
-    return Harness(charm_type(), meta=yaml.safe_dump({'name': 'holder'}))
+    return Harness(charm_type(), meta=yaml.safe_dump(
+        {'name': 'holder',
+         'requires': {'db': {'interface': 'db'}}}))
 
 
 @pytest.fixture(scope='function')
@@ -195,10 +230,9 @@ def grant(owner: CharmBase, secret_specifier: str, holder: CharmBase,
           relation_name='db',
           relation_id=1,
           is_peer=False):
-
     # simulate a relation
-    owner.model._backend._secrets._relation_list_mock[1] = holder.unit.name
-    holder.model._backend._secrets._relation_list_mock[1] = owner.unit.name
+    owner.model._backend._secrets._mock_relation_ids_map[1] = holder.unit.name
+    holder.model._backend._secrets._mock_relation_ids_map[1] = owner.unit.name
 
     owner.model.get_secret(secret_specifier).grant(
         holder.unit,
@@ -214,7 +248,8 @@ def test_owner_create_secret(owner, holder):
     @owner.run
     def create_secret():
         nonlocal sec_id
-        secret = owner.app.add_secret('my_label', {'a': 'b'})
+        secret = owner.app.add_secret({'a': 'b'})
+        secret.set_label('my_label')
         sec_id = secret.id
         assert secret._am_owner
 
@@ -224,7 +259,7 @@ def test_owner_create_secret(owner, holder):
 
         # however we can't inspect the contents:
         with pytest.raises(ops.model.OwnershipError):
-            secret.get()
+            secret.get('a')
 
     @holder.run
     def secret_get_without_access():
@@ -234,7 +269,7 @@ def test_owner_create_secret(owner, holder):
             assert holder.model.get_secret('my_label')
 
         with pytest.raises(ops.model.SecretNotGrantedError):
-            holder.model.get_secret(sec_id, label='other_label')
+            holder.model.get_secret(sec_id)
 
     @owner.run
     def grant_access():
@@ -245,16 +280,73 @@ def test_owner_create_secret(owner, holder):
     def secret_get_with_access():
         nonlocal sec_id
         # as a holder, we can secret-get
-        secret = holder.model.get_secret(sec_id, label='other_label')
+        secret = holder.model.get_secret(sec_id)
+        secret.set_label('other_label')
 
         assert not secret._am_owner
-        # we give it our own label
-        secret.get(label='other_label')
         # we can get it by label as well now!
         assert holder.model.get_secret('other_label') == secret
 
         assert secret.get('a') == 'b'
 
+    @holder.run
+    def secret_relabel():
+        nonlocal sec_id
+        # as a holder, we can secret-get
+        secret = holder.model.get_secret('other_label')
+        secret.set_label('new_label')
+        secret1 = holder.model.get_secret('new_label')
+        assert secret == secret1
+        assert secret.get('a') == secret1.get('a')
 
-# TODO: write some charm-perspective tests (use _TestSecret object)
-#  map _TestSecret backend calls
+
+class TestHolderCharmPOV:
+    # Typically you want to unittest
+    def test_owner_charm_pov(self, owner, holder, holder_harness):
+        db_rel_id = holder_harness.add_relation('db', owner.app.name)
+        secret = holder_harness.add_secret(owner.app, {'token': 'abc123'}, db_rel_id)
+        secret.grant(holder_harness.charm.unit)
+        sec_id = secret.id
+
+        # verify that the holder can access the secret
+        @holder.run  # this is charm code:
+        def secret_get_with_access():
+            secret = holder.model.get_secret(sec_id)
+            assert not secret._am_owner
+            secret.set_label('other_label')
+            assert secret.get('token') == 'abc123'
+            assert secret.revision == 0
+
+        @holder.listener(holder.on.secret_changed)
+        def _on_changed(evt):
+            assert isinstance(evt, SecretChangedEvent)
+            # SecretRotateEvent.secret is *the currently tracked revision*
+            assert evt.secret == holder.model.get_secret(sec_id)
+            assert evt.secret.revision == 0
+
+        @holder.listener(holder.on.secret_remove)
+        def _on_remove(evt):
+            assert isinstance(evt, SecretRemoveEvent)
+            # SecretRotateEvent.secret is *the currently tracked revision*
+            assert evt.secret == holder.model.get_secret(sec_id)
+
+        # rotate the secret
+        secret.set({'token': 'new token!!'})
+        assert holder.get_calls() == [_on_changed]
+
+        # and again
+        secret.set({'token': 'yet another one'})
+        assert holder.get_calls() == [_on_changed, _on_changed]
+
+        @holder.run
+        def _update_to_latest_revision():
+            # we didn't call update() yet, so our revision is still stuck at 0
+            secret = holder.model.get_secret(sec_id)
+            assert secret.revision == 0
+            assert secret.get('token') == 'abc123'
+
+            new_secret = secret.update()
+            assert new_secret.revision == 2
+            assert new_secret.get('token') == 'yet another one'
+
+        secret.prune_all_untracked()  # removes 0 and 1

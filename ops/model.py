@@ -156,17 +156,7 @@ class Model:
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
 
-    @overload
-    def get_secret(self, specifier: 'SecretID', label: 'SecretLabel') -> 'Secret':
-        ...
-
-    @overload
-    def get_secret(self, specifier: 'SecretLabel', label: None = None) -> 'Secret':
-        ...
-
-    def get_secret(self,
-                   specifier: Union['SecretID', 'SecretLabel'],
-                   label: Optional['SecretLabel'] = None) -> 'Secret':
+    def get_secret(self, specifier: Union['SecretID', 'SecretLabel']) -> 'Secret':
         """Fetch Secret instance from a label or a secret ID.
 
         Note that, especially if you have *lots* of secrets, passing a label is
@@ -176,26 +166,23 @@ class Model:
         my_secrets = self._backend.secret_ids()
         if specifier in my_secrets:
             # we own this secret
-            old_label = self._backend.secret_meta(specifier).get('label')
-            current_label = label if label is not None else old_label
+            meta = self._backend.secret_meta(specifier)[specifier]
+            label = meta.get('label')
+            revision = meta.get('revision')
 
             # Note: we explicitly don't set the revision here in order to disallow pruning outside
-            # of a secret-remove event context.
-            secret = Secret(self._backend, specifier, label=current_label, am_owner=True)
-
-            if old_label and old_label != label:
-                # we're relabelling the secret?
-                logger.warning('Relabelling {!r}: {!r} --> {!r}'.format(
-                    specifier, old_label, label))
-                secret.set()
+            #  a secret-remove event context.
+            return Secret(self._backend, specifier, label=label,
+                          revision=revision, am_owner=True)
 
         # check if the specifier is a label for an owned secret
         for my_secret_id in my_secrets:
-            meta = self._backend.secret_meta(my_secret_id)
-            if meta[my_secret_id].get('label') == specifier:
+            meta = self._backend.secret_meta(specifier)[my_secret_id]
+            if meta.get('label') == specifier:
                 # Note: we explicitly don't set the revision here in order to disallow pruning outside
                 # of a secret-remove event context.
                 return Secret(self._backend, my_secret_id,
+                              revision=meta.get('revision'),
                               label=specifier, am_owner=True)
 
         # We must not own this secret.
@@ -205,7 +192,7 @@ class Model:
             #  or if we do not have access (SecretNotGrantedError)
             #  or if this secret id is invalid = does not identify a secret
             #   juju (or the testing env) knows of (InvalidSecretIDError).
-            self._backend.secret_get(specifier, label=label)
+            self._backend.secret_get(specifier)
             secret_id = specifier
 
         # we allow (SecretNotGrantedError, OwnershipError) to raise
@@ -217,7 +204,10 @@ class Model:
                     "The provided specifier {!r} is not a "
                     "known secret ID nor a known label.") from e2
 
-        return Secret(self._backend, secret_id, am_owner=False)
+        # TODO: check that --metadata returns 'the currently tracked revision'
+        revision = self._backend.secret_meta(secret_id)[secret_id].get('revision')
+        return Secret(self._backend, secret_id,
+                      revision=revision, am_owner=False)
 
     @property
     def unit(self) -> 'Unit':
@@ -387,7 +377,7 @@ class Application:
     def _invalidate(self):
         self._status = None
 
-    def add_secret(self, label: str,
+    def add_secret(self,
                    content: Dict[str, str],
                    description: str = None,
                    expire: datetime.datetime = None,
@@ -396,9 +386,6 @@ class Application:
 
         Parameters:
         -----------
-            label: Label by which this secret will be known by units of
-                this application. This will not be visible by the consumers of the secret.
-                Use it to distinguish multiple secrets owned by the same unit/application.
             content: The payload of the secret: a [str:str] key-value mapping
                 containing the actual secret contents, e.g. credential pairs.
             description: An optional string to describe the content of the secret.
@@ -408,15 +395,18 @@ class Application:
 
         Example::
 
-            self.model.app.add_secret(
-                label='database_keys',
-                {'username':'foo', 'password':'1234'},
-                description='the credentials to access this database',
-                expire=datetime.datetime.today() + datetime.timedelta(days=24),
-                rotate='never')
+            >>> self.model.app.add_secret(
+            ...    {'username':'foo', 'password':'1234'},
+            ...    description='the credentials to access this database',
+            ...    expire=datetime.datetime.today() + datetime.timedelta(days=24),
+            ...    rotate='never')
         """
+        if not self._backend._hook_is_running:
+            raise RuntimeError("This method is meant to be called from charm code;"
+                               "testing code should use `Harness.add_secret()`.")
+
         sec_id = self._backend.secret_add(
-            owner='application', content=content, description=description, label=label,
+            owner='application', content=content, description=description,
             expire=expire, rotate=rotate)
         return Secret(self._backend, sec_id, am_owner=True)
 
@@ -521,16 +511,14 @@ class Unit:
             containers = meta.containers  # type: _ContainerMeta_Raw
             self._containers = ContainerMapping(iter(containers), backend)
 
-    def add_secret(self, label: str,
+    def add_secret(self,
                    content: Dict[str, str],
                    description: str = None,
                    expire: datetime.datetime = None,
-                   rotate: '_SecretRotationPolicy' = 'never'):
+                   rotate: '_SecretRotationPolicy' = 'never') -> 'Secret':
         """Create a juju secret owned by this unit.
+
         Parameters:
-            label: Label by which this secret will be known by this unit.
-                This will not be visible by the consumers of the secret.
-                Use it to distinguish multiple secrets owned by the same unit.
             content: The payload of the secret: a [str:str] key-value mapping
                 containing the actual secret contents, e.g. credential pairs.
             description: An optional string to describe the content of the secret.
@@ -538,17 +526,22 @@ class Unit:
                 due to expire.
             rotate: The secret rotation policy.
 
-        Example::
+        Example:
+            >>> secret = self.model.unit.add_secret(
+            ...    content={'username':'foo', 'password':'1234'},
+            ...    description='the credentials to access this database',
+            ...    expire=datetime.datetime.today() + datetime.timedelta(days=24),
+            ...    rotate='never')
+            >>> secret.set_label('my_secret')
+            >>> secret.grant(self.model.relations['db'][0])
 
-            self.model.unit.add_secret(
-                label='database_keys',
-                content={'username':'foo', 'password':'1234'},
-                description='the credentials to access this database',
-                expire=datetime.datetime.today() + datetime.timedelta(days=24),
-                rotate='never')
         """
+        if not self._backend._hook_is_running:
+            raise RuntimeError("This method is meant to be called from charm code;"
+                               "testing code should use `Harness.add_secret()`.")
+
         sec_id = self._backend.secret_add(content=content,
-                                          owner='unit', description=description, label=label,
+                                          owner='unit', description=description,
                                           expire=expire, rotate=rotate)
         return Secret(self._backend, sec_id, am_owner=True)
 
@@ -942,10 +935,28 @@ class Secret:
                  revision: Optional[int] = None, am_owner: bool = False):
         self._backend = backend
 
-        self.id = id
-        self.label = label
+        self._id = id
+        self._label = label
         self._revision = revision
         self._am_owner = am_owner
+
+    @property
+    def id(self) -> str:
+        """Unique identifier for this secret."""
+        return self._id
+
+    @property
+    def label(self) -> str:
+        """Label by which this secret is locally known.
+
+        This label is locally unique.
+        """
+        return self._label
+
+    @property
+    def revision(self) -> int:
+        """The revision number for this secret."""
+        return self._revision
 
     def __eq__(self, other: Any):
         if not isinstance(other, Secret):
@@ -958,8 +969,7 @@ class Secret:
         return '<{}>'.format(self.id)
 
     def set(self, content: Dict[str, str] = None,
-            description: Optional[str] = None,
-            label: Optional[str] = None):
+            description: Optional[str] = None):
         """Update the contents of this secret.
 
         This will create a new revision, and notify all units tracking this secret
@@ -972,9 +982,6 @@ class Secret:
 
         Parameters:
         -----------
-        label: Label by which this secret will be known by units of
-            this application. This will not be visible by the consumers of the secret.
-            Use it to distinguish multiple secrets owned by the same unit/application.
         content: The payload of the secret: a [str:str] key-value mapping
             containing the actual secret contents, e.g. credential pairs.
         description: An optional string to describe the content of the secret.
@@ -984,8 +991,7 @@ class Secret:
                 'cannot set on secret {} which is owned by a different unit'.format(self))
         self._backend.secret_set(self.id,
                                  content=content,
-                                 description=description,
-                                 label=label)
+                                 description=description)
 
     def grant(self, target: Union['Relation', Unit, Application],
               relation: Optional['Relation'] = None):
@@ -1003,13 +1009,15 @@ class Secret:
         """
         if not self._am_owner:
             raise RuntimeError(
-                'cannot grant for secret {} which is owned by a different unit'.format(self))
+                'cannot grant secret {!r} which is owned by a different unit'.format(self))
         if relation is None and not isinstance(target, Relation):
             raise RuntimeError(
-                'granting secret access to a unit or application target requires a relation to be specified')
+                'granting secret access to a unit or application '
+                'target requires a relation to be specified')
         if relation and isinstance(target, Application) and relation.app is not target:
             raise RuntimeError(
-                'cannot grant secret access to application that is not remote to the specified relation')
+                'cannot grant secret access to application that is not '
+                'remote to the specified relation')
 
         relation = relation or target
         assert isinstance(relation, Relation)  # type guard
@@ -1065,34 +1073,61 @@ class Secret:
         """
 
         if not self._am_owner:
-            raise RuntimeError(
+            raise RuntimeError(  # todo unify with OwnershipError
                 'cannot remove secret {} which is owned by a different unit'.format(self))
         self._backend.secret_remove(self.id)
 
-    def update(self):
+    def update(self) -> 'Secret':
         """Fetch the latest available revision of this secret.
 
-        After this is called, you should be able to get(
+        Returns a Secret object pointing to the newest available revision.
+        The old Secret revision is not updated in-place, so it will keep pointing
+        to the old revision.
+
+        Examples:
+            >>> def _on_update_status(self: ops.charm.CharmBase, _):
+            >>>     old_revision = self.model.get_secret('my_label')
+            >>>     new_revision = old_revision.update()
+            >>>     if new_revision != old_revision:
+            >>>         logger.info('updated to new revision!')
         """
         if self._am_owner:
             raise RuntimeError(
                 'cannot update secret {} which is owned by this unit - did you mean to call Secret.set?'.format(
                     self))
         self._backend.secret_get(self.id, update=True)
+        new_rev = self._backend.secret_meta(self.id)[self.id]['revision']
 
-    # TODO: remove this usage; keep (key: str) -> str
-    @overload
-    def get(self, key: None = None, label: str = None) -> Dict[str, str]:
-        ...
+        return Secret(backend=self._backend,
+                      id=self.id,
+                      label=self.label,
+                      revision=int(new_rev),
+                      am_owner=self._am_owner)
 
-    @overload
-    def get(self, key: str, label: str = None) -> str:
-        ...
-
-    def get(self, key: str = None, label: str = None) -> Union[str, Dict[str, str]]:
+    def get(self, key: str,
+            update: bool = False,
+            peek: bool = False) -> str:
         """Get the secret contents.
 
-        The `label` argument can be used to assign a label to this secret, or update it.
+        Parameters
+        ----------
+            key: if is specified, only the value mapped to this key will be returned.
+                Otherwise, the full key=value secret contents dict will be returned.
+            update: returns the contents of the latest revision and starts tracking it.
+            peek: returns the contents of the latest revision. Unlike update,
+                it will not switch the secret to track the latest revision. I.e. the next
+                time you call get() -- without peek=True -- you will get the revision
+                you are currently tracking, even though a more recent one is available.
+                Useful if you want to "try out" the new secret revision before dropping
+                the old one.
+        """
+        if self._am_owner:
+            raise OwnershipError(
+                'cannot get contents for secret {} which is owned by this unit'.format(self))
+        return self._backend.secret_get(self.id, key=key, update=update, peek=peek)
+
+    def set_label(self, label: str):
+        """Assign a label to this Secret.
 
         This secret will be henceforth associated **locally** with this label:
         you can use the label to identify the different secrets that this unit has access to.
@@ -1102,25 +1137,16 @@ class Secret:
         their own label to it.
 
         Passing `label=""` will remove the label.
-
-        Parameters
-        ----------
-            key: if is specified, only the value mapped to this key will be returned.
-                Otherwise, the full key=value secret contents dict will be returned.
-            label: update the label associated with this secret.
         """
-        if self._am_owner:
-            raise OwnershipError(
-                'cannot get contents for secret {} which is owned by this unit'.format(self))
-        self.label = label
-        return self._backend.secret_get(self.id, label=label)
 
-
-    # TODO remove label:str from set() and get()
-    def set_label(self, label: str):
+        # We provide this unified API instead of forcing the user to call different
+        # methods depending on the ownership status.
+        self._label = label
         if self._am_owner:
-            return self.set(label=label)
+            # owners have to *set* a secret to change its label
+            return self._backend.secret_set(self.id, label=label)
         else:
+            # holders can set the label on *getting* it!
             return self._backend.secret_get(self.id, label=label)
 
 

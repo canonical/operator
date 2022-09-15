@@ -148,6 +148,8 @@ class HookEvent(EventBase):
 
 
 class SecretEvent(EventBase):
+    """Base class for secret-related events."""
+
     if TYPE_CHECKING:
         _SecretEventSnapshot = TypedDict('_SecretEventSnapshot', {
             'secret_id': Required[str],
@@ -189,12 +191,14 @@ class SecretChangedEvent(SecretEvent):
     that are tracking this secret will be notified by means of this event that a new
     revision is available.
 
-    Typically, you will want to update the secret (i.e. fetch the new
+    Typically, you will want to update the secret (i.e. fetch the new revision)
+    and prune the old one.
 
-    Typically, you will want to `Secret.prune()` to remove all orphaned revisions
-    when you receive this event.
-
-
+    >>> def _on_secret_changed(self: CharmBase, evt: SecretChangedEvent):
+    >>>     evt.secret.update()
+    >>>     evt.secret.prune()
+    >>>     new_secret = self.model.get_secret(evt.secret.id)
+            # self._update_credentials(new_secret) ...
     """
 
 
@@ -223,6 +227,10 @@ class SecretRotateEvent(SecretEvent):
     This event is fired on the secret owner to inform it that the secret
     must be rotated. The event will keep firing until the owner creates a
     new revision by calling `Secret.set()`.
+
+    Examples:
+        >>> def _on_secret_rotate(self: CharmBase, evt: SecretRotateEvent):
+        >>>     evt.secret.set({'new': 'credentials'})
     """
     def defer(self):
         """Secret rotation events are not deferrable.
@@ -241,7 +249,12 @@ class SecretExpiredEvent(SecretEvent):
     This event is fired on the secret owner to inform it that the secret
     must be rotated. The event will keep firing until the owner creates a
     new revision by calling `Secret.set()`.
+
+    Examples:
+        >>> def _on_secret_expired(self: CharmBase, evt: SecretExpiredEvent):
+        >>>     evt.secret.set({'new': 'credentials'})
     """
+
     def defer(self):
         """Secret expiration events are not deferrable.
 
