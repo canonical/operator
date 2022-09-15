@@ -408,7 +408,7 @@ class Application:
         sec_id = self._backend.secret_add(
             owner='application', content=content, description=description,
             expire=expire, rotate=rotate)
-        return Secret(self._backend, sec_id, am_owner=True)
+        return Secret(self._backend, sec_id, am_owner=True, revision=0)
 
     @property
     def status(self) -> 'StatusBase':
@@ -543,7 +543,7 @@ class Unit:
         sec_id = self._backend.secret_add(content=content,
                                           owner='unit', description=description,
                                           expire=expire, rotate=rotate)
-        return Secret(self._backend, sec_id, am_owner=True)
+        return Secret(self._backend, sec_id, am_owner=True, revision=0)
 
     def _invalidate(self):
         self._status = None
@@ -2619,12 +2619,32 @@ class _ModelBackend:
     def secret_id_to_label(self, secret_id: str) -> Optional[str]:
         return self.secret_meta(secret_id)[secret_id].get('label')
 
-    def secret_meta(self, secret_id: str) -> Dict[str, Dict[str, str]]:
-        # TODO: label may be used instead of ID to fetch the secret
+    def secret_meta(self, secret_id: str, fetch:bool = False, update: bool = False) -> Dict[str, Dict[str, str]]:
+        args = ['secret-get']
+
+        # FIXME: label may be used instead of ID to fetch the secret
         #  in that case we can pass --label <label> instead of <secret_id>
         #  but that means that we need to know what what we've been passed is
-        return self._run('secret-get', secret_id, '--metadata',
-                         return_output=True, use_json=True)
+        #  this might-a work, but is horrible. Find a better way.
+        def _is_label(s):
+            try:
+                return bool(self.secret_label_to_id(s))
+            except ModelError:
+                return False
+
+        if _is_label(secret_id):
+            args.extend(('--label', secret_id))
+        else:
+            args.append(secret_id)
+
+        args.append('--metadata')
+        if fetch:
+            args.append('--fetch')
+        if update:
+            args.append('--update')
+
+
+        return self._run(*args, return_output=True, use_json=True)
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:

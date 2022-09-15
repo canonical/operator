@@ -1665,7 +1665,10 @@ class _TestingSecretManager:
     def _get_content(self, secret_id: str, revision: int):
         return self._get_mgr(secret_id)._revisions[secret_id][revision]['content']
 
-    def secret_meta(self, secret_id: str) -> Dict[str, Dict[str, str]]:
+    def secret_meta(self, secret_id: str, fetch: bool = False, update: bool = False) -> Dict[str, Dict[str, str]]:
+        if update:
+            raise NotImplementedError('update')
+
         try:
             self._check_access('secret_meta', secret_id, read=True)
         except InvalidSecretIDError as e:
@@ -1676,8 +1679,17 @@ class _TestingSecretManager:
                 raise e
 
         mgr = self._get_mgr(secret_id)
-        revisions = mgr._revisions[secret_id]
-        latest = revisions[-1]
+        rev_meta = mgr._revisions[secret_id]
+
+        if fetch:
+            revision = len(rev_meta) - 1
+        else:
+            revision = self._tracking.get(secret_id, None)
+            if revision is None:
+                # we update implicitly to the latest one.
+                revision = len(rev_meta) -1
+
+        meta = rev_meta[revision]
 
         if mgr is self:
             label = self._labels.get(secret_id)
@@ -1687,11 +1699,10 @@ class _TestingSecretManager:
         return {
             secret_id: {
                 "label": label,
-                # "revision": len(revisions) - 1, # TODO: or does meta return the latest revision?
-                "revision": self._tracking.get(secret_id, None),
-                "expires": latest.get('expire'),
-                "rotation": latest.get('rotate'),
-                "rotates": "2022-08-31T12:31:56Z"  # not implemented
+                "revision": revision,
+                "expires": meta.get('expire'),
+                "rotation": meta.get('rotate'),
+                "rotates": NotImplemented  # TODO: implement
             }
         }
 
