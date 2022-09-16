@@ -303,8 +303,12 @@ def test_owner_create_secret(owner, holder):
 class TestHolderCharmPOV:
     # Typically you want to unittest
     def test_owner_charm_pov(self, owner, holder, holder_harness):
+        rev_0_key = 'a'
+        rev_1_key = 'a1'
+        rev_2_key = 'a2'
+
         db_rel_id = holder_harness.add_relation('db', owner.app.name)
-        secret = holder_harness.add_secret(owner.app, {'token': 'abc123'}, db_rel_id)
+        secret = holder_harness.add_secret(owner.app, {'token': rev_0_key}, db_rel_id)
         secret.grant(holder_harness.charm.unit)
         sec_id = secret.id
 
@@ -314,15 +318,15 @@ class TestHolderCharmPOV:
             secret = holder.model.get_secret(sec_id)
             assert not secret._am_owner
             secret.set_label('other_label')
-            assert secret.get('token') == 'abc123'
-            assert secret.revision == 0
+            assert secret.get('token') == rev_0_key
+            # assert secret.revision == 0  # non-owners cannot see the revision
 
         @holder.listener(holder.on.secret_changed)
         def _on_changed(evt):
             assert isinstance(evt, SecretChangedEvent)
             # SecretRotateEvent.secret is *the currently tracked revision*
             assert evt.secret == holder.model.get_secret(sec_id)
-            assert evt.secret.revision == 0
+            assert evt.secret.get('token') == rev_0_key
 
         @holder.listener(holder.on.secret_remove)
         def _on_remove(evt):
@@ -331,22 +335,21 @@ class TestHolderCharmPOV:
             assert evt.secret == holder.model.get_secret(sec_id)
 
         # rotate the secret
-        secret.set({'token': 'new token!!'})
+        secret.set({'token': rev_1_key})
         assert holder.get_calls() == [_on_changed]
 
         # and again
-        secret.set({'token': 'yet another one'})
+        secret.set({'token': rev_2_key})
         assert holder.get_calls() == [_on_changed, _on_changed]
 
         @holder.run
         def _update_to_latest_revision():
             # we didn't call update() yet, so our revision is still stuck at 0
             secret = holder.model.get_secret(sec_id)
-            assert secret.revision == 0
-            assert secret.get('token') == 'abc123'
+            assert secret.get('token') == rev_0_key
 
+            # updating bumps us to rev2
             new_secret = secret.update()
-            assert new_secret.revision == 2
-            assert new_secret.get('token') == 'yet another one'
+            assert new_secret.get('token') == rev_2_key
 
         secret.prune_all_untracked()  # removes 0 and 1

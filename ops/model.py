@@ -204,10 +204,11 @@ class Model:
                     "The provided specifier {!r} is not a "
                     "known secret ID nor a known label.") from e2
 
-        # TODO: check that --metadata returns 'the currently tracked revision'
-        revision = self._backend.secret_meta(secret_id)[secret_id].get('revision')
+        # we're not owners, so we cannot know the revision.
+        # --metadata returns 'the currently tracked revision'
+        # revision = self._backend.secret_meta(secret_id)[secret_id].get('revision')
         return Secret(self._backend, secret_id,
-                      revision=revision, am_owner=False)
+                      revision=None, am_owner=False)
 
     @property
     def unit(self) -> 'Unit':
@@ -933,6 +934,10 @@ class Secret:
 
     def __init__(self, backend: '_ModelBackend', id: str, label: Optional[str] = None,
                  revision: Optional[int] = None, am_owner: bool = False):
+        if am_owner and revision is None:
+            logger.warning('secret {!r} (owned by this unit) has no revision!'
+                           ' Things might break'.format(id))
+
         self._backend = backend
 
         self._id = id
@@ -1096,12 +1101,11 @@ class Secret:
                 'cannot update secret {} which is owned by this unit - did you mean to call Secret.set?'.format(
                     self))
         self._backend.secret_get(self.id, update=True)
-        new_rev = self._backend.secret_meta(self.id)[self.id]['revision']
 
         return Secret(backend=self._backend,
                       id=self.id,
                       label=self.label,
-                      revision=int(new_rev),
+                      revision=None,  # cannot know the revision as a non-owner
                       am_owner=self._am_owner)
 
     def get(self, key: str,

@@ -1670,7 +1670,7 @@ class _TestingSecretManager:
             raise NotImplementedError('update')
 
         try:
-            self._check_access('secret_meta', secret_id, read=True)
+            self._check_access('secret_meta', secret_id, own=True)
         except InvalidSecretIDError as e:
             # secret_meta can be called with a label instead of a secret ID
             try:
