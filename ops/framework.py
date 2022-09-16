@@ -532,7 +532,7 @@ class PrefixedEvents:
         self._emitter = emitter
         self._prefix = key.replace("-", "_") + '_'
 
-    def __getattr__(self, name: str) -> Union['PrefixedEvents', EventSource[Any]]:
+    def __getattr__(self, name: str) -> BoundEvent[Any]:
         return getattr(self._emitter, self._prefix + name)
 
 
@@ -597,7 +597,7 @@ class Framework(Object):
         # an old, deprecated __init__ interface accepted an Optional charm_dir,
         #  so we have to keep supporting it:
         if charm_dir is None:
-            logger.warning('Deprecation warning: charm_dir should not be `None`')
+            logger.warning('Framework should not be initialized with `charm_dir` set to None.')
             self.charm_dir = None  # type: ignore
         else:
             self.charm_dir = pathlib.Path(charm_dir)

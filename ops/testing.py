@@ -68,11 +68,9 @@ from typing import (
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
-from ops.charm import CharmBase, CharmMeta
+from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.model import RelationNotFoundError
 
-T = TypeVar("T")
-M = TypeVar("M")
 
 if TYPE_CHECKING:
     from typing_extensions import Literal, TypedDict
@@ -182,13 +180,23 @@ class Harness(Generic[CharmType]):
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
 
+        # TODO: will be removed in the next breaking-changes release
+        #  together with self._oci_resources
+        self._deprecated_oci_resources_do_not_use = {}  # type: Dict[Any, Any]
+
         # TODO: If/when we decide to allow breaking changes for a release,
-        # change SIMULATE_CAN_CONNECT default value to True and remove the
-        # warning message below.  This warning was added 2022-03-22
+        #  change SIMULATE_CAN_CONNECT default value to True and remove the
+        #  warning message below.  This warning was added 2022-03-22
         if not SIMULATE_CAN_CONNECT:
             warnings.warn(
                 'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
+
+    @property
+    def _oci_resources(self):
+        warnings.warn('Deprecation warning: Harness.`_oci_resources` is '
+                      'deprecated and will be removed in a future release.')
+        return self._deprecated_oci_resources_do_not_use
 
     def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
@@ -332,15 +340,15 @@ class Harness(Generic[CharmType]):
             # To be fired.
         """
         self.begin()
-        my_charm = cast(CharmBase, self._charm)
+        charm = cast(CharmBase, self._charm)
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
             for storage_index in self._backend.storage_list(storage_name, include_detached=True):
-                s = model.Storage(storage_name, storage_index, self._backend)  # type: ignore
+                s = model.Storage(storage_name, storage_index, self._backend)
                 self.attach_storage(s.full_id)
         # Storage done, emit install event
-        my_charm.on.install.emit()
+        charm.on.install.emit()
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
         # of joined units for a given relation.
@@ -348,7 +356,7 @@ class Harness(Generic[CharmType]):
         random.shuffle(items)
         this_app_name = self._meta.name
         for relname, rel_meta in items:
-            if rel_meta.role == charm.RelationRole.peer:
+            if rel_meta.role == RelationRole.peer:
                 # If the user has directly added a relation, leave it be, but otherwise ensure
                 # that peer relations are always established at before leader-elected.
                 rel_ids = self._backend._relation_ids_map.get(relname)
@@ -365,11 +373,11 @@ class Harness(Generic[CharmType]):
                     app_name = self._backend._relation_app_and_units[rel_id]["app"]
                     self._emit_relation_created(relname, rel_id, app_name)
         if self._backend._is_leader:
-            my_charm.on.leader_elected.emit()
+            charm.on.leader_elected.emit()
         else:
-            my_charm.on.leader_settings_changed.emit()
-        my_charm.on.config_changed.emit()
-        my_charm.on.start.emit()
+            charm.on.leader_settings_changed.emit()
+        charm.on.config_changed.emit()
+        charm.on.start.emit()
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
@@ -387,13 +395,12 @@ class Harness(Generic[CharmType]):
             relation = self._model.get_relation(rel_name, rel_id)
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
-                my_charm.on[rel_name].relation_changed.emit(  # type:ignore
-                    relation, app, None)
+                charm.on[rel_name].relation_changed.emit(relation, app, None)
             for unit_name in sorted(rel_app_and_units["units"]):
                 remote_unit = self._model.get_unit(unit_name)
-                my_charm.on[rel_name].relation_joined.emit(  # type:ignore
+                charm.on[rel_name].relation_joined.emit(
                     relation, remote_unit.app, remote_unit)
-                my_charm.on[rel_name].relation_changed.emit(  # type:ignore
+                charm.on[rel_name].relation_changed.emit(
                     relation, remote_unit.app, remote_unit)
 
     def cleanup(self) -> None:
@@ -452,11 +459,13 @@ class Harness(Generic[CharmType]):
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        config = cast('RawConfig', yaml.safe_load(cast(str, charm_config)))
+
+        assert isinstance(charm_config, str)  # type guard
+        config = yaml.safe_load(charm_config)
 
         if not isinstance(config, dict):  # pyright: reportUnnecessaryIsInstance=false
             raise TypeError(config)
-        return config
+        return cast('RawConfig', config)
 
     def add_oci_resource(self, resource_name: str,
                          contents: Optional[Mapping[str, str]] = None) -> None:
@@ -605,8 +614,8 @@ class Harness(Generic[CharmType]):
         storage_attached = self._backend._storage_is_attached(  # pyright:ReportPrivateUsage=false
             storage_name, storage_index)
         if storage_attached and self._hooks_enabled:
-            self.charm.on[storage_name].storage_detaching.emit(  # type: ignore
-                model.Storage(storage_name, storage_index, self._backend))  # type: ignore
+            self.charm.on[storage_name].storage_detaching.emit(
+                model.Storage(storage_name, storage_index, self._backend))
         self._backend._storage_detach(storage_id)  # pyright:ReportPrivateUsage=false
 
     def attach_storage(self, storage_id: str) -> None:
@@ -632,8 +641,8 @@ class Harness(Generic[CharmType]):
         self._model._storages._invalidate(storage_name)
 
         storage_index = int(storage_index)
-        self.charm.on[storage_name].storage_attached.emit(  # type:ignore
-            model.Storage(storage_name, storage_index, self._backend))  # type: ignore
+        self.charm.on[storage_name].storage_attached.emit(
+            model.Storage(storage_name, storage_index, self._backend))
 
     def remove_storage(self, storage_id: str) -> None:
         """Detach a storage device.
@@ -655,8 +664,8 @@ class Harness(Generic[CharmType]):
         is_attached = self._backend._storage_is_attached(  # pyright:ReportPrivateUsage=false
             storage_name, storage_index)
         if self.charm is not None and self._hooks_enabled and is_attached:
-            self.charm.on[storage_name].storage_detaching.emit(  # type: ignore
-                model.Storage(storage_name, storage_index, self._backend))  # type: ignore
+            self.charm.on[storage_name].storage_detaching.emit(
+                model.Storage(storage_name, storage_index, self._backend))
         self._backend._storage_remove(storage_id)  # pyright:ReportPrivateUsage=false
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
@@ -732,7 +741,7 @@ class Harness(Generic[CharmType]):
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_created.emit(  # type:ignore
+        self._charm.on[relation_name].relation_created.emit(
             relation, app)
 
     def _emit_relation_broken(self, relation_name: str, relation_id: int,
@@ -742,8 +751,7 @@ class Harness(Generic[CharmType]):
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_broken.emit(  # type: ignore
-            relation, app)
+        self._charm.on[relation_name].relation_broken.emit(relation, app)
 
     def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Add a new unit to a relation.
@@ -794,7 +802,7 @@ class Harness(Generic[CharmType]):
         self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return
-        self._charm.on[relation_name].relation_joined.emit(  # type: ignore
+        self._charm.on[relation_name].relation_joined.emit(
             relation, remote_unit.app, remote_unit)
 
     def remove_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
@@ -811,7 +819,7 @@ class Harness(Generic[CharmType]):
         normally be followed by a `relation_changed` event triggered
         by Juju. However when using the test harness a
         `relation_changed` event must be triggererd using
-        :meth:`.update_relation_data`. This deviation from normal Juju
+        :meth:`.update_relation_data`. This deviation from normal Juj
         behaviour, facilitates testing by making each step in the
         charm life cycle explicit.
 
@@ -863,7 +871,7 @@ class Harness(Generic[CharmType]):
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(  # type: ignore
+        self._charm.on[rel_name].relation_departed.emit(
             relation, app, unit, unit_name)
 
     def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> Mapping[str, str]:
@@ -886,7 +894,7 @@ class Harness(Generic[CharmType]):
             name = app_or_unit.name
         elif isinstance(app_or_unit, model.Unit):
             name = app_or_unit.name
-        elif isinstance(app_or_unit, str):  # str
+        elif isinstance(app_or_unit, str):
             name = app_or_unit
         else:
             raise TypeError('Expected Application | Unit | str, got {}'.format(type(app_or_unit)))
@@ -933,7 +941,7 @@ class Harness(Generic[CharmType]):
         container = self.model.unit.get_container(container_name)
         if SIMULATE_CAN_CONNECT:
             self.set_can_connect(container, True)
-        self.charm.on[container_name].pebble_ready.emit(container)  # type: ignore  #darkmagic
+        self.charm.on[container_name].pebble_ready.emit(container)
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -948,10 +956,12 @@ class Harness(Generic[CharmType]):
         This is a convenience method to invoke both Harness.set_model_name
         and Harness.set_model_uuid at once.
         """
-        self.set_model_name(name)
-        self.set_model_uuid(uuid)
+        if name is not None:
+            self.set_model_name(name)
+        if uuid is not None:
+            self.set_model_uuid(uuid)
 
-    def set_model_name(self, name: Optional[str]) -> None:
+    def set_model_name(self, name: str) -> None:
         """Set the name of the Model that this is representing.
 
         This cannot be called once begin() has been called. But it lets you set the value that
@@ -961,7 +971,7 @@ class Harness(Generic[CharmType]):
             raise RuntimeError('cannot set the Model name after begin()')
         self._backend.model_name = name
 
-    def set_model_uuid(self, uuid: Optional[str]) -> None:
+    def set_model_uuid(self, uuid: str) -> None:
         """Set the uuid of the Model that this is representing.
 
         This cannot be called once begin() has been called. But it lets you set the value that
@@ -1055,7 +1065,7 @@ class Harness(Generic[CharmType]):
             app_name = app_or_unit
             app = self.model.get_app(app_name)
             args = (relation, app)
-        self._charm.on[rel_name].relation_changed.emit(*args)  # type: ignore
+        self._charm.on[rel_name].relation_changed.emit(*args)
 
     def _update_config(
             self,
@@ -1584,7 +1594,7 @@ class _TestingModelBackend:
                 if mount.storage != name:
                     continue
                 for index, store in self._storage_list[mount.storage].items():
-                    fs = client._fs  # type:ignore
+                    fs = client._fs  # pyright: reportPrivateUsage=false
                     fs.add_mount(mount.storage, mount.location, store['location'])
 
         index = int(index)
@@ -1624,7 +1634,7 @@ class _TestingModelBackend:
         raise NotImplementedError(self.add_metrics)  # type:ignore
 
     @classmethod
-    def log_split(cls, message, max_len):  # type:ignore
+    def log_split(cls, message, max_len=model.MAX_LOG_LINE_LEN):  # type:ignore
         raise NotImplementedError(cls.log_split)  # type:ignore
 
     def juju_log(self, level, msg):  # type:ignore
@@ -1686,7 +1696,7 @@ class _TestingPebbleClient:
         self._backend = backend
 
     def _check_connection(self):
-        if not self._backend._can_connect(self):  # type: ignore # noqa
+        if not self._backend._can_connect(self):  # pyright: reportPrivateUsage=false
             raise pebble.ConnectionError('cannot connect to pebble')
 
     def get_system_info(self) -> pebble.SystemInfo:
@@ -1876,7 +1886,7 @@ ChangeError: cannot perform the following tasks:
 
     def get_plan(self) -> pebble.Plan:
         self._check_connection()
-        plan = pebble.Plan('{}')  # type: pebble.Plan
+        plan = pebble.Plan('{}')
         services = self._render_services()
         if not services:
             return plan
