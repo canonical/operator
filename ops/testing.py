@@ -71,7 +71,6 @@ from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.model import RelationNotFoundError
 
-
 if TYPE_CHECKING:
     from typing_extensions import Literal, TypedDict
 
