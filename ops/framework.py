@@ -484,6 +484,15 @@ class ObjectEvents(Object):
 
         event_type: a type of the event to define.
 
+        Note that attempting to define the same event kind more than once will
+        raise a 'overlaps with existing type' runtime error. Ops uses a
+        labeling system to track and reconstruct events between hook executions
+        (each time a hook runs, the Juju Agent invokes a fresh instance of ops;
+        there is no ops process that persists on the host between hooks).
+        Having duplicate Python objects creates duplicate labels. Overwriting a
+        previously created label means that only the latter code path will be
+        run when the current event, if it does get deferred, is reemitted. This
+        is usually not what is desired, and is error-prone and ambigous.
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
