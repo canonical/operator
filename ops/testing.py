@@ -2386,7 +2386,6 @@ class _TestingFilesystem:
         path = pathlib.PurePosixPath(path)
         parent_dir = self.get_path(path.parent)
         if not isinstance(parent_dir, _Directory):
-            # todo: or should we be casting instead?
             raise RuntimeError('cannot delete {}: parent {!r}'
                                'is not a directory'.format(path.name, parent_dir))
         del parent_dir[path.name]
