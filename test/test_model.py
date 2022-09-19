@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import datetime
+import hashlib
 import ipaddress
 import json
 import os
@@ -679,6 +680,15 @@ class TestModel(unittest.TestCase):
 
         self.assertEqual(self.harness.model.resources.fetch('foo').name, 'foo.txt')
         self.assertEqual(self.harness.model.resources.fetch('bar').name, 'bar.txt')
+
+    def test_resources_sha256(self):
+        contents = 'foo contents\n'
+        self.harness.add_resource('foo', contents)
+        hash = hashlib.sha256()
+        hash.update(bytes(contents, 'ascii'))
+        self.assertEqual(
+            self.harness.model.resources.sha256digest('foo'), hash.digest()
+        )
 
     def test_resources_immutable(self):
         with self.assertRaises(AttributeError):

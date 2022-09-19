@@ -14,6 +14,7 @@
 
 """Representations of Juju's model, application, unit, and other entities."""
 import datetime
+import hashlib
 import ipaddress
 import json
 import logging
@@ -1218,6 +1219,16 @@ class Resources:
         if self._paths[name] is None:
             self._paths[name] = Path(self._backend.resource_get(name))
         return typing.cast(Path, self._paths[name])
+
+    def sha256digest(self, name: str) -> bytes:
+        """Get the sha256 hash of a resource."""
+        sha256 = hashlib.sha256()
+        with self.fetch(name).open('rb') as resource:
+            chunk = resource.read(4096)
+            while chunk:
+                sha256.update(chunk)
+                chunk = resource.read(4096)
+        return sha256.digest()
 
 
 class Pod:
