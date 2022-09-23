@@ -63,6 +63,11 @@ from ops.testing import (
 
 is_linux = platform.system() == 'Linux'
 
+# fixme: setting this to true breaks plenty of our own tests
+#  because of all the event recording hackiness we do.
+#  see esp. StorageTester.observed_events and RecordingCharm.changes
+testing.REINITIALIZE_CHARM_ON_EVENT = False
+
 
 class SetLeaderErrorTester(CharmBase):
     """Sets peer relation data inside leader-elected."""
@@ -4325,7 +4330,7 @@ class TestReinitializeCharmOnEvent(unittest.TestCase):
 
         # mapping from ID to instances
         initial_charm_instance = self.harness.charm
-        charm_ids = {id(initial_charm_instance)}
+        charm_instances = [initial_charm_instance]
 
         # we test with all events that are easy to mock, i.e. no args/kwargs.
         bound_events = (
@@ -4341,9 +4346,9 @@ class TestReinitializeCharmOnEvent(unittest.TestCase):
         for i, evt in enumerate(bound_events):
             with self.subTest(name=str(evt)):
                 self.harness.emit_event(evt)
-                new_charm_id = id(self.harness.charm)
-                self.assertNotIn(new_charm_id, charm_ids)
-                charm_ids.add(new_charm_id)
+                new_charm_instance = self.harness.charm
+                self.assertNotIn(new_charm_instance, charm_instances)
+                charm_instances.append(new_charm_instance)
 
     def test_not_reinitialize(self):
         testing.REINITIALIZE_CHARM_ON_EVENT = False

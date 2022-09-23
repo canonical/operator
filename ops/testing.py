@@ -207,7 +207,7 @@ class Harness(typing.Generic[CharmType]):
         evt.emit(*args, **kwargs)
 
     def _reinitialize_charm(self):
-        self._framework._forget(self.charm)
+        self._framework._clear_all_state()  # type:ignore # noqa
         self._charm = None
         self.begin()
 

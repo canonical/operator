@@ -640,6 +640,22 @@ class Framework(Object):
         self._juju_debug_at = (set(x.strip() for x in debug_at.split(','))
                                if debug_at else set())  # type: Set[str]
 
+    def _clear_all_state(self):
+        """Clear the state.
+
+        Allows testing environments to clean the framework up and instantiate the
+        same Object (Handle, specifically) multiple times.
+        """
+        if self.model._backend._hook_is_running:  # type: ignore # noqa
+            raise RuntimeError('You should not do this while a hook is running. '
+                               'This method is for testing only.')
+
+        self._objects.clear()
+        self._observers.clear()
+        self._observer.clear()
+        self._type_registry.clear()
+        self._type_known.clear()
+
     def set_breakpointhook(self):
         """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
 
