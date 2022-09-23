@@ -32,7 +32,7 @@ import pytest
 import yaml
 
 import ops.testing
-from ops import model, pebble
+from ops import model, pebble, testing
 from ops.charm import (
     CharmBase,
     PebbleReadyEvent,
@@ -4310,3 +4310,62 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIs
     @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         pass
+
+
+class TestReinitializeCharmOnEvent(unittest.TestCase):
+    def setUp(self):
+        class MyCharm(CharmBase):
+            pass
+
+        self.harness = Harness(MyCharm)
+        self.harness.begin()
+
+    def test_reinitialize(self):
+        testing.REINITIALIZE_CHARM_ON_EVENT = True
+
+        # mapping from ID to instances
+        initial_charm_instance = self.harness.charm
+        charm_ids = {id(initial_charm_instance)}
+
+        # we test with all events that are easy to mock, i.e. no args/kwargs.
+        bound_events = (
+            initial_charm_instance.on.start,
+            initial_charm_instance.on.install,
+            initial_charm_instance.on.update_status,
+            initial_charm_instance.on.leader_elected,
+            initial_charm_instance.on.leader_settings_changed,
+            initial_charm_instance.on.stop,
+            initial_charm_instance.on.remove,
+            initial_charm_instance.on.config_changed)
+
+        for i, evt in enumerate(bound_events):
+            with self.subTest(name=str(evt)):
+                self.harness.emit_event(evt)
+                new_charm_id = id(self.harness.charm)
+                self.assertNotIn(new_charm_id, charm_ids)
+                charm_ids.add(new_charm_id)
+
+    def test_not_reinitialize(self):
+        testing.REINITIALIZE_CHARM_ON_EVENT = False
+
+        # mapping from ID to instances
+        initial_charm_instance = self.harness.charm
+        charm_id = id(initial_charm_instance)
+
+        # we test with all events that are easy to mock, i.e. no args/kwargs.
+        bound_events = (
+            initial_charm_instance.on.start,
+            initial_charm_instance.on.install,
+            initial_charm_instance.on.update_status,
+            initial_charm_instance.on.leader_elected,
+            initial_charm_instance.on.leader_settings_changed,
+            initial_charm_instance.on.stop,
+            initial_charm_instance.on.remove,
+            initial_charm_instance.on.config_changed)
+
+        for i, evt in enumerate(bound_events):
+            with self.subTest(name=str(evt)):
+                self.harness.emit_event(evt)
+                new_charm_instance = self.harness.charm
+                self.assertEqual(id(new_charm_instance), charm_id)
+                self.assertIs(new_charm_instance, initial_charm_instance)

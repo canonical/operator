@@ -46,10 +46,11 @@ import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
+from ops.framework import BoundEvent
 from ops.model import RelationNotFoundError
 
 if TYPE_CHECKING:
@@ -58,6 +59,12 @@ if TYPE_CHECKING:
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
 SIMULATE_CAN_CONNECT = False
+
+# Toggles an experimental feature which reinitializes the charm instance
+# attached to the harness every time an event is fired on it. This will make the
+# runtime more closely resemble that of a live, deployed charm.
+# This flag will default to True in a future release.
+REINITIALIZE_CHARM_ON_EVENT = False
 
 # OptionalYAML is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
@@ -187,6 +194,23 @@ class Harness(typing.Generic[CharmType]):
         """
         return self._framework._event_context(event_name)
 
+    def emit_event(self, evt: BoundEvent, *args: Any, **kwargs: Any):
+        """Emit a bound event on the charm."""
+        if evt.emitter.framework is not self._framework:
+            # namely, not sure what might happen if it doesn't.
+            raise RuntimeError('event needs to be bound to an emitter '
+                               'sharing the same framework as this harness.')
+
+        if REINITIALIZE_CHARM_ON_EVENT:
+            self._reinitialize_charm()
+
+        evt.emit(*args, **kwargs)
+
+    def _reinitialize_charm(self):
+        self._framework._forget(self.charm)
+        self._charm = None
+        self.begin()
+
     def set_can_connect(self, container: typing.Union[str, model.Container], val: bool):
         """Change the simulated can_connect status of a container's underlying pebble client.
 
@@ -286,7 +310,7 @@ class Harness(typing.Generic[CharmType]):
                 s = model.Storage(storage_name, storage_index, self._backend)
                 self.attach_storage(s.full_id)
         # Storage done, emit install event
-        self._charm.on.install.emit()
+        self.emit_event(self._charm.on.install)
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
         # of joined units for a given relation.
@@ -311,11 +335,11 @@ class Harness(typing.Generic[CharmType]):
                     app_name = self._backend._relation_app_and_units[rel_id]["app"]
                     self._emit_relation_created(relname, rel_id, app_name)
         if self._backend._is_leader:
-            self._charm.on.leader_elected.emit()
+            self.emit_event(self._charm.on.leader_elected)
         else:
-            self._charm.on.leader_settings_changed.emit()
-        self._charm.on.config_changed.emit()
-        self._charm.on.start.emit()
+            self.emit_event(self._charm.on.leader_settings_changed)
+        self.emit_event(self._charm.on.config_changed)
+        self.emit_event(self._charm.on.start)
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
@@ -333,14 +357,14 @@ class Harness(typing.Generic[CharmType]):
             relation = self._model.get_relation(rel_name, rel_id)
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
-                self._charm.on[rel_name].relation_changed.emit(
-                    relation, app, None)
+                self.emit_event(self._charm.on[rel_name].relation_changed,
+                                relation, app, None)
             for unit_name in sorted(rel_app_and_units["units"]):
                 remote_unit = self._model.get_unit(unit_name)
-                self._charm.on[rel_name].relation_joined.emit(
-                    relation, remote_unit.app, remote_unit)
-                self._charm.on[rel_name].relation_changed.emit(
-                    relation, remote_unit.app, remote_unit)
+                self.emit_event(self._charm.on[rel_name].relation_joined,
+                                relation, remote_unit.app, remote_unit)
+                self.emit_event(self._charm.on[rel_name].relation_changed,
+                                relation, remote_unit.app, remote_unit)
 
     def cleanup(self) -> None:
         """Called by your test infrastructure to cleanup any temporary directories/files/etc.
@@ -548,8 +572,8 @@ class Harness(typing.Generic[CharmType]):
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
         if self._backend._storage_is_attached(storage_name, storage_index) and self._hooks_enabled:
-            self.charm.on[storage_name].storage_detaching.emit(
-                model.Storage(storage_name, storage_index, self._backend))
+            self.emit_event(self.charm.on[storage_name].storage_detaching,
+                            model.Storage(storage_name, storage_index, self._backend))
         self._backend._storage_detach(storage_id)
 
     def attach_storage(self, storage_id: str) -> None:
@@ -575,8 +599,8 @@ class Harness(typing.Generic[CharmType]):
         self._model._storages._invalidate(storage_name)
 
         storage_index = int(storage_index)
-        self.charm.on[storage_name].storage_attached.emit(
-            model.Storage(storage_name, storage_index, self._backend))
+        self.emit_event(self.charm.on[storage_name].storage_attached,
+                        model.Storage(storage_name, storage_index, self._backend))
 
     def remove_storage(self, storage_id: str) -> None:
         """Detach a storage device.
@@ -597,8 +621,8 @@ class Harness(typing.Generic[CharmType]):
                 "the key '{}' is not specified as a storage key in metadata".format(storage_name))
         is_attached = self._backend._storage_is_attached(storage_name, storage_index)
         if self.charm is not None and self._hooks_enabled and is_attached:
-            self.charm.on[storage_name].storage_detaching.emit(
-                model.Storage(storage_name, storage_index, self._backend))
+            self.emit_event(self.charm.on[storage_name].storage_detaching,
+                            model.Storage(storage_name, storage_index, self._backend))
         self._backend._storage_remove(storage_id)
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
@@ -670,8 +694,8 @@ class Harness(typing.Generic[CharmType]):
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_created.emit(
-            relation, app)
+        self.emit_event(self._charm.on[relation_name].relation_created,
+                        relation, app)
 
     def _emit_relation_broken(self, relation_name: str, relation_id: int,
                               remote_app: str) -> None:
@@ -680,8 +704,8 @@ class Harness(typing.Generic[CharmType]):
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_broken.emit(
-            relation, app)
+        self.emit_event(self._charm.on[relation_name].relation_broken,
+                        relation, app)
 
     def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Add a new unit to a relation.
@@ -726,8 +750,8 @@ class Harness(typing.Generic[CharmType]):
         self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return
-        self._charm.on[relation_name].relation_joined.emit(
-            relation, remote_unit.app, remote_unit)
+        self.emit_event(self._charm.on[relation_name].relation_joined,
+                        relation, remote_unit.app, remote_unit)
 
     def remove_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Remove a unit from a relation.
@@ -787,7 +811,7 @@ class Harness(typing.Generic[CharmType]):
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)
+        self.emit_event(self._charm.on[rel_name].relation_departed, relation, app, unit, unit_name)
 
     def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> typing.Mapping:
         """Get the relation data bucket for a single app or unit in a given relation.
@@ -849,7 +873,7 @@ class Harness(typing.Generic[CharmType]):
         container = self.model.unit.get_container(container_name)
         if SIMULATE_CAN_CONNECT:
             self.set_can_connect(container, True)
-        self.charm.on[container_name].pebble_ready.emit(container)
+        self.emit_event(self.charm.on[container_name].pebble_ready, container)
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -963,7 +987,7 @@ class Harness(typing.Generic[CharmType]):
             app_name = app_or_unit
             app = self.model.get_app(app_name)
             args = (relation, app)
-        self._charm.on[rel_name].relation_changed.emit(*args)
+        self.emit_event(self._charm.on[rel_name].relation_changed, *args)
 
     def _update_config(
             self,
@@ -1023,7 +1047,7 @@ class Harness(typing.Generic[CharmType]):
         self._update_config(key_values, unset)
         if self._charm is None or not self._hooks_enabled:
             return
-        self._charm.on.config_changed.emit()
+        self.emit_event(self._charm.on.config_changed)
 
     def set_leader(self, is_leader: bool = True) -> None:
         """Set whether this unit is the leader or not.
@@ -1041,7 +1065,7 @@ class Harness(typing.Generic[CharmType]):
         # Note: jam 2020-03-01 currently is_leader is cached at the ModelBackend level, not in
         # the Model objects, so this automatically gets noticed.
         if is_leader and self._charm is not None and self._hooks_enabled:
-            self._charm.on.leader_elected.emit()
+            self.emit_event(self._charm.on.leader_elected)
 
     def set_planned_units(self, num_units: int) -> None:
         """Set the number of "planned" units  that "Application.planned_units" should return.
