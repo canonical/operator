@@ -29,10 +29,13 @@ def safe_load(stream: Union[str, TextIO]):
 
 
 @overload
-def safe_dump(data: Any, *args: Any, encoding:None =None, **kwargs: Any) -> str: ...
+def safe_dump(data: Any, *args: Any, encoding: None = None, **kwargs: Any) -> str: ...  # noqa
 @overload
-def safe_dump(data: Any, *args: Any, encoding: str = "", **kwargs: Any) -> bytes: ...
+def safe_dump(data: Any, *args: Any, encoding: str = "", **kwargs: Any) -> bytes: ...  # noqa
 def safe_dump(data: Any, stream: Optional[Union[str, TextIO]] = None, **kwargs: Any  # noqa
               ) -> Union[str, bytes]:
-    """Same as yaml.safe_dump, but use fast C dumper if available."""
+    """Same as yaml.safe_dump, but use fast C dumper if available.
+
+    If `encoding:str` is provided, return bytes. Else, return str.
+    """
     return yaml.dump(data, stream=stream, Dumper=_safe_dumper, **kwargs)
