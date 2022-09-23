@@ -14,7 +14,7 @@
 
 """Internal YAML helpers."""
 
-from typing import Any, Optional, TextIO, Union
+from typing import Any, Optional, TextIO, Union, overload
 
 import yaml
 
@@ -27,7 +27,10 @@ def safe_load(stream: Union[str, TextIO]):
     """Same as yaml.safe_load, but use fast C loader if available."""
     return yaml.load(stream, Loader=_safe_loader)
 
-
-def safe_dump(data: Any, stream: Optional[Union[str, TextIO]] = None, **kwargs):
+@overload
+def safe_dump(data: Any, *args: Any, encoding:None =None, **kwargs: Any) -> str: ...
+@overload
+def safe_dump(data: Any, *args: Any, encoding: str = "", **kwargs: Any) -> bytes: ...
+def safe_dump(data: Any, stream: Optional[Union[str, TextIO]] = None, **kwargs: Any) -> Union[str, bytes]:
     """Same as yaml.safe_dump, but use fast C dumper if available."""
     return yaml.dump(data, stream=stream, Dumper=_safe_dumper, **kwargs)

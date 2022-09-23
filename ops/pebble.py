@@ -749,7 +749,7 @@ class Plan:
 
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
-        return yaml.safe_dump(self.to_dict())  # type: ignore
+        return yaml.safe_dump(self.to_dict())
 
     __str__ = to_yaml
 
@@ -790,8 +790,7 @@ class Layer:
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
-        yamlstr = yaml.safe_dump(self.to_dict())  # type: ignore
-        return typing.cast(str, yamlstr)
+        return yaml.safe_dump(self.to_dict())
 
     def to_dict(self) -> 'LayerDict':
         """Convert this layer to its dict representation."""
