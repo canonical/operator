@@ -488,7 +488,7 @@ class Harness(Generic[CharmType]):
         if self._meta.resources[resource_name].type != "oci-image":
             raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
 
-        as_yaml = yaml.safe_dump(contents)  # type: ignore  # it's a str
+        as_yaml = yaml.safe_dump(contents)
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
 
     def add_resource(self, resource_name: str, content: AnyStr) -> None:

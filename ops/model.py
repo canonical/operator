@@ -2226,7 +2226,7 @@ class _ModelBackend:
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool
                      ) -> '_RelationDataContent_Raw':
-        if not isinstance(is_app, bool):   # pyright:
+        if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if is_app:
@@ -2247,7 +2247,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -2263,7 +2263,7 @@ class _ModelBackend:
         args.extend(["--file", "-"])
 
         try:
-            content = yaml.safe_dump({key: value}, encoding='utf8')  # type: bytes
+            content = yaml.safe_dump({key: value}, encoding='utf8')
             self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
