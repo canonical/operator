@@ -199,13 +199,13 @@ if TYPE_CHECKING:
                           {'services': Dict[str, _ServiceDict],
                            'checks': Dict[str, _CheckDict]},
                           total=False)
-
-    _LayerDict = TypedDict('_LayerDict',
-                           {'summary': str,
-                            'description': str,
-                            'services': Dict[str, _ServiceDict],
-                            'checks': Dict[str, _CheckDict]},
-                           total=False)
+    # public as it is accessed by ops.testing
+    LayerDict = TypedDict('LayerDict',
+                          {'summary': str,
+                           'description': str,
+                           'services': Dict[str, _ServiceDict],
+                           'checks': Dict[str, _CheckDict]},
+                          total=False)
 
     _Error = TypedDict('_Error',
                        {'kind': str,
@@ -749,7 +749,7 @@ class Plan:
 
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
-        return yaml.safe_dump(self.to_dict())  # type: ignore
+        return yaml.safe_dump(self.to_dict())
 
     __str__ = to_yaml
 
@@ -772,12 +772,12 @@ class Layer:
     # description: str
     # services: Mapping[str, 'Service']
 
-    def __init__(self, raw: Optional[Union[str, '_LayerDict']] = None):
+    def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
         if isinstance(raw, str):
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
             d = raw or {}
-        d = typing.cast('_LayerDict', d)
+        d = typing.cast('LayerDict', d)
 
         self.summary = d.get('summary', '')  # type: str
         self.description = d.get('description', '')  # type: str
@@ -790,10 +790,9 @@ class Layer:
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
-        yamlstr = yaml.safe_dump(self.to_dict())  # type: ignore
-        return typing.cast(str, yamlstr)
+        return yaml.safe_dump(self.to_dict())
 
-    def to_dict(self) -> '_LayerDict':
+    def to_dict(self) -> 'LayerDict':
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -802,7 +801,7 @@ class Layer:
             ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
         ]
         dct = {name: value for name, value in fields if value}
-        return typing.cast('_LayerDict', dct)
+        return typing.cast('LayerDict', dct)
 
     def __repr__(self) -> str:
         return 'Layer({!r})'.format(self.to_dict())
@@ -1809,7 +1808,7 @@ class Client:
             change_id, timeout))
 
     def add_layer(
-            self, label: str, layer: Union[str, '_LayerDict', Layer], *,
+            self, label: str, layer: Union[str, 'LayerDict', Layer], *,
             combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 

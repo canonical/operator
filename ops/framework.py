@@ -541,7 +541,7 @@ class PrefixedEvents:
         self._emitter = emitter
         self._prefix = key.replace("-", "_") + '_'
 
-    def __getattr__(self, name: str) -> Union['PrefixedEvents', EventSource[Any]]:
+    def __getattr__(self, name: str) -> BoundEvent[Any]:
         return getattr(self._emitter, self._prefix + name)
 
 
@@ -589,7 +589,7 @@ class Framework(Object):
     # Override properties from Object so that we can set them in __init__.
     model = None  # type: 'Model' # pyright: reportGeneralTypeIssues=false
     meta = None  # type: 'CharmMeta' # pyright: reportGeneralTypeIssues=false
-    charm_dir = None  # type: 'Path' # pyright: reportGeneralTypeIssues=false
+    charm_dir = None  # type: Path # pyright: reportGeneralTypeIssues=false
 
     # to help the type checker and IDEs:
 
@@ -598,11 +598,19 @@ class Framework(Object):
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
-    def __init__(self, storage: Union[SQLiteStorage, JujuStorage], charm_dir: 'Path',
+    def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
+                 charm_dir: Union[str, pathlib.Path],
                  meta: 'CharmMeta', model: 'Model'):
         super().__init__(self, None)
 
-        self.charm_dir = charm_dir
+        # an old, deprecated __init__ interface accepted an Optional charm_dir,
+        #  so we have to keep supporting it:
+        if charm_dir is None:
+            logger.warning('Framework should not be initialized with `charm_dir` set to None.')
+            self.charm_dir = None  # type: ignore
+        else:
+            self.charm_dir = pathlib.Path(charm_dir)
+
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
