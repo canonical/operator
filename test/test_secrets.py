@@ -83,7 +83,8 @@ def model(backend):
 
 
 def test_secret_add_and_get(model, backend):
-    secret = model.unit.add_secret('hey', {'foo': 'bar'})
+    secret = model.unit.add_secret({'foo': 'bar'})
+    secret.set_label('hey')
     # I always have access to the secrets I created
     with backend._god_mode_ctx(value=False):
         secret_2 = model.get_secret(secret.id)
@@ -91,7 +92,8 @@ def test_secret_add_and_get(model, backend):
 
 
 def test_cannot_get_removed_secret(model):
-    secret = model.unit.add_secret('hey', {'foo': 'bar'})
+    secret = model.unit.add_secret({'foo': 'bar'})
+    secret.set_label('foo')
     secret.remove()
 
     # god mode or not, if a secret is gone, it's gone.
@@ -99,10 +101,20 @@ def test_cannot_get_removed_secret(model):
         model.get_secret(secret.id)
 
 
+def test_duplicate_labels_raise(model):
+    secret = model.unit.add_secret({'foo': 'bar'})
+    secret.set_label('foo')
+
+    secret2 = model.unit.add_secret({'foo': 'bar'})
+    with pytest.raises(Exception):  # todo: exceptions
+        secret2.set_label('foo')
+
+
 def test_grant_secret(model, backend):
-    secret = model.unit.add_secret('hey', {'foo': 'bar'})
+    secret = model.unit.add_secret({'foo': 'bar'})
+    secret.set_label('hey')
     backend._mock_relation_ids_map[1] = 'remote/0'
-    secret.grant('remote/0',
+    secret.grant(model.get_unit('remote/0'),
                  ops.model.Relation('db', 1, is_peer=False,
                                     backend=backend, cache=model._cache,
                                     our_unit=model.unit))
@@ -119,9 +131,10 @@ def test_grant_secret(model, backend):
 
 
 def test_cannot_get_revoked_secret(model, backend):
-    secret = model.unit.add_secret('hey', {'foo': 'bar'})
+    secret = model.unit.add_secret({'foo': 'bar'})
+    secret.set_label('hey')
     backend._mock_relation_ids_map[1] = 'remote/0'
-    secret.grant('remote/0',
+    secret.grant(model.get_unit('remote/0'),
                  ops.model.Relation('db', 1, is_peer=False,
                                     backend=backend, cache=model._cache,
                                     our_unit=model.unit))

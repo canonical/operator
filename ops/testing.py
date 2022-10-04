@@ -1337,23 +1337,29 @@ class _TestSecret:
         self._owner = owner or mgr.unit_name
         self._meta = self._mgr._revisions[revision]
 
+    @_copy_docstrings(Secret.id)
     @property
     def id(self) -> str:
-        """Unique identifier for this secret.
-
-        The secret holder can use this identifier to get the secret contents.
-        """
         return self._secret_id
 
-    def set(self, content: Dict[str, str],
-            description: Optional[str] = None) -> '_TestSecret':
-        """Set new content for this secret.
+    @_copy_docstrings(Secret.get)
+    def get(self, key: str,
+            label: str = None,
+            update: bool = False,
+            peek: bool = False) -> str:
+        return self._mgr.secret_get(self._secret_id,
+                                    key=key,
+                                    label=label,
+                                    update=update,
+                                    peek=peek)
 
-        This will create a new revision and notify the holder with a SecretRotateEvent.
-        It will return the new revision.
-        """
+    @_copy_docstrings(Secret.set)
+    def set(self, content: Dict[str, str],
+            label: str = None,
+            description: Optional[str] = None) -> '_TestSecret':
         self._mgr.secret_set(
             self._secret_id,
+            label=label,
             content=content,
             description=description)
         self._harness._emit_secret_changed(self._secret_id)
@@ -1384,24 +1390,24 @@ class _TestSecret:
             relation_id=self._relation_id,
             owner=self._owner)
 
+    @_copy_docstrings(Secret.grant)
     def grant(self, entity: Optional[Union[str, 'UnitOrApplication']] = None):
-        """Grant this secret to that entity (or self)."""
         entity_name = _get_unit_or_app_name(entity)
         self._mgr.secret_grant(self._secret_id, self._relation_id,
                                entity_name or self._mgr.unit_name)
 
+    @_copy_docstrings(Secret.revoke)
     def revoke(self, entity: Optional[Union[str, 'UnitOrApplication']] = None):
-        """Revoke this secret."""
         entity_name = _get_unit_or_app_name(entity)
         self._mgr.secret_revoke(self._secret_id, self._relation_id,
                                 entity_name or self._mgr.unit_name)
 
+    @_copy_docstrings(Secret.remove)
     def remove(self, revision: int = None):
-        """Remove this secret."""
         self._mgr.secret_remove(self._secret_id, revision)
 
+    @_copy_docstrings(Secret.prune)
     def prune(self):
-        """Remove this revision of the secret. """
         self._mgr.secret_remove(self._secret_id, self._revision)
 
     def prune_all_untracked(self):
@@ -1613,8 +1619,8 @@ class _TestingSecretManager:
         self._revisions[secret_id].append(kwargs)
         return secret_id
 
-    def set_label(self, secret_id: str, label: str):
-        self._labels[secret_id] = label
+    # def set_label(self, secret_id: str, label: str):
+    #     self._labels[secret_id] = label
 
     @_copy_signature(model._ModelBackend.secret_set)
     def secret_set(self, secret_id: str, label=None, **kwargs):
@@ -1630,6 +1636,11 @@ class _TestingSecretManager:
             if label == "":
                 del self._labels[secret_id]
             else:
+                # check label is unique:
+                existing_labels = {self._labels.get(s_id, None) for s_id in self.secret_ids()}
+                if label in existing_labels:
+                    raise ModelError(f'duplicate label: {label}')  # todo: check actual error msg
+
                 self._labels[secret_id] = label
 
     def secret_ids(self) -> List[str]:
@@ -1665,7 +1676,8 @@ class _TestingSecretManager:
     def _get_content(self, secret_id: str, revision: int):
         return self._get_mgr(secret_id)._revisions[secret_id][revision]['content']
 
-    def secret_meta(self, secret_id: str, fetch: bool = False, update: bool = False) -> Dict[str, Dict[str, str]]:
+    def secret_meta(self, secret_id: str, fetch: bool = False, update: bool = False
+                    ) -> Dict[str, Dict[str, str]]:
         if update:
             raise NotImplementedError('update')
 
