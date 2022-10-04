@@ -2102,6 +2102,10 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
 
     for key, value in input.items():
         # Ensure the key is of a valid format, and raise a ValueError if not
+        if not isinstance(key, str):
+            # technically a type error, but for consistency with the
+            # other exceptions raised on key validation...
+            raise ValueError('invalid key {!r}; must be a string'.format(key))
         if not _ACTION_RESULT_KEY_REGEX.match(key):
             raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
                              "'some.key'".format(key))
