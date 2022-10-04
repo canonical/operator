@@ -74,7 +74,7 @@ if TYPE_CHECKING:
     _ObserverCallback = Callable[[Any], None]
 
     # types that can be stored natively
-    _StorableType = Union[int, float, str, bytes, Literal[None],
+    _StorableType = Union[int, bool, float, str, bytes, Literal[None],
                           List['_StorableType'],
                           Dict[str, '_StorableType'],
                           Set['_StorableType']]
@@ -484,6 +484,15 @@ class ObjectEvents(Object):
 
         event_type: a type of the event to define.
 
+        Note that attempting to define the same event kind more than once will
+        raise a 'overlaps with existing type' runtime error. Ops uses a
+        labeling system to track and reconstruct events between hook executions
+        (each time a hook runs, the Juju Agent invokes a fresh instance of ops;
+        there is no ops process that persists on the host between hooks).
+        Having duplicate Python objects creates duplicate labels. Overwriting a
+        previously created label means that only the latter code path will be
+        run when the current event, if it does get deferred, is reemitted. This
+        is usually not what is desired, and is error-prone and ambigous.
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
@@ -1055,6 +1064,11 @@ class BoundStoredState:
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)  # type: ignore
 
+    if TYPE_CHECKING:
+        @typing.overload
+        def __getattr__(self, key: Literal['on']) -> ObjectEvents:
+            pass
+
     def __getattr__(self, key: str) -> Union['_StorableType', 'StoredObject', ObjectEvents]:
         # "on" is the only reserved key that can't be used in the data map.
         if key == "on":
@@ -1063,7 +1077,7 @@ class BoundStoredState:
             raise AttributeError("attribute '{}' is not stored".format(key))
         return _wrap_stored(self._data, self._data[key])
 
-    def __setattr__(self, key: str, value: '_StoredObject'):
+    def __setattr__(self, key: str, value: Union['_StorableType', '_StoredObject']):
         if key == "on":
             raise AttributeError("attribute 'on' is reserved and cannot be set")
 
@@ -1076,7 +1090,7 @@ class BoundStoredState:
 
         self._data[key] = unwrapped
 
-    def set_default(self, **kwargs: Dict[str, '_StorableType']):
+    def set_default(self, **kwargs: '_StorableType'):
         """Set the value of any given key if it has not already been set."""
         for k, v in kwargs.items():
             if k not in self._data:
@@ -1112,8 +1126,25 @@ class StoredState:
         self.parent_type = None  # type: Optional[Type[Any]]
         self.attr_name = None  # type: Optional[str]
 
-    def __get__(self, parent: '_ObjectType', parent_type: 'Type[_ObjectType]'
-                ) -> Union['StoredState', BoundStoredState]:
+    if TYPE_CHECKING:
+        @typing.overload
+        def __get__(
+                self,
+                parent: Literal[None],
+                parent_type: 'Type[_ObjectType]') -> 'StoredState':
+            pass
+
+        @typing.overload
+        def __get__(
+                self,
+                parent: '_ObjectType',
+                parent_type: 'Type[_ObjectType]') -> BoundStoredState:
+            pass
+
+    def __get__(self,
+                parent: '_ObjectType',
+                parent_type: 'Type[_ObjectType]') -> Union['StoredState',
+                                                           BoundStoredState]:
         if self.parent_type is not None and self.parent_type not in parent_type.mro():
             # the StoredState instance is being shared between two unrelated classes
             # -> unclear what is expected of us -> bail out
