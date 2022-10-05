@@ -201,8 +201,12 @@ class Harness(typing.Generic[CharmType]):
         """Return the instance of the charm class that was passed to __init__.
 
         Note that the Charm is not instantiated until you have called
-        :meth:`.begin()`.
+        :meth:`.begin()`. Until then, attempting to access this property will raise
+        an exception.
         """
+        if self._charm is None:
+            raise RuntimeError('The charm instance is not available yet. '
+                               'Call Harness.begin() first.')
         return self._charm
 
     @property
@@ -543,7 +547,7 @@ class Harness(typing.Generic[CharmType]):
             storage_id: The full storage ID of the storage unit being detached, including the
                 storage key, e.g. my-storage/0.
         """
-        if self.charm is None:
+        if self._charm is None:
             raise RuntimeError('cannot detach storage before Harness is initialised')
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
@@ -565,7 +569,7 @@ class Harness(typing.Generic[CharmType]):
         """
         if not self._backend._storage_attach(storage_id):
             return  # storage was already attached
-        if not self.charm or not self._hooks_enabled:
+        if not self._charm or not self._hooks_enabled:
             return  # don't need to run hook callback
 
         storage_name, storage_index = storage_id.split('/', 1)
@@ -596,7 +600,7 @@ class Harness(typing.Generic[CharmType]):
             raise RuntimeError(
                 "the key '{}' is not specified as a storage key in metadata".format(storage_name))
         is_attached = self._backend._storage_is_attached(storage_name, storage_index)
-        if self.charm is not None and self._hooks_enabled and is_attached:
+        if self._charm is not None and self._hooks_enabled and is_attached:
             self.charm.on[storage_name].storage_detaching.emit(
                 model.Storage(storage_name, storage_index, self._backend))
         self._backend._storage_remove(storage_id)
@@ -844,7 +848,7 @@ class Harness(typing.Generic[CharmType]):
         container's can_connect state to True before the hook
         function is called.
         """
-        if self.charm is None:
+        if self._charm is None:
             return
         container = self.model.unit.get_container(container_name)
         if SIMULATE_CAN_CONNECT:

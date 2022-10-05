@@ -2183,7 +2183,8 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
         harness.set_leader(True)
-        self.assertIsNone(harness.charm)
+        with self.assertRaises(RuntimeError):
+            _ = harness.charm
         harness.begin_with_initial_hooks()
         self.assertIsNotNone(harness.charm)
         self.assertEqual(
@@ -2207,7 +2208,8 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
-        self.assertIsNone(harness.charm)
+        with self.assertRaises(RuntimeError):
+            _ = harness.charm
         harness.begin_with_initial_hooks()
         self.assertIsNotNone(harness.charm)
         self.assertEqual(
@@ -2238,7 +2240,8 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
-        self.assertIsNone(harness.charm)
+        with self.assertRaises(RuntimeError):
+            _ = harness.charm
         harness.begin_with_initial_hooks()
         self.assertIsNotNone(harness.charm)
         rel_id = harness.model.get_relation('peer').id
