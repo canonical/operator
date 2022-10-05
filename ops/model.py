@@ -61,13 +61,14 @@ if typing.TYPE_CHECKING:
         Client,
         ExecProcess,
         FileInfo,
+        LayerDict,
         Plan,
         ServiceInfo,
-        _LayerDict,
     )
     from typing_extensions import TypedDict
 
     from ops.framework import _SerializedData
+    from ops.testing import _ConfigOption
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
@@ -80,12 +81,13 @@ if typing.TYPE_CHECKING:
                        Tuple['JsonObject', ...]]
 
     # a k8s spec is a mapping from names/"types" to json/yaml spec objects
-    _K8sSpec = Mapping[str, JsonObject]
+    # public since it is used in ops.testing
+    K8sSpec = Mapping[str, JsonObject]
 
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
-    _Layer = Union[str, _LayerDict, pebble.Layer]
+    _Layer = Union[str, LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
     _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -1229,7 +1231,7 @@ class Pod:
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def set_spec(self, spec: '_K8sSpec', k8s_resources: Optional['_K8sSpec'] = None):
+    def set_spec(self, spec: 'K8sSpec', k8s_resources: Optional['K8sSpec'] = None):
         """Set the specification for pods that Juju should start in kubernetes.
 
         See `juju help-tool pod-spec-set` for details of what should be passed.
@@ -2100,6 +2102,10 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
 
     for key, value in input.items():
         # Ensure the key is of a valid format, and raise a ValueError if not
+        if not isinstance(key, str):
+            # technically a type error, but for consistency with the
+            # other exceptions raised on key validation...
+            raise ValueError('invalid key {!r}; must be a string'.format(key))
         if not _ACTION_RESULT_KEY_REGEX.match(key):
             raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
                              "'some.key'".format(key))
@@ -2235,7 +2241,7 @@ class _ModelBackend:
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool
                      ) -> '_RelationDataContent_Raw':
-        if not isinstance(is_app, bool):   # pyright:
+        if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if is_app:
@@ -2256,7 +2262,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -2272,15 +2278,16 @@ class _ModelBackend:
         args.extend(["--file", "-"])
 
         try:
-            content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
-            return self._run(*args, input_stream=content)  # type: ignore
+            content = yaml.safe_dump({key: value}, encoding='utf8')
+            self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
-    def config_get(self):
-        return self._run('config-get', return_output=True, use_json=True)
+    def config_get(self) -> Dict[str, '_ConfigOption']:
+        out = self._run('config-get', return_output=True, use_json=True)
+        return typing.cast(Dict[str, '_ConfigOption'], out)
 
     def is_leader(self) -> bool:
         """Obtain the current leadership status for the unit the charm code is executing on.
@@ -2313,12 +2320,12 @@ class _ModelBackend:
         try:
             spec_path = tmpdir / 'spec.yaml'
             with spec_path.open("wt", encoding="utf8") as f:
-                yaml.safe_dump(spec, stream=f)  # type: ignore
+                yaml.safe_dump(spec, stream=f)
             args = ['--file', str(spec_path)]
             if k8s_resources:
                 k8s_res_path = tmpdir / 'k8s-resources.yaml'
                 with k8s_res_path.open("wt", encoding="utf8") as f:
-                    yaml.safe_dump(k8s_resources, stream=f)  # type: ignore
+                    yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:
@@ -2358,7 +2365,7 @@ class _ModelBackend:
         else:
             return typing.cast('_StatusDict', content)
 
-    def status_set(self, status: str, message: str = '', *, is_app: bool = False):
+    def status_set(self, status: str, message: str = '', *, is_app: bool = False) -> None:
         """Set a status of a unit or an application.
 
         Args:
@@ -2369,9 +2376,9 @@ class _ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
-        return self._run('status-set', '--application={}'.format(is_app), status, message)
+        self._run('status-set', '--application={}'.format(is_app), status, message)
 
-    def storage_list(self, name: str):
+    def storage_list(self, name: str) -> List[int]:
         storages = self._run('storage-list', name, return_output=True, use_json=True)
         storages = typing.cast(List[str], storages)
         return [int(s.split('/')[1]) for s in storages]
@@ -2390,36 +2397,41 @@ class _ModelBackend:
         return id, location
 
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
+        if not len(attribute) > 0:  # assume it's an empty string.
+            raise RuntimeError('calling storage_get with `attribute=""` will return a dict '
+                               'and not a string. This usage is not supported.')
         out = self._run('storage-get', '-s', storage_name_id, attribute,
                         return_output=True, use_json=True)
         return typing.cast(str, out)
 
-    def storage_add(self, name: str, count: int = 1):
+    def storage_add(self, name: str, count: int = 1) -> None:
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError('storage count must be integer, got: {} ({})'.format(count,
                                                                                  type(count)))
         self._run('storage-add', '{}={}'.format(name, count))
 
-    def action_get(self):
-        return self._run('action-get', return_output=True, use_json=True)
+    def action_get(self) -> Dict[str, str]:  # todo: what do we know about this dict?
+        out = self._run('action-get', return_output=True, use_json=True)
+        return typing.cast(Dict[str, str], out)
 
-    def action_set(self, results: '_SerializedData'):
+    def action_set(self, results: '_SerializedData') -> None:
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
         self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
 
-    def action_log(self, message: str):
+    def action_log(self, message: str) -> None:
         self._run('action-log', message)
 
-    def action_fail(self, message: str = ''):
+    def action_fail(self, message: str = '') -> None:
         self._run('action-fail', message)
 
-    def application_version_set(self, version: str):
+    def application_version_set(self, version: str) -> None:
         self._run('application-version-set', '--', version)
 
     @classmethod
-    def log_split(cls, message: str, max_len: int = MAX_LOG_LINE_LEN):
+    def log_split(cls, message: str, max_len: int = MAX_LOG_LINE_LEN
+                  ) -> Generator[str, None, None]:
         """Helper to handle log messages that are potentially too long.
 
         This is a generator that splits a message string into multiple chunks if it is too long
@@ -2432,7 +2444,7 @@ class _ModelBackend:
             yield message[:max_len]
             message = message[max_len:]
 
-    def juju_log(self, level: str, message: str):
+    def juju_log(self, level: str, message: str) -> None:
         """Pass a log message on to the juju logger."""
         for line in self.log_split(message):
             self._run('juju-log', '--log-level', level, "--", line)
@@ -2456,7 +2468,7 @@ class _ModelBackend:
             raise
 
     def add_metrics(self, metrics: Mapping[str, 'Numerical'],
-                    labels: Optional[Mapping[str, str]] = None):
+                    labels: Optional[Mapping[str, str]] = None) -> None:
         cmd = ['add-metric']  # type: List[str]
         if labels:
             label_args = []  # type: List[str]
