@@ -53,10 +53,10 @@ from typing import TYPE_CHECKING, Optional, List, Dict, TypedDict, Union, Set, L
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
-from ops.model import RelationNotFoundError, ModelError, InvalidSecretIDError, Secret
+from ops.model import RelationNotFoundError, ModelError, InvalidSecretIDError, _Secret
 
 if TYPE_CHECKING:
-    from ops.model import UnitOrApplication
+    from ops.model import UnitOrApplication, JsonObject
     RelationID = int
     SecretID = str
     UnitName = str
@@ -1139,7 +1139,7 @@ class Harness(typing.Generic[CharmType]):
             self._backend._calls.clear()
         return calls
 
-    def _get_secret(self, secret_id: str) -> Secret:
+    def _get_secret(self, secret_id: str) -> _Secret:
         # get the Secret instance (same as the Charm would)
         return self.charm.model.get_secret(secret_id)
 
@@ -1319,7 +1319,7 @@ def _get_unit_or_app_name(
                            'pass [str | Unit | Application]')
     return entity_name
 
-
+@_copy_docstrings(_Secret)
 class _TestSecret:
     def __init__(self, harness: 'Harness',
                  secret_id: str,
@@ -1337,12 +1337,10 @@ class _TestSecret:
         self._owner = owner or mgr.unit_name
         self._meta = self._mgr._revisions[revision]
 
-    @_copy_docstrings(Secret.id)
     @property
     def id(self) -> str:
         return self._secret_id
 
-    @_copy_docstrings(Secret.get)
     def get(self, key: str,
             label: str = None,
             update: bool = False,
@@ -1353,7 +1351,6 @@ class _TestSecret:
                                     update=update,
                                     peek=peek)
 
-    @_copy_docstrings(Secret.set)
     def set(self, content: Dict[str, str],
             label: str = None,
             description: Optional[str] = None) -> '_TestSecret':
@@ -1390,23 +1387,19 @@ class _TestSecret:
             relation_id=self._relation_id,
             owner=self._owner)
 
-    @_copy_docstrings(Secret.grant)
     def grant(self, entity: Optional[Union[str, 'UnitOrApplication']] = None):
         entity_name = _get_unit_or_app_name(entity)
         self._mgr.secret_grant(self._secret_id, self._relation_id,
                                entity_name or self._mgr.unit_name)
 
-    @_copy_docstrings(Secret.revoke)
     def revoke(self, entity: Optional[Union[str, 'UnitOrApplication']] = None):
         entity_name = _get_unit_or_app_name(entity)
         self._mgr.secret_revoke(self._secret_id, self._relation_id,
                                 entity_name or self._mgr.unit_name)
 
-    @_copy_docstrings(Secret.remove)
     def remove(self, revision: int = None):
         self._mgr.secret_remove(self._secret_id, revision)
 
-    @_copy_docstrings(Secret.prune)
     def prune(self):
         self._mgr.secret_remove(self._secret_id, self._revision)
 
@@ -1429,7 +1422,6 @@ class _TestSecret:
 class _TestingSecretManager:
     RETRACTED = object()
     ALL = object()
-
 
     def __init__(self, this_unit: str, backend: '_TestingModelBackend'):
         self._backend = backend
@@ -1594,8 +1586,13 @@ class _TestingSecretManager:
             self._scopes[secret_id][relation_id].remove(unit_id)
 
     @_copy_signature(model._ModelBackend.secret_add)
-    def secret_add(self, _local=True, **kwargs) -> str:
+    def secret_add(self, _local=True, label:str = None ,**kwargs) -> str:
         # no checks: anyone can add a secret
+
+        # if you did pass a label, that should be unique.
+        if label and label in self._labels.values():
+            raise ModelError('duplicate label')  # todo match juju exception
+
         secret_id = self._new_secret_id()
         self._secret_ids.add(secret_id)
         owner = kwargs.get('owner')
@@ -1615,12 +1612,12 @@ class _TestingSecretManager:
             if not owner:
                 raise ValueError('you should provide a remote owner')
 
+        if label:
+            self._labels[secret_id] = label
+
         self._owners[secret_id] = owner or self.app_name  # default is app name
         self._revisions[secret_id].append(kwargs)
         return secret_id
-
-    # def set_label(self, secret_id: str, label: str):
-    #     self._labels[secret_id] = label
 
     @_copy_signature(model._ModelBackend.secret_set)
     def secret_set(self, secret_id: str, label=None, **kwargs):
@@ -1643,16 +1640,26 @@ class _TestingSecretManager:
 
                 self._labels[secret_id] = label
 
+    @_copy_docstrings(model._ModelBackend.secret_ids)
     def secret_ids(self) -> List[str]:
         # filter out secrets we don't own
         return list(filter(self._owns, self._secret_ids))
 
-    def secret_get(self, secret_id: str, key: Optional[str] = None,
+    @_copy_docstrings(model._ModelBackend.secret_get)
+    def secret_get(self, secret_id: str = None,
+                   key: Optional[str] = None,
                    label: Optional[str] = None,
                    update: bool = False,
-                   peek: bool = False) -> Union[str, Dict[str, str]]:
+                   peek: bool = False,
+                   meta: bool = False
+                   ) -> Union[str, Dict[str, 'JsonObject']]:
+        if not (secret_id or label):
+            raise TypeError('provide an id or a label or both')
+        secret_id = secret_id or self._secret_label_to_id(label)
+        if secret_id not in self._secret_ids:
+            raise InvalidSecretIDError()
         self._check_access('secret_get', secret_id=secret_id,
-                           own=False, read=True)
+                           own=meta, read=True)
         owner_mgr = self._get_mgr(secret_id)
 
         if label is not None:
@@ -1668,6 +1675,9 @@ class _TestingSecretManager:
 
         revision = latest_revision if peek else self._tracking[secret_id]
 
+        if meta:
+            return owner_mgr._get_secret_meta(secret_id, peek=peek)
+
         content = owner_mgr._get_content(secret_id, revision)
         if key:
             return content[key]
@@ -1676,24 +1686,36 @@ class _TestingSecretManager:
     def _get_content(self, secret_id: str, revision: int):
         return self._get_mgr(secret_id)._revisions[secret_id][revision]['content']
 
-    def secret_meta(self, secret_id: str, fetch: bool = False, update: bool = False
-                    ) -> Dict[str, Dict[str, str]]:
+    def _secret_label_to_id(self, label: str) -> 'SecretID':
+        for _id, _label in self._labels.items():
+            if _label == label:
+                return _id
+        raise KeyError('secret with label {!r} not found'.format(label))
+
+    def _get_secret_meta(
+            self, identifier: str,
+            peek: bool = False,
+            update: bool = False
+    ) -> Dict[str, Dict[str, str]]:
         if update:
             raise NotImplementedError('update')
 
         try:
-            self._check_access('secret_meta', secret_id, own=True)
+            self._check_access('secret_meta', identifier, own=True)
+            secret_id = identifier
         except InvalidSecretIDError as e:
             # secret_meta can be called with a label instead of a secret ID
             try:
-                secret_id = self.secret_label_to_id(secret_id)
-            except ModelError:
-                raise e
+                secret_id = self._secret_label_to_id(identifier)
+            except KeyError:
+                raise RuntimeError(
+                    'invalid secret identifier: {!r} is not a '
+                    'known secret ID or label'.format(identifier))
 
         mgr = self._get_mgr(secret_id)
         rev_meta = mgr._revisions[secret_id]
 
-        if fetch:
+        if peek:
             revision = len(rev_meta) - 1
         else:
             revision = self._tracking.get(secret_id, None)
@@ -1718,22 +1740,8 @@ class _TestingSecretManager:
             }
         }
 
-    def secret_label_to_id(self, label: str):
-        # is this label assigned to one of MY secrets?
-        for sec_id, _label in self._labels.items():
-            if _label == label:
-                return sec_id
-
-        # is this label assigned to some other secret out there?
-        for k, v in self._foreign_labels.items():
-            if v == label:
-                return k
-
-        # TODO: uniform with juju error msg when known
-        raise ModelError('no secret found with label {!r}'.format(label))
-
     def _describe(self, secret_id: str) -> Tuple['SecretMetadata', Dict[str, str]]:
-        return self.secret_meta(secret_id), self.secret_get(secret_id)
+        return self._get_secret_meta(secret_id), self.secret_get(secret_id)
 
     def _prune_all_untracked(self, secret_id: str):
         current_revision = self._tracking[secret_id]
@@ -1800,10 +1808,6 @@ class _TestingModelBackend:
     def secret_remove(self, *args, **kwargs):
         return self._secrets.secret_remove(*args, **kwargs)
 
-    @_copy_signature(model._ModelBackend.secret_label_to_id)
-    def secret_label_to_id(self, *args, **kwargs):
-        return self._secrets.secret_label_to_id(*args, **kwargs)
-
     @_copy_signature(model._ModelBackend.secret_grant)
     def secret_grant(self, *args, **kwargs):
         return self._secrets.secret_grant(*args, **kwargs)
@@ -1823,10 +1827,6 @@ class _TestingModelBackend:
     @_copy_signature(model._ModelBackend.secret_get)
     def secret_get(self, *args, **kwargs) -> Union[str, Dict[str, str]]:
         return self._secrets.secret_get(*args, **kwargs)
-
-    @_copy_signature(model._ModelBackend.secret_meta)
-    def secret_meta(self, *args, **kwargs) -> Dict[str, str]:
-        return self._secrets.secret_meta(*args, **kwargs)
 
     def _validate_relation_access(self, relation_name, relations):
         """Ensures that the named relation exists/has been added.

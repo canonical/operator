@@ -10,7 +10,7 @@ import ops.model
 from ops import testing
 from ops.charm import SecretChangedEvent, CharmBase, SecretRotateEvent, SecretRemoveEvent
 from ops.framework import EventBase, BoundEvent
-from ops.model import Secret
+from ops.model import _Secret
 from ops.testing import _TestingModelBackend, Harness
 
 SECRET_METHODS = ("secret_set",
@@ -19,8 +19,7 @@ SECRET_METHODS = ("secret_set",
                   "secret_revoke",
                   "secret_add",
                   "secret_ids",
-                  "secret_get",
-                  "secret_meta")
+                  "secret_get")
 
 
 @pytest.mark.parametrize('method', SECRET_METHODS, ids=SECRET_METHODS)
@@ -32,9 +31,9 @@ def test_testing_secrets_manager_api_completeness(method):
     tmb_sig = inspect.signature(getattr(_TestingModelBackend, method))
 
     assert tsm_sig == mmb_sig, 'the _TestingSecretManager and ' \
-                               '_ModelBackend signatures have diverged'
+                               '_ModelBackend signatures for {} have diverged'.format(method)
     assert tmb_sig == mmb_sig, 'the _TestingModelBackend and ' \
-                               '_ModelBackend signatures have diverged'
+                               '_ModelBackend signatures for {} have diverged'.format(method)
 
 
 class _TestingSecretManager(testing._TestingSecretManager):
@@ -82,37 +81,52 @@ def model(backend):
     )
 
 
+def assert_secrets_equal(s1, s2):
+    return (s1.id, s1.revision, s1.label) == (s2.id, s2.revision, s2.label)
+
 def test_secret_add_and_get(model, backend):
-    secret = model.unit.add_secret({'foo': 'bar'})
-    secret.set_label('hey')
+    secret = model.unit.add_secret({'foo': 'bar'}, label='hey!')
     # I always have access to the secrets I created
     with backend._god_mode_ctx(value=False):
-        secret_2 = model.get_secret(secret.id)
-    assert secret == secret_2
+        secret_2 = model.get_secret(secret_id=secret.id)
+    assert_secrets_equal(secret, secret_2)
 
 
-def test_cannot_get_removed_secret(model):
-    secret = model.unit.add_secret({'foo': 'bar'})
-    secret.set_label('foo')
+def test_secret_get_by_label_owner(model, backend):
+    secret = model.unit.add_secret({'foo': 'bar'}, label='hey!')
+    secret2 = model.get_secret(label='hey!')
+    assert_secrets_equal(secret, secret2)
+
+
+def test_secret_get_by_id_owner(model, backend):
+    secret = model.unit.add_secret({'foo': 'bar'}, label='hey!')
+    secret2 = model.get_secret(secret_id=secret.id)
+    assert_secrets_equal(secret, secret2)
+
+
+@pytest.mark.parametrize('god_mode', (True, False))
+def test_cannot_get_removed_secret(model, god_mode, backend):
+    secret = model.unit.add_secret({'foo': 'bar'}, label='foo')
     secret.remove()
 
-    # god mode or not, if a secret is gone, it's gone.
-    with pytest.raises(Exception):  # todo: exceptions
-        model.get_secret(secret.id)
+    with backend._god_mode_ctx(value=god_mode):
+        # god mode or not, if a secret is gone, it's gone.
+        with pytest.raises(Exception):  # todo: exceptions
+            model.get_secret(secret_id=secret.id)
 
 
 def test_duplicate_labels_raise(model):
-    secret = model.unit.add_secret({'foo': 'bar'})
-    secret.set_label('foo')
+    _ = model.unit.add_secret({'foo': 'bar'}, label='foo')
 
-    secret2 = model.unit.add_secret({'foo': 'bar'})
     with pytest.raises(Exception):  # todo: exceptions
-        secret2.set_label('foo')
+        _ = model.unit.add_secret({'another': 'secret'}, label='foo')
+
+    with pytest.raises(Exception):  # todo: exceptions
+        _ = model.app.add_secret({'another': 'secret'}, label='foo')
 
 
 def test_grant_secret(model, backend):
-    secret = model.unit.add_secret({'foo': 'bar'})
-    secret.set_label('hey')
+    secret = model.unit.add_secret({'foo': 'bar'}, label='hey')
     backend._mock_relation_ids_map[1] = 'remote/0'
     secret.grant(model.get_unit('remote/0'),
                  ops.model.Relation('db', 1, is_peer=False,
@@ -126,7 +140,7 @@ def test_grant_secret(model, backend):
         backend.secret_get(secret.id)  # this works in god mode
 
     with backend._god_mode_ctx(False):
-        with pytest.raises(ops.model.OwnershipError):
+        with pytest.raises(ops.model.SecretOwnershipError):
             backend.secret_get(secret.id)
 
 
@@ -145,8 +159,8 @@ def test_cannot_get_revoked_secret(model, backend):
 
 
 def test_secret_event_snapshot(backend):
-    sec = Secret(backend, 'secret:1234567',
-                 label='bar', revision=7, am_owner=True)
+    sec = _Secret(backend, 'secret:1234567',
+                  label='bar', revision=7, am_owner=True)
     e1 = SecretChangedEvent('', sec)
     e2 = SecretChangedEvent('', None)
 
@@ -256,22 +270,23 @@ def grant(owner: CharmBase, secret_specifier: str, holder: CharmBase,
 
 
 def test_owner_create_secret(owner, holder):
+    # this secret id will in practice be shared via relation data.
+    # here we don't care about how it's being shared.
     sec_id = ''
 
     @owner.run
     def create_secret():
         nonlocal sec_id
-        secret = owner.app.add_secret({'a': 'b'})
-        secret.set_label('my_label')
+        secret = owner.app.add_secret({'a': 'b'}, label='my_label')
         sec_id = secret.id
         assert secret._am_owner
 
         # now we can also get it by:
-        secret2 = owner.model.get_secret('my_label')
+        secret2 = owner.model.get_secret(label='my_label')
         assert secret == secret2
 
         # however we can't inspect the contents:
-        with pytest.raises(ops.model.OwnershipError):
+        with pytest.raises(ops.model.SecretOwnershipError):
             secret.get('a')
 
     @holder.run
@@ -279,10 +294,11 @@ def test_owner_create_secret(owner, holder):
         nonlocal sec_id
         # labels are local: my_label is how OWNER knows this secret, not holder.
         with pytest.raises(ops.model.InvalidSecretIDError):
-            assert holder.model.get_secret('my_label')
+            assert holder.model.get_secret(label='my_label')
 
+        # and either way, we haven't been granted the secret yet!
         with pytest.raises(ops.model.SecretNotGrantedError):
-            holder.model.get_secret(sec_id)
+            holder.model.get_secret(secret_id=sec_id)
 
     @owner.run
     def grant_access():
@@ -293,12 +309,12 @@ def test_owner_create_secret(owner, holder):
     def secret_get_with_access():
         nonlocal sec_id
         # as a holder, we can secret-get
-        secret = holder.model.get_secret(sec_id)
-        secret.set_label('other_label')
+        secret = holder.model.get_secret(secret_id=sec_id,
+                                         label='other_label')
 
         assert not secret._am_owner
         # we can get it by label as well now!
-        assert holder.model.get_secret('other_label') == secret
+        assert holder.model.get_secret(label='other_label') == secret
 
         assert secret.get('a') == 'b'
 

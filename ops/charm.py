@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
     from ops.framework import Handle, JsonObject, _SerializedData
-    from ops.model import Container, Numerical, Relation, Storage, Secret
+    from ops.model import Container, Numerical, Relation, Storage, _Secret
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
@@ -155,7 +155,7 @@ class SecretEvent(EventBase):
             'secret_id': Required[str],
         }, total=False)
 
-    def __init__(self, handle: 'Handle', secret: model.Secret):
+    def __init__(self, handle: 'Handle', secret: model._Secret):
         super().__init__(handle)
         self.secret = secret
 
@@ -176,7 +176,7 @@ class SecretEvent(EventBase):
 
         Not meant to be called by charm code.
         """
-        self.secret = model.Secret(
+        self.secret = model._Secret(
             self.framework.model._backend,  # pyright: PrivateMemberAccess=false
             snapshot['id'],
             label=snapshot['label'],
