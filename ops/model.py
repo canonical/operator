@@ -28,7 +28,7 @@ import typing
 import weakref
 from abc import ABC, abstractmethod
 from pathlib import Path
-from subprocess import PIPE, CalledProcessError, CompletedProcess, run
+from subprocess import PIPE, CalledProcessError, run
 from typing import (
     Any,
     BinaryIO,
@@ -37,13 +37,13 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Literal,
     Mapping,
     MutableMapping,
     Optional,
     Sequence,
     Set,
     TextIO,
-    overload,
     Tuple,
     Type,
     TypeVar,
@@ -66,7 +66,7 @@ if typing.TYPE_CHECKING:
         ServiceInfo,
         _LayerDict,
     )
-    from typing_extensions import TypedDict, Literal
+    from typing_extensions import TypedDict
 
     from ops.framework import _SerializedData
 
@@ -121,7 +121,7 @@ if typing.TYPE_CHECKING:
     })
     _SecretRotationPolicy = Literal['never', 'hourly', 'daily', 'weekly',
                                     'monthly', 'quarterly', 'yearly']
-
+    _SecretOwner = Literal['unit', 'application']
     SecretID, SecretLabel = str, str
 
 StrOrPath = typing.Union[str, Path]
@@ -179,6 +179,14 @@ class Model:
                 meta=True)
         except SecretOwnershipError:  # let other types raise
             # the call failed. We do not own the secret, and secret_id/label are only known if we provided them.
+            # however, unless we call secret_get again without meta, juju might not know that we attempted to set a
+            # label for it.
+            if secret_id:  # call secret-get to ensure that, if the label is new, juju knows about it.
+                self._backend.secret_get(secret_id=secret_id, label=label)
+            if not secret_id:
+                logger.warning('No secret_id provided for secret {!r}. The framework cannot know what secret ID this '
+                               'secret corresponds to, but if the label is known to juju, '
+                               'everything should work.'.format(label))
             return _Secret(self._backend, secret_id, label=label,
                            revision=None, am_owner=False)
 
@@ -386,9 +394,10 @@ class Application:
             ...    expire=datetime.datetime.today() + datetime.timedelta(days=24),
             ...    rotate='never')
         """
-        if not self._backend._hook_is_running:
+        if not self._backend._hook_is_running:  # noqa
             raise RuntimeError("This method is meant to be called from charm code;"
                                "testing code should use `Harness.add_secret()`.")
+        _Secret._validate_content(content)  # noqa
 
         sec_id = self._backend.secret_add(
             owner='application', content=content, label=label,
@@ -524,9 +533,10 @@ class Unit:
             >>> secret.grant(self.model.relations['db'][0])
 
         """
-        if not self._backend._hook_is_running:
+        if not self._backend._hook_is_running:  # noqa
             raise RuntimeError("This method is meant to be called from charm code;"
                                "testing code should use `Harness.add_secret()`.")
+        _Secret._validate_content(content)  # noqa
 
         sec_id = self._backend.secret_add(content=content, label=label,
                                           owner='unit', description=description,
@@ -924,6 +934,7 @@ class _Secret:
     Typically you should obtain a Secret instance by creating one via your Unit or your Application,
     or get one (typically one you don't own) from your Model.
     """
+    secret_key_re = re.compile(r"^([a-z](?:-?[a-z0-9]){2,})$")
 
     def __init__(self, backend: '_ModelBackend',
                  secret_id: Optional[str] = None,
@@ -980,6 +991,19 @@ class _Secret:
             return '<{}({})>'.format(self.id, self.label)
         return '<{}>'.format(self.id)
 
+    @staticmethod
+    def _validate_content(content: Optional[Dict[str, str]]):
+        if not content:
+            # fixme: ATM you can't secret-set without content (e.g. to only update the label),
+            #  but that is a bug in juju.
+            #  when that is fixed, `secret-set [id] --label X` will be valid.
+            raise ModelError('missing secret value or filename')
+        for key, value in content.items():
+            if not _Secret.secret_key_re.match(key):
+                raise ModelError('key "{}" not valid. '
+                                 'Constraints: at least 3 characters long, '
+                                 'no number to start, no dash to end.'.format(key))
+
     def set(self, content: Dict[str, str],
             description: Optional[str] = None):
         """Update the contents of this secret.
@@ -999,9 +1023,7 @@ class _Secret:
         description: An optional string to describe the content of the secret.
         label: Update the label of the secret.
         """
-        if not content:
-            # fixme: this is apparently a juju bug, it should be possible "soon".
-            raise RuntimeError("cannot set secret with no content: {}.".format(content))
+        self._validate_content(content)
 
         if not self._am_owner:
             raise RuntimeError(
@@ -1138,9 +1160,6 @@ class _Secret:
                 Useful if you want to "try out" the new secret revision before dropping
                 the old one.
         """
-        if self._am_owner:
-            raise SecretOwnershipError(
-                'cannot get contents for secret {} which is owned by this unit'.format(self))
         return self._backend.secret_get(self.id, key=key,
                                         update=update, peek=peek,
                                         label=self.label)
@@ -2596,7 +2615,7 @@ class _ModelBackend:
 
     def secret_add(self,
                    content: Dict[str, str],
-                   owner: str = 'application',
+                   owner: '_SecretOwner' = 'application',
                    description: Optional[str] = None,
                    label: Optional[str] = None,
                    expire: Optional[datetime.datetime] = None,
