@@ -147,20 +147,42 @@ class HookEvent(EventBase):
     """
 
 
-class SecretEvent(EventBase):
+class SecretEvent(HookEvent):
     """Base class for secret-related events."""
+
+    # used to determine whether the secret instance
+    # exposed by this event is self-owned or not. Uses the knowledge that certain event
+    # types are only fired on secret owners / holders.
+    _is_owner_event = NotImplemented
 
     if TYPE_CHECKING:
         _SecretEventSnapshot = TypedDict('_SecretEventSnapshot', {
             'id': str,
             'label': str,
             'revision': int,
-            'am_owner': bool
         })
 
-    def __init__(self, handle: 'Handle', secret: model._Secret):
+    def __init__(self,
+                 handle: 'Handle',
+                 id: str,
+                 label: Optional[str] = None,
+                 revision: Optional[str] = None):
         super().__init__(handle)
-        self.secret = secret
+        assert isinstance(self._is_owner_event, bool), '_is_owner_event ' \
+                                                       'should be overridden in subclass'
+        self.id = id
+        self.label = label
+        self.revision = int(revision) if revision else None
+
+    @property
+    def secret(self) -> model._Secret:  # pyright: reportPrivateUsage=false
+        """The secret instance this event is about."""
+        return model._Secret(  # pyright: reportPrivateUsage=false
+            backend=self.framework.model._backend,  # pyright: reportPrivateUsage=false
+            id=self.id,
+            label=self.label,
+            revision=self.revision,
+            am_owner=self._is_owner_event)
 
     def snapshot(self) -> '_SecretEventSnapshot':
         """Used by the framework to serialize the event to disk.
@@ -168,10 +190,9 @@ class SecretEvent(EventBase):
         Not meant to be called by charm code.
         """
         snapshot = {
-            'id': self.secret.id,
-            'label': self.secret.label,
-            'revision': self.secret._revision,  # pyright: PrivateMemberAccess=false
-            'am_owner': self.secret._am_owner,  # pyright: PrivateMemberAccess=false
+            'id': self.id,
+            'label': self.label,
+            'revision': self.revision,  # pyright: PrivateMemberAccess=false
         }
         return cast('SecretEvent._SecretEventSnapshot', snapshot)
 
@@ -180,16 +201,13 @@ class SecretEvent(EventBase):
 
         Not meant to be called by charm code.
         """
-        self.secret = model._Secret(  # pyright: PrivateMemberAccess=false
-            backend=self.framework.model._backend,  # pyright: PrivateMemberAccess=false
-            id=snapshot['id'],
-            label=snapshot['label'],
-            revision=snapshot['revision'],
-            am_owner=snapshot['am_owner'])
+        self.id = snapshot['id']
+        self.label = snapshot['label']
+        self.revision = snapshot['revision']
 
 
 class SecretChangedEvent(SecretEvent):
-    """Event raised by juju when the owner of a secret has changed its contents.
+    """Event raised by juju on a secret holder when the owner has changed its contents.
 
     When the owner of a secret creates a new revision, all units/applications
     that are tracking this secret will be notified by means of this event that a new
@@ -204,6 +222,7 @@ class SecretChangedEvent(SecretEvent):
     >>>     new_secret = self.model.get_secret(evt.secret.id)
             # self._update_credentials(new_secret) ...
     """
+    _is_owner_event = False
 
 
 class SecretRemoveEvent(SecretEvent):
@@ -223,6 +242,7 @@ class SecretRemoveEvent(SecretEvent):
         >>> def _on_secret_remove(self, event: SecretRemoveEvent):
         >>>     event.secret.prune()
     """
+    _is_owner_event = True
 
 
 class SecretRotateEvent(SecretEvent):
@@ -236,6 +256,8 @@ class SecretRotateEvent(SecretEvent):
         >>> def _on_secret_rotate(self: CharmBase, evt: SecretRotateEvent):
         >>>     evt.secret.set({'new': 'credentials'})
     """
+    _is_owner_event = True
+
     def defer(self):
         """Secret rotation events are not deferrable.
 
@@ -258,6 +280,7 @@ class SecretExpiredEvent(SecretEvent):
         >>> def _on_secret_expired(self: CharmBase, evt: SecretExpiredEvent):
         >>>     evt.secret.set({'new': 'credentials'})
     """
+    _is_owner_event = True
 
     def defer(self):
         """Secret expiration events are not deferrable.

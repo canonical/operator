@@ -210,6 +210,7 @@ def test_secret_event_snapshot(backend):
     e1 = SecretChangedEvent('', sec)
     e2 = SecretChangedEvent('', None)
 
+    e1.framework = Mock(model=Mock(_backend=backend))
     e2.framework = Mock(model=Mock(_backend=backend))
     e2.restore(e1.snapshot())
     assert e1.secret.__dict__ == e2.secret.__dict__

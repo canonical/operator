@@ -1168,19 +1168,19 @@ class Harness(typing.Generic[CharmType]):
 
     def _emit_secret_changed(self, id: str):
         secret = self._get_secret(id)
-        self.charm.on.secret_changed.emit(secret)
+        self.charm.on.secret_changed.emit(id, label=secret.label, revision=secret.revision)
 
     def _emit_secret_rotate(self, id: str):
         secret = self._get_secret(id)
-        self.charm.on.secret_rotate.emit(secret)
+        self.charm.on.secret_rotate.emit(id, label=secret.label, revision=secret.revision)
 
     def _emit_secret_remove(self, id: str):
         secret = self._get_secret(id)
-        self.charm.on.secret_remove.emit(secret)
+        self.charm.on.secret_remove.emit(id, label=secret.label, revision=secret.revision)
 
     def _emit_secret_expired(self, id: str):
         secret = self._get_secret(id)
-        self.charm.on.secret_expired.emit(secret)
+        self.charm.on.secret_expired.emit(id, label=secret.label, revision=secret.revision)
 
 
 def _record_calls(cls):
