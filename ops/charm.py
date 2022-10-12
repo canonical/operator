@@ -152,8 +152,11 @@ class SecretEvent(EventBase):
 
     if TYPE_CHECKING:
         _SecretEventSnapshot = TypedDict('_SecretEventSnapshot', {
-            'secret_id': Required[str],
-        }, total=False)
+            'id': str,
+            'label': str,
+            'revision': int,
+            'am_owner': bool
+        })
 
     def __init__(self, handle: 'Handle', secret: model._Secret):
         super().__init__(handle)
@@ -164,21 +167,22 @@ class SecretEvent(EventBase):
 
         Not meant to be called by charm code.
         """
-        return {
+        snapshot = {
             'id': self.secret.id,
             'label': self.secret.label,
             'revision': self.secret._revision,  # pyright: PrivateMemberAccess=false
             'am_owner': self.secret._am_owner,  # pyright: PrivateMemberAccess=false
-        }  # type: 'SecretEvent._SecretEventSnapshot'
+        }
+        return cast('SecretEvent._SecretEventSnapshot', snapshot)
 
     def restore(self, snapshot: '_SecretEventSnapshot'):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
         """
-        self.secret = model._Secret(
-            self.framework.model._backend,  # pyright: PrivateMemberAccess=false
-            snapshot['id'],
+        self.secret = model._Secret(  # pyright: PrivateMemberAccess=false
+            backend=self.framework.model._backend,  # pyright: PrivateMemberAccess=false
+            id=snapshot['id'],
             label=snapshot['label'],
             revision=snapshot['revision'],
             am_owner=snapshot['am_owner'])

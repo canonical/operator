@@ -1,3 +1,16 @@
+# Copyright 2019-2020 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import inspect
 from contextlib import contextmanager
 from unittest.mock import Mock
@@ -109,7 +122,7 @@ def test_secret_add_and_get(model, backend):
     secret = model.unit.add_secret({'foo': 'bar'}, label='hey!')
     # I always have access to the secrets I created
     with backend._god_mode_ctx(value=False):
-        secret_2 = model.get_secret(secret_id=secret.id)
+        secret_2 = model.get_secret(id=secret.id)
     assert_secrets_equal(secret, secret_2)
 
 
@@ -121,7 +134,7 @@ def test_secret_get_by_label_owner(model, backend):
 
 def test_secret_get_by_id_owner(model, backend):
     secret = model.unit.add_secret({'foo': 'bar'}, label='hey!')
-    secret2 = model.get_secret(secret_id=secret.id)
+    secret2 = model.get_secret(id=secret.id)
     assert_secrets_equal(secret, secret2)
 
 
@@ -134,12 +147,12 @@ def test_cannot_get_removed_secret(model, god_mode, leader, owner, backend):
     # we create a secret and then remove it.
     with backend._god_mode_ctx():
         secret_id = backend.secret_add(content={'foo': 'bar'}, owner=owner)
-        backend.secret_remove(secret_id=secret_id)
+        backend.secret_remove(id=secret_id)
 
     with backend._god_mode_ctx(value=god_mode):
         # god mode or not, if a secret is gone, it's gone.
         with pytest.raises(ops.model.InvalidSecretIDError):
-            model.get_secret(secret_id=secret_id)
+            model.get_secret(id=secret_id)
 
 
 def test_duplicate_labels_raise(model):
@@ -185,10 +198,10 @@ def test_cannot_get_revoked_secret(model, backend):
 
     # if remote_0 tried to get the secret:
     with pytest.raises(ops.model.SecretNotGrantedError):
-        remote_0_mgr.secret_get(secret_id=secret.id, key='foo')
+        remote_0_mgr.secret_get(id=secret.id, key='foo')
 
     with pytest.raises(ops.model.SecretNotGrantedError):
-        remote_0_mgr.secret_get(secret_id=secret.id)
+        remote_0_mgr.secret_get(id=secret.id)
 
 
 def test_secret_event_snapshot(backend):
@@ -289,7 +302,7 @@ def grant(owner: CharmBase, holder: CharmBase,
     owner.model._backend._secrets._mock_relation_ids_map[1] = holder.unit.name
     holder.model._backend._secrets._mock_relation_ids_map[1] = owner.unit.name
 
-    owner.model.get_secret(label=label, secret_id=secret_id).grant(
+    owner.model.get_secret(label=label, id=secret_id).grant(
         holder.unit,
         relation=ops.model.Relation(relation_name, relation_id, is_peer=is_peer,
                                     backend=owner.model._backend,
@@ -329,7 +342,7 @@ def test_owner_create_secret(owner_harness, owner, holder):
 
         # and either way, we haven't been granted the secret yet!
         with pytest.raises(ops.model.SecretNotGrantedError):
-            holder.model.get_secret(secret_id=sec_id)
+            holder.model.get_secret(id=sec_id)
 
     @owner.run
     def grant_access():
@@ -340,7 +353,7 @@ def test_owner_create_secret(owner_harness, owner, holder):
     def secret_get_with_access():
         nonlocal sec_id
         # as a holder, we can secret-get
-        secret = holder.model.get_secret(secret_id=sec_id, label='other_label')
+        secret = holder.model.get_secret(id=sec_id, label='other_label')
 
         assert not secret._am_owner
         # we can get it by label as well now!
@@ -354,8 +367,8 @@ def test_owner_create_secret(owner_harness, owner, holder):
         nonlocal sec_id
         # as a holder, we can secret-get. If we do this outside of a secret-event context,
         # we can't map ids to labels.
-        secret = holder.model.get_secret(secret_id=sec_id, label='other_label')
-        secret1 = holder.model.get_secret(secret_id=sec_id, label='new_label')
+        secret = holder.model.get_secret(id=sec_id, label='other_label')
+        secret1 = holder.model.get_secret(id=sec_id, label='new_label')
         assert_secrets_equal(secret, secret1)
         assert secret.get("foo") == secret1.get("foo")
 
@@ -376,7 +389,7 @@ class TestHolderCharmPOV:
         # verify that the holder can access the secret
         @holder.run  # this is charm code:
         def secret_get_with_access():
-            s = holder.model.get_secret(secret_id=sec_id, label='other_label')
+            s = holder.model.get_secret(id=sec_id, label='other_label')
             assert not s._am_owner
             assert s.get('token') == rev_0_key
             # assert secret.revision == 0  # non-owners cannot see the revision
@@ -385,14 +398,14 @@ class TestHolderCharmPOV:
         def _on_changed(evt):
             assert isinstance(evt, SecretChangedEvent)
             # SecretRotateEvent.secret is *the currently tracked revision*
-            assert_secrets_equal(evt.secret, holder.model.get_secret(secret_id=sec_id))
+            assert_secrets_equal(evt.secret, holder.model.get_secret(id=sec_id))
             assert evt.secret.get('token') == rev_0_key
 
         @holder.listener(holder.on.secret_remove)
         def _on_remove(evt):
             assert isinstance(evt, SecretRemoveEvent)
             # SecretRotateEvent.secret is *the currently tracked revision*
-            assert evt.secret == holder.model.get_secret(secret_id=sec_id)
+            assert evt.secret == holder.model.get_secret(id=sec_id)
 
         # rotate the secret
         secret.set({'token': rev_1_key})
@@ -405,7 +418,7 @@ class TestHolderCharmPOV:
         @holder.run
         def _update_to_latest_revision():
             # we didn't call update() yet, so our revision is still stuck at 0
-            secret = holder.model.get_secret(secret_id=sec_id)
+            secret = holder.model.get_secret(id=sec_id)
             assert secret.get('token') == rev_0_key
 
             # updating bumps us to rev2
@@ -414,7 +427,7 @@ class TestHolderCharmPOV:
 
         @owner.run  # this is charm code:
         def bump_revisions():
-            s = owner.model.get_secret(secret_id=sec_id)
+            s = owner.model.get_secret(id=sec_id)
             for i in range(4):
                 s.set({'token': 'new_secret_rev-{}'.format(i)})
 
@@ -431,7 +444,7 @@ class TestHolderCharmPOV:
 
         @holder.run
         def _update_to_latest_revision_once_more():
-            secret = holder.model.get_secret(secret_id=sec_id)
+            secret = holder.model.get_secret(id=sec_id)
             assert secret.get('token') == rev_2_key
 
             # updating bumps us to rev6
