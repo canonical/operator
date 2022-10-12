@@ -1,5 +1,4 @@
 import inspect
-from collections import defaultdict
 from contextlib import contextmanager
 from unittest.mock import Mock
 
@@ -8,10 +7,10 @@ import yaml
 
 import ops.model
 from ops import testing
-from ops.charm import SecretChangedEvent, CharmBase, SecretRotateEvent, SecretRemoveEvent
-from ops.framework import EventBase, BoundEvent
+from ops.charm import CharmBase, SecretChangedEvent, SecretRemoveEvent
+from ops.framework import BoundEvent, EventBase
 from ops.model import _Secret
-from ops.testing import _TestingModelBackend, Harness
+from ops.testing import Harness, _TestingModelBackend
 
 SECRET_METHODS = ("secret_set",
                   "secret_remove",
@@ -20,7 +19,6 @@ SECRET_METHODS = ("secret_set",
                   "secret_add",
                   "secret_ids",
                   "secret_get")
-
 
 
 @pytest.mark.parametrize('method', SECRET_METHODS, ids=SECRET_METHODS)
@@ -87,8 +85,6 @@ def bind(owner_harness: Harness, holder_harness: Harness):
     bind_secret_mgrs(owner_harness.model._backend._secrets, holder_harness.model._backend._secrets)  # noqa
 
 
-
-
 @pytest.fixture
 def backend():
     return _TestingSecretManager('myapp/0')
@@ -107,6 +103,7 @@ def assert_secrets_equal(s1: _Secret, s2: _Secret):
         if not s1.revision == s2.revision:
             return False
     return (s1.id, s1.label) == (s2.id, s2.label)
+
 
 def test_secret_add_and_get(model, backend):
     secret = model.unit.add_secret({'foo': 'bar'}, label='hey!')
@@ -332,7 +329,7 @@ def test_owner_create_secret(owner_harness, owner, holder):
 
         # and either way, we haven't been granted the secret yet!
         with pytest.raises(ops.model.SecretNotGrantedError):
-            secret = holder.model.get_secret(secret_id=sec_id)
+            holder.model.get_secret(secret_id=sec_id)
 
     @owner.run
     def grant_access():
@@ -355,7 +352,8 @@ def test_owner_create_secret(owner_harness, owner, holder):
     @holder.run
     def secret_relabel():
         nonlocal sec_id
-        # as a holder, we can secret-get. If we do this outside of a secret-event context, we can't map ids to labels.
+        # as a holder, we can secret-get. If we do this outside of a secret-event context,
+        # we can't map ids to labels.
         secret = holder.model.get_secret(secret_id=sec_id, label='other_label')
         secret1 = holder.model.get_secret(secret_id=sec_id, label='new_label')
         assert_secrets_equal(secret, secret1)
@@ -439,6 +437,7 @@ class TestHolderCharmPOV:
             # updating bumps us to rev6
             new_secret = secret.update()
             assert new_secret.get('token') == 'new_secret_rev-3'
+
 
 def test_app_scope_leader():
     mgr1 = _TestingSecretManager('local/0')

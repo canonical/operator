@@ -162,8 +162,8 @@ def _get_event_args(charm: 'CharmBase',
         return [container], {}
     elif issubclass(event_type, ops.charm.SecretEvent):
         kwargs = {
-            'label': os.getenv('JUJU_SECRET_LABEL') or None,
-            'revision': os.getenv('JUJU_SECRET_REVISION') or None,
+            'label': os.environ.get('JUJU_SECRET_LABEL', None),
+            'revision': os.environ.get('JUJU_SECRET_REVISION', None),
         }
         return [os.environ['JUJU_SECRET_ID']], kwargs
     elif issubclass(event_type, ops.charm.StorageEvent):

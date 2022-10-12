@@ -38,7 +38,6 @@ import inspect
 import os
 import pathlib
 import random
-import re
 import signal
 import tempfile
 import typing
@@ -50,14 +49,35 @@ from functools import wraps
 from io import BytesIO, StringIO
 from itertools import chain
 from textwrap import dedent
-from typing import TYPE_CHECKING, Optional, List, Dict, TypedDict, Union, Set, Literal, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    TypedDict,
+    Union,
+)
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
-from ops.model import RelationNotFoundError, ModelError, InvalidSecretIDError, _Secret, InvalidSecretLabelError
+from ops.model import (
+    InvalidSecretIDError,
+    InvalidSecretLabelError,
+    ModelError,
+    RelationNotFoundError,
+    _Secret,
+)
 
 if TYPE_CHECKING:
-    from ops.model import UnitOrApplication, JsonObject, _SecretOwner, _SecretRotationPolicy
+    from ops.model import (
+        JsonObject,
+        UnitOrApplication,
+        _SecretOwner,
+        _SecretRotationPolicy,
+    )
     RelationID = int
     SecretID = str
     UnitName = str
@@ -152,15 +172,23 @@ class Harness(typing.Generic[CharmType]):
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
 
     def add_secret(self, owner: Union[str, 'UnitOrApplication'],
-                      content: Dict[str, str],
-                      relation_id: int,
-                      description: Optional[str] = None) -> '_TestSecret':
-        """Creates a Secret owned by some *remote* unit or app.
+                   content: Dict[str, str],
+                   relation_id: int,
+                   description: Optional[str] = None) -> '_TestSecret':
+        """Return a Secret instance owned by some *remote* unit or app.
 
         If you want to create Secret instances owned by this charm (the one you're
         writing tests for) you will have to do so from charm code, using e.g.
         `ops.model.Application.add_secret()`.
-        Examples:
+
+        Args:
+            owner: the owner of this secret.
+            content: the secret content.
+            relation_id: ID of the relation associated with this secret.
+                The secret's lifetime is bound to that of the relation.
+            description: an optional description for what this secret is.
+
+        Example::
         ---------
             >>> harness = Harness(MyCharm, meta=yaml.safe_dump(
             ...  {'name': 'local', 'requires':
@@ -1320,6 +1348,7 @@ def _get_unit_or_app_name(
                            'pass [str | Unit | Application]')
     return entity_name
 
+
 @_copy_docstrings(_Secret)
 class _TestSecret:
     def __init__(self, harness: 'Harness',
@@ -1330,7 +1359,8 @@ class _TestSecret:
         self._harness = harness
         self._mgr = mgr = harness._backend._secrets  # type: '_TestingSecretManager'
 
-        assert 0 <= revision < len(mgr._revisions[secret_id]), "invalid revision: {}".format(revision)
+        if not 0 <= revision < len(mgr._revisions[secret_id]):
+            raise ValueError("invalid revision: {}".format(revision))
 
         self._secret_id = secret_id
         self._revision = revision
@@ -1369,7 +1399,9 @@ class _TestSecret:
         """Return the latest available revision of this secret.
 
         Will return itself if this secret is already at its newest revision.
-        Examples:
+
+        Example::
+
             >>> def test_secret(self, harness):
             >>>     secret = harness.add_secret(...) # rev 0
             >>>     secret.set(...)  # new revision 1
@@ -1406,7 +1438,9 @@ class _TestSecret:
 
     def prune_all_untracked(self):
         """Prune all untracked, outdated revisions of this secret.
-        Examples:
+
+        Example::
+
             >>> secret = harness.add_secret(myapp, ...)  # revision 0
             >>> secret.set() # creates revision 1
             >>> secret.set() # creates revision 2
@@ -1416,13 +1450,15 @@ class _TestSecret:
             >>> secret.set() # creates revision 3
             >>> secret.set() # creates revision 4
             >>> secret.prune() # delete revisions 0, 1 and 3
-"""
+        """
         self._mgr._prune_all_untracked(self._secret_id)  # noqa
 
 
 class _TestingSecretManager:
     RETRACTED = "<RETRACTED>"
     ALL = object()
+    if TYPE_CHECKING:
+        _Revisions = Dict[SecretID, List[Union[SecretMetadata, Literal["<RETRACTED>"]]]]
 
     def __init__(self, this_unit: str, backend: '_TestingModelBackend'):
         self._backend = backend
@@ -1432,8 +1468,7 @@ class _TestingSecretManager:
         self._secret_ids = set()  # type: Set[SecretID]
         self._scopes = defaultdict(lambda: defaultdict(
             list))  # type: Dict[SecretID, Dict[RelationID, Optional[List[UnitName]]]]  # noqa
-        self._revisions = defaultdict(
-            list)  # type: Dict[SecretID, List[Union[SecretMetadata, _TestingSecretManager.RETRACTED]]]
+        self._revisions = defaultdict(list)  # type: _TestingSecretManager._Revisions
         self._owners = {}  # type: Dict[SecretID, UnitName]
 
         # Which revision are we tracking, for every secret we know (but don't own)?
@@ -1477,7 +1512,7 @@ class _TestingSecretManager:
     @property
     def _hook_is_running(self) -> bool:
         # used to check whether the manager has to enforce permission checks or not
-        #   True -> 'god mode' -> no permission checks and all
+        #   True -> 'testing mode' -> no permission checks and all
         #   False -> 'charm mode' -> permission checks enforced!
         #       the backend will behave as a 'real' backend would.
 
@@ -1626,7 +1661,7 @@ class _TestingSecretManager:
 
         # _local: charm code is calling secret_add, so we will interpret the
         #   owner: application|unit arg as 'this app/this unit'.
-        # _local should only ever be false if we are testing.
+        #   _local should only ever be false if we are testing.
         if _local:
             if owner == 'unit':
                 owner = self.unit_name
@@ -1671,7 +1706,7 @@ class _TestingSecretManager:
         # todo: can anyone do this?
         return list(filter(self._owns, self._secret_ids))
 
-    def _label_update(self, am_owner: bool, secret_id:str, label:str):
+    def _label_update(self, am_owner: bool, secret_id: str, label: str):
         if label is not None:
             if not am_owner:
                 self._foreign_labels[secret_id] = label
@@ -1680,8 +1715,10 @@ class _TestingSecretManager:
                 if existing_label is None:
                     self._labels[secret_id] = label
                 elif existing_label != label:
-                    e = InvalidSecretLabelError('{} already has a label ({}); '
-                                                'cannot relabel to {}'.format(secret_id, existing_label, label))
+                    e = InvalidSecretLabelError(
+                        '{} already has a label ({}); cannot relabel to {}'.format(
+                            secret_id, existing_label, label
+                        ))
                     raise ModelError('secret with label "{}" already exists'.format(label)) from e
 
     @_copy_docstrings(model._ModelBackend.secret_get)  # noqa
@@ -1730,8 +1767,13 @@ class _TestingSecretManager:
             return value
         return content
 
-    def _get_content(self, secret_id: str, revision: int) -> Union[Literal[RETRACTED], Dict[str, str]]:
-        """Retrieve the content of this secret revision, or RETRACTED if the revision has been deleted."""
+    def _get_content(self, secret_id: str, revision: int
+                     ) -> Union[Literal[RETRACTED], Dict[str, str]]:
+        """Return the content of this secret revision.
+
+        It will return RETRACTED if the requested revision has been deleted and is no
+        longer available.
+        """
         rev = self._get_mgr(secret_id)._revisions[secret_id][revision]
         if rev is self.RETRACTED:
             return rev
@@ -1756,7 +1798,7 @@ class _TestingSecretManager:
             revision = self._tracking.get(secret_id, None)
             if revision is None:
                 # we update implicitly to the latest one.
-                revision = len(rev_meta) -1
+                revision = len(rev_meta) - 1
 
         meta = rev_meta[revision]
 
@@ -1779,9 +1821,10 @@ class _TestingSecretManager:
         current_revision = self._tracking[secret_id]
         for i in range(len(self._revisions[secret_id][:-1])):
             if i == current_revision:
-                # we skip the current revision but we don't break: also all 'future' revisions between the
-                # current one and the 'latest' one get pruned, because the next time we update, we'll skip
-                # all of them and go directly to the latest.
+                # we skip the current revision, but we don't break: also all 'future'
+                # revisions between the current one and the 'latest' one get pruned,
+                # because the next time we update, we'll skip all of them and go directly
+                # to the latest.
                 continue
             self.secret_remove(secret_id, i)
 

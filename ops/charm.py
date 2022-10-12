@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
     from ops.framework import Handle, JsonObject, _SerializedData
-    from ops.model import Container, Numerical, Relation, Storage, _Secret
+    from ops.model import Container, Numerical, Relation, Storage
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
