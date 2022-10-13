@@ -545,11 +545,15 @@ class PrefixedEvents:
         return getattr(self._emitter, self._prefix + name)
 
 
-class PreCommitEvent(EventBase):
+class FrameworkEvent(EventBase):
+    """Base class for events emitted by the Framework."""
+
+
+class PreCommitEvent(FrameworkEvent):
     """Events that will be emitted first on commit."""
 
 
-class CommitEvent(EventBase):
+class CommitEvent(FrameworkEvent):
     """Events that will be emitted second on commit."""
 
 
@@ -914,7 +918,24 @@ class Framework(Object):
             observer = self._observer.get(observer_path)
             if observer:
                 if single_event_path is None:
-                    logger.debug("Re-emitting %s.", event)
+                    logger.debug("Re-emitting deferred %s.", event)
+                elif isinstance(event, FrameworkEvent):
+                    pass  # We get two of these each hook execution: too much noise.
+                else:
+                    try:
+                        # this is the event that is causing this charm execution
+                        env_evt = os.environ.get('JUJU_DISPATCH_PATH', sys.argv[0]).split('/')[-1]
+                        if env_evt.replace('-', '_') != event.handle.kind:
+                            # if the event we are emitting now is not the event being
+                            # fired by juju, and it also is not an event we have deferred,
+                            # it must be a custom event
+                            logger.debug("Emitting custom event %s.", event)
+                    except (KeyError, ValueError) as e:
+                        logger.error(
+                            "Something went wrong when attempting to determine if "
+                            "the event being emitted is a custom one: "
+                            "({}){}".format(type(e).__name__, e))
+
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)

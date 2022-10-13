@@ -21,14 +21,24 @@ sys.path.append('lib')
 
 from ops.charm import (  # noqa: E402 (module-level import after non-import code)
     CharmBase,
+    CharmEvents,
 )
-from ops.framework import StoredState  # noqa: E402
+from ops.framework import EventBase, EventSource, StoredState  # noqa: E402
 from ops.main import main  # noqa: E402 (ditto)
 
 logger = logging.getLogger()
 
 
+class CustomEvent(EventBase):
+    pass
+
+
+class MyCharmEvents(CharmEvents):
+    custom = EventSource(CustomEvent)
+
+
 class Charm(CharmBase):
+    on = MyCharmEvents()
 
     _stored = StoredState()
 
@@ -57,6 +67,8 @@ class Charm(CharmBase):
             on_log_warning_action=[],
             on_log_info_action=[],
             on_log_debug_action=[],
+
+            on_custom=[],
 
             # Observed event type names per invocation. A list is used to preserve the
             # order in which charm handlers have observed the events.
@@ -90,6 +102,7 @@ class Charm(CharmBase):
             self.framework.observe(self.on.log_debug_action, self._on_log_debug_action)
 
         self.framework.observe(self.on.collect_metrics, self._on_collect_metrics)
+        self.framework.observe(self.on.custom, self._on_custom)
 
         if os.getenv('TRY_EXCEPTHOOK', False):
             raise RuntimeError("failing as requested")
@@ -110,6 +123,9 @@ class Charm(CharmBase):
     def _on_update_status(self, event):
         self._stored.on_update_status.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
+
+        if os.getenv('EMIT_CUSTOM_EVENT'):
+            self.on.custom.emit()
 
     def _on_leader_settings_changed(self, event):
         self._stored.on_leader_settings_changed.append(type(event).__name__)
@@ -175,6 +191,10 @@ class Charm(CharmBase):
         self._stored.on_collect_metrics.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         event.add_metrics({'foo': 42}, {'bar': 4.2})
+
+    def _on_custom(self, event):
+        self._stored.on_custom.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
 
     def _on_log_critical_action(self, event):
         logger.critical('super critical')
