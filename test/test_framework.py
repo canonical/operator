@@ -393,7 +393,7 @@ class TestFramework(BaseTestCase):
         #    we'd get a foo=3).
         #
         self.assertEqual(obs.seen, ["on_foo:foo=2", "on_foo:foo=2"])
-        self.assertLoggedDebug("Re-emitting <MyEvent via MyNotifier[1]/foo[1]>.")
+        self.assertLoggedDebug("Re-emitting deferred <MyEvent via MyNotifier[1]/foo[1]>.")
 
     def test_weak_observer(self):
         framework = self.create_framework()
