@@ -669,6 +669,14 @@ class Framework(Object):
             sys.breakpointhook = self.breakpoint
         return old_breakpointhook
 
+    def abort(self):
+        """Abort the execution of the framework and exit."""
+        try:
+            self.commit()
+        finally:
+            self.close()
+        sys.exit(0)
+
     def close(self):
         """Close the underlying backends."""
         self._storage.close()
