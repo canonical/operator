@@ -330,7 +330,7 @@ def test_owner_create_secret(owner_harness, owner, holder):
         # as owners, we can inspect the contents:
         assert secret.get('foo') == 'bar'
         # and we know the revision
-        assert secret.revision == 0
+        assert secret.revision == 1
 
     @holder.run
     def secret_get_without_access():

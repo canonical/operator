@@ -436,7 +436,7 @@ class Application:
             owner='application', content=content, label=label,
             description=description, expire=expire, rotate=rotate)
         # strip the secret id as it seems to contain a trailing \n
-        return _Secret(self._backend, secret_id.strip(), label=label, am_owner=True, revision=0)
+        return _Secret(self._backend, secret_id.strip(), label=label, am_owner=True, revision=1)
 
     @property
     def status(self) -> 'StatusBase':
@@ -1051,11 +1051,14 @@ class _Secret:
             #  but that is a bug in juju.
             #  when that is fixed, `secret-set [id] --label X` will be valid.
             raise ModelError('missing secret value or filename')
-        for key, _ in content.items():
-            if not _Secret.secret_key_re.match(key):
-                raise ModelError('key "{}" not valid. '
-                                 'Constraints: at least 3 characters long, '
-                                 'no number to start, no dash to end.'.format(key))
+        invalid_secret_keys = list(
+            filter(lambda key: not _Secret.secret_key_re.match(key),
+                   content.keys())
+        )
+        if invalid_secret_keys:
+            raise ModelError('Some secret keys are invalid: {}. '
+                             'Constraints: at least 3 characters long, '
+                             'no number to start, no dash to end.'.format(invalid_secret_keys))
 
     def set(self, content: Dict[str, str],
             description: Optional[str] = None):
@@ -1074,11 +1077,11 @@ class _Secret:
                 containing the actual secret contents, e.g. credential pairs.
             description: An optional string to describe the content of the secret.
         """
-        self._validate_content(content)
-
         if not self._am_owner:
             raise SecretOwnershipError(
                 'cannot set on secret {} which is owned by a different unit'.format(self))
+
+        self._validate_content(content)
         self._backend.secret_set(self.id,
                                  content=content,
                                  label=self.label,
