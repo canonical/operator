@@ -2702,7 +2702,7 @@ class _ModelBackend:
                 args.append('{}="{}"'.format(k, v))
 
         output = self._run('secret-add', *args, return_output=True)
-        return typing.cast(str, output.strip())
+        return typing.cast(str, output).strip()
 
     def secret_remove(self, id: str, revision: Optional[int] = None) -> None:
         args = []  # type: List[str]
