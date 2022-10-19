@@ -969,6 +969,7 @@ class _Secret:
     Unit or your Application, or get one (typically one you don't own) from your Model.
     """
     secret_key_re = re.compile(r"^([a-z](?:-?[a-z0-9]){2,})$")
+    secret_id_re = re.compile(r"^secret:((?:-?[a-z0-9]){5,})$")
 
     def __init__(self, backend: '_ModelBackend',
                  id: Optional[str] = None,
@@ -977,26 +978,18 @@ class _Secret:
                  am_owner: bool = False):
         if not label and not id:
             raise RuntimeError('Provide at least one of (`label`|`id`).')
+
+        if id is not None:
+            if not self.secret_id_re.match(id):
+                raise ValueError("{} is not a valid secret id.")
+            id = id.strip()  # trim any whitespace
+
         if am_owner and revision is None:
             # This should only happen in testing, when one instantiates Secret manually.
             logger.error('secret {!r} (owned by this unit) has no revision!'
                          ' Things might malfunction'.format(id))
 
         self._backend = backend
-
-        if isinstance(id, str):
-            if not id.startswith('secret:'):  # todo: regex validation?
-                raise InvalidSecretIDError(
-                    'secret secret ID {!r} should start with `secret:`'.format(id)
-                )
-            if id.strip() != id:
-                # FIXME one of the hook tools returns some whitespace around
-                #  the secret-id. We should catch that earlier and trim it there.
-                logger.warning(
-                    'invalid characters in secret ID '
-                    '{!r}: something wrong'.format(id)
-                )
-                id = id.strip()
 
         self._id = id
         self._label = label
@@ -2703,8 +2696,8 @@ class _ModelBackend:
             for k, v in content.items():
                 args.append('{}="{}"'.format(k, v))
 
-        output = self._run('secret-add', *args)
-        return typing.cast(str, output)
+        output = self._run('secret-add', *args, return_output=True)
+        return typing.cast(str, output.strip())
 
     def secret_remove(self, id: str, revision: Optional[int] = None) -> None:
         args = []  # type: List[str]

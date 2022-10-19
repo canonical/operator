@@ -205,10 +205,8 @@ def test_cannot_get_revoked_secret(model, backend):
 
 
 def test_secret_event_snapshot(backend):
-    sec = _Secret(backend, 'secret:1234567',
-                  label='bar', revision=7, am_owner=True)
-    e1 = SecretChangedEvent('', sec)
-    e2 = SecretChangedEvent('', None)
+    e1 = SecretChangedEvent('', id='secret:1234567', revision=7, label='bar')
+    e2 = SecretChangedEvent('', '')
 
     e1.framework = Mock(model=Mock(_backend=backend))
     e2.framework = Mock(model=Mock(_backend=backend))
