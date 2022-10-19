@@ -1573,7 +1573,8 @@ class _TestingSecretManager:
                                'not in relation {}'.format(fn, id, relation_id))
 
     def _check_scope(self, fn: str, id: str):
-        scope = self._get_secret_meta(id)[id].get('owner', 'application')
+        secret_tail = id[7:]  # metadata return object strips the "secret:" prefix
+        scope = self._get_secret_meta(id)[secret_tail].get('owner', 'application')
         self._check_leadership(fn, typing.cast('_SecretOwner', scope))
 
     def _check_leadership(self, fn: str, scope: '_SecretOwner'):
@@ -1800,8 +1801,9 @@ class _TestingSecretManager:
         else:
             label = self._foreign_labels.get(id)
 
+        secret_tail = id[7:]  # metadata return object omits the `secret:` prefix
         return {
-            id: {
+            secret_tail: {
                 "label": label,
                 "revision": revision,
                 "expires": meta.get('expire'),

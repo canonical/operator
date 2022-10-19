@@ -224,11 +224,21 @@ class Model:
             return _Secret(self._backend, id, label=label,
                            revision=None, am_owner=False)
 
-        secret_id = id or next(iter(meta))  # type: str
-
         # if we have metadata access, we own the secret
         # we can also get the label and revision from the metadata.
-        metadata = meta[secret_id]  # type: _SecretMetadataDict
+        if id:
+            secret_id = id
+            secret_tail = secret_id.split(':')[1]
+        else:
+            secret_tail = next(iter(meta))  # type: str
+            if secret_tail.startswith('secret:'):
+                logger.warning('unexpected secret ID in metadata: {}'.format(secret_tail))
+                secret_tail = secret_tail[7:]
+            secret_id = 'secret:' + secret_tail
+
+        # even if we called `secret-get secret:xx --metadata`, we'll get
+        #  back {xx: {...}}  ("secret:" gets stripped)
+        metadata = meta[secret_tail]  # type: _SecretMetadataDict
         label = metadata.get('label')
         revision = int(metadata.get('revision'))
         return _Secret(self._backend, secret_id, label=label,
