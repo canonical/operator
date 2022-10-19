@@ -217,7 +217,7 @@ class SecretChangedEvent(SecretEvent):
     and prune the old one.
 
     >>> def _on_secret_changed(self: CharmBase, evt: SecretChangedEvent):
-    >>>     evt.secret.update()
+    >>>     evt.secret.get_latest_revision()
     >>>     evt.secret.prune()
     >>>     new_secret = self.model.get_secret(evt.secret.id)
             # self._update_credentials(new_secret) ...

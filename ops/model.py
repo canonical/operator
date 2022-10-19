@@ -1189,7 +1189,7 @@ class _Secret:
         id = self._check_id(self.id, 'remove')
         self._backend.secret_remove(id)
 
-    def update(self) -> '_Secret':
+    def get_latest_revision(self) -> '_Secret':
         """Fetch the latest available revision of this secret.
 
         Returns a Secret object pointing to the newest available revision.
@@ -1199,7 +1199,7 @@ class _Secret:
         Example::
             >>> def _on_update_status(self: ops.charm.CharmBase, _):
             >>>     old_revision = self.model.get_secret('my_label')
-            >>>     new_revision = old_revision.update()
+            >>>     new_revision = old_revision.get_latest_revision()
             >>>     if new_revision != old_revision:
             >>>         logger.info('updated to new revision!')
         """
@@ -1223,9 +1223,11 @@ class _Secret:
         Args:
             key: the secret key to be fetched.
             update: returns the contents of the latest revision and starts tracking it.
+                From this moment on, `secret.get()` will return the latest revision's payload,
+                with or without explicitly passing `update=True`.
             peek: returns the contents of the latest revision. Unlike update,
                 it will not switch the secret to track the latest revision. I.e. the next
-                time you call get() -- without peek=True -- you will get the revision
+                time you call `get()` -- without `peek=True` -- you will get the revision
                 you are currently tracking, even though a more recent one is available.
                 Useful if you want to "try out" the new secret revision before dropping
                 the old one.

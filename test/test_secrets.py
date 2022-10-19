@@ -421,7 +421,7 @@ class TestHolderCharmPOV:
             assert secret.get('token') == rev_0_key
 
             # updating bumps us to rev2
-            new_secret = secret.update()
+            new_secret = secret.get_latest_revision()
             assert new_secret.get('token') == rev_2_key
 
         @owner.run  # this is charm code:
@@ -447,7 +447,7 @@ class TestHolderCharmPOV:
             assert secret.get('token') == rev_2_key
 
             # updating bumps us to rev6
-            new_secret = secret.update()
+            new_secret = secret.get_latest_revision()
             assert new_secret.get('token') == 'new_secret_rev-3'
 
 
