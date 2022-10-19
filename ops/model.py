@@ -2755,7 +2755,7 @@ class _ModelBackend:
 
         if label:
             args += ['--label', label]
-        if meta is not None:
+        if meta:
             args.append('--metadata')
         if key is not None:
             args.append(key)
