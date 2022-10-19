@@ -1034,9 +1034,9 @@ class _Secret:
         if self._revision is None:
             if self._am_owner:
                 # use _revision if you know what you're doing (testing, presumably)
-                raise RuntimeError("This secret has no revision.")
+                raise ValueError("This secret has no revision.")  # should not happen in production
             else:
-                raise RuntimeError("Only secret owners can see the revision number.")
+                raise SecretOwnershipError("Only secret owners can see the revision number.")
         return self._revision
 
     def __str__(self):
@@ -1077,7 +1077,7 @@ class _Secret:
         self._validate_content(content)
 
         if not self._am_owner:
-            raise RuntimeError(
+            raise SecretOwnershipError(
                 'cannot set on secret {} which is owned by a different unit'.format(self))
         self._backend.secret_set(self.id,
                                  content=content,
@@ -1114,14 +1114,14 @@ class _Secret:
                 If the target is a Unit or Application, this argument is required.
         """
         if not self._am_owner:
-            raise RuntimeError(
+            raise SecretOwnershipError(
                 'cannot grant secret {!r} which is owned by a different unit'.format(self))
         if relation is None and not isinstance(target, Relation):
-            raise RuntimeError(
+            raise ValueError(
                 'granting secret access to a unit or application '
                 'target requires a relation to be specified')
         if relation and isinstance(target, Application) and relation.app is not target:
-            raise RuntimeError(
+            raise ValueError(
                 'cannot grant secret access to application that is not '
                 'remote to the specified relation')
 
@@ -1142,15 +1142,15 @@ class _Secret:
                 Needs to be provided if `target` is not a Relation instance.
         """
         if not self._am_owner:
-            raise RuntimeError(
+            raise SecretOwnershipError(
                 'cannot revoke secret {} which is owned by a '
                 'different unit'.format(self))
         if relation is None and not isinstance(target, Relation):
-            raise RuntimeError(
+            raise ValueError(
                 'revoking secret access to a unit or application target '
                 'requires a relation to be specified')
         if isinstance(target, Application) and relation and relation.app != target:
-            raise RuntimeError(
+            raise ValueError(
                 'cannot revoke secret access from application that is not '
                 'remote to the specified relation')
 
@@ -1168,10 +1168,10 @@ class _Secret:
         some remote units.
         """
         if not self._am_owner:
-            raise RuntimeError(
+            raise SecretOwnershipError(
                 'cannot prune secret {} which is owned by a different unit'.format(self))
         if self._revision is None:
-            raise RuntimeError(
+            raise ValueError(
                 'secret {} has no revision to prune - are you outside a secret-remove hook call?')
         id = self._check_id(self.id, 'prune')
         self._backend.secret_remove(id, revision=self._revision)
@@ -1184,7 +1184,7 @@ class _Secret:
         been granted to might attempt to get the secret.
         """
         if not self._am_owner:
-            raise RuntimeError(  # todo unify with SecretOwnershipError
+            raise SecretOwnershipError(
                 'cannot remove secret {} which is owned by a different unit'.format(self))
         id = self._check_id(self.id, 'remove')
         self._backend.secret_remove(id)
@@ -1204,7 +1204,7 @@ class _Secret:
             >>>         logger.info('updated to new revision!')
         """
         if self._am_owner:
-            raise RuntimeError(
+            raise SecretOwnershipError(
                 'cannot update secret {} which is owned by this unit - '
                 'did you mean to call Secret.set?'.format(self))
         self._backend.secret_get(self.id, update=True)
@@ -2512,7 +2512,7 @@ class SecretPermissionError(ModelError):
 
 
 class SecretOwnershipError(SecretPermissionError):
-    """Raised when a secret holder attempts an owner-only operation."""
+    """Raised when a secret holder attempts an owner-only operation, or vice versa."""
 
 
 class SecretNotGrantedError(SecretPermissionError):
