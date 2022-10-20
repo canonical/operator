@@ -54,21 +54,21 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.model import (
-    InvalidSecretIDError,
-    InvalidSecretLabelError,
     ModelError,
     RelationNotFoundError,
     Secret,
+    SecretIDNotFoundError,
+    SecretLabelNotFoundError,
+    SecretOwner,
 )
 
 if TYPE_CHECKING:
     from typing_extensions import Literal, TypedDict
 
     from ops.model import (
+        SecretRotationPolicy,
         UnitOrApplication,
         _SecretGetResponseType,
-        _SecretOwner,
-        _SecretRotationPolicy,
     )
 
     _RetractedLiteral = Literal["<RETRACTED>"]
@@ -79,8 +79,8 @@ if TYPE_CHECKING:
         'label': str,
         'description': str,
         'expire': str,
-        'rotate': _SecretRotationPolicy,
-        'owner': _SecretOwner,
+        'rotate': SecretRotationPolicy,
+        'owner': Literal['unit', 'application'],  # we use the SecretOwner enum internally
         'content': Dict[str, str],
     })
 
@@ -1415,19 +1415,19 @@ class _TestSecret:
 
     def grant(self, entity: Optional[Union[str, 'UnitOrApplication']] = None):
         entity_name = _get_unit_or_app_name(entity)
-        self._mgr.secret_grant(self._secret_id, self._relation_id,
-                               entity_name or self._mgr.unit_name)
+        self._mgr.secret_grant(id=self._secret_id, relation_id=self._relation_id,
+                               unit_id=entity_name or self._mgr.unit_name)
 
     def revoke(self, entity: Optional[Union[str, 'UnitOrApplication']] = None):
         entity_name = _get_unit_or_app_name(entity)
-        self._mgr.secret_revoke(self._secret_id, self._relation_id,
-                                entity_name or self._mgr.unit_name)
+        self._mgr.secret_revoke(id=self._secret_id, relation_id=self._relation_id,
+                                unit_id=entity_name or self._mgr.unit_name)
 
     def remove(self, revision: int = None):
-        self._mgr.secret_remove(self._secret_id, revision)
+        self._mgr.secret_remove(id=self._secret_id, revision=revision)
 
     def prune(self):
-        self._mgr.secret_remove(self._secret_id, self._revision)
+        self._mgr.secret_remove(id=self._secret_id, revision=self._revision)
 
     def prune_all_untracked(self):
         """Prune all untracked, outdated revisions of this secret.
@@ -1526,7 +1526,7 @@ class _TestingSecretManager:
     @staticmethod
     def _new_secret_id():
         # generate a unique secret ID.
-        return "secret:{}".format(uuid.uuid4())
+        return Secret._ensure_id(str(uuid.uuid4()), 'generate')
 
     def _get_mgr(self, id) -> '_TestingSecretManager':
         for secret_mgr in (self, *self._other_managers):
@@ -1540,7 +1540,7 @@ class _TestingSecretManager:
         try:
             return self._get_mgr(id)._owners[id]
         except NoOwnerError as e:
-            raise InvalidSecretIDError(id) from e
+            raise SecretIDNotFoundError(id) from e
 
     def _check_permissions(self, fn: str, id: str):
         if self._owns(id):
@@ -1574,10 +1574,10 @@ class _TestingSecretManager:
     def _check_scope(self, fn: str, id: str):
         secret_tail = id[7:]  # metadata return object strips the "secret:" prefix
         scope = self._get_secret_meta(id)[secret_tail].get('owner', 'application')
-        self._check_leadership(fn, typing.cast('_SecretOwner', scope))
+        self._check_leadership(fn, SecretOwner(scope))
 
-    def _check_leadership(self, fn: str, scope: '_SecretOwner'):
-        if scope == 'application' and not self.is_leader:
+    def _check_leadership(self, fn: str, scope: SecretOwner):
+        if scope is SecretOwner.application and not self.is_leader:
             raise model.SecretOwnershipError('Follower attempted to call {}. '
                                              'Only the leader can manage '
                                              'application-scoped secrets.'.format(fn))
@@ -1609,16 +1609,30 @@ class _TestingSecretManager:
         if relation_id:
             self._check_relation(fn, id, relation_id)
 
-    def secret_remove(self, id: str, revision: Optional[int] = None) -> None:
+    def secret_remove(self, *, id: Optional[str] = None,
+                      label: Optional[str] = None,
+                      revision: Optional[int] = None) -> None:
+        try:
+            id = id or self._secret_label_to_id(label)
+        except KeyError:
+            raise SecretLabelNotFoundError(label)
         self._validate_access('secret_remove', id=id, own=True, manage=True)
+
         if revision is None:
             self._secret_ids.remove(id)
             del self._revisions[id]
         else:
             self._revisions[id][revision] = _TestingSecretManager.RETRACTED
 
-    def secret_grant(self, id: str, relation_id: int,
+    def secret_grant(self, *,
+                     id: Optional[str] = None,
+                     label: Optional[str] = None,
+                     relation_id: int,
                      unit_id: Optional[str] = None) -> None:
+        try:
+            id = id or self._secret_label_to_id(label)
+        except KeyError:
+            raise SecretLabelNotFoundError(label)
         self._validate_access('secret_grant', id=id, own=True,
                               relation_id=relation_id, manage=True)
         readers = self._scopes[id][relation_id]
@@ -1627,9 +1641,14 @@ class _TestingSecretManager:
                                'access is already ALL'.format(id, relation_id))
         readers.append(unit_id or _TestingSecretManager.ALL)
 
-    def secret_revoke(self, id: str,
+    def secret_revoke(self, *, id: Optional[str] = None,
+                      label: Optional[str] = None,
                       relation_id: int,
                       unit_id: Optional[str] = None) -> None:
+        try:
+            id = id or self._secret_label_to_id(label)
+        except KeyError:
+            raise SecretLabelNotFoundError(label)
         self._validate_access('secret_revoke', id=id, own=True,
                               relation_id=relation_id, manage=True)
         if not unit_id:
@@ -1638,11 +1657,13 @@ class _TestingSecretManager:
             self._scopes[id][relation_id].remove(unit_id)
 
     @_copy_signature(model._ModelBackend.secret_add)
-    def secret_add(self, _local=True, label: str = None, **kwargs) -> str:
+    def secret_add(self, _local=True, label: str = None,
+                   owner=SecretOwner.application,
+                   expiration=None, **kwargs) -> str:
         # only one check: that if we're creating an app-scoped secret, we are the leader.
         # we can't use _validate_access directly because we don't have a id yet.
         if self._hook_is_running:
-            self._check_leadership('secret_add', kwargs.get('owner', 'application'))
+            self._check_leadership('secret_add', owner or SecretOwner.application)
 
         # if you did pass a label, that should be unique.
         if label and label in self._labels.values():
@@ -1650,15 +1671,14 @@ class _TestingSecretManager:
 
         id = self._new_secret_id()
         self._secret_ids.add(id)
-        owner = kwargs.get('owner')
 
         # _local: charm code is calling secret_add, so we will interpret the
         #   owner: application|unit arg as 'this app/this unit'.
         #   _local should only ever be false if we are testing.
-        if _local:
-            if owner == 'unit':
+        if _local and owner is not None:
+            if owner is SecretOwner.unit:
                 owner = self.unit_name
-            elif owner == 'application':
+            elif owner is SecretOwner.application:
                 owner = self.app_name
             else:
                 raise ValueError(owner)
@@ -1671,9 +1691,8 @@ class _TestingSecretManager:
             if not owner:
                 raise ValueError('you should provide a remote owner')
 
-        expire = kwargs.get('expire')
-        if expire and not isinstance(expire, (datetime.timedelta, datetime.datetime)):
-            raise TypeError(expire)
+        if expiration and not isinstance(expiration, (datetime.timedelta, datetime.datetime)):
+            raise TypeError(expiration)
 
         if label:
             self._labels[id] = label
@@ -1683,7 +1702,7 @@ class _TestingSecretManager:
         return id
 
     @_copy_signature(model._ModelBackend.secret_set)
-    def secret_set(self, id: str, label: str = None, **kwargs):
+    def secret_set(self, id: str = None, label: str = None, **kwargs):
         self._validate_access('secret_set', id=id, own=True, manage=True)
 
         id = id or self._secret_label_to_id(label)
@@ -1703,23 +1722,24 @@ class _TestingSecretManager:
         # todo: can anyone do this?
         return list(filter(self._owns, self._secret_ids))
 
-    def _label_update(self, am_owner: bool, id: str, label: str):
+    def _label_update(self, is_owned_by_this_unit: bool, id: str, label: str):
         if label is not None:
-            if not am_owner:
+            if not is_owned_by_this_unit:
                 self._foreign_labels[id] = label
             else:
                 existing_label = self._labels.get(id)
                 if existing_label is None:
                     self._labels[id] = label
                 elif existing_label != label:
-                    e = InvalidSecretLabelError(
+                    e = SecretLabelNotFoundError(
                         '{} already has a label ({}); cannot relabel to {}'.format(
                             id, existing_label, label
                         ))
                     raise ModelError('secret with label "{}" already exists'.format(label)) from e
 
     @_copy_docstrings(model._ModelBackend.secret_get)  # noqa
-    def secret_get(self, id: Optional[str] = None,
+    def secret_get(self, *,
+                   id: Optional[str] = None,
                    key: Optional[str] = None,
                    label: Optional[str] = None,
                    update: bool = False,
@@ -1728,15 +1748,18 @@ class _TestingSecretManager:
                    ) -> '_SecretGetResponseType':
         if not (id or label):
             raise TypeError('provide an id or a label or both')
+        if peek and update:
+            raise TypeError('At most one of `peek` and `update` should be True.')
+
         try:
             id = id or self._secret_label_to_id(label)
         except KeyError:
-            raise InvalidSecretLabelError(label)
+            raise SecretLabelNotFoundError(label)
 
         try:
             owner_mgr = self._get_mgr(id)
         except NoOwnerError:
-            raise InvalidSecretIDError(id)
+            raise SecretIDNotFoundError(id)
 
         self._validate_access('secret_get', id=id,
                               own=meta or None, read=True)
@@ -1824,7 +1847,7 @@ class _TestingSecretManager:
                 # because the next time we update, we'll skip all of them and go directly
                 # to the latest.
                 continue
-            self.secret_remove(id, i)
+            self.secret_remove(id=id, revision=i)
 
 
 @_copy_docstrings(model._ModelBackend)  # noqa

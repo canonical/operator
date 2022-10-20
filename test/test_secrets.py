@@ -23,7 +23,7 @@ import ops.model
 from ops import testing
 from ops.charm import CharmBase, SecretChangedEvent, SecretRemoveEvent
 from ops.framework import BoundEvent, EventBase
-from ops.model import Secret
+from ops.model import Secret, SecretOwner
 from ops.testing import Harness, _TestingModelBackend
 
 SECRET_METHODS = ("secret_set",
@@ -113,7 +113,7 @@ def model(backend):
 
 
 def assert_secrets_equal(s1: Secret, s2: Secret):
-    if s1._am_owner and s2._am_owner:  # noqa
+    if s1._is_owned_by_this_unit and s2._is_owned_by_this_unit:  # noqa
         if not s1.revision == s2.revision:
             return False
     return (s1.id, s1.label) == (s2.id, s2.label)
@@ -139,23 +139,23 @@ def test_secret_get_by_id_owner(model, backend):
     assert_secrets_equal(secret, secret2)
 
 
-@pytest.mark.parametrize('expire, expect_valid', (
+@pytest.mark.parametrize('expiration, expect_valid', (
     (datetime.datetime(day=12, year=2024, month=10), True),
     (datetime.timedelta(days=1), True),
     (None, True),
     (42, False),
 ))
-def test_expire(expire, expect_valid, model, backend):
+def test_expire(expiration, expect_valid, model, backend):
     backend._is_leader = True
     if expect_valid:
-        model.app.add_secret({'foo': 'bar'}, expire=expire)
+        model.app.add_secret({'foo': 'bar'}, expiration=expiration)
     else:
         with pytest.raises(TypeError):
-            model.app.add_secret({'foo': 'bar'}, expire=expire)
+            model.app.add_secret({'foo': 'bar'}, expiration=expiration)
 
 
 @pytest.mark.parametrize('god_mode', (True, False))
-@pytest.mark.parametrize('owner', ('unit', 'application'))
+@pytest.mark.parametrize('owner', (SecretOwner.unit, SecretOwner.application))
 @pytest.mark.parametrize('leader', (True, False))
 def test_cannot_get_removed_secret(model, god_mode, leader, owner, backend):
     backend._is_leader = leader
@@ -167,7 +167,7 @@ def test_cannot_get_removed_secret(model, god_mode, leader, owner, backend):
 
     with backend._god_mode_ctx(value=god_mode):
         # god mode or not, if a secret is gone, it's gone.
-        with pytest.raises(ops.model.InvalidSecretIDError):
+        with pytest.raises(ops.model.SecretIDNotFoundError):
             model.get_secret(id=secret_id)
 
 
@@ -195,7 +195,7 @@ def test_grant_secret(model, backend, god_mode):
     # as an owner, I can see my own secret values
     with backend._god_mode_ctx(god_mode):
         assert secret.get('foo') == 'bar'
-        assert backend.secret_get(secret.id) == {'foo': 'bar'}
+        assert backend.secret_get(id=secret.id) == {'foo': 'bar'}
 
 
 def test_cannot_get_revoked_secret(model, backend):
@@ -207,7 +207,7 @@ def test_cannot_get_revoked_secret(model, backend):
                  ops.model.Relation('db', 1, is_peer=False,
                                     backend=backend, cache=model._cache,
                                     our_unit=model.unit))
-    backend.secret_revoke(secret.id, 1)
+    backend.secret_revoke(id=secret.id, relation_id=1)
 
     remote_0_mgr = _TestingSecretManager('remote/0')
     bind_secret_mgrs(remote_0_mgr, backend)
@@ -337,7 +337,7 @@ def test_owner_create_secret(owner_harness, owner, holder):
         nonlocal sec_id
         secret = owner.app.add_secret({'foo': 'bar'}, label='my_label')
         sec_id = secret.id
-        assert secret._am_owner
+        assert secret._is_owned_by_this_unit
 
         # now we can also get it by:
         secret2 = owner.model.get_secret(label='my_label')
@@ -352,12 +352,13 @@ def test_owner_create_secret(owner_harness, owner, holder):
     def secret_get_without_access():
         nonlocal sec_id
         # labels are local: my_label is how OWNER knows this secret, not holder.
-        with pytest.raises(ops.model.InvalidSecretLabelError):
+        with pytest.raises(ops.model.SecretLabelNotFoundError):
             assert holder.model.get_secret(label='my_label')
 
+        secret = holder.model.get_secret(id=sec_id)
         # and either way, we haven't been granted the secret yet!
         with pytest.raises(ops.model.SecretNotGrantedError):
-            holder.model.get_secret(id=sec_id)
+            secret.get('foo')
 
     @owner.run
     def grant_access():
@@ -370,7 +371,7 @@ def test_owner_create_secret(owner_harness, owner, holder):
         # as a holder, we can secret-get
         secret = holder.model.get_secret(id=sec_id, label='other_label')
 
-        assert not secret._am_owner
+        assert not secret._is_owned_by_this_unit
         # we can get it by label as well now!
         secret2 = holder.model.get_secret(label='other_label')
         assert_secrets_equal(secret, secret2)
@@ -405,7 +406,7 @@ class TestHolderCharmPOV:
         @holder.run  # this is charm code:
         def secret_get_with_access():
             s = holder.model.get_secret(id=sec_id, label='other_label')
-            assert not s._am_owner
+            assert not s._is_owned_by_this_unit
             assert s.get('token') == rev_0_key
             # assert secret.revision == 0  # non-owners cannot see the revision
 
@@ -471,7 +472,26 @@ def test_app_scope_leader():
 
     bind_secret_mgrs(mgr1, mgr2)
     mgr1._is_leader = True
-    mgr1.secret_add({'abc': 'def'}, owner='application')
+    mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.application)
+
+
+@pytest.mark.parametrize(
+    'input, expected_output', (
+        ('foobar', 'secret:foobar'),
+        ('secret:foobar', 'secret:foobar'),
+        (':foobar', ValueError),
+        ('foobar:', ValueError),
+        (42, TypeError),
+        (b'12', TypeError),
+        (object(), TypeError),
+    )
+)
+def test_secret_prefix(input, expected_output):
+    if isinstance(expected_output, type):
+        with pytest.raises(expected_output):
+            Secret._ensure_id(input, 'test')
+    else:
+        assert Secret._ensure_id(input, 'test') == expected_output
 
 
 def test_app_scope_follower():
@@ -479,11 +499,11 @@ def test_app_scope_follower():
     mgr1._is_leader = False
 
     with pytest.raises(ops.model.SecretOwnershipError):
-        mgr1.secret_add({'abc': 'def'}, owner='application')
+        mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.application)
 
     # we give it leadership to create a secret
     mgr1._is_leader = True
-    secret_id = mgr1.secret_add({'abc': 'def'}, owner='application')
+    secret_id = mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.application)
 
     # but then we lose leadership again
     mgr1._is_leader = False
@@ -492,6 +512,7 @@ def test_app_scope_follower():
     with pytest.raises(ops.model.SecretOwnershipError):
         mgr1.secret_set(secret_id, content={'foo': 'bar'})
     with pytest.raises(ops.model.SecretOwnershipError):
-        mgr1.secret_remove(secret_id)
+        mgr1.secret_remove(id=secret_id)
     with pytest.raises(ops.model.SecretOwnershipError):
-        mgr1.secret_grant(secret_id, 0, 'anything/0')
+        mgr1.secret_grant(id=secret_id, relation_id=0,
+                          unit_id='anything-whatsoever/0')

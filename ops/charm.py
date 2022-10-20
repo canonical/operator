@@ -182,7 +182,7 @@ class SecretEvent(HookEvent):
             id=self.id,
             label=self.label,
             revision=self.revision,
-            am_owner=self._is_owner_event)
+            is_owned_by_this_unit=self._is_owner_event)
 
     def snapshot(self) -> '_SecretEventSnapshot':
         """Used by the framework to serialize the event to disk.
