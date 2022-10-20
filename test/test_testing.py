@@ -130,7 +130,7 @@ class TestHarness(unittest.TestCase):
 
     def test_can_connect_legacy(self):
         # This tests the old behavior where we weren't simulating can_connect status of containers
-        # like it runs in juju.
+        # like it runs in Juju.
         tmp = ops.testing.SIMULATE_CAN_CONNECT
         ops.testing.SIMULATE_CAN_CONNECT = False
 
@@ -334,7 +334,7 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         harness.charm.observe_relation_events('foo')
 
-        # relation remote app is None to mirror production juju behavior where juju doesn't
+        # relation remote app is None to mirror production Juju behavior where Juju doesn't
         # communicate the remote app to ops.
         rel_id = harness.add_relation('foo', None)
 

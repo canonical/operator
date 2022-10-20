@@ -26,7 +26,7 @@ if typing.TYPE_CHECKING:
 
 
 class JujuLogHandler(logging.Handler):
-    """A handler for sending logs to Juju via juju-log."""
+    """A handler for sending logs to Juju via Juju-log."""
 
     def __init__(self, model_backend: "_ModelBackend", level: int = logging.DEBUG):
         super().__init__(level)
@@ -42,7 +42,7 @@ class JujuLogHandler(logging.Handler):
 
 
 def setup_root_logging(model_backend: "_ModelBackend", debug: bool = False):
-    """Setup python logging to forward messages to juju-log.
+    """Setup python logging to forward messages to Juju-log.
 
     By default, logging is set to DEBUG level, and messages will be filtered by Juju.
     Charmers can also set their own default log level with::
@@ -50,8 +50,8 @@ def setup_root_logging(model_backend: "_ModelBackend", debug: bool = False):
       logging.getLogger().setLevel(logging.INFO)
 
     Args:
-        model_backend: a ModelBackend to use for juju-log
-        debug: if True, write logs to stderr as well as to juju-log.
+        model_backend: a ModelBackend to use for Juju-log
+        debug: if True, write logs to stderr as well as to Juju-log.
     """
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)

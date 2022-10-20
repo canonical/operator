@@ -148,7 +148,7 @@ class HookEvent(EventBase):
 
 
 class SecretEvent(HookEvent):
-    """Base class for secret-related events."""
+    """Base class for secret events."""
 
     # used to determine whether the secret instance
     # exposed by this event is self-owned or not. Uses the knowledge that certain event
@@ -166,18 +166,18 @@ class SecretEvent(HookEvent):
                  handle: 'Handle',
                  id: str,
                  label: Optional[str] = None,
-                 revision: Optional[str] = None):
+                 revision: Optional[int] = None):
         super().__init__(handle)
         assert isinstance(self._is_owner_event, bool), '_is_owner_event ' \
                                                        'should be overridden in subclass'
         self.id = id
         self.label = label
-        self.revision = int(revision) if revision else None
+        self.revision = revision
 
     @property
-    def secret(self) -> model._Secret:  # pyright: reportPrivateUsage=false
+    def secret(self) -> model.Secret:  # pyright: reportPrivateUsage=false
         """The secret instance this event is about."""
-        return model._Secret(  # pyright: reportPrivateUsage=false
+        return model.Secret(  # pyright: reportPrivateUsage=false
             backend=self.framework.model._backend,  # pyright: reportPrivateUsage=false
             id=self.id,
             label=self.label,
@@ -207,7 +207,7 @@ class SecretEvent(HookEvent):
 
 
 class SecretChangedEvent(SecretEvent):
-    """Event raised by juju on a secret holder when the owner has changed its contents.
+    """Event raised by Juju on a secret holder when the owner has changed its contents.
 
     When the owner of a secret creates a new revision, all units/applications
     that are tracking this secret will be notified by means of this event that a new
@@ -215,6 +215,9 @@ class SecretChangedEvent(SecretEvent):
 
     Typically, you will want to update the secret (i.e. fetch the new revision)
     and prune the old one.
+
+    Attributes:
+        secret: class:`Secret`, the Secret instance this event is about.
 
     >>> def _on_secret_changed(self: CharmBase, evt: SecretChangedEvent):
     >>>     evt.secret.get_latest_revision()
@@ -226,17 +229,17 @@ class SecretChangedEvent(SecretEvent):
 
 
 class SecretRemoveEvent(SecretEvent):
-    """Event raised by juju when an expired/outdated secret revision can be removed.
+    """Event raised by Juju when an expired/outdated secret revision can be removed.
 
     When the owner of a secret creates a new revision, and after all applications
     consuming it have updated to the new revision, a secret-remove event will be fired
     to inform the secret owner that the old revision can be removed.
 
-    Typically, you will want to `Secret.prune()` to remove all orphaned revisions
+    Typically, you will want to :meth:`Secret.prune()` to remove all orphaned revisions
     when you receive this event.
 
     Attributes:
-        secret:class:`Secret`, the Secret instance this event is about.
+        secret: class:`Secret`, the Secret instance this event is about.
 
     Examples:
         >>> def _on_secret_remove(self, event: SecretRemoveEvent):
@@ -246,11 +249,14 @@ class SecretRemoveEvent(SecretEvent):
 
 
 class SecretRotateEvent(SecretEvent):
-    """Event raised by juju when a secret's rotation policy times out.
+    """Event raised by Juju when a secret's rotation policy times out.
 
     This event is fired on the secret owner to inform it that the secret
     must be rotated. The event will keep firing until the owner creates a
-    new revision by calling `Secret.set()`.
+    new revision by calling :meth:`Secret.set()`.
+
+    Attributes:
+        secret: class:`Secret`, the Secret instance this event is about.
 
     Examples:
         >>> def _on_secret_rotate(self: CharmBase, evt: SecretRotateEvent):
@@ -270,11 +276,14 @@ class SecretRotateEvent(SecretEvent):
 
 
 class SecretExpiredEvent(SecretEvent):
-    """Event raised by juju when a secret's expiration policy times out.
+    """Event raised by Juju when a secret's expiration policy times out.
 
     This event is fired on the secret owner to inform it that the secret
     must be rotated. The event will keep firing until the owner creates a
-    new revision by calling `Secret.set()`.
+    new revision by calling :meth:`Secret.set()`.
+
+    Attributes:
+        secret: class:`Secret`, the Secret instance this event is about.
 
     Examples:
         >>> def _on_secret_expired(self: CharmBase, evt: SecretExpiredEvent):
@@ -409,7 +418,7 @@ class ConfigChangedEvent(HookEvent):
       rescheduling, on unit upgrade/refresh, etc...
     - As a specific instance of the above point: when networking changes
       (if the machine reboots and comes up with a different IP).
-    - When the cloud admin reconfigures the charm via the juju CLI, i.e.
+    - When the cloud admin reconfigures the charm via the Juju CLI, i.e.
       `juju config my-charm foo=bar`. This event notifies the charm of
       its new configuration. (The event itself, however, is now aware of *what*
       specifically has changed in the config).

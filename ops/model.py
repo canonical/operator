@@ -153,11 +153,11 @@ class SecretsError(RuntimeError):
 
 
 class InvalidSecretIDError(SecretsError):
-    """Raised when one attempts to get a secret by ID but that ID is not known to juju."""
+    """Raised when one attempts to get a secret by ID but that ID is not known to Juju."""
 
 
 class InvalidSecretLabelError(SecretsError):
-    """Raised when one attempts to get a secret by label but that label is not known to juju."""
+    """Raised when one attempts to get a secret by label but that label is not known to Juju."""
 
 
 class Model:
@@ -182,13 +182,23 @@ class Model:
         self._bindings = BindingMapping(self._backend)
 
     @typing.overload
-    def get_secret(self, *, label: 'SecretLabel', id: None = None) -> '_Secret': ...  # noqa
+    def get_secret(self, *, label: 'SecretLabel', id: None = None) -> 'Secret': ...  # noqa
     @typing.overload
-    def get_secret(self, *, id: 'SecretID', label: None = None) -> '_Secret': ...  # noqa
+    def get_secret(self, *, id: 'SecretID', label: None = None) -> 'Secret': ...  # noqa
     @typing.overload
-    def get_secret(self, *, id: 'SecretID', label: 'SecretLabel') -> '_Secret': ...  # noqa
-    def get_secret(self, *, id: 'SecretID' = None, label: 'SecretLabel' = None) -> '_Secret':  # type: ignore  # noqa
-        """Fetch Secret instance from a label or a secret ID."""
+    def get_secret(self, *, id: 'SecretID', label: 'SecretLabel') -> 'Secret': ...  # noqa
+
+    def get_secret(self, *, id: 'SecretID' = None, label: 'SecretLabel' = None) -> 'Secret':  # type: ignore  # noqa
+        """Fetch Secret instance from a label or a secret ID.
+
+        You need to provide at least one of `id` and `label`.
+        If you provide both, the secret will be fetched by ID and the secret label will be
+        updated to the label you provided.
+
+        :raise: InvalidSecretLabelError: If only `label` is provided, but that label is
+            unknown to Juju.
+        :raise: `InvalidSecretIDError`: If the `id` is unknown to Juju.
+        """
         if not (id or label):
             raise TypeError('provide an id or a label or both')
 
@@ -212,17 +222,17 @@ class Model:
         except SecretOwnershipError:  # let other types raise
             # the call failed. We do not own the secret, and id/label are only
             # known if we provided them.
-            # however, unless we call secret_get again without meta, juju
+            # however, unless we call secret_get again without meta, Juju
             # might not know that we attempted to set a label for it.
-            if id:  # call secret-get to ensure that, if the label is new, juju knows about it.
+            if id:  # call secret-get to ensure that, if the label is new, Juju knows about it.
                 self._backend.secret_get(id=id, label=label)
             if not id:
                 logger.warning('No id provided for secret {!r}. The framework '
                                'annot know what secret ID this secret corresponds to, '
-                               'but if the label is known to juju, '
+                               'but if the label is known to Juju, '
                                'everything should work.'.format(label))
-            return _Secret(self._backend, id, label=label,
-                           revision=None, am_owner=False)
+            return Secret(self._backend, id, label=label,
+                          revision=None, am_owner=False)
 
         # if we have metadata access, we own the secret
         # we can also get the label and revision from the metadata.
@@ -241,8 +251,8 @@ class Model:
         metadata = meta[secret_tail]  # type: _SecretMetadataDict
         label = metadata.get('label')
         revision = int(metadata.get('revision'))
-        return _Secret(self._backend, secret_id, label=label,
-                       revision=revision, am_owner=True)
+        return Secret(self._backend, secret_id, label=label,
+                      revision=revision, am_owner=True)
 
     @property
     def unit(self) -> 'Unit':
@@ -416,37 +426,46 @@ class Application:
                    content: Dict[str, str],
                    label: Optional[str] = None,
                    description: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: Optional['_SecretRotationPolicy'] = None) -> '_Secret':
-        """Create a juju secret owned by this application.
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional['_SecretRotationPolicy'] = None) -> 'Secret':
+        """Create a Juju :class:`Secret` owned by this application.
 
         Args:
             content: The payload of the secret: a [str:str] key-value mapping
                 containing the actual secret contents, e.g. credential pairs.
-            label: Add a private label to this secret.
+            label: Assign a private, unique label to this secret. This will be stored in the juju
+                model and can be used later for lookup.
             description: An optional string to describe the content of the secret.
-            expire: a :class:`datetime.datetime` object representing when the secret is
-                due to expire.
-            rotate: The secret rotation policy. Defaults to 'never' (juju-side)
+            expire: a point in time at which the secret is due to expire. When that timeout is hit,
+                juju will notify the charm with a SecretExpired event. Can be provided as a
+                datetime object, which will be interpreted as absolute, or as a timedelta object,
+                which will be interpreted as relative to "now".
+                `None` means the secret will never expire.
+            rotate: The secret rotation policy. Every time the timeout is hit, juju will notify the
+                charm with a SecretRotate event. Defaults to 'never' (juju-side).
 
-        Example::
+        Examples::
 
             >>> self.model.app.add_secret(
             ...    {'username':'foo', 'password':'1234'},
             ...    description='the credentials to access this database',
-            ...    expire=datetime.datetime.today() + datetime.timedelta(days=24),
+            ...    expire=datetime.timedelta(days=24),
             ...    rotate='never')
+
+            >>> self.model.app.add_secret(
+            ...    {'username':'foo', 'password':'1234'},
+            ...    expire=datetime.datetime(day=23, year=2045, month=12))
         """
         if not self._backend._hook_is_running:  # noqa
-            raise RuntimeError("This method is meant to be called from charm code;"
-                               "testing code should use `Harness.add_secret()`.")
-        _Secret._validate_content(content)  # noqa
+            raise RuntimeError("This method is meant to be called from charm code only; "
+                               "testing code should use `Harness.add_secret()` instead.")
+        Secret._validate_content(content)  # noqa
 
         secret_id = self._backend.secret_add(
             owner='application', content=content, label=label,
             description=description, expire=expire, rotate=rotate)
         # strip the secret id as it seems to contain a trailing \n
-        return _Secret(self._backend, secret_id.strip(), label=label, am_owner=True, revision=1)
+        return Secret(self._backend, secret_id.strip(), label=label, am_owner=True, revision=1)
 
     @property
     def status(self) -> 'StatusBase':
@@ -553,40 +572,46 @@ class Unit:
                    content: Dict[str, str],
                    label: Optional[str] = None,
                    description: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: Optional['_SecretRotationPolicy'] = None) -> '_Secret':
-        """Create a juju secret owned by this unit.
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional['_SecretRotationPolicy'] = None) -> 'Secret':
+        """Create a Juju :class:`Secret` owned by this unit.
 
         Args:
             content: The payload of the secret: a [str:str] key-value mapping
                 containing the actual secret contents, e.g. credential pairs.
-            label: Assign a private, unique label to this secret.
+            label: Assign a private, unique label to this secret. This will be stored in the juju
+                model and can be used later for lookup.
             description: An optional string to describe the content of the secret.
-            expire: a :class:`datetime.datetime` object representing when the secret is
-                due to expire.
-            rotate: The secret rotation policy. Defaults to 'never' (juju-side)
+            expire: a point in time at which the secret is due to expire. When that timeout is hit,
+                juju will notify the charm with a SecretExpired event. Can be provided as a
+                datetime object, which will be interpreted as absolute, or as a timedelta object,
+                which will be interpreted as relative to "now".
+                `None` means the secret will never expire.
+            rotate: The secret rotation policy. Every time the timeout is hit, juju will notify the
+                charm with a SecretRotate event. Defaults to 'never' (juju-side).
 
         Example::
 
-            >>> secret = self.model.unit.add_secret(
-            ...    content={'username':'foo', 'password':'1234'},
+            >>> self.model.unit.add_secret(
+            ...    {'username':'foo', 'password':'1234'},
             ...    description='the credentials to access this database',
-            ...    expire=datetime.datetime.today() + datetime.timedelta(days=24),
+            ...    expire=datetime.timedelta(days=24),
             ...    rotate='never')
-            >>> secret.set_label('my_secret')
-            >>> secret.grant(self.model.relations['db'][0])
 
+            >>> self.model.unit.add_secret(
+            ...    {'username':'foo', 'password':'1234'},
+            ...    expire=datetime.datetime(day=23, year=2045, month=12))
         """
         if not self._backend._hook_is_running:  # noqa
             raise RuntimeError("This method is meant to be called from charm code;"
                                "testing code should use `Harness.add_secret()`.")
-        _Secret._validate_content(content)  # noqa
+        Secret._validate_content(content)  # noqa
 
         secret_id = self._backend.secret_add(content=content, label=label,
                                              owner='unit', description=description,
                                              expire=expire, rotate=rotate)
         # strip the secret id as it seems to contain a trailing \n
-        return _Secret(self._backend, secret_id.strip(), label=label, am_owner=True, revision=0)
+        return Secret(self._backend, secret_id.strip(), label=label, am_owner=True, revision=0)
 
     def _invalidate(self):
         self._status = None
@@ -971,12 +996,17 @@ class NetworkInterface:
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
-class _Secret:
+class Secret:
     """Secret object.
 
-    Not meant to be instantiated directly by charm code.
-    Typically, you should obtain a Secret instance by creating one via your
-    Unit or your Application, or get one (typically one you don't own) from your Model.
+    Charmers should not instantiate Secret objects directly, but should use
+    - :meth:`Unit.add_secret` if they want to create a unit-owned secret.
+    - :meth:`Application.add_secret` if they want to create an app-owned secret.
+    - :meth:`Model.get_secret` if they need a reference to an existing secret
+      (one they've created or been granted access to).
+
+    All secret events (e.g. SecretChanged) also have a :meth:`SecretEvent.secret` which
+    returns the Secret object associated with that event.
     """
     secret_key_re = re.compile(r"^([a-z](?:-?[a-z0-9]){2,})$")
     secret_id_re = re.compile(r"^secret:((?:-?[a-z0-9]){5,})$")
@@ -1062,7 +1092,7 @@ class _Secret:
             #  when that is fixed, `secret-set [id] --label X` will be valid.
             raise ModelError('missing secret value or filename')
         invalid_secret_keys = list(
-            filter(lambda key: not _Secret.secret_key_re.match(key),
+            filter(lambda key: not Secret.secret_key_re.match(key),
                    content.keys())
         )
         if invalid_secret_keys:
@@ -1202,51 +1232,40 @@ class _Secret:
         id = self._check_id(self.id, 'remove')
         self._backend.secret_remove(id)
 
-    def get_latest_revision(self) -> '_Secret':
-        """Fetch the latest available revision of this secret.
-
-        Returns a Secret object pointing to the newest available revision.
-        The current Secret instance is not updated in-place, so it will keep pointing
-        to the old revision.
-
-        Example::
-            >>> def _on_update_status(self: ops.charm.CharmBase, _):
-            >>>     old_revision = self.model.get_secret('my_label')
-            >>>     new_revision = old_revision.get_latest_revision()
-            >>>     if new_revision != old_revision:
-            >>>         logger.info('updated to new revision!')
-        """
-        if self._am_owner:
-            raise SecretOwnershipError(
-                'cannot update secret {} which is owned by this unit - '
-                'did you mean to call Secret.set?'.format(self))
-        self._backend.secret_get(self.id, update=True)
-
-        return _Secret(backend=self._backend,
-                       id=self.id,
-                       label=self.label,
-                       revision=None,  # cannot know the revision as a non-owner
-                       am_owner=self._am_owner)
-
     def get(self, key: str,
-            update: bool = False,
-            peek: bool = False) -> str:
+            track_latest: bool = False) -> str:
         """Get the secret contents.
+
+        Optionally, update the currently tracked revision to the latest one available,
+        and get the value from that revision.
 
         Args:
             key: the secret key to be fetched.
-            update: returns the contents of the latest revision and starts tracking it.
+            track_latest: returns the contents of the latest revision and starts tracking it.
                 From this moment on, `secret.get()` will return the latest revision's payload,
                 with or without explicitly passing `update=True`.
-            peek: returns the contents of the latest revision. Unlike update,
-                it will not switch the secret to track the latest revision. I.e. the next
-                time you call `get()` -- without `peek=True` -- you will get the revision
-                you are currently tracking, even though a more recent one is available.
-                Useful if you want to "try out" the new secret revision before dropping
-                the old one.
         """
         value = self._backend.secret_get(self.id, key=key,
-                                         update=update, peek=peek,
+                                         update=track_latest,
+                                         label=self.label)
+        # when called without --metadata and with key, secret_get returns str.
+        return typing.cast(str, value)
+
+    def peek_latest(self, key: str) -> str:
+        """Get the contents of the latest revision of this secret.
+
+         Unlike .get(track_latest=True), this will not switch the secret to track the latest
+         revision.
+         I.e. the next time you call `get()` -- without `peek=True` -- you will get the revision
+         you are currently tracking, even though a more recent one is available.
+         Useful if you want to "try out" the new secret revision before dropping
+         the old one.
+
+        Args:
+            key: the secret key to be fetched.
+        """
+        value = self._backend.secret_get(self.id, key=key,
+                                         peek=True,
                                          label=self.label)
         # when called without --metadata and with key, secret_get returns str.
         return typing.cast(str, value)
@@ -2678,9 +2697,9 @@ class _ModelBackend:
         if id:
             # Id is optional because we could set a secret by label.
             args.append(id)
-        if description:
+        if description is not None:  # empty string means: clear
             args += ['--description', description]
-        if label:
+        if label is not None:  # empty string means: clear
             args += ['--label', label]
         if content:
             for k, v in content.items():
@@ -2692,18 +2711,25 @@ class _ModelBackend:
                    owner: '_SecretOwner' = 'application',
                    description: Optional[str] = None,
                    label: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
                    rotate: Optional['_SecretRotationPolicy'] = 'never') -> str:
         self._validate_secret_content(content)
         args = []  # type: List[str]
 
-        if description:
+        if description is not None:  # empty string means: clear
             args += ['--description', description]
-        if label:
+        if label is not None:  # empty string means: clear
             args += ['--label', label]
         if owner:
             args += ['--owner', owner]
         if expire:
+            if isinstance(expire, datetime.datetime):
+                pass
+            elif isinstance(expire, datetime.timedelta):
+                expire = datetime.datetime.now() + expire
+            else:
+                raise TypeError(expire)
+
             args += ['--expire', expire.isoformat()]
         if rotate:
             args += ['--rotate', rotate]
@@ -2749,11 +2775,13 @@ class _ModelBackend:
         args = ['secret-get']
         if not (id or label):
             raise ValueError('provide at least one of (`id`, `label`).')
+        if peek and update:
+            raise ValueError('At most one of `peek` and `update` should be True.')
 
         if id:
             args.append(id)
 
-        if label:
+        if label is not None:  # empty string means: clear (if an ID is provided!)
             args += ['--label', label]
         if meta:
             args.append('--metadata')
@@ -2858,7 +2886,6 @@ class _ModelBackend:
 
         try:
             content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
-            logger.info('relation-set: {}'.format(typing.cast(str, content)))
             return self._run(*args, input_stream=content)  # type: ignore
         except ModelError as e:
             if self._is_relation_not_found(e):

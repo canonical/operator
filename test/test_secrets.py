@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
 import inspect
 from contextlib import contextmanager
 from unittest.mock import Mock
@@ -22,7 +23,7 @@ import ops.model
 from ops import testing
 from ops.charm import CharmBase, SecretChangedEvent, SecretRemoveEvent
 from ops.framework import BoundEvent, EventBase
-from ops.model import _Secret
+from ops.model import Secret
 from ops.testing import Harness, _TestingModelBackend
 
 SECRET_METHODS = ("secret_set",
@@ -111,7 +112,7 @@ def model(backend):
     )
 
 
-def assert_secrets_equal(s1: _Secret, s2: _Secret):
+def assert_secrets_equal(s1: Secret, s2: Secret):
     if s1._am_owner and s2._am_owner:  # noqa
         if not s1.revision == s2.revision:
             return False
@@ -136,6 +137,21 @@ def test_secret_get_by_id_owner(model, backend):
     secret = model.unit.add_secret({'foo': 'bar'}, label='hey!')
     secret2 = model.get_secret(id=secret.id)
     assert_secrets_equal(secret, secret2)
+
+
+@pytest.mark.parametrize('expire, expect_valid', (
+    (datetime.datetime(day=12, year=2024, month=10), True),
+    (datetime.timedelta(days=1), True),
+    (None, True),
+    (42, False),
+))
+def test_expire(expire, expect_valid, model, backend):
+    backend._is_leader = True
+    if expect_valid:
+        model.app.add_secret({'foo': 'bar'}, expire=expire)
+    else:
+        with pytest.raises(TypeError):
+            model.app.add_secret({'foo': 'bar'}, expire=expire)
 
 
 @pytest.mark.parametrize('god_mode', (True, False))
@@ -421,8 +437,7 @@ class TestHolderCharmPOV:
             assert secret.get('token') == rev_0_key
 
             # updating bumps us to rev2
-            new_secret = secret.get_latest_revision()
-            assert new_secret.get('token') == rev_2_key
+            assert secret.get('token', track_latest=True) == rev_2_key
 
         @owner.run  # this is charm code:
         def bump_revisions():
@@ -447,8 +462,7 @@ class TestHolderCharmPOV:
             assert secret.get('token') == rev_2_key
 
             # updating bumps us to rev6
-            new_secret = secret.get_latest_revision()
-            assert new_secret.get('token') == 'new_secret_rev-3'
+            assert secret.get('token', track_latest=True) == 'new_secret_rev-3'
 
 
 def test_app_scope_leader():

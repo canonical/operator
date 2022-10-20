@@ -58,7 +58,7 @@ from ops.model import (
     InvalidSecretLabelError,
     ModelError,
     RelationNotFoundError,
-    _Secret,
+    Secret,
 )
 
 if TYPE_CHECKING:
@@ -1162,7 +1162,7 @@ class Harness(typing.Generic[CharmType]):
             self._backend._calls.clear()
         return calls
 
-    def _get_secret(self, id: str) -> _Secret:
+    def _get_secret(self, id: str) -> Secret:
         # get the Secret instance (same as the Charm would)
         return self.charm.model.get_secret(id=id)
 
@@ -1343,7 +1343,7 @@ def _get_unit_or_app_name(
     return entity_name
 
 
-@_copy_docstrings(_Secret)
+@_copy_docstrings(Secret)
 class _TestSecret:
     def __init__(self, harness: 'Harness',
                  id: str,
@@ -1367,14 +1367,13 @@ class _TestSecret:
         return self._secret_id
 
     def get(self, key: str,
-            label: str = None,
-            update: bool = False,
-            peek: bool = False) -> str:
+            track_latest: bool = False) -> str:
         return self._mgr.secret_get(self._secret_id,
                                     key=key,
-                                    label=label,
-                                    update=update,
-                                    peek=peek)
+                                    update=track_latest)
+
+    def peek_latest(self, key: str) -> str:
+        return self._mgr.secret_get(self._secret_id, key=key, peek=True)
 
     def set(self, content: Dict[str, str],
             label: str = None,
@@ -1662,7 +1661,7 @@ class _TestingSecretManager:
             elif owner == 'application':
                 owner = self.app_name
             else:
-                raise ValueError('unknown')
+                raise ValueError(owner)
         # not _local: testing code is calling secret_add, so we will interpret the
         #   (mandatory) owner arg as the remote owner for this secret.
         else:
@@ -1671,6 +1670,10 @@ class _TestingSecretManager:
                                    'harness calls in a testing context.')
             if not owner:
                 raise ValueError('you should provide a remote owner')
+
+        expire = kwargs.get('expire')
+        if expire and not isinstance(expire, (datetime.timedelta, datetime.datetime)):
+            raise TypeError(expire)
 
         if label:
             self._labels[id] = label

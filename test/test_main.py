@@ -378,7 +378,7 @@ class _TestMain(abc.ABC):
             env.update({
                 'JUJU_SECRET_ID': event_spec.secret_id,
                 'JUJU_SECRET_LABEL': event_spec.secret_label or '',
-                'JUJU_SECRET_revision': str(event_spec.secret_revision or ''),
+                'JUJU_SECRET_REVISION': str(event_spec.secret_revision or ''),
             })
         if issubclass(event_spec.event_type, RelationEvent):
             rel_name = event_spec.event_name.split('_')[0]
