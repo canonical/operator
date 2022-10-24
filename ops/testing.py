@@ -74,7 +74,7 @@ from ops.model import RelationNotFoundError
 if TYPE_CHECKING:
     from typing_extensions import Literal, TypedDict
 
-    from ops.model import UnitOrApplication
+    from ops.model import UnitOrApplication, _NetworkDict
 
     ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
     _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
@@ -1174,6 +1174,36 @@ class Harness(Generic[CharmType]):
         """
         self._backend._planned_units = None
 
+    def add_network(
+            self,
+            network_info: '_NetworkDict',
+            endpoint_name: str,
+            relation_id: Optional[int] = None) -> None:
+        """Add simulated network data.
+
+        This supports testing charms that rely on the presence of networking info
+        to function. It will make the provided network_info available to the
+        testing backends network_get() method.
+
+        Args:
+            network_info: dictionary of network data as would be returned by
+                network_get()
+            endpoint_name: name of the binding to register data for
+            relation_id: optional a relation id
+        """
+        self._backend._network_map[(endpoint_name, relation_id)] = network_info
+
+    def remove_network(self, endpoint_name: str, relation_id: Optional[int] = None):
+        """Remove simulated network data."""
+        try:
+            del self._backend._network_map[(endpoint_name, relation_id)]
+        except KeyError as e:
+            raise RelationNotFoundError() from e
+
+    def reset_networks(self):
+        """Clear any simulated network info."""
+        self._backend._network_map = {}
+
     def _get_backend_calls(self, reset: bool = True) -> List[Tuple[Any, ...]]:
         """Return the calls that we have made to the TestingModelBackend.
 
@@ -1372,6 +1402,7 @@ class _TestingModelBackend:
         self._pebble_clients_can_connect = {}  # type: Dict[_TestingPebbleClient, bool]
         self._planned_units = None  # type: Optional[int]
         self._hook_is_running = ''
+        self._network_map = {}  # type: Dict[Tuple[str, Optional[int]], _NetworkDict]
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -1618,6 +1649,22 @@ class _TestingModelBackend:
         index = int(index)
         self._storage_list[name].pop(index, None)
 
+    def network_get(self, endpoint_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
+        """Return simulated network data.
+
+        If simulated network data has been set for a given endpoint (and optional relation)
+        it will be available via this method. Otherwise a RelationNotFoundError
+        will be raised
+
+        Args:
+            endpoint_name: binding the network info was registered for
+            relation_id: optional relation identifier
+        """
+        try:
+            return self._network_map[(endpoint_name, relation_id)]
+        except KeyError as e:
+            raise RelationNotFoundError() from e
+
     def action_get(self):  # type:ignore
         raise NotImplementedError(self.action_get)  # type:ignore
 
@@ -1629,9 +1676,6 @@ class _TestingModelBackend:
 
     def action_fail(self, message=''):  # type:ignore
         raise NotImplementedError(self.action_fail)  # type:ignore
-
-    def network_get(self, endpoint_name, relation_id=None):  # type:ignore
-        raise NotImplementedError(self.network_get)  # type:ignore
 
     def add_metrics(self, metrics, labels=None):  # type:ignore
         raise NotImplementedError(self.add_metrics)  # type:ignore
