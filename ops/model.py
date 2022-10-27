@@ -141,15 +141,28 @@ if typing.TYPE_CHECKING:
                                        '_SecretGetMetadataDict']]]
 
 
-class SecretRotationPolicy(enum.Enum):
+class SecretRotate(enum.Enum):
     """Allowed secret rotation policies."""
-    never = 'never'  # the default in juju
-    hourly = 'hourly'
-    daily = 'daily'
-    weekly = 'weekly'
-    monthly = 'monthly'
-    quarterly = 'quarterly'
-    yearly = 'yearly'
+    NEVER = 'never'  # the default in juju
+    HOURLY = 'hourly'
+    DAILY = 'daily'
+    WEEKLY = 'weekly'
+    MONTHLY = 'monthly'
+    QUARTERLY = 'quarterly'
+    YEARLY = 'yearly'
+
+    @staticmethod
+    def cast(value: Union['SecretRotate', str]):
+        """Cast :param:`value` to :class:`SecretRotate`.
+
+        raise SecretRotateValueError on failure.
+        """
+        if value is None:
+            return None  # None will be defaulted to 'never' on the juju side.
+        try:
+            return SecretRotate(value)
+        except ValueError as e:
+            raise SecretRotateValueError(value) from e
 
 
 class SecretOwner(enum.Enum):
@@ -175,6 +188,10 @@ class SecretIDNotFoundError(SecretsError):
 
 class SecretLabelNotFoundError(SecretsError):
     """Raised when one attempts to get a secret by label but that label is not known to Juju."""
+
+
+class SecretRotateValueError(SecretsError):
+    """Raised when one attempts to create a secret with a bad `rotate` value."""
 
 
 class Model:
@@ -507,7 +524,7 @@ class Application:
                    label: Optional[str] = None,
                    description: Optional[str] = None,
                    expiration: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional[SecretRotationPolicy] = None) -> 'Secret':
+                   rotate: Optional[SecretRotate] = None) -> 'Secret':
         """Create a Juju :class:`Secret` owned by this application.
 
         Args:
@@ -545,7 +562,7 @@ class Application:
                                              label=label,
                                              description=description,
                                              expiration=expiration,
-                                             rotate=rotate)
+                                             rotate=SecretRotate.cast(rotate))
         return Secret(self._backend, secret_id, label=label,
                       is_owned_by_this_unit=True, revision=1)
 
@@ -675,7 +692,7 @@ class Unit:
                    label: Optional[str] = None,
                    description: Optional[str] = None,
                    expiration: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional[SecretRotationPolicy] = None) -> 'Secret':
+                   rotate: Optional[SecretRotate] = None) -> 'Secret':
         """Create a Juju :class:`Secret` owned by this unit.
 
         See :meth:`Application.add_secret` for the details.
@@ -690,7 +707,7 @@ class Unit:
                                              owner=SecretOwner.unit,
                                              description=description,
                                              expiration=expiration,
-                                             rotate=rotate)
+                                             rotate=SecretRotate.cast(rotate))
         return Secret(self._backend, secret_id, label=label,
                       is_owned_by_this_unit=True, revision=1)
 
@@ -2710,7 +2727,7 @@ class _ModelBackend:
                    description: Optional[str] = None,
                    label: Optional[str] = None,
                    expiration: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional[SecretRotationPolicy] = None) -> str:
+                   rotate: Optional[SecretRotate] = None) -> str:
         args = []  # type: List[str]
 
         if description is not None:  # empty string means: clear

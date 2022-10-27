@@ -23,7 +23,7 @@ import ops.model
 from ops import testing
 from ops.charm import CharmBase, SecretChangedEvent, SecretRemoveEvent
 from ops.framework import BoundEvent, EventBase
-from ops.model import Secret, SecretOwner
+from ops.model import Secret, SecretOwner, SecretRotate, SecretRotateValueError
 from ops.testing import Harness, _TestingModelBackend
 
 SECRET_METHODS = ("secret_set",
@@ -389,6 +389,28 @@ def test_owner_create_secret(owner_harness, owner, holder):
         assert secret.get("foo") == secret1.get("foo")
 
 
+@pytest.mark.parametrize(
+    'rotate, expect_ok',
+    tuple((x, True) for x in list(SecretRotate)) +  # noqa: W504
+    tuple((x, False) for x in (42, 'foo', 'months')) +  # noqa: W504
+    tuple((x, True) for x in ('daily', 'monthly')),
+)
+def test_rotation(owner, owner_harness, rotate, expect_ok):
+    owner_harness.disable_hooks()
+    db_rel_id = owner_harness.add_relation('db', owner.app.name)
+    if expect_ok:
+        owner_harness.add_secret(content={'foo': 'bar'},
+                                 rotate=rotate,
+                                 relation_id=db_rel_id,
+                                 owner=owner.unit.name)
+    else:
+        with pytest.raises(SecretRotateValueError):
+            owner_harness.add_secret(content={'foo': 'bar'},
+                                     rotate=rotate,
+                                     relation_id=db_rel_id,
+                                     owner=owner.unit.name)
+
+
 class TestHolderCharmPOV:
     # Typically you want to unittest
     def test_owner_charm_pov(self, owner, holder, owner_harness, holder_harness):
@@ -398,7 +420,9 @@ class TestHolderCharmPOV:
         owner_harness.set_leader(True)
 
         db_rel_id = holder_harness.add_relation('db', owner.app.name)
-        secret = holder_harness.add_secret(owner.app, {'token': rev_0_key}, db_rel_id)
+        secret = holder_harness.add_secret(owner=owner.app,
+                                           content={'token': rev_0_key},
+                                           relation_id=db_rel_id)
         secret.grant(holder_harness.charm.unit)
         sec_id = secret.id
 

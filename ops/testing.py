@@ -60,16 +60,13 @@ from ops.model import (
     SecretIDNotFoundError,
     SecretLabelNotFoundError,
     SecretOwner,
+    SecretRotate,
 )
 
 if TYPE_CHECKING:
     from typing_extensions import Literal, TypedDict
 
-    from ops.model import (
-        SecretRotationPolicy,
-        UnitOrApplication,
-        _SecretGetResponseType,
-    )
+    from ops.model import UnitOrApplication, _SecretGetResponseType
 
     _RetractedLiteral = Literal["<RETRACTED>"]
     RelationID = int
@@ -79,7 +76,7 @@ if TYPE_CHECKING:
         'label': str,
         'description': str,
         'expire': str,
-        'rotate': SecretRotationPolicy,
+        'rotate': SecretRotate,
         'owner': Literal['unit', 'application'],  # we use the SecretOwner enum internally
         'content': Dict[str, str],
     })
@@ -165,10 +162,12 @@ class Harness(typing.Generic[CharmType]):
                 'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
 
-    def add_secret(self, owner: Union[str, 'UnitOrApplication'],
-                   content: Dict[str, str],
+    def add_secret(self, content: Dict[str, str],
+                   owner: Union[str, 'UnitOrApplication'],
                    relation_id: int,
-                   description: Optional[str] = None) -> '_TestSecret':
+                   description: Optional[str] = None,
+                   rotate: Optional['SecretRotate'] = None,
+                   ) -> '_TestSecret':
         """Return a Secret instance owned by some *remote* unit or app.
 
         If you want to create Secret instances owned by this charm (the one you're
@@ -176,8 +175,10 @@ class Harness(typing.Generic[CharmType]):
         `ops.model.Application.add_secret()`.
 
         Args:
-            owner: the owner of this secret.
+            owner: the unit/app name of the owner of this secret.
             content: the secret content.
+            rotate: the secret rotation policy. Note that at the moment the harness does not
+                simulate the passing of time, therefore this arg will be effectively ignored.
             relation_id: ID of the relation associated with this secret.
                 The secret's lifetime is bound to that of the relation.
             description: an optional description for what this secret is.
@@ -203,7 +204,8 @@ class Harness(typing.Generic[CharmType]):
         mgr = self._backend._secrets
         entity_name = _get_unit_or_app_name(owner)
         id = mgr.secret_add(content=content, description=description,
-                            owner=entity_name, _local=False)
+                            owner=entity_name, _local=False,
+                            rotate=SecretRotate.cast(rotate))
         return _TestSecret(
             harness=self,
             id=id,
