@@ -152,7 +152,7 @@ class SecretRotate(enum.Enum):
     YEARLY = 'yearly'
 
     @staticmethod
-    def cast(value: Union['SecretRotate', str]):
+    def cast(value: Optional[Union['SecretRotate', str]]):
         """Cast :param:`value` to :class:`SecretRotate`.
 
         raise SecretRotateValueError on failure.
