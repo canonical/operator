@@ -155,7 +155,7 @@ def test_expire(expiration, expect_valid, model, backend):
 
 
 @pytest.mark.parametrize('god_mode', (True, False))
-@pytest.mark.parametrize('owner', (SecretOwner.unit, SecretOwner.application))
+@pytest.mark.parametrize('owner', (SecretOwner.UNIT, SecretOwner.APPLICATION))
 @pytest.mark.parametrize('leader', (True, False))
 def test_cannot_get_removed_secret(model, god_mode, leader, owner, backend):
     backend._is_leader = leader
@@ -496,7 +496,7 @@ def test_app_scope_leader():
 
     bind_secret_mgrs(mgr1, mgr2)
     mgr1._is_leader = True
-    mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.application)
+    mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.APPLICATION)
 
 
 @pytest.mark.parametrize(
@@ -523,11 +523,11 @@ def test_app_scope_follower():
     mgr1._is_leader = False
 
     with pytest.raises(ops.model.SecretOwnershipError):
-        mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.application)
+        mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.APPLICATION)
 
     # we give it leadership to create a secret
     mgr1._is_leader = True
-    secret_id = mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.application)
+    secret_id = mgr1.secret_add({'abc': 'def'}, owner=SecretOwner.APPLICATION)
 
     # but then we lose leadership again
     mgr1._is_leader = False

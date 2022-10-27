@@ -167,8 +167,8 @@ class SecretRotate(enum.Enum):
 
 class SecretOwner(enum.Enum):
     """Secret owner names."""
-    unit = 'unit'
-    application = 'application'
+    UNIT = 'unit'
+    APPLICATION = 'application'
 
 
 StrOrPath = typing.Union[str, Path]
@@ -704,7 +704,7 @@ class Unit:
 
         secret_id = self._backend.secret_add(content=content,
                                              label=label,
-                                             owner=SecretOwner.unit,
+                                             owner=SecretOwner.UNIT,
                                              description=description,
                                              expiration=expiration,
                                              rotate=SecretRotate.cast(rotate))

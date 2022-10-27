@@ -1579,7 +1579,7 @@ class _TestingSecretManager:
         self._check_leadership(fn, SecretOwner(scope))
 
     def _check_leadership(self, fn: str, scope: SecretOwner):
-        if scope is SecretOwner.application and not self.is_leader:
+        if scope is SecretOwner.APPLICATION and not self.is_leader:
             raise model.SecretOwnershipError('Follower attempted to call {}. '
                                              'Only the leader can manage '
                                              'application-scoped secrets.'.format(fn))
@@ -1660,12 +1660,12 @@ class _TestingSecretManager:
 
     @_copy_signature(model._ModelBackend.secret_add)
     def secret_add(self, _local=True, label: str = None,
-                   owner=SecretOwner.application,
+                   owner=SecretOwner.APPLICATION,
                    expiration=None, **kwargs) -> str:
         # only one check: that if we're creating an app-scoped secret, we are the leader.
         # we can't use _validate_access directly because we don't have a id yet.
         if self._hook_is_running:
-            self._check_leadership('secret_add', owner or SecretOwner.application)
+            self._check_leadership('secret_add', owner or SecretOwner.APPLICATION)
 
         # if you did pass a label, that should be unique.
         if label and label in self._labels.values():
@@ -1678,9 +1678,9 @@ class _TestingSecretManager:
         #   owner: application|unit arg as 'this app/this unit'.
         #   _local should only ever be false if we are testing.
         if _local and owner is not None:
-            if owner is SecretOwner.unit:
+            if owner is SecretOwner.UNIT:
                 owner = self.unit_name
-            elif owner is SecretOwner.application:
+            elif owner is SecretOwner.APPLICATION:
                 owner = self.app_name
             else:
                 raise ValueError(owner)
