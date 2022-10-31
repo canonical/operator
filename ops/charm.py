@@ -189,11 +189,12 @@ class SecretEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        snapshot = {
+        snapshot = super().snapshot()
+        snapshot.update({
             'id': self.id,
             'label': self.label,
-            'revision': self.revision,  # pyright: PrivateMemberAccess=false
-        }
+            'revision': self.revision,
+        })
         return cast('SecretEvent._SecretEventSnapshot', snapshot)
 
     def restore(self, snapshot: '_SecretEventSnapshot'):
@@ -201,6 +202,7 @@ class SecretEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
+        super().restore(snapshot)
         self.id = snapshot['id']
         self.label = snapshot['label']
         self.revision = snapshot['revision']
