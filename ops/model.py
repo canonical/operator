@@ -2562,7 +2562,7 @@ class SecretPermissionError(ModelError):
 
 
 class SecretOwnershipError(SecretPermissionError):
-    """Raised when a secret holder attempts an owner-only operation, or vice versa."""
+    """Raised when a secret consumer attempts an owner-only operation, or vice versa."""
 
 
 class SecretNotGrantedError(SecretPermissionError):

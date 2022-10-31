@@ -152,7 +152,7 @@ class SecretEvent(HookEvent):
 
     # used to determine whether the secret instance
     # exposed by this event is self-owned or not. Uses the knowledge that certain event
-    # types are only fired on secret owners / holders.
+    # types are only fired on secret owners / consumers.
     _is_owner_event = NotImplemented
 
     if TYPE_CHECKING:
@@ -207,7 +207,7 @@ class SecretEvent(HookEvent):
 
 
 class SecretChangedEvent(SecretEvent):
-    """Event raised by Juju on a secret holder when the owner has changed its contents.
+    """Event raised by Juju on a secret **consumer** when the owner has changed its contents.
 
     When the owner of a secret creates a new revision, all units/applications
     that are tracking this secret will be notified by means of this event that a new

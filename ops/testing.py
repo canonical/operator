@@ -1602,7 +1602,7 @@ class _TestingSecretManager:
             self._check_scope(fn, id)
 
         # some things we can only do as secret owners ("creators?"),
-        # some others only as holders ("grantees"?)
+        # some others only as consumers ("grantees"?)
         if own is not None:
             self._check_ownership(fn, id, should_own=own)
         if read:

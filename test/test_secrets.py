@@ -93,10 +93,10 @@ def bind_secret_mgrs(mgr1: _TestingSecretManager, mgr2: _TestingSecretManager):
     mgr2._bind(mgr1)  # noqa
 
 
-def bind(owner_harness: Harness, holder_harness: Harness):
+def bind(owner_harness: Harness, consumer_harness: Harness):
     # binds the two harnesses in such a way that the respective Secret
     # backends will work in sync
-    bind_secret_mgrs(owner_harness.model._backend._secrets, holder_harness.model._backend._secrets)  # noqa
+    bind_secret_mgrs(owner_harness.model._backend._secrets, consumer_harness.model._backend._secrets)  # noqa
 
 
 @pytest.fixture
@@ -294,38 +294,38 @@ def owner(owner_harness):
 
 
 @pytest.fixture(scope='function')
-def holder_harness():
+def consumer_harness():
     return Harness(charm_type(), meta=yaml.safe_dump(
-        {'name': 'holder',
+        {'name': 'consumer',
          'requires': {'db': {'interface': 'db'}}}))
 
 
 @pytest.fixture(scope='function')
-def holder(holder_harness, owner_harness):
-    holder_harness.begin()
-    bind(owner_harness, holder_harness)
-    return holder_harness.charm
+def consumer(consumer_harness, owner_harness):
+    consumer_harness.begin()
+    bind(owner_harness, consumer_harness)
+    return consumer_harness.charm
 
 
-def grant(owner: CharmBase, holder: CharmBase,
+def grant(owner: CharmBase, consumer: CharmBase,
           label: str = None,
           secret_id: str = None,
           relation_name='db',
           relation_id=1,
           is_peer=False):
     # simulate a relation
-    owner.model._backend._secrets._mock_relation_ids_map[1] = holder.unit.name
-    holder.model._backend._secrets._mock_relation_ids_map[1] = owner.unit.name
+    owner.model._backend._secrets._mock_relation_ids_map[1] = consumer.unit.name
+    consumer.model._backend._secrets._mock_relation_ids_map[1] = owner.unit.name
 
     owner.model.get_secret(label=label, id=secret_id).grant(
-        holder.unit,
+        consumer.unit,
         relation=ops.model.Relation(relation_name, relation_id, is_peer=is_peer,
                                     backend=owner.model._backend,
                                     cache=owner.model._cache,
                                     our_unit=owner.model.unit))
 
 
-def test_owner_create_secret(owner_harness, owner, holder):
+def test_owner_create_secret(owner_harness, owner, consumer):
     # this secret id will in practice be shared via relation data.
     # here we don't care about how it's being shared.
     sec_id = ''
@@ -348,43 +348,43 @@ def test_owner_create_secret(owner_harness, owner, holder):
         # and we know the revision
         assert secret.revision == 1
 
-    @holder.run
+    @consumer.run
     def secret_get_without_access():
         nonlocal sec_id
-        # labels are local: my_label is how OWNER knows this secret, not holder.
+        # labels are local: my_label is how OWNER knows this secret, not consumer.
         with pytest.raises(ops.model.SecretLabelNotFoundError):
-            assert holder.model.get_secret(label='my_label')
+            assert consumer.model.get_secret(label='my_label')
 
-        secret = holder.model.get_secret(id=sec_id)
+        secret = consumer.model.get_secret(id=sec_id)
         # and either way, we haven't been granted the secret yet!
         with pytest.raises(ops.model.SecretNotGrantedError):
             secret.get('foo')
 
     @owner.run
     def grant_access():
-        # simulate a relation, grant the holder access.
-        grant(owner, holder, label='my_label')
+        # simulate a relation, grant the consumer access.
+        grant(owner, consumer, label='my_label')
 
-    @holder.run
+    @consumer.run
     def secret_get_with_access():
         nonlocal sec_id
-        # as a holder, we can secret-get
-        secret = holder.model.get_secret(id=sec_id, label='other_label')
+        # as a consumer, we can secret-get
+        secret = consumer.model.get_secret(id=sec_id, label='other_label')
 
         assert not secret._is_owned_by_this_unit
         # we can get it by label as well now!
-        secret2 = holder.model.get_secret(label='other_label')
+        secret2 = consumer.model.get_secret(label='other_label')
         assert_secrets_equal(secret, secret2)
 
         assert secret.get('foo') == 'bar'
 
-    @holder.run
+    @consumer.run
     def secret_relabel():
         nonlocal sec_id
-        # as a holder, we can secret-get. If we do this outside of a secret-event context,
+        # as a consumer, we can secret-get. If we do this outside of a secret-event context,
         # we can't map ids to labels.
-        secret = holder.model.get_secret(id=sec_id, label='other_label')
-        secret1 = holder.model.get_secret(id=sec_id, label='new_label')
+        secret = consumer.model.get_secret(id=sec_id, label='other_label')
+        secret1 = consumer.model.get_secret(id=sec_id, label='new_label')
         assert_secrets_equal(secret, secret1)
         assert secret.get("foo") == secret1.get("foo")
 
@@ -413,52 +413,52 @@ def test_rotation(owner, owner_harness, rotate, expect_ok):
 
 class TestHolderCharmPOV:
     # Typically you want to unittest
-    def test_owner_charm_pov(self, owner, holder, owner_harness, holder_harness):
+    def test_owner_charm_pov(self, owner, consumer, owner_harness, consumer_harness):
         rev_0_key = 'a'
         rev_1_key = 'a1'
         rev_2_key = 'a2'
         owner_harness.set_leader(True)
 
-        db_rel_id = holder_harness.add_relation('db', owner.app.name)
-        secret = holder_harness.add_secret(owner=owner.app,
-                                           content={'token': rev_0_key},
-                                           relation_id=db_rel_id)
-        secret.grant(holder_harness.charm.unit)
+        db_rel_id = consumer_harness.add_relation('db', owner.app.name)
+        secret = consumer_harness.add_secret(owner=owner.app,
+                                             content={'token': rev_0_key},
+                                             relation_id=db_rel_id)
+        secret.grant(consumer_harness.charm.unit)
         sec_id = secret.id
 
-        # verify that the holder can access the secret
-        @holder.run  # this is charm code:
+        # verify that the consumer can access the secret
+        @consumer.run  # this is charm code:
         def secret_get_with_access():
-            s = holder.model.get_secret(id=sec_id, label='other_label')
+            s = consumer.model.get_secret(id=sec_id, label='other_label')
             assert not s._is_owned_by_this_unit
             assert s.get('token') == rev_0_key
             # assert secret.revision == 0  # non-owners cannot see the revision
 
-        @holder.listener(holder.on.secret_changed)
+        @consumer.listener(consumer.on.secret_changed)
         def _on_changed(evt):
             assert isinstance(evt, SecretChangedEvent)
             # SecretRotateEvent.secret is *the currently tracked revision*
-            assert_secrets_equal(evt.secret, holder.model.get_secret(id=sec_id))
+            assert_secrets_equal(evt.secret, consumer.model.get_secret(id=sec_id))
             assert evt.secret.get('token') == rev_0_key
 
-        @holder.listener(holder.on.secret_remove)
+        @consumer.listener(consumer.on.secret_remove)
         def _on_remove(evt):
             assert isinstance(evt, SecretRemoveEvent)
             # SecretRotateEvent.secret is *the currently tracked revision*
-            assert evt.secret == holder.model.get_secret(id=sec_id)
+            assert evt.secret == consumer.model.get_secret(id=sec_id)
 
         # rotate the secret
         secret.set({'token': rev_1_key})
-        assert holder.get_calls() == [_on_changed]
+        assert consumer.get_calls() == [_on_changed]
 
         # and again
         secret.set({'token': rev_2_key})
-        assert holder.get_calls() == [_on_changed, _on_changed]
+        assert consumer.get_calls() == [_on_changed, _on_changed]
 
-        @holder.run
+        @consumer.run
         def _update_to_latest_revision():
             # we didn't call update() yet, so our revision is still stuck at 0
-            secret = holder.model.get_secret(id=sec_id)
+            secret = consumer.model.get_secret(id=sec_id)
             assert secret.get('token') == rev_0_key
 
             # updating bumps us to rev2
@@ -474,16 +474,16 @@ class TestHolderCharmPOV:
         # knows that there's 4 new revisions.
         # if we prune all untracked revisions (something we can only do from test code!!)
         # we will remove #0,1 and #3-5.  #6, being the latest, remains alive because the next time
-        # the holder updates, that's what he'll be bumped to.
+        # the consumer updates, that's what he'll be bumped to.
 
         secret.prune_all_untracked()
         secrets_mgr = secret._mgr
         for revision in (0, 1, 3, 4, 5):
             assert secrets_mgr._get_content(sec_id, revision) == secrets_mgr.RETRACTED
 
-        @holder.run
+        @consumer.run
         def _update_to_latest_revision_once_more():
-            secret = holder.model.get_secret(id=sec_id)
+            secret = consumer.model.get_secret(id=sec_id)
             assert secret.get('token') == rev_2_key
 
             # updating bumps us to rev6
