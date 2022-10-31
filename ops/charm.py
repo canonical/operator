@@ -189,12 +189,11 @@ class SecretEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        snapshot = super().snapshot()
-        snapshot.update({
-            'id': self.id,
-            'label': self.label,
-            'revision': self.revision,
-        })
+        # relax the _SerializedData type a bit:
+        snapshot = cast(Dict[str, Optional['JsonObject']], super().snapshot())
+        snapshot['id'] = self.id
+        snapshot['label'] = self.label
+        snapshot['revision'] = self.revision
         return cast('SecretEvent._SecretEventSnapshot', snapshot)
 
     def restore(self, snapshot: '_SecretEventSnapshot'):
@@ -202,7 +201,7 @@ class SecretEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        super().restore(snapshot)
+        super().restore(snapshot)  # type: ignore
         self.id = snapshot['id']
         self.label = snapshot['label']
         self.revision = snapshot['revision']
