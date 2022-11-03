@@ -111,6 +111,15 @@ if typing.TYPE_CHECKING:
         'value': str,  # Juju >= 2.9
         'cidr': str
     })
+
+    _Topology = TypedDict('_Topology', {
+        "model": str,
+        "model_uuid": str,
+        "application": str,
+        "unit": str,
+        "charm_name": str
+    })
+
     _BindAddressDict = TypedDict('_BindAddressDict', {
         'interface-name': str,
         'addresses': List[_AddressDict]
@@ -139,6 +148,7 @@ class Model:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
+        self._meta = meta
         self._unit = self.get_unit(self._backend.unit_name)
         relations = meta.relations  # type: _RelationsMeta_Raw
         self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
@@ -258,6 +268,25 @@ class Model:
             falls back to the default binding for the relation name.
         """
         return self._bindings.get(binding_key)
+
+    @property
+    def topology(self) -> '_Topology':
+        """A dict uniquely identifying this unit across all your Juju-managed deployments.
+
+        This is like a fingerprint that combines the following four elements:
+        - ``name``: Model name
+        - ``model_uuid``: Model UUID
+        - ``application``: Application name
+        - ``unit``: Unit name
+        - ``charm_name``: The name of the charm
+        """
+        return {
+            'model': self.name,
+            'model_uuid': self.uuid,
+            'application': self.app.name,
+            'unit': self.unit.name,
+            'charm_name': self._meta.name,
+        }
 
 
 _T = TypeVar('_T', bound='UnitOrApplication')

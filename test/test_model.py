@@ -942,6 +942,19 @@ class TestModel(unittest.TestCase):
     def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
+    def test_topology(self):
+        meta = ops.charm.CharmMeta()
+        meta.name = 'foo/0'
+        model = ops.model.Model(meta, ops.model._ModelBackend('myapp/0'))
+        topo = model.topology
+        assert topo == {
+            'application': 'myapp',
+            'charm_name': 'foo/0',
+            'model': model.name,
+            'model_uuid': model.uuid,
+            'unit': 'myapp/0'
+        }
+
 
 class PushPullCase:
     """Test case for table-driven tests."""
