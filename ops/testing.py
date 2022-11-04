@@ -1403,6 +1403,7 @@ class _TestingModelBackend:
         if self._resource_dir is not None:
             self._resource_dir.cleanup()
             self._resource_dir = None
+        self._harness_tmp_dir.cleanup()
 
     def _get_resource_dir(self) -> pathlib.Path:
         if self._resource_dir is None:
