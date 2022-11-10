@@ -180,7 +180,8 @@ class ActionEvent(EventBase):
         event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
         if event_action_name != env_action_name:
             # This could only happen if the dev manually emits the action, or from a bug.
-            raise RuntimeError('action event kind does not match current action')
+            raise RuntimeError('action event kind ({}) does not match current '
+                               'action ({})'.format(event_action_name, env_action_name))
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()  # pyright: reportPrivateUsage=false  # noqa
@@ -190,6 +191,28 @@ class ActionEvent(EventBase):
 
         Args:
             results: The result of the action as a Dict
+            Juju eventually only accepts a str:str mapping, so we will attempt
+            to flatten any more complex data structure like so:
+            >>> {'a': 'b'} # becomes: 'a'='b'
+            >>> {'a': {'b': 'c'}} # becomes: 'a.b'='c'
+            >>> {'a': {'b': 'c', 'd': 'e'}} # becomes: 'a.b'='c', 'a.d' = 'e'
+            >>> {'a.b': 'c', 'a.d': 'e'} # equivalent to previous
+            Note that duplicate keys are not allowed, so
+            >>> {'a': {'b': 'c'}, 'a.b': 'c'} # invalid!
+
+            Note that the resulting keys must start and end with lowercase
+            alphanumeric, and can only contain lowercase alphanumeric, hyphens
+            and periods.
+
+            If any exceptions occur whilst the action is being handled, juju will
+            gather any stdout/stderr data (and the return code) and inject them into the
+            results object. Thus, the results object might contain the following keys,
+            additionally to those specified by the charm code:
+             - Stdout
+             - Stderr
+             - Stdout-encoding
+             - Stderr-encoding
+             - ReturnCode
         """
         self.framework.model._backend.action_set(results)   # pyright: reportPrivateUsage=false
 
@@ -589,6 +612,9 @@ class StorageEvent(HookEvent):
     charms can define several different types of storage that are
     allocated from Juju. Changes in state of storage trigger sub-types
     of :class:`StorageEvent`.
+
+    Attributes:
+        storage: The :class:`~ops.model.Storage` instance this event is about.
     """
 
     def __init__(self, handle: 'Handle', storage: 'Storage'):
