@@ -67,8 +67,6 @@ if TYPE_CHECKING:
 
     from typing_extensions import Literal, Protocol, TypedDict
 
-    from ops.model import LayerArg
-
     # callback types for _MultiParser header and body handlers
     class _BodyHandler(Protocol):
         def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
@@ -774,7 +772,7 @@ class Layer:
     # description: str
     # services: Mapping[str, 'Service']
 
-    def __init__(self, raw: Optional['LayerArg'] = None):
+    def __init__(self, raw: Optional[Union[str, '_LayerDict']] = None):
         if isinstance(raw, str):
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
@@ -1811,7 +1809,7 @@ class Client:
             change_id, timeout))
 
     def add_layer(
-            self, label: str, layer: Union['LayerArg', 'Layer'], *,
+            self, label: str, layer: Union[str, '_LayerDict', Layer], *,
             combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 

@@ -55,15 +55,12 @@ from ops._private import yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
-    from typing import Collection
-
     from pebble import (  # pyright: reportMissingTypeStubs=false
         CheckInfo,
         CheckLevel,
         Client,
         ExecProcess,
         FileInfo,
-        Layer,
         Plan,
         ServiceInfo,
         _LayerDict,
@@ -88,7 +85,7 @@ if typing.TYPE_CHECKING:
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
-    LayerArg = Union[str, Dict[str, Collection[str]], _LayerDict]
+    _Layer = Union[str, _LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
     _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -906,8 +903,8 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: Optional['UnitOrApplication']):
-        if key is None:
+    def __getitem__(self, key: 'UnitOrApplication'):
+        if key is None and self.relation.app is None:
             # NOTE: if juju gets fixed to set JUJU_REMOTE_APP for relation-broken events, then that
             # should fix the only case in which we expect key to be None - potentially removing the
             # need for this error in future ops versions (i.e. if relation.app is guaranteed to not
@@ -1472,7 +1469,7 @@ class Container:
 
         self._pebble.stop_services(service_names)
 
-    def add_layer(self, label: str, layer: Union['LayerArg', 'Layer'], *, combine: bool = False):
+    def add_layer(self, label: str, layer: '_Layer', *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         Args:
