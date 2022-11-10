@@ -1,6 +1,6 @@
 name: Data Platform Charm Tests
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_call]
 
 jobs:
   db-charm-tests:
@@ -20,7 +20,7 @@ jobs:
         with:
           repository: ${{ matrix.charm-repo }}
 
-      - name: Inject current/edge 'ops' version dependency into test charm
+      - name: Update 'ops' dependency in test charm to latest
         run: |
           sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
           echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
@@ -28,6 +28,6 @@ jobs:
       - name: Install dependencies
         run: pip install tox
 
-      - name: Run charm unit tests
+      - name: Run the charm's unit tests
         run: tox -vve unit
 
