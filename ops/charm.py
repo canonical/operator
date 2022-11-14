@@ -288,7 +288,7 @@ class ConfigChangedEvent(HookEvent):
       (if the machine reboots and comes up with a different IP).
     - When the cloud admin reconfigures the charm via the juju CLI, i.e.
       `juju config my-charm foo=bar`. This event notifies the charm of
-      its new configuration. (The event itself, however, is now aware of *what*
+      its new configuration. (The event itself, however, is not aware of *what*
       specifically has changed in the config).
 
     Any callback method bound to this event cannot assume that the
