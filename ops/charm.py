@@ -612,6 +612,9 @@ class StorageEvent(HookEvent):
     charms can define several different types of storage that are
     allocated from Juju. Changes in state of storage trigger sub-types
     of :class:`StorageEvent`.
+
+    Attributes:
+        storage: The :class:`~ops.model.Storage` instance this event is about.
     """
 
     def __init__(self, handle: 'Handle', storage: 'Storage'):
