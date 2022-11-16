@@ -170,12 +170,12 @@ def _get_event_args(charm: 'CharmBase',
             storage_name = "-".join(bound_event.event_kind.split("_")[:-2])
 
         storages = model.storages[storage_name]
-        id, storage_location = model._backend._storage_event_details()
+        index, storage_location = model._backend._storage_event_details()
         if len(storages) == 1:
             storage = storages[0]
         else:
             # If there's more than one value, pick the right one. We'll realize the key on lookup
-            storage = next((s for s in storages if s.id == id), None)
+            storage = next((s for s in storages if s.index == index), None)
         storage = cast(Union[ops.storage.JujuStorage, ops.storage.SQLiteStorage], storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
