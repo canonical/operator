@@ -391,9 +391,9 @@ def test_owner_create_secret(owner_harness, owner, consumer):
 
 @pytest.mark.parametrize(
     'rotate, expect_ok',
-    tuple((x, True) for x in list(SecretRotate)) +  # noqa: W504
-    tuple((x, False) for x in (42, 'foo', 'months')) +  # noqa: W504
-    tuple((x, True) for x in ('daily', 'monthly')),
+    tuple((x, True) for x in list(SecretRotate))  # noqa: W504
+    + tuple((x, False) for x in (42, 'foo', 'months'))  # noqa: W504
+    + tuple((x, True) for x in ('daily', 'monthly')),
 )
 def test_rotation(owner, owner_harness, rotate, expect_ok):
     owner_harness.disable_hooks()
