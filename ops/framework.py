@@ -669,12 +669,11 @@ class Framework(Object):
             sys.breakpointhook = self.breakpoint
         return old_breakpointhook
 
-    def abort(self):
-        """Abort the execution of the framework and exit."""
-        try:
+    def exit(self, commit: bool = True):
+        """Stop the execution of the framework and exit."""
+        if commit:
             self.commit()
-        finally:
-            self.close()
+
         sys.exit(0)
 
     def close(self):
