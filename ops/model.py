@@ -68,7 +68,7 @@ if typing.TYPE_CHECKING:
         ServiceInfo,
         _LayerDict,
     )
-    from typing_extensions import Literal, TypedDict
+    from typing_extensions import TypedDict
 
     from ops.framework import _SerializedData
 
@@ -77,7 +77,7 @@ if typing.TYPE_CHECKING:
     Numerical = Union[int, float]
 
     # all types that can be (de) serialized to json(/yaml) fom Python builtins
-    JsonObject = Union[Numerical, bool, str,
+    JsonObject = Union[None, Numerical, bool, str,
                        Dict[str, 'JsonObject'],
                        List['JsonObject'],
                        Tuple['JsonObject', ...]]
@@ -122,76 +122,12 @@ if typing.TYPE_CHECKING:
         'egress-subnets': List[str]
     })
 
-    _SecretMetadataDict = TypedDict('_SecretMetadataDict', {
-        'label': str,
-        'revision': str,
-        'expires': str,
-        'rotation': str,
-
-        # internally converted to SecretRotationPolicy enum
-        'rotates': Literal['never', 'hourly', 'daily', 'weekly',
-                           'monthly', 'quarterly', 'yearly'],
-    })
-
-    _SecretGetMetadataDict = Dict[str, _SecretMetadataDict]
-    _SecretGetContentsDict = Dict[str, Dict[str, str]]
-    _SecretGetResponseType = Union[str,
-                                   Dict[str, Union[
-                                       '_SecretGetContentsDict',
-                                       '_SecretGetMetadataDict']]]
-
-
-class SecretRotate(enum.Enum):
-    """Allowed secret rotation policies."""
-    NEVER = 'never'  # the default in juju
-    HOURLY = 'hourly'
-    DAILY = 'daily'
-    WEEKLY = 'weekly'
-    MONTHLY = 'monthly'
-    QUARTERLY = 'quarterly'
-    YEARLY = 'yearly'
-
-    @staticmethod
-    def cast(value: Optional[Union['SecretRotate', str]]):
-        """Cast :param:`value` to :class:`SecretRotate`.
-
-        raise SecretRotateValueError on failure.
-        """
-        if value is None:
-            return None  # None will be defaulted to 'never' on the juju side.
-        try:
-            return SecretRotate(value)
-        except ValueError as e:
-            raise SecretRotateValueError(value) from e
-
-
-class SecretOwner(enum.Enum):
-    """Secret owner names."""
-    UNIT = 'unit'
-    APPLICATION = 'application'
-
 
 StrOrPath = typing.Union[str, Path]
 
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
-
-
-class SecretsError(Exception):
-    """Base class for secrets-related errors."""
-
-
-class SecretIDNotFoundError(SecretsError):
-    """Raised when one attempts to get a secret by ID but that ID is not known to Juju."""
-
-
-class SecretLabelNotFoundError(SecretsError):
-    """Raised when one attempts to get a secret by label but that label is not known to Juju."""
-
-
-class SecretRotateValueError(SecretsError):
-    """Raised when one attempts to create a secret with a bad `rotate` value."""
 
 
 class Model:
@@ -214,69 +150,6 @@ class Model:
         storages = meta.storages  # type: Iterable[str]
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
-
-    @typing.overload
-    def get_secret(self, *, label: str, id: None = None) -> 'Secret': ...  # noqa
-    @typing.overload
-    def get_secret(self, *, id: str, label: None = None) -> 'Secret': ...  # noqa
-    @typing.overload
-    def get_secret(self, *, id: str, label: str) -> 'Secret': ...  # noqa
-
-    def get_secret(self, *, id: str = None, label: str = None) -> 'Secret':  # type: ignore  # noqa
-        """Fetch Secret instance from a label or a secret ID.
-
-        You need to provide at least one of `id` and `label`.
-        If you provide both, the secret will be fetched by ID and the secret label will be
-        updated to the label you provided.
-
-        :raise: SecretLabelNotFoundError: If only `label` is provided, but that label is
-            unknown to Juju.
-        :raise: `SecretIDNotFoundError`: If the `id` is unknown to Juju.
-        """
-        if not (id or label):
-            raise TypeError('provide an id or a label or both')
-
-        # let's try to determine whether we own this secret or not.
-        # assumption: secret-get --metadata will only succeed for owners.
-        try:
-            meta = self._backend.secret_get(
-                id=id,
-                label=label,
-                meta=True)
-            meta = typing.cast('_SecretGetMetadataDict', meta)
-
-        except SecretOwnershipError:  # let other types raise
-            # the call failed. We do not own the secret, and id/label are only
-            # known if we provided them.
-            # however, unless we call secret_get again without meta, Juju
-            # might not know that we attempted to set a label for it.
-            if id and label:
-                # call secret-get and pass the label to ensure that,
-                # if the label is new, we update it in the Juju model.
-                self._backend.secret_get(id=id, label=label)
-
-            # if the ID is None at this point, the Framework cannot know it.
-            # So long as the label is known by juju, we are good.
-            return Secret(self._backend, id, label=label)
-
-        # if we have metadata access, we own the secret
-        # we can also get the label and revision from the metadata.
-
-        if id:
-            secret_id = id
-            secret_tail = Secret._ensure_id(secret_id).split(':')[1]
-        else:
-            # extract the first (and hopefully the only) key from the metadata dict
-            secret_tail = next(iter(meta))  # type: str
-            secret_id = Secret._ensure_id(secret_tail, 'create')
-
-        # even if we called `secret-get secret:xx --metadata`, we'll get
-        #  back {xx: {...}}  ("secret:" gets stripped)
-        metadata = meta[secret_tail]  # type: _SecretMetadataDict
-        label = metadata.get('label')
-        revision = int(metadata.get('revision'))
-        return Secret(self._backend, secret_id, label=label,
-                      revision=revision, is_owned_by_this_unit=True)
 
     @property
     def unit(self) -> 'Unit':
@@ -387,6 +260,23 @@ class Model:
         """
         return self._bindings.get(binding_key)
 
+    def get_secret(self, *, id: Optional[str] = None, label: Optional[str] = None) -> 'Secret':
+        """Get the :class:`Secret` with the given ID or label.
+
+        You must provide at least one of `id` or `label`. If you provide both,
+        the secret will be fetched by ID, and the secret's label will be
+        updated to the label you provided.
+
+        Args:
+            id: Secret ID if fetching by ID.
+            label: Secret label if fetching by label (or updating it).
+
+        Raises:
+            SecretNotFoundError: If a secret with this ID or label doesn't exist.
+        """
+        content = self._backend.secret_get(id=id, label=label)
+        return Secret(self._backend, id=id, label=label, content=content)
+
 
 _T = TypeVar('_T', bound='UnitOrApplication')
 
@@ -485,7 +375,7 @@ class Application:
             )
 
         if not self._is_our_app:
-            raise RuntimeError('cannot to set status for a remote application {}'.format(self))
+            raise RuntimeError('cannot set status for a remote application {}'.format(self))
 
         if not self._backend.is_leader():
             raise RuntimeError('cannot set application status as a non-leader unit')
@@ -523,48 +413,33 @@ class Application:
                    content: Dict[str, str],
                    label: Optional[str] = None,
                    description: Optional[str] = None,
-                   expiration: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional[SecretRotate] = None) -> 'Secret':
-        """Create a Juju :class:`Secret` owned by this application.
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional['SecretRotate'] = None) -> 'Secret':
+        """Create a :class:`Secret` owned by this application.
 
         Args:
-            content: The payload of the secret: a key-value mapping
-                containing the actual secret contents, e.g. credential pairs.
-            label: Assign a private, unique label to this secret. This will be stored in the juju
-                model and can be used later for lookup.
-            description: An optional string to describe the content of the secret.
-            expiration: a point in time at which the secret is due to expiration.
-                When that timeout is hit, juju will notify the charm with a SecretExpired event.
-                Can be provided as a datetime object, which will be interpreted as absolute,
-                or as a timedelta object, which will be interpreted as relative to "now".
-                `None` means the secret will never expire.
-            rotate: The secret rotation policy. Every time the timeout is hit, juju will notify the
-                charm with a SecretRotate event. Defaults to 'never' (juju-side).
-
-        Examples::
-
-            >>> self.model.app.add_secret(
-            ...    {'username':'foo', 'password':'1234'},
-            ...    description='the credentials to access this database',
-            ...    expiration=datetime.timedelta(days=24),
-            ...    rotate='never')
-
-            >>> self.model.app.add_secret(
-            ...    {'username':'foo', 'password':'1234'},
-            ...    expiration=datetime.datetime(day=23, year=2045, month=12))
+            content: A key-value mapping containing the payload of the secret,
+                for example :code:`{"password": "foo123"}`.
+            label: Private label to assign to this secret, which can later be
+                used for lookup.
+            description: Description of the secret's purpose.
+            expire: Time in the future (or timedelta from now) at which the
+                secret is due to expire. When that time elapses, Juju will
+                notify the charm by sending a SecretExpired event. None (the
+                default) means the secret will never expire.
+            rotate: Rotation policy/time. Every time this elapses, Juju will
+                notify the charm by sending a SecretRotate event. None (the
+                default) means to use the Juju default, which is never expire.
         """
-        if not self._backend._hook_is_running:  # noqa
-            raise RuntimeError("This method is meant to be called from charm code only; "
-                               "testing code should use `Harness.add_secret()` instead.")
-        Secret._validate_content(content)  # noqa
-
-        secret_id = self._backend.secret_add(content=content,
-                                             label=label,
-                                             description=description,
-                                             expiration=expiration,
-                                             rotate=SecretRotate.cast(rotate))
-        return Secret(self._backend, secret_id, label=label,
-                      is_owned_by_this_unit=True, revision=1)
+        Secret._validate_content(content)
+        id = self._backend.secret_add(
+            content,
+            label=label,
+            description=description,
+            expire=expire,
+            rotate=rotate.value if rotate else None,
+            owner='application')
+        return Secret(self._backend, id=id, label=label, content=content, revision=1)
 
 
 class Unit:
@@ -691,25 +566,21 @@ class Unit:
                    content: Dict[str, str],
                    label: Optional[str] = None,
                    description: Optional[str] = None,
-                   expiration: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional[SecretRotate] = None) -> 'Secret':
-        """Create a Juju :class:`Secret` owned by this unit.
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional['SecretRotate'] = None) -> 'Secret':
+        """Create a :class:`Secret` owned by this unit.
 
-        See :meth:`Application.add_secret` for the details.
+        See :meth:`Application.add_secret` for details.
         """
-        if not self._backend._hook_is_running:  # noqa
-            raise RuntimeError("This method is meant to be called from charm code;"
-                               "testing code should use `Harness.add_secret()`.")
-        Secret._validate_content(content)  # noqa
-
-        secret_id = self._backend.secret_add(content=content,
-                                             label=label,
-                                             owner=SecretOwner.UNIT,
-                                             description=description,
-                                             expiration=expiration,
-                                             rotate=SecretRotate.cast(rotate))
-        return Secret(self._backend, secret_id, label=label,
-                      is_owned_by_this_unit=True, revision=1)
+        Secret._validate_content(content)
+        id = self._backend.secret_add(
+            content,
+            label=label,
+            description=description,
+            expire=expire,
+            rotate=rotate.value if rotate else None,
+            owner='unit')
+        return Secret(self._backend, id=id, label=label, content=content, revision=1)
 
 
 class LazyMapping(Mapping[str, str], ABC):
@@ -1001,312 +872,251 @@ class NetworkInterface:
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
+class SecretRotate(enum.Enum):
+    """Secret rotation policies."""
+
+    NEVER = 'never'  # the default in juju
+    HOURLY = 'hourly'
+    DAILY = 'daily'
+    WEEKLY = 'weekly'
+    MONTHLY = 'monthly'
+    QUARTERLY = 'quarterly'
+    YEARLY = 'yearly'
+
+
+class SecretInfo:
+    """Secret information (metadata)."""
+
+    def __init__(self,
+                 id: str,
+                 label: Optional[str],
+                 revision: int,
+                 expires: Optional[datetime.datetime],
+                 rotation: Optional[SecretRotate],
+                 rotates: Optional[datetime.datetime]):
+        self.id = id
+        self.label = label
+        self.revision = revision
+        self.expires = expires
+        self.rotation = rotation
+        self.rotates = rotates
+
+    @classmethod
+    def from_dict(cls, id: str, d: '_SerializedData') -> 'SecretInfo':
+        """Create new SecretInfo object from ID and dict parsed from JSON."""
+        expires = typing.cast(Optional[str], d.get('expires'))
+        try:
+            rotation = SecretRotate(typing.cast(Optional[str], d.get('rotation')))
+        except ValueError:
+            rotation = None
+        rotates = typing.cast(Optional[str], d.get('rotates'))
+        # TODO(benhoyt): move _parse_timestamp up to a common location
+        return cls(
+            id=id,
+            label=typing.cast(Optional[str], d.get('label')),
+            revision=typing.cast(int, d['revision']),
+            expires=pebble._parse_timestamp(expires) if expires is not None else None,
+            rotation=rotation,
+            rotates=pebble._parse_timestamp(rotates) if rotates is not None else None,
+        )
+
+    def __repr__(self):
+        return ('SecretInfo('
+                'id={self.id!r}, '
+                'label={self.label!r}, '
+                'revision={self.revision}, '
+                'expires={self.expires!r}, '
+                'rotation={self.rotation}, '
+                'rotates={self.rotates!r})'
+                ).format(self=self)
+
+
 class Secret:
-    """Secret object.
+    """Represents a single secret in the model.
 
-    Charmers should not instantiate Secret objects directly, but should use
-    - :meth:`Unit.add_secret` if they want to create a unit-owned secret.
-    - :meth:`Application.add_secret` if they want to create an app-owned secret.
-    - :meth:`Model.get_secret` if they need a reference to an existing secret
-      (one they've created or been granted access to).
+    This class should not be instantiated directly, instead use
+    :meth:`Model.get_secret` (for consumers and owners), or
+    :meth:`Application.add_secret` or :meth:`Unit.add_secret` (for owners).
 
-    All secret events (e.g. SecretChanged) also have a :meth:`SecretEvent.secret` which
-    returns the Secret object associated with that event.
+    All secret events have a :meth:`SecretEvent.secret` attribute which
+    provides the :class:`Secret` associated with that event.
     """
-    _secret_key_re = re.compile(r"^([a-z](?:-?[a-z0-9]){2,})$")
-    _secret_id_re = re.compile(r"^secret:((?:-?[a-z0-9]){5,})$")
-    _secret_id_prefix = 'secret:'
+
+    _key_re = re.compile(r'^([a-z](?:-?[a-z0-9]){2,})$')  # copied from Juju code
 
     def __init__(self, backend: '_ModelBackend',
                  id: Optional[str] = None,
                  label: Optional[str] = None,
-                 revision: Optional[int] = None,
-                 is_owned_by_this_unit: bool = False):
+                 content: Optional[Dict[str, str]] = None,
+                 revision: Optional[int] = None):
         if not (id or label):
-            raise TypeError('provide an id or a label or both')
+            raise TypeError('Must provide an id or label, or both')
 
         if id is not None:
-            id = self._ensure_id(id)
-
-        if is_owned_by_this_unit and revision is None:
-            # This should only happen in testing, when one instantiates Secret manually.
-            # we set revision to an obviously weird value so that if the behaviour is unexpected,
-            # you know why.
-            revision = -1
+            id = self._canonicalize_id(id)
 
         self._backend = backend
-
         self._id = id
         self._label = label
+        self._content = content
         self._revision = revision
-        self._is_owned_by_this_unit = is_owned_by_this_unit
+
+    @classmethod
+    def _canonicalize_id(cls, id: str) -> str:
+        """Return the canonical form of the given secret ID, with the 'secret:' prefix."""
+        id = id.strip()
+        if not id.startswith('secret:'):
+            id = 'secret:' + id  # add the prefix if not there already
+        return id
+
+    @classmethod
+    def _validate_content(cls, content: Optional[Dict[str, str]]):
+        """Ensure the given secret content is valid, or raise ValueError."""
+        if not content:
+            raise ValueError('Secret content must not be empty')
+
+        invalid_keys = [k for k in content if not cls._key_re.match(k)]
+        invalid_values = [v for v in content.values() if not isinstance(v, str)]  # type: List[Any]
+        msg = ''
+        if invalid_keys:
+            msg += ('Invalid secret keys: {}. Keys should be at least 3 characters long, '
+                    + 'start with a letter, and not end with a hyphen.').format(invalid_keys)
+        if invalid_values:
+            if msg:
+                msg += ' '
+            type_names = [type(v).__name__ for v in invalid_values]
+            msg += 'Invalid secret values: should be of type str, not {}.'.format(
+                ' or '.join(type_names))
+        if msg:
+            raise ValueError(msg)
 
     @property
     def id(self) -> Optional[str]:
-        """Unique identifier for this secret in the Juju model.
+        """Unique identifier for this secret.
 
-        The `id` property will be set (not None) if you obtained this secret via one
-        of the following:
-            - `self.[unit|app].add_secret(...)`
-            - `self.model.get_secret(id=<some-id>)`
-            - from a SecretEvent instance.
-
-        If you obtained this secret via `self.model.get_secret(label=<some-label>)`,
-        then the secret ID will be unknown.
+        This will be None if you obtained the secret using
+        :meth:`Model.get_secret` with a label but no ID.
         """
         return self._id
 
     @property
     def label(self) -> Optional[str]:
-        """Label by which this secret is locally known.
+        """Label used to reference this secret locally.
 
-        The `label` property will be set (not None) if you obtained this secret via one
-        of the following:
-            - ``self.[unit|app].add_secret(label=<some-label>, ...)``
-            - ``self.model.get_secret(label=<some-label>)``
-            - from a :class:`SecretEvent` instance.
+        This label is locally unique, that is, Juju will ensure that the
+        entity (the owner or consumer) only has one secret with this label at
+        once.
 
-        If you obtained this secret by ``self.model.get_secret(id=<some-id>)``,
-        then the label for this secret will be unknown.
-
-        This label is locally unique. I.e. Juju will check that *this unit* only has one secret
-        with this label at any given time, but any other unit is free to use the same label for
-        one of their secrets (the same secret, or a different one).
-        The label is private: other units can't see it.
+        This will be None if you obtained the secret using
+        :meth:`Model.get_secret` with an ID but no label.
         """
         return self._label
 
-    @property
-    def revision(self) -> Optional[int]:
-        """The revision number for this secret.
-
-        This will only be visible to the owner of the secret.
-        Secret consumers will get ``None``.
-        """
-        if self._revision is None and not self._is_owned_by_this_unit:
-            if self._is_owned_by_this_unit:
-                # use _revision if you know what you're doing (testing, presumably)
-                raise RuntimeError(
-                    "{} has no revision, but is owned by this unit.".format(self)
-                )  # should not happen in production.
-            else:
-                return None
-        return self._revision
-
-    def __str__(self):
-        label = " <?>"
-        if self.label:
-            label = " label={!r}".format(self.label)
-        revision = "<?>"
-        if self.revision:
-            revision = " revision={!r}".format(self.revision)
-        return '<{}{}{} owned-by-this-unit={}>'.format(self.id, revision, label,
-                                                       self._is_owned_by_this_unit)
-
-    @classmethod
-    def _ensure_id(cls, id: Optional[str], operation: str = "do this on") -> str:
-        if not id:  # empty string will fail the regex match afterwards anyway
-            raise ValueError(
-                'Cannot {} a secret with ID={!r}. If you created this secret via '
-                '`self.model.get_secret(label=X)`, you should pass `id` instead.'
-                ''.format(id, operation))
-        if not isinstance(id, str):
-            raise TypeError(id)
-
-        id = id.strip()  # trim any whitespace
-
-        # add the prefix if not there already
-        if not id.startswith(cls._secret_id_prefix):
-            id = cls._secret_id_prefix + id
-
-        if not cls._secret_id_re.match(id):
-            raise ValueError("{!r} is not a valid secret id.".format(id))
-
-        return id
-
-    @classmethod
-    def _validate_content(cls, content: Optional[Dict[str, str]]):
-        if not content:
-            # fixme: ATM you can't secret-set without content (e.g. to only update the label),
-            #  but that is a bug in juju.
-            #  when that is fixed, `secret-set [id] --label X` will be valid.
-            raise ModelError('missing secret value or filename')
-
-        invalid_secret_keys = [key for key in content if not cls._secret_key_re.match(key)]
-        invalid_secret_values = [val for val in content.values() if not isinstance(val, str)]  # type: List[Any]  # noqa
-        if invalid_secret_keys or invalid_secret_values:
-            msg = "Secret content invalid."
-            if invalid_secret_keys:
-                msg += '\nInvalid keys: {}. Secret content keys should be ' \
-                       'at least 3 characters long, ' \
-                       'no number to start, no dash to end.'.format(invalid_secret_keys)
-            if invalid_secret_values:
-                bad_types = [type(obj).__name__ for obj in invalid_secret_values]
-                msg += '\nInvalid values: {}. Secret content values should be of ' \
-                       'type str, not {}.'.format(invalid_secret_values, bad_types)
-            raise ValueError(msg)
-
-    def _validate_ownership(self, operation_name: str,
-                            should_own: bool = True):
-        owns = self._is_owned_by_this_unit
-        if should_own and not owns:
-            raise SecretOwnershipError(
-                'Cannot {} secret {!r} which is owned by a different unit'.format(
-                    operation_name, self))
-        if not should_own and owns:
-            raise SecretOwnershipError(
-                'Cannot {} secret {!r} as an owner. Only consumers can do that.'.format(
-                    operation_name, self))
-
-    def _validate_target_relation(self, operation: str,
-                                  target: Union['Relation', Unit, Application],
-                                  relation: Optional['Relation']):
-        if relation is None and not isinstance(target, Relation):
-            raise TypeError(
-                'cannot {} secret {} to a unit or application '
-                'target without specifying a relation as its scope'.format(operation, self))
-        if relation and isinstance(target, Application) and relation.app is not target:
-            raise TypeError(
-                'cannot {} secret {} to an application that is not remote to the '
-                'specified relation'.format(operation, self))
-
-    def set(self, content: Dict[str, str],
-            description: Optional[str] = None):
-        """Update the contents of this secret.
-
-        This will create a new revision, and notify all units tracking this secret
-        (the 'consumers') that a new revision is available (i.e. juju will emit a
-        `secret-changed` event on each one of them).
-
-        Once all secret consumers have updated to some newer revision, *this* unit
-        will receive a `secret-remove` event to give it a chance to prune the
-        orphaned revisions that are not being used any longer.
+    def get_content(self, refresh: bool = False) -> Dict[str, str]:
+        """Get the secret's content.
 
         Args:
-            content: The payload of the secret, containing the actual secret contents,
-                e.g. credential pairs.
-            description: An optional human-readable description of the content of the secret.
+            refresh: If true, fetch the latest revision's content and tell
+                Juju to update to tracking that revision. The default is to
+                get the content of the currently-tracked revision.
         """
-        self._validate_ownership('set', should_own=True)
-        self._validate_content(content)
+        if refresh or self._content is None:
+            self._content = self._backend.secret_get(
+                id=self.id, label=self.label, refresh=refresh)
+        return self._content
 
-        self._backend.secret_set(id=self.id,
-                                 content=content,
+    def peek_content(self) -> Dict[str, str]:
+        """Get the content of the latest revision of this secret.
+
+        This returns the content of the latest revision without updating the
+        tracking.
+        """
+        return self._backend.secret_get(id=self.id, label=self.label, peek=True)
+
+    def get_info(self) -> SecretInfo:
+        """Get this secret's information (metadata).
+
+        Only secret owners can fetch this information.
+        """
+        return self._backend.secret_get_info(id=self.id, label=self.label)
+
+    def set_content(self, content: Dict[str, str], description: Optional[str] = None):
+        """Update the content of this secret.
+
+        This will create a new secret revision, and notify all units tracking
+        the secret (the "consumers") that a new revision is available with a
+        :class:`charm.SecretChangedEvent`.
+
+        Args:
+            content: A key-value mapping containing the payload of the secret,
+                for example :code:`{"password": "foo123"}`.
+            description: Description of the secret's purpose.
+        """
+        self._validate_content(content)
+        self._backend.secret_set(content,
+                                 id=self.id,
                                  label=self.label,
                                  description=description)
 
-    def grant(self, target: Union['Relation', Unit, Application],
-              relation: Optional['Relation'] = None):
-        """Grant read access to this secret to a designated target.
+    def grant(self, relation: 'Relation', unit: Optional[Unit] = None):
+        """Grant read access to this secret.
 
         Args:
-            target: The individual unit, application, or relation to grant secret
-                access to.
-                - if `ops.modelUnit`: only that specific unit will be allowed to
-                    read the secret contents.
-                - if `ops.model.Application`: all units of that app will be
-                    given read access.
-                - if `ops.model.Relation`: the remote end of this relation will
-                    be given read access.
-            relation: The relation that this secret is bound to.
-                If the target is a Relation instance, then this argument needs
-                    not be provided.
-                If the target is a Unit or Application, this argument is required.
+            relation: The relation used to scope the life of this secret.
+            unit: If specified, grant access to only this unit, rather than
+                all units in the application.
         """
-        self._validate_ownership('grant', should_own=True)
-        self._validate_target_relation('grant', target, relation)
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_grant(
+            relation.id,
+            id=self.id,
+            label=self.label,
+            unit=unit.name if unit is not None else None)
 
-        rel = typing.cast(Relation, relation or target)
-        relation_id = rel.id
-        unit = target.name if isinstance(target, Unit) else None
-        id = self._ensure_id(self.id, 'grant')
-        self._backend.secret_grant(id=id, label=self.label,
-                                   relation_id=relation_id, unit_id=unit)
-
-    def revoke(self, target: Union['Relation', Unit, Application],
-               relation: Optional['Relation'] = None):
-        """Revoke read access to this secret from a designated target.
+    def revoke(self, relation: 'Relation', unit: Optional[Unit] = None):
+        """Revoke read access to this secret.
 
         Args:
-            target: The individual unit, application, or relation to
-                revoke secret read access from. Needs to be a subset of the targets
-                this secret has been granted to.
-                See :meth:`grant` for details.
-            relation: The relation that this secret is bound to.
-                See :meth:`grant` for details.
+            relation: The relation used to scope the life of this secret.
+            unit: If specified, revoke access to only this unit, rather than
+                all units in the application.
         """
-        self._validate_ownership('revoke', should_own=True)
-        self._validate_target_relation('revoke', target, relation)
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_revoke(
+            relation.id,
+            id=self.id,
+            label=self.label,
+            unit=unit.name if unit is not None else None)
 
-        rel = typing.cast(Relation, relation or target)
-        relation_id = rel.id
-        unit = target.name if isinstance(target, Unit) else None
-        id = self._ensure_id(self.id, 'revoke')
-        self._backend.secret_revoke(id=id, label=self.label,
-                                    relation_id=relation_id, unit_id=unit)
+    def remove_revision(self, revision: Optional[int] = None):
+        """Remove this secret revision.
 
-    def prune(self):
-        """Remove this secret revision from juju.
-
-        This should be called while handling `secret-remove` events, otherwise
-        this revision might still be used by some remote units.
-        """
-        self._validate_ownership('prune', should_own=True)
-        if self._revision is None:
-            raise ValueError(
-                'secret {} has no revision to prune - are you '
-                'outside a secret-remove hook call?'.format(self))
-
-        id = self._ensure_id(self.id, 'prune')
-        self._backend.secret_remove(id=id, label=self.label, revision=self._revision)
-
-    def remove(self):
-        """Remove all revisions of this secret from juju, effectively deleting it.
-
-        This should typically happen when the relation the secret is bound to is broken.
-        Removing the secret prematurely means that all units/applications it has
-        been granted to might attempt to get the secret.
-        """
-        self._validate_ownership('remove', should_own=True)
-        id = self._ensure_id(self.id, 'remove')
-        self._backend.secret_remove(id=id, label=self.label)
-
-    def get(self, key: str,
-            track_latest: bool = False) -> str:
-        """Get the secret contents.
-
-        Optionally, update the currently tracked revision to the latest one available,
-        and get the value from that revision.
+        This is normally called when handling :class:`charm.SecretRemoveEvent`
+        or :class:`charm.SecretExpiredEvent`.
 
         Args:
-            key: the secret key to be fetched.
-            track_latest: returns the contents of the latest revision and starts tracking it.
-                From this moment on, `secret.get()` will return the latest revision's payload,
-                with or without explicitly passing `update=True`.
+            revision: The secret revision to remove. This argument is not
+                required if handling a secret event and this is being called
+                on :code:`event.secret`.
         """
-        value = self._backend.secret_get(id=self.id, key=key,
-                                         update=track_latest,
-                                         label=self.label)
-        # when called without --metadata and with key, secret_get returns str.
-        return typing.cast(str, value)
+        if revision is None:
+            revision = self._revision
+        self._backend.secret_remove(
+            id=self.id,
+            label=self.label,
+            revision=revision)
 
-    def peek_latest(self, key: str) -> str:
-        """Get the contents of the latest revision of this secret.
+    def remove_all(self):
+        """Remove all revisions of this secret.
 
-         Unlike :meth:`get(track_latest=True)`, this will not switch the secret to track the latest
-         revision.
-         I.e. the next time you call :meth:`get()` (without `peek=True`) you will get the revision
-         you are currently tracking, even though a more recent one is available.
-         Useful if you want to "try out" the new secret revision before dropping
-         the old one.
-
-        Args:
-            key: the secret key to be fetched.
+        This is called when the secret is no longer needed, for example when
+        handling :class:`charm.RelationBrokenEvent`.
         """
-        value = self._backend.secret_get(id=self.id, key=key,  # type: ignore
-                                         peek=True, label=self.label)
-        # when called without --metadata and with key, secret_get returns str.
-        return typing.cast(str, value)
+        self._backend.secret_remove(
+            id=self.id,
+            label=self.label)
 
 
 class Relation:
@@ -2555,26 +2365,16 @@ class RelationDataAccessError(RelationDataError):
     """
 
 
-class SecretPermissionError(ModelError):
-    """Raised when a secret operation is forbidden."""
-    # TODO: when we know what error messages juju returns on secret-related errors,
-    #  raise these specific errors instead of a generic ModelError. For now only used in tests.
-
-
-class SecretOwnershipError(SecretPermissionError):
-    """Raised when a secret consumer attempts an owner-only operation, or vice versa."""
-
-
-class SecretNotGrantedError(SecretPermissionError):
-    """Raised when one attempts to get a secret it's not been granted access to."""
-
-
 class RelationNotFoundError(ModelError):
     """Backend error when querying juju for a given relation and that relation doesn't exist."""
 
 
 class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
+
+
+class SecretNotFoundError(ModelError):
+    """Raised when the specified secret does not exist."""
 
 
 _ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
@@ -2695,141 +2495,6 @@ class _ModelBackend:
                     return json.loads(text)
                 else:
                     return text
-
-    def secret_set(self,
-                   *,
-                   content: Dict[str, str],
-                   id: Optional[str] = None,
-                   description: Optional[str] = None,
-                   label: Optional[str] = None) -> None:
-        args = []  # type: List[str]
-        if id:
-            # Id is optional because we could set a secret by label.
-            args.append(id)
-        if description is not None:  # empty string means: clear
-            args += ['--description', description]
-        if label is not None:  # empty string means: clear
-            args += ['--label', label]
-        if not content:
-            # FIXME: juju would print
-            #  "updating secrets: at least one attribute to update must be specified"
-            #  but return code 0.
-            raise TypeError('secret_set requires nonempty content')
-        for k, v in content.items():
-            # assume that the key/value pairs are valid, as per Secret._validate_content.
-            args.append('{}={}'.format(k, v))
-        self._run('secret-set', *args)
-
-    def secret_add(self,
-                   *,
-                   content: Dict[str, str],
-                   owner: Optional[SecretOwner] = None,
-                   description: Optional[str] = None,
-                   label: Optional[str] = None,
-                   expiration: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional[SecretRotate] = None) -> str:
-        args = []  # type: List[str]
-
-        if description is not None:  # empty string means: clear
-            args += ['--description', description]
-        if label is not None:  # empty string means: clear
-            args += ['--label', label]
-        if owner:
-            args += ['--owner', owner.value]
-        if expiration:
-            if isinstance(expiration, datetime.datetime):
-                pass
-            elif isinstance(expiration, datetime.timedelta):
-                expiration = datetime.datetime.now() + expiration
-            else:
-                raise TypeError(expiration)
-
-            args += ['--expire', expiration.isoformat()]
-        if rotate:
-            args += ['--rotate', rotate.value]
-        if content:
-            for k, v in content.items():
-                # assume that the key/value pairs are valid, as per Secret._validate_content.
-                args.append('{}={}'.format(k, v))
-
-        output = self._run('secret-add', *args, return_output=True)
-        return typing.cast(str, output).strip()  # trim trailing whitespace
-
-    def secret_remove(self, *, id: Optional[str] = None,
-                      label: Optional[str] = None,
-                      revision: Optional[int] = None) -> None:
-        args = []  # type: List[str]
-        if id:
-            args.append(id)
-        if revision is not None:
-            args += ['--revision', str(revision)]
-        if label is not None:
-            args += ['--label', str(label)]
-        self._run('secret-remove', *args)
-
-    def secret_grant(self, *,
-                     id: Optional[str] = None,
-                     label: Optional[str] = None,
-                     relation_id: int,
-                     unit_id: Optional[str] = None) -> None:
-        args = []  # type: List[str]
-        if id:
-            args.append(id)
-        if unit_id is not None:
-            args += ['--unit', str(unit_id)]
-        if label is not None:
-            args += ['--label', str(label)]
-        self._run('secret-grant', '--relation', str(relation_id), *args)
-
-    def secret_revoke(self, *, id: Optional[str] = None,
-                      label: Optional[str] = None,
-                      relation_id: int,
-                      unit_id: Optional[str] = None) -> None:
-        args = []  # type: List[str]
-        if id:
-            args.append(id)
-        if unit_id is not None:
-            args += ['--unit', str(unit_id)]
-        if label is not None:
-            args += ['--label', str(label)]
-        self._run('secret-revoke', '--relation', str(relation_id), *args)
-
-    def secret_ids(self) -> List[str]:
-        # fixme: secret-ids returns secret ids without the secret: prefix. We add it back
-        #  here for uniformity. Or do we want to handle this otherwise?
-        ids = self._run('secret-ids', return_output=True, use_json=True) or []
-        ids = typing.cast(List[str], ids)
-        return ['secret:' + id_ for id_ in ids]
-
-    def secret_get(self, *,
-                   id: Optional[str] = None,
-                   key: Optional[str] = None,
-                   label: Optional[str] = None,
-                   update: bool = False,
-                   peek: bool = False,
-                   meta: bool = False
-                   ) -> '_SecretGetResponseType':
-        args = ['secret-get']
-        if not (id or label):
-            raise TypeError('provide an id or a label or both')
-        if peek and update:
-            raise TypeError('At most one of `peek` and `update` should be True.')
-
-        if id:
-            args.append(id)
-
-        if label is not None:  # empty string means: clear (if an ID is provided!)
-            args += ['--label', label]
-        if meta:
-            args.append('--metadata')
-        if key is not None:
-            args.append(key)
-        if update:
-            args.append('--update')
-        if peek:
-            args.append('--peek')
-        response = self._run(*args, return_output=True, use_json=key is None)
-        return typing.cast('_SecretGetResponseType', response)
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:
@@ -3145,6 +2810,142 @@ class _ModelBackend:
     def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
                              key: str, value: str):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
+
+    def secret_get(self, *,
+                   id: Optional[str] = None,
+                   label: Optional[str] = None,
+                   refresh: bool = False,
+                   peek: bool = False) -> Dict[str, str]:
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
+
+        args = []  # type: List[str]
+        if id is not None:
+            args.append(id)
+        if label is not None:
+            args.extend(['--label', label])
+        if refresh:
+            args.append('--refresh')
+        if peek:
+            args.append('--peek')
+
+        result = self._run('secret-get', *args, return_output=True, use_json=True)
+        return typing.cast(Dict[str, str], result)
+
+    def secret_get_info(self, *,
+                        id: Optional[str] = None,
+                        label: Optional[str] = None) -> SecretInfo:
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
+
+        args = []  # type: List[str]
+        if id is not None:
+            args.append(id)
+        if label is not None:
+            args.extend(['--label', label])
+
+        result = self._run('secret-get-info', *args, return_output=True, use_json=True)
+        info_dicts = typing.cast(Dict[str, JsonObject], result)
+        id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
+        return SecretInfo.from_dict(id, typing.cast('_SerializedData', info_dicts[id]))
+
+    def secret_set(self, content: Dict[str, str], *,
+                   id: Optional[str] = None,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None):
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
+
+        args = []  # type: List[str]
+        if id is not None:
+            args.append(id)
+        if label is not None:
+            args.extend(['--label', label])
+        if description is not None:
+            args.extend(['--description', description])
+        # The content has already been validated with Secret._validate_content
+        for k, v in content.items():
+            args.append('{}={}'.format(k, v))
+
+        self._run('secret-set', *args)
+
+    def secret_add(self, content: Dict[str, str], *,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None,
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional[SecretRotate] = None,
+                   owner: Optional[str] = None) -> str:
+        args = []  # type: List[str]
+        if label is not None:
+            args.extend(['--label', label])
+        if description is not None:
+            args.extend(['--description', description])
+        if expire is not None:
+            if isinstance(expire, datetime.timedelta):
+                expire = datetime.datetime.now() + expire
+            args.extend(['--expire', expire.isoformat()])
+        if rotate is not None:
+            args += ['--rotate', rotate.value]
+        if owner:
+            args += ['--owner', owner]
+        # The content has already been validated with Secret._validate_content
+        for k, v in content.items():
+            args.append('{}={}'.format(k, v))
+
+        result = self._run('secret-add', *args, return_output=True)
+        secret_id = typing.cast(str, result)
+        return secret_id.strip()
+
+    def secret_grant(self, relation_id: int, *,
+                     id: Optional[str] = None,
+                     label: Optional[str] = None,
+                     unit: Optional[str] = None):
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
+
+        args = ['--relation', str(relation_id)]
+        if id is not None:
+            args.append(id)
+        if label is not None:
+            args.extend(['--label', label])
+        if unit is not None:
+            args += ['--unit', str(unit)]
+
+        self._run('secret-grant', *args)
+
+    def secret_revoke(self, relation_id: int, *,
+                      id: Optional[str] = None,
+                      label: Optional[str] = None,
+                      unit: Optional[str] = None):
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
+
+        args = ['--relation', str(relation_id)]
+        if id is not None:
+            args.append(id)
+        if label is not None:
+            args.extend(['--label', label])
+        if unit is not None:
+            args += ['--unit', str(unit)]
+
+        self._run('secret-revoke', *args)
+
+    def secret_remove(self, *,
+                      id: Optional[str] = None,
+                      label: Optional[str] = None,
+                      revision: Optional[int] = None):
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
+
+        args = []  # type: List[str]
+        if id is not None:
+            args.append(id)
+        if label is not None:
+            args.extend(['--label', label])
+        if revision is not None:
+            args.extend(['--revision', str(revision)])
+
+        self._run('secret-remove', *args)
 
 
 class _ModelBackendValidator:
