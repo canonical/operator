@@ -437,7 +437,7 @@ class Application:
             label=label,
             description=description,
             expire=expire,
-            rotate=rotate.value if rotate else None,
+            rotate=rotate,
             owner='application')
         return Secret(self._backend, id=id, label=label, content=content, revision=1)
 
@@ -578,7 +578,7 @@ class Unit:
             label=label,
             description=description,
             expire=expire,
-            rotate=rotate.value if rotate else None,
+            rotate=rotate,
             owner='unit')
         return Secret(self._backend, id=id, label=label, content=content, revision=1)
 
@@ -960,6 +960,16 @@ class Secret:
         self._label = label
         self._content = content
         self._revision = revision
+
+    def __repr__(self):
+        fields = []
+        if self._id is not None:
+            fields.append('id={!r}'.format(self._id))
+        if self._label is not None:
+            fields.append('label={!r}'.format(self._label))
+        if self._revision is not None:
+            fields.append('revision={}'.format(self._revision))
+        return '<Secret ' + ' '.join(fields) + '>'
 
     @classmethod
     def _canonicalize_id(cls, id: str) -> str:
