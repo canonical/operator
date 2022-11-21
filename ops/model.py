@@ -1079,9 +1079,8 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_grant(
+            self.id,
             relation.id,
-            id=self.id,
-            label=self.label,
             unit=unit.name if unit is not None else None)
 
     def revoke(self, relation: 'Relation', unit: Optional[Unit] = None):
@@ -1095,9 +1094,8 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_revoke(
+            self.id,
             relation.id,
-            id=self.id,
-            label=self.label,
             unit=unit.name if unit is not None else None)
 
     def remove_revision(self, revision: Optional[int] = None):
@@ -2906,35 +2904,17 @@ class _ModelBackend:
         secret_id = typing.cast(str, result)
         return secret_id.strip()
 
-    def secret_grant(self, relation_id: int, *,
-                     id: Optional[str] = None,
-                     label: Optional[str] = None,
+    def secret_grant(self, id: str, relation_id: int, *,
                      unit: Optional[str] = None):
-        if not (id or label):
-            raise TypeError('Must provide an id or label, or both')
-
-        args = ['--relation', str(relation_id)]
-        if id is not None:
-            args.append(id)
-        if label is not None:
-            args.extend(['--label', label])
+        args = [id, '--relation', str(relation_id)]
         if unit is not None:
             args += ['--unit', str(unit)]
 
         self._run('secret-grant', *args)
 
-    def secret_revoke(self, relation_id: int, *,
-                      id: Optional[str] = None,
-                      label: Optional[str] = None,
+    def secret_revoke(self, id: str, relation_id: int, *,
                       unit: Optional[str] = None):
-        if not (id or label):
-            raise TypeError('Must provide an id or label, or both')
-
-        args = ['--relation', str(relation_id)]
-        if id is not None:
-            args.append(id)
-        if label is not None:
-            args.extend(['--label', label])
+        args = [id, '--relation', str(relation_id)]
         if unit is not None:
             args += ['--unit', str(unit)]
 
