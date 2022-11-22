@@ -1057,7 +1057,7 @@ class Secret:
 
         Only secret owners can fetch this information.
         """
-        return self._backend.secret_get_info(id=self.id, label=self.label)
+        return self._backend.secret_info_get(id=self.id, label=self.label)
 
     def set_content(self, content: Dict[str, str], description: Optional[str] = None):
         """Update the content of this secret.
@@ -1120,10 +1120,9 @@ class Secret:
         """
         if revision is None:
             revision = self._revision
-        self._backend.secret_remove(
-            id=self.id,
-            label=self.label,
-            revision=revision)
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_remove(self.id, revision=revision)
 
     def remove_all(self):
         """Remove all revisions of this secret.
@@ -1131,9 +1130,9 @@ class Secret:
         This is called when the secret is no longer needed, for example when
         handling :class:`charm.RelationBrokenEvent`.
         """
-        self._backend.secret_remove(
-            id=self.id,
-            label=self.label)
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_remove(self.id)
 
 
 class Relation:
@@ -2828,6 +2827,14 @@ class _ModelBackend:
                              key: str, value: str):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
+    def _run_secret(self, *args, **kwargs):
+        try:
+            return self._run(*args, **kwargs)
+        except ModelError as e:
+            if 'not found' in str(e):
+                raise SecretNotFoundError() from e
+            raise
+
     def secret_get(self, *,
                    id: Optional[str] = None,
                    label: Optional[str] = None,
@@ -2846,10 +2853,10 @@ class _ModelBackend:
         if peek:
             args.append('--peek')
 
-        result = self._run('secret-get', *args, return_output=True, use_json=True)
+        result = self._run_secret('secret-get', *args, return_output=True, use_json=True)
         return typing.cast(Dict[str, str], result)
 
-    def secret_get_info(self, *,
+    def secret_info_get(self, *,
                         id: Optional[str] = None,
                         label: Optional[str] = None) -> SecretInfo:
         if not (id or label):
@@ -2861,8 +2868,8 @@ class _ModelBackend:
         if label is not None:
             args.extend(['--label', label])
 
-        result = self._run('secret-get-info', *args, return_output=True, use_json=True)
-        info_dicts = typing.cast(Dict[str, JsonObject], result)
+        result = self._run_secret('secret-info-get', *args, return_output=True, use_json=True)
+        info_dicts = typing.cast(Dict[str, 'JsonObject'], result)
         id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
         return SecretInfo.from_dict(id, typing.cast('_SerializedData', info_dicts[id]))
 
@@ -2884,7 +2891,7 @@ class _ModelBackend:
         for k, v in content.items():
             args.append('{}={}'.format(k, v))
 
-        self._run('secret-set', *args)
+        self._run_secret('secret-set', *args)
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -2913,38 +2920,26 @@ class _ModelBackend:
         secret_id = typing.cast(str, result)
         return secret_id.strip()
 
-    def secret_grant(self, id: str, relation_id: int, *,
-                     unit: Optional[str] = None):
+    def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         args = [id, '--relation', str(relation_id)]
         if unit is not None:
             args += ['--unit', str(unit)]
 
-        self._run('secret-grant', *args)
+        self._run_secret('secret-grant', *args)
 
-    def secret_revoke(self, id: str, relation_id: int, *,
-                      unit: Optional[str] = None):
+    def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         args = [id, '--relation', str(relation_id)]
         if unit is not None:
             args += ['--unit', str(unit)]
 
-        self._run('secret-revoke', *args)
+        self._run_secret('secret-revoke', *args)
 
-    def secret_remove(self, *,
-                      id: Optional[str] = None,
-                      label: Optional[str] = None,
-                      revision: Optional[int] = None):
-        if not (id or label):
-            raise TypeError('Must provide an id or label, or both')
-
-        args = []  # type: List[str]
-        if id is not None:
-            args.append(id)
-        if label is not None:
-            args.extend(['--label', label])
+    def secret_remove(self, id: str, *, revision: Optional[int] = None):
+        args = [id]
         if revision is not None:
             args.extend(['--revision', str(revision)])
 
-        self._run('secret-remove', *args)
+        self._run_secret('secret-remove', *args)
 
 
 class _ModelBackendValidator:
