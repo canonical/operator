@@ -57,9 +57,6 @@ from ops.model import (
     ModelError,
     RelationNotFoundError,
     Secret,
-    SecretIDNotFoundError,
-    SecretLabelNotFoundError,
-    SecretOwner,
     SecretRotate,
 )
 
@@ -1578,7 +1575,7 @@ class _TestingSecretManager:
         scope = self._get_secret_meta(id)[secret_tail].get('owner', 'application')
         self._check_leadership(fn, SecretOwner(scope))
 
-    def _check_leadership(self, fn: str, scope: SecretOwner):
+    def _check_leadership(self, fn: str, scope: 'SecretOwner'):
         if scope is SecretOwner.APPLICATION and not self.is_leader:
             raise model.SecretOwnershipError('Follower attempted to call {}. '
                                              'Only the leader can manage '
@@ -1660,7 +1657,7 @@ class _TestingSecretManager:
 
     @_copy_signature(model._ModelBackend.secret_add)
     def secret_add(self, _local=True, label: str = None,
-                   owner=SecretOwner.APPLICATION,
+                   owner='application',
                    expiration=None, **kwargs) -> str:
         # only one check: that if we're creating an app-scoped secret, we are the leader.
         # we can't use _validate_access directly because we don't have a id yet.
@@ -1717,12 +1714,6 @@ class _TestingSecretManager:
             owner_mgr._revisions[id].append(new_revision)
 
         self._label_update(owner_mgr is self, id, label)
-
-    @_copy_docstrings(model._ModelBackend.secret_ids)  # noqa
-    def secret_ids(self) -> List[str]:
-        # filter out secrets we don't own
-        # todo: can anyone do this?
-        return list(filter(self._owns, self._secret_ids))
 
     def _label_update(self, is_owned_by_this_unit: bool, id: str, label: str):
         if label is not None:
@@ -1920,10 +1911,6 @@ class _TestingModelBackend:
     @_copy_signature(model._ModelBackend.secret_add)  # noqa
     def secret_add(self, *args, **kwargs) -> str:
         return self._secrets.secret_add(*args, **kwargs)
-
-    @_copy_signature(model._ModelBackend.secret_ids)  # noqa
-    def secret_ids(self, *args, **kwargs) -> List[str]:
-        return self._secrets.secret_ids(*args, **kwargs)
 
     @_copy_signature(model._ModelBackend.secret_get)  # noqa
     def secret_get(self, *args, **kwargs) -> Union[str, Dict[str, str]]:

@@ -23,7 +23,7 @@ import ops.model
 from ops import testing
 from ops.charm import CharmBase, SecretChangedEvent, SecretRemoveEvent
 from ops.framework import BoundEvent, EventBase
-from ops.model import Secret, SecretOwner, SecretRotate, SecretRotateValueError
+from ops.model import Secret, SecretRotate
 from ops.testing import Harness, _TestingModelBackend
 
 SECRET_METHODS = ("secret_set",
@@ -155,7 +155,7 @@ def test_expire(expiration, expect_valid, model, backend):
 
 
 @pytest.mark.parametrize('god_mode', (True, False))
-@pytest.mark.parametrize('owner', (SecretOwner.UNIT, SecretOwner.APPLICATION))
+# @pytest.mark.parametrize('owner', (SecretOwner.UNIT, SecretOwner.APPLICATION))
 @pytest.mark.parametrize('leader', (True, False))
 def test_cannot_get_removed_secret(model, god_mode, leader, owner, backend):
     backend._is_leader = leader

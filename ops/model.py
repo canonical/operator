@@ -2500,7 +2500,7 @@ class _ModelBackend:
 
             # pyright infers the first match when argument overloading/unpacking is used,
             # so this needs to be coerced into the right type
-            result = typing.cast('CompletedProcess[bytes]', result)  # noqa
+            result = typing.cast('CompletedProcess[bytes]', result)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
@@ -2567,7 +2567,7 @@ class _ModelBackend:
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool
                      ) -> '_RelationDataContent_Raw':
-        if not isinstance(is_app, bool):  # pyright:
+        if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if is_app:
