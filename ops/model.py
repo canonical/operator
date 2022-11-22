@@ -278,7 +278,8 @@ class Model:
             content = self._backend.secret_get(id=id, label=label)
             return Secret(self._backend, id=id, label=label, content=content)
         except ModelError:
-            # TODO(benhoyt): remove this and use secret-get once Juju "consumer label X not found" issue fixed
+            # TODO(benhoyt): remove this and use secret-get once Juju "consumer label
+            # X not found" issue fixed
             info = self._backend.secret_info_get(id=id, label=label)
             return Secret(
                 self._backend,
@@ -971,7 +972,7 @@ class Secret:
         self._revision = revision
 
     def __repr__(self):
-        fields = []
+        fields = []  # type: List[str]
         if self._id is not None:
             fields.append('id={!r}'.format(self._id))
         if self._label is not None:
@@ -1088,7 +1089,7 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_grant(
-            self.id,
+            typing.cast(str, self.id),
             relation.id,
             unit=unit.name if unit is not None else None)
 
@@ -1103,7 +1104,7 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_revoke(
-            self.id,
+            typing.cast(str, self.id),
             relation.id,
             unit=unit.name if unit is not None else None)
 
@@ -1122,7 +1123,7 @@ class Secret:
             revision = self._revision
         if self._id is None:
             self._id = self.get_info().id
-        self._backend.secret_remove(self.id, revision=revision)
+        self._backend.secret_remove(typing.cast(str, self.id), revision=revision)
 
     def remove_all(self):
         """Remove all revisions of this secret.
@@ -1132,7 +1133,7 @@ class Secret:
         """
         if self._id is None:
             self._id = self.get_info().id
-        self._backend.secret_remove(self.id)
+        self._backend.secret_remove(typing.cast(str, self.id))
 
 
 class Relation:
@@ -2827,9 +2828,10 @@ class _ModelBackend:
                              key: str, value: str):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
-    def _run_secret(self, *args, **kwargs):
+    def _run_secret(self, *args: str, return_output: bool = False,
+                    use_json: bool = False) -> Union[str, 'JsonObject', None]:
         try:
-            return self._run(*args, **kwargs)
+            return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
             if 'not found' in str(e):
                 raise SecretNotFoundError() from e
