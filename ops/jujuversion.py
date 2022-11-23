@@ -114,6 +114,6 @@ class JujuVersion:
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
     @property
-    def secrets_supported(self) -> bool:
-        """Determine whether this juju version supports `secrets` feature."""
-        return (self.major, self.minor, self.patch) >= (3, 0, 0)
+    def has_secrets(self) -> bool:
+        """Determine whether this Juju version supports the `secrets` feature."""
+        return (self.major, self.minor, self.patch) >= (3, 0, 2)
