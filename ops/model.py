@@ -2392,9 +2392,9 @@ class _ModelBackend:
             raise RuntimeError('unable to find storage key in {output!r}'.format(output=output))
         key = match.groupdict()["storage_key"]
 
-        id = int(key.split("/")[1])
+        index = int(key.split("/")[1])
         location = self.storage_get(key, "location")
-        return id, location
+        return index, location
 
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
         if not len(attribute) > 0:  # assume it's an empty string.
