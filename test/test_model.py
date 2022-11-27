@@ -33,7 +33,14 @@ import ops.testing
 from ops import model
 from ops._private import yaml
 from ops.charm import RelationMeta, RelationRole
-from ops.pebble import APIError, FileInfo, FileType, ServiceInfo
+from ops.pebble import (
+    APIError,
+    ConnectionError,
+    FileInfo,
+    FileType,
+    ServiceInfo,
+    SystemInfo,
+)
 
 
 class TestModel(unittest.TestCase):
@@ -1354,8 +1361,9 @@ containers:
         self.container.replan()
         self.assertEqual(self.pebble.requests, [('replan',)])
 
-    def test_get_system_info(self):
-        self.container.can_connect()
+    def test_can_connect(self):
+        self.pebble.responses.append(SystemInfo.from_dict({'version': '1.0.0'}))
+        self.assertTrue(self.container.can_connect())
         self.assertEqual(self.pebble.requests, [('get_system_info',)])
 
     def test_start(self):
@@ -1687,9 +1695,36 @@ containers:
             ('remove_path', '/path/2', True),
         ])
 
-    def test_bare_can_connect_call(self):
-        self.pebble.responses.append('dummy')
+    def test_can_connect_simple(self):
+        self.pebble.responses.append(SystemInfo.from_dict({'version': '1.0.0'}))
         self.assertTrue(self.container.can_connect())
+
+    def test_can_connect_connection_error(self):
+        def raise_error():
+            raise ConnectionError('connection error!')
+        self.pebble.get_system_info = raise_error
+        with self.assertLogs('ops.model', level='DEBUG') as cm:
+            self.assertFalse(self.container.can_connect())
+        self.assertEqual(len(cm.output), 1)
+        self.assertRegex(cm.output[0], r'DEBUG:ops.model:.*: connection error!')
+
+    def test_can_connect_file_not_found_error(self):
+        def raise_error():
+            raise FileNotFoundError('file not found!')
+        self.pebble.get_system_info = raise_error
+        with self.assertLogs('ops.model', level='DEBUG') as cm:
+            self.assertFalse(self.container.can_connect())
+        self.assertEqual(len(cm.output), 1)
+        self.assertRegex(cm.output[0], r'DEBUG:ops.model:.*: file not found!')
+
+    def test_can_connect_api_error(self):
+        def raise_error():
+            raise APIError('body', 404, 'status', 'api error!')
+        self.pebble.get_system_info = raise_error
+        with self.assertLogs('ops.model') as cm:
+            self.assertFalse(self.container.can_connect())
+        self.assertEqual(len(cm.output), 1)
+        self.assertRegex(cm.output[0], r'WARNING:ops.model:.*: api error!')
 
     def test_exec(self):
         self.pebble.responses.append('fake_exec_process')
@@ -1759,6 +1794,7 @@ class MockPebbleClient:
 
     def get_system_info(self):
         self.requests.append(('get_system_info',))
+        return self.responses.pop(0)
 
     def replan_services(self):
         self.requests.append(('replan',))
