@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import functools
 import os
 import shutil
 import tempfile
@@ -24,6 +24,7 @@ from ops.charm import (
     CharmMeta,
     ContainerMeta,
     ContainerStorageMeta,
+    StartEvent,
 )
 from ops.framework import EventBase, EventSource, Framework
 from ops.model import Model, Storage, _ModelBackend
@@ -94,6 +95,42 @@ class TestCharm(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "observer methods must now be explicitly provided"):
             framework.observe(charm.on.start, charm)
+
+    def test_observe_decorated_method(self):
+        # we test that charm methods decorated with @functools.wraps(wrapper)
+        # can be observed by Framework. Simpler decorators won't work because
+        # Framework searches for __self__ and other method things; functools.wraps
+        # is more careful and it still works, this test is here to ensure that
+        # it keeps working in future releases, as this is presently the only
+        # way we know of to cleanly decorate charm event observers.
+        events = []
+
+        def dec(fn):
+            # simple decorator that appends to the nonlocal
+            # `events` list all events it receives
+            @functools.wraps(fn)
+            def wrapper(charm, evt):
+                events.append(evt)
+                fn(charm, evt)
+            return wrapper
+
+        class MyCharm(CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                framework.observe(self.on.start, self._on_start)
+                self.seen = None
+
+            @dec
+            def _on_start(self, event):
+                self.seen = event
+
+        framework = self.create_framework()
+        charm = MyCharm(framework)
+        charm.on.start.emit()
+        # check that the event has been seen by the decorator
+        self.assertEqual(1, len(events))
+        # check that the event has been seen by the observer
+        self.assertIsInstance(charm.seen, StartEvent)
 
     def test_empty_action(self):
         meta = CharmMeta.from_yaml('name: my-charm', '')
@@ -393,7 +430,15 @@ start:
   description: "Start the unit."
 ''')
 
-    def _test_action_events(self, cmd_type):
+    def _setup_test_action(self):
+        os.environ['JUJU_ACTION_NAME'] = 'foo-bar'
+        fake_script(self, 'action-get', """echo '{"foo-name": "name", "silent": true}'""")
+        fake_script(self, 'action-set', "")
+        fake_script(self, 'action-log', "")
+        fake_script(self, 'action-fail', "")
+        self.meta = self._get_action_test_meta()
+
+    def test_action_events(self):
 
         class MyCharm(CharmBase):
 
@@ -411,13 +456,7 @@ start:
             def _on_start_action(self, event):
                 pass
 
-        fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
-        fake_script(self, cmd_type + '-set', "")
-        fake_script(self, cmd_type + '-log', "")
-        fake_script(self, cmd_type + '-fail', "")
-        self.meta = self._get_action_test_meta()
-
-        os.environ['JUJU_{}_NAME'.format(cmd_type.upper())] = 'foo-bar'
+        self._setup_test_action()
         framework = self.create_framework()
         charm = MyCharm(framework)
 
@@ -428,10 +467,10 @@ start:
         charm.on.foo_bar_action.emit()
         self.assertEqual(charm.seen_action_params, {"foo-name": "name", "silent": True})
         self.assertEqual(fake_script_calls(self), [
-            [cmd_type + '-get', '--format=json'],
-            [cmd_type + '-log', "test-log"],
-            [cmd_type + '-set', "res=val with spaces"],
-            [cmd_type + '-fail', "test-fail"],
+            ['action-get', '--format=json'],
+            ['action-log', "test-log"],
+            ['action-set', "res=val with spaces"],
+            ['action-fail', "test-fail"],
         ])
 
         # Make sure that action events that do not match the current context are
@@ -439,8 +478,32 @@ start:
         with self.assertRaises(RuntimeError):
             charm.on.start_action.emit()
 
-    def test_action_events(self):
-        self._test_action_events('action')
+    def test_invalid_action_results(self):
+
+        class MyCharm(CharmBase):
+
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.res = {}
+                framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
+
+            def _on_foo_bar_action(self, event):
+                event.set_results(self.res)
+
+        self._setup_test_action()
+        framework = self.create_framework()
+        charm = MyCharm(framework)
+
+        for bad_res in (
+                {'a': {'b': 'c'}, 'a.b': 'c'},
+                {'a': {'B': 'c'}},
+                {'a': {(1, 2): 'c'}},
+                {'a': {None: 'c'}},
+                {'aBc': 'd'}):
+            charm.res = bad_res
+
+            with self.assertRaises(ValueError):
+                charm.on.foo_bar_action.emit()
 
     def _test_action_event_defer_fails(self, cmd_type):
 

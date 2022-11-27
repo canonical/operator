@@ -112,3 +112,8 @@ class JujuVersion:
     def has_controller_storage(self) -> bool:
         """Determine whether this juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
+
+    @property
+    def has_secrets(self) -> bool:
+        """Determine whether this Juju version supports the `secrets` feature."""
+        return (self.major, self.minor, self.patch) >= (3, 0, 2)

@@ -5,16 +5,22 @@ on:
       - published
 
 jobs:
+  framework-tests:
+    uses: ./.github/workflows/framework-tests.yaml
+  observability-charm-tests:
+    uses: ./.github/workflows/observability-charm-tests.yaml
+  hello-charm-tests:
+    uses: ./.github/workflows/hello-charm-tests.yaml
   build-n-publish:
     name: Build and Publish to PyPI
     runs-on: ubuntu-latest
-
+    needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v2
       - name: Setup Python
         uses: actions/setup-python@v1
         with:
-          python-version: 3.9
+          python-version: "3.10"
       - name: Install wheel
         run: pip install wheel
       - name: Build

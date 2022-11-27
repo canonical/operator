@@ -61,10 +61,14 @@ if typing.TYPE_CHECKING:
         Client,
         ExecProcess,
         FileInfo,
+        LayerDict,
         Plan,
         ServiceInfo,
     )
     from typing_extensions import TypedDict
+
+    from ops.framework import _SerializedData
+    from ops.testing import _ConfigOption
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
@@ -77,14 +81,13 @@ if typing.TYPE_CHECKING:
                        Tuple['JsonObject', ...]]
 
     # a k8s spec is a mapping from names/"types" to json/yaml spec objects
-    _K8sSpec = Mapping[str, JsonObject]
+    # public since it is used in ops.testing
+    K8sSpec = Mapping[str, JsonObject]
 
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
-    # todo: replace with pebble._LayerDict (a TypedDict) when pebble.py is typed
-    _LayerDict = Dict[str, '_LayerDict']
-    _Layer = Union[str, _LayerDict, pebble.Layer]
+    _Layer = Union[str, LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
     _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -92,7 +95,7 @@ if typing.TYPE_CHECKING:
     _RelationsMeta_Raw = Dict[str, ops.charm.RelationMeta]
     # mapping from container name to container metadata
     _ContainerMeta_Raw = Dict[str, ops.charm.ContainerMeta]
-    _IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+    _NetworkAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]
     _Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
     _ServiceInfoMapping = Mapping[str, pebble.ServiceInfo]
@@ -137,16 +140,13 @@ class Model:
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
-        # fixme: remove cast after typing charm.py
-        relations = typing.cast('_RelationsMeta_Raw', meta.relations)  # type: ignore
+        relations = meta.relations  # type: _RelationsMeta_Raw
         self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
         self._config = ConfigData(self._backend)
-        # fixme: remove cast after typing charm.py
-        resources = typing.cast(Iterable[str], meta.resources)  # type: ignore
+        resources = meta.resources  # type: Iterable[str]
         self._resources = Resources(list(resources), self._backend)
         self._pod = Pod(self._backend)
-        # fixme: remove cast after typing charm.py
-        storages = typing.cast(Iterable[str], meta.storages)  # type: ignore
+        storages = meta.storages  # type: Iterable[str]
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
 
@@ -413,8 +413,7 @@ class Unit:
         self._status = None
 
         if self._is_our_unit and hasattr(meta, "containers"):
-            # fixme: remove cast when charm.py is typed
-            containers = typing.cast('_ContainerMeta_Raw', meta.containers)  # type: ignore
+            containers = meta.containers  # type: _ContainerMeta_Raw
             self._containers = ContainerMapping(iter(containers), backend)
 
     def _invalidate(self):
@@ -695,6 +694,17 @@ class Binding:
         return self._network
 
 
+def _cast_network_address(raw: str) -> '_NetworkAddress':
+    # fields marked as network addresses need not be IPs; they could be
+    # hostnames that juju failed to resolve. In that case, we'll log a
+    # debug message and leave it as-is.
+    try:
+        return ipaddress.ip_address(raw)
+    except ValueError:
+        logger.debug("could not cast {} to IPv4/v6 address".format(raw))
+        return raw
+
+
 class Network:
     """Network space details.
 
@@ -728,15 +738,15 @@ class Network:
             if addrs is not None:
                 for address_info in addrs:
                     self.interfaces.append(NetworkInterface(interface_name, address_info))
-        self.ingress_addresses = []  # type: List[_IPAddress]
+        self.ingress_addresses = []  # type: List[_NetworkAddress]
         for address in network_info.get('ingress-addresses', []):
-            self.ingress_addresses.append(ipaddress.ip_address(address))
+            self.ingress_addresses.append(_cast_network_address(address))
         self.egress_subnets = []  # type: List[_Network]
         for subnet in network_info.get('egress-subnets', []):
             self.egress_subnets.append(ipaddress.ip_network(subnet))
 
     @property
-    def bind_address(self) -> Optional['_IPAddress']:
+    def bind_address(self) -> Optional['_NetworkAddress']:
         """A single address that your application should bind() to.
 
         For the common case where there is a single answer. This represents a single
@@ -749,7 +759,7 @@ class Network:
             return None
 
     @property
-    def ingress_address(self):
+    def ingress_address(self) -> Optional['_NetworkAddress']:
         """The address other applications should use to connect to your unit.
 
         Due to things like public/private addresses, NAT and tunneling, the address you bind()
@@ -785,8 +795,8 @@ class NetworkInterface:
             address = address_info.get('address')
 
         # The value field may be empty.
-        address_ = ipaddress.ip_address(address) if address else None
-        self.address = address_  # type: Optional[_IPAddress]
+        address_ = _cast_network_address(address) if address else None
+        self.address = address_  # type: Optional[_NetworkAddress]
         cidr = address_info.get('cidr')  # type: str
         # The cidr field may be empty, see LP: #1864102.
         if cidr:
@@ -896,6 +906,15 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
         return iter(self._data)
 
     def __getitem__(self, key: 'UnitOrApplication'):
+        if key is None and self.relation.app is None:
+            # NOTE: if juju gets fixed to set JUJU_REMOTE_APP for relation-broken events, then that
+            # should fix the only case in which we expect key to be None - potentially removing the
+            # need for this error in future ops versions (i.e. if relation.app is guaranteed to not
+            # be None. See https://bugs.launchpad.net/juju/+bug/1960934.
+            raise KeyError(
+                'Cannot index relation data with "None".'
+                ' Are you trying to access remote app data during a relation-broken event?'
+                ' This is not allowed.')
         return self._data[key]
 
     def __repr__(self):
@@ -914,6 +933,13 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._backend = backend
         self._is_app = isinstance(entity, Application)  # type: bool
 
+    @property
+    def _hook_is_running(self) -> bool:
+        # this flag controls whether the access we have to RelationDataContent
+        # is 'strict' aka the same as a deployed charm would have, or whether it is
+        # unrestricted, allowing test code to read/write databags at will.
+        return bool(self._backend._hook_is_running)  # pyright: reportPrivateUsage=false
+
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
         try:
@@ -922,30 +948,110 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # Dead relations tell no tales (and have no data).
             return {}
 
-    def _is_mutable(self):
-        """Return if the data content can be modified."""
+    def _validate_read(self):
+        """Return if the data content can be read."""
+        # if we're not in production (we're testing): we skip access control rules
+        if not self._hook_is_running:
+            return
+
+        # Only remote units (and the leader unit) can read *this* app databag.
+
+        # is this an app databag?
+        if not self._is_app:
+            # all unit databags are publicly readable
+            return
+
+        # Am I leader?
+        if self._backend.is_leader():
+            # leaders have no read restrictions
+            return
+
+        # type guard; we should not be accessing relation data
+        # if the remote app does not exist.
+        app = self.relation.app
+        if app is None:
+            raise RelationDataAccessError(
+                "Remote application instance cannot be retrieved for {}.".format(
+                    self.relation
+                )
+            )
+
+        # is this a peer relation?
+        if app.name == self._entity.name:
+            # peer relation data is always publicly readable
+            return
+
+        # if we're here it means: this is not a peer relation,
+        # this is an app databag, and we don't have leadership.
+
+        # is this a LOCAL app databag?
+        if self._backend.app_name == self._entity.name:
+            # minions can't read local app databags
+            raise RelationDataAccessError(
+                "{} is not leader and cannot read its own application databag".format(
+                    self._backend.unit_name
+                )
+            )
+
+        return True
+
+    def _validate_write(self, key: str, value: str):
+        """Validate writing key:value to this databag.
+
+        1) that key: value is a valid str:str pair
+        2) that we have write access to this databag
+        """
+        # firstly, we validate WHAT we're trying to write.
+        # this is independent of whether we're in testing code or production.
+        if not isinstance(key, str):
+            raise RelationDataTypeError(
+                'relation data keys must be strings, not {}'.format(type(key)))
+        if not isinstance(value, str):
+            raise RelationDataTypeError(
+                'relation data values must be strings, not {}'.format(type(value)))
+
+        # if we're not in production (we're testing): we skip access control rules
+        if not self._hook_is_running:
+            return
+
+        # finally, we check whether we have permissions to write this databag
         if self._is_app:
             is_our_app = self._backend.app_name == self._entity.name  # type: bool
             if not is_our_app:
-                return False
+                raise RelationDataAccessError(
+                    "{} cannot write the data of remote application {}".format(
+                        self._backend.app_name, self._entity.name
+                    ))
             # Whether the application data bag is mutable or not depends on
             # whether this unit is a leader or not, but this is not guaranteed
             # to be always true during the same hook execution.
-            return self._backend.is_leader()
+            if self._backend.is_leader():
+                return  # all good
+            raise RelationDataAccessError(
+                "{} is not leader and cannot write application data.".format(
+                    self._backend.unit_name
+                )
+            )
         else:
-            is_our_unit = self._backend.unit_name == self._entity.name
-            if is_our_unit:
-                return True
-        return False
+            # we are attempting to write a unit databag
+            # is it OUR UNIT's?
+            if self._backend.unit_name != self._entity.name:
+                raise RelationDataAccessError(
+                    "{} cannot write databag of {}: not the same unit.".format(
+                        self._backend.unit_name, self._entity.name
+                    )
+                )
 
     def __setitem__(self, key: str, value: str):
-        if not self._is_mutable():
-            raise RelationDataError('cannot set relation data for {}'.format(self._entity.name))
-        if not isinstance(value, str):
-            raise RelationDataError('relation data values must be strings')
+        self._validate_write(key, value)
+        self._commit(key, value)
+        self._update(key, value)
 
-        self._backend.relation_set(self.relation.id, key, value, self._is_app)
+    def _commit(self, key: str, value: str):
+        self._backend.update_relation_data(self.relation.id, self._entity, key, value)
 
+    def _update(self, key: str, value: str):
+        """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
             if value == '':
@@ -955,10 +1061,22 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             else:
                 self._data[key] = value
 
+    def __getitem__(self, key: str) -> str:
+        self._validate_read()
+        return super().__getitem__(key)
+
     def __delitem__(self, key: str):
+        self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
+
+    def __repr__(self):
+        try:
+            self._validate_read()
+        except RelationDataAccessError:
+            return '<n/a>'
+        return super().__repr__()
 
 
 class ConfigData(LazyMapping):
@@ -1113,7 +1231,7 @@ class Pod:
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def set_spec(self, spec: '_K8sSpec', k8s_resources: Optional['_K8sSpec'] = None):
+    def set_spec(self, spec: 'K8sSpec', k8s_resources: Optional['K8sSpec'] = None):
         """Set the specification for pods that Juju should start in kubernetes.
 
         See `juju help-tool pod-spec-set` for details of what should be passed.
@@ -1148,6 +1266,10 @@ class StorageMapping(Mapping[str, List['Storage']]):
         return iter(self._storage_map)
 
     def __getitem__(self, storage_name: str) -> List['Storage']:
+        if storage_name not in self._storage_map:
+            meant = ', or '.join(['{!r}'.format(k) for k in self._storage_map.keys()])
+            raise KeyError(
+                'Storage {!r} not found. Did you mean {}?'.format(storage_name, meant))
         storage_list = self._storage_map[storage_name]
         if storage_list is None:
             storage_list = self._storage_map[storage_name] = []
@@ -1323,8 +1445,7 @@ class Container:
         if not service_names:
             raise TypeError('start expected at least 1 argument, got 0')
 
-        # fixme: remove on pebble.exec signature fix
-        self._pebble.start_services(service_names)   # type: ignore
+        self._pebble.start_services(service_names)
 
     def restart(self, *service_names: str):
         """Restart the given service(s) by name."""
@@ -1332,8 +1453,7 @@ class Container:
             raise TypeError('restart expected at least 1 argument, got 0')
 
         try:
-            # fixme: remove on pebble.exec signature fix
-            self._pebble.restart_services(service_names)  # type: ignore
+            self._pebble.restart_services(service_names)
         except pebble.APIError as e:
             if e.code != 400:
                 raise e
@@ -1341,18 +1461,15 @@ class Container:
             stop = tuple(s.name for s in self.get_services(*service_names).values(
             ) if s.is_running())  # type: Tuple[str, ...]
             if stop:
-                # fixme: remove on pebble.exec signature fix
-                self._pebble.stop_services(stop)   # type: ignore
-            # fixme: remove on pebble.exec signature fix
-            self._pebble.start_services(service_names)  # type: ignore
+                self._pebble.stop_services(stop)
+            self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
         if not service_names:
             raise TypeError('stop expected at least 1 argument, got 0')
 
-        # fixme: remove on pebble.exec signature fix
-        self._pebble.stop_services(service_names)  # type: ignore
+        self._pebble.stop_services(service_names)
 
     def add_layer(self, label: str, layer: '_Layer', *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -1368,8 +1485,7 @@ class Container:
                 are combined into a single one considering the layer override
                 rules; if the layer doesn't exist, it is added as usual.
         """
-        # fixme: remove ignore once pebble.py is typed
-        self._pebble.add_layer(label, layer, combine=combine)  # type: ignore
+        self._pebble.add_layer(label, layer, combine=combine)
 
     def get_plan(self) -> 'Plan':
         """Get the current effective pebble configuration."""
@@ -1382,8 +1498,7 @@ class Container:
         services, otherwise return information for only the given services.
         """
         names = service_names or None
-        # fixme: remove on pebble.exec signature fix
-        services = self._pebble.get_services(names)   # type: ignore
+        services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
     def get_service(self, service_name: str) -> 'ServiceInfo':
@@ -1410,8 +1525,7 @@ class Container:
             level: Optional check level to query for. If not specified, fetch
                 checks with any level.
         """
-        # fixme: remove on pebble.exec signature fix
-        checks = self._pebble.get_checks(names=check_names or None, level=level)  # type: ignore
+        checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
     def get_check(self, check_name: str) -> 'CheckInfo':
@@ -1447,7 +1561,7 @@ class Container:
              source: Union[bytes, str, BinaryIO, TextIO],
              *,
              encoding: str = 'utf-8',
-             make_dirs: Optional[bool] = False,
+             make_dirs: bool = False,
              permissions: Optional[int] = None,
              user_id: Optional[int] = None,
              user: Optional[str] = None,
@@ -1473,11 +1587,10 @@ class Container:
                 both are specified.
         """
         self._pebble.push(str(path), source, encoding=encoding,
-                          # fixme: remove these ignores on pebble.exec signature fix
-                          make_dirs=make_dirs,  # type: ignore
-                          permissions=permissions,   # type: ignore
-                          user_id=user_id, user=user,  # type: ignore
-                          group_id=group_id, group=group)   # type: ignore
+                          make_dirs=make_dirs,
+                          permissions=permissions,
+                          user_id=user_id, user=user,
+                          group_id=group_id, group=group)
 
     def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['FileInfo']:
@@ -1495,8 +1608,7 @@ class Container:
                 directory itself, rather than its contents.
         """
         return self._pebble.list_files(str(path),
-                                       # fixme: remove on pebble.exec signature fix
-                                       pattern=pattern, itself=itself)  # type: ignore
+                                       pattern=pattern, itself=itself)
 
     def push_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
@@ -1673,7 +1785,7 @@ class Container:
             name=path.name,
             type=ftype,
             size=info.st_size,
-            permissions=stat.S_IMODE(info.st_mode),  # type: ignore
+            permissions=typing.cast(int, stat.S_IMODE(info.st_mode)),  # type: ignore
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pwd.getpwuid(info.st_uid).pw_name,
@@ -1766,11 +1878,10 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        # fixme: remove ignores on pebble.exec signature fix
         self._pebble.make_dir(path, make_parents=make_parents,
-                              permissions=permissions,  # type: ignore
-                              user_id=user_id, user=user,  # type: ignore
-                              group_id=group_id, group=group)  # type: ignore
+                              permissions=permissions,
+                              user_id=user_id, user=user,
+                              group_id=group_id, group=group)
 
     def remove_path(self, path: str, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
@@ -1805,19 +1916,18 @@ class Container:
         """
         return self._pebble.exec(
             command,
-            # fixme: remove ignores on pebble.py typing fix
-            environment=environment,  # type: ignore
-            working_dir=working_dir,  # type: ignore
-            timeout=timeout,  # type: ignore
-            user_id=user_id,  # type: ignore
-            user=user,  # type: ignore
-            group_id=group_id,  # type: ignore
-            group=group,  # type: ignore
-            stdin=stdin,  # type: ignore
-            stdout=stdout,  # type: ignore
-            stderr=stderr,  # type: ignore
-            encoding=encoding,  # type: ignore
-            combine_stderr=combine_stderr,  # type: ignore
+            environment=environment,
+            working_dir=working_dir,
+            timeout=timeout,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            encoding=encoding,
+            combine_stderr=combine_stderr,
         )
 
     def send_signal(self, sig: Union[int, str], *service_names: str):
@@ -1835,8 +1945,7 @@ class Container:
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')
 
-        # fixme: remove ignore once pebble.send_signature signature is fixed
-        self._pebble.send_signal(sig, service_names)  # type: ignore
+        self._pebble.send_signal(sig, service_names)
 
 
 class ContainerMapping(Mapping[str, Container]):
@@ -1925,11 +2034,25 @@ class TooManyRelatedAppsError(ModelError):
 
 
 class RelationDataError(ModelError):
-    """Raised by ``Relation.data[entity][key] = 'foo'`` if the data is invalid.
+    """Raised when a relation data read/write is invalid.
 
     This is raised if you're either trying to set a value to something that isn't a string,
     or if you are trying to set a value in a bucket that you don't have access to. (eg,
     another application/unit or setting your application data but you aren't the leader.)
+    Also raised when you attempt to read a databag you don't have access to
+    (i.e. a local app databag if you're not the leader).
+    """
+
+
+class RelationDataTypeError(RelationDataError):
+    """Raised by ``Relation.data[entity][key] = value`` if `key` or `value` are not strings."""
+
+
+class RelationDataAccessError(RelationDataError):
+    """Raised by ``Relation.data[entity][key] = value`` if you don't have access.
+
+    This typically means that you don't have permission to write read/write the databag,
+    but in some cases it is raised when attempting to read/write from a deceased remote entity.
     """
 
 
@@ -1979,6 +2102,10 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
 
     for key, value in input.items():
         # Ensure the key is of a valid format, and raise a ValueError if not
+        if not isinstance(key, str):
+            # technically a type error, but for consistency with the
+            # other exceptions raised on key validation...
+            raise ValueError('invalid key {!r}; must be a string'.format(key))
         if not _ACTION_RESULT_KEY_REGEX.match(key):
             raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
                              "'some.key'".format(key))
@@ -2093,7 +2220,7 @@ class _ModelBackend:
             event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
             if relation_id == event_relation_id:
                 # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
-                return os.environ['JUJU_REMOTE_APP']
+                return os.getenv('JUJU_REMOTE_APP') or None
 
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
@@ -2114,7 +2241,7 @@ class _ModelBackend:
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool
                      ) -> '_RelationDataContent_Raw':
-        if not isinstance(is_app, bool):   # pyright:
+        if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if is_app:
@@ -2135,7 +2262,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -2151,15 +2278,16 @@ class _ModelBackend:
         args.extend(["--file", "-"])
 
         try:
-            content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
-            return self._run(*args, input_stream=content)
+            content = yaml.safe_dump({key: value}, encoding='utf8')
+            self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
-    def config_get(self):
-        return self._run('config-get', return_output=True, use_json=True)
+    def config_get(self) -> Dict[str, '_ConfigOption']:
+        out = self._run('config-get', return_output=True, use_json=True)
+        return typing.cast(Dict[str, '_ConfigOption'], out)
 
     def is_leader(self) -> bool:
         """Obtain the current leadership status for the unit the charm code is executing on.
@@ -2192,12 +2320,12 @@ class _ModelBackend:
         try:
             spec_path = tmpdir / 'spec.yaml'
             with spec_path.open("wt", encoding="utf8") as f:
-                yaml.safe_dump(spec, stream=f)  # type: ignore
+                yaml.safe_dump(spec, stream=f)
             args = ['--file', str(spec_path)]
             if k8s_resources:
                 k8s_res_path = tmpdir / 'k8s-resources.yaml'
                 with k8s_res_path.open("wt", encoding="utf8") as f:
-                    yaml.safe_dump(k8s_resources, stream=f)  # type: ignore
+                    yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:
@@ -2237,7 +2365,7 @@ class _ModelBackend:
         else:
             return typing.cast('_StatusDict', content)
 
-    def status_set(self, status: str, message: str = '', *, is_app: bool = False):
+    def status_set(self, status: str, message: str = '', *, is_app: bool = False) -> None:
         """Set a status of a unit or an application.
 
         Args:
@@ -2248,9 +2376,9 @@ class _ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
-        return self._run('status-set', '--application={}'.format(is_app), status, message)
+        self._run('status-set', '--application={}'.format(is_app), status, message)
 
-    def storage_list(self, name: str):
+    def storage_list(self, name: str) -> List[int]:
         storages = self._run('storage-list', name, return_output=True, use_json=True)
         storages = typing.cast(List[str], storages)
         return [int(s.split('/')[1]) for s in storages]
@@ -2264,41 +2392,46 @@ class _ModelBackend:
             raise RuntimeError('unable to find storage key in {output!r}'.format(output=output))
         key = match.groupdict()["storage_key"]
 
-        id = int(key.split("/")[1])
+        index = int(key.split("/")[1])
         location = self.storage_get(key, "location")
-        return id, location
+        return index, location
 
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
+        if not len(attribute) > 0:  # assume it's an empty string.
+            raise RuntimeError('calling storage_get with `attribute=""` will return a dict '
+                               'and not a string. This usage is not supported.')
         out = self._run('storage-get', '-s', storage_name_id, attribute,
                         return_output=True, use_json=True)
         return typing.cast(str, out)
 
-    def storage_add(self, name: str, count: int = 1):
+    def storage_add(self, name: str, count: int = 1) -> None:
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError('storage count must be integer, got: {} ({})'.format(count,
                                                                                  type(count)))
         self._run('storage-add', '{}={}'.format(name, count))
 
-    def action_get(self):
-        return self._run('action-get', return_output=True, use_json=True)
+    def action_get(self) -> Dict[str, str]:  # todo: what do we know about this dict?
+        out = self._run('action-get', return_output=True, use_json=True)
+        return typing.cast(Dict[str, str], out)
 
-    def action_set(self, results: Dict[str, 'JsonObject']):
+    def action_set(self, results: '_SerializedData') -> None:
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
         self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
 
-    def action_log(self, message: str):
+    def action_log(self, message: str) -> None:
         self._run('action-log', message)
 
-    def action_fail(self, message: str = ''):
+    def action_fail(self, message: str = '') -> None:
         self._run('action-fail', message)
 
-    def application_version_set(self, version: str):
+    def application_version_set(self, version: str) -> None:
         self._run('application-version-set', '--', version)
 
     @classmethod
-    def log_split(cls, message: str, max_len: int = MAX_LOG_LINE_LEN):
+    def log_split(cls, message: str, max_len: int = MAX_LOG_LINE_LEN
+                  ) -> Generator[str, None, None]:
         """Helper to handle log messages that are potentially too long.
 
         This is a generator that splits a message string into multiple chunks if it is too long
@@ -2311,7 +2444,7 @@ class _ModelBackend:
             yield message[:max_len]
             message = message[max_len:]
 
-    def juju_log(self, level: str, message: str):
+    def juju_log(self, level: str, message: str) -> None:
         """Pass a log message on to the juju logger."""
         for line in self.log_split(message):
             self._run('juju-log', '--log-level', level, "--", line)
@@ -2335,7 +2468,7 @@ class _ModelBackend:
             raise
 
     def add_metrics(self, metrics: Mapping[str, 'Numerical'],
-                    labels: Optional[Mapping[str, str]] = None):
+                    labels: Optional[Mapping[str, str]] = None) -> None:
         cmd = ['add-metric']  # type: List[str]
         if labels:
             label_args = []  # type: List[str]
@@ -2370,6 +2503,10 @@ class _ModelBackend:
         app_state = typing.cast(Dict[str, List[str]], app_state)
         # Planned units can be zero. We don't need to do error checking here.
         return len(app_state.get('units', []))
+
+    def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
+                             key: str, value: str):
+        self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
 
 class _ModelBackendValidator:
