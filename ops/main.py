@@ -33,7 +33,7 @@ from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
 
 if TYPE_CHECKING:
-    from ops.charm import CharmBase
+    from ops.charm import CharmBase, EventBase
     from ops.framework import BoundEvent, EventSource
     from ops.model import Relation
 
@@ -129,7 +129,7 @@ def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
             _create_event_link(charm, bound_event, link_to)
 
 
-def _emit_charm_event(charm: 'CharmBase', event_name: str):
+def _emit_charm_event(charm: 'CharmBase', event_name: str) -> Optional['EventBase']:
     """Emits a charm event based on a Juju event name.
 
     Args:
@@ -147,7 +147,7 @@ def _emit_charm_event(charm: 'CharmBase', event_name: str):
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
         logger.debug('Emitting Juju event %s.', event_name)
-        event_to_emit.emit(*args, **kwargs)
+        return event_to_emit.emit(*args, **kwargs)
 
 
 def _get_event_args(charm: 'CharmBase',
@@ -354,7 +354,8 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
 
 
 def main(charm_class: Type[ops.charm.CharmBase],
-         use_juju_for_storage: Optional[bool] = None):
+         use_juju_for_storage: Optional[bool] = None
+         ) -> Optional[Tuple[CharmBase, Optional[EventBase]]]:
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
@@ -435,8 +436,10 @@ def main(charm_class: Type[ops.charm.CharmBase],
         if not dispatcher.is_restricted_context():
             framework.reemit()
 
-        _emit_charm_event(charm, dispatcher.event_name)
+        event = _emit_charm_event(charm, dispatcher.event_name)
 
         framework.commit()
     finally:
         framework.close()
+
+    return charm, event

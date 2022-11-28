@@ -51,7 +51,7 @@ from ops.charm import (
     UpgradeCharmEvent,
     WorkloadEvent,
 )
-from ops.framework import Framework, StoredStateData
+from ops.framework import EventBase, Framework, StoredStateData
 from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
 from ops.storage import SQLiteStorage
 from ops.version import version
@@ -191,6 +191,30 @@ class CharmInitTestCase(unittest.TestCase):
             juju_backend_available.return_value = True
             with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
                 self._check(CharmBase, use_juju_for_storage=True)
+
+    def test_main_return_values(self):
+        fake_environ = {
+            'JUJU_UNIT_NAME': 'test_main/0',
+            'JUJU_MODEL_NAME': 'mymodel',
+            'JUJU_VERSION': '2.7.0',
+            'JUJU_DISPATCH_PATH': 'hooks/update-status',
+        }
+
+        class Foo(CharmBase):
+            pass
+
+        with patch.dict(os.environ, fake_environ):
+            with patch('ops.main._get_charm_dir') as mock_charmdir:
+                with tempfile.TemporaryDirectory() as tmpdirname:
+                    tmpdirname = Path(tmpdirname)
+                    fake_metadata = tmpdirname / 'metadata.yaml'
+                    with fake_metadata.open('wb') as fh:
+                        fh.write(b'name: test')
+                    mock_charmdir.return_value = tmpdirname
+                    charm, event = main(Foo)
+
+        assert isinstance(charm, Foo)
+        assert isinstance(event, EventBase)
 
 
 @patch('sys.argv', new=("hooks/config-changed",))

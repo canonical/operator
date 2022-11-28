@@ -343,7 +343,7 @@ class BoundEvent(Generic[_EventType]):
         self.event_type = event_type
         self.event_kind = event_kind
 
-    def emit(self, *args: Any, **kwargs: Any):
+    def emit(self, *args: Any, **kwargs: Any) -> 'EventBase':
         """Emit event to all registered observers.
 
         The current storage state is committed before and after each observer is notified.
@@ -353,6 +353,7 @@ class BoundEvent(Generic[_EventType]):
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         event.framework = framework
         framework._emit(event)  # noqa
+        return event
 
 
 class HandleKind:
