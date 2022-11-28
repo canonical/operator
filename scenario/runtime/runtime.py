@@ -10,6 +10,7 @@ from ops.charm import CharmBase
 from ops.framework import EventBase
 
 from logger import logger as pkg_logger
+from scenario.event_db import TemporaryEventDB
 from scenario.runtime.memo import (
     MEMO_DATABASE_NAME_KEY,
     MEMO_MODE_KEY,
@@ -20,7 +21,6 @@ from scenario.runtime.memo import Event as MemoEvent
 from scenario.runtime.memo import Scene as MemoScene
 from scenario.runtime.memo import event_db
 from scenario.runtime.memo_tools import DECORATE_MODEL, DECORATE_PEBBLE, inject_memoizer
-from scenario.event_db import TemporaryEventDB
 
 if TYPE_CHECKING:
     from ops.testing import CharmType

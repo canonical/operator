@@ -1,14 +1,19 @@
 import json
 from dataclasses import asdict
-from typing import Callable, Iterable, TextIO, List, Optional, Union, Dict, Any
+from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union
 
 from ops.charm import CharmBase
 from ops.framework import BoundEvent, EventBase
 
 from logger import logger as pkg_logger
 from scenario import Runtime
-from scenario.consts import (ATTACH_ALL_STORAGES, BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, CREATE_ALL_RELATIONS,)
-from scenario.structs import Event, Scene, Context, InjectRelation, CharmSpec
+from scenario.consts import (
+    ATTACH_ALL_STORAGES,
+    BREAK_ALL_RELATIONS,
+    CREATE_ALL_RELATIONS,
+    DETACH_ALL_STORAGES,
+)
+from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene
 
 CharmMeta = Optional[Union[str, TextIO, dict]]
 AssertionType = Callable[["BoundEvent", "Context", "Emitter"], Optional[bool]]
