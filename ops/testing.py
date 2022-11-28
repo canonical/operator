@@ -1679,6 +1679,41 @@ class _TestingModelBackend:
 
         return len(units) + 1  # Account for this unit.
 
+    def secret_get(self, *,
+                   id: Optional[str] = None,
+                   label: Optional[str] = None,
+                   refresh: bool = False,
+                   peek: bool = False) -> Dict[str, str]:
+        raise NotImplementedError(self.secret_get)
+
+    def secret_info_get(self, *,
+                        id: Optional[str] = None,
+                        label: Optional[str] = None) -> model.SecretInfo:
+        raise NotImplementedError(self.secret_info_get)
+
+    def secret_set(self, content: Dict[str, str], *,
+                   id: Optional[str] = None,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None) -> None:
+        raise NotImplementedError(self.secret_set)
+
+    def secret_add(self, content: Dict[str, str], *,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None,
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional[model.SecretRotate] = None,
+                   owner: Optional[str] = None) -> str:
+        raise NotImplementedError(self.secret_add)
+
+    def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
+        raise NotImplementedError(self.secret_grant)
+
+    def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
+        raise NotImplementedError(self.secret_revoke)
+
+    def secret_remove(self, id: str, *, revision: Optional[int] = None) -> None:
+        raise NotImplementedError(self.secret_remove)
+
 
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:

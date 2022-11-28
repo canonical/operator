@@ -102,15 +102,15 @@ class JujuVersion:
         return cls(v)
 
     def has_app_data(self) -> bool:
-        """Determine whether this juju version knows about app data."""
+        """Determine whether this Juju version knows about app data."""
         return (self.major, self.minor, self.patch) >= (2, 7, 0)
 
     def is_dispatch_aware(self) -> bool:
-        """Determine whether this juju version knows about dispatch."""
+        """Determine whether this Juju version knows about dispatch."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
     def has_controller_storage(self) -> bool:
-        """Determine whether this juju version supports controller-side storage."""
+        """Determine whether this Juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
     @property
