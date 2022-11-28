@@ -1,0 +1,112 @@
+{
+  "event": {
+    "env": {
+      "JUJU_UNIT_NAME": "prom/0",
+      "KUBERNETES_SERVICE_PORT": "443",
+      "KUBERNETES_PORT": "tcp://10.152.183.1:443",
+      "JUJU_VERSION": "3.0-beta4",
+      "JUJU_CHARM_HTTP_PROXY": "",
+      "APT_LISTCHANGES_FRONTEND": "none",
+      "JUJU_CONTEXT_ID": "prom/0-run-commands-6599488296390959740",
+      "SHLVL": "1",
+      "JUJU_API_ADDRESSES": "10.152.183.162:17070 controller-service.controller-mk8scloud.svc.cluster.local:17070",
+      "JUJU_AGENT_SOCKET_NETWORK": "unix",
+      "JUJU_CHARM_HTTPS_PROXY": "",
+      "JUJU_AGENT_SOCKET_ADDRESS": "@/var/lib/juju/agents/unit-prom-0/agent.socket",
+      "JUJU_MODEL_NAME": "foo",
+      "JUJU_DISPATCH_PATH": "hooks/update-status",
+      "JUJU_AVAILABILITY_ZONE": "",
+      "JUJU_CHARM_DIR": "/var/lib/juju/agents/unit-prom-0/charm",
+      "_": "./dispatch",
+      "TERM": "tmux-256color",
+      "KUBERNETES_PORT_443_TCP_ADDR": "10.152.183.1",
+      "PATH": "/var/lib/juju/tools/unit-prom-0:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/charm/bin",
+      "JUJU_METER_STATUS": "AMBER",
+      "KUBERNETES_PORT_443_TCP_PORT": "443",
+      "KUBERNETES_PORT_443_TCP_PROTO": "tcp",
+      "LANG": "C.UTF-8",
+      "JUJU_HOOK_NAME": "",
+      "CLOUD_API_VERSION": "1.25.0",
+      "DEBIAN_FRONTEND": "noninteractive",
+      "JUJU_SLA": "unsupported",
+      "KUBERNETES_SERVICE_PORT_HTTPS": "443",
+      "KUBERNETES_PORT_443_TCP": "tcp://10.152.183.1:443",
+      "JUJU_MODEL_UUID": "62f2bf65-4e77-445b-85d3-e95b02c2a720",
+      "JUJU_METER_INFO": "not set",
+      "PWD": "/var/lib/juju/agents/unit-prom-0/charm",
+      "JUJU_CHARM_FTP_PROXY": "",
+      "JUJU_MACHINE_ID": "",
+      "KUBERNETES_SERVICE_HOST": "10.152.183.1",
+      "JUJU_PRINCIPAL_UNIT": "",
+      "JUJU_CHARM_NO_PROXY": "127.0.0.1,localhost,::1",
+      "PYTHONPATH": "lib:venv",
+      "CHARM_DIR": "/var/lib/juju/agents/unit-prom-0/charm"
+    },
+    "timestamp": "2022-10-13T09:28:46.116952"
+  },
+  "context": {
+    "memos": {
+      "_ModelBackend.juju_log": {
+        "calls": {
+          "[[\"DEBUG\", \"Operator Framework 1.5.3 up and running.\"], {}]": null,
+          "[[\"DEBUG\", \"Emitting Juju event update_status.\"], {}]": null
+        },
+        "cursor": 0,
+        "caching_policy": "loose"
+      },
+      "_ModelBackend.config_get": {
+        "calls": {
+          "[[], {}]": {
+            "evaluation_interval": "1m",
+            "log_level": "info",
+            "maximum_retention_size": "80%",
+            "metrics_retention_time": "15d",
+            "metrics_wal_compression": false,
+            "web_external_url": ""
+          }
+        },
+        "cursor": 0,
+        "caching_policy": "loose"
+      },
+      "_ModelBackend.relation_ids": {
+        "calls": {
+          "[[\"self-metrics-endpoint\"], {}]": []
+        },
+        "cursor": 0,
+        "caching_policy": "loose"
+      },
+      "_ModelBackend.is_leader": {
+        "calls": [
+          [
+            [
+              [],
+              {}
+            ],
+            false
+          ]
+        ],
+        "cursor": 1,
+        "caching_policy": "strict"
+      },
+      "_ModelBackend.status_get": {
+        "calls": [
+          [
+            [
+              [],
+              {
+                "is_app": false
+              }
+            ],
+            {
+              "message": "",
+              "status": "active",
+              "status-data": {}
+            }
+          ]
+        ],
+        "cursor": 1,
+        "caching_policy": "strict"
+      }
+    }
+  }
+}
