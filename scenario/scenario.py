@@ -167,43 +167,28 @@ class Scenario:
         # decompose the meta event
         events = []
 
-        if event.name == ATTACH_ALL_STORAGES:
+        if event.name in [ATTACH_ALL_STORAGES, DETACH_ALL_STORAGES]:
             logger.warning(f"meta-event {event.name} not supported yet")
             return
 
-        elif event.name == DETACH_ALL_STORAGES:
-            logger.warning(f"meta-event {event.name} not supported yet")
-            return
+        if event.name in [CREATE_ALL_RELATIONS, BREAK_ALL_RELATIONS] and context:
+            for relation in context.relations:
+                # RELATION_OBJ is to indicate to the harness_ctx that
+                # it should retrieve the
+                if CREATE_ALL_RELATIONS:
+                    name = f"{relation.meta.endpoint}-relation-created"
+                elif BREAK_ALL_RELATIONS:
+                    name = f"{relation.meta.endpoint}-relation-broken"
 
-        elif event.name == CREATE_ALL_RELATIONS:
-            if context:
-                for relation in context.relations:
-                    # RELATION_OBJ is to indicate to the harness_ctx that
-                    # it should retrieve the
-                    evt = Event(
-                        f"{relation.meta.endpoint}-relation-created",
-                        args=(
-                            InjectRelation(
-                                relation.meta.endpoint, relation.meta.relation_id
-                            ),
+                evt = Event(
+                    name,
+                    args=(
+                        InjectRelation(
+                            relation.meta.endpoint, relation.meta.relation_id
                         ),
-                    )
-                    events.append(evt)
-
-        elif event.name == BREAK_ALL_RELATIONS:
-            if context:
-                for relation in context.relations:
-                    evt = Event(
-                        f"{relation.meta.endpoint}-relation-broken",
-                        args=(
-                            InjectRelation(
-                                relation.meta.endpoint, relation.meta.relation_id
-                            ),
-                        ),
-                    )
-                    events.append(evt)
-                    # todo should we ensure there's no relation data in this context?
-
+                    ),
+                )
+                events.append(evt)
         else:
             raise RuntimeError(f"unknown meta-event {event.name}")
 
