@@ -224,7 +224,7 @@ class Scenario:
     ) -> PlayResult:
 
         if isinstance(obj, str):
-            _event = Event(obj) if isinstance(obj, str) else obj
+            _event = Event(obj)
             if _event.is_meta:
                 return self._play_meta(_event, context, add_to_playbook=add_to_playbook)
             scene = Scene(_event, context)
