@@ -355,7 +355,7 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
 
 def main(charm_class: Type[ops.charm.CharmBase],
          use_juju_for_storage: Optional[bool] = None
-         ) -> Optional[Tuple[CharmBase, Optional[EventBase]]]:
+         ) -> Optional[Tuple['CharmBase', Optional['EventBase']]]:
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
