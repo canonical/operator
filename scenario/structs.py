@@ -111,7 +111,7 @@ class State(memo.State, DCBase):
             self.status, unit=(status, message)))
 
 
-@ dataclass
+@dataclass
 class CharmSpec:
     """Charm spec."""
 
