@@ -121,3 +121,5 @@ This will trigger an automatic build for the Python package and publish it to Py
 See [.github/workflows/publish.yml](https://github.com/canonical/operator/blob/main/.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the github actions, not the versions of the Operator Framework.)
 
 You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+
+Announce the release on discourse.

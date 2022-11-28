@@ -863,6 +863,18 @@ class TestCheck(unittest.TestCase):
         check.exec['command'] = 'foo'
         self.assertEqual(d['exec'], {'command': 'echo foo'})
 
+    def test_level_raw(self):
+        d = {
+            'override': 'replace',
+            'level': 'foobar!',
+            'period': '10s',
+            'timeout': '3s',
+            'threshold': 5,
+            'http': {'url': 'https://example.com/'},
+        }
+        check = pebble.Check('chk-http', d)
+        self.assertEqual(check.level, 'foobar!')  # remains a string
+
     def test_equality(self):
         d = {
             'override': 'replace',
@@ -1259,7 +1271,7 @@ class TestClient(unittest.TestCase):
 
     def test_client_init(self):
         pebble.Client(socket_path='foo')  # test that constructor runs
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             pebble.Client()  # socket_path arg required
 
     def test_get_system_info(self):
@@ -2499,6 +2511,32 @@ bad path\r
         self.assertEqual(len(checks), 1)
         self.assertEqual(checks[0].name, 'chk2')
         self.assertEqual(checks[0].level, pebble.CheckLevel.READY)
+        self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
+        self.assertEqual(checks[0].failures, 0)
+        self.assertEqual(checks[0].threshold, 3)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
+        ])
+
+    def test_checklevel_conversion(self):
+        self.client.responses.append({
+            "result": [
+                {
+                    "name": "chk2",
+                    "level": "foobar!",
+                    "status": "up",
+                    "threshold": 3,
+                },
+            ],
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0].name, 'chk2')
+        self.assertEqual(checks[0].level, 'foobar!')  # stays a raw string
         self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
         self.assertEqual(checks[0].failures, 0)
         self.assertEqual(checks[0].threshold, 3)

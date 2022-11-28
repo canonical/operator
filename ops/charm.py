@@ -17,11 +17,114 @@
 import enum
 import os
 import pathlib
-import typing
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    TextIO,
+    Union,
+    cast,
+)
 
 from ops import model
 from ops._private import yaml
 from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
+
+if TYPE_CHECKING:
+    from typing_extensions import Literal, Required, TypedDict
+
+    from ops.framework import Handle, JsonObject, _SerializedData
+    from ops.model import Container, Numerical, Relation, Storage
+
+    # CharmMeta also needs these.
+    _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
+    _ActionMetaDict = TypedDict(
+        '_ActionMetaDict', {
+            'title': str,
+            'description': str,
+            'params': Dict[str, _ActionParam],
+            'required': List[str]},
+        total=False)
+
+    _Scopes = Literal['global', 'container']
+    _RelationMetaDict = TypedDict(
+        '_RelationMetaDict', {
+            'interface': Required[str],
+            'limit': int,
+            'scope': _Scopes},
+        total=False)
+
+    _MultipleRange = TypedDict('_MultipleRange', {'range': str})
+    _StorageMetaDict = TypedDict('_StorageMetaDict', {
+        'type': Required[str],
+        'description': int,
+        'shared': bool,
+        'read-only': bool,
+        'minimum-size': str,
+        'location': str,
+        'multiple-range': str,
+        'multiple': _MultipleRange
+    })
+
+    _ResourceMetaDict = TypedDict(
+        '_ResourceMetaDict', {
+            'type': Required[str],
+            'filename': str,
+            'description': str},
+        total=False)
+
+    _PayloadMetaDict = TypedDict('_PayloadMetaDict', {'type': str})
+
+    _MountDict = TypedDict(
+        '_MountDict', {'storage': Required[str],
+                       'location': str},
+        total=False)
+    _ContainerMetaDict = TypedDict(
+        '_ContainerMetaDict', {'mounts': List[_MountDict]})
+
+    _CharmMetaDict = TypedDict(
+        '_CharmMetaDict', {  # all are optional
+            'name': Required[str],
+            'summary': Required[str],
+            'description': Required[str],
+            'maintainer': str,
+            'maintainers': List[str],
+            'tags': List[str],
+            'terms': List[str],
+            'series': List[str],
+            'subordinate': bool,
+            'min-juju-version': str,
+            'requires': Dict[str, '_RelationMetaDict'],
+            'provides': Dict[str, '_RelationMetaDict'],
+            'peers': Dict[str, '_RelationMetaDict'],
+            'storage': Dict[str, '_StorageMetaDict'],
+            'resources': Dict[str, '_ResourceMetaDict'],
+            'payloads': Dict[str, '_PayloadMetaDict'],
+            'extra-bindings': Dict[str, Any],  # fixme: _BindingDict?
+            'containers': Dict[str, '_ContainerMetaDict']
+        }, total=False)
+
+    # can't put in *Event because *Event.snapshot needs it.
+    _WorkloadEventSnapshot = TypedDict('_WorkloadEventSnapshot', {
+        'container_name': str
+    }, total=False)
+
+    _RelationDepartedEventSnapshot = TypedDict('_RelationDepartedEventSnapshot', {
+        'relation_name': str,
+        'relation_id': int,
+        'app_name': Optional[str],
+        'unit_name': Optional[str],
+        'departing_unit': Optional[str]
+    }, total=False)
+
+    _StorageEventSnapshot = TypedDict('_StorageEventSnapshot', {
+        'storage_name': str,
+        'storage_index': int,
+        'storage_location': str,
+    }, total=False)
 
 
 class HookEvent(EventBase):
@@ -68,7 +171,7 @@ class ActionEvent(EventBase):
         """
         raise RuntimeError('cannot defer action events')
 
-    def restore(self, snapshot: dict) -> None:
+    def restore(self, snapshot: 'JsonObject'):
         """Used by the operator framework to record the action.
 
         Not meant to be called directly by charm code.
@@ -77,34 +180,57 @@ class ActionEvent(EventBase):
         event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
         if event_action_name != env_action_name:
             # This could only happen if the dev manually emits the action, or from a bug.
-            raise RuntimeError('action event kind does not match current action')
+            raise RuntimeError('action event kind ({}) does not match current '
+                               'action ({})'.format(event_action_name, env_action_name))
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
-        self.params = self.framework.model._backend.action_get()
+        self.params = self.framework.model._backend.action_get()  # pyright: reportPrivateUsage=false  # noqa
 
-    def set_results(self, results: typing.Mapping) -> None:
+    def set_results(self, results: '_SerializedData'):
         """Report the result of the action.
 
         Args:
             results: The result of the action as a Dict
-        """
-        self.framework.model._backend.action_set(results)
+            Juju eventually only accepts a str:str mapping, so we will attempt
+            to flatten any more complex data structure like so:
+            >>> {'a': 'b'} # becomes: 'a'='b'
+            >>> {'a': {'b': 'c'}} # becomes: 'a.b'='c'
+            >>> {'a': {'b': 'c', 'd': 'e'}} # becomes: 'a.b'='c', 'a.d' = 'e'
+            >>> {'a.b': 'c', 'a.d': 'e'} # equivalent to previous
+            Note that duplicate keys are not allowed, so
+            >>> {'a': {'b': 'c'}, 'a.b': 'c'} # invalid!
 
-    def log(self, message: str) -> None:
+            Note that the resulting keys must start and end with lowercase
+            alphanumeric, and can only contain lowercase alphanumeric, hyphens
+            and periods.
+
+            If any exceptions occur whilst the action is being handled, juju will
+            gather any stdout/stderr data (and the return code) and inject them into the
+            results object. Thus, the results object might contain the following keys,
+            additionally to those specified by the charm code:
+             - Stdout
+             - Stderr
+             - Stdout-encoding
+             - Stderr-encoding
+             - ReturnCode
+        """
+        self.framework.model._backend.action_set(results)   # pyright: reportPrivateUsage=false
+
+    def log(self, message: str):
         """Send a message that a user will see while the action is running.
 
         Args:
             message: The message for the user.
         """
-        self.framework.model._backend.action_log(message)
+        self.framework.model._backend.action_log(message)  # pyright: reportPrivateUsage=false
 
-    def fail(self, message: str = '') -> None:
+    def fail(self, message: str = ''):
         """Report that this action has failed.
 
         Args:
             message: Optional message to record why it has failed.
         """
-        self.framework.model._backend.action_fail(message)
+        self.framework.model._backend.action_fail(message)  # pyright: reportPrivateUsage=false
 
 
 class InstallEvent(HookEvent):
@@ -147,18 +273,23 @@ class RemoveEvent(HookEvent):
 
 
 class ConfigChangedEvent(HookEvent):
-    """Event triggered when a configuration change is requested.
+    """Event triggered when a configuration change occurs.
 
-    This event fires in several different situations.
+    This event can fire in several situations:
 
-    - immediately after the :class:`install <InstallEvent>` event.
-    - after a :class:`relation is created <RelationCreatedEvent>`.
-    - after a :class:`leader is elected <LeaderElectedEvent>`.
-    - after changing charm configuration using the GUI or command line
-      interface
-    - when the charm :class:`starts <StartEvent>`.
-    - when a new unit :class:`joins a relation <RelationJoinedEvent>`.
-    - when there is a :class:`change to an existing relation <RelationChangedEvent>`.
+    - Right after the unit starts up for the first time.
+      This event notifies the charm of its initial configuration.
+      Typically, this event will fire between a :class:`install <InstallEvent>`
+      and a :class:`starts <StartEvent>` during the startup sequence
+      (when you first deploy a unit), but more in general it will fire whenever
+      the unit is (re)started, e.g. after pod churn on kubernetes, on unit
+      rescheduling, on unit upgrade/refresh, etc...
+    - As a specific instance of the above point: when networking changes
+      (if the machine reboots and comes up with a different IP).
+    - When the cloud admin reconfigures the charm via the juju CLI, i.e.
+      `juju config my-charm foo=bar`. This event notifies the charm of
+      its new configuration. (The event itself, however, is not aware of *what*
+      specifically has changed in the config).
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
@@ -261,7 +392,8 @@ class CollectMetricsEvent(HookEvent):
     how they can interact with Juju.
     """
 
-    def add_metrics(self, metrics: typing.Mapping, labels: typing.Mapping = None) -> None:
+    def add_metrics(self, metrics: Mapping[str, 'Numerical'],
+                    labels: Optional[Mapping[str, str]] = None):
         """Record metrics that have been gathered by the charm for this unit.
 
         Args:
@@ -270,7 +402,7 @@ class CollectMetricsEvent(HookEvent):
             labels: {key:value} strings that can be applied to the
                 metrics that are being gathered
         """
-        self.framework.model._backend.add_metrics(metrics, labels)
+        self.framework.model._backend.add_metrics(metrics, labels)  # type:ignore
 
 
 class RelationEvent(HookEvent):
@@ -292,8 +424,17 @@ class RelationEvent(HookEvent):
               :class:`~ops.model.Application` level event
 
     """
+    if TYPE_CHECKING:
+        _RelationEventSnapshot = TypedDict('_RelationEventSnapshot', {
+            'relation_name': Required[str],
+            'relation_id': Required[int],
+            'app_name': Optional[str],
+            'unit_name': Optional[str]
+        }, total=False)
 
-    def __init__(self, handle, relation, app=None, unit=None):
+    def __init__(self, handle: 'Handle', relation: 'Relation',
+                 app: Optional[model.Application] = None,
+                 unit: Optional[model.Unit] = None):
         super().__init__(handle)
 
         if unit is not None and unit.app != app:
@@ -304,7 +445,7 @@ class RelationEvent(HookEvent):
         self.app = app
         self.unit = unit
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> '_RelationEventSnapshot':
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
@@ -312,20 +453,25 @@ class RelationEvent(HookEvent):
         snapshot = {
             'relation_name': self.relation.name,
             'relation_id': self.relation.id,
-        }
+        }  # type: 'RelationEvent._RelationEventSnapshot'
         if self.app:
             snapshot['app_name'] = self.app.name
         if self.unit:
             snapshot['unit_name'] = self.unit.name
         return snapshot
 
-    def restore(self, snapshot: dict) -> None:
+    def restore(self, snapshot: '_RelationEventSnapshot'):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
         """
-        self.relation = self.framework.model.get_relation(
+        relation = self.framework.model.get_relation(
             snapshot['relation_name'], snapshot['relation_id'])
+        if relation is None:
+            raise ValueError(
+                'Unable to restore {}: relation {} (id={}) not found.'.format(
+                    self, snapshot['relation_name'], snapshot['relation_id']))
+        self.relation = relation
 
         app_name = snapshot.get('app_name')
         if app_name:
@@ -406,14 +552,26 @@ class RelationDepartedEvent(RelationEvent):
             unit.
     """
 
-    def __init__(self, handle, relation, app=None, unit=None,
-                 departing_unit_name=None):
+    def __init__(self, handle: 'Handle', relation: 'Relation',
+                 app: Optional[model.Application] = None,
+                 unit: Optional[model.Unit] = None,
+                 departing_unit_name: Optional[str] = None):
         super().__init__(handle, relation, app=app, unit=unit)
 
         self._departing_unit_name = departing_unit_name
 
+    def snapshot(self) -> '_RelationDepartedEventSnapshot':
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        snapshot = cast('_RelationDepartedEventSnapshot', super().snapshot())
+        if self._departing_unit_name:
+            snapshot['departing_unit'] = self._departing_unit_name
+        return snapshot
+
     @property
-    def departing_unit(self) -> typing.Optional[model.Unit]:
+    def departing_unit(self) -> Optional[model.Unit]:
         """The `ops.model.Unit` that is departing, if any."""
         # doing this on init would fail because `framework` gets patched in
         # post-init
@@ -421,22 +579,12 @@ class RelationDepartedEvent(RelationEvent):
             return None
         return self.framework.model.get_unit(self._departing_unit_name)
 
-    def snapshot(self) -> dict:
-        """Used by the framework to serialize the event to disk.
-
-        Not meant to be called by charm code.
-        """
-        snapshot = super().snapshot()
-        if self._departing_unit_name:
-            snapshot['departing_unit'] = self.departing_unit.name
-        return snapshot
-
-    def restore(self, snapshot: dict) -> None:
+    def restore(self, snapshot: '_RelationDepartedEventSnapshot'):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
         """
-        super().restore(snapshot)
+        super().restore(snapshot)  # type: ignore
 
         self._departing_unit_name = snapshot.get('departing_unit')
 
@@ -464,26 +612,28 @@ class StorageEvent(HookEvent):
     charms can define several different types of storage that are
     allocated from Juju. Changes in state of storage trigger sub-types
     of :class:`StorageEvent`.
+
+    Attributes:
+        storage: The :class:`~ops.model.Storage` instance this event is about.
     """
 
-    def __init__(self, handle, storage):
+    def __init__(self, handle: 'Handle', storage: 'Storage'):
         super().__init__(handle)
         self.storage = storage
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> '_StorageEventSnapshot':
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
-        snapshot = {}
-
+        snapshot = {}  # type: '_StorageEventSnapshot'
         if isinstance(self.storage, model.Storage):
             snapshot["storage_name"] = self.storage.name
             snapshot["storage_index"] = self.storage.index
             snapshot["storage_location"] = str(self.storage.location)
         return snapshot
 
-    def restore(self, snapshot: dict) -> None:
+    def restore(self, snapshot: '_StorageEventSnapshot'):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -499,6 +649,12 @@ class StorageEvent(HookEvent):
                 msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
                     .format(storage_name, storage_index)
                 raise RuntimeError(msg)
+            if storage_location is None:
+                raise RuntimeError(
+                    'failed loading storage location from snapshot.'
+                    '(name={!r}, index={!r}, storage_location=None)'
+                    .format(storage_name, storage_index))
+
             self.storage.location = storage_location
 
 
@@ -546,22 +702,22 @@ class WorkloadEvent(HookEvent):
                   a Machine.
     """
 
-    def __init__(self, handle, workload):
+    def __init__(self, handle: 'Handle', workload: 'Container'):
         super().__init__(handle)
 
         self.workload = workload
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> '_WorkloadEventSnapshot':
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
-        snapshot = {}
+        snapshot = {}  # type: "_WorkloadEventSnapshot"
         if isinstance(self.workload, model.Container):
             snapshot['container_name'] = self.workload.name
         return snapshot
 
-    def restore(self, snapshot: dict) -> None:
+    def restore(self, snapshot: '_WorkloadEventSnapshot'):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -669,10 +825,14 @@ class CharmBase(Object):
 
     # note that without the #: below, sphinx will copy the whole of CharmEvents
     # docstring inline which is less than ideal.
-    #: Used to set up event handlers; see :class:`CharmEvents`.
-    on = CharmEvents()
+    # Used to set up event handlers; see :class:`CharmEvents`.
+    on = CharmEvents()  # type: ignore
+    if TYPE_CHECKING:
+        # to help the type checker and IDEs:
+        @property
+        def on(self) -> CharmEvents: ...  # noqa
 
-    def __init__(self, framework: Framework, key: typing.Optional = None):
+    def __init__(self, framework: Framework, key: Optional[str] = None):
         super().__init__(framework, None)
 
         for relation_name in self.framework.meta.relations:
@@ -775,15 +935,21 @@ class CharmMeta:
         actions_raw: a mapping containing the contents of actions.yaml
 
     """
+    if TYPE_CHECKING:
+        # avoid long line in init
+        _ActionsRaw = Optional[Dict[str, '_ActionMetaDict']]
 
-    def __init__(self, raw: dict = None, actions_raw: dict = None):
-        raw = raw or {}
-        actions_raw = actions_raw or {}
+    def __init__(self,
+                 raw: Optional['_CharmMetaDict'] = None,  # type: ignore
+                 actions_raw: '_ActionsRaw' = None  # type: ignore
+                 ):
+        raw = raw or cast('_CharmMetaDict', {})  # type: _CharmMetaDict
+        actions_raw = actions_raw or {}  # type: Dict[str, _ActionMetaDict]
 
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
-        self.maintainers = []
+        self.maintainers = []  # type: List[str]
         if 'maintainer' in raw:
             self.maintainers.append(raw['maintainer'])
         if 'maintainers' in raw:
@@ -799,7 +965,7 @@ class CharmMeta:
                          for name, rel in raw.get('provides', {}).items()}
         self.peers = {name: RelationMeta(RelationRole.peer, name, rel)
                       for name, rel in raw.get('peers', {}).items()}
-        self.relations = {}
+        self.relations = {}  # type: Dict[str, RelationMeta]
         self.relations.update(self.requires)
         self.relations.update(self.provides)
         self.relations.update(self.peers)
@@ -819,8 +985,8 @@ class CharmMeta:
 
     @classmethod
     def from_yaml(
-            cls, metadata: typing.Union[str, typing.TextIO],
-            actions: typing.Optional[typing.Union[str, typing.TextIO]] = None):
+            cls, metadata: Union[str, TextIO],
+            actions: Optional[Union[str, TextIO]] = None):
         """Instantiate a CharmMeta from a YAML description of metadata.yaml.
 
         Args:
@@ -828,10 +994,10 @@ class CharmMeta:
                 This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
             actions: YAML description of Actions for this charm (eg actions.yaml)
         """
-        meta = yaml.safe_load(metadata)
+        meta = cast('_CharmMetaDict', yaml.safe_load(metadata))
         raw_actions = {}
         if actions is not None:
-            raw_actions = yaml.safe_load(actions)
+            raw_actions = cast(Dict[str, '_ActionMetaDict'], yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
         return cls(meta, raw_actions)
@@ -875,17 +1041,16 @@ class RelationMeta:
 
     VALID_SCOPES = ['global', 'container']
 
-    def __init__(self, role: RelationRole, relation_name: str, raw: dict):
-        if not isinstance(role, RelationRole):
-            raise TypeError("role should be a Role, not {!r}".format(role))
+    def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
+        assert isinstance(role, RelationRole), "role should be one of {!r}, not {!r}".format(list(RelationRole), role)  # noqa
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
         self.interface_name = raw['interface']
 
-        self.limit = raw.get('limit')
-        if self.limit and not isinstance(self.limit, int):
-            raise TypeError("limit should be an int, not {}".format(type(self.limit)))
+        self.limit = limit = raw.get('limit', None)
+        if limit is not None and not isinstance(limit, int):  # type: ignore  # noqa
+            raise TypeError("limit should be an int, not {}".format(type(limit)))
 
         self.scope = raw.get('scope') or self._default_scope
         if self.scope not in self.VALID_SCOPES:
@@ -906,7 +1071,7 @@ class StorageMeta:
         multiple_range: Range of numeric qualifiers when multiple storage units are used
     """
 
-    def __init__(self, name, raw):
+    def __init__(self, name: str, raw: '_StorageMetaDict'):
         self.storage_name = name
         self.type = raw['type']
         self.description = raw.get('description', '')
@@ -933,7 +1098,7 @@ class ResourceMeta:
         description: A text description of resource
     """
 
-    def __init__(self, name, raw):
+    def __init__(self, name: str, raw: '_ResourceMetaDict'):
         self.resource_name = name
         self.type = raw['type']
         self.filename = raw.get('filename', None)
@@ -948,7 +1113,7 @@ class PayloadMeta:
         type: Payload type
     """
 
-    def __init__(self, name, raw):
+    def __init__(self, name: str, raw: '_PayloadMetaDict'):
         self.payload_name = name
         self.type = raw['type']
 
@@ -956,7 +1121,7 @@ class PayloadMeta:
 class ActionMeta:
     """Object containing metadata about an action's definition."""
 
-    def __init__(self, name, raw=None):
+    def __init__(self, name: str, raw: Optional['_ActionMetaDict'] = None):
         raw = raw or {}
         self.name = name
         self.title = raw.get('title', '')
@@ -976,16 +1141,16 @@ class ContainerMeta:
         mounts: :class:`ContainerStorageMeta` mounts available to the container
     """
 
-    def __init__(self, name, raw):
+    def __init__(self, name: str, raw: '_ContainerMetaDict'):
         self.name = name
-        self._mounts = {}
+        self._mounts = {}  # type: Dict[str, ContainerStorageMeta]
 
         # This is not guaranteed to be populated/is not enforced yet
         if raw:
             self._populate_mounts(raw.get('mounts', []))
 
     @property
-    def mounts(self) -> typing.Dict:
+    def mounts(self) -> Dict[str, 'ContainerStorageMeta']:
         """An accessor for the mounts in a container.
 
         Dict keys match key name in :class:`StorageMeta`
@@ -1004,7 +1169,7 @@ class ContainerMeta:
         """
         return self._mounts
 
-    def _populate_mounts(self, mounts: typing.List):
+    def _populate_mounts(self, mounts: List['_MountDict']):
         """Populate a list of container mountpoints.
 
         Since Charm Metadata v2 specifies the mounts as a List, do a little data manipulation
@@ -1038,20 +1203,20 @@ class ContainerStorageMeta:
     which mount point was desired, and `locations` should be iterated over.
     """
 
-    def __init__(self, storage, location):
+    def __init__(self, storage: str, location: str):
         self.storage = storage
-        self._locations = [location]
+        self._locations = [location]  # type: List[str]
 
-    def add_location(self, location):
+    def add_location(self, location: str):
         """Add an additional mountpoint to a known storage."""
         self._locations.append(location)
 
     @property
-    def locations(self) -> typing.List:
+    def locations(self) -> List[str]:
         """An accessor for the list of locations for a mount."""
         return self._locations
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str):
         if name == "location":
             if len(self._locations) == 1:
                 return self._locations[0]

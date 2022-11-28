@@ -1,6 +1,6 @@
 name: Hello Charm Tests
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_call]
 
 jobs:
   hello-charm-tests:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python 3.8
         uses: actions/setup-python@v2
         with:
-          python-version: 3.8
+          python-version: "3.8"
 
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v2

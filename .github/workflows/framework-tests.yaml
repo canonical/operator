@@ -1,6 +1,6 @@
 name: Operator Framework Tests
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_call]
 
 jobs:
   lint:
@@ -37,7 +37,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: [3.5, 3.6, 3.7, 3.8, 3.9]
+        python-version: ["3.5", "3.6", "3.8", "3.10"]
 
     steps:
       - uses: actions/checkout@v2
@@ -58,7 +58,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.5, 3.6, 3.7, 3.8, 3.9]
+        python-version: ["3.5", "3.6", "3.8", "3.10"]
 
     steps:
       - uses: actions/checkout@v2
@@ -70,7 +70,7 @@ jobs:
       - name: Set up Go 1.17
         uses: actions/setup-go@v1
         with:
-          go-version: 1.17
+          go-version: "1.17"
 
       - name: Install tox
         run: pip install tox
@@ -90,4 +90,3 @@ jobs:
         env:
           RUN_REAL_PEBBLE_TESTS: 1 
           PEBBLE: /tmp/pebble 
-
