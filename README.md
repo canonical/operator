@@ -125,6 +125,7 @@ def test_scenario_base(scenario, start_scene):
 def test_status_leader(scenario, start_scene, leader):
     leader_scene = start_scene.copy()
     leader_scene.context.state.leader = leader
+    
     out = scenario.run(leader_scene)
     if leader:
         assert out.context_out.state.status.unit == ('active', 'I rule')

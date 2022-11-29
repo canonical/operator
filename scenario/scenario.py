@@ -1,14 +1,20 @@
 import json
 from dataclasses import asdict
-from typing import Callable, Iterable, TextIO, List, Optional, Union, Dict, Any
+from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union
 
 from ops.charm import CharmBase
 from ops.framework import BoundEvent, EventBase
 
 from logger import logger as pkg_logger
 from scenario import Runtime
-from scenario.consts import (ATTACH_ALL_STORAGES, BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, CREATE_ALL_RELATIONS,)
-from scenario.structs import Event, Scene, Context, InjectRelation, CharmSpec
+from scenario.consts import (
+    ATTACH_ALL_STORAGES,
+    BREAK_ALL_RELATIONS,
+    CREATE_ALL_RELATIONS,
+    DETACH_ALL_STORAGES,
+    META_EVENTS,
+)
+from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene
 
 CharmMeta = Optional[Union[str, TextIO, dict]]
 AssertionType = Callable[["BoundEvent", "Context", "Emitter"], Optional[bool]]
@@ -161,56 +167,37 @@ class Scenario:
     def reset(self):
         self._playbook.restart()
 
-    def _play_meta(
-        self, event: Event, context: Context = None, add_to_playbook: bool = False
-    ):
+    def _play_meta(self, event: Event, context: Context, add_to_playbook: bool = False):
         # decompose the meta event
         events = []
 
-        if event.name == ATTACH_ALL_STORAGES:
+        if event.name in [ATTACH_ALL_STORAGES, DETACH_ALL_STORAGES]:
             logger.warning(f"meta-event {event.name} not supported yet")
             return
 
-        elif event.name == DETACH_ALL_STORAGES:
-            logger.warning(f"meta-event {event.name} not supported yet")
-            return
-
-        elif event.name == CREATE_ALL_RELATIONS:
-            if context:
-                for relation in context.relations:
-                    # RELATION_OBJ is to indicate to the harness_ctx that
-                    # it should retrieve the
-                    evt = Event(
-                        f"{relation.meta.endpoint}-relation-created",
-                        args=(
-                            InjectRelation(
-                                relation.meta.endpoint, relation.meta.relation_id
-                            ),
+        if event.name in [CREATE_ALL_RELATIONS, BREAK_ALL_RELATIONS]:
+            for relation in context.state.relations:
+                evt = Event(
+                    relation.meta.endpoint + META_EVENTS[event.name],
+                    args=(
+                        # right now, the Relation object hasn't been created by ops yet, so we can't pass it down.
+                        # this will be replaced by a Relation instance before the event is fired.
+                        InjectRelation(
+                            relation.meta.endpoint, relation.meta.relation_id
                         ),
-                    )
-                    events.append(evt)
-
-        elif event.name == BREAK_ALL_RELATIONS:
-            if context:
-                for relation in context.relations:
-                    evt = Event(
-                        f"{relation.meta.endpoint}-relation-broken",
-                        args=(
-                            InjectRelation(
-                                relation.meta.endpoint, relation.meta.relation_id
-                            ),
-                        ),
-                    )
-                    events.append(evt)
-                    # todo should we ensure there's no relation data in this context?
-
+                    ),
+                )
+                events.append(evt)
         else:
             raise RuntimeError(f"unknown meta-event {event.name}")
 
         logger.debug(f"decomposed meta {event.name} into {events}")
         last = None
+
         for event in events:
-            last = self.play(event, context, add_to_playbook=add_to_playbook)
+            scene = Scene(event, context)
+            last = self.play(scene, add_to_playbook=add_to_playbook)
+
         return last
 
     def run(self, scene: Scene, add_to_playbook: bool = False):
@@ -222,14 +209,14 @@ class Scenario:
         context: Context = None,
         add_to_playbook: bool = False,
     ) -> PlayResult:
+        scene = obj
+        context = context or Context()
 
         if isinstance(obj, str):
-            _event = Event(obj) if isinstance(obj, str) else obj
+            _event = Event(obj)
             if _event.is_meta:
                 return self._play_meta(_event, context, add_to_playbook=add_to_playbook)
             scene = Scene(_event, context)
-        else:
-            scene = obj
 
         runtime = self._runtime
         result = runtime.run(scene)

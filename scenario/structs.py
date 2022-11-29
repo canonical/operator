@@ -5,8 +5,8 @@ from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
 from ops.charm import CharmBase
 from ops.testing import CharmType
 
-from scenario.runtime import memo
 from scenario.consts import META_EVENTS
+from scenario.runtime import memo
 
 
 @dataclass
@@ -107,11 +107,12 @@ class State(memo.State, DCBase):
         return self.replace(leader=leader)
 
     def with_unit_status(self, status: str, message: str):
-        return self.replace(status=dataclasses.replace(
-            self.status, unit=(status, message)))
+        return self.replace(
+            status=dataclasses.replace(self.status, unit=(status, message))
+        )
 
 
-@ dataclass
+@dataclass
 class CharmSpec:
     """Charm spec."""
 

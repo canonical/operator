@@ -27,12 +27,20 @@ class MyCharm(CharmBase):
 
 @pytest.fixture
 def dummy_state():
-    return State(config={"foo": "bar"}, leader=True)
+    return State(
+        config={"foo": "bar"},
+        leader=True
+    )
 
 
 @pytest.fixture
 def start_scene(dummy_state):
-    return Scene(get_event("start"), context=Context(state=dummy_state))
+    return Scene(
+        get_event("start"),
+        context=Context(
+            state=dummy_state
+        )
+    )
 
 
 def test_bare_event(start_scene):
@@ -67,5 +75,7 @@ def test_status_setting(start_scene):
     assert out.context_out.state.status.unit == ("active", "foo test")
     assert out.context_out.state.status.app == ("unknown", "")
     assert out.delta().patch == [
-        {"op": "replace", "path": "/state/status/unit", "value": ("active", "foo test")}
+        {"op": "replace",
+         "path": "/state/status/unit",
+         "value": ("active", "foo test")}
     ]
