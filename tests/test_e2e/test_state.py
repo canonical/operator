@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 from tests.setup_tests import setup_tests
 
 setup_tests()  # noqa & keep this on top
@@ -171,17 +173,17 @@ def test_relation_get(start_scene: Scene, mycharm):
         )
     )
     scene = start_scene.copy()
-    scene.context.state.relations = (
+    scene.context.state.relations = [
         relation(
             endpoint="foo",
             interface="bar",
             local_app_data={"a": "because"},
             remote_app_name="remote",
-            remote_unit_ids=(0, 1, 2),
+            remote_unit_ids=[0, 1, 2],
             remote_app_data={"a": "b"},
             local_unit_data={"c": "d"},
         ),
-    )
+    ]
     scenario.run(scene)
 
 
@@ -212,12 +214,23 @@ def test_relation_set(start_scene: Scene, mycharm):
         relation(
             endpoint="foo",
             interface="bar",
-            remote_unit_ids=(1, 4),
+            remote_unit_ids=[1, 4],
             local_app_data={},
             local_unit_data={},
         )
     ]
     out = scenario.run(scene)
+
+    assert asdict(out.context_out.state.relations[0]) == \
+           asdict(
+               relation(
+                   endpoint="foo",
+                   interface="bar",
+                   remote_unit_ids=[1, 4],
+                   local_app_data={"a": "b"},
+                   local_unit_data={"c": "d"},
+               )
+           )
 
     assert out.context_out.state.relations[0].local_app_data == {"a": "b"}
     assert out.context_out.state.relations[0].local_unit_data == {"c": "d"}

@@ -598,7 +598,7 @@ class RelationMeta:
     interface: str
     relation_id: int
     remote_app_name: str
-    remote_unit_ids: Tuple[int, ...] = (0,)
+    remote_unit_ids: List[int] = field(default_factory=lambda: list((0, )))
 
     # local limit
     limit: int = 1

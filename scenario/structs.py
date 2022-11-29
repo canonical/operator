@@ -1,6 +1,13 @@
 import dataclasses
+import typing
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Type, Union, List
+
+if typing.TYPE_CHECKING:
+    try:
+        from typing import Self
+    except ImportError:
+        from typing_extensions import Self
 
 from ops.charm import CharmBase
 from ops.testing import CharmType
@@ -14,7 +21,7 @@ class DCBase:
     def replace(self, *args, **kwargs):
         return dataclasses.replace(self, *args, **kwargs)
 
-    def copy(self):
+    def copy(self) -> "Self":
         return dataclasses.replace(self)
 
 
@@ -53,7 +60,7 @@ def relation(
     interface: str,
     remote_app_name: str = "remote",
     relation_id: int = 0,
-    remote_unit_ids: Tuple[int, ...] = (0,),
+    remote_unit_ids: List[int] = (0,),
     # mapping from unit ID to databag contents
     local_unit_data: Dict[str, str] = None,
     local_app_data: Dict[str, str] = None,
@@ -64,7 +71,7 @@ def relation(
         endpoint=endpoint,
         interface=interface,
         remote_app_name=remote_app_name,
-        remote_unit_ids=remote_unit_ids,
+        remote_unit_ids=list(remote_unit_ids),
         relation_id=relation_id,
     )
     return RelationSpec(

@@ -151,8 +151,49 @@ def test_status_leader(scenario, start_scene, leader):
         assert out.context_out.state.status.unit == ('active', 'I follow')
 ```
 
-By defining the right state we can programmatically define what answers will the charm get to all the questions it can
-ask to the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
+By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask to the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
+
+An example involving relations:
+
+```python
+from scenario.structs import relation
+
+# This charm copies over remote app data to local unit data
+class MyCharm(CharmBase):
+    ...
+    def _on_event(self, e):
+        relation = self.model.relations['foo'][0]
+        assert relation.app.name == 'remote'
+        assert e.relation.data[self.unit]['abc'] == 'foo'
+        e.relation.data[self.unit]['abc'] = e.relation.data[e.app]['cde']
+        
+
+def test_relation_data(scenario, start_scene):
+    scene = start_scene.copy()
+    scene.context.state.relations = [
+        relation(
+            endpoint="foo",
+            interface="bar",
+            remote_app_name="remote",
+            local_unit_data={"abc": "foo"},
+            remote_app_data={"cde": "baz!"},
+        ),
+    ]
+    out = scenario.run(scene)
+    assert out.context_out.state.relations[0].local_unit_data == {"abc": "baz!"}
+    # one could probably even do:
+    assert out.context_out.state.relations == [
+            relation(
+            endpoint="foo",
+            interface="bar",
+            remote_app_name="remote",
+            local_unit_data={"abc": "baz!"},
+            remote_app_data={"cde": "baz!"},
+        ),
+    ]
+    # which is very idiomatic and superbly explicit. Noice.
+```
+
 
 # Caveats
 The way we're injecting memo calls is by rewriting parts of `ops.main`, and `ops.framework` using the python ast module. This means that we're seriously messing with your venv. This is a temporary measure and will be factored out of the code as we move out of the alpha phase.
@@ -160,6 +201,7 @@ The way we're injecting memo calls is by rewriting parts of `ops.main`, and `ops
 Options we're considering:
 - have a script that generates our own `ops` lib, distribute that along with the scenario source, and in your scenario tests you'll have to import from the patched-ops we provide instead of the 'canonical' ops module.
 - trust you to run all of this in ephemeral contexts (e.g. containers, tox env...)  for now, YOU SHOULD REALLY DO THAT
+
 
 # Advanced Mockery
 The Harness mocks data by providing a separate backend. When the charm code asks: am I leader? there's a variable
