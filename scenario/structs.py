@@ -48,6 +48,33 @@ class RelationSpec(memo.RelationSpec, DCBase):
     pass
 
 
+def relation(
+    endpoint: str,
+    interface: str,
+    remote_app_name: str = "remote",
+    relation_id: int = 0,
+    remote_unit_ids: Tuple[int, ...] = (0,),
+    # mapping from unit ID to databag contents
+    local_unit_data: Dict[str, str] = None,
+    local_app_data: Dict[str, str] = None,
+    remote_app_data: Dict[str, str] = None,
+):
+    """Helper function to construct a RelationMeta object with some sensible defaults."""
+    metadata = RelationMeta(
+        endpoint=endpoint,
+        interface=interface,
+        remote_app_name=remote_app_name,
+        remote_unit_ids=remote_unit_ids,
+        relation_id=relation_id,
+    )
+    return RelationSpec(
+        meta=metadata,
+        local_unit_data=local_unit_data or {},
+        local_app_data=local_app_data or {},
+        remote_app_data=remote_app_data or {},
+    )
+
+
 def network(
     private_address: str = "1.1.1.1",
     mac_address: str = "",
@@ -144,7 +171,7 @@ class Memo(DCBase):
 @dataclass
 class Context(DCBase):
     memos: Dict[str, Memo] = dataclasses.field(default_factory=dict)
-    state: State = dataclasses.field(default_factory=State.null)
+    state: State = dataclasses.field(default_factory=State)
 
     @classmethod
     def from_dict(cls, obj):

@@ -42,6 +42,9 @@ class Emitter:
         return self.event
 
 
+patch_sort_key = lambda obj: obj["path"] + obj["op"]
+
+
 class PlayResult:
     # TODO: expose the 'final context' or a Delta object from the PlayResult.
     def __init__(
@@ -68,9 +71,13 @@ class PlayResult:
         if self.scene_in.context == self.context_out:
             return None
 
-        return jsonpatch.make_patch(
+        patch = jsonpatch.make_patch(
             asdict(self.scene_in.context), asdict(self.context_out)
-        )
+        ).patch
+        return sorted(patch, key=patch_sort_key)
+
+    def sort_patch(self, patch: List[Dict]):
+        return sorted(patch, key=patch_sort_key)
 
 
 class _Builtins:
@@ -148,11 +155,16 @@ class Playbook:
 class Scenario:
     builtins = _Builtins()
 
-    def __init__(self, charm_spec: CharmSpec, playbook: Playbook = Playbook(())):
+    def __init__(
+        self,
+        charm_spec: CharmSpec,
+        playbook: Playbook = Playbook(()),
+        juju_version: str = "3.0.0",
+    ):
         self._playbook = playbook
         self._charm_spec = charm_spec
         self._charm_type = charm_spec.charm_type
-        self._runtime = Runtime(charm_spec)
+        self._runtime = Runtime(charm_spec, juju_version=juju_version)
 
     @property
     def playbook(self) -> Playbook:

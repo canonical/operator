@@ -11,11 +11,9 @@ import pytest
 try:
     from scenario.runtime import Runtime
 except ModuleNotFoundError:
-    import os
+    from scenario.runtime.runtime import RUNTIME_MODULE
 
-    from jhack.utils.event_recorder.runtime import RECORDER_MODULE
-
-    sys.path.append(str(RECORDER_MODULE.absolute()))
+    sys.path.append(str(RUNTIME_MODULE.absolute()))
 
 from ops.charm import CharmBase, CharmEvents
 

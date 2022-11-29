@@ -45,6 +45,10 @@ _PRINTED_MODE = False
 _NotFound = object()
 
 
+class NotFoundError(RuntimeError):
+    pass
+
+
 def _check_caching_policy(policy: _CachingPolicy) -> _CachingPolicy:
     if policy in {"strict", "loose"}:
         return policy
@@ -231,24 +235,24 @@ def memo(
                 return fn(*args, **kwargs)
 
             def load_from_state(
-                context: Context, question: Tuple[str, Tuple[Any], Dict[str, Any]]
+                scene: Scene, question: Tuple[str, Tuple[Any], Dict[str, Any]]
             ):
                 if not os.getenv(USE_STATE_KEY):
                     return propagate()
 
                 logger.debug("Attempting to load from state.")
-                if not hasattr(context, "state"):
+                if not hasattr(scene.context, "state"):
                     logger.warning(
                         "Context has no state; probably there is a version mismatch."
                     )
                     return propagate()
 
-                if not context.state:
+                if not scene.context.state:
                     logger.debug("No state found for this call.")
                     return propagate()
 
                 try:
-                    return get_from_state(context.state, question)
+                    return get_from_state(scene, question)
                 except StateError as e:
                     logger.error(f"Error trying to get_from_state {memo_name}: {e}")
                     return propagate()
@@ -328,7 +332,7 @@ def memo(
                             f"No memo found for {memo_name}: " f"this path must be new."
                         )
                         return load_from_state(
-                            data.scenes[idx].context,
+                            data.scenes[idx],
                             (memo_name, memoizable_args, kwargs),
                         )
 
@@ -481,6 +485,15 @@ class Event:
         return self.env["JUJU_DISPATCH_PATH"].split("/")[1]
 
     @property
+    def unit_name(self):
+        return self.env.get("JUJU_UNIT_NAME", "")
+
+    @property
+    def app_name(self):
+        unit_name = self.unit_name
+        return unit_name.split("/")[0] if unit_name else ""
+
+    @property
     def datetime(self):
         return DT.datetime.fromisoformat(self.timestamp)
 
@@ -583,13 +596,13 @@ class NetworkSpec:
 class RelationMeta:
     endpoint: str
     interface: str
-    remote_app_name: str
     relation_id: int
+    remote_app_name: str
+    remote_unit_ids: Tuple[int, ...] = (0,)
 
     # local limit
     limit: int = 1
 
-    remote_unit_ids: Tuple[int, ...] = (0,)
     # scale of the remote application; number of units, leader ID?
     # TODO figure out if this is relevant
     scale: int = 1
@@ -603,8 +616,9 @@ class RelationMeta:
 @dataclass
 class RelationSpec:
     meta: RelationMeta
-    application_data: dict = dataclasses.field(default_factory=dict)
-    units_data: Dict[int, dict] = dataclasses.field(default_factory=dict)
+    local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, obj):
@@ -616,14 +630,26 @@ class RelationSpec:
 class Status:
     app: Tuple[str, str] = ("unknown", "")
     unit: Tuple[str, str] = ("unknown", "")
+    app_version: str = ""
+
+    @classmethod
+    def from_dict(cls, obj: dict):
+        if obj is None:
+            return cls()
+
+        return cls(
+            app=tuple(obj.get("app", ("unknown", ""))),
+            unit=tuple(obj.get("unit", ("unknown", ""))),
+            app_version=obj.get("app_version", ""),
+        )
 
 
 @dataclass
 class State:
     config: Dict[str, Union[str, int, float, bool]] = None
-    relations: Tuple[RelationSpec] = ()
-    networks: Tuple[NetworkSpec] = ()
-    containers: Tuple[ContainerSpec] = ()
+    relations: List[RelationSpec] = field(default_factory=list)
+    networks: List[NetworkSpec] = field(default_factory=list)
+    containers: List[ContainerSpec] = field(default_factory=list)
     status: Status = field(default_factory=Status)
     leader: bool = False
     model: Model = Model()
@@ -634,27 +660,29 @@ class State:
     #  juju topology
 
     @classmethod
-    def null(cls):
-        return cls()
-
-    @classmethod
     def from_dict(cls, obj):
         if obj is None:
-            return cls.null()
+            return cls()
 
         return cls(
             config=obj["config"],
-            relations=tuple(
+            relations=list(
                 RelationSpec.from_dict(raw_ard) for raw_ard in obj["relations"]
             ),
-            networks=tuple(NetworkSpec.from_dict(raw_ns) for raw_ns in obj["networks"]),
-            containers=tuple(
+            networks=list(NetworkSpec.from_dict(raw_ns) for raw_ns in obj["networks"]),
+            containers=list(
                 ContainerSpec.from_dict(raw_cs) for raw_cs in obj["containers"]
             ),
             leader=obj.get("leader", False),
-            status=Status(**{k: tuple(v) for k, v in obj.get("status", {}).items()}),
+            status=Status.from_dict(obj.get("status")),
             model=Model(**obj.get("model", {})),
         )
+
+    def get_container(self, name) -> ContainerSpec:
+        try:
+            return next(filter(lambda c: c.name == name, self.containers))
+        except StopIteration as e:
+            raise NotFoundError(f"container: {name}") from e
 
 
 @dataclass
@@ -743,7 +771,9 @@ class QuestionNotImplementedError(StateError):
     pass
 
 
-def get_from_state(state: State, question: Tuple[str, Tuple[Any], Dict[str, Any]]):
+def get_from_state(scene: Scene, question: Tuple[str, Tuple[Any], Dict[str, Any]]):
+    state = scene.context.state
+    this_unit_name = scene.event.unit_name
     memo_name, call_args, call_kwargs = question
     ns, _, meth = memo_name.rpartition(".")
     setter = False
@@ -752,24 +782,51 @@ def get_from_state(state: State, question: Tuple[str, Tuple[Any], Dict[str, Any]
         # MODEL BACKEND CALLS
         if ns == "_ModelBackend":
             if meth == "relation_get":
-                pass
+                rel_id, obj_name, app = call_args
+                relation = next(
+                    filter(lambda r: r.meta.relation_id == rel_id, state.relations)
+                )
+                if app and obj_name == scene.event.app_name:
+                    return relation.local_app_data
+                elif app:
+                    return relation.remote_app_data
+                elif obj_name == this_unit_name:
+                    return relation.local_unit_data.get(this_unit_name, {})
+                else:
+                    unit_id = obj_name.split("/")[-1]
+                    return relation.local_unit_data[unit_id]
+
             elif meth == "is_leader":
                 return state.leader
+
             elif meth == "status_get":
                 status, message = (
                     state.status.app if call_kwargs.get("app") else state.status.unit
                 )
                 return {"status": status, "message": message}
-            elif meth == "action_get":
-                pass
+
             elif meth == "relation_ids":
-                pass
+                return [rel.meta.relation_id for rel in state.relations]
+
             elif meth == "relation_list":
-                pass
-            elif meth == "relation_remote_app_name":
-                pass
+                rel_id = call_args[0]
+                relation = next(
+                    filter(lambda r: r.meta.relation_id == rel_id, state.relations)
+                )
+                return tuple(
+                    f"{relation.meta.remote_app_name}/{unit_id}"
+                    for unit_id in relation.meta.remote_unit_ids
+                )
+
             elif meth == "config_get":
                 return state.config[call_args[0]]
+
+            elif meth == "action_get":
+                pass
+
+            elif meth == "relation_remote_app_name":
+                pass
+
             elif meth == "resource_get":
                 pass
             elif meth == "storage_list":
@@ -784,14 +841,11 @@ def get_from_state(state: State, question: Tuple[str, Tuple[Any], Dict[str, Any]
                 setter = True
 
             # # setter methods
+
             if meth == "application_version_set":
-                pass
-            elif meth == "relation_set":
-                pass
-            elif meth == "action_set":
-                pass
-            elif meth == "action_fail":
-                pass
+                state.status.app_version = call_args[0]
+                return None
+
             elif meth == "status_set":
                 status = call_args
                 if call_kwargs.get("is_app"):
@@ -799,11 +853,31 @@ def get_from_state(state: State, question: Tuple[str, Tuple[Any], Dict[str, Any]
                 else:
                     state.status.unit = status
                 return None
-            elif meth == "action_log":
-                pass
+
             elif meth == "juju_log":
                 state.juju_log.append(call_args)
                 return None
+
+            elif meth == "relation_set":
+                rel_id, key, value, app = call_args
+                relation = next(
+                    filter(lambda r: r.meta.relation_id == rel_id, state.relations)
+                )
+                if app:
+                    if not state.leader:
+                        raise RuntimeError("needs leadership to set app data")
+                    tgt = relation.local_app_data
+                else:
+                    tgt = relation.local_unit_data
+                tgt[key] = value
+                return None
+
+            elif meth == "action_set":
+                pass
+            elif meth == "action_fail":
+                pass
+            elif meth == "action_log":
+                pass
             elif meth == "storage_add":
                 pass
 
@@ -816,7 +890,13 @@ def get_from_state(state: State, question: Tuple[str, Tuple[Any], Dict[str, Any]
         # PEBBLE CALLS
         elif ns == "Client":
             if meth == "_request":
-                pass
+                if call_args == ("GET", "/v1/system-info"):
+                    # fixme: can't differentiate between containers ATM, because Client._request
+                    #  does not pass around the container name as argument
+                    if state.containers[0].can_connect:
+                        return {"result": {"version": "unknown"}}
+                    else:
+                        raise FileNotFoundError("")
             elif meth == "pull":
                 pass
             elif meth == "push":
@@ -827,9 +907,8 @@ def get_from_state(state: State, question: Tuple[str, Tuple[Any], Dict[str, Any]
             raise QuestionNotImplementedError(ns)
     except Exception as e:
         action = "setting" if setter else "getting"
-        raise StateError(
-            f"Error {action} state for {ns}.{meth} given "
-            f"({call_args}, {call_kwargs})"
-        ) from e
+        msg = f"Error {action} state for {ns}.{meth} given ({call_args}, {call_kwargs})"
+        logger.error(msg)
+        raise StateError(msg) from e
 
     raise QuestionNotImplementedError((ns, meth))

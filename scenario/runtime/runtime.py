@@ -23,6 +23,8 @@ from scenario.runtime.memo_tools import DECORATE_MODEL, DECORATE_PEBBLE, inject_
 from scenario.event_db import TemporaryEventDB
 
 if TYPE_CHECKING:
+    from ops.charm import CharmBase
+    from ops.framework import EventBase
     from ops.testing import CharmType
 
     from scenario.structs import CharmSpec, Scene
@@ -46,12 +48,9 @@ class Runtime:
     This object bridges a local environment and a charm artifact.
     """
 
-    def __init__(
-        self,
-        charm_spec: "CharmSpec",
-    ):
-
+    def __init__(self, charm_spec: "CharmSpec", juju_version: str = "3.0.0"):
         self._charm_spec = charm_spec
+        self._juju_version = juju_version
         self._charm_type = charm_spec.charm_type
         # todo consider cleaning up venv on __delete__, but ideally you should be
         #  running this in a clean venv or a container anyway.
@@ -175,6 +174,7 @@ class Runtime:
 
     def _get_event_env(self, scene: "Scene", charm_root: Path):
         return {
+            "JUJU_VERSION": self._juju_version,
             "JUJU_UNIT_NAME": self.unit_name,
             "_": "./dispatch",
             "JUJU_DISPATCH_PATH": f"hooks/{scene.event.name}",

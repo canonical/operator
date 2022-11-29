@@ -20,6 +20,24 @@ Testing a charm under a given scenario, then, means verifying that:
 - the charm does not raise uncaught exceptions while handling the scenario
 - the output state (or the diff with the input state) is as expected
 
+
+# Core concepts as a metaphor
+I like metaphors, so here we go:
+- There is a theatre stage (Scenario).
+- You pick an actor (a Charm) to put on the stage.
+- You pick a sketch that the actor will have to play out (a Scene). The sketch is specified as:
+  - An initial situation (Context) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what other actors are there around it, what is written on those books on the table?
+  - Something that happens (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the stage (relation-departed))
+- How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a container), or write something to a book (pebble.push).
+
+# Core concepts not as a metaphor
+Each scene maps to a single event. 
+The Scenario encapsulates the charm and its metadata. A scenario can play scenes, which represent the several events one can fire on a charm and the context in which they occur.
+
+Crucially, this decoupling of charm and context allows us to swap out easily any part of this flow, and even share context data across charms, codebases, teams...
+
+In this spirit, but that I still have to think through how useful it really is, a Scenario exposes a `playbook`: a sequence of scenes it can run sequentially (although given that each Scene's input state is totally disconnected from any other's, the ordering of the sequence is irrelevant) and potentially share with other projects.
+
 # Writing scenario tests
 
 Writing a scenario tests consists of two broad steps:
