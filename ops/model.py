@@ -1488,7 +1488,12 @@ class Container:
         self._pebble.add_layer(label, layer, combine=combine)
 
     def get_plan(self) -> 'Plan':
-        """Get the current effective pebble configuration."""
+        """Get the combined Pebble configuration.
+
+        This will immediately reflect changes from any previous
+        :meth:`add_layer` calls, regardless of whether :meth:`replan` or
+        :meth:`restart` have been called.
+        """
         return self._pebble.get_plan()
 
     def get_services(self, *service_names: str) -> '_ServiceInfoMapping':
