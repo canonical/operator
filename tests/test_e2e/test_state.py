@@ -63,12 +63,20 @@ def mycharm():
 
 @pytest.fixture
 def dummy_state():
-    return State(config={"foo": "bar"}, leader=True)
+    return State(
+        config={"foo": "bar"},
+        leader=True
+    )
 
 
 @pytest.fixture
 def start_scene(dummy_state):
-    return Scene(get_event("start"), context=Context(state=dummy_state))
+    return Scene(
+        get_event("start"),
+        context=Context(
+            state=dummy_state
+        )
+    )
 
 
 def test_bare_event(start_scene, mycharm):

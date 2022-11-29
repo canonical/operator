@@ -9,15 +9,14 @@ import pytest
 # your current venv, ops.model won't break as it tries to import recorder.py
 
 try:
-    from scenario.runtime import Runtime
+    from memo import memo
 except ModuleNotFoundError:
     from scenario.runtime.runtime import RUNTIME_MODULE
-
     sys.path.append(str(RUNTIME_MODULE.absolute()))
 
 from ops.charm import CharmBase, CharmEvents
 
-from scenario.runtime import Runtime
+from scenario.runtime.runtime import Runtime
 
 MEMO_TOOLS_RESOURCES_FOLDER = Path(__file__).parent / "memo_tools_test_files"
 
