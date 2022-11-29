@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scenario.runtime import (
+from scenario.runtime.memo import (
     DEFAULT_NAMESPACE,
     MEMO_DATABASE_NAME_KEY,
     MEMO_MODE_KEY,

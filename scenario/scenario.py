@@ -12,6 +12,7 @@ from scenario.consts import (
     BREAK_ALL_RELATIONS,
     CREATE_ALL_RELATIONS,
     DETACH_ALL_STORAGES,
+    META_EVENTS,
 )
 from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene
 
@@ -166,9 +167,7 @@ class Scenario:
     def reset(self):
         self._playbook.restart()
 
-    def _play_meta(
-        self, event: Event, context: Context = None, add_to_playbook: bool = False
-    ):
+    def _play_meta(self, event: Event, context: Context, add_to_playbook: bool = False):
         # decompose the meta event
         events = []
 
@@ -176,18 +175,13 @@ class Scenario:
             logger.warning(f"meta-event {event.name} not supported yet")
             return
 
-        if event.name in [CREATE_ALL_RELATIONS, BREAK_ALL_RELATIONS] and context:
-            for relation in context.relations:
-                # RELATION_OBJ is to indicate to the harness_ctx that
-                # it should retrieve the
-                if CREATE_ALL_RELATIONS:
-                    name = f"{relation.meta.endpoint}-relation-created"
-                elif BREAK_ALL_RELATIONS:
-                    name = f"{relation.meta.endpoint}-relation-broken"
-
+        if event.name in [CREATE_ALL_RELATIONS, BREAK_ALL_RELATIONS]:
+            for relation in context.state.relations:
                 evt = Event(
-                    name,
+                    relation.meta.endpoint + META_EVENTS[event.name],
                     args=(
+                        # right now, the Relation object hasn't been created by ops yet, so we can't pass it down.
+                        # this will be replaced by a Relation instance before the event is fired.
                         InjectRelation(
                             relation.meta.endpoint, relation.meta.relation_id
                         ),
@@ -199,8 +193,11 @@ class Scenario:
 
         logger.debug(f"decomposed meta {event.name} into {events}")
         last = None
+
         for event in events:
-            last = self.play(event, context, add_to_playbook=add_to_playbook)
+            scene = Scene(event, context)
+            last = self.play(scene, add_to_playbook=add_to_playbook)
+
         return last
 
     def run(self, scene: Scene, add_to_playbook: bool = False):
@@ -213,6 +210,7 @@ class Scenario:
         add_to_playbook: bool = False,
     ) -> PlayResult:
         scene = obj
+        context = context or Context()
 
         if isinstance(obj, str):
             _event = Event(obj)

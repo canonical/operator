@@ -6,8 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Type
 
 import yaml
-from ops.charm import CharmBase
-from ops.framework import EventBase
 
 from logger import logger as pkg_logger
 from scenario.event_db import TemporaryEventDB
@@ -24,7 +22,8 @@ from scenario.runtime.memo_tools import DECORATE_MODEL, DECORATE_PEBBLE, inject_
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
-
+    from ops.charm import CharmBase
+    from ops.framework import EventBase
     from scenario.structs import CharmSpec, Scene
 
 logger = pkg_logger.getChild("runtime")
@@ -35,9 +34,9 @@ logger = logger.getChild("event_recorder.runtime")
 
 @dataclasses.dataclass
 class RuntimeRunResult:
-    charm: CharmBase
+    charm: "CharmBase"
     scene: "Scene"
-    event: EventBase
+    event: "EventBase"
 
 
 class Runtime:
@@ -76,7 +75,7 @@ class Runtime:
                 f"Try `pip install -r {local_charm_src / 'requirements.txt'}`"
             ) from e
 
-        my_charm_type: Type[CharmBase] = ldict["my_charm_type"]
+        my_charm_type: Type["CharmBase"] = ldict["my_charm_type"]
         return Runtime(my_charm_type)
 
     @staticmethod
