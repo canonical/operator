@@ -276,6 +276,8 @@ class Model:
         Raises:
             SecretNotFoundError: If a secret with this ID or label doesn't exist.
         """
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
         try:
             content = self._backend.secret_get(id=id, label=label)
             return Secret(self._backend, id=id, label=label, content=content)
@@ -286,8 +288,7 @@ class Model:
             return Secret(
                 self._backend,
                 id=info.id,
-                label=info.label,
-                revision=info.revision)
+                label=info.label)
 
 
 _T = TypeVar('_T', bound='UnitOrApplication')
@@ -418,8 +419,7 @@ class Application:
     def __repr__(self):
         return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
 
-    def add_secret(self,
-                   content: Dict[str, str],
+    def add_secret(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
                    description: Optional[str] = None,
                    expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
@@ -441,6 +441,8 @@ class Application:
                 default) means to use the Juju default, which is never expire.
         """
         Secret._validate_content(content)
+        if isinstance(expire, datetime.timedelta):
+            expire = datetime.datetime.now() + expire
         id = self._backend.secret_add(
             content,
             label=label,
@@ -448,7 +450,7 @@ class Application:
             expire=expire,
             rotate=rotate,
             owner='application')
-        return Secret(self._backend, id=id, label=label, content=content, revision=1)
+        return Secret(self._backend, id=id, label=label, content=content)
 
 
 class Unit:
@@ -571,8 +573,7 @@ class Unit:
         except KeyError:
             raise ModelError('container {!r} not found'.format(container_name))
 
-    def add_secret(self,
-                   content: Dict[str, str],
+    def add_secret(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
                    description: Optional[str] = None,
                    expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
@@ -582,6 +583,8 @@ class Unit:
         See :meth:`Application.add_secret` for details.
         """
         Secret._validate_content(content)
+        if isinstance(expire, datetime.timedelta):
+            expire = datetime.datetime.now() + expire
         id = self._backend.secret_add(
             content,
             label=label,
@@ -589,7 +592,7 @@ class Unit:
             expire=expire,
             rotate=rotate,
             owner='unit')
-        return Secret(self._backend, id=id, label=label, content=content, revision=1)
+        return Secret(self._backend, id=id, label=label, content=content)
 
 
 class LazyMapping(Mapping[str, str], ABC):
@@ -930,7 +933,7 @@ class SecretInfo:
         except ValueError:
             rotation = None
         rotates = typing.cast(Optional[str], d.get('rotates'))
-        # TODO(benhoyt): move _parse_timestamp up to a common location
+        # TODO(benhoyt): move pebble._parse_timestamp up to a common location
         return cls(
             id=id,
             label=typing.cast(Optional[str], d.get('label')),
@@ -967,19 +970,15 @@ class Secret:
     def __init__(self, backend: '_ModelBackend',
                  id: Optional[str] = None,
                  label: Optional[str] = None,
-                 content: Optional[Dict[str, str]] = None,
-                 revision: Optional[int] = None):
+                 content: Optional[Dict[str, str]] = None):
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
-
         if id is not None:
             id = self._canonicalize_id(id)
-
         self._backend = backend
         self._id = id
         self._label = label
         self._content = content
-        self._revision = revision
 
     def __repr__(self):
         fields = []  # type: List[str]
@@ -987,8 +986,6 @@ class Secret:
             fields.append('id={!r}'.format(self._id))
         if self._label is not None:
             fields.append('label={!r}'.format(self._label))
-        if self._revision is not None:
-            fields.append('revision={}'.format(self._revision))
         return '<Secret ' + ' '.join(fields) + '>'
 
     @classmethod
@@ -1042,7 +1039,7 @@ class Secret:
         """
         return self._label
 
-    def get_content(self, refresh: bool = False) -> Dict[str, str]:
+    def get_content(self, *, refresh: bool = False) -> Dict[str, str]:
         """Get the secret's content.
 
         Args:
@@ -1070,7 +1067,7 @@ class Secret:
         """
         return self._backend.secret_info_get(id=self.id, label=self.label)
 
-    def set_content(self, content: Dict[str, str], description: Optional[str] = None):
+    def set_content(self, content: Dict[str, str]):
         """Update the content of this secret.
 
         This will create a new secret revision, and notify all units tracking
@@ -1083,12 +1080,42 @@ class Secret:
             description: Description of the secret's purpose.
         """
         self._validate_content(content)
-        self._backend.secret_set(content,
-                                 id=self.id,
-                                 label=self.label,
-                                 description=description)
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_set(content=content, id=self.id, label=self.label)
 
-    def grant(self, relation: 'Relation', unit: Optional[Unit] = None):
+    def set_info(self, *,
+                 label: Optional[str] = None,
+                 description: Optional[str] = None,
+                 expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                 rotate: Optional[SecretRotate] = None):
+        """Update this secret's information (metadata).
+
+        This will create a new secret revision, and notify all units tracking
+        the secret (the "consumers") that a new revision is available with a
+        :class:`charm.SecretChangedEvent`.
+
+        Args:
+            label: New label to apply.
+            description: New description to apply.
+            expire: New expiration time (or timedelta from now) to apply.
+            rotate: New rotation policy to apply. The new policy will take
+                effect only after the currently-scheduled rotation.
+        """
+        if label is None and description is None and expire is None and rotate is None:
+            raise TypeError('Must provide a label, description, expiration time, '
+                            'or rotation policy')
+        if self._id is None:
+            self._id = self.get_info().id
+        if isinstance(expire, datetime.timedelta):
+            expire = datetime.datetime.now() + expire
+        self._backend.secret_set(id=self.id,
+                                 label=self.label,
+                                 description=description,
+                                 expire=expire,
+                                 rotate=rotate)
+
+    def grant(self, relation: 'Relation', *, unit: Optional[Unit] = None):
         """Grant read access to this secret.
 
         Args:
@@ -1103,7 +1130,7 @@ class Secret:
             relation.id,
             unit=unit.name if unit is not None else None)
 
-    def revoke(self, relation: 'Relation', unit: Optional[Unit] = None):
+    def revoke(self, relation: 'Relation', *, unit: Optional[Unit] = None):
         """Revoke read access to this secret.
 
         Args:
@@ -1118,19 +1145,17 @@ class Secret:
             relation.id,
             unit=unit.name if unit is not None else None)
 
-    def remove_revision(self, revision: Optional[int] = None):
-        """Remove this secret revision.
+    def remove_revision(self, revision: int):
+        """Remove the given secret revision.
 
         This is normally called when handling :class:`charm.SecretRemoveEvent`
         or :class:`charm.SecretExpiredEvent`.
 
         Args:
-            revision: The secret revision to remove. This argument is not
-                required if handling a secret event and this is being called
-                on :code:`event.secret`.
+            revision: The secret revision to remove. If being called from a
+                secret event, this should usually be set to
+                :attr:`SecretEvent.revision`.
         """
-        if revision is None:
-            revision = self._revision
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_remove(typing.cast(str, self.id), revision=revision)
@@ -2862,9 +2887,6 @@ class _ModelBackend:
                    label: Optional[str] = None,
                    refresh: bool = False,
                    peek: bool = False) -> Dict[str, str]:
-        if not (id or label):
-            raise TypeError('Must provide an id or label, or both')
-
         args = []  # type: List[str]
         if id is not None:
             args.append(id)
@@ -2874,34 +2896,29 @@ class _ModelBackend:
             args.append('--refresh')
         if peek:
             args.append('--peek')
-
         result = self._run_secret('secret-get', *args, return_output=True, use_json=True)
         return typing.cast(Dict[str, str], result)
 
     def secret_info_get(self, *,
                         id: Optional[str] = None,
                         label: Optional[str] = None) -> SecretInfo:
-        if not (id or label):
-            raise TypeError('Must provide an id or label, or both')
-
         args = []  # type: List[str]
         if id is not None:
             args.append(id)
         if label is not None:
             args.extend(['--label', label])
-
         result = self._run_secret('secret-info-get', *args, return_output=True, use_json=True)
         info_dicts = typing.cast(Dict[str, 'JsonObject'], result)
         id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
         return SecretInfo.from_dict(id, typing.cast('_SerializedData', info_dicts[id]))
 
-    def secret_set(self, content: Dict[str, str], *,
+    def secret_set(self, *,
+                   content: Optional[Dict[str, str]] = None,
                    id: Optional[str] = None,
                    label: Optional[str] = None,
-                   description: Optional[str] = None):
-        if not (id or label):
-            raise TypeError('Must provide an id or label, or both')
-
+                   description: Optional[str] = None,
+                   expire: Optional[datetime.datetime] = None,
+                   rotate: Optional[SecretRotate] = None):
         args = []  # type: List[str]
         if id is not None:
             args.append(id)
@@ -2909,16 +2926,20 @@ class _ModelBackend:
             args.extend(['--label', label])
         if description is not None:
             args.extend(['--description', description])
-        # The content has already been validated with Secret._validate_content
-        for k, v in content.items():
-            args.append('{}={}'.format(k, v))
-
+        if expire is not None:
+            args.extend(['--expire', expire.isoformat()])
+        if rotate is not None:
+            args += ['--rotate', rotate.value]
+        if content is not None:
+            # The content has already been validated with Secret._validate_content
+            for k, v in content.items():
+                args.append('{}={}'.format(k, v))
         self._run_secret('secret-set', *args)
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
                    description: Optional[str] = None,
-                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   expire: Optional[datetime.datetime] = None,
                    rotate: Optional[SecretRotate] = None,
                    owner: Optional[str] = None) -> str:
         args = []  # type: List[str]
@@ -2927,8 +2948,6 @@ class _ModelBackend:
         if description is not None:
             args.extend(['--description', description])
         if expire is not None:
-            if isinstance(expire, datetime.timedelta):
-                expire = datetime.datetime.now() + expire
             args.extend(['--expire', expire.isoformat()])
         if rotate is not None:
             args += ['--rotate', rotate.value]
@@ -2937,7 +2956,6 @@ class _ModelBackend:
         # The content has already been validated with Secret._validate_content
         for k, v in content.items():
             args.append('{}={}'.format(k, v))
-
         result = self._run('secret-add', *args, return_output=True)
         secret_id = typing.cast(str, result)
         return secret_id.strip()
@@ -2946,21 +2964,18 @@ class _ModelBackend:
         args = [id, '--relation', str(relation_id)]
         if unit is not None:
             args += ['--unit', str(unit)]
-
         self._run_secret('secret-grant', *args)
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         args = [id, '--relation', str(relation_id)]
         if unit is not None:
             args += ['--unit', str(unit)]
-
         self._run_secret('secret-revoke', *args)
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         args = [id]
         if revision is not None:
             args.extend(['--revision', str(revision)])
-
         self._run_secret('secret-remove', *args)
 
 

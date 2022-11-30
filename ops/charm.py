@@ -761,8 +761,12 @@ class SecretEvent(HookEvent):
         return model.Secret(
             backend=self.framework.model._backend,
             id=self._id,
-            label=self._label,
-            revision=self._revision)
+            label=self._label)
+
+    @property
+    def revision(self) -> Optional[int]:
+        """The secret revision this event refers to, if any."""
+        return self._revision
 
     def snapshot(self) -> '_SerializedData':
         """Used by the framework to serialize the event to disk.
