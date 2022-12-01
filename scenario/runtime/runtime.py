@@ -116,16 +116,6 @@ class Runtime:
         logger.info(f"rewriting ops.model ({ops_model_module})")
         inject_memoizer(ops_model_module, decorate=DECORATE_MODEL)
 
-        # make main return the charm instance, for testing
-        from ops import main
-
-        ops_main_module = Path(main.__file__)
-        logger.info(f"rewriting ops.main ({ops_main_module})")
-
-        retcharm = "return charm  # added by jhack.replay.Runtime"
-        ops_main_module_text = ops_main_module.read_text()
-        if retcharm not in ops_main_module_text:
-            ops_main_module.write_text(ops_main_module_text + f"    {retcharm}\n")
 
     @staticmethod
     def _is_installed():
@@ -248,9 +238,12 @@ class Runtime:
                 # _reset_replay_cursors(self._local_db_path, 0)
                 os.environ.update(env)
 
-                from ops.main import main
+                # we don't import from ops because we need some extra return statements.
+                # see https://github.com/canonical/operator/pull/862
+                # from ops.main import main
+                from scenario.ops_main_mock import main
 
-                logger.info(" - Entering ops.main.")
+                logger.info(" - Entering ops.main (mocked).")
 
                 try:
                     charm, event = main(self._charm_type)
