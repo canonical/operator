@@ -1077,12 +1077,11 @@ class Secret:
         Args:
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
-            description: Description of the secret's purpose.
         """
         self._validate_content(content)
         if self._id is None:
             self._id = self.get_info().id
-        self._backend.secret_set(content=content, id=self.id, label=self.label)
+        self._backend.secret_set(typing.cast(str, self.id), content=content)
 
     def set_info(self, *,
                  label: Optional[str] = None,
@@ -1109,7 +1108,7 @@ class Secret:
             self._id = self.get_info().id
         if isinstance(expire, datetime.timedelta):
             expire = datetime.datetime.now() + expire
-        self._backend.secret_set(id=self.id,
+        self._backend.secret_set(typing.cast(str, self.id),
                                  label=self.label,
                                  description=description,
                                  expire=expire,
@@ -2912,16 +2911,13 @@ class _ModelBackend:
         id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
         return SecretInfo.from_dict(id, typing.cast('_SerializedData', info_dicts[id]))
 
-    def secret_set(self, *,
+    def secret_set(self, id: str, *,
                    content: Optional[Dict[str, str]] = None,
-                   id: Optional[str] = None,
                    label: Optional[str] = None,
                    description: Optional[str] = None,
                    expire: Optional[datetime.datetime] = None,
                    rotate: Optional[SecretRotate] = None):
-        args = []  # type: List[str]
-        if id is not None:
-            args.append(id)
+        args = [id]
         if label is not None:
             args.extend(['--label', label])
         if description is not None:

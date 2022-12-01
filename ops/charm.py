@@ -757,16 +757,11 @@ class SecretEvent(HookEvent):
 
     @property
     def secret(self) -> model.Secret:
-        """The :class:`model.Secret` instance this event refers to."""
+        """The secret instance this event refers to."""
         return model.Secret(
             backend=self.framework.model._backend,
             id=self._id,
             label=self._label)
-
-    @property
-    def revision(self) -> Optional[int]:
-        """The secret revision this event refers to, if any."""
-        return self._revision
 
     def snapshot(self) -> '_SerializedData':
         """Used by the framework to serialize the event to disk.
@@ -799,9 +794,6 @@ class SecretChangedEvent(SecretEvent):
     Typically, you will want to fetch the new content by calling
     :meth:`Secret.get_content` with :code:`refresh=True` to tell Juju to start
     tracking the new revision.
-
-    Attributes:
-        secret: The :class:`model.Secret` instance this event refers to.
     """
 
 
@@ -814,10 +806,12 @@ class SecretRemoveEvent(SecretEvent):
 
     Typically, you will want to call :meth:`Secret.remove_revision` to remove
     the now-unused revision.
-
-    Attributes:
-        secret: The :class:`model.Secret` instance this event refers to.
     """
+
+    @property
+    def revision(self) -> int:
+        """The secret revision this event refers to."""
+        return cast(int, self._revision)
 
 
 class SecretRotateEvent(SecretEvent):
@@ -826,10 +820,12 @@ class SecretRotateEvent(SecretEvent):
     This event is fired on the secret owner to inform it that the secret must
     be rotated. The event will keep firing until the owner creates a new
     revision by calling :meth:`Secret.set_content`.
-
-    Attributes:
-        secret: The :class:`model.Secret` instance this event refers to.
     """
+
+    @property
+    def revision(self) -> int:
+        """The secret revision this event refers to."""
+        return cast(int, self._revision)
 
     def defer(self):
         """Secret rotation events are not deferrable (Juju handles re-invocation)."""
@@ -844,10 +840,12 @@ class SecretExpiredEvent(SecretEvent):
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
     revision by calling :meth:`Secret.remove_revision()`.
-
-    Attributes:
-        secret: The :class:`model.Secret` instance this event refers to.
     """
+
+    @property
+    def revision(self) -> int:
+        """The secret revision this event refers to."""
+        return cast(int, self._revision)
 
     def defer(self):
         """Secret expiration events are not deferrable (Juju handles re-invocation)."""
