@@ -32,6 +32,7 @@ Global Variables:
 """
 
 
+import dataclasses
 import datetime
 import fnmatch
 import inspect
@@ -188,7 +189,7 @@ class Harness(Generic[CharmType]):
         #  warning message below.  This warning was added 2022-03-22
         if not SIMULATE_CAN_CONNECT:
             warnings.warn(
-                'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
+                'Please set ops.testing.SIMULATE_CAN_CONNECT=True. '
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
 
     @property
@@ -737,6 +738,8 @@ class Harness(Generic[CharmType]):
         ids_map[relation_name].remove(relation_id)
         rel_names.pop(relation_id)
 
+        # TODO(benhoyt): self._backend._relation_removed(relation_id)
+
     def _emit_relation_created(self, relation_name: str, relation_id: int,
                                remote_app: str) -> None:
         """Trigger relation-created for a given relation with a given remote application."""
@@ -819,10 +822,10 @@ class Harness(Generic[CharmType]):
 
         This will trigger a `relation_departed` event. This would
         normally be followed by a `relation_changed` event triggered
-        by Juju. However when using the test harness a
-        `relation_changed` event must be triggererd using
-        :meth:`.update_relation_data`. This deviation from normal Juj
-        behaviour, facilitates testing by making each step in the
+        by Juju. However, when using the test harness, a
+        `relation_changed` event must be triggered using
+        :meth:`.update_relation_data`. This deviation from normal Juju
+        behaviour facilitates testing by making each step in the
         charm life cycle explicit.
 
         Args:
@@ -861,6 +864,8 @@ class Harness(Generic[CharmType]):
         if unit_cache is not None:
             unit_cache._invalidate()
 
+        # TODO(benhoyt): self._backend._relation_unit_removed(relation_id, remote_unit_name)
+
     def _emit_relation_departed(self, relation_id: int, unit_name: str):
         """Trigger relation-departed event for a given relation id and unit."""
         if self._charm is None or not self._hooks_enabled:
@@ -892,14 +897,7 @@ class Harness(Generic[CharmType]):
         Raises:
             KeyError: if relation_id doesn't exist
         """
-        if isinstance(app_or_unit, model.Application):
-            name = app_or_unit.name
-        elif isinstance(app_or_unit, model.Unit):
-            name = app_or_unit.name
-        elif isinstance(app_or_unit, str):
-            name = app_or_unit
-        else:
-            raise TypeError('Expected Application | Unit | str, got {}'.format(type(app_or_unit)))
+        name = _get_app_or_unit_name(app_or_unit)
 
         # bypass access control by going directly to raw
         return self._backend._relation_data_raw[relation_id].get(name, None)
@@ -933,7 +931,7 @@ class Harness(Generic[CharmType]):
     def container_pebble_ready(self, container_name: str):
         """Fire the pebble_ready hook for the associated container.
 
-        This will do nothing if the begin() has not been called.  If
+        This will do nothing if begin() has not been called. If
         SIMULATE_CAN_CONNECT is True, this will switch the given
         container's can_connect state to True before the hook
         function is called.
@@ -1191,6 +1189,107 @@ class Harness(Generic[CharmType]):
             self._backend._calls.clear()
         return calls
 
+    # TODO(benhoyt): I think the expire and rotate events are actually useless here,
+    #  because how would you even access them?
+    def add_secret(self, app_or_unit: AppUnitOrName, content: Dict[str, str], *,
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional['model.SecretRotate'] = None) -> str:
+        """Add a secret owned by the remote application or unit given.
+
+        Args:
+            app_or_unit: The remote application (or specific remote unit) that
+                will own the secret.
+            content: A key-value mapping containing the payload of the secret,
+                for example `{"password": "foo123"}`_.
+            expire: Time in the future (or timedelta from now) at which the
+                secret is due to expire. The harness will not actually send a
+                SecretExpired event when this time elapses.
+            rotate: Rotation policy/time. The harness will not actually send a
+                SecretRotate event when this time elapses.
+
+        Return:
+            The ID of the newly-secret added.
+        """
+        owner_name = _get_app_or_unit_name(app_or_unit)
+
+        model.Secret._validate_content(content)
+        if isinstance(expire, datetime.timedelta):
+            expire = datetime.datetime.now() + expire
+
+        return self._backend._secret_add(content, owner_name, expire=expire, rotate=rotate)
+
+    def grant_secret(self, secret_id: str, app_or_unit: AppUnitOrName):
+        """Grant read access to this secret for the given application or unit.
+
+        If the given application or unit has already been granted access to
+        this secret, do nothing.
+
+        Args:
+            secret_id: The ID of the secret to grant access to. This should be
+                the return value of :meth:`add_secret`.
+            app_or_unit: The application (or specific unit) to grant access
+                to. You must already have created a relation between this
+                application and the charm under test.
+        """
+        secret = next((s for s in self._backend._secrets if s.id == secret_id), None)
+        if secret is None:
+            raise RuntimeError(f'Secret {secret_id!r} not found')
+
+        app_or_unit_name = _get_app_or_unit_name(app_or_unit)
+        relation_id = self._secret_relation_id_to(secret)
+        if relation_id not in secret.grants:
+            secret.grants[relation_id] = set()
+        secret.grants[relation_id].add(app_or_unit_name)
+
+    def revoke_secret(self, secret_id: str, app_or_unit: AppUnitOrName):
+        """Revoke read access to this secret for the given application or unit.
+
+        If the given application or unit does not have access to this secret,
+        do nothing.
+
+        Args:
+            secret_id: The ID of the secret to revoke access for. This should be
+                the return value of :meth:`add_secret`.
+            app_or_unit: The application (or specific unit) to revoke access
+                to. You must already have created a relation between this
+                application and the charm under test.
+        """
+        secret = next((s for s in self._backend._secrets if s.id == secret_id), None)
+        if secret is None:
+            raise RuntimeError(f'Secret {secret_id!r} not found')
+
+        app_or_unit_name = _get_app_or_unit_name(app_or_unit)
+        relation_id = self._secret_relation_id_to(secret)
+        if relation_id not in secret.grants:
+            return
+        secret.grants[relation_id].discard(app_or_unit_name)
+
+    def _secret_relation_id_to(self, secret: '_Secret') -> int:
+        """Get relation ID of relation between this charm and the secret owner."""
+        owner_app = secret.owner_name.split('/')[0]
+        relation_id = self._backend._relation_id_to(owner_app)
+        if relation_id is None:
+            raise RuntimeError(f'No relation between this charm ({self.model.app.name}) '
+                               f'and secret owner ({owner_app})')
+        return relation_id
+
+    def get_secret(self, app_or_unit: AppUnitOrName, secret_id: str) -> None:
+        """Get secret from point of view of application or unit."""
+        # TODO(benhoyt)
+        raise NotImplementedError
+
+
+def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
+    """Return name of given application or unit (return strings directly)."""
+    if isinstance(app_or_unit, model.Application):
+        return app_or_unit.name
+    elif isinstance(app_or_unit, model.Unit):
+        return app_or_unit.name
+    elif isinstance(app_or_unit, str):
+        return app_or_unit
+    else:
+        raise TypeError('Expected Application | Unit | str, got {}'.format(type(app_or_unit)))
+
 
 def _record_calls(cls: Any):
     """Replace methods on cls with methods that record that they have been called.
@@ -1315,6 +1414,25 @@ class _TestingRelationDataContents(Dict[str, str]):
         return _TestingRelationDataContents(super().copy())
 
 
+@dataclasses.dataclass
+class _SecretRevision:
+    revision: int
+    content: Dict[str, str]
+
+
+@dataclasses.dataclass
+class _Secret:
+    id: str
+    owner_name: str
+    revisions: List[_SecretRevision]
+    rotate_policy: Optional[str]
+    expire_time: Optional[datetime.datetime]
+    label: Optional[str] = None
+    description: Optional[str] = None
+    tracked: int = 1
+    grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
+
+
 @_copy_docstrings(model._ModelBackend)  # pyright: reportPrivateUsage=false
 @_record_calls
 class _TestingModelBackend:
@@ -1371,6 +1489,7 @@ class _TestingModelBackend:
         self._pebble_clients_can_connect = {}  # type: Dict[_TestingPebbleClient, bool]
         self._planned_units = None  # type: Optional[int]
         self._hook_is_running = ''
+        self._secrets: List[_Secret] = []
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -1679,40 +1798,221 @@ class _TestingModelBackend:
 
         return len(units) + 1  # Account for this unit.
 
+    # two scopes:
+    # - "ownership scope" (unit or app):
+    #   + when unit or app is deleted, so too are owned secrets
+    #   + only the owner can view/manage the secret, unless permissions are granted
+    #   + peer, non-leader units always get latest revision and can view only
+    #   + error if peer (non-leader) tries to admin (set content, grant, revoke, etc)
+    # - we only grant access for other apps in the context of a relation
+    #   + if you're mysql, you can't grant mediawiki access to a secret without a relation
+    #   + relation is attached to the grant in the backend as a "scope"
+    #   + if relation is removed, so too are any grants
+    #   + grants need an "entity", application or specific unit
+
+    # think about event firing / handling
+
+    def _get_secret(self, id: str) -> Optional[_Secret]:
+        return next((s for s in self._secrets if s.id == id), None)
+
+    def _ensure_secret(self, id: str) -> _Secret:
+        secret = self._get_secret(id)
+        if secret is None:
+            raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+        return secret
+
+    def _ensure_secret_id_or_label(self, id: Optional[str], label: Optional[str]):
+        secret = None
+        if id is not None:
+            secret = self._get_secret(id)
+            if secret is not None and label is not None:
+                secret.label = label  # both id and label given, update label
+        if secret is None and label is not None:
+            secret = next((s for s in self._secrets if s.label == label), None)
+        if secret is None:
+            raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+        return secret
+
     def secret_get(self, *,
                    id: Optional[str] = None,
                    label: Optional[str] = None,
                    refresh: bool = False,
                    peek: bool = False) -> Dict[str, str]:
-        raise NotImplementedError(self.secret_get)
+        secret = self._ensure_secret_id_or_label(id, label)
+
+        # Check that caller has permission to get this secret
+        owner_app = secret.owner_name.split('/')[0]
+        if owner_app == self.app_name:
+            # Owner or peer is calling, get latest revision
+            peek = True
+            if refresh:
+                raise ValueError('Only the secret consumer can refresh a secret')
+        else:
+            # Consumer is calling: does secret have a grant on relation between
+            # this charm (the consumer) and the secret owner's app?
+            relation_id = self._relation_id_to(owner_app)
+            if relation_id is None:
+                raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+            grants = secret.grants.get(relation_id, set())
+            if self.app_name not in grants and self.unit_name not in grants:
+                raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+
+        if peek or refresh:
+            revision = secret.revisions[-1]
+            if refresh:
+                secret.tracked = revision.revision
+        else:
+            revision = next((r for r in secret.revisions if r.revision == secret.tracked), None)
+            if revision is None:
+                # tracked revision was removed
+                raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+
+        return revision.content
+
+    def _relation_id_to(self, remote_app: str) -> Optional[int]:
+        """Return relation ID of relation from charm's app to remote app."""
+        for relation_id, app_units in self._relation_app_and_units.items():
+            if app_units['app'] == remote_app:
+                return relation_id
+        return None
+
+    def _ensure_secret_owner(self, secret: _Secret):
+        if secret.owner_name not in [self.app_name, self.unit_name]:
+            raise model.SecretNotFoundError  # TODO(benhoyt): proper message
 
     def secret_info_get(self, *,
                         id: Optional[str] = None,
                         label: Optional[str] = None) -> model.SecretInfo:
-        raise NotImplementedError(self.secret_info_get)
+        secret = self._ensure_secret_id_or_label(id, label)
+        self._ensure_secret_owner(secret)
 
-    def secret_set(self, content: Dict[str, str], *,
-                   id: Optional[str] = None,
+        rotates = None
+        rotation = None
+        if secret.rotate_policy is not None:
+            rotation = model.SecretRotate(secret.rotate_policy)
+            if secret.rotate_policy != model.SecretRotate.NEVER:
+                # Just set a fake rotation time some time in the future
+                rotates = datetime.datetime.now() + datetime.timedelta(days=1)
+
+        return model.SecretInfo(
+            id=secret.id,
+            label=secret.label,
+            revision=secret.revisions[-1].revision,
+            expires=secret.expire_time,
+            rotation=rotation,
+            rotates=rotates,
+        )
+
+    def secret_set(self, id: str, *,
+                   content: Optional[Dict[str, str]] = None,
                    label: Optional[str] = None,
-                   description: Optional[str] = None) -> None:
-        raise NotImplementedError(self.secret_set)
+                   description: Optional[str] = None,
+                   expire: Optional[datetime.datetime] = None,
+                   rotate: Optional[model.SecretRotate] = None) -> None:
+        secret = self._ensure_secret(id)
+        self._ensure_secret_owner(secret)
+
+        if content is None:
+            content = secret.revisions[-1].content
+        revision = _SecretRevision(
+            revision=secret.revisions[-1].revision + 1,
+            content=content
+        )
+        secret.revisions.append(revision)
+        if label is not None:
+            if label:
+                secret.label = label
+            else:
+                secret.label = None  # clear label
+        if description is not None:
+            if description:
+                secret.description = description
+            else:
+                secret.description = None  # clear description
+        if expire is not None:
+            secret.expire_time = expire
+        if rotate is not None:
+            if rotate != model.SecretRotate.NEVER:
+                secret.rotate_policy = rotate.value
+            else:
+                secret.rotate_policy = None  # clear rotation policy
+
+    # TODO(benhoyt): move this to _Secret._generate_id()
+    @classmethod
+    def _generate_secret_id(cls) -> str:
+        # Not a proper Juju secrets-style xid, but that's okay
+        return 'secret:' + str(uuid.uuid4())
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
                    description: Optional[str] = None,
-                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   expire: Optional[datetime.datetime] = None,
                    rotate: Optional[model.SecretRotate] = None,
                    owner: Optional[str] = None) -> str:
-        raise NotImplementedError(self.secret_add)
+        if owner == 'unit':
+            owner_name = self.unit_name
+        else:
+            owner_name = self.app_name
+        return self._secret_add(content, owner_name,
+                                label=label,
+                                description=description,
+                                expire=expire,
+                                rotate=rotate)
+
+    def _secret_add(self, content: Dict[str, str], owner_name: str, *,
+                    label: Optional[str] = None,
+                    description: Optional[str] = None,
+                    expire: Optional[datetime.datetime] = None,
+                    rotate: Optional[model.SecretRotate] = None) -> str:
+        id = self._generate_secret_id()
+        revision = _SecretRevision(
+            revision=1,
+            content=content,
+        )
+        secret = _Secret(
+            id=id,
+            owner_name=owner_name,
+            revisions=[revision],
+            rotate_policy=rotate.value if rotate is not None else None,
+            expire_time=expire,
+            label=label,
+            description=description,
+        )
+        self._secrets.append(secret)
+        return id
 
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
-        raise NotImplementedError(self.secret_grant)
+        secret = self._ensure_secret(id)
+        self._ensure_secret_owner(secret)
+
+        if relation_id not in secret.grants:
+            secret.grants[relation_id] = set()
+        secret.grants[relation_id].add(unit or self.app_name)
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
-        raise NotImplementedError(self.secret_revoke)
+        secret = self._ensure_secret(id)
+        self._ensure_secret_owner(secret)
+
+        if relation_id not in secret.grants:
+            return
+        secret.grants[relation_id].discard(unit or self.app_name)
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None) -> None:
-        raise NotImplementedError(self.secret_remove)
+        secret = self._ensure_secret(id)
+        self._ensure_secret_owner(secret)
+
+        if revision is not None:
+            revisions = [r for r in secret.revisions if r.revision != revision]
+            if len(revisions) == len(secret.revisions):
+                # TODO(benhoyt): proper message
+                raise model.SecretNotFoundError('revision not found')
+            if revisions:
+                secret.revisions = revisions
+            else:
+                # Last revision removed, remove entire secret
+                self._secrets = [s for s in self._secrets if s.id != id]
+        else:
+            self._secrets = [s for s in self._secrets if s.id != id]
 
 
 @_copy_docstrings(pebble.Client)
