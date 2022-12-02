@@ -11,7 +11,7 @@ from asttokens.util import Token
 from astunparse import unparse
 
 if typing.TYPE_CHECKING:
-    from memo import SUPPORTED_SERIALIZERS
+    from scenario import SUPPORTED_SERIALIZERS
 
 
 @dataclass
@@ -101,7 +101,7 @@ DECORATE_PEBBLE = {
 memo_import_block = dedent(
     """# ==== block added by scenario.runtime.memo_tools ===
 try:
-    from memo import memo
+    from scenario import memo
 except ModuleNotFoundError as e:
     msg = "recorder not installed. " \
           "This can happen if you're playing with Runtime in a local venv. " \

@@ -3,11 +3,11 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Type, TypeVar
 
 import yaml
 
-from logger import logger as pkg_logger
+from scenario.logger import logger as pkg_logger
 from scenario.event_db import TemporaryEventDB
 from scenario.runtime.memo import (
     MEMO_DATABASE_NAME_KEY,
@@ -27,11 +27,13 @@ if TYPE_CHECKING:
     from ops.charm import CharmBase
     from ops.framework import EventBase
     from scenario.structs import CharmSpec, Scene
+    _CT = TypeVar("_CT", bound=Type["CharmType"])
+
 
 logger = pkg_logger.getChild("runtime")
 
+
 RUNTIME_MODULE = Path(__file__).parent
-logger = logger.getChild("event_recorder.runtime")
 
 
 @dataclasses.dataclass
@@ -56,8 +58,8 @@ class Runtime:
 
     @staticmethod
     def from_local_file(
-        local_charm_src: Path,
-        charm_cls_name: str,
+            local_charm_src: Path,
+            charm_cls_name: str,
     ) -> "Runtime":
         sys.path.extend((str(local_charm_src / "src"), str(local_charm_src / "lib")))
 
@@ -91,6 +93,7 @@ class Runtime:
             Nobody will help you fix your borked env.
             Have fun!
         """
+
         if not force and Runtime._is_installed():
             logger.warning(
                 "Runtime is already installed. "
@@ -116,21 +119,27 @@ class Runtime:
         logger.info(f"rewriting ops.model ({ops_model_module})")
         inject_memoizer(ops_model_module, decorate=DECORATE_MODEL)
 
-
     @staticmethod
     def _is_installed():
-        from ops import model
+        try:
+            from ops import model
+        except RuntimeError as e:
+            # we rewrite ops.model to import memo.
+            # We try to import ops from here --> circular import.
+            if e.args[0].startswith('recorder not installed'):
+                return True
+            raise e
 
         model_path = Path(model.__file__)
 
-        if "from memo import memo" not in model_path.read_text():
+        if "from scenario import memo" not in model_path.read_text():
             logger.error(
                 f"ops.model ({model_path} does not seem to import runtime.memo.memo"
             )
             return False
 
         try:
-            import memo
+            from scenario import memo
         except ModuleNotFoundError:
             logger.error("Could not `import memo`.")
             return False
@@ -145,9 +154,8 @@ class Runtime:
             logger.debug("Hijacked root logger.")
             pass
 
-        import ops.main
-
-        ops.main.setup_root_logging = _patch_logger
+        from scenario import ops_main_mock
+        ops_main_mock.setup_root_logging = _patch_logger
 
     def _cleanup_env(self, env):
         # cleanup env, in case we'll be firing multiple events, we don't want to accumulate.
@@ -204,7 +212,20 @@ class Runtime:
         """Convert scenario.structs.Scene to Memo.Scene."""
         return MemoScene(event=MemoEvent(env=env), context=scene.context)
 
-    def run(self, scene: "Scene") -> RuntimeRunResult:
+    def _wrap(self, charm_type: "_CT") -> "_CT":
+        # dark sorcery to work around framework using class attrs to hold on to event sources
+        class WrappedEvents(charm_type.on.__class__):
+            pass
+
+        WrappedEvents.__name__ = charm_type.on.__class__.__name__
+
+        class WrappedCharm(charm_type):  # type: ignore
+            on = WrappedEvents()
+
+        WrappedCharm.__name__ = charm_type.__name__
+        return WrappedCharm
+
+    def run(self, scene: "Scene") -> RuntimeRunResult[C]:
         """Executes a scene on the charm.
 
         This will set the environment up and call ops.main.main().
@@ -246,7 +267,7 @@ class Runtime:
                 logger.info(" - Entering ops.main (mocked).")
 
                 try:
-                    charm, event = main(self._charm_type)
+                    charm, event = main(self._wrap(self._charm_type))
                 except Exception as e:
                     raise RuntimeError(
                         f"Uncaught error in operator/charm code: {e}."
@@ -267,32 +288,3 @@ if __name__ == "__main__":
     # relevant pebble.Client | model._ModelBackend juju/container-facing calls are
     # @memo-decorated and can be used in "replay" mode to reproduce a remote run.
     Runtime.install(force=False)
-
-    # IRL one would probably manually @memo the annoying ksp calls.
-    def _patch_traefik_charm(charm: Type["CharmType"]):
-        from charms.observability_libs.v0 import kubernetes_service_patch  # noqa
-
-        def _do_nothing(*args, **kwargs):
-            print("KubernetesServicePatch call skipped")
-
-        def _null_evt_handler(self, event):
-            print(f"event {event} received and skipped")
-
-        kubernetes_service_patch.KubernetesServicePatch._service_object = _do_nothing
-        kubernetes_service_patch.KubernetesServicePatch._patch = _null_evt_handler
-        return charm
-
-    # here's the magic:
-    # this env grabs the event db from the "trfk/0" unit (assuming the unit is available
-    # in the currently switched-to juju model/controller).
-    runtime = Runtime.from_local_file(
-        local_charm_src=Path("/home/pietro/canonical/traefik-k8s-operator"),
-        charm_cls_name="TraefikIngressCharm",
-    )
-    # then it will grab the TraefikIngressCharm from that local path and simulate the whole
-    # remote runtime env by calling `ops.main.main()` on it.
-    # this tells the runtime which event to replay. Right now, #X of the
-    # `jhack replay list trfk/0` queue. Switch it to whatever number you like to
-    # locally replay that event.
-    runtime._charm_type = _patch_traefik_charm(runtime._charm_type)
-    runtime.run(2)

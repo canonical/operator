@@ -18,7 +18,7 @@ from scenario.structs import (
     Context,
     Scene,
     State,
-    get_event,
+    event,
     relation,
 )
 
@@ -74,7 +74,7 @@ def dummy_state():
 @pytest.fixture
 def start_scene(dummy_state):
     return Scene(
-        get_event("start"),
+        event("start"),
         context=Context(
             state=dummy_state
         )

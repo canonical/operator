@@ -1,7 +1,7 @@
 import dataclasses
 import typing
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional, Tuple, Type, Union, List
+from typing import Any, Dict, Literal, Optional, Tuple, Type, List
 
 if typing.TYPE_CHECKING:
     try:
@@ -9,11 +9,11 @@ if typing.TYPE_CHECKING:
     except ImportError:
         from typing_extensions import Self
 
-from ops.charm import CharmBase
-from ops.testing import CharmType
-
 from scenario.consts import META_EVENTS
 from scenario.runtime import memo
+
+if typing.TYPE_CHECKING:
+    from ops.testing import CharmType
 
 
 @dataclass
@@ -56,15 +56,15 @@ class RelationSpec(memo.RelationSpec, DCBase):
 
 
 def relation(
-    endpoint: str,
-    interface: str,
-    remote_app_name: str = "remote",
-    relation_id: int = 0,
-    remote_unit_ids: List[int] = (0,),
-    # mapping from unit ID to databag contents
-    local_unit_data: Dict[str, str] = None,
-    local_app_data: Dict[str, str] = None,
-    remote_app_data: Dict[str, str] = None,
+        endpoint: str,
+        interface: str,
+        remote_app_name: str = "remote",
+        relation_id: int = 0,
+        remote_unit_ids: List[int] = (0,),
+        # mapping from unit ID to databag contents
+        local_unit_data: Dict[str, str] = None,
+        local_app_data: Dict[str, str] = None,
+        remote_app_data: Dict[str, str] = None,
 ):
     """Helper function to construct a RelationMeta object with some sensible defaults."""
     metadata = RelationMeta(
@@ -83,13 +83,13 @@ def relation(
 
 
 def network(
-    private_address: str = "1.1.1.1",
-    mac_address: str = "",
-    hostname: str = "",
-    cidr: str = "",
-    interface_name: str = "",
-    egress_subnets=("1.1.1.2/32",),
-    ingress_addresses=("1.1.1.2",),
+        private_address: str = "1.1.1.1",
+        mac_address: str = "",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        egress_subnets=("1.1.1.2/32",),
+        ingress_addresses=("1.1.1.2",),
 ) -> memo.Network:
     """Construct a network object."""
     return memo.Network(
@@ -154,15 +154,6 @@ class CharmSpec:
     meta: Optional[Dict[str, Any]] = None
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
-
-    @staticmethod
-    def cast(obj: Union["CharmSpec", CharmType, Type[CharmBase]]):
-        if isinstance(obj, type) and issubclass(obj, CharmBase):
-            return CharmSpec(charm_type=obj)
-        elif isinstance(obj, CharmSpec):
-            return obj
-        else:
-            raise ValueError(f"cannot convert {obj} to CharmSpec")
 
 
 @dataclass
@@ -241,6 +232,6 @@ def _derive_args(event_name: str):
     return tuple(args)
 
 
-def get_event(name: str, append_args: Tuple[Any] = (), **kwargs) -> Event:
+def event(name: str, append_args: Tuple[Any] = (), **kwargs) -> Event:
     """This routine will attempt to generate event args for you, based on the event name."""
     return Event(name=name, args=_derive_args(name) + append_args, kwargs=kwargs)

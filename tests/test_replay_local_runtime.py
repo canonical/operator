@@ -9,7 +9,7 @@ import pytest
 # your current venv, ops.model won't break as it tries to import recorder.py
 
 try:
-    from memo import memo
+    from scenario import memo
 except ModuleNotFoundError:
     from scenario.runtime.runtime import RUNTIME_MODULE
     sys.path.append(str(RUNTIME_MODULE.absolute()))

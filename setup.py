@@ -42,7 +42,7 @@ def _get_version() -> str:
 version = _get_version()
 
 setup(
-    name="ops-scenario",
+    name="scenario",
     version=version,
     description="Python library providing a Scenario-based "
                 "testing API for Operator Framework charms.",
@@ -52,9 +52,10 @@ setup(
     url="https://github.com/PietroPasotti/ops-scenario",
     author="Pietro Pasotti.",
     author_email="pietro.pasotti@canonical.com",
-    packages=find_packages(
-        include=('scenario',
-                 'scenario.runtime')),
+    packages=[
+        'scenario',
+        'scenario.runtime'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "Intended Audience :: Developers",
@@ -62,4 +63,7 @@ setup(
         "Operating System :: POSIX :: Linux",
     ],
     python_requires='>=3.8',
+    install_requires=["asttokens",
+                      "astunparse",
+                      "ops"],
 )

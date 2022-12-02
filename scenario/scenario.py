@@ -1,11 +1,9 @@
 import json
+import typing
 from dataclasses import asdict
 from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union
 
-from ops.charm import CharmBase
-from ops.framework import BoundEvent, EventBase
-
-from logger import logger as pkg_logger
+from scenario.logger import logger as pkg_logger
 from scenario import Runtime
 from scenario.consts import (
     ATTACH_ALL_STORAGES,
@@ -16,6 +14,12 @@ from scenario.consts import (
 )
 from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene
 
+
+if typing.TYPE_CHECKING:
+    from ops.charm import CharmBase
+    from ops.framework import BoundEvent, EventBase
+
+
 CharmMeta = Optional[Union[str, TextIO, dict]]
 AssertionType = Callable[["BoundEvent", "Context", "Emitter"], Optional[bool]]
 
@@ -25,7 +29,7 @@ logger = pkg_logger.getChild("scenario")
 class Emitter:
     """Event emitter."""
 
-    def __init__(self, emit: Callable[[], BoundEvent]):
+    def __init__(self, emit: Callable[[], "BoundEvent"]):
         self._emit = emit
         self.event = None
         self._emitted = False
@@ -55,9 +59,9 @@ class PlayResult:
     # TODO: expose the 'final context' or a Delta object from the PlayResult.
     def __init__(
         self,
-        charm: CharmBase,
+        charm: "CharmBase",
         scene_in: "Scene",
-        event: EventBase,
+        event: "EventBase",
         context_out: "Context",
     ):
         self.charm = charm

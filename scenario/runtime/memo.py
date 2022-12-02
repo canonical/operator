@@ -14,10 +14,10 @@ import warnings
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Literal, Tuple, Union
 from uuid import uuid4
 
-from logger import logger as pkg_logger
+from scenario.logger import logger as pkg_logger
 
 logger = pkg_logger.getChild("recorder")
 
