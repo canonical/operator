@@ -792,8 +792,8 @@ class SecretChangedEvent(SecretEvent):
     secret will be notified via this event that a new revision is available.
 
     Typically, you will want to fetch the new content by calling
-    :meth:`Secret.get_content` with :code:`refresh=True` to tell Juju to start
-    tracking the new revision.
+    :meth:`ops.model.Secret.get_content` with :code:`refresh=True` to tell Juju to
+    start tracking the new revision.
     """
 
 
@@ -804,8 +804,8 @@ class SecretRemoveEvent(SecretEvent):
     consumers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, you will want to call :meth:`Secret.remove_revision` to remove
-    the now-unused revision.
+    Typically, you will want to call :meth:`ops.model.Secret.remove_revision` to
+    remove the now-unused revision.
     """
 
     @property
@@ -819,7 +819,7 @@ class SecretRotateEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret must
     be rotated. The event will keep firing until the owner creates a new
-    revision by calling :meth:`Secret.set_content`.
+    revision by calling :meth:`ops.model.Secret.set_content`.
     """
 
     @property
@@ -839,7 +839,7 @@ class SecretExpiredEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
-    revision by calling :meth:`Secret.remove_revision()`.
+    revision by calling :meth:`model.Secret.remove_revision()`.
     """
 
     @property

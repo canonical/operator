@@ -1197,7 +1197,7 @@ class Harness(Generic[CharmType]):
             app_or_unit: The remote application (or specific remote unit) that
                 will own the secret.
             content: A key-value mapping containing the payload of the secret,
-                for example `{"password": "foo123"}`_.
+                for example :code:`{"password": "foo123"}`.
 
         Return:
             The ID of the newly-secret added.

@@ -961,8 +961,8 @@ class Secret:
     :meth:`Model.get_secret` (for consumers and owners), or
     :meth:`Application.add_secret` or :meth:`Unit.add_secret` (for owners).
 
-    All secret events have a :meth:`SecretEvent.secret` attribute which
-    provides the :class:`Secret` associated with that event.
+    All secret events have a :code:`.secret` attribute which provides the
+    :class:`Secret` associated with that event.
     """
 
     _key_re = re.compile(r'^([a-z](?:-?[a-z0-9]){2,})$')  # copied from Juju code
@@ -1072,7 +1072,7 @@ class Secret:
 
         This will create a new secret revision, and notify all units tracking
         the secret (the "consumers") that a new revision is available with a
-        :class:`charm.SecretChangedEvent`.
+        :class:`ops.charm.SecretChangedEvent`.
 
         Args:
             content: A key-value mapping containing the payload of the secret,
@@ -1092,7 +1092,7 @@ class Secret:
 
         This will create a new secret revision, and notify all units tracking
         the secret (the "consumers") that a new revision is available with a
-        :class:`charm.SecretChangedEvent`.
+        :class:`ops.charm.SecretChangedEvent`.
 
         Args:
             label: New label to apply.
@@ -1147,8 +1147,8 @@ class Secret:
     def remove_revision(self, revision: int):
         """Remove the given secret revision.
 
-        This is normally called when handling :class:`charm.SecretRemoveEvent`
-        or :class:`charm.SecretExpiredEvent`.
+        This is normally called when handling :class:`ops.charm.SecretRemoveEvent`
+        or :class:`ops.charm.SecretExpiredEvent`.
 
         Args:
             revision: The secret revision to remove. If being called from a
@@ -1163,7 +1163,7 @@ class Secret:
         """Remove all revisions of this secret.
 
         This is called when the secret is no longer needed, for example when
-        handling :class:`charm.RelationBrokenEvent`.
+        handling :class:`ops.charm.RelationBrokenEvent`.
         """
         if self._id is None:
             self._id = self.get_info().id
