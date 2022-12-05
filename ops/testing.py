@@ -1218,6 +1218,31 @@ class Harness(Generic[CharmType]):
 
         return self._backend._secret_add(content, owner_name, expire=expire, rotate=rotate)
 
+    def _ensure_secret(self, secret_id: str) -> '_Secret':
+        secret = self._backend._get_secret(secret_id)
+        if secret is None:
+            raise RuntimeError(f'Secret {secret_id!r} not found')
+        return secret
+
+    def set_secret_content(self, secret_id: str, content: Dict[str, str]):
+        """Update a secret's content, add a new revision, and fire *secret-changed*.
+
+        Args:
+            secret_id: The ID of the secret to update. This should normally be
+                the return value of :meth:`add_secret`.
+            content: A key-value mapping containing the new payload.
+        """
+        secret = self._ensure_secret(secret_id)
+        new_revision = _SecretRevision(
+            revision=secret.revisions[-1].revision + 1,
+            content=content,
+        )
+        secret.revisions.append(new_revision)
+        self.charm.on.secret_changed.emit(
+            secret_id,
+            label=secret.label,
+            revision=new_revision.revision)
+
     def grant_secret(self, secret_id: str, app_or_unit: AppUnitOrName):
         """Grant read access to this secret for the given application or unit.
 
@@ -1225,15 +1250,13 @@ class Harness(Generic[CharmType]):
         this secret, do nothing.
 
         Args:
-            secret_id: The ID of the secret to grant access to. This should be
-                the return value of :meth:`add_secret`.
+            secret_id: The ID of the secret to grant access to. This should
+                normally be the return value of :meth:`add_secret`.
             app_or_unit: The application (or specific unit) to grant access
                 to. You must already have created a relation between this
                 application and the charm under test.
         """
-        secret = next((s for s in self._backend._secrets if s.id == secret_id), None)
-        if secret is None:
-            raise RuntimeError(f'Secret {secret_id!r} not found')
+        secret = self._ensure_secret(secret_id)
 
         app_or_unit_name = _get_app_or_unit_name(app_or_unit)
         relation_id = self._secret_relation_id_to(secret)
@@ -1248,15 +1271,13 @@ class Harness(Generic[CharmType]):
         do nothing.
 
         Args:
-            secret_id: The ID of the secret to revoke access for. This should be
-                the return value of :meth:`add_secret`.
+            secret_id: The ID of the secret to revoke access for. This should
+                normally be the return value of :meth:`add_secret`.
             app_or_unit: The application (or specific unit) to revoke access
                 to. You must already have created a relation between this
                 application and the charm under test.
         """
-        secret = next((s for s in self._backend._secrets if s.id == secret_id), None)
-        if secret is None:
-            raise RuntimeError(f'Secret {secret_id!r} not found')
+        secret = self._ensure_secret(secret_id)
 
         app_or_unit_name = _get_app_or_unit_name(app_or_unit)
         relation_id = self._secret_relation_id_to(secret)
@@ -1273,10 +1294,78 @@ class Harness(Generic[CharmType]):
                                f'and secret owner ({owner_app})')
         return relation_id
 
-    def get_secret(self, app_or_unit: AppUnitOrName, secret_id: str) -> None:
-        """Get secret from point of view of application or unit."""
-        # TODO(benhoyt)
-        raise NotImplementedError
+    def get_secret_grants(self, secret_id: str, relation_id: int) -> Set[str]:
+        """Return set of app and unit names granted to secret for this relation.
+
+        Args:
+            secret_id: The ID of the secret to get grants for.
+            relation_id: The ID of the relation granted access.
+        """
+        secret = self._ensure_secret(secret_id)
+        return secret.grants.get(relation_id, set())
+
+    def get_secret_revisions(self, secret_id: str) -> List[Dict[str, str]]:
+        """Return list of revisions (content) for the given secret.
+
+        Args:
+            secret_id: The ID of the secret to get revisions for.
+        """
+        secret = self._ensure_secret(secret_id)
+        return [r.content for r in secret.revisions]
+
+    def emit_secret_rotate(self, secret_id: str, label: Optional[str] = None,
+                           revision: Optional[int] = None):
+        """Emit secret-rotate event on given secret.
+
+        Args:
+            secret_id: The ID of the secret associated with the event.
+            label: Label value to send to the event. If not set, the secret's
+                label is used.
+            revision: Revision number to send to the event. If not set, the
+                secret's latest revision number is used.
+        """
+        secret = self._ensure_secret(secret_id)
+        if label is None:
+            label = secret.label
+        if revision is None:
+            revision = secret.revisions[-1].revision
+        self.charm.on.secret_rotate.emit(secret_id, label=label, revision=revision)
+
+    def emit_secret_remove(self, secret_id: str, label: Optional[str] = None,
+                           revision: Optional[int] = None):
+        """Emit secret-remove event on given secret.
+
+        Args:
+            secret_id: The ID of the secret associated with the event.
+            label: Label value to send to the event. If not set, the secret's
+                label is used.
+            revision: Revision number to send to the event. If not set, the
+                secret's latest revision number is used.
+        """
+        secret = self._ensure_secret(secret_id)
+        if label is None:
+            label = secret.label
+        if revision is None:
+            revision = secret.revisions[-1].revision
+        self.charm.on.secret_remove.emit(secret_id, label=label, revision=revision)
+
+    def emit_secret_expired(self, secret_id: str, label: Optional[str] = None,
+                            revision: Optional[int] = None):
+        """Emit secret-expired event on given secret.
+
+        Args:
+            secret_id: The ID of the secret associated with the event.
+            label: Label value to send to the event. If not set, the secret's
+                label is used.
+            revision: Revision number to send to the event. If not set, the
+                secret's latest revision number is used.
+        """
+        secret = self._ensure_secret(secret_id)
+        if label is None:
+            label = secret.label
+        if revision is None:
+            revision = secret.revisions[-1].revision
+        self.charm.on.secret_expired.emit(secret_id, label=label, revision=revision)
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
@@ -1897,7 +1986,7 @@ class _TestingModelBackend:
         return model.SecretInfo(
             id=secret.id,
             label=secret.label,
-            revision=secret.revisions[-1].revision,
+            revision=secret.tracked,
             expires=secret.expire_time,
             rotation=rotation,
             rotates=rotates,
@@ -1987,7 +2076,8 @@ class _TestingModelBackend:
 
         if relation_id not in secret.grants:
             secret.grants[relation_id] = set()
-        secret.grants[relation_id].add(unit or self.app_name)
+        remote_app_name = self._relation_app_and_units[relation_id]['app']
+        secret.grants[relation_id].add(unit or remote_app_name)
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
         secret = self._ensure_secret(id)
@@ -1995,7 +2085,8 @@ class _TestingModelBackend:
 
         if relation_id not in secret.grants:
             return
-        secret.grants[relation_id].discard(unit or self.app_name)
+        remote_app_name = self._relation_app_and_units[relation_id]['app']
+        secret.grants[relation_id].discard(unit or remote_app_name)
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None) -> None:
         secret = self._ensure_secret(id)
