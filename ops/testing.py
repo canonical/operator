@@ -738,7 +738,10 @@ class Harness(Generic[CharmType]):
         ids_map[relation_name].remove(relation_id)
         rel_names.pop(relation_id)
 
-        # TODO(benhoyt): self._backend._relation_removed(relation_id)
+        # Remove secret grants that give access via this relation
+        for secret in self._backend._secrets:
+            secret.grants = dict((rid, names) for rid, names in secret.grants.items()
+                                 if rid != relation_id)
 
     def _emit_relation_created(self, relation_name: str, relation_id: int,
                                remote_app: str) -> None:
@@ -863,8 +866,6 @@ class Harness(Generic[CharmType]):
 
         if unit_cache is not None:
             unit_cache._invalidate()
-
-        # TODO(benhoyt): self._backend._relation_unit_removed(relation_id, remote_unit_name)
 
     def _emit_relation_departed(self, relation_id: int, unit_name: str):
         """Trigger relation-departed event for a given relation id and unit."""
