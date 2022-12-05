@@ -1189,11 +1189,7 @@ class Harness(Generic[CharmType]):
             self._backend._calls.clear()
         return calls
 
-    # TODO(benhoyt): I think the expire and rotate events are actually useless here,
-    #  because how would you even access them?
-    def add_secret(self, app_or_unit: AppUnitOrName, content: Dict[str, str], *,
-                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional['model.SecretRotate'] = None) -> str:
+    def add_secret(self, app_or_unit: AppUnitOrName, content: Dict[str, str]) -> str:
         """Add a secret owned by the remote application or unit given.
 
         Args:
@@ -1201,22 +1197,13 @@ class Harness(Generic[CharmType]):
                 will own the secret.
             content: A key-value mapping containing the payload of the secret,
                 for example `{"password": "foo123"}`_.
-            expire: Time in the future (or timedelta from now) at which the
-                secret is due to expire. The harness will not actually send a
-                SecretExpired event when this time elapses.
-            rotate: Rotation policy/time. The harness will not actually send a
-                SecretRotate event when this time elapses.
 
         Return:
             The ID of the newly-secret added.
         """
         owner_name = _get_app_or_unit_name(app_or_unit)
-
         model.Secret._validate_content(content)
-        if isinstance(expire, datetime.timedelta):
-            expire = datetime.datetime.now() + expire
-
-        return self._backend._secret_add(content, owner_name, expire=expire, rotate=rotate)
+        return self._backend._secret_add(content, owner_name)
 
     def _ensure_secret(self, secret_id: str) -> '_Secret':
         secret = self._backend._get_secret(secret_id)
