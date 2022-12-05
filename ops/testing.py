@@ -1894,7 +1894,7 @@ class _TestingModelBackend:
     def _ensure_secret(self, id: str) -> _Secret:
         secret = self._get_secret(id)
         if secret is None:
-            raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+            raise model.SecretNotFoundError(f'Secret {id!r} not found')
         return secret
 
     def _ensure_secret_id_or_label(self, id: Optional[str], label: Optional[str]):
@@ -1906,7 +1906,8 @@ class _TestingModelBackend:
         if secret is None and label is not None:
             secret = next((s for s in self._secrets if s.label == label), None)
         if secret is None:
-            raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+            raise model.SecretNotFoundError(
+                f'Secret not found by ID ({id!r}) or label ({label!r})')
         return secret
 
     def secret_get(self, *,
@@ -1928,10 +1929,12 @@ class _TestingModelBackend:
             # this charm (the consumer) and the secret owner's app?
             relation_id = self._relation_id_to(owner_app)
             if relation_id is None:
-                raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+                raise model.SecretNotFoundError(
+                    f'Secret {id!r} does not have relation to {owner_app!r}')
             grants = secret.grants.get(relation_id, set())
             if self.app_name not in grants and self.unit_name not in grants:
-                raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+                raise model.SecretNotFoundError(
+                    f'Secret {id!r} not granted access to {self.app_name!r} or {self.unit_name!r}')
 
         if peek or refresh:
             revision = secret.revisions[-1]
@@ -1940,8 +1943,7 @@ class _TestingModelBackend:
         else:
             revision = next((r for r in secret.revisions if r.revision == secret.tracked), None)
             if revision is None:
-                # tracked revision was removed
-                raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+                raise model.SecretNotFoundError(f'Secret {id!r} tracked revision was removed')
 
         return revision.content
 
@@ -1954,7 +1956,8 @@ class _TestingModelBackend:
 
     def _ensure_secret_owner(self, secret: _Secret):
         if secret.owner_name not in [self.app_name, self.unit_name]:
-            raise model.SecretNotFoundError  # TODO(benhoyt): proper message
+            raise model.SecretNotFoundError(
+                f'You must own secret {id!r} to perform this operation')
 
     def secret_info_get(self, *,
                         id: Optional[str] = None,
@@ -2013,7 +2016,6 @@ class _TestingModelBackend:
             else:
                 secret.rotate_policy = None  # clear rotation policy
 
-    # TODO(benhoyt): move this to _Secret._generate_id()
     @classmethod
     def _generate_secret_id(cls) -> str:
         # Not a proper Juju secrets-style xid, but that's okay
@@ -2082,8 +2084,7 @@ class _TestingModelBackend:
         if revision is not None:
             revisions = [r for r in secret.revisions if r.revision != revision]
             if len(revisions) == len(secret.revisions):
-                # TODO(benhoyt): proper message
-                raise model.SecretNotFoundError('revision not found')
+                raise model.SecretNotFoundError(f'Secret {id!r} revision {revision} not found')
             if revisions:
                 secret.revisions = revisions
             else:
