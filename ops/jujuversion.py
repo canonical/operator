@@ -116,4 +116,9 @@ class JujuVersion:
     @property
     def has_secrets(self) -> bool:
         """Determine whether this Juju version supports the `secrets` feature."""
+        # Juju version 3.0.0 had an initial version of secrets, but:
+        # * In 3.0.2, secret-get "--update" was renamed to "--refresh", and
+        #   secret-get-info was separated into its own hook tool
+        # * In 3.0.3, a bug with consumer labels was fixed (juju/juju#14916)
+        # TODO(benhoyt): update to 3.0.3+ once shipped (for juju/juju#14916 fix)
         return (self.major, self.minor, self.patch) >= (3, 0, 2)
