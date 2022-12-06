@@ -1113,6 +1113,9 @@ class Secret:
     def grant(self, relation: 'Relation', *, unit: Optional[Unit] = None):
         """Grant read access to this secret.
 
+        If the application or unit has already been granted access to this
+        secret, do nothing.
+
         Args:
             relation: The relation used to scope the life of this secret.
             unit: If specified, grant access to only this unit, rather than
@@ -1127,6 +1130,9 @@ class Secret:
 
     def revoke(self, relation: 'Relation', *, unit: Optional[Unit] = None):
         """Revoke read access to this secret.
+
+        If the application or unit does not have access to this secret, do
+        nothing.
 
         Args:
             relation: The relation used to scope the life of this secret.
