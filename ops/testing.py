@@ -1220,6 +1220,7 @@ class Harness(Generic[CharmType]):
                 the return value of :meth:`add_secret`.
             content: A key-value mapping containing the new payload.
         """
+        model.Secret._validate_content(content)
         secret = self._ensure_secret(secret_id)
         new_revision = _SecretRevision(
             revision=secret.revisions[-1].revision + 1,
