@@ -1087,9 +1087,8 @@ class Secret:
                  rotate: Optional[SecretRotate] = None):
         """Update this secret's information (metadata).
 
-        This will create a new secret revision, and notify all units tracking
-        the secret (the "consumers") that a new revision is available with a
-        :class:`ops.charm.SecretChangedEvent`.
+        This will not create a new secret revision (that applies only to
+        :meth:`set_content`). Once attributes are set, they cannot be unset.
 
         Args:
             label: New label to apply.
