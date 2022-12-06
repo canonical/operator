@@ -1222,6 +1222,7 @@ class Harness(Generic[CharmType]):
         """
         model.Secret._validate_content(content)
         secret = self._ensure_secret(secret_id)
+        # TODO(benhoyt): ensure this is not a secret we're supposed to own
         new_revision = _SecretRevision(
             revision=secret.revisions[-1].revision + 1,
             content=content,
