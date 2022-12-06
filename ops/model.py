@@ -1000,17 +1000,17 @@ class Secret:
             raise ValueError('Secret content must not be empty')
 
         invalid_keys = [k for k in content if not cls._key_re.match(k)]
-        invalid_values = [v for v in content.values() if not isinstance(v, str)]  # type: List[Any]
+        invalid_value_keys = [k for k, v in content.items() if not isinstance(v, str)]
         msg = ''
         if invalid_keys:
-            msg += ('Invalid secret keys: {}. Keys should be at least 3 characters long, '
-                    + 'start with a letter, and not end with a hyphen.').format(invalid_keys)
-        if invalid_values:
+            msg += (f'Invalid secret keys: {invalid_keys}. '
+                    + 'Keys should be at least 3 characters long, '
+                    + 'start with a letter, and not end with a hyphen.')
+        if invalid_value_keys:
             if msg:
                 msg += ' '
-            type_names = [type(v).__name__ for v in invalid_values]
-            msg += 'Invalid secret values: should be of type str, not {}.'.format(
-                ' or '.join(type_names))
+            msg += (f'Invalid secret values for keys: {invalid_value_keys}. '
+                    + 'Values should be of type str.')
         if msg:
             raise ValueError(msg)
 
