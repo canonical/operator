@@ -1226,10 +1226,7 @@ class Harness(Generic[CharmType]):
             content=content,
         )
         secret.revisions.append(new_revision)
-        self.charm.on.secret_changed.emit(
-            secret_id,
-            label=secret.label,
-            revision=new_revision.revision)
+        self.charm.on.secret_changed.emit(secret_id, secret.label)
 
     def grant_secret(self, secret_id: str, app_or_unit: AppUnitOrName):
         """Grant read access to this secret for the given application or unit.
@@ -1317,7 +1314,7 @@ class Harness(Generic[CharmType]):
             label = secret.label
         if revision is None:
             revision = secret.revisions[-1].revision
-        self.charm.on.secret_rotate.emit(secret_id, label=label, revision=revision)
+        self.charm.on.secret_rotate.emit(secret_id, label, revision)
 
     def emit_secret_remove(self, secret_id: str, label: Optional[str] = None,
                            revision: Optional[int] = None):
@@ -1335,7 +1332,7 @@ class Harness(Generic[CharmType]):
             label = secret.label
         if revision is None:
             revision = secret.revisions[-1].revision
-        self.charm.on.secret_remove.emit(secret_id, label=label, revision=revision)
+        self.charm.on.secret_remove.emit(secret_id, label, revision)
 
     def emit_secret_expired(self, secret_id: str, label: Optional[str] = None,
                             revision: Optional[int] = None):
@@ -1353,7 +1350,7 @@ class Harness(Generic[CharmType]):
             label = secret.label
         if revision is None:
             revision = secret.revisions[-1].revision
-        self.charm.on.secret_expired.emit(secret_id, label=label, revision=revision)
+        self.charm.on.secret_expired.emit(secret_id, label, revision)
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
