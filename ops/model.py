@@ -2874,8 +2874,8 @@ class _ModelBackend:
                              key: str, value: str):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
-    def _run_secret(self, *args: str, return_output: bool = False,
-                    use_json: bool = False) -> Union[str, 'JsonObject', None]:
+    def _run_for_secret(self, *args: str, return_output: bool = False,
+                        use_json: bool = False) -> Union[str, 'JsonObject', None]:
         try:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
@@ -2897,7 +2897,7 @@ class _ModelBackend:
             args.append('--refresh')
         if peek:
             args.append('--peek')
-        result = self._run_secret('secret-get', *args, return_output=True, use_json=True)
+        result = self._run_for_secret('secret-get', *args, return_output=True, use_json=True)
         return typing.cast(Dict[str, str], result)
 
     def secret_info_get(self, *,
@@ -2908,7 +2908,7 @@ class _ModelBackend:
             args.append(id)
         if label is not None:
             args.extend(['--label', label])
-        result = self._run_secret('secret-info-get', *args, return_output=True, use_json=True)
+        result = self._run_for_secret('secret-info-get', *args, return_output=True, use_json=True)
         info_dicts = typing.cast(Dict[str, 'JsonObject'], result)
         id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
         return SecretInfo.from_dict(id, typing.cast('_SerializedData', info_dicts[id]))
@@ -2932,7 +2932,7 @@ class _ModelBackend:
             # The content has already been validated with Secret._validate_content
             for k, v in content.items():
                 args.append('{}={}'.format(k, v))
-        self._run_secret('secret-set', *args)
+        self._run_for_secret('secret-set', *args)
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -2962,19 +2962,19 @@ class _ModelBackend:
         args = [id, '--relation', str(relation_id)]
         if unit is not None:
             args += ['--unit', str(unit)]
-        self._run_secret('secret-grant', *args)
+        self._run_for_secret('secret-grant', *args)
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         args = [id, '--relation', str(relation_id)]
         if unit is not None:
             args += ['--unit', str(unit)]
-        self._run_secret('secret-revoke', *args)
+        self._run_for_secret('secret-revoke', *args)
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         args = [id]
         if revision is not None:
             args.extend(['--revision', str(revision)])
-        self._run_secret('secret-remove', *args)
+        self._run_for_secret('secret-remove', *args)
 
 
 class _ModelBackendValidator:
