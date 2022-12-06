@@ -1921,7 +1921,7 @@ class _TestingModelBackend:
             # Owner or peer is calling, get latest revision
             peek = True
             if refresh:
-                raise ValueError('Only the secret consumer can refresh a secret')
+                raise ValueError('Secret owner cannot use refresh=True')
         else:
             # Consumer is calling: does secret have a grant on relation between
             # this charm (the consumer) and the secret owner's app?
