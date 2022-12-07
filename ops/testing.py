@@ -1227,7 +1227,9 @@ class Harness(Generic[CharmType]):
         """
         model.Secret._validate_content(content)
         secret = self._ensure_secret(secret_id)
-        # TODO(benhoyt): ensure this is not a secret we're supposed to own
+        if secret.owner_name in [self.model.app.name, self.model.unit.name]:
+            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
+                               f"can't call set_secret_content")
         new_revision = _SecretRevision(
             revision=secret.revisions[-1].revision + 1,
             content=content,
@@ -1249,7 +1251,9 @@ class Harness(Generic[CharmType]):
                 application and the charm under test.
         """
         secret = self._ensure_secret(secret_id)
-
+        if secret.owner_name in [self.model.app.name, self.model.unit.name]:
+            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
+                               f"can't call grant_secret")
         app_or_unit_name = _get_app_or_unit_name(app_or_unit)
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
@@ -1270,7 +1274,9 @@ class Harness(Generic[CharmType]):
                 application and the charm under test.
         """
         secret = self._ensure_secret(secret_id)
-
+        if secret.owner_name in [self.model.app.name, self.model.unit.name]:
+            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
+                               f"can't call revoke_secret")
         app_or_unit_name = _get_app_or_unit_name(app_or_unit)
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
