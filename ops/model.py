@@ -438,19 +438,27 @@ class Application:
                 default) means to use the Juju default, which is never expire.
         """
         Secret._validate_content(content)
-        if isinstance(expire, datetime.timedelta):
-            expire = datetime.datetime.now() + expire
-        elif not isinstance(expire, datetime.datetime):
-            raise TypeError('Expiration time must be a datetime or timedelta from now, not '
-                            + type(expire).__name__)
         id = self._backend.secret_add(
             content,
             label=label,
             description=description,
-            expire=expire,
+            expire=_canonicalize_expire_time(expire),
             rotate=rotate,
             owner='application')
         return Secret(self._backend, id=id, label=label, content=content)
+
+
+def _canonicalize_expire_time(expire: Optional[Union[datetime.datetime, datetime.timedelta]],
+                              ) -> Optional[datetime.datetime]:
+    if expire is None:
+        return None
+    if isinstance(expire, datetime.datetime):
+        return expire
+    elif isinstance(expire, datetime.timedelta):
+        return datetime.datetime.now() + expire
+    else:
+        raise TypeError('Expiration time must be a datetime or timedelta from now, not '
+                        + type(expire).__name__)
 
 
 class Unit:
@@ -583,16 +591,11 @@ class Unit:
         See :meth:`Application.add_secret` for parameter details.
         """
         Secret._validate_content(content)
-        if isinstance(expire, datetime.timedelta):
-            expire = datetime.datetime.now() + expire
-        elif not isinstance(expire, datetime.datetime):
-            raise TypeError('Expiration time must be a datetime or timedelta from now, not '
-                            + type(expire).__name__)
         id = self._backend.secret_add(
             content,
             label=label,
             description=description,
-            expire=expire,
+            expire=_canonicalize_expire_time(expire),
             rotate=rotate,
             owner='unit')
         return Secret(self._backend, id=id, label=label, content=content)
@@ -1108,15 +1111,10 @@ class Secret:
                             'or rotation policy')
         if self._id is None:
             self._id = self.get_info().id
-        if isinstance(expire, datetime.timedelta):
-            expire = datetime.datetime.now() + expire
-        elif not isinstance(expire, datetime.datetime):
-            raise TypeError('Expiration time must be a datetime or timedelta from now, not '
-                            + type(expire).__name__)
         self._backend.secret_set(typing.cast(str, self.id),
                                  label=self.label,
                                  description=description,
-                                 expire=expire,
+                                 expire=_canonicalize_expire_time(expire),
                                  rotate=rotate)
 
     def grant(self, relation: 'Relation', *, unit: Optional[Unit] = None):
