@@ -52,7 +52,7 @@ from typing import (
 
 import ops
 import ops.pebble as pebble
-from ops._private import yaml
+from ops._private import timeconv, yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
@@ -939,14 +939,13 @@ class SecretInfo:
         except ValueError:
             rotation = None
         rotates = typing.cast(Optional[str], d.get('rotates'))
-        # TODO(benhoyt): move pebble._parse_timestamp up to a common location
         return cls(
             id=id,
             label=typing.cast(Optional[str], d.get('label')),
             revision=typing.cast(int, d['revision']),
-            expires=pebble._parse_timestamp(expires) if expires is not None else None,
+            expires=timeconv.parse_go_timestamp(expires) if expires is not None else None,
             rotation=rotation,
-            rotates=pebble._parse_timestamp(rotates) if rotates is not None else None,
+            rotates=timeconv.parse_go_timestamp(rotates) if rotates is not None else None,
         )
 
     def __repr__(self):

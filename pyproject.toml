@@ -34,7 +34,7 @@ docstring-convention = "google"
 [tool.pyright]
 include = ["ops/jujuversion.py", "ops/log.py", "ops/model.py", "ops/version.py",
     "ops/__init__.py", "ops/framework.py", "ops/pebble.py", "ops/charm.py",
-    "ops/storage.py", "ops/main.py", "ops/testing.py"]
+    "ops/storage.py", "ops/main.py", "ops/testing.py", "ops/_private/timeconv.py"]
 pythonVersion = "3.8" # check no python > 3.8 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"

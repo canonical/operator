@@ -28,7 +28,6 @@ import io
 import json
 import logging
 import os
-import re
 import select
 import shutil
 import signal
@@ -59,7 +58,7 @@ from typing import (
     Union,
 )
 
-from ops._private import yaml
+from ops._private import timeconv, yaml
 from ops._vendor import websocket
 
 if TYPE_CHECKING:
@@ -259,45 +258,6 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         """Override http_open to use a Unix socket connection (instead of TCP)."""
         return self.do_open(_UnixSocketConnection, req,  # type:ignore
                             socket_path=self.socket_path)
-
-
-# Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
-_TIMESTAMP_RE = re.compile(
-    r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
-
-# Matches [-+]HH:MM
-_TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
-
-
-def _parse_timestamp(s: str):
-    """Parse timestamp from Go-encoded JSON.
-
-    This parses RFC3339 timestamps (which are a subset of ISO8601 timestamps)
-    that Go's encoding/json package produces for time.Time values.
-
-    Unfortunately we can't use datetime.fromisoformat(), as that does not
-    support more than 6 digits for the fractional second, nor the 'Z' for UTC.
-    Also, it was only introduced in Python 3.7.
-    """
-    match = _TIMESTAMP_RE.match(s)
-    if not match:
-        raise ValueError('invalid timestamp {!r}'.format(s))
-    y, m, d, hh, mm, ss, sfrac, zone = match.groups()
-
-    if zone in ('Z', 'z'):
-        tz = datetime.timezone.utc
-    else:
-        match = _TIMEOFFSET_RE.match(zone)
-        if not match:
-            raise ValueError('invalid timestamp {!r}'.format(s))
-        sign, zh, zm = match.groups()
-        tz_delta = datetime.timedelta(hours=int(zh), minutes=int(zm))
-        tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
-
-    microsecond = round(float(sfrac or '0') * 1000000)
-
-    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
-                             microsecond=microsecond, tzinfo=tz)
 
 
 def _format_timeout(timeout: float) -> str:
@@ -527,9 +487,9 @@ class Warning:
         """Create new Warning object from dict parsed from JSON."""
         return cls(
             message=d['message'],
-            first_added=_parse_timestamp(d['first-added']),
-            last_added=_parse_timestamp(d['last-added']),
-            last_shown=(_parse_timestamp(d['last-shown'])  # type: ignore
+            first_added=timeconv.parse_go_timestamp(d['first-added']),
+            last_added=timeconv.parse_go_timestamp(d['last-added']),
+            last_shown=(timeconv.parse_go_timestamp(d['last-shown'])  # type: ignore
                         if d.get('last-shown') else None),
             expire_after=d['expire-after'],
             repeat_after=d['repeat-after'],
@@ -618,8 +578,9 @@ class Task:
             status=d['status'],
             log=d.get('log') or [],
             progress=TaskProgress.from_dict(d['progress']),
-            spawn_time=_parse_timestamp(d['spawn-time']),
-            ready_time=_parse_timestamp(d['ready-time']) if d.get('ready-time') else None,
+            spawn_time=timeconv.parse_go_timestamp(d['spawn-time']),
+            ready_time=(timeconv.parse_go_timestamp(d['ready-time'])
+                        if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
 
@@ -682,8 +643,8 @@ class Change:
             tasks=[Task.from_dict(t) for t in d.get('tasks') or []],
             ready=d['ready'],
             err=d.get('err'),
-            spawn_time=_parse_timestamp(d['spawn-time']),
-            ready_time=(_parse_timestamp(d['ready-time'])  # type: ignore
+            spawn_time=timeconv.parse_go_timestamp(d['spawn-time']),
+            ready_time=(timeconv.parse_go_timestamp(d['ready-time'])  # type: ignore
                         if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
@@ -1076,7 +1037,7 @@ class FileInfo:
             type=file_type,
             size=d.get('size'),
             permissions=int(d['permissions'], 8),
-            last_modified=_parse_timestamp(d['last-modified']),
+            last_modified=timeconv.parse_go_timestamp(d['last-modified']),
             user_id=d.get('user-id'),
             user=d.get('user'),
             group_id=d.get('group-id'),
