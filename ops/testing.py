@@ -1190,8 +1190,13 @@ class Harness(Generic[CharmType]):
             self._backend._calls.clear()
         return calls
 
-    def add_secret(self, app_or_unit: AppUnitOrName, content: Dict[str, str]) -> str:
-        """Add a secret owned by the remote application or unit given.
+    def add_model_secret(self, app_or_unit: AppUnitOrName, content: Dict[str, str]) -> str:
+        """Add a secret owned by the remote application or unit specified.
+
+        This is named :code:`add_model_secret` instead of :code:`add_secret`
+        to distinguish it from the :meth:`ops.model.Application.add_secret`
+        and :meth:`ops.model.Unit.add_secret` methods used by secret owner
+        charms.
 
         Args:
             app_or_unit: The remote application (or specific remote unit) that

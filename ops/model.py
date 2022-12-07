@@ -577,7 +577,7 @@ class Unit:
                    rotate: Optional['SecretRotate'] = None) -> 'Secret':
         """Create a :class:`Secret` owned by this unit.
 
-        See :meth:`Application.add_secret` for details.
+        See :meth:`Application.add_secret` for parameter details.
         """
         Secret._validate_content(content)
         if isinstance(expire, datetime.timedelta):
