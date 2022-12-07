@@ -1004,8 +1004,8 @@ class Secret:
         msg = ''
         if invalid_keys:
             msg += (f'Invalid secret keys: {invalid_keys}. '
-                    + 'Keys should be at least 3 characters long, '
-                    + 'start with a letter, and not end with a hyphen.')
+                    + 'Keys should be lowercase letters and digits, at least 3 characters long, '
+                    + 'start with a letter, and not start or end with a hyphen.')
         if invalid_value_keys:
             if msg:
                 msg += ' '
