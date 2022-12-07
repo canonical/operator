@@ -440,6 +440,9 @@ class Application:
         Secret._validate_content(content)
         if isinstance(expire, datetime.timedelta):
             expire = datetime.datetime.now() + expire
+        elif not isinstance(expire, datetime.datetime):
+            raise TypeError('Expiration time must be a datetime or timedelta from now, not '
+                            + type(expire).__name__)
         id = self._backend.secret_add(
             content,
             label=label,
@@ -582,6 +585,9 @@ class Unit:
         Secret._validate_content(content)
         if isinstance(expire, datetime.timedelta):
             expire = datetime.datetime.now() + expire
+        elif not isinstance(expire, datetime.datetime):
+            raise TypeError('Expiration time must be a datetime or timedelta from now, not '
+                            + type(expire).__name__)
         id = self._backend.secret_add(
             content,
             label=label,
@@ -1104,6 +1110,9 @@ class Secret:
             self._id = self.get_info().id
         if isinstance(expire, datetime.timedelta):
             expire = datetime.datetime.now() + expire
+        elif not isinstance(expire, datetime.datetime):
+            raise TypeError('Expiration time must be a datetime or timedelta from now, not '
+                            + type(expire).__name__)
         self._backend.secret_set(typing.cast(str, self.id),
                                  label=self.label,
                                  description=description,
