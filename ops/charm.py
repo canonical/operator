@@ -772,11 +772,7 @@ class SecretEvent(HookEvent):
         self._label = cast(Optional[str], snapshot['label'])
 
 
-class SecretConsumerEvent(SecretEvent):
-    """Base class for secret consumer events."""
-
-
-class SecretChangedEvent(SecretConsumerEvent):
+class SecretChangedEvent(SecretEvent):
     """Event raised by Juju on the consumer when the secret owner changes its contents.
 
     When the owner of a secret changes the secret's contents, Juju will create
@@ -789,8 +785,31 @@ class SecretChangedEvent(SecretConsumerEvent):
     """
 
 
-class SecretOwnerEvent(SecretEvent):
-    """Base class for secret owner events."""
+class SecretRotateEvent(SecretEvent):
+    """Event raised by Juju on the owner when the secret's rotation policy elapses.
+
+    This event is fired on the secret owner to inform it that the secret must
+    be rotated. The event will keep firing until the owner creates a new
+    revision by calling :meth:`ops.model.Secret.set_content`.
+    """
+
+    def defer(self):
+        """Secret rotation events are not deferrable (Juju handles re-invocation)."""
+        raise RuntimeError(
+            'Cannot defer secret rotation events. Juju will keep firing this '
+            'event until you create a new revision.')
+
+
+class SecretRemoveEvent(SecretEvent):
+    """Event raised by Juju on the owner when a secret revision can be removed.
+
+    When the owner of a secret creates a new revision, and after all
+    consumers have updated to that new revision, this event will be fired to
+    inform the secret owner that the old revision can be removed.
+
+    Typically, you will want to call :meth:`ops.model.Secret.remove_revision` to
+    remove the now-unused revision.
+    """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
         super().__init__(handle, id, label)
@@ -819,40 +838,39 @@ class SecretOwnerEvent(SecretEvent):
         self._revision = cast(int, snapshot['revision'])
 
 
-class SecretRemoveEvent(SecretOwnerEvent):
-    """Event raised by Juju on the owner when a secret revision can be removed.
-
-    When the owner of a secret creates a new revision, and after all
-    consumers have updated to that new revision, this event will be fired to
-    inform the secret owner that the old revision can be removed.
-
-    Typically, you will want to call :meth:`ops.model.Secret.remove_revision` to
-    remove the now-unused revision.
-    """
-
-
-class SecretRotateEvent(SecretOwnerEvent):
-    """Event raised by Juju on the owner when the secret's rotation policy elapses.
-
-    This event is fired on the secret owner to inform it that the secret must
-    be rotated. The event will keep firing until the owner creates a new
-    revision by calling :meth:`ops.model.Secret.set_content`.
-    """
-
-    def defer(self):
-        """Secret rotation events are not deferrable (Juju handles re-invocation)."""
-        raise RuntimeError(
-            'Cannot defer secret rotation events. Juju will keep firing this '
-            'event until you create a new revision.')
-
-
-class SecretExpiredEvent(SecretOwnerEvent):
+class SecretExpiredEvent(SecretEvent):
     """Event raised by Juju on the owner when a secret's expiration time elapses.
 
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
     revision by calling :meth:`model.Secret.remove_revision()`.
     """
+
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
+        super().__init__(handle, id, label)
+        self._revision = revision
+
+    @property
+    def revision(self) -> int:
+        """The secret revision this event refers to."""
+        return self._revision
+
+    def snapshot(self) -> '_SerializedData':
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        data = super().snapshot()
+        data['revision'] = self._revision
+        return data
+
+    def restore(self, snapshot: '_SerializedData'):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        super().restore(snapshot)
+        self._revision = cast(int, snapshot['revision'])
 
     def defer(self):
         """Secret expiration events are not deferrable (Juju handles re-invocation)."""

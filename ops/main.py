@@ -165,7 +165,7 @@ def _get_event_args(charm: 'CharmBase',
             os.environ['JUJU_SECRET_ID'],
             os.environ.get('JUJU_SECRET_LABEL'),
         ]
-        if issubclass(event_type, ops.charm.SecretOwnerEvent):
+        if issubclass(event_type, (ops.charm.SecretRemoveEvent, ops.charm.SecretExpiredEvent)):
             args.append(int(os.environ['JUJU_SECRET_REVISION']))
         return args, {}
     elif issubclass(event_type, ops.charm.StorageEvent):

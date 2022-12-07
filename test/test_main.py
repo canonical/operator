@@ -48,7 +48,6 @@ from ops.charm import (
     SecretChangedEvent,
     SecretEvent,
     SecretExpiredEvent,
-    SecretOwnerEvent,
     SecretRemoveEvent,
     SecretRotateEvent,
     StartEvent,
@@ -380,7 +379,7 @@ class _TestMain(abc.ABC):
                 'JUJU_SECRET_ID': event_spec.secret_id,
                 'JUJU_SECRET_LABEL': event_spec.secret_label or '',
             })
-        if issubclass(event_spec.event_type, SecretOwnerEvent):
+        if issubclass(event_spec.event_type, (SecretRemoveEvent, SecretExpiredEvent)):
             env.update({
                 'JUJU_SECRET_REVISION': str(event_spec.secret_revision or ''),
             })

@@ -1305,8 +1305,7 @@ class Harness(Generic[CharmType]):
         secret = self._ensure_secret(secret_id)
         return [r.revision for r in secret.revisions]
 
-    def trigger_secret_rotation(self, secret_id: str, *, label: Optional[str] = None,
-                                revision: Optional[int] = None):
+    def trigger_secret_rotation(self, secret_id: str, *, label: Optional[str] = None):
         """Trigger a secret-rotate event for the given secret.
 
         This event is fired by Juju when a secret's rotation time elapses,
@@ -1317,19 +1316,15 @@ class Harness(Generic[CharmType]):
             secret_id: The ID of the secret associated with the event.
             label: Label value to send to the event. If None, the secret's
                 label is used.
-            revision: Revision number to provide to the event. If None, the
-                secret's oldest revision is used.
         """
         secret = self._ensure_secret(secret_id)
         if label is None:
             label = secret.label
-        if revision is None:
-            revision = secret.revisions[0].revision
-        self.charm.on.secret_rotate.emit(secret_id, label, revision)
+        self.charm.on.secret_rotate.emit(secret_id, label)
 
-    def trigger_secret_removal(self, secret_id: str, *, label: Optional[str] = None,
-                               revision: Optional[int] = None):
-        """Trigger a secret-remove event for the given secret.
+    def trigger_secret_removal(self, secret_id: str, revision: int, *,
+                               label: Optional[str] = None):
+        """Trigger a secret-remove event for the given secret and revision.
 
         This event is fired by Juju for a specific revision when all the
         secret's consumers have refreshed to a later revision, however, in the
@@ -1337,20 +1332,18 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret associated with the event.
+            revision: Revision number to provide to the event. This should be
+                an item from the list returned by :meth:`get_secret_revisions`.
             label: Label value to send to the event. If None, the secret's
                 label is used.
-            revision: Revision number to provide to the event. If None, the
-                secret's oldest revision is used.
         """
         secret = self._ensure_secret(secret_id)
         if label is None:
             label = secret.label
-        if revision is None:
-            revision = secret.revisions[0].revision
         self.charm.on.secret_remove.emit(secret_id, label, revision)
 
-    def trigger_secret_expiration(self, secret_id: str, *, label: Optional[str] = None,
-                                  revision: Optional[int] = None):
+    def trigger_secret_expiration(self, secret_id: str, revision: int, *,
+                                  label: Optional[str] = None):
         """Trigger a secret-expired event for the given secret.
 
         This event is fired by Juju when a secret's expiration time elapses,
@@ -1359,16 +1352,14 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret associated with the event.
+            revision: Revision number to provide to the event. This should be
+                an item from the list returned by :meth:`get_secret_revisions`.
             label: Label value to send to the event. If None, the secret's
                 label is used.
-            revision: Revision number to provide to the event. If None, the
-                secret's oldest revision is used.
         """
         secret = self._ensure_secret(secret_id)
         if label is None:
             label = secret.label
-        if revision is None:
-            revision = secret.revisions[0].revision
         self.charm.on.secret_expired.emit(secret_id, label, revision)
 
 
