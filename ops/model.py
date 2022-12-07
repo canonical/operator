@@ -2874,21 +2874,12 @@ class _ModelBackend:
                              key: str, value: str):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
-    def _run_for_secret(self, *args: str, return_output: bool = False,
-                        use_json: bool = False) -> Union[str, 'JsonObject', None]:
-        try:
-            return self._run(*args, return_output=return_output, use_json=use_json)
-        except ModelError as e:
-            if 'not found' in str(e):
-                raise SecretNotFoundError() from e
-            raise
-
     def secret_get(self, *,
                    id: Optional[str] = None,
                    label: Optional[str] = None,
                    refresh: bool = False,
                    peek: bool = False) -> Dict[str, str]:
-        args = []  # type: List[str]
+        args: List[str] = []
         if id is not None:
             args.append(id)
         if label is not None:
@@ -2897,8 +2888,25 @@ class _ModelBackend:
             args.append('--refresh')
         if peek:
             args.append('--peek')
-        result = self._run_for_secret('secret-get', *args, return_output=True, use_json=True)
+        # IMPORTANT: Don't call shared _run_for_secret method here; we want to
+        # be extra sensitive inside secret_get to ensure we never
+        # accidentally log or output secrets, even if _run_for_secret changes.
+        try:
+            result = self._run('secret-get', *args, return_output=True, use_json=True)
+        except ModelError as e:
+            if 'not found' in str(e):
+                raise SecretNotFoundError() from e
+            raise
         return typing.cast(Dict[str, str], result)
+
+    def _run_for_secret(self, *args: str, return_output: bool = False,
+                        use_json: bool = False) -> Union[str, 'JsonObject', None]:
+        try:
+            return self._run(*args, return_output=return_output, use_json=use_json)
+        except ModelError as e:
+            if 'not found' in str(e):
+                raise SecretNotFoundError() from e
+            raise
 
     def secret_info_get(self, *,
                         id: Optional[str] = None,
