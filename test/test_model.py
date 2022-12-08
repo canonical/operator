@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import datetime
 import ipaddress
 import json
@@ -942,6 +943,24 @@ class TestModel(unittest.TestCase):
     def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
+    def test_get_secret_id(self):
+        secret_id = self.harness.add_model_secret('myapp', {'foo': 'x'})
+        secret = self.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertIsNone(secret.label)
+        self.assertEqual(secret.get_content(), {'foo': 'x'})
+
+    def test_get_secret_id_and_label(self):
+        secret_id = self.harness.add_model_secret('myapp', {'foo': 'y'})
+        secret = self.model.get_secret(id=secret_id, label='lbl')
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.label, 'lbl')
+        self.assertEqual(secret.get_content(), {'foo': 'y'})
+
+    def test_get_secret_no_args(self):
+        with self.assertRaises(TypeError):
+            self.model.get_secret()
+
 
 class PushPullCase:
     """Test case for table-driven tests."""
@@ -1281,6 +1300,122 @@ class TestApplication(unittest.TestCase):
         # Verify that we can clear the override.
         self.harness.reset_planned_units()
         self.assertEqual(self.app.planned_units(), 4)  # self + 3 peers
+
+    def test_add_secret_simple(self):
+        secret = self.app.add_secret({'foo': 'x'})
+        self.assertIsInstance(secret, model.Secret)
+        self.assertTrue(secret.id.startswith('secret:'))
+        self.assertIsNone(secret.label)
+        self.assertEqual(secret.get_content(), {'foo': 'x'})
+        self.assertEqual(self.harness.get_secret_revisions(secret.id), [1])
+
+        info = secret.get_info()
+        self.assertTrue(info.id.startswith('secret:'))
+        self.assertIsNone(info.label)
+        self.assertEqual(info.revision, 1)
+        self.assertIsNone(info.expires)
+        self.assertIsNone(info.rotates)
+        self.assertIsNone(info.rotation)
+
+    def test_add_secret_args(self):
+        expire = datetime.datetime.now() + datetime.timedelta(days=1)
+        secret = self.app.add_secret({'foo': 'x'}, label='lbl', description='desc',
+                                     expire=expire, rotate=model.SecretRotate.HOURLY)
+        self.assertIs(secret.label, 'lbl')
+        self.assertEqual(secret.get_content(), {'foo': 'x'})
+
+        info = secret.get_info()
+        self.assertTrue(info.id.startswith('secret:'))
+        self.assertEqual(info.label, 'lbl')
+        self.assertEqual(info.revision, 1)
+        self.assertGreater(info.expires, expire - datetime.timedelta(minutes=1))
+        self.assertLess(info.expires, expire + datetime.timedelta(minutes=1))
+        self.assertIsNotNone(info.rotates)
+        self.assertEqual(info.rotation, model.SecretRotate.HOURLY)
+
+    def test_add_secret_owner(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns['secret_add'] = ['secret:123']
+        app = model.Application('myapp', None, backend, {})
+        app.add_secret({'foo': 'x'})
+        self.assertEqual(backend.calls['secret_add'][0].kwargs['owner'], 'application')
+
+    def test_add_secret_errors(self):
+        errors = [
+            # Invalid content dict or types
+            (None, {}, TypeError),
+            ({}, {}, ValueError),
+            ({b'foo', 'bar'}, {}, TypeError),
+            ({3: 'bar'}, {}, TypeError),
+            ({'foo': 1, 'bar': 2}, {}, TypeError),
+            # Invalid content keys
+            ({'xy': 'bar'}, {}, ValueError),
+            ({'FOO': 'bar'}, {}, ValueError),
+            ({'foo-': 'bar'}, {}, ValueError),
+            ({'-foo': 'bar'}, {}, ValueError),
+            # Invalid "expire" type
+            ({'foo': 'x'}, {'expire': 7}, TypeError),
+        ]
+        for content, kwargs, exc_type in errors:
+            msg = f'expected {exc_type.__name__} when adding secret content {content}'
+            with self.assertRaises(exc_type, msg=msg):
+                self.app.add_secret(content, **kwargs)
+
+
+ArgsKwargs = collections.namedtuple('ArgsKwargs', ['args', 'kwargs'])
+
+
+class MockSecretBackend:
+    def __init__(self, unit_name):
+        self.unit_name = unit_name
+        self.app_name = unit_name.split('/')[0]
+        self.calls = collections.defaultdict(list)
+        self.returns = {}
+
+    def secret_add(self, *args, **kwargs):
+        self.calls['secret_add'].append(ArgsKwargs(args, kwargs))
+        return self.returns['secret_add'].pop(0)
+
+
+class TestUnit(unittest.TestCase):
+    def setUp(self):
+        self.harness = ops.testing.Harness(ops.charm.CharmBase)
+        self.unit = self.harness.model.unit
+        self.addCleanup(self.harness.cleanup)
+
+    # Additional add_secret tests are done in TestApplication
+    def test_add_secret(self):
+        secret = self.unit.add_secret({'foo': 'x'})
+        self.assertIsInstance(secret, model.Secret)
+        self.assertTrue(secret.id.startswith('secret:'))
+        self.assertIsNone(secret.label)
+        self.assertEqual(secret.get_content(), {'foo': 'x'})
+        self.assertEqual(self.harness.get_secret_revisions(secret.id), [1])
+
+        info = secret.get_info()
+        self.assertTrue(info.id.startswith('secret:'))
+        self.assertIsNone(info.label)
+        self.assertEqual(info.revision, 1)
+        self.assertIsNone(info.expires)
+        self.assertIsNone(info.rotates)
+        self.assertIsNone(info.rotation)
+
+    def test_add_secret_owner(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns['secret_add'] = ['secret:123']
+        unit = model.Unit('app/0', None, backend, {})
+        unit.add_secret({'foo': 'x'})
+        self.assertEqual(backend.calls['secret_add'][0].kwargs['owner'], 'unit')
+
+    def test_add_secret_errors(self):
+        errors = [
+            ({'xy': 'bar'}, {}, ValueError),
+            ({'foo': 'x'}, {'expire': 7}, TypeError),
+        ]
+        for content, kwargs, exc_type in errors:
+            msg = f'expected {exc_type.__name__} when adding secret content {content}'
+            with self.assertRaises(exc_type, msg=msg):
+                self.unit.add_secret(content, **kwargs)
 
 
 class TestContainers(unittest.TestCase):

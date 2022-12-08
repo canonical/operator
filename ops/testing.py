@@ -1932,8 +1932,7 @@ class _TestingModelBackend:
         secret = self._ensure_secret_id_or_label(id, label)
 
         # Check that caller has permission to get this secret
-        owner_app = secret.owner_name.split('/')[0]
-        if owner_app == self.app_name:
+        if secret.owner_name in [self.app_name, self.unit_name]:
             # Owner or peer is calling, get latest revision
             peek = True
             if refresh:
@@ -1941,6 +1940,7 @@ class _TestingModelBackend:
         else:
             # Consumer is calling: does secret have a grant on relation between
             # this charm (the consumer) and the secret owner's app?
+            owner_app = secret.owner_name.split('/')[0]
             relation_id = self._relation_id_to(owner_app)
             if relation_id is None:
                 raise model.SecretNotFoundError(
@@ -1971,7 +1971,7 @@ class _TestingModelBackend:
     def _ensure_secret_owner(self, secret: _Secret):
         if secret.owner_name not in [self.app_name, self.unit_name]:
             raise model.SecretNotFoundError(
-                f'You must own secret {id!r} to perform this operation')
+                f'You must own secret {secret.id!r} to perform this operation')
 
     def secret_info_get(self, *,
                         id: Optional[str] = None,

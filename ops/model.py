@@ -1004,23 +1004,31 @@ class Secret:
     @classmethod
     def _validate_content(cls, content: Optional[Dict[str, str]]):
         """Ensure the given secret content is valid, or raise ValueError."""
+        if not isinstance(content, dict):
+            raise TypeError(f'Secret content must be a dict, not {type(content).__name__}')
         if not content:
             raise ValueError('Secret content must not be empty')
 
-        invalid_keys = [k for k in content if not cls._key_re.match(k)]
-        invalid_value_keys = [k for k, v in content.items() if not isinstance(v, str)]
-        msg = ''
+        invalid_keys: List[str] = []
+        invalid_value_keys: List[str] = []
+        invalid_value_types: Set[str] = set()
+        for k, v in content.items():
+            if not cls._key_re.match(k):
+                invalid_keys.append(k)
+            if not isinstance(v, str):
+                invalid_value_keys.append(k)
+                invalid_value_types.add(type(v).__name__)
+
         if invalid_keys:
-            msg += (f'Invalid secret keys: {invalid_keys}. '
-                    + 'Keys should be lowercase letters and digits, at least 3 characters long, '
-                    + 'start with a letter, and not start or end with a hyphen.')
+            raise ValueError(
+                f'Invalid secret keys: {invalid_keys}. '
+                f'Keys should be lowercase letters and digits, at least 3 characters long, '
+                f'start with a letter, and not start or end with a hyphen.')
+
         if invalid_value_keys:
-            if msg:
-                msg += ' '
-            msg += (f'Invalid secret values for keys: {invalid_value_keys}. '
-                    + 'Values should be of type str.')
-        if msg:
-            raise ValueError(msg)
+            invalid_types = ' or '.join(sorted(invalid_value_types))
+            raise TypeError(f'Invalid secret values for keys: {invalid_value_keys}. '
+                            f'Values should be of type str, not {invalid_types}.')
 
     @property
     def id(self) -> Optional[str]:
