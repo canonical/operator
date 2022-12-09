@@ -1204,7 +1204,7 @@ class TestMultipartParser(unittest.TestCase):
                     if not test.error:
                         self.fail('unexpected error:', err)
                         break
-                    self.assertEqual(test.error, err.message())
+                    self.assertEqual(test.error, str(err))
                 else:
                     if test.error:
                         self.fail('missing expected error: {!r}'.format(test.error))
