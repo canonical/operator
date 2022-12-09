@@ -951,24 +951,6 @@ class TestModel(unittest.TestCase):
     def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
-    def test_get_secret_id(self):
-        secret_id = self.harness.add_model_secret('myapp', {'foo': 'x'})
-        secret = self.model.get_secret(id=secret_id)
-        self.assertEqual(secret.id, secret_id)
-        self.assertIsNone(secret.label)
-        self.assertEqual(secret.get_content(), {'foo': 'x'})
-
-    def test_get_secret_id_and_label(self):
-        secret_id = self.harness.add_model_secret('myapp', {'foo': 'y'})
-        secret = self.model.get_secret(id=secret_id, label='lbl')
-        self.assertEqual(secret.id, secret_id)
-        self.assertEqual(secret.label, 'lbl')
-        self.assertEqual(secret.get_content(), {'foo': 'y'})
-
-    def test_get_secret_no_args(self):
-        with self.assertRaises(TypeError):
-            self.model.get_secret()
-
 
 class PushPullCase:
     """Test case for table-driven tests."""
@@ -1308,142 +1290,6 @@ class TestApplication(unittest.TestCase):
         # Verify that we can clear the override.
         self.harness.reset_planned_units()
         self.assertEqual(self.app.planned_units(), 4)  # self + 3 peers
-
-    def test_add_secret_simple(self):
-        secret = self.app.add_secret({'foo': 'x'})
-        self.assertIsInstance(secret, model.Secret)
-        self.assertTrue(secret.id.startswith('secret:'))
-        self.assertIsNone(secret.label)
-        self.assertEqual(secret.get_content(), {'foo': 'x'})
-        self.assertEqual(self.harness.get_secret_revisions(secret.id), [1])
-
-        info = secret.get_info()
-        self.assertTrue(info.id.startswith('secret:'))
-        self.assertIsNone(info.label)
-        self.assertEqual(info.revision, 1)
-        self.assertIsNone(info.expires)
-        self.assertIsNone(info.rotates)
-        self.assertIsNone(info.rotation)
-
-    def test_add_secret_args(self):
-        expire = datetime.datetime.now() + datetime.timedelta(days=1)
-        secret = self.app.add_secret({'foo': 'x'}, label='lbl', description='desc',
-                                     expire=expire, rotate=model.SecretRotate.HOURLY)
-        self.assertIs(secret.label, 'lbl')
-        self.assertEqual(secret.get_content(), {'foo': 'x'})
-
-        info = secret.get_info()
-        self.assertTrue(info.id.startswith('secret:'))
-        self.assertEqual(info.label, 'lbl')
-        self.assertEqual(info.revision, 1)
-        self.assertGreater(info.expires, expire - datetime.timedelta(minutes=1))
-        self.assertLess(info.expires, expire + datetime.timedelta(minutes=1))
-        self.assertIsNotNone(info.rotates)
-        self.assertEqual(info.rotation, model.SecretRotate.HOURLY)
-
-    def test_add_secret_owner(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns['secret_add'] = ['secret:123']
-        app = model.Application('myapp', None, backend, {})
-        app.add_secret({'foo': 'x'})
-        self.assertEqual(backend.calls['secret_add'][0].kwargs['owner'], 'application')
-
-    def test_add_secret_errors(self):
-        errors = [
-            # Invalid content dict or types
-            (None, {}, TypeError),
-            ({}, {}, ValueError),
-            ({b'foo', 'bar'}, {}, TypeError),
-            ({3: 'bar'}, {}, TypeError),
-            ({'foo': 1, 'bar': 2}, {}, TypeError),
-            # Invalid content keys
-            ({'xy': 'bar'}, {}, ValueError),
-            ({'FOO': 'bar'}, {}, ValueError),
-            ({'foo-': 'bar'}, {}, ValueError),
-            ({'-foo': 'bar'}, {}, ValueError),
-            # Invalid "expire" type
-            ({'foo': 'x'}, {'expire': 7}, TypeError),
-        ]
-        for content, kwargs, exc_type in errors:
-            msg = f'expected {exc_type.__name__} when adding secret content {content}'
-            with self.assertRaises(exc_type, msg=msg):
-                self.app.add_secret(content, **kwargs)
-
-
-ArgsKwargs = collections.namedtuple('ArgsKwargs', ['args', 'kwargs'])
-
-
-class MockSecretBackend:
-    def __init__(self, unit_name):
-        self.unit_name = unit_name
-        self.app_name = unit_name.split('/')[0]
-        self.calls = collections.defaultdict(list)
-        self.returns = {}
-
-    def secret_get(self, *args, **kwargs):
-        self.calls['secret_get'].append(ArgsKwargs(args, kwargs))
-        return self.returns['secret_get'].pop(0)
-
-    def secret_info_get(self, *args, **kwargs):
-        self.calls['secret_info_get'].append(ArgsKwargs(args, kwargs))
-        return self.returns['secret_info_get'].pop(0)
-
-    def secret_add(self, *args, **kwargs):
-        self.calls['secret_add'].append(ArgsKwargs(args, kwargs))
-        return self.returns['secret_add'].pop(0)
-
-    def secret_set(self, *args, **kwargs):
-        self.calls['secret_set'].append(ArgsKwargs(args, kwargs))
-
-    def secret_grant(self, *args, **kwargs):
-        self.calls['secret_grant'].append(ArgsKwargs(args, kwargs))
-
-    def secret_revoke(self, *args, **kwargs):
-        self.calls['secret_revoke'].append(ArgsKwargs(args, kwargs))
-
-    def secret_remove(self, *args, **kwargs):
-        self.calls['secret_remove'].append(ArgsKwargs(args, kwargs))
-
-
-class TestUnit(unittest.TestCase):
-    def setUp(self):
-        self.harness = ops.testing.Harness(ops.charm.CharmBase)
-        self.unit = self.harness.model.unit
-        self.addCleanup(self.harness.cleanup)
-
-    # Additional add_secret tests are done in TestApplication
-    def test_add_secret(self):
-        secret = self.unit.add_secret({'foo': 'x'})
-        self.assertIsInstance(secret, model.Secret)
-        self.assertTrue(secret.id.startswith('secret:'))
-        self.assertIsNone(secret.label)
-        self.assertEqual(secret.get_content(), {'foo': 'x'})
-        self.assertEqual(self.harness.get_secret_revisions(secret.id), [1])
-
-        info = secret.get_info()
-        self.assertTrue(info.id.startswith('secret:'))
-        self.assertIsNone(info.label)
-        self.assertEqual(info.revision, 1)
-        self.assertIsNone(info.expires)
-        self.assertIsNone(info.rotates)
-        self.assertIsNone(info.rotation)
-
-    def test_add_secret_owner(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns['secret_add'] = ['secret:123']
-        unit = model.Unit('app/0', None, backend, {})
-        unit.add_secret({'foo': 'x'})
-        self.assertEqual(backend.calls['secret_add'][0].kwargs['owner'], 'unit')
-
-    def test_add_secret_errors(self):
-        errors = [
-            ({'xy': 'bar'}, {}, ValueError),
-            ({'foo': 'x'}, {'expire': 7}, TypeError),
-        ]
-        for content, kwargs, exc_type in errors:
-            msg = f'expected {exc_type.__name__} when adding secret content {content}'
-            with self.assertRaises(exc_type, msg=msg):
-                self.unit.add_secret(content, **kwargs)
 
 
 class TestContainers(unittest.TestCase):
@@ -2852,6 +2698,125 @@ class TestLazyMapping(unittest.TestCase):
         self.assertEqual(loaded, [1, 1])
 
 
+class TestSecrets(unittest.TestCase):
+    def setUp(self):
+        self.model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+        self.app = self.model.app
+        self.unit = self.model.unit
+
+    def test_app_add_secret_simple(self):
+        fake_script(self, 'secret-add', 'echo secret:123')
+
+        secret = self.app.add_secret({'foo': 'x'})
+        self.assertIsInstance(secret, model.Secret)
+        self.assertEqual(secret.id, 'secret:123')
+        self.assertIsNone(secret.label)
+
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-add', '--owner', 'application', 'foo=x']])
+
+    def test_app_add_secret_args(self):
+        fake_script(self, 'secret-add', 'echo secret:234')
+
+        expire = datetime.datetime(2022, 12, 9, 16, 17, 0)
+        secret = self.app.add_secret({'foo': 'x', 'bar': 'y'}, label='lbl', description='desc',
+                                     expire=expire, rotate=model.SecretRotate.HOURLY)
+        self.assertEqual(secret.id, 'secret:234')
+        self.assertEqual(secret.label, 'lbl')
+        self.assertEqual(secret.get_content(), {'foo': 'x', 'bar': 'y'})
+
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-add', '--label', 'lbl', '--description', 'desc',
+                           '--expire', '2022-12-09T16:17:00', '--rotate', 'hourly',
+                           '--owner', 'application', 'foo=x', 'bar=y']])
+
+    def test_unit_add_secret_simple(self):
+        fake_script(self, 'secret-add', 'echo secret:345')
+
+        secret = self.unit.add_secret({'foo': 'x'})
+        self.assertIsInstance(secret, model.Secret)
+        self.assertEqual(secret.id, 'secret:345')
+        self.assertIsNone(secret.label)
+
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-add', '--owner', 'unit', 'foo=x']])
+
+    def test_unit_add_secret_args(self):
+        fake_script(self, 'secret-add', 'echo secret:456')
+
+        expire = datetime.datetime(2022, 12, 9, 16, 22, 0)
+        secret = self.unit.add_secret({'foo': 'w', 'bar': 'z'}, label='l2', description='xyz',
+                                      expire=expire, rotate=model.SecretRotate.YEARLY)
+        self.assertEqual(secret.id, 'secret:456')
+        self.assertEqual(secret.label, 'l2')
+        self.assertEqual(secret.get_content(), {'foo': 'w', 'bar': 'z'})
+
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-add', '--label', 'l2', '--description', 'xyz',
+                           '--expire', '2022-12-09T16:22:00', '--rotate', 'yearly',
+                           '--owner', 'unit', 'foo=w', 'bar=z']])
+
+    def test_unit_add_secret_errors(self):
+        # Additional add_secret tests are done in TestApplication
+        errors = [
+            ({'xy': 'bar'}, {}, ValueError),
+            ({'foo': 'x'}, {'expire': 7}, TypeError),
+        ]
+        for content, kwargs, exc_type in errors:
+            msg = f'expected {exc_type.__name__} when adding secret content {content}'
+            with self.assertRaises(exc_type, msg=msg):
+                self.unit.add_secret(content, **kwargs)
+
+    def test_add_secret_errors(self):
+        errors = [
+            # Invalid content dict or types
+            (None, {}, TypeError),
+            ({}, {}, ValueError),
+            ({b'foo', 'bar'}, {}, TypeError),
+            ({3: 'bar'}, {}, TypeError),
+            ({'foo': 1, 'bar': 2}, {}, TypeError),
+            # Invalid content keys
+            ({'xy': 'bar'}, {}, ValueError),
+            ({'FOO': 'bar'}, {}, ValueError),
+            ({'foo-': 'bar'}, {}, ValueError),
+            ({'-foo': 'bar'}, {}, ValueError),
+            # Invalid "expire" type
+            ({'foo': 'x'}, {'expire': 7}, TypeError),
+        ]
+        for content, kwargs, exc_type in errors:
+            msg = f'expected {exc_type.__name__} when adding secret content {content}'
+            with self.assertRaises(exc_type, msg=msg):
+                self.app.add_secret(content, **kwargs)
+            with self.assertRaises(exc_type, msg=msg):
+                self.unit.add_secret(content, **kwargs)
+
+    def test_get_secret_id(self):
+        fake_script(self, 'secret-get', """echo '{"foo": "g"}'""")
+
+        secret = self.model.get_secret(id='123')
+        self.assertEqual(secret.id, 'secret:123')
+        self.assertIsNone(secret.label)
+        self.assertEqual(secret.get_content(), {'foo': 'g'})
+
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-get', '123', '--format=json']])
+
+    def test_get_secret_id_and_label(self):
+        fake_script(self, 'secret-get', """echo '{"foo": "h"}'""")
+
+        secret = self.model.get_secret(id='123', label='l')
+        self.assertEqual(secret.id, 'secret:123')
+        self.assertEqual(secret.label, 'l')
+        self.assertEqual(secret.get_content(), {'foo': 'h'})
+
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-get', '123', '--label', 'l', '--format=json']])
+
+    def test_get_secret_no_args(self):
+        with self.assertRaises(TypeError):
+            self.model.get_secret()
+
+
 class TestSecretInfo(unittest.TestCase):
     def test_init(self):
         info = model.SecretInfo(
@@ -2905,86 +2870,88 @@ class TestSecretInfo(unittest.TestCase):
         self.assertEqual(info.revision, 9)
 
 
-class TestSecret(unittest.TestCase):
-    maxDiff = 64*1024
+class TestSecretClass(unittest.TestCase):
+    maxDiff = 64 * 1024
+
+    def setUp(self):
+        self.model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+
+    def make_secret(self, id=None, label=None, content=None):
+        return model.Secret(self.model._backend, id=id, label=label, content=content)
 
     def test_id_and_label(self):
-        secret = model.Secret(None, id=' abc ', label='lbl')
+        secret = self.make_secret(id=' abc ', label='lbl')
         self.assertEqual(secret.id, 'secret:abc')
         self.assertEqual(secret.label, 'lbl')
 
-        secret = model.Secret(None, id='x')
+        secret = self.make_secret(id='x')
         self.assertEqual(secret.id, 'secret:x')
         self.assertIsNone(secret.label)
 
-        secret = model.Secret(None, label='y')
+        secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
         self.assertEqual(secret.label, 'y')
 
-    def test_get_content(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_get': [
-            {'foo': 'refreshed'},
-            {'foo': 'notcached'},
-        ]}
+    def test_get_content_cached(self):
+        fake_script(self, 'secret-get', """exit 1""")
 
-        secret = model.Secret(backend, id='x', label='y', content={'foo': 'bar'})
+        secret = self.make_secret(id='x', label='y', content={'foo': 'bar'})
         content = secret.get_content()  # will use cached content, not run secret-get
         self.assertEqual(content, {'foo': 'bar'})
 
+        self.assertEqual(fake_script_calls(self, clear=True), [])
+
+    def test_get_content_refresh(self):
+        fake_script(self, 'secret-get', """echo '{"foo": "refreshed"}'""")
+
+        secret = self.make_secret(id='y', content={'foo': 'bar'})
         content = secret.get_content(refresh=True)
         self.assertEqual(content, {'foo': 'refreshed'})
 
-        secret = model.Secret(backend, id='y', label='z')
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-get', 'secret:y', '--refresh', '--format=json']])
+
+    def test_get_content_uncached(self):
+        fake_script(self, 'secret-get', """echo '{"foo": "notcached"}'""")
+
+        secret = self.make_secret(id='z')
         content = secret.get_content()
         self.assertEqual(content, {'foo': 'notcached'})
 
-        self.assertEqual(dict(backend.calls), {'secret_get': [
-            ArgsKwargs((), {'id': 'secret:x', 'label': 'y', 'refresh': True}),
-            ArgsKwargs((), {'id': 'secret:y', 'label': 'z', 'refresh': False}),
-        ]})
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-get', 'secret:z', '--format=json']])
 
     def test_peek_content(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_get': [
-            {'foo': 'peeked'},
-        ]}
+        fake_script(self, 'secret-get', """echo '{"foo": "peeked"}'""")
 
-        secret = model.Secret(backend, id='a', label='b')
+        secret = self.make_secret(id='a', label='b')
         content = secret.peek_content()
         self.assertEqual(content, {'foo': 'peeked'})
 
-        self.assertEqual(dict(backend.calls), {'secret_get': [
-            ArgsKwargs((), {'id': 'secret:a', 'label': 'b', 'peek': True}),
-        ]})
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-get', 'secret:a', '--label', 'b', '--peek', '--format=json']])
 
     def test_get_info(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_info_get': [
-            model.SecretInfo.from_dict('secret:x', {'label': 'y', 'revision': 7}),
-        ]}
+        fake_script(self, 'secret-info-get', """echo '{"x": {"label": "y", "revision": 7}}'""")
 
-        secret = model.Secret(backend, id='x', label='y')
+        secret = self.make_secret(id='x', label='y')
         info = secret.get_info()
         self.assertEqual(info.id, 'secret:x')
         self.assertEqual(info.label, 'y')
         self.assertEqual(info.revision, 7)
 
-        self.assertEqual(dict(backend.calls), {'secret_info_get': [
-            ArgsKwargs((), {'id': 'secret:x', 'label': 'y'}),
-        ]})
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-info-get', 'secret:x', '--label', 'y', '--format=json']])
 
     def test_set_content(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_info_get': [
-            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
-        ]}
+        fake_script(self, 'secret-set', """exit 0""")
+        fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
-        secret = model.Secret(backend, id='x')
+        secret = self.make_secret(id='x')
         secret.set_content({'foo': 'bar'})
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
-        secret = model.Secret(backend, label='y')
+        secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
         secret.set_content({'bar': 'foo'})
         self.assertEqual(secret.id, 'secret:z')
@@ -2992,24 +2959,18 @@ class TestSecret(unittest.TestCase):
         with self.assertRaises(ValueError):
             secret.set_content({'s': 't'})  # ensure it validates content (key too short)
 
-        self.assertEqual(dict(backend.calls), {
-            'secret_info_get': [
-                ArgsKwargs((), {'id': None, 'label': 'y'}),
-            ],
-            'secret_set': [
-                ArgsKwargs(('secret:x',), {'content': {'foo': 'bar'}}),
-                ArgsKwargs(('secret:z',), {'content': {'bar': 'foo'}}),
-            ],
-        })
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['secret-set', 'secret:x', 'foo=bar'],
+            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-set', 'secret:z', 'bar=foo'],
+        ])
 
     def test_set_info(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_info_get': [
-            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
-        ]}
+        fake_script(self, 'secret-set', """exit 0""")
+        fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
-        secret = model.Secret(backend, id='x')
-        expire = datetime.datetime.now()
+        secret = self.make_secret(id='x')
+        expire = datetime.datetime(2022, 12, 9, 16, 59, 0)
         secret.set_info(
             label='lab',
             description='desc',
@@ -3018,137 +2979,100 @@ class TestSecret(unittest.TestCase):
         )
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
-        secret = model.Secret(backend, label='y')
+        secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
         secret.set_info(label='lbl')
         self.assertEqual(secret.id, 'secret:z')
 
-        self.assertEqual(dict(backend.calls), {
-            'secret_info_get': [
-                ArgsKwargs((), {'id': None, 'label': 'y'}),
-            ],
-            'secret_set': [
-                ArgsKwargs(('secret:x',), {
-                    'label': 'lab',
-                    'description': 'desc',
-                    'expire': expire,
-                    'rotate': model.SecretRotate.MONTHLY,
-                }),
-                ArgsKwargs(('secret:z',), {
-                    'label': 'lbl',
-                    'description': None,
-                    'expire': None,
-                    'rotate': None,
-                }),
-            ],
-        })
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['secret-set', 'secret:x', '--label', 'lab', '--description', 'desc',
+             '--expire', '2022-12-09T16:59:00', '--rotate', 'monthly'],
+            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-set', 'secret:z', '--label', 'lbl'],
+        ])
 
         with self.assertRaises(TypeError):
             secret.set_info()  # no args provided
 
     def test_grant(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_info_get': [
-            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
-        ]}
+        fake_script(self, 'secret-grant', """exit 0""")
+        fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
-        secret = model.Secret(backend, id='x')
+        secret = self.make_secret(id='x')
         secret.grant(types.SimpleNamespace(id=123))
         secret.grant(types.SimpleNamespace(id=234), unit=types.SimpleNamespace(name='app/0'))
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
-        secret = model.Secret(backend, label='y')
+        secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
         secret.grant(types.SimpleNamespace(id=345))
         self.assertEqual(secret.id, 'secret:z')
 
-        self.assertEqual(dict(backend.calls), {
-            'secret_info_get': [
-                ArgsKwargs((), {'id': None, 'label': 'y'}),
-            ],
-            'secret_grant': [
-                ArgsKwargs(('secret:x', 123), {'unit': None}),
-                ArgsKwargs(('secret:x', 234), {'unit': 'app/0'}),
-                ArgsKwargs(('secret:z', 345), {'unit': None}),
-            ],
-        })
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['secret-grant', 'secret:x', '--relation', '123'],
+            ['secret-grant', 'secret:x', '--relation', '234', '--unit', 'app/0'],
+            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-grant', 'secret:z', '--relation', '345'],
+        ])
 
     def test_revoke(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_info_get': [
-            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
-        ]}
+        fake_script(self, 'secret-revoke', """exit 0""")
+        fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
-        secret = model.Secret(backend, id='x')
+        secret = self.make_secret(id='x')
         secret.revoke(types.SimpleNamespace(id=123))
         secret.revoke(types.SimpleNamespace(id=234), unit=types.SimpleNamespace(name='app/0'))
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
-        secret = model.Secret(backend, label='y')
+        secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
         secret.revoke(types.SimpleNamespace(id=345))
         self.assertEqual(secret.id, 'secret:z')
 
-        self.assertEqual(dict(backend.calls), {
-            'secret_info_get': [
-                ArgsKwargs((), {'id': None, 'label': 'y'}),
-            ],
-            'secret_revoke': [
-                ArgsKwargs(('secret:x', 123), {'unit': None}),
-                ArgsKwargs(('secret:x', 234), {'unit': 'app/0'}),
-                ArgsKwargs(('secret:z', 345), {'unit': None}),
-            ],
-        })
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['secret-revoke', 'secret:x', '--relation', '123'],
+            ['secret-revoke', 'secret:x', '--relation', '234', '--unit', 'app/0'],
+            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-revoke', 'secret:z', '--relation', '345'],
+        ])
 
     def test_remove_revision(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_info_get': [
-            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
-        ]}
+        fake_script(self, 'secret-remove', """exit 0""")
+        fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
-        secret = model.Secret(backend, id='x')
+        secret = self.make_secret(id='x')
         secret.remove_revision(123)
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
-        secret = model.Secret(backend, label='y')
+        secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
         secret.remove_revision(234)
         self.assertEqual(secret.id, 'secret:z')
 
-        self.assertEqual(dict(backend.calls), {
-            'secret_info_get': [
-                ArgsKwargs((), {'id': None, 'label': 'y'}),
-            ],
-            'secret_remove': [
-                ArgsKwargs(('secret:x',), {'revision': 123}),
-                ArgsKwargs(('secret:z',), {'revision': 234}),
-            ],
-        })
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['secret-remove', 'secret:x', '--revision', '123'],
+            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-remove', 'secret:z', '--revision', '234'],
+        ])
 
     def test_remove_all(self):
-        backend = MockSecretBackend('myapp/0')
-        backend.returns = {'secret_info_get': [
-            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
-        ]}
+        fake_script(self, 'secret-remove', """exit 0""")
+        fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
-        secret = model.Secret(backend, id='x')
+        secret = self.make_secret(id='x')
         secret.remove_all()
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
-        secret = model.Secret(backend, label='y')
+        secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
         secret.remove_all()
         self.assertEqual(secret.id, 'secret:z')
 
-        self.assertEqual(dict(backend.calls), {
-            'secret_info_get': [
-                ArgsKwargs((), {'id': None, 'label': 'y'}),
-            ],
-            'secret_remove': [
-                ArgsKwargs(('secret:x',), {}),
-                ArgsKwargs(('secret:z',), {}),
-            ],
-        })
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['secret-remove', 'secret:x'],
+            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-remove', 'secret:z'],
+        ])
 
 
 if __name__ == "__main__":
