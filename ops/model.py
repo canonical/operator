@@ -923,7 +923,7 @@ class SecretInfo:
                  expires: Optional[datetime.datetime],
                  rotation: Optional[SecretRotate],
                  rotates: Optional[datetime.datetime]):
-        self.id = id
+        self.id = Secret._canonicalize_id(id)
         self.label = label
         self.revision = revision
         self.expires = expires

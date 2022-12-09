@@ -21,6 +21,7 @@ import os
 import pathlib
 import sys
 import tempfile
+import types
 import unittest
 from collections import OrderedDict
 from test.test_helpers import fake_script, fake_script_calls
@@ -1379,9 +1380,29 @@ class MockSecretBackend:
         self.calls = collections.defaultdict(list)
         self.returns = {}
 
+    def secret_get(self, *args, **kwargs):
+        self.calls['secret_get'].append(ArgsKwargs(args, kwargs))
+        return self.returns['secret_get'].pop(0)
+
+    def secret_info_get(self, *args, **kwargs):
+        self.calls['secret_info_get'].append(ArgsKwargs(args, kwargs))
+        return self.returns['secret_info_get'].pop(0)
+
     def secret_add(self, *args, **kwargs):
         self.calls['secret_add'].append(ArgsKwargs(args, kwargs))
         return self.returns['secret_add'].pop(0)
+
+    def secret_set(self, *args, **kwargs):
+        self.calls['secret_set'].append(ArgsKwargs(args, kwargs))
+
+    def secret_grant(self, *args, **kwargs):
+        self.calls['secret_grant'].append(ArgsKwargs(args, kwargs))
+
+    def secret_revoke(self, *args, **kwargs):
+        self.calls['secret_revoke'].append(ArgsKwargs(args, kwargs))
+
+    def secret_remove(self, *args, **kwargs):
+        self.calls['secret_remove'].append(ArgsKwargs(args, kwargs))
 
 
 class TestUnit(unittest.TestCase):
@@ -2829,6 +2850,305 @@ class TestLazyMapping(unittest.TestCase):
         map._invalidate()
         self.assertEqual(map['foo'], 'bar')
         self.assertEqual(loaded, [1, 1])
+
+
+class TestSecretInfo(unittest.TestCase):
+    def test_init(self):
+        info = model.SecretInfo(
+            id='3',
+            label='lbl',
+            revision=7,
+            expires=datetime.datetime(2022, 12, 9, 14, 10, 0),
+            rotation=model.SecretRotate.MONTHLY,
+            rotates=datetime.datetime(2023, 1, 9, 14, 10, 0),
+        )
+        self.assertEqual(info.id, 'secret:3')
+        self.assertEqual(info.label, 'lbl')
+        self.assertEqual(info.revision, 7)
+        self.assertEqual(info.expires, datetime.datetime(2022, 12, 9, 14, 10, 0))
+        self.assertEqual(info.rotation, model.SecretRotate.MONTHLY)
+        self.assertEqual(info.rotates, datetime.datetime(2023, 1, 9, 14, 10, 0))
+
+        self.assertTrue(repr(info).startswith('SecretInfo('))
+        self.assertTrue(repr(info).endswith(')'))
+
+    def test_from_dict(self):
+        utc = datetime.timezone.utc
+        info = model.SecretInfo.from_dict('secret:4', {
+            'label': 'fromdict',
+            'revision': 8,
+            'expires': '2022-12-09T14:10:00Z',
+            'rotation': 'yearly',
+            'rotates': '2023-01-09T14:10:00Z',
+        })
+        self.assertEqual(info.id, 'secret:4')
+        self.assertEqual(info.label, 'fromdict')
+        self.assertEqual(info.revision, 8)
+        self.assertEqual(info.expires, datetime.datetime(2022, 12, 9, 14, 10, 0, tzinfo=utc))
+        self.assertEqual(info.rotation, model.SecretRotate.YEARLY)
+        self.assertEqual(info.rotates, datetime.datetime(2023, 1, 9, 14, 10, 0, tzinfo=utc))
+
+        info = model.SecretInfo.from_dict('secret:4', {
+            'label': 'fromdict',
+            'revision': 8,
+            'rotation': 'badvalue',
+        })
+        self.assertEqual(info.id, 'secret:4')
+        self.assertEqual(info.label, 'fromdict')
+        self.assertEqual(info.revision, 8)
+        self.assertIsNone(info.expires)
+        self.assertIsNone(info.rotation)
+        self.assertIsNone(info.rotates)
+
+        info = model.SecretInfo.from_dict('5', {'revision': 9})
+        self.assertEqual(info.id, 'secret:5')
+        self.assertEqual(info.revision, 9)
+
+
+class TestSecret(unittest.TestCase):
+    maxDiff = 64*1024
+
+    def test_id_and_label(self):
+        secret = model.Secret(None, id=' abc ', label='lbl')
+        self.assertEqual(secret.id, 'secret:abc')
+        self.assertEqual(secret.label, 'lbl')
+
+        secret = model.Secret(None, id='x')
+        self.assertEqual(secret.id, 'secret:x')
+        self.assertIsNone(secret.label)
+
+        secret = model.Secret(None, label='y')
+        self.assertIsNone(secret.id)
+        self.assertEqual(secret.label, 'y')
+
+    def test_get_content(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_get': [
+            {'foo': 'refreshed'},
+            {'foo': 'notcached'},
+        ]}
+
+        secret = model.Secret(backend, id='x', label='y', content={'foo': 'bar'})
+        content = secret.get_content()  # will use cached content, not run secret-get
+        self.assertEqual(content, {'foo': 'bar'})
+
+        content = secret.get_content(refresh=True)
+        self.assertEqual(content, {'foo': 'refreshed'})
+
+        secret = model.Secret(backend, id='y', label='z')
+        content = secret.get_content()
+        self.assertEqual(content, {'foo': 'notcached'})
+
+        self.assertEqual(dict(backend.calls), {'secret_get': [
+            ArgsKwargs((), {'id': 'secret:x', 'label': 'y', 'refresh': True}),
+            ArgsKwargs((), {'id': 'secret:y', 'label': 'z', 'refresh': False}),
+        ]})
+
+    def test_peek_content(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_get': [
+            {'foo': 'peeked'},
+        ]}
+
+        secret = model.Secret(backend, id='a', label='b')
+        content = secret.peek_content()
+        self.assertEqual(content, {'foo': 'peeked'})
+
+        self.assertEqual(dict(backend.calls), {'secret_get': [
+            ArgsKwargs((), {'id': 'secret:a', 'label': 'b', 'peek': True}),
+        ]})
+
+    def test_get_info(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_info_get': [
+            model.SecretInfo.from_dict('secret:x', {'label': 'y', 'revision': 7}),
+        ]}
+
+        secret = model.Secret(backend, id='x', label='y')
+        info = secret.get_info()
+        self.assertEqual(info.id, 'secret:x')
+        self.assertEqual(info.label, 'y')
+        self.assertEqual(info.revision, 7)
+
+        self.assertEqual(dict(backend.calls), {'secret_info_get': [
+            ArgsKwargs((), {'id': 'secret:x', 'label': 'y'}),
+        ]})
+
+    def test_set_content(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_info_get': [
+            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
+        ]}
+
+        secret = model.Secret(backend, id='x')
+        secret.set_content({'foo': 'bar'})
+
+        # If secret doesn't have an ID, we'll run secret-info-get to fetch it
+        secret = model.Secret(backend, label='y')
+        self.assertIsNone(secret.id)
+        secret.set_content({'bar': 'foo'})
+        self.assertEqual(secret.id, 'secret:z')
+
+        with self.assertRaises(ValueError):
+            secret.set_content({'s': 't'})  # ensure it validates content (key too short)
+
+        self.assertEqual(dict(backend.calls), {
+            'secret_info_get': [
+                ArgsKwargs((), {'id': None, 'label': 'y'}),
+            ],
+            'secret_set': [
+                ArgsKwargs(('secret:x',), {'content': {'foo': 'bar'}}),
+                ArgsKwargs(('secret:z',), {'content': {'bar': 'foo'}}),
+            ],
+        })
+
+    def test_set_info(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_info_get': [
+            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
+        ]}
+
+        secret = model.Secret(backend, id='x')
+        expire = datetime.datetime.now()
+        secret.set_info(
+            label='lab',
+            description='desc',
+            expire=expire,
+            rotate=model.SecretRotate.MONTHLY,
+        )
+
+        # If secret doesn't have an ID, we'll run secret-info-get to fetch it
+        secret = model.Secret(backend, label='y')
+        self.assertIsNone(secret.id)
+        secret.set_info(label='lbl')
+        self.assertEqual(secret.id, 'secret:z')
+
+        self.assertEqual(dict(backend.calls), {
+            'secret_info_get': [
+                ArgsKwargs((), {'id': None, 'label': 'y'}),
+            ],
+            'secret_set': [
+                ArgsKwargs(('secret:x',), {
+                    'label': 'lab',
+                    'description': 'desc',
+                    'expire': expire,
+                    'rotate': model.SecretRotate.MONTHLY,
+                }),
+                ArgsKwargs(('secret:z',), {
+                    'label': 'lbl',
+                    'description': None,
+                    'expire': None,
+                    'rotate': None,
+                }),
+            ],
+        })
+
+        with self.assertRaises(TypeError):
+            secret.set_info()  # no args provided
+
+    def test_grant(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_info_get': [
+            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
+        ]}
+
+        secret = model.Secret(backend, id='x')
+        secret.grant(types.SimpleNamespace(id=123))
+        secret.grant(types.SimpleNamespace(id=234), unit=types.SimpleNamespace(name='app/0'))
+
+        # If secret doesn't have an ID, we'll run secret-info-get to fetch it
+        secret = model.Secret(backend, label='y')
+        self.assertIsNone(secret.id)
+        secret.grant(types.SimpleNamespace(id=345))
+        self.assertEqual(secret.id, 'secret:z')
+
+        self.assertEqual(dict(backend.calls), {
+            'secret_info_get': [
+                ArgsKwargs((), {'id': None, 'label': 'y'}),
+            ],
+            'secret_grant': [
+                ArgsKwargs(('secret:x', 123), {'unit': None}),
+                ArgsKwargs(('secret:x', 234), {'unit': 'app/0'}),
+                ArgsKwargs(('secret:z', 345), {'unit': None}),
+            ],
+        })
+
+    def test_revoke(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_info_get': [
+            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
+        ]}
+
+        secret = model.Secret(backend, id='x')
+        secret.revoke(types.SimpleNamespace(id=123))
+        secret.revoke(types.SimpleNamespace(id=234), unit=types.SimpleNamespace(name='app/0'))
+
+        # If secret doesn't have an ID, we'll run secret-info-get to fetch it
+        secret = model.Secret(backend, label='y')
+        self.assertIsNone(secret.id)
+        secret.revoke(types.SimpleNamespace(id=345))
+        self.assertEqual(secret.id, 'secret:z')
+
+        self.assertEqual(dict(backend.calls), {
+            'secret_info_get': [
+                ArgsKwargs((), {'id': None, 'label': 'y'}),
+            ],
+            'secret_revoke': [
+                ArgsKwargs(('secret:x', 123), {'unit': None}),
+                ArgsKwargs(('secret:x', 234), {'unit': 'app/0'}),
+                ArgsKwargs(('secret:z', 345), {'unit': None}),
+            ],
+        })
+
+    def test_remove_revision(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_info_get': [
+            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
+        ]}
+
+        secret = model.Secret(backend, id='x')
+        secret.remove_revision(123)
+
+        # If secret doesn't have an ID, we'll run secret-info-get to fetch it
+        secret = model.Secret(backend, label='y')
+        self.assertIsNone(secret.id)
+        secret.remove_revision(234)
+        self.assertEqual(secret.id, 'secret:z')
+
+        self.assertEqual(dict(backend.calls), {
+            'secret_info_get': [
+                ArgsKwargs((), {'id': None, 'label': 'y'}),
+            ],
+            'secret_remove': [
+                ArgsKwargs(('secret:x',), {'revision': 123}),
+                ArgsKwargs(('secret:z',), {'revision': 234}),
+            ],
+        })
+
+    def test_remove_all(self):
+        backend = MockSecretBackend('myapp/0')
+        backend.returns = {'secret_info_get': [
+            model.SecretInfo.from_dict('z', {'label': 'y', 'revision': 7}),
+        ]}
+
+        secret = model.Secret(backend, id='x')
+        secret.remove_all()
+
+        # If secret doesn't have an ID, we'll run secret-info-get to fetch it
+        secret = model.Secret(backend, label='y')
+        self.assertIsNone(secret.id)
+        secret.remove_all()
+        self.assertEqual(secret.id, 'secret:z')
+
+        self.assertEqual(dict(backend.calls), {
+            'secret_info_get': [
+                ArgsKwargs((), {'id': None, 'label': 'y'}),
+            ],
+            'secret_remove': [
+                ArgsKwargs(('secret:x',), {}),
+                ArgsKwargs(('secret:z',), {}),
+            ],
+        })
 
 
 if __name__ == "__main__":
