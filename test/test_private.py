@@ -50,7 +50,7 @@ class TestYAML(unittest.TestCase):
 
 
 class TestStrconv(unittest.TestCase):
-    def test_parse_timestamp(self):
+    def test_parse_go_timestamp(self):
         nzdt = datetime.timezone(datetime.timedelta(hours=13))
         utc = datetime.timezone.utc
 
