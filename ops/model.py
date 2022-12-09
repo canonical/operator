@@ -1119,7 +1119,7 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_set(typing.cast(str, self.id),
-                                 label=self.label,
+                                 label=label,
                                  description=description,
                                  expire=_canonicalize_expire_time(expire),
                                  rotate=rotate)
