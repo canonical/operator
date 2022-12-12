@@ -435,7 +435,7 @@ class Application:
                 default) means the secret will never expire.
             rotate: Rotation policy/time. Every time this elapses, Juju will
                 notify the charm by sending a SecretRotate event. None (the
-                default) means to use the Juju default, which is never expire.
+                default) means to use the Juju default, which is never rotate.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
