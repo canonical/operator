@@ -1190,24 +1190,24 @@ class Harness(Generic[CharmType]):
             self._backend._calls.clear()
         return calls
 
-    def add_model_secret(self, app_or_unit: AppUnitOrName, content: Dict[str, str]) -> str:
+    def add_model_secret(self, owner: AppUnitOrName, content: Dict[str, str]) -> str:
         """Add a secret owned by the remote application or unit specified.
 
         This is named :code:`add_model_secret` instead of :code:`add_secret`
-        to distinguish it from the :meth:`ops.model.Application.add_secret`
+        to avoid confusion with the :meth:`ops.model.Application.add_secret`
         and :meth:`ops.model.Unit.add_secret` methods used by secret owner
         charms.
 
         Args:
-            app_or_unit: The remote application (or specific remote unit) that
-                will own the secret.
+            owner: The name of the remote application (or specific remote
+                unit) that will own the secret.
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
 
         Return:
             The ID of the newly-secret added.
         """
-        owner_name = _get_app_or_unit_name(app_or_unit)
+        owner_name = _get_app_or_unit_name(owner)
         model.Secret._validate_content(content)
         return self._backend._secret_add(content, owner_name)
 
@@ -1237,8 +1237,8 @@ class Harness(Generic[CharmType]):
         secret.revisions.append(new_revision)
         self.charm.on.secret_changed.emit(secret_id, secret.label)
 
-    def grant_secret(self, secret_id: str, app_or_unit: AppUnitOrName):
-        """Grant read access to this secret for the given application or unit.
+    def grant_secret(self, secret_id: str, consumer: AppUnitOrName):
+        """Grant read access to this secret for the given consumer application or unit.
 
         If the given application or unit has already been granted access to
         this secret, do nothing.
@@ -1246,22 +1246,22 @@ class Harness(Generic[CharmType]):
         Args:
             secret_id: The ID of the secret to grant access to. This should
                 normally be the return value of :meth:`add_secret`.
-            app_or_unit: The application (or specific unit) to grant access
-                to. You must already have created a relation between this
-                application and the charm under test.
+            consumer: The name of the application (or specific unit) to grant
+                access to. You must already have created a relation between
+                this application and the charm under test.
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
                                f"can't call grant_secret")
-        app_or_unit_name = _get_app_or_unit_name(app_or_unit)
+        app_or_unit_name = _get_app_or_unit_name(consumer)
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
             secret.grants[relation_id] = set()
         secret.grants[relation_id].add(app_or_unit_name)
 
-    def revoke_secret(self, secret_id: str, app_or_unit: AppUnitOrName):
-        """Revoke read access to this secret for the given application or unit.
+    def revoke_secret(self, secret_id: str, consumer: AppUnitOrName):
+        """Revoke read access to this secret for the given consumer application or unit.
 
         If the given application or unit does not have access to this secret,
         do nothing.
@@ -1269,15 +1269,15 @@ class Harness(Generic[CharmType]):
         Args:
             secret_id: The ID of the secret to revoke access for. This should
                 normally be the return value of :meth:`add_secret`.
-            app_or_unit: The application (or specific unit) to revoke access
-                to. You must already have created a relation between this
-                application and the charm under test.
+            consumer: The name of the application (or specific unit) to revoke
+                access to. You must already have created a relation between
+                this application and the charm under test.
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
                                f"can't call revoke_secret")
-        app_or_unit_name = _get_app_or_unit_name(app_or_unit)
+        app_or_unit_name = _get_app_or_unit_name(consumer)
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
             return
