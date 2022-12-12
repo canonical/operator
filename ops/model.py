@@ -2976,7 +2976,7 @@ class _ModelBackend:
             args.extend(['--expire', expire.isoformat()])
         if rotate is not None:
             args += ['--rotate', rotate.value]
-        if owner:
+        if owner is not None:
             args += ['--owner', owner]
         # The content has already been validated with Secret._validate_content
         for k, v in content.items():

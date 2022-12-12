@@ -2815,6 +2815,23 @@ class TestSecrets(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.model.get_secret()
 
+    def test_get_secret_not_found(self):
+        script = """echo 'ERROR secret "123" not found' >&2; exit 1"""
+        fake_script(self, 'secret-get', script)
+        fake_script(self, 'secret-info-get', script)
+
+        with self.assertRaises(model.SecretNotFoundError):
+            self.model.get_secret(id='123')
+
+    def test_get_secret_other_error(self):
+        script = """echo 'ERROR other error' >&2; exit 1"""
+        fake_script(self, 'secret-get', script)
+        fake_script(self, 'secret-info-get', script)
+
+        with self.assertRaises(model.ModelError) as cm:
+            self.model.get_secret(id='123')
+        self.assertNotIsInstance(cm.exception, model.SecretNotFoundError)
+
 
 class TestSecretInfo(unittest.TestCase):
     def test_init(self):
