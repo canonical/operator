@@ -3071,17 +3071,17 @@ class TestSecretClass(unittest.TestCase):
             ['secret-remove', 'secret:z', '--revision', '234'],
         ])
 
-    def test_remove_all(self):
+    def test_remove_all_revisions(self):
         fake_script(self, 'secret-remove', """exit 0""")
         fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
         secret = self.make_secret(id='x')
-        secret.remove_all()
+        secret.remove_all_revisions()
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
         secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
-        secret.remove_all()
+        secret.remove_all_revisions()
         self.assertEqual(secret.id, 'secret:z')
 
         self.assertEqual(fake_script_calls(self, clear=True), [

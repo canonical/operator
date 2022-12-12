@@ -1175,7 +1175,7 @@ class Secret:
             self._id = self.get_info().id
         self._backend.secret_remove(typing.cast(str, self.id), revision=revision)
 
-    def remove_all(self):
+    def remove_all_revisions(self):
         """Remove all revisions of this secret.
 
         This is called when the secret is no longer needed, for example when
