@@ -773,7 +773,7 @@ class SecretEvent(HookEvent):
 
 
 class SecretChangedEvent(SecretEvent):
-    """Event raised by Juju on the consumer when the secret owner changes its contents.
+    """Event raised by Juju on the observer when the secret owner changes its contents.
 
     When the owner of a secret changes the secret's contents, Juju will create
     a new secret revision, and all applications or units that are tracking this
@@ -804,7 +804,7 @@ class SecretRemoveEvent(SecretEvent):
     """Event raised by Juju on the owner when a secret revision can be removed.
 
     When the owner of a secret creates a new revision, and after all
-    consumers have updated to that new revision, this event will be fired to
+    observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
     Typically, you will want to call :meth:`ops.model.Secret.remove_revision` to

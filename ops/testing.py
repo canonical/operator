@@ -1237,8 +1237,8 @@ class Harness(Generic[CharmType]):
         secret.revisions.append(new_revision)
         self.charm.on.secret_changed.emit(secret_id, secret.label)
 
-    def grant_secret(self, secret_id: str, consumer: AppUnitOrName):
-        """Grant read access to this secret for the given consumer application or unit.
+    def grant_secret(self, secret_id: str, observer: AppUnitOrName):
+        """Grant read access to this secret for the given observer application or unit.
 
         If the given application or unit has already been granted access to
         this secret, do nothing.
@@ -1246,7 +1246,7 @@ class Harness(Generic[CharmType]):
         Args:
             secret_id: The ID of the secret to grant access to. This should
                 normally be the return value of :meth:`add_model_secret`.
-            consumer: The name of the application (or specific unit) to grant
+            observer: The name of the application (or specific unit) to grant
                 access to. You must already have created a relation between
                 this application and the charm under test.
         """
@@ -1254,14 +1254,14 @@ class Harness(Generic[CharmType]):
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
                                f"can't call grant_secret")
-        app_or_unit_name = _get_app_or_unit_name(consumer)
+        app_or_unit_name = _get_app_or_unit_name(observer)
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
             secret.grants[relation_id] = set()
         secret.grants[relation_id].add(app_or_unit_name)
 
-    def revoke_secret(self, secret_id: str, consumer: AppUnitOrName):
-        """Revoke read access to this secret for the given consumer application or unit.
+    def revoke_secret(self, secret_id: str, observer: AppUnitOrName):
+        """Revoke read access to this secret for the given observer application or unit.
 
         If the given application or unit does not have access to this secret,
         do nothing.
@@ -1269,7 +1269,7 @@ class Harness(Generic[CharmType]):
         Args:
             secret_id: The ID of the secret to revoke access for. This should
                 normally be the return value of :meth:`add_model_secret`.
-            consumer: The name of the application (or specific unit) to revoke
+            observer: The name of the application (or specific unit) to revoke
                 access to. You must already have created a relation between
                 this application and the charm under test.
         """
@@ -1277,7 +1277,7 @@ class Harness(Generic[CharmType]):
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
                                f"can't call revoke_secret")
-        app_or_unit_name = _get_app_or_unit_name(consumer)
+        app_or_unit_name = _get_app_or_unit_name(observer)
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
             return
@@ -1333,7 +1333,7 @@ class Harness(Generic[CharmType]):
         """Trigger a secret-remove event for the given secret and revision.
 
         This event is fired by Juju for a specific revision when all the
-        secret's consumers have refreshed to a later revision, however, in the
+        secret's observers have refreshed to a later revision, however, in the
         harness you call this method to fire the event manually.
 
         Args:
@@ -1925,8 +1925,8 @@ class _TestingModelBackend:
             if refresh:
                 raise ValueError('Secret owner cannot use refresh=True')
         else:
-            # Consumer is calling: does secret have a grant on relation between
-            # this charm (the consumer) and the secret owner's app?
+            # Observer is calling: does secret have a grant on relation between
+            # this charm (the observer) and the secret owner's app?
             owner_app = secret.owner_name.split('/')[0]
             relation_id = self._relation_id_to(owner_app)
             if relation_id is None:

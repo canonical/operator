@@ -963,7 +963,7 @@ class Secret:
     """Represents a single secret in the model.
 
     This class should not be instantiated directly, instead use
-    :meth:`Model.get_secret` (for consumers and owners), or
+    :meth:`Model.get_secret` (for observers and owners), or
     :meth:`Application.add_secret` or :meth:`Unit.add_secret` (for owners).
 
     All secret events have a :code:`.secret` attribute which provides the
@@ -1044,7 +1044,7 @@ class Secret:
         """Label used to reference this secret locally.
 
         This label is locally unique, that is, Juju will ensure that the
-        entity (the owner or consumer) only has one secret with this label at
+        entity (the owner or observer) only has one secret with this label at
         once.
 
         This will be None if you obtained the secret using
@@ -1084,7 +1084,7 @@ class Secret:
         """Update the content of this secret.
 
         This will create a new secret revision, and notify all units tracking
-        the secret (the "consumers") that a new revision is available with a
+        the secret (the "observers") that a new revision is available with a
         :class:`ops.charm.SecretChangedEvent`.
 
         Args:
