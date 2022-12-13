@@ -442,14 +442,14 @@ class Application:
             content,
             label=label,
             description=description,
-            expire=_canonicalize_expire_time(expire),
+            expire=_calculate_expiry(expire),
             rotate=rotate,
             owner='application')
         return Secret(self._backend, id=id, label=label, content=content)
 
 
-def _canonicalize_expire_time(expire: Optional[Union[datetime.datetime, datetime.timedelta]],
-                              ) -> Optional[datetime.datetime]:
+def _calculate_expiry(expire: Optional[Union[datetime.datetime, datetime.timedelta]],
+                      ) -> Optional[datetime.datetime]:
     if expire is None:
         return None
     if isinstance(expire, datetime.datetime):
@@ -595,7 +595,7 @@ class Unit:
             content,
             label=label,
             description=description,
-            expire=_canonicalize_expire_time(expire),
+            expire=_calculate_expiry(expire),
             rotate=rotate,
             owner='unit')
         return Secret(self._backend, id=id, label=label, content=content)
@@ -1121,7 +1121,7 @@ class Secret:
         self._backend.secret_set(typing.cast(str, self.id),
                                  label=label,
                                  description=description,
-                                 expire=_canonicalize_expire_time(expire),
+                                 expire=_calculate_expiry(expire),
                                  rotate=rotate)
 
     def grant(self, relation: 'Relation', *, unit: Optional[Unit] = None):
