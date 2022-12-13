@@ -740,8 +740,8 @@ class Harness(Generic[CharmType]):
 
         # Remove secret grants that give access via this relation
         for secret in self._backend._secrets:
-            secret.grants = dict((rid, names) for rid, names in secret.grants.items()
-                                 if rid != relation_id)
+            secret.grants = {rid: names for rid, names in secret.grants.items()
+                             if rid != relation_id}
 
     def _emit_relation_created(self, relation_name: str, relation_id: int,
                                remote_app: str) -> None:
@@ -1222,13 +1222,13 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret to update. This should normally be
-                the return value of :meth:`add_secret`.
+                the return value of :meth:`add_model_secret`.
             content: A key-value mapping containing the new payload.
         """
         model.Secret._validate_content(content)
         secret = self._ensure_secret(secret_id)
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
-            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
+            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, '
                                f"can't call set_secret_content")
         new_revision = _SecretRevision(
             revision=secret.revisions[-1].revision + 1,
@@ -1245,7 +1245,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret to grant access to. This should
-                normally be the return value of :meth:`add_secret`.
+                normally be the return value of :meth:`add_model_secret`.
             consumer: The name of the application (or specific unit) to grant
                 access to. You must already have created a relation between
                 this application and the charm under test.
@@ -1268,7 +1268,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret to revoke access for. This should
-                normally be the return value of :meth:`add_secret`.
+                normally be the return value of :meth:`add_model_secret`.
             consumer: The name of the application (or specific unit) to revoke
                 access to. You must already have created a relation between
                 this application and the charm under test.
@@ -1888,20 +1888,6 @@ class _TestingModelBackend:
             units.update(peer_units)
 
         return len(units) + 1  # Account for this unit.
-
-    # two scopes:
-    # - "ownership scope" (unit or app):
-    #   + when unit or app is deleted, so too are owned secrets
-    #   + only the owner can view/manage the secret, unless permissions are granted
-    #   + peer, non-leader units always get latest revision and can view only
-    #   + error if peer (non-leader) tries to admin (set content, grant, revoke, etc)
-    # - we only grant access for other apps in the context of a relation
-    #   + if you're mysql, you can't grant mediawiki access to a secret without a relation
-    #   + relation is attached to the grant in the backend as a "scope"
-    #   + if relation is removed, so too are any grants
-    #   + grants need an "entity", application or specific unit
-
-    # think about event firing / handling
 
     def _get_secret(self, id: str) -> Optional[_Secret]:
         return next((s for s in self._secrets if s.id == id), None)
