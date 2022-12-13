@@ -479,9 +479,9 @@ class Warning:
         """Create new Warning object from dict parsed from JSON."""
         return cls(
             message=d['message'],
-            first_added=timeconv.parse_go_timestamp(d['first-added']),
-            last_added=timeconv.parse_go_timestamp(d['last-added']),
-            last_shown=(timeconv.parse_go_timestamp(d['last-shown'])  # type: ignore
+            first_added=timeconv.parse_rfc3339(d['first-added']),
+            last_added=timeconv.parse_rfc3339(d['last-added']),
+            last_shown=(timeconv.parse_rfc3339(d['last-shown'])  # type: ignore
                         if d.get('last-shown') else None),
             expire_after=d['expire-after'],
             repeat_after=d['repeat-after'],
@@ -570,8 +570,8 @@ class Task:
             status=d['status'],
             log=d.get('log') or [],
             progress=TaskProgress.from_dict(d['progress']),
-            spawn_time=timeconv.parse_go_timestamp(d['spawn-time']),
-            ready_time=(timeconv.parse_go_timestamp(d['ready-time'])
+            spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
+            ready_time=(timeconv.parse_rfc3339(d['ready-time'])
                         if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
@@ -635,8 +635,8 @@ class Change:
             tasks=[Task.from_dict(t) for t in d.get('tasks') or []],
             ready=d['ready'],
             err=d.get('err'),
-            spawn_time=timeconv.parse_go_timestamp(d['spawn-time']),
-            ready_time=(timeconv.parse_go_timestamp(d['ready-time'])  # type: ignore
+            spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
+            ready_time=(timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
                         if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
@@ -1029,7 +1029,7 @@ class FileInfo:
             type=file_type,
             size=d.get('size'),
             permissions=int(d['permissions'], 8),
-            last_modified=timeconv.parse_go_timestamp(d['last-modified']),
+            last_modified=timeconv.parse_rfc3339(d['last-modified']),
             user_id=d.get('user-id'),
             user=d.get('user'),
             group_id=d.get('group-id'),

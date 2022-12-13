@@ -25,8 +25,8 @@ _TIMESTAMP_RE = re.compile(
 _TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
 
 
-def parse_go_timestamp(s: str) -> datetime.datetime:
-    """Parse timestamp from Go-encoded JSON.
+def parse_rfc3339(s: str) -> datetime.datetime:
+    """Parse an RFC3339 timestamp.
 
     This parses RFC3339 timestamps (which are a subset of ISO8601 timestamps)
     that Go's encoding/json package produces for time.Time values.

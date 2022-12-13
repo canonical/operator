@@ -943,9 +943,9 @@ class SecretInfo:
             id=id,
             label=typing.cast(Optional[str], d.get('label')),
             revision=typing.cast(int, d['revision']),
-            expires=timeconv.parse_go_timestamp(expires) if expires is not None else None,
+            expires=timeconv.parse_rfc3339(expires) if expires is not None else None,
             rotation=rotation,
-            rotates=timeconv.parse_go_timestamp(rotates) if rotates is not None else None,
+            rotates=timeconv.parse_rfc3339(rotates) if rotates is not None else None,
         )
 
     def __repr__(self):
