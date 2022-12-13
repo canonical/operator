@@ -993,8 +993,8 @@ class Secret:
             fields.append('label={!r}'.format(self._label))
         return '<Secret ' + ' '.join(fields) + '>'
 
-    @classmethod
-    def _canonicalize_id(cls, id: str) -> str:
+    @staticmethod
+    def _canonicalize_id(id: str) -> str:
         """Return the canonical form of the given secret ID, with the 'secret:' prefix."""
         id = id.strip()
         if not id.startswith('secret:'):
