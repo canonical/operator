@@ -341,14 +341,7 @@ class APIError(Error):
 
 
 class ChangeError(Error):
-    """Raised by actions when a change is ready but has an error.
-
-    For example, this happens when you attempt to start an already-started
-    service:
-
-    cannot perform the following tasks:
-    - Start service "test" (service "test" was previously started)
-    """
+    """Raised by actions when a change is ready but has an error."""
 
     def __init__(self, err: str, change: 'Change'):
         """This shouldn't be instantiated directly."""
