@@ -949,6 +949,14 @@ class TestModel(unittest.TestCase):
     def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
+    def test_run_error(self):
+        model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+        fake_script(self, 'status-get', """echo 'ERROR cannot get status' >&2; exit 1""")
+        with self.assertRaises(ops.model.ModelError) as cm:
+            _ = model.unit.status.message
+        self.assertEqual(str(cm.exception), 'ERROR cannot get status')
+        self.assertEqual(cm.exception.args[0], 'ERROR cannot get status')
+
 
 class PushPullCase:
     """Test case for table-driven tests."""
