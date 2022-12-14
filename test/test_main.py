@@ -45,6 +45,11 @@ from ops.charm import (
     RelationDepartedEvent,
     RelationEvent,
     RelationJoinedEvent,
+    SecretChangedEvent,
+    SecretEvent,
+    SecretExpiredEvent,
+    SecretRemoveEvent,
+    SecretRotateEvent,
     StartEvent,
     StorageAttachedEvent,
     UpdateStatusEvent,
@@ -80,7 +85,8 @@ class EventSpec:
     def __init__(self, event_type, event_name, env_var=None,
                  relation_id=None, remote_app=None, remote_unit=None,
                  model_name=None, set_in_env=None, workload_name=None,
-                 departing_unit_name=None):
+                 departing_unit_name=None, secret_id=None, secret_label=None,
+                 secret_revision=None):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -91,6 +97,9 @@ class EventSpec:
         self.model_name = model_name
         self.set_in_env = set_in_env
         self.workload_name = workload_name
+        self.secret_id = secret_id
+        self.secret_label = secret_label
+        self.secret_revision = secret_revision
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
@@ -365,6 +374,15 @@ class _TestMain(abc.ABC):
         })
         if event_spec.set_in_env is not None:
             env.update(event_spec.set_in_env)
+        if issubclass(event_spec.event_type, SecretEvent):
+            env.update({
+                'JUJU_SECRET_ID': event_spec.secret_id,
+                'JUJU_SECRET_LABEL': event_spec.secret_label or '',
+            })
+        if issubclass(event_spec.event_type, (SecretRemoveEvent, SecretExpiredEvent)):
+            env.update({
+                'JUJU_SECRET_REVISION': str(event_spec.secret_revision or ''),
+            })
         if issubclass(event_spec.event_type, RelationEvent):
             rel_name = event_spec.event_name.split('_')[0]
             env.update({
@@ -542,6 +560,37 @@ class _TestMain(abc.ABC):
             EventSpec(PebbleReadyEvent, 'test_pebble_ready',
                       workload_name='test'),
             {'container_name': 'test'},
+        ), (
+            EventSpec(SecretChangedEvent, 'secret_changed',
+                      secret_id='secret:12345',
+                      secret_label='foo'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
+        ), (
+            EventSpec(SecretRotateEvent, 'secret_rotate',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
+        ), (
+            EventSpec(SecretRemoveEvent, 'secret_remove',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
+        ), (
+            EventSpec(SecretExpiredEvent, 'secret_expired',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
         )]
 
         logger.debug('Expected events %s', events_under_test)

@@ -286,7 +286,7 @@ class ConfigChangedEvent(HookEvent):
       rescheduling, on unit upgrade/refresh, etc...
     - As a specific instance of the above point: when networking changes
       (if the machine reboots and comes up with a different IP).
-    - When the cloud admin reconfigures the charm via the juju CLI, i.e.
+    - When the cloud admin reconfigures the charm via the Juju CLI, i.e.
       `juju config my-charm foo=bar`. This event notifies the charm of
       its new configuration. (The event itself, however, is not aware of *what*
       specifically has changed in the config).
@@ -742,6 +742,143 @@ class PebbleReadyEvent(WorkloadEvent):
     """
 
 
+class SecretEvent(HookEvent):
+    """Base class for all secret events."""
+
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str]):
+        super().__init__(handle)
+        self._id = id
+        self._label = label
+
+    @property
+    def secret(self) -> model.Secret:
+        """The secret instance this event refers to."""
+        backend = self.framework.model._backend
+        return model.Secret(backend=backend, id=self._id, label=self._label)
+
+    def snapshot(self) -> '_SerializedData':
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        return {'id': self._id, 'label': self._label}
+
+    def restore(self, snapshot: '_SerializedData'):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        self._id = cast(str, snapshot['id'])
+        self._label = cast(Optional[str], snapshot['label'])
+
+
+class SecretChangedEvent(SecretEvent):
+    """Event raised by Juju on the observer when the secret owner changes its contents.
+
+    When the owner of a secret changes the secret's contents, Juju will create
+    a new secret revision, and all applications or units that are tracking this
+    secret will be notified via this event that a new revision is available.
+
+    Typically, you will want to fetch the new content by calling
+    :meth:`ops.model.Secret.get_content` with :code:`refresh=True` to tell Juju to
+    start tracking the new revision.
+    """
+
+
+class SecretRotateEvent(SecretEvent):
+    """Event raised by Juju on the owner when the secret's rotation policy elapses.
+
+    This event is fired on the secret owner to inform it that the secret must
+    be rotated. The event will keep firing until the owner creates a new
+    revision by calling :meth:`ops.model.Secret.set_content`.
+    """
+
+    def defer(self):
+        """Secret rotation events are not deferrable (Juju handles re-invocation)."""
+        raise RuntimeError(
+            'Cannot defer secret rotation events. Juju will keep firing this '
+            'event until you create a new revision.')
+
+
+class SecretRemoveEvent(SecretEvent):
+    """Event raised by Juju on the owner when a secret revision can be removed.
+
+    When the owner of a secret creates a new revision, and after all
+    observers have updated to that new revision, this event will be fired to
+    inform the secret owner that the old revision can be removed.
+
+    Typically, you will want to call :meth:`ops.model.Secret.remove_revision` to
+    remove the now-unused revision.
+    """
+
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
+        super().__init__(handle, id, label)
+        self._revision = revision
+
+    @property
+    def revision(self) -> int:
+        """The secret revision this event refers to."""
+        return self._revision
+
+    def snapshot(self) -> '_SerializedData':
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        data = super().snapshot()
+        data['revision'] = self._revision
+        return data
+
+    def restore(self, snapshot: '_SerializedData'):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        super().restore(snapshot)
+        self._revision = cast(int, snapshot['revision'])
+
+
+class SecretExpiredEvent(SecretEvent):
+    """Event raised by Juju on the owner when a secret's expiration time elapses.
+
+    This event is fired on the secret owner to inform it that the secret revision
+    must be removed. The event will keep firing until the owner removes the
+    revision by calling :meth:`model.Secret.remove_revision()`.
+    """
+
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
+        super().__init__(handle, id, label)
+        self._revision = revision
+
+    @property
+    def revision(self) -> int:
+        """The secret revision this event refers to."""
+        return self._revision
+
+    def snapshot(self) -> '_SerializedData':
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        data = super().snapshot()
+        data['revision'] = self._revision
+        return data
+
+    def restore(self, snapshot: '_SerializedData'):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        super().restore(snapshot)
+        self._revision = cast(int, snapshot['revision'])
+
+    def defer(self):
+        """Secret expiration events are not deferrable (Juju handles re-invocation)."""
+        raise RuntimeError(
+            'Cannot defer secret expiration events. Juju will keep firing '
+            'this event until you create a new revision.')
+
+
 class CharmEvents(ObjectEvents):
     """Events generated by Juju pertaining to application lifecycle.
 
@@ -782,6 +919,11 @@ class CharmEvents(ObjectEvents):
     leader_elected = EventSource(LeaderElectedEvent)
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
     collect_metrics = EventSource(CollectMetricsEvent)
+
+    secret_changed = EventSource(SecretChangedEvent)
+    secret_expired = EventSource(SecretExpiredEvent)
+    secret_rotate = EventSource(SecretRotateEvent)
+    secret_remove = EventSource(SecretRemoveEvent)
 
 
 class CharmBase(Object):

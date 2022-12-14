@@ -102,18 +102,23 @@ class JujuVersion:
         return cls(v)
 
     def has_app_data(self) -> bool:
-        """Determine whether this juju version knows about app data."""
+        """Determine whether this Juju version knows about app data."""
         return (self.major, self.minor, self.patch) >= (2, 7, 0)
 
     def is_dispatch_aware(self) -> bool:
-        """Determine whether this juju version knows about dispatch."""
+        """Determine whether this Juju version knows about dispatch."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
     def has_controller_storage(self) -> bool:
-        """Determine whether this juju version supports controller-side storage."""
+        """Determine whether this Juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
     @property
     def has_secrets(self) -> bool:
         """Determine whether this Juju version supports the `secrets` feature."""
+        # Juju version 3.0.0 had an initial version of secrets, but:
+        # * In 3.0.2, secret-get "--update" was renamed to "--refresh", and
+        #   secret-get-info was separated into its own hook tool
+        # * In 3.0.3, a bug with observer labels was fixed (juju/juju#14916)
+        # TODO(benhoyt): update to 3.0.3+ once shipped (for juju/juju#14916 fix)
         return (self.major, self.minor, self.patch) >= (3, 0, 2)
