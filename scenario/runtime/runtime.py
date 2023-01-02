@@ -3,7 +3,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Type, TypeVar
+from typing import TYPE_CHECKING, Type, TypeVar, Generic
 
 import yaml
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from ops.charm import CharmBase
     from ops.framework import EventBase
     from scenario.structs import CharmSpec, Scene
-    _CT = TypeVar("_CT", bound=Type["CharmType"])
+    _CT = TypeVar("_CT", bound=Type[CharmType])
 
 
 logger = pkg_logger.getChild("runtime")
@@ -225,7 +225,7 @@ class Runtime:
         WrappedCharm.__name__ = charm_type.__name__
         return WrappedCharm
 
-    def run(self, scene: "Scene") -> RuntimeRunResult[C]:
+    def run(self, scene: "Scene") -> RuntimeRunResult:
         """Executes a scene on the charm.
 
         This will set the environment up and call ops.main.main().

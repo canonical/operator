@@ -52,11 +52,11 @@ class Emitter:
         return self.event
 
 
-patch_sort_key = lambda obj: obj["path"] + obj["op"]
+def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
+    return sorted(patch, key=key)
 
 
 class PlayResult:
-    # TODO: expose the 'final context' or a Delta object from the PlayResult.
     def __init__(
         self,
         charm: "CharmBase",
@@ -84,31 +84,7 @@ class PlayResult:
         patch = jsonpatch.make_patch(
             asdict(self.scene_in.context), asdict(self.context_out)
         ).patch
-        return sorted(patch, key=patch_sort_key)
-
-    def sort_patch(self, patch: List[Dict]):
-        return sorted(patch, key=patch_sort_key)
-
-
-class _Builtins:
-    @staticmethod
-    def startup(leader=True):
-        return Scenario.from_events(
-            (
-                ATTACH_ALL_STORAGES,
-                "start",
-                CREATE_ALL_RELATIONS,
-                "leader-elected" if leader else "leader-settings-changed",
-                "config-changed",
-                "install",
-            )
-        )
-
-    @staticmethod
-    def teardown():
-        return Scenario.from_events(
-            (BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, "stop", "remove")
-        )
+        return sort_patch(patch)
 
 
 class Playbook:
@@ -163,8 +139,6 @@ class Playbook:
 
 
 class Scenario:
-    builtins = _Builtins()
-
     def __init__(
         self,
         charm_spec: CharmSpec,
@@ -216,26 +190,12 @@ class Scenario:
 
         return last
 
-    def run(self, scene: Scene, add_to_playbook: bool = False):
-        return self.play(scene, add_to_playbook=add_to_playbook)
-
     def play(
         self,
-        obj: Union[Scene, str],
-        context: Context = None,
+        scene: Scene,
         add_to_playbook: bool = False,
     ) -> PlayResult:
-        scene = obj
-        context = context or Context()
-
-        if isinstance(obj, str):
-            _event = Event(obj)
-            if _event.is_meta:
-                return self._play_meta(_event, context, add_to_playbook=add_to_playbook)
-            scene = Scene(_event, context)
-
-        runtime = self._runtime
-        result = runtime.run(scene)
+        result = self._runtime.run(scene)
         # todo verify that if state was mutated, it was mutated
         #  in a way that makes sense:
         #  e.g. - charm cannot modify leadership status, etc...
@@ -251,11 +211,50 @@ class Scenario:
             event=result.event,
         )
 
-    def play_until_complete(self):
+    def play_until_complete(self) -> List[PlayResult]:
+        """Plays every scene in the Playbook and returns a list of results."""
         if not self._playbook:
             raise RuntimeError("playbook is empty")
 
-        with self:
-            for context, event in self._playbook:
-                ctx = self.play(event=event, context=context)
-        return ctx
+        results = []
+        for scene in self._playbook:
+            result = self.play(scene)
+            results.append(result)
+
+        return results
+
+
+def events_to_scenes(events: typing.Sequence[Union[str, Event]]):
+    def _to_event(obj):
+        if isinstance(obj, str):
+            return Event(obj)
+        elif isinstance(obj, Event):
+            return obj
+        else:
+            raise TypeError(obj)
+    scenes = map(Scene, map(_to_event, events))
+    for i, scene in enumerate(scenes):
+        scene.name = f"<Scene {i}: {scene.event.name}>"
+        yield scene
+
+
+class StartupScenario(Scenario):
+    def __init__(self, charm_spec: CharmSpec, leader: bool = True, juju_version: str = "3.0.0"):
+        playbook: Playbook = Playbook(events_to_scenes((
+                ATTACH_ALL_STORAGES,
+                "start",
+                CREATE_ALL_RELATIONS,
+                "leader-elected" if leader else "leader-settings-changed",
+                "config-changed",
+                "install",
+            )))
+        super().__init__(charm_spec, playbook, juju_version)
+
+
+class TeardownScenario(Scenario):
+    def __init__(self, charm_spec: CharmSpec, juju_version: str = "3.0.0"):
+        playbook: Playbook = Playbook(events_to_scenes(
+            (BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, "stop", "remove")
+        ))
+        super().__init__(charm_spec, playbook, juju_version)
+
