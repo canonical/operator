@@ -15,10 +15,10 @@ config?...).
 The output is another context instance: the context after the charm has had a chance to interact with the mocked juju
 model.
 
-Testing a charm under a given scenario, then, means verifying that:
+Scenario-testing a charm, then, means verifying that:
 
-- the charm does not raise uncaught exceptions while handling the scenario
-- the output state (or the diff with the input state) is as expected
+- the charm does not raise uncaught exceptions while handling the scene
+- the output state (or the diff with the input state) is as expected.
 
 
 # Core concepts as a metaphor
@@ -198,12 +198,47 @@ def test_relation_data(scenario, start_scene):
 ```
 
 
+# Playbooks
+
+A playbook encapsulates a sequence of scenes. 
+
+For example:
+```python
+from scenario.scenario import Playbook
+from scenario.structs import State, Scene, Event, Context
+playbook = Playbook(
+        (
+            Scene(Event("update-status"),
+                  context=Context(state=State(config={'foo':'bar'}))),
+            Scene(Event("config-changed"), 
+                  context=Context(state=State(config={'foo':'baz'}))),
+        )
+    )
+```
+
+This allows us to write concisely common event sequences, such as the charm startup/teardown sequences. These are the only ones that are built-into the framework.
+This is the new `Harness.begin_with_initial_hooks`:
+```python
+import pytest
+from scenario.scenario import StartupScenario
+from scenario.structs import CharmSpec
+
+@pytest.mark.parametrize("leader", (True, False))
+def test_setup(leader, mycharm):
+    scenario = StartupScenario(CharmSpec(mycharm, meta={"name": "foo"}), leader=leader)
+    scenario.play_until_complete()
+```
+
+The idea is that users can write down sequences common to their use case 
+(or multiple charms in a bundle) and share them between tests.
+
+
 # Caveats
 The way we're injecting memo calls is by rewriting parts of `ops.main`, and `ops.framework` using the python ast module. This means that we're seriously messing with your venv. This is a temporary measure and will be factored out of the code as we move out of the alpha phase.
 
 Options we're considering:
 - have a script that generates our own `ops` lib, distribute that along with the scenario source, and in your scenario tests you'll have to import from the patched-ops we provide instead of the 'canonical' ops module.
-- trust you to run all of this in ephemeral contexts (e.g. containers, tox env...)  for now, YOU SHOULD REALLY DO THAT
+- trust you to run all of this in ephemeral contexts (e.g. containers, tox env...)  for now, **YOU SHOULD REALLY DO THAT**
 
 
 # Advanced Mockery
