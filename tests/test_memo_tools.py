@@ -246,6 +246,42 @@ def test_memoizer_loose_caching():
             assert my_fn(i) == i + 1
 
 
+def test_memoizer_passthrough():
+    with tempfile.NamedTemporaryFile() as temp_db_file:
+        with event_db(temp_db_file.name) as data:
+            data.scenes.append(Scene(event=Event(env={}, timestamp="10:10")))
+
+        os.environ[MEMO_DATABASE_NAME_KEY] = temp_db_file.name
+
+        _backing = {x: x + 1 for x in range(50)}
+
+        @memo(caching_policy="loose", log_on_replay=True)
+        def my_fn(m):
+            return _backing[m]
+
+        os.environ[MEMO_MODE_KEY] = "record"
+        for i in range(50):
+            assert my_fn(i) == i + 1
+
+        # set the mode to passthrough, so that the original function will
+        # be called even though there are memos stored
+        os.environ[MEMO_MODE_KEY] = "passthrough"
+
+        # clear the backing storage.
+        _backing.clear()
+        with pytest.raises(KeyError):
+            my_fn(1)
+        with pytest.raises(KeyError):
+            my_fn(10)
+
+        # go to replay mode
+        os.environ[MEMO_MODE_KEY] = "replay"
+
+        # now it works again
+        assert my_fn(1) == 2
+        assert my_fn(10) == 11
+
+
 def test_memoizer_classmethod_recording():
     os.environ[MEMO_MODE_KEY] = "record"
 

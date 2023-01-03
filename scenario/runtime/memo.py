@@ -35,7 +35,7 @@ SUPPORTED_SERIALIZERS = Literal["pickle", "json", "io", "PebblePush"]
 SUPPORTED_SERIALIZERS_LIST = ["pickle", "json", "io", "PebblePush"]
 
 
-MemoModes = Literal["record", "replay", "isolated"]
+MemoModes = Literal["passthrough", "record", "replay", "isolated"]
 _CachingPolicy = Literal["strict", "loose"]
 
 # notify just once of what mode we're running in
@@ -63,6 +63,9 @@ def _load_memo_mode() -> MemoModes:
     global _PRINTED_MODE
 
     val = os.getenv(MEMO_MODE_KEY, "record")
+    if val == "passthrough":
+        # avoid doing anything at all with passthrough, to save time.
+        pass
     if val == "record":
         # don't use logger, but print, to avoid recursion issues with juju-log.
         if not _PRINTED_MODE:
@@ -166,6 +169,27 @@ def memo(
         SUPPORTED_SERIALIZERS, Tuple[SUPPORTED_SERIALIZERS, SUPPORTED_SERIALIZERS]
     ] = "json",
 ):
+    f"""This decorator wraps a callable and memoizes its calls.
+    
+    Based on the value of the {MEMO_MODE_KEY!r} environment variable, it can work in multiple ways:
+    
+    - "passthrough": does nothing. As if the decorator wasn't there.
+    - "record": each function call gets intercepted, and the [arguments -> return value] mapping is 
+        stored in a database, using `namespace`.`name` as key. The `serializers` arg tells how the args/kwargs and
+        return value should be serialized, respectively.
+    - "isolated": each function call gets intercepted, and instead of propagating the call to the wrapped function,
+        the database is searched for a matching argument set. If one is found, the stored return value is 
+        deserialized and returned. If none is found, a RuntimeError is raised.
+    - "replay": like "isolated", but in case of a cache miss, the call is propagated to the wrapped function 
+        (the database is NOT implicitly updated).
+        
+    `caching_policy` can be either:
+    - "strict": each function call is stored individually and in an ordered sequence. Useful for when a 
+        function can return different values when called on distinct occasions.
+    - "loose": the arguments -> return value mapping is stored as a mapping. Assumes that same 
+        arguments == same return value.
+    """
+
     def decorator(fn):
         if not inspect.isfunction(fn):
             raise RuntimeError(f"Cannot memoize non-function obj {fn!r}.")
@@ -174,6 +198,24 @@ def memo(
         def wrapper(*args, **kwargs):
 
             _MEMO_MODE: MemoModes = _load_memo_mode()
+
+            def propagate():
+                """Make the real wrapped call."""
+                if _MEMO_MODE == "isolated":
+                    raise RuntimeError(
+                        f"Attempted propagation in isolated mode: "
+                        f"{_call_repr(fn, args, kwargs)}"
+                    )
+
+                if _MEMO_MODE == "replay" and log_on_replay:
+                    _log_memo(fn, args, kwargs, "<propagated>", cache_hit=False)
+
+                # todo: if we are replaying, should we be caching this result?
+                return fn(*args, **kwargs)
+
+            if _MEMO_MODE == "passthrough":
+                return propagate()
+
             input_serializer, output_serializer = _check_serializer(serializer)
 
             def _load(obj: str, method: SUPPORTED_SERIALIZERS):
@@ -234,20 +276,6 @@ def memo(
                     byt = pickle.dumps(obj.read())
                     return base64.b64encode(byt).decode("utf-8")
                 raise ValueError(f"Invalid method: {method!r}")
-
-            def propagate():
-                """Make the real wrapped call."""
-                if _MEMO_MODE == "isolated":
-                    raise RuntimeError(
-                        f"Attempted propagation in isolated mode: "
-                        f"{_call_repr(fn, args, kwargs)}"
-                    )
-
-                if _MEMO_MODE == "replay" and log_on_replay:
-                    _log_memo(fn, args, kwargs, "<propagated>", cache_hit=False)
-
-                # todo: if we are replaying, should we be caching this result?
-                return fn(*args, **kwargs)
 
             def load_from_state(
                 scene: Scene, question: Tuple[str, Tuple[Any], Dict[str, Any]]
