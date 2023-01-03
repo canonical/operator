@@ -24,11 +24,11 @@ Scenario-testing a charm, then, means verifying that:
 # Core concepts as a metaphor
 I like metaphors, so here we go:
 - There is a theatre stage (Scenario).
-- You pick an actor (a Charm) to put on the stage.
+- You pick an actor (a Charm) to put on the stage. Not just any actor: an improv one.
 - You pick a sketch that the actor will have to play out (a Scene). The sketch is specified as:
-  - An initial situation (Context) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what other actors are there around it, what is written on those books on the table?
-  - Something that happens (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the stage (relation-departed))
-- How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a container), or write something to a book (pebble.push).
+  - An initial situation (Context) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what other actors are there around it, what is written in those books on the table?
+  - Something that happens (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the stage (relation-departed), or the content of one of the books changes).
+- How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a container), or write something down into one of the books.
 
 
 # Core concepts not as a metaphor
@@ -37,14 +37,14 @@ The Scenario encapsulates the charm and its metadata. A scenario can play scenes
 
 Crucially, this decoupling of charm and context allows us to swap out easily any part of this flow, and even share context data across charms, codebases, teams...
 
-In this spirit, but that I still have to think through how useful it really is, a Scenario exposes a `playbook`: a sequence of scenes it can run sequentially (although given that each Scene's input state is totally disconnected from any other's, the ordering of the sequence is irrelevant) and potentially share with other projects.
+In this spirit, but that I still have to think through how useful it really is, a Scenario exposes a `playbook`: a sequence of scenes it can run sequentially (although given that each Scene's input state is totally disconnected from any other's, the ordering of the sequence is irrelevant) and potentially share with other projects. More on this later.
+
 
 # Writing scenario tests
+Writing a scenario test consists of two broad steps:
 
-Writing a scenario tests consists of two broad steps:
-
-- define a Scenario
-- run the scenario
+- define a scene
+- play it
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, and no leadership.
