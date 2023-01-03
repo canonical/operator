@@ -30,6 +30,7 @@ I like metaphors, so here we go:
   - Something that happens (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the stage (relation-departed))
 - How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a container), or write something to a book (pebble.push).
 
+
 # Core concepts not as a metaphor
 Each scene maps to a single event. 
 The Scenario encapsulates the charm and its metadata. A scenario can play scenes, which represent the several events one can fire on a charm and the context in which they occur.
@@ -52,7 +53,7 @@ With that, we can write the simplest possible scenario test:
 
 ```python
 from scenario.scenario import Scenario, Scene
-from scenario.structs import CharmSpec, get_event, Context
+from scenario.structs import CharmSpec, event, Context
 from ops.charm import CharmBase
 
 
@@ -62,7 +63,7 @@ class MyCharm(CharmBase):
 
 def test_scenario_base():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
-    out = scenario.run(Scene(event=get_event('start'), context=Context()))
+    out = scenario.play(Scene(event=event('start'), context=Context()))
     assert out.context_out.state.status.unit == ('unknown', '')
 ```
 
@@ -71,7 +72,7 @@ Our charm sets a special state if it has leadership on 'start':
 
 ```python
 from scenario.scenario import Scenario, Scene
-from scenario.structs import CharmSpec, get_event, Context, State
+from scenario.structs import CharmSpec, event, Context, State
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
@@ -87,15 +88,15 @@ class MyCharm(CharmBase):
 
 def test_scenario_base():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
-    out = scenario.run(Scene(event=get_event('start'), context=Context()))
+    out = scenario.play(Scene(event=event('start'), context=Context()))
     assert out.context_out.state.status.unit == ('unknown', '')
 
 
 def test_status_leader():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
-    out = scenario.run(
+    out = scenario.play(
         Scene(
-            event=get_event('start'),
+            event=event('start'),
             context=Context(
                 state=State(leader=True)
             )))
@@ -108,7 +109,7 @@ concisely (and parametrically) as:
 ```python
 import pytest
 from scenario.scenario import Scenario, Scene
-from scenario.structs import CharmSpec, get_event, Context
+from scenario.structs import CharmSpec, event, Context
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
@@ -131,7 +132,7 @@ def scenario():
 
 @pytest.fixture
 def start_scene():
-  return Scene(event=get_event('start'), context=Context())
+  return Scene(event=event('start'), context=Context())
 
 
 def test_scenario_base(scenario, start_scene):
@@ -245,7 +246,7 @@ Suppose we want this test to pass. How could we mock this using Scenario?
 
 ```python
 scene = Scene(
-    event=get_event('start'),
+    event=event('start'),
     context=Context(memos=[
         {'name': '_ModelBackend.leader_get',
          'values': ['True', 'False'],
@@ -265,4 +266,4 @@ The good news is that you can generate memos by scraping them off of a live unit
 - Figure out how to distribute this. I'm thinking `pip install ops[scenario]`
 - Better syntax for memo generation
 - Consider consolidating memo and State (e.g. passing a Sequence object to a State value...)
-- Expose instructions or facilities re. how to use this without touching your venv.
+- Expose instructions or facilities re. how to use this without borking your venv.
