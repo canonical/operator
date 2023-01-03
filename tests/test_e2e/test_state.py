@@ -1,9 +1,4 @@
 from dataclasses import asdict
-
-from tests.setup_tests import setup_tests
-
-setup_tests()  # noqa & keep this on top
-
 from typing import Optional, Type
 
 import pytest
@@ -11,7 +6,7 @@ from ops.charm import CharmBase, CharmEvents, StartEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
-from scenario.scenario import Scenario
+from scenario.scenario import Scenario, sort_patch
 from scenario.structs import (
     CharmSpec,
     ContainerSpec,
@@ -21,6 +16,13 @@ from scenario.structs import (
     event,
     relation,
 )
+
+# from tests.setup_tests import setup_tests
+#
+# setup_tests()  # noqa & keep this on top
+
+
+
 
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
@@ -65,26 +67,18 @@ def mycharm():
 
 @pytest.fixture
 def dummy_state():
-    return State(
-        config={"foo": "bar"},
-        leader=True
-    )
+    return State(config={"foo": "bar"}, leader=True)
 
 
 @pytest.fixture
 def start_scene(dummy_state):
-    return Scene(
-        event("start"),
-        context=Context(
-            state=dummy_state
-        )
-    )
+    return Scene(event("start"), context=Context(state=dummy_state))
 
 
 def test_bare_event(start_scene, mycharm):
     mycharm._call = lambda *_: True
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
-    out = scenario.run(start_scene)
+    out = scenario.play(start_scene)
 
     assert isinstance(out.charm, mycharm)
     assert out.charm.called
@@ -99,7 +93,7 @@ def test_leader_get(start_scene, mycharm):
 
     mycharm._call = call
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
-    scenario.run(start_scene)
+    scenario.play(start_scene)
 
 
 def test_status_setting(start_scene, mycharm):
@@ -110,11 +104,11 @@ def test_status_setting(start_scene, mycharm):
 
     mycharm._call = call
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
-    out = scenario.run(start_scene)
+    out = scenario.play(start_scene)
     assert out.context_out.state.status.unit == ("active", "foo test")
     assert out.context_out.state.status.app == ("waiting", "foo barz")
     assert out.context_out.state.status.app_version == ""
-    assert out.delta() == out.sort_patch(
+    assert out.delta() == sort_patch(
         [
             {
                 "op": "replace",
@@ -150,7 +144,7 @@ def test_container(start_scene: Scene, connect, mycharm):
     )
     scene = start_scene.copy()
     scene.context.state.containers = (ContainerSpec(name="foo", can_connect=connect),)
-    scenario.run(scene)
+    scenario.play(scene)
 
 
 def test_relation_get(start_scene: Scene, mycharm):
@@ -184,7 +178,7 @@ def test_relation_get(start_scene: Scene, mycharm):
             local_unit_data={"c": "d"},
         ),
     ]
-    scenario.run(scene)
+    scenario.play(scene)
 
 
 def test_relation_set(start_scene: Scene, mycharm):
@@ -219,22 +213,21 @@ def test_relation_set(start_scene: Scene, mycharm):
             local_unit_data={},
         )
     ]
-    out = scenario.run(scene)
+    out = scenario.play(scene)
 
-    assert asdict(out.context_out.state.relations[0]) == \
-           asdict(
-               relation(
-                   endpoint="foo",
-                   interface="bar",
-                   remote_unit_ids=[1, 4],
-                   local_app_data={"a": "b"},
-                   local_unit_data={"c": "d"},
-               )
-           )
+    assert asdict(out.context_out.state.relations[0]) == asdict(
+        relation(
+            endpoint="foo",
+            interface="bar",
+            remote_unit_ids=[1, 4],
+            local_app_data={"a": "b"},
+            local_unit_data={"c": "d"},
+        )
+    )
 
     assert out.context_out.state.relations[0].local_app_data == {"a": "b"}
     assert out.context_out.state.relations[0].local_unit_data == {"c": "d"}
-    assert out.delta() == out.sort_patch(
+    assert out.delta() == sort_patch(
         [
             {"op": "add", "path": "/state/relations/0/local_app_data/a", "value": "b"},
             {"op": "add", "path": "/state/relations/0/local_unit_data/c", "value": "d"},

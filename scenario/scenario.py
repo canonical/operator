@@ -3,7 +3,6 @@ import typing
 from dataclasses import asdict
 from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union
 
-from scenario.logger import logger as pkg_logger
 from scenario import Runtime
 from scenario.consts import (
     ATTACH_ALL_STORAGES,
@@ -12,8 +11,8 @@ from scenario.consts import (
     DETACH_ALL_STORAGES,
     META_EVENTS,
 )
+from scenario.logger import logger as pkg_logger
 from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene
-
 
 if typing.TYPE_CHECKING:
     from ops.charm import CharmBase
@@ -195,7 +194,7 @@ class Scenario:
         scene: Scene,
         add_to_playbook: bool = False,
     ) -> PlayResult:
-        result = self._runtime.run(scene)
+        result = self._runtime.play(scene)
         # todo verify that if state was mutated, it was mutated
         #  in a way that makes sense:
         #  e.g. - charm cannot modify leadership status, etc...
@@ -232,6 +231,7 @@ def events_to_scenes(events: typing.Sequence[Union[str, Event]]):
             return obj
         else:
             raise TypeError(obj)
+
     scenes = map(Scene, map(_to_event, events))
     for i, scene in enumerate(scenes):
         scene.name = f"<Scene {i}: {scene.event.name}>"
@@ -239,22 +239,29 @@ def events_to_scenes(events: typing.Sequence[Union[str, Event]]):
 
 
 class StartupScenario(Scenario):
-    def __init__(self, charm_spec: CharmSpec, leader: bool = True, juju_version: str = "3.0.0"):
-        playbook: Playbook = Playbook(events_to_scenes((
-                ATTACH_ALL_STORAGES,
-                "start",
-                CREATE_ALL_RELATIONS,
-                "leader-elected" if leader else "leader-settings-changed",
-                "config-changed",
-                "install",
-            )))
+    def __init__(
+        self, charm_spec: CharmSpec, leader: bool = True, juju_version: str = "3.0.0"
+    ):
+        playbook: Playbook = Playbook(
+            events_to_scenes(
+                (
+                    ATTACH_ALL_STORAGES,
+                    "start",
+                    CREATE_ALL_RELATIONS,
+                    "leader-elected" if leader else "leader-settings-changed",
+                    "config-changed",
+                    "install",
+                )
+            )
+        )
         super().__init__(charm_spec, playbook, juju_version)
 
 
 class TeardownScenario(Scenario):
     def __init__(self, charm_spec: CharmSpec, juju_version: str = "3.0.0"):
-        playbook: Playbook = Playbook(events_to_scenes(
-            (BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, "stop", "remove")
-        ))
+        playbook: Playbook = Playbook(
+            events_to_scenes(
+                (BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, "stop", "remove")
+            )
+        )
         super().__init__(charm_spec, playbook, juju_version)
-

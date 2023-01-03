@@ -18,15 +18,20 @@ from ops.log import setup_root_logging
 if TYPE_CHECKING:
     from ops.charm import CharmBase, EventBase
 
-from ops.main import _get_charm_dir, _Dispatcher, _should_use_controller_storage, _get_event_args
 from ops.framework import Handle
+from ops.main import (
+    _Dispatcher,
+    _get_charm_dir,
+    _get_event_args,
+    _should_use_controller_storage,
+)
 
-CHARM_STATE_FILE = '.unit-state.db'
+CHARM_STATE_FILE = ".unit-state.db"
 
 logger = logging.getLogger()
 
 
-def patched_bound_event_emit(self, *args: Any, **kwargs: Any) -> 'EventBase':
+def patched_bound_event_emit(self, *args: Any, **kwargs: Any) -> "EventBase":
     """Emit event to all registered observers.
 
     The current storage state is committed before and after each observer is notified.
@@ -44,7 +49,7 @@ from ops import framework
 framework.BoundEvent.emit = patched_bound_event_emit
 
 
-def _emit_charm_event(charm: 'CharmBase', event_name: str) -> Optional['EventBase']:
+def _emit_charm_event(charm: "CharmBase", event_name: str) -> Optional["EventBase"]:
     """Emits a charm event based on a Juju event name.
 
     Args:
@@ -61,13 +66,16 @@ def _emit_charm_event(charm: 'CharmBase', event_name: str) -> Optional['EventBas
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        logger.debug('Emitting Juju event %s.', event_name)
+        logger.debug("Emitting Juju event %s.", event_name)
         return event_to_emit.emit(*args, **kwargs)
 
 
-def main(charm_class: Type[ops.charm.CharmBase],
-         use_juju_for_storage: Optional[bool] = None
-         ) -> Optional[Tuple['CharmBase', Optional['EventBase']]]:
+def main(
+    charm_class: Type[ops.charm.CharmBase],
+    use_juju_for_storage: Optional[bool] = None,
+    pre_event=None,
+    post_event=None,
+) -> Optional[Tuple["CharmBase", Optional["EventBase"]]]:
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
@@ -82,15 +90,17 @@ def main(charm_class: Type[ops.charm.CharmBase],
     charm_dir = _get_charm_dir()
 
     model_backend = ops.model._ModelBackend()  # pyright: reportPrivateUsage=false
-    debug = ('JUJU_DEBUG' in os.environ)
+    debug = "JUJU_DEBUG" in os.environ
     setup_root_logging(model_backend, debug=debug)
-    logger.debug("Operator Framework %s up and running.", ops.__version__)  # type:ignore
+    logger.debug(
+        "Operator Framework %s up and running.", ops.__version__
+    )  # type:ignore
 
     dispatcher = _Dispatcher(charm_dir)
     dispatcher.run_any_legacy_hook()
 
-    metadata = (charm_dir / 'metadata.yaml').read_text()
-    actions_meta = charm_dir / 'actions.yaml'
+    metadata = (charm_dir / "metadata.yaml").read_text()
+    actions_meta = charm_dir / "actions.yaml"
     if actions_meta.exists():
         actions_metadata = actions_meta.read_text()
     else:
@@ -103,7 +113,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     if use_juju_for_storage and not ops.storage.juju_backend_available():
         # raise an exception; the charm is broken and needs fixing.
-        msg = 'charm set use_juju_for_storage=True, but Juju version {} does not support it'
+        msg = "charm set use_juju_for_storage=True, but Juju version {} does not support it"
         raise RuntimeError(msg.format(JujuVersion.from_environ()))
 
     if use_juju_for_storage is None:
@@ -115,9 +125,11 @@ def main(charm_class: Type[ops.charm.CharmBase],
             #  Though we eventually expect that juju will run collect-metrics in a
             #  non-restricted context. Once we can determine that we are running collect-metrics
             #  in a non-restricted context, we should fire the event as normal.
-            logger.debug('"%s" is not supported when using Juju for storage\n'
-                         'see: https://github.com/canonical/operator/issues/348',
-                         dispatcher.event_name)
+            logger.debug(
+                '"%s" is not supported when using Juju for storage\n'
+                "see: https://github.com/canonical/operator/issues/348",
+                dispatcher.event_name,
+            )
             # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
             return
         store = ops.storage.JujuStorage()
@@ -132,7 +144,8 @@ def main(charm_class: Type[ops.charm.CharmBase],
         except TypeError:
             msg = (
                 "the second argument, 'key', has been deprecated and will be "
-                "removed after the 0.7 release")
+                "removed after the 0.7 release"
+            )
             warnings.warn(msg, DeprecationWarning)
             charm = charm_class(framework, None)
         else:
@@ -148,7 +161,13 @@ def main(charm_class: Type[ops.charm.CharmBase],
         if not dispatcher.is_restricted_context():
             framework.reemit()
 
+        if pre_event:
+            pre_event(charm)
+
         event = _emit_charm_event(charm, dispatcher.event_name)
+
+        if post_event:
+            post_event(charm)
 
         framework.commit()
     finally:

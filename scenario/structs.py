@@ -1,7 +1,7 @@
 import dataclasses
 import typing
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional, Tuple, Type, List
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type
 
 if typing.TYPE_CHECKING:
     try:
@@ -56,15 +56,15 @@ class RelationSpec(memo.RelationSpec, DCBase):
 
 
 def relation(
-        endpoint: str,
-        interface: str,
-        remote_app_name: str = "remote",
-        relation_id: int = 0,
-        remote_unit_ids: List[int] = (0,),
-        # mapping from unit ID to databag contents
-        local_unit_data: Dict[str, str] = None,
-        local_app_data: Dict[str, str] = None,
-        remote_app_data: Dict[str, str] = None,
+    endpoint: str,
+    interface: str,
+    remote_app_name: str = "remote",
+    relation_id: int = 0,
+    remote_unit_ids: List[int] = (0,),
+    # mapping from unit ID to databag contents
+    local_unit_data: Dict[str, str] = None,
+    local_app_data: Dict[str, str] = None,
+    remote_app_data: Dict[str, str] = None,
 ):
     """Helper function to construct a RelationMeta object with some sensible defaults."""
     metadata = RelationMeta(
@@ -83,13 +83,13 @@ def relation(
 
 
 def network(
-        private_address: str = "1.1.1.1",
-        mac_address: str = "",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
+    private_address: str = "1.1.1.1",
+    mac_address: str = "",
+    hostname: str = "",
+    cidr: str = "",
+    interface_name: str = "",
+    egress_subnets=("1.1.1.2/32",),
+    ingress_addresses=("1.1.1.2",),
 ) -> memo.Network:
     """Construct a network object."""
     return memo.Network(

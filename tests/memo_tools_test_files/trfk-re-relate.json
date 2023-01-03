@@ -88,6 +88,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -190,6 +213,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -347,6 +393,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -504,6 +573,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -597,18 +689,12 @@
             ]
           },
           "_ModelBackend.relation_get": {
-            "calls": [
-              [
-                "[[3, \"prom/1\", false], {}]",
-                "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}"
-              ],
-              [
-                "[[3, \"trfk\", true], {}]",
-                "{}"
-              ]
-            ],
+            "calls": {
+              "[[3, \"prom/1\", false], {}]": "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}",
+              "[[3, \"trfk\", true], {}]": "{}"
+            },
             "cursor": 0,
-            "caching_policy": "strict",
+            "caching_policy": "loose",
             "serializer": [
               "json",
               "json"
@@ -729,6 +815,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -822,18 +931,12 @@
             ]
           },
           "_ModelBackend.relation_get": {
-            "calls": [
-              [
-                "[[3, \"prom/1\", false], {}]",
-                "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}"
-              ],
-              [
-                "[[3, \"trfk\", true], {}]",
-                "{}"
-              ]
-            ],
-            "cursor": 2,
-            "caching_policy": "strict",
+            "calls": {
+              "[[3, \"prom/1\", false], {}]": "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}",
+              "[[3, \"trfk\", true], {}]": "{}"
+            },
+            "cursor": 0,
+            "caching_policy": "loose",
             "serializer": [
               "json",
               "json"
@@ -915,7 +1018,7 @@
                 "true"
               ]
             ],
-            "cursor": 0,
+            "cursor": 4,
             "caching_policy": "strict",
             "serializer": [
               "json",
@@ -954,6 +1057,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -1047,18 +1173,12 @@
             ]
           },
           "_ModelBackend.relation_get": {
-            "calls": [
-              [
-                "[[3, \"prom/1\", false], {}]",
-                "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}"
-              ],
-              [
-                "[[3, \"trfk\", true], {}]",
-                "{}"
-              ]
-            ],
+            "calls": {
+              "[[3, \"prom/1\", false], {}]": "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}",
+              "[[3, \"trfk\", true], {}]": "{}"
+            },
             "cursor": 0,
-            "caching_policy": "strict",
+            "caching_policy": "loose",
             "serializer": [
               "json",
               "json"
@@ -1179,6 +1299,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -1273,22 +1416,13 @@
             ]
           },
           "_ModelBackend.relation_get": {
-            "calls": [
-              [
-                "[[3, \"prom/1\", false], {}]",
-                "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}"
-              ],
-              [
-                "[[3, \"prom/0\", false], {}]",
-                "{\"egress-subnets\": \"10.152.183.124/32\", \"ingress-address\": \"10.152.183.124\", \"private-address\": \"10.152.183.124\"}"
-              ],
-              [
-                "[[3, \"trfk\", true], {}]",
-                "{}"
-              ]
-            ],
+            "calls": {
+              "[[3, \"prom/1\", false], {}]": "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}",
+              "[[3, \"prom/0\", false], {}]": "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-0.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/0\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}",
+              "[[3, \"trfk\", true], {}]": "{}"
+            },
             "cursor": 3,
-            "caching_policy": "strict",
+            "caching_policy": "loose",
             "serializer": [
               "json",
               "json"
@@ -1409,6 +1543,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -1502,22 +1659,13 @@
             ]
           },
           "_ModelBackend.relation_get": {
-            "calls": [
-              [
-                "[[3, \"prom/1\", false], {}]",
-                "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}"
-              ],
-              [
-                "[[3, \"prom/0\", false], {}]",
-                "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-0.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/0\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}"
-              ],
-              [
-                "[[3, \"trfk\", true], {}]",
-                "{}"
-              ]
-            ],
+            "calls": {
+              "[[3, \"prom/1\", false], {}]": "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-1.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/1\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}",
+              "[[3, \"prom/0\", false], {}]": "{\"egress-subnets\": \"10.152.183.124/32\", \"host\": \"prom-0.prom-endpoints.foo.svc.cluster.local\", \"ingress-address\": \"10.152.183.124\", \"mode\": \"http\", \"model\": \"foo\", \"name\": \"prom/0\", \"port\": \"9090\", \"private-address\": \"10.152.183.124\"}",
+              "[[3, \"trfk\", true], {}]": "{}"
+            },
             "cursor": 0,
-            "caching_policy": "strict",
+            "caching_policy": "loose",
             "serializer": [
               "json",
               "json"
@@ -1654,6 +1802,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -1745,6 +1916,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -1847,6 +2041,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     },
@@ -2004,6 +2221,29 @@
               "json"
             ]
           }
+        },
+        "state": {
+          "config": null,
+          "relations": [],
+          "networks": [],
+          "containers": [],
+          "status": {
+            "app": [
+              "unknown",
+              ""
+            ],
+            "unit": [
+              "unknown",
+              ""
+            ],
+            "app_version": ""
+          },
+          "leader": false,
+          "model": {
+            "name": "LkRovLn9ze9sHbOQSGAs",
+            "uuid": "257152f0-b1b3-46ea-ac21-73f28ace77aa"
+          },
+          "juju_log": []
         }
       }
     }

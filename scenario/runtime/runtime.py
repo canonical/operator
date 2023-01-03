@@ -3,12 +3,12 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Type, TypeVar, Generic
+from typing import TYPE_CHECKING, Callable, Optional, Type, TypeVar, Union
 
 import yaml
 
-from scenario.logger import logger as pkg_logger
 from scenario.event_db import TemporaryEventDB
+from scenario.logger import logger as pkg_logger
 from scenario.runtime.memo import (
     MEMO_DATABASE_NAME_KEY,
     MEMO_MODE_KEY,
@@ -16,22 +16,26 @@ from scenario.runtime.memo import (
     USE_STATE_KEY,
 )
 from scenario.runtime.memo import Event as MemoEvent
+from scenario.runtime.memo import MemoModes
 from scenario.runtime.memo import Scene as MemoScene
-from scenario.runtime.memo import event_db
-from scenario.runtime.memo_tools import DECORATE_MODEL, DECORATE_PEBBLE, inject_memoizer
+from scenario.runtime.memo import _reset_replay_cursors, event_db
+from scenario.runtime.memo_tools import (
+    DECORATE_MODEL,
+    DECORATE_PEBBLE,
+    IMPORT_BLOCK,
+    inject_memoizer,
+)
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
     from ops.framework import EventBase
     from ops.testing import CharmType
-    from ops.charm import CharmBase
-    from ops.framework import EventBase
+
     from scenario.structs import CharmSpec, Scene
+
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
-
 logger = pkg_logger.getChild("runtime")
-
 
 RUNTIME_MODULE = Path(__file__).parent
 
@@ -49,17 +53,23 @@ class Runtime:
     This object bridges a local environment and a charm artifact.
     """
 
-    def __init__(self, charm_spec: "CharmSpec", juju_version: str = "3.0.0"):
+    def __init__(
+        self,
+        charm_spec: "CharmSpec",
+        juju_version: str = "3.0.0",
+        event_db_path: Optional[Union[Path, str]] = None,
+    ):
+        self._event_db_path = Path(event_db_path) if event_db_path else None
         self._charm_spec = charm_spec
         self._juju_version = juju_version
         self._charm_type = charm_spec.charm_type
-        # todo consider cleaning up venv on __delete__, but ideally you should be
+        # TODO consider cleaning up venv on __delete__, but ideally you should be
         #  running this in a clean venv or a container anyway.
 
     @staticmethod
     def from_local_file(
-            local_charm_src: Path,
-            charm_cls_name: str,
+        local_charm_src: Path,
+        charm_cls_name: str,
     ) -> "Runtime":
         sys.path.extend((str(local_charm_src / "src"), str(local_charm_src / "lib")))
 
@@ -77,7 +87,7 @@ class Runtime:
             ) from e
 
         my_charm_type: Type["CharmBase"] = ldict["my_charm_type"]
-        return Runtime(my_charm_type)
+        return Runtime(CharmSpec(my_charm_type))  # TODO add meta, options,...
 
     @staticmethod
     def install(force=False):
@@ -126,13 +136,13 @@ class Runtime:
         except RuntimeError as e:
             # we rewrite ops.model to import memo.
             # We try to import ops from here --> circular import.
-            if e.args[0].startswith('recorder not installed'):
+            if e.args[0].startswith("scenario not installed"):
                 return True
             raise e
 
         model_path = Path(model.__file__)
 
-        if "from scenario import memo" not in model_path.read_text():
+        if IMPORT_BLOCK not in model_path.read_text():
             logger.error(
                 f"ops.model ({model_path} does not seem to import runtime.memo.memo"
             )
@@ -155,6 +165,7 @@ class Runtime:
             pass
 
         from scenario import ops_main_mock
+
         ops_main_mock.setup_root_logging = _patch_logger
 
     def _cleanup_env(self, env):
@@ -182,7 +193,7 @@ class Runtime:
         }
 
     def _drop_meta(self, charm_root: Path):
-        logger.debug("Dropping metadata.yaml and actions.yaml...")
+        logger.debug("Dropping metadata.yaml, config.yaml, actions.yaml...")
         (charm_root / "metadata.yaml").write_text(yaml.safe_dump(self._charm_spec.meta))
         if self._charm_spec.actions:
             (charm_root / "actions.yaml").write_text(
@@ -193,7 +204,9 @@ class Runtime:
                 yaml.safe_dump(self._charm_spec.config)
             )
 
-    def _get_runtime_env(self, scene_idx: int, db_path: Path):
+    def _get_runtime_env(
+        self, scene_idx: int, db_path: Path, mode: MemoModes = "replay"
+    ):
         env = {}
         env.update(
             {
@@ -203,7 +216,7 @@ class Runtime:
             }
         )
         sys.path.append(str(RUNTIME_MODULE.absolute()))
-        env[MEMO_MODE_KEY] = "replay"
+        env[MEMO_MODE_KEY] = mode
 
         os.environ.update(env)  # todo consider subprocess
         return env
@@ -225,8 +238,13 @@ class Runtime:
         WrappedCharm.__name__ = charm_type.__name__
         return WrappedCharm
 
-    def run(self, scene: "Scene") -> RuntimeRunResult:
-        """Executes a scene on the charm.
+    def play(
+        self,
+        scene: "Scene",
+        pre_event: Optional[Callable[["_CT"], None]] = None,
+        post_event: Optional[Callable[["_CT"], None]] = None,
+    ) -> RuntimeRunResult:
+        """Plays a scene on the charm.
 
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
@@ -240,16 +258,14 @@ class Runtime:
             f"Preparing to fire {scene.event.name} on {self._charm_type.__name__}"
         )
 
-        logger.info(" - clearing env")
-
         logger.info(" - preparing env")
         with tempfile.TemporaryDirectory() as charm_root:
             charm_root_path = Path(charm_root)
             env = self._get_event_env(scene, charm_root_path)
+            self._drop_meta(charm_root_path)
 
             memo_scene = self._scene_to_memo_scene(scene, env)
             with TemporaryEventDB(memo_scene, charm_root) as db_path:
-                self._drop_meta(charm_root_path)
                 env.update(self._get_runtime_env(0, db_path))
 
                 logger.info(" - redirecting root logging")
@@ -267,7 +283,11 @@ class Runtime:
                 logger.info(" - Entering ops.main (mocked).")
 
                 try:
-                    charm, event = main(self._wrap(self._charm_type))
+                    charm, event = main(
+                        self._wrap(self._charm_type),
+                        pre_event=pre_event,
+                        post_event=post_event,
+                    )
                 except Exception as e:
                     raise RuntimeError(
                         f"Uncaught error in operator/charm code: {e}."
@@ -275,12 +295,92 @@ class Runtime:
                 finally:
                     logger.info(" - Exited ops.main.")
 
+                logger.info(" - clearing env")
                 self._cleanup_env(env)
 
                 with event_db(db_path) as data:
                     scene_out = data.scenes[0]
 
         return RuntimeRunResult(charm, scene_out, event)
+
+    def replay(
+        self,
+        index: int,
+        pre_event: Optional[Callable[["_CT"], None]] = None,
+        post_event: Optional[Callable[["_CT"], None]] = None,
+    ) -> RuntimeRunResult:
+        """Replays a stored scene by index.
+
+        This requires having a statically defined event DB.
+        """
+        if not Runtime._is_installed():
+            raise RuntimeError(
+                "Runtime is not installed. Call `runtime.install()` (and read the fine prints)."
+            )
+        if not self._event_db_path:
+            raise ValueError(
+                "No event_db_path set. Pass one to the Runtime constructor."
+            )
+
+        logger.info(f"Preparing to fire scene #{index} on {self._charm_type.__name__}")
+        logger.info(" - redirecting root logging")
+        self._redirect_root_logger()
+
+        logger.info(" - setting up temporary charm root")
+        with tempfile.TemporaryDirectory() as charm_root:
+            charm_root_path = Path(charm_root).absolute()
+            self._drop_meta(charm_root_path)
+
+            # extract the env from the scene
+            with event_db(self._event_db_path) as data:
+                logger.info(
+                    f" - resetting scene {index} replay cursor."
+                )  # just in case
+                _reset_replay_cursors(self._event_db_path, index)
+
+                logger.info(" - preparing env")
+                scene = data.scenes[index]
+                env = dict(scene.event.env)
+                # declare the charm root for ops to pick up
+                env["JUJU_CHARM_DIR"] = str(charm_root_path)
+
+            # inject the memo envvars
+            env.update(
+                self._get_runtime_env(
+                    index,
+                    self._event_db_path,
+                    # set memo to isolated mode so that we raise
+                    # instead of propagating: it'd be useless
+                    # anyway in most cases TODO generalize?
+                    mode="isolated",
+                )
+            )
+            os.environ.update(env)
+
+            # we don't import from ops because we need some extra return statements.
+            # see https://github.com/canonical/operator/pull/862
+            # from ops.main import main
+            from scenario.ops_main_mock import main
+
+            logger.info(" - Entering ops.main (mocked).")
+
+            try:
+                charm, event = main(
+                    self._wrap(self._charm_type),
+                    pre_event=pre_event,
+                    post_event=post_event,
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Uncaught error in operator/charm code: {e}."
+                ) from e
+            finally:
+                logger.info(" - Exited ops.main.")
+
+            logger.info(" - cleaning up env")
+            self._cleanup_env(env)
+
+        return RuntimeRunResult(charm, scene, event)
 
 
 if __name__ == "__main__":

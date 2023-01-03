@@ -5,6 +5,8 @@ from subprocess import Popen
 
 import pytest
 
+from scenario.structs import CharmSpec
+
 # keep this block before `ops` imports. This ensures that if you've called Runtime.install() on
 # your current venv, ops.model won't break as it tries to import recorder.py
 
@@ -12,6 +14,7 @@ try:
     from scenario import memo
 except ModuleNotFoundError:
     from scenario.runtime.runtime import RUNTIME_MODULE
+
     sys.path.append(str(RUNTIME_MODULE.absolute()))
 
 from ops.charm import CharmBase, CharmEvents
@@ -69,18 +72,21 @@ def charm_type():
     ),
 )
 def test_run(evt_idx, expected_name):
-    charm = charm_type()
     runtime = Runtime(
-        charm,
-        meta={
-            "name": "foo",
-            "requires": {"ingress-per-unit": {"interface": "ingress_per_unit"}},
-        },
-        local_db_path=MEMO_TOOLS_RESOURCES_FOLDER / "trfk-re-relate.json",
-        install=True,
+        CharmSpec(
+            charm_type(),
+            meta={
+                "name": "foo",
+                "requires": {"ingress-per-unit": {"interface": "ingress_per_unit"}},
+            },
+        ),
+        event_db_path=MEMO_TOOLS_RESOURCES_FOLDER / "trfk-re-relate.json",
     )
 
-    charm, scene = runtime.run(evt_idx)
+    result = runtime.replay(evt_idx)
+    charm = result.charm
+    scene = result.scene
+
     assert charm.unit.name == "trfk/0"
     assert charm.model.name == "foo"
     assert (
@@ -89,24 +95,25 @@ def test_run(evt_idx, expected_name):
 
 
 def test_relation_data():
-    charm = charm_type()
     runtime = Runtime(
-        charm,
-        meta={
-            "name": "foo",
-            "requires": {"ingress-per-unit": {"interface": "ingress_per_unit"}},
-        },
-        local_db_path=MEMO_TOOLS_RESOURCES_FOLDER / "trfk-re-relate.json",
+        CharmSpec(
+            charm_type(),
+            meta={
+                "name": "foo",
+                "requires": {"ingress-per-unit": {"interface": "ingress_per_unit"}},
+            },
+        ),
+        event_db_path=MEMO_TOOLS_RESOURCES_FOLDER / "trfk-re-relate.json",
     )
-    charm, scene = runtime.run(5)  # ipu-relation-changed
 
-    assert scene.event.name == "ingress-per-unit-relation-changed"
+    def pre_event(charm):
+        assert not charm._event
 
-    rel = charm.model.relations["ingress-per-unit"][0]
-
-    for _ in range(2):
-        # the order in which we call the hook tools should not matter because
+    def post_event(charm):
+        rel = charm.model.relations["ingress-per-unit"][0]
+        # the [order in which/number of times] we call the hook tools should not matter because
         # relation-get is cached in 'loose' mode! yay!
+        _ = rel.data[charm.app]
         _ = rel.data[charm.app]
 
         remote_unit_data = rel.data[list(rel.units)[0]]
@@ -117,34 +124,11 @@ def test_relation_data():
 
         local_app_data = rel.data[charm.app]
         assert local_app_data == {}
+        assert charm._event
 
-
-def test_local_run_loose():
-    runtime = Runtime(
-        charm_type(),
-        meta={
-            "name": "foo",
-            "requires": {"ingress-per-unit": {"interface": "ingress_per_unit"}},
-        },
-        local_db_path=MEMO_TOOLS_RESOURCES_FOLDER / "trfk-re-relate.json",
-    )
-    charm, scene = runtime.run(5)  # ipu-relation-changed
+    result = runtime.replay(
+        5, pre_event=pre_event, post_event=post_event
+    )  # ipu-relation-changed
+    scene = result.scene
 
     assert scene.event.name == "ingress-per-unit-relation-changed"
-
-    rel = charm.model.relations["ingress-per-unit"][0]
-
-    # fixme: we need to access the data in the same ORDER in which we did before.
-    #  for relation-get, it should be safe to ignore the memo ordering,
-    #  since the data is frozen for the hook duration.
-    #  actually it should be fine for most hook tools, except leader and status.
-    #  pebble is a different story.
-
-    remote_unit_data = rel.data[list(rel.units)[0]]
-    assert remote_unit_data["host"] == "prom-1.prom-endpoints.foo.svc.cluster.local"
-    assert remote_unit_data["port"] == "9090"
-    assert remote_unit_data["model"] == "foo"
-    assert remote_unit_data["name"] == "prom/1"
-
-    local_app_data = rel.data[charm.app]
-    assert local_app_data == {}

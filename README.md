@@ -114,41 +114,41 @@ from ops.model import ActiveStatus
 
 
 class MyCharm(CharmBase):
-    def __init__(self, ...):
-        self.framework.observe(self.on.start, self._on_start)
+  def __init__(self, ...):
+    self.framework.observe(self.on.start, self._on_start)
 
-    def _on_start(self, _):
-        if self.unit.is_leader():
-            self.unit.status = ActiveStatus('I rule')
-        else:
-            self.unit.status = ActiveStatus('I follow')
+  def _on_start(self, _):
+    if self.unit.is_leader():
+      self.unit.status = ActiveStatus('I rule')
+    else:
+      self.unit.status = ActiveStatus('I follow')
 
 
 @pytest.fixture
 def scenario():
-    return Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
+  return Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
 
 
 @pytest.fixture
 def start_scene():
-    return Scene(event=get_event('start'), context=Context())
+  return Scene(event=get_event('start'), context=Context())
 
 
 def test_scenario_base(scenario, start_scene):
-    out = scenario.run(start_scene)
-    assert out.context_out.state.status.unit == ('unknown', '')
+  out = scenario.play(start_scene)
+  assert out.context_out.state.status.unit == ('unknown', '')
 
 
 @pytest.mark.parametrize('leader', [True, False])
 def test_status_leader(scenario, start_scene, leader):
-    leader_scene = start_scene.copy()
-    leader_scene.context.state.leader = leader
-    
-    out = scenario.run(leader_scene)
-    if leader:
-        assert out.context_out.state.status.unit == ('active', 'I rule')
-    else:
-        assert out.context_out.state.status.unit == ('active', 'I follow')
+  leader_scene = start_scene.copy()
+  leader_scene.context.state.leader = leader
+
+  out = scenario.play(leader_scene)
+  if leader:
+    assert out.context_out.state.status.unit == ('active', 'I rule')
+  else:
+    assert out.context_out.state.status.unit == ('active', 'I follow')
 ```
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask to the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
@@ -158,40 +158,42 @@ An example involving relations:
 ```python
 from scenario.structs import relation
 
+
 # This charm copies over remote app data to local unit data
 class MyCharm(CharmBase):
-    ...
-    def _on_event(self, e):
-        relation = self.model.relations['foo'][0]
-        assert relation.app.name == 'remote'
-        assert e.relation.data[self.unit]['abc'] == 'foo'
-        e.relation.data[self.unit]['abc'] = e.relation.data[e.app]['cde']
-        
+  ...
+
+  def _on_event(self, e):
+    relation = self.model.relations['foo'][0]
+    assert relation.app.name == 'remote'
+    assert e.relation.data[self.unit]['abc'] == 'foo'
+    e.relation.data[self.unit]['abc'] = e.relation.data[e.app]['cde']
+
 
 def test_relation_data(scenario, start_scene):
-    scene = start_scene.copy()
-    scene.context.state.relations = [
-        relation(
-            endpoint="foo",
-            interface="bar",
-            remote_app_name="remote",
-            local_unit_data={"abc": "foo"},
-            remote_app_data={"cde": "baz!"},
-        ),
-    ]
-    out = scenario.run(scene)
-    assert out.context_out.state.relations[0].local_unit_data == {"abc": "baz!"}
-    # one could probably even do:
-    assert out.context_out.state.relations == [
-            relation(
-            endpoint="foo",
-            interface="bar",
-            remote_app_name="remote",
-            local_unit_data={"abc": "baz!"},
-            remote_app_data={"cde": "baz!"},
-        ),
-    ]
-    # which is very idiomatic and superbly explicit. Noice.
+  scene = start_scene.copy()
+  scene.context.state.relations = [
+    relation(
+      endpoint="foo",
+      interface="bar",
+      remote_app_name="remote",
+      local_unit_data={"abc": "foo"},
+      remote_app_data={"cde": "baz!"},
+    ),
+  ]
+  out = scenario.play(scene)
+  assert out.context_out.state.relations[0].local_unit_data == {"abc": "baz!"}
+  # one could probably even do:
+  assert out.context_out.state.relations == [
+    relation(
+      endpoint="foo",
+      interface="bar",
+      remote_app_name="remote",
+      local_unit_data={"abc": "baz!"},
+      remote_app_data={"cde": "baz!"},
+    ),
+  ]
+  # which is very idiomatic and superbly explicit. Noice.
 ```
 
 

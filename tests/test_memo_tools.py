@@ -19,7 +19,7 @@ from scenario.runtime.memo import (
     event_db,
     memo,
 )
-from scenario.runtime.memo_tools import DecorateSpec, inject_memoizer, memo_import_block
+from scenario.runtime.memo_tools import MEMO_IMPORT_BLOCK, DecorateSpec, inject_memoizer
 
 # we always replay the last event in the default test env.
 os.environ["MEMO_REPLAY_IDX"] = "-1"
@@ -45,7 +45,7 @@ class Foo:
         return str(random.random())
 """
 
-expected_decorated_source = f"""{memo_import_block}
+expected_decorated_source = f"""{MEMO_IMPORT_BLOCK}
 import random
 
 class _ModelBackend():
@@ -191,9 +191,7 @@ def test_memoizer_replay():
         def _catch_log_call(_, *args, **kwargs):
             caught_calls.append((args, kwargs))
 
-        with patch(
-            "jhack.utils.event_recorder.recorder._log_memo", new=_catch_log_call
-        ):
+        with patch("scenario.runtime.memo._log_memo", new=_catch_log_call):
             assert my_fn(10, retval=10, foo="bar") == 20
             assert my_fn(10, retval=11, foo="baz") == 21
             assert my_fn(11, retval=10, foo="baq", a="b") == 22

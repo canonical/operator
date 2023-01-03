@@ -35,7 +35,7 @@ SUPPORTED_SERIALIZERS = Literal["pickle", "json", "io", "PebblePush"]
 SUPPORTED_SERIALIZERS_LIST = ["pickle", "json", "io", "PebblePush"]
 
 
-MemoModes = Literal["record", "replay"]
+MemoModes = Literal["record", "replay", "isolated"]
 _CachingPolicy = Literal["strict", "loose"]
 
 # notify just once of what mode we're running in
@@ -70,6 +70,9 @@ def _load_memo_mode() -> MemoModes:
     elif val == "replay":
         if not _PRINTED_MODE:
             print("MEMO: replaying")
+    elif val == "isolated":
+        if not _PRINTED_MODE:
+            print("MEMO: replaying (isolated mode)")
     else:
         warnings.warn(
             f"[ERROR]: MEMO: invalid value ({val!r}). Defaulting to `record`."
@@ -86,6 +89,21 @@ def _is_bound_method(fn: Any):
         return next(iter(inspect.signature(fn).parameters.items()))[0] == "self"
     except:
         return False
+
+
+def _call_repr(
+    fn: Callable,
+    args,
+    kwargs,
+):
+    """Str repr of memoized function call address."""
+    fn_name = getattr(fn, "__name__", str(fn))
+    if _self := getattr(fn, "__self__", None):
+        # it's a method
+        fn_repr = type(_self).__name__ + fn_name
+    else:
+        fn_repr = fn_name
+    return f"{fn_repr}(*{args}, **{kwargs})"
 
 
 def _log_memo(
@@ -107,16 +125,8 @@ def _log_memo(
     trimmed = "[...]" if len(output_repr) > 100 else ""
     hit = "hit" if cache_hit else "miss"
 
-    fn_name = getattr(fn, "__name__", str(fn))
-
-    if _self := getattr(fn, "__self__", None):
-        # it's a method
-        fn_repr = type(_self).__name__ + fn_name
-    else:
-        fn_repr = fn_name
-
-    log_fn(
-        f"@memo[{hit}]: replaying {fn_repr}(*{args}, **{kwargs})"
+    return log_fn(
+        f"@memo[{hit}]: replaying {_call_repr(fn, args, kwargs)}"
         f"\n\t --> {trim}{trimmed}"
     )
 
@@ -167,7 +177,7 @@ def memo(
             input_serializer, output_serializer = _check_serializer(serializer)
 
             def _load(obj: str, method: SUPPORTED_SERIALIZERS):
-                if log_on_replay and _MEMO_MODE == "replay":
+                if log_on_replay and _MEMO_MODE in ["replay", "isolated"]:
                     _log_memo(fn, args, kwargs, recorded_output, cache_hit=True)
                 if method == "pickle":
                     byt = base64.b64decode(obj)
@@ -227,6 +237,11 @@ def memo(
 
             def propagate():
                 """Make the real wrapped call."""
+                if _MEMO_MODE == "isolated":
+                    raise RuntimeError(
+                        f"Attempted propagation in isolated mode: "
+                        f"{_call_repr(fn, args, kwargs)}"
+                    )
 
                 if _MEMO_MODE == "replay" and log_on_replay:
                     _log_memo(fn, args, kwargs, "<propagated>", cache_hit=False)
@@ -270,9 +285,13 @@ def memo(
             memo_args = list(memoizable_args)
 
             database = os.environ.get(MEMO_DATABASE_NAME_KEY, DEFAULT_DB_NAME)
+            if not Path(database).exists():
+                raise RuntimeError(
+                    f"Database not found at {database}. "
+                    f"@memo requires a scene to be set."
+                )
+
             with event_db(database) as data:
-                if not data.scenes:
-                    raise RuntimeError("No scenes: cannot memoize.")
                 idx = os.environ.get(MEMO_REPLAY_INDEX_KEY, None)
 
                 strict_caching = _check_caching_policy(caching_policy) == "strict"
@@ -309,7 +328,7 @@ def memo(
                         return _load(serialized_output, "io")
                     return output
 
-                elif _MEMO_MODE == "replay":
+                elif _MEMO_MODE in ["replay", "isolated"]:
                     if idx is None:
                         raise RuntimeError(
                             f"provide a {MEMO_REPLAY_INDEX_KEY} envvar"
@@ -388,7 +407,7 @@ def memo(
                                 f"this path must have diverged. Propagating call..."
                             )
                             return load_from_state(
-                                data.scenes[idx].context,
+                                data.scenes[idx],
                                 (memo_name, memoizable_args, kwargs),
                             )
 
@@ -402,7 +421,7 @@ def memo(
                                 f"This path has diverged. Propagating call..."
                             )
                             return load_from_state(
-                                data.scenes[idx].context,
+                                data.scenes[idx],
                                 (memo_name, memoizable_args, kwargs),
                             )
 
@@ -427,7 +446,7 @@ def memo(
                             f"This path has diverged."
                         )
                         return load_from_state(
-                            data.scenes[idx].context,
+                            data.scenes[idx],
                             (memo_name, memoizable_args, kwargs),
                         )
 
@@ -598,7 +617,7 @@ class RelationMeta:
     interface: str
     relation_id: int
     remote_app_name: str
-    remote_unit_ids: List[int] = field(default_factory=lambda: list((0, )))
+    remote_unit_ids: List[int] = field(default_factory=lambda: list((0,)))
 
     # local limit
     limit: int = 1
@@ -694,7 +713,7 @@ class Context:
     def from_dict(obj: dict):
         return Context(
             memos={name: Memo(**content) for name, content in obj["memos"].items()},
-            state=State.from_dict(obj["state"]),
+            state=State.from_dict(obj.get("state")),
         )
 
 
@@ -758,7 +777,7 @@ def setup(file=DEFAULT_DB_NAME):
         event = _record_current_event(file)
         print(f"Captured event: {event.name}.")
 
-    if _MEMO_MODE == "replay":
+    if _MEMO_MODE in ["replay", "isolated"]:
         _reset_replay_cursors()
         print(f"Replaying: reset replay cursors.")
 

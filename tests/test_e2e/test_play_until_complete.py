@@ -1,7 +1,3 @@
-from tests.setup_tests import setup_tests
-
-setup_tests()  # noqa & keep this on top
-
 from typing import Optional, Type
 
 import pytest
@@ -9,9 +5,7 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 
 from scenario.scenario import StartupScenario, TeardownScenario
-from scenario.structs import (
-    CharmSpec,
-)
+from scenario.structs import CharmSpec
 
 CHARM_CALLED = 0
 
@@ -50,7 +44,7 @@ def mycharm():
     return MyCharm
 
 
-@pytest.mark.parametrize('leader', (True, False))
+@pytest.mark.parametrize("leader", (True, False))
 def test_setup(leader, mycharm):
     scenario = StartupScenario(CharmSpec(mycharm, meta={"name": "foo"}), leader=leader)
     scenario.play_until_complete()

@@ -97,21 +97,25 @@ DECORATE_PEBBLE = {
     }
 }
 
+IMPORT_BLOCK = "from scenario import memo"
+RUNTIME_PATH = str(Path(__file__).parent.absolute())
 
-memo_import_block = dedent(
+MEMO_IMPORT_BLOCK = dedent(
     """# ==== block added by scenario.runtime.memo_tools ===
+import sys
+sys.path.append({runtime_path!r})  # add /path/to/scenario/runtime to the PATH
 try:
-    from scenario import memo
+    {import_block}
 except ModuleNotFoundError as e:
-    msg = "recorder not installed. " \
+    msg = "scenario not installed. " \
           "This can happen if you're playing with Runtime in a local venv. " \
           "In that case all you have to do is ensure that the PYTHONPATH is patched to include the path to " \
-          "recorder.py before loading this module. " \
+          "scenario before loading this module. " \
           "Tread carefully."
     raise RuntimeError(msg) from e
 # ==== end block ===
 """
-)
+).format(import_block=IMPORT_BLOCK, runtime_path=str(RUNTIME_PATH))
 
 
 def inject_memoizer(source_file: Path, decorate: Dict[str, Dict[str, DecorateSpec]]):
@@ -151,8 +155,8 @@ def inject_memoizer(source_file: Path, decorate: Dict[str, Dict[str, DecorateSpe
                 method.decorator_list.append(spec_token)
 
     unparsed_source = unparse(atok)
-    if "from recorder import memo" not in unparsed_source:
+    if IMPORT_BLOCK not in unparsed_source:
         # only add the import if necessary:
-        unparsed_source = memo_import_block + unparsed_source
+        unparsed_source = MEMO_IMPORT_BLOCK + unparsed_source
 
     source_file.write_text(unparsed_source)
