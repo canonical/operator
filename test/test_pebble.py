@@ -20,7 +20,6 @@ import io
 import json
 import os
 import signal
-import sys
 import tempfile
 import test.fake_pebble as fake_pebble
 import threading
@@ -2390,7 +2389,7 @@ bad path\r
             ('POST', '/v1/signals', None, {'signal': 'SIGHUP', 'services': ['s1', 's2']}),
         ])
 
-    @unittest.skipUnless(hasattr(signal, 'SIGHUP'), 'signal constants not present on Windows')
+    @unittest.skipUnless(hasattr(signal, 'SIGHUP'), 'signal constants not present')
     def test_send_signal_number(self):
         self.client.responses.append({
             'result': True,
@@ -2502,7 +2501,6 @@ bad path\r
         ])
 
 
-@unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
 class TestSocketClient(unittest.TestCase):
     def test_socket_not_found(self):
         client = pebble.Client(socket_path='does_not_exist')
@@ -2737,7 +2735,7 @@ class TestExec(unittest.TestCase):
         process = self.client.exec(['server'])
         process.send_signal('SIGHUP')
         num_sends = 1
-        if hasattr(signal, 'SIGHUP'):  # Skip this part on Windows
+        if hasattr(signal, 'SIGHUP'):
             process.send_signal(1)
             process.send_signal(signal.SIGHUP)
             num_sends += 2
@@ -3001,7 +2999,6 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(io_ws.sends, [])
 
-    @unittest.skipIf(sys.platform == 'win32', "exec() with files doesn't work on Windows")
     def test_wait_file_io(self):
         fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
         out = tempfile.TemporaryFile(mode='w+', encoding='utf-8')

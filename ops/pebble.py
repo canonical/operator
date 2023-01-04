@@ -1855,14 +1855,6 @@ class Client:
 
         f = parser.get_file(path, encoding)
 
-        # The opened file remains usable after removing/unlinking on posix
-        # platforms until it is closed.  This prevents callers from
-        # interacting with it on disk.  But e.g. Windows doesn't allow
-        # removing opened files, and so we use the tempfile lib's
-        # helper class to auto-delete on close/gc for us.
-        if os.name != 'posix' or sys.platform == 'cygwin':
-            return tempfile._TemporaryFileWrapper(  # type: ignore
-                f, f.name, delete=True)  # type: ignore
         parser.remove_files()
         return f
 
@@ -2247,9 +2239,6 @@ class Client:
 
         if stdin is not None:
             if _has_fileno(stdin):
-                if sys.platform == 'win32':
-                    raise NotImplementedError('file-based stdin not supported on Windows')
-
                 # Create a pipe so _reader_to_websocket can select() on the
                 # reader as well as this cancel_reader; when we write anything
                 # to cancel_writer it'll trigger the select and end the thread.
