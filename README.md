@@ -25,9 +25,9 @@ Scenario-testing a charm, then, means verifying that:
 I like metaphors, so here we go:
 - There is a theatre stage (Scenario).
 - You pick an actor (a Charm) to put on the stage. Not just any actor: an improv one.
-- You pick a sketch that the actor will have to play out (a Scene). The sketch is specified as:
+- You arrange the stage with content that the the actor will have to interact with (a Scene). Setting up the scene consists of selecting:
   - An initial situation (Context) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what other actors are there around it, what is written in those books on the table?
-  - Something that happens (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the stage (relation-departed), or the content of one of the books changes).
+  - Something that has just happened (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the stage (relation-departed), or the content of one of the books changes).
 - How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a container), or write something down into one of the books.
 
 

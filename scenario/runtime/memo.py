@@ -173,15 +173,19 @@ def memo(
     
     Based on the value of the {MEMO_MODE_KEY!r} environment variable, it can work in multiple ways:
     
-    - "passthrough": does nothing. As if the decorator wasn't there.
+    - "passthrough": does nothing. As if the decorator wasn't there. Useful as production default, 
+        to minimize the runtime impact of memo.
     - "record": each function call gets intercepted, and the [arguments -> return value] mapping is 
         stored in a database, using `namespace`.`name` as key. The `serializers` arg tells how the args/kwargs and
-        return value should be serialized, respectively.
+        return value should be serialized, respectively. 
+        Useful for populating a database for replaying/testing purposes.
     - "isolated": each function call gets intercepted, and instead of propagating the call to the wrapped function,
         the database is searched for a matching argument set. If one is found, the stored return value is 
         deserialized and returned. If none is found, a RuntimeError is raised.
+        Useful for replaying in local environments, where propagating the call would result in errors further down.
     - "replay": like "isolated", but in case of a cache miss, the call is propagated to the wrapped function 
         (the database is NOT implicitly updated).
+        Useful for replaying in 'live' environments where propagating the call would get you the right result.
         
     `caching_policy` can be either:
     - "strict": each function call is stored individually and in an ordered sequence. Useful for when a 
