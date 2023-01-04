@@ -25,10 +25,10 @@ knowledge from experts in a software component that can be shared.
 
 The Charmed Operator Framework extends the "operator pattern" to enable Charmed
 Operators, packaged as and often referred to as "charms". Charms are not just
-for Kubernetes but also operators for traditional Linux or Windows application
-management. Operators use an Operator Lifecycle Manager (OLM), like Juju, to
-coordinate their work in a cluster. The system uses Golang for concurrent event
-processing under the hood, but enables the operators to be written in Python.
+for Kubernetes but also operators for traditional Linux application management.
+Operators use an Operator Lifecycle Manager (OLM), like Juju, to coordinate
+their work in a cluster. The system uses Golang for concurrent event processing
+under the hood, but enables the operators to be written in Python.
 
 Operators should do one thing and do it well. Each operator drives a single
 application or service and can be composed with other operators to deliver a

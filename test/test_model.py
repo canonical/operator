@@ -1120,7 +1120,6 @@ recursive_push_pull_cases = [
 ]
 
 
-@unittest.skipIf(os.name == 'nt', "These pebble ops are not supported on windows")
 @pytest.mark.parametrize('case', recursive_push_pull_cases)
 def test_recursive_push_and_pull(case):
     # full "integration" test of push+pull
