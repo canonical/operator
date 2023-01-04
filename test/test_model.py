@@ -2283,7 +2283,7 @@ class TestModelBackend(unittest.TestCase):
                 case()
 
     def test_local_set_invalid_status(self):
-        # juju return exit code 1 if you ask to set status to 'unknown'
+        # juju returns exit code 1 if you ask to set status to 'unknown' or 'error'
         meta = ops.charm.CharmMeta.from_yaml('''
             name: myapp
         ''')
@@ -2314,50 +2314,43 @@ class TestModelBackend(unittest.TestCase):
         ])
 
     def test_local_get_status(self):
-        # juju return exit code 1 if you ask to set status to 'unknown'
-        meta = ops.charm.CharmMeta.from_yaml('''
-            name: myapp
-        ''')
-        model = ops.model.Model(meta, self.backend)
-
-        for name, expected_status_type in (
+        for name, expected_cls in (
             ("active", ops.model.ActiveStatus),
             ("waiting", ops.model.WaitingStatus),
             ("blocked", ops.model.BlockedStatus),
             ("maintenance", ops.model.MaintenanceStatus),
             ("error", ops.model.ErrorStatus),
         ):
+            meta = ops.charm.CharmMeta.from_yaml('''
+                name: myapp
+            ''')
+            model = ops.model.Model(meta, self.backend)
+
             with self.subTest(name):
-                content = dedent("""
-                    {
-                        "message": "foo",
-                        "status": "STATUS",
-                        "status-data": {}
-                    }""".replace("STATUS", name))
+                content = json.dumps({
+                    "message": "foo",
+                    "status": name,
+                    "status-data": {},
+                })
                 fake_script(self, 'status-get', "echo '{}'".format(content))
 
-                # self.assertIsInstance(model.unit.status, expected_status_type)
-                self.assertEquals(model.unit.status.name, name)
-                self.assertEquals(model.unit.status.message, "foo")
+                self.assertIsInstance(model.unit.status, expected_cls)
+                self.assertEqual(model.unit.status.name, name)
+                self.assertEqual(model.unit.status.message, "foo")
 
-                content = dedent("""
-                    {
-                        "application-status": {
-                            "message": "bar",
-                            "status": "STATUS",
-                            "status-data": {}
-                        }
-                    }""".replace("STATUS", name))
+                content = json.dumps({
+                    "application-status": {
+                        "message": "bar",
+                        "status": name,
+                        "status-data": {},
+                    }
+                })
                 fake_script(self, 'status-get', "echo '{}'".format(content))
                 fake_script(self, 'is-leader', 'echo true')
 
-                # self.assertIsInstance(model.app.status, expected_status_type)
-                self.assertEquals(model.app.status.name, name)
-                self.assertEquals(model.app.status.message, "bar")
-
-                # cleanup the caches
-                model.unit._status = None
-                model.app._status = None
+                self.assertIsInstance(model.app.status, expected_cls)
+                self.assertEqual(model.app.status.name, name)
+                self.assertEqual(model.app.status.message, "bar")
 
     def test_status_set_is_app_not_bool_raises(self):
         for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:

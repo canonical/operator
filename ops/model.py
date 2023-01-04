@@ -1158,19 +1158,12 @@ class UnknownStatus(StatusBase):
 
 @StatusBase.register
 class ErrorStatus(StatusBase):
-    """The unit status is unknown.
+    """The unit status is error.
 
-    A unit-agent has encountered an error.
-
+    The unit-agent has encountered an error (the application or unit requires
+    human intervention in order to operate correctly).
     """
     name = 'error'
-
-    def __init__(self, message: str = ''):
-        # Error status cannot be set.
-        super().__init__(message)
-
-    def __repr__(self):
-        return "ErrorStatus()"
 
 
 @StatusBase.register
