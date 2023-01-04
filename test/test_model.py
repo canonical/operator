@@ -2260,9 +2260,8 @@ class TestModelBackend(unittest.TestCase):
                     content = t.read()
                 finally:
                     t.close()
-                self.assertEqual(content.decode('utf-8'), dedent("""\
-                    foo: bar
-                    """))
+                decoded = content.decode('utf-8').replace('\r\n', '\n')
+                self.assertEqual(decoded, 'foo: bar\n')
 
         # before 2.7.0, it just fails always (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'
