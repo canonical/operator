@@ -372,7 +372,7 @@ class _JujuStorageBackend:
             CalledProcessError: if 'state-get' returns an error code.
         """
         # We don't capture stderr here so it can end up in debug logs.
-        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True, universal_newlines=True)
+        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True, encoding='utf-8')
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
         return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore

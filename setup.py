@@ -42,9 +42,7 @@ def _get_version() -> str:
 version = _get_version()
 version_path = Path("ops/version.py")
 version_backup = Path("ops/version.py~")
-if version_backup.exists():
-    # unlink(missing_ok=True) is a 3.8-ish
-    version_backup.unlink()
+version_backup.unlink(missing_ok=True)
 version_path.rename(version_backup)
 try:
     with version_path.open("wt", encoding="utf8") as fh:
@@ -77,7 +75,7 @@ version = {!r}
             # include Windows once we're running tests there also
             # "Operating System :: Microsoft :: Windows",
         ],
-        python_requires='>=3.5',
+        python_requires='>=3.8',
         install_requires=["PyYAML"],
         package_data={'ops': ['py.typed']},
     )

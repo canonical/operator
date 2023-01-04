@@ -1,6 +1,6 @@
 # Setting up a Dev Environment
 
-To work in the framework itself you will need Python >= 3.5. Linting, testing,
+To work in the framework itself you will need Python >= 3.8. Linting, testing,
 and docs automation is performed using
 [`tox`](https://tox.readthedocs.io/en/latest/) which you should install.
 For improved performance on the tests, ensure that you have PyYAML
