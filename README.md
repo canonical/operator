@@ -10,7 +10,7 @@ software component that can be shared.
 
 This project extends the operator pattern to enable
 [charmed operators](https://juju.is/universal-operators), not just for Kubernetes but also
-operators for traditional Linux or Windows application management.
+operators for traditional Linux application management.
 
 Operators use a [Charmed Operator Lifecycle Manager
 (Charmed OLM)](https://juju.is/operator-lifecycle-manager) to coordinate their work in a cluster.

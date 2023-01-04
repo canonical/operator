@@ -17,7 +17,6 @@ import importlib.util
 import io
 import logging
 import os
-import platform
 import shutil
 import subprocess
 import sys
@@ -62,8 +61,6 @@ from ops.storage import SQLiteStorage
 from ops.version import version
 
 from .test_helpers import fake_script, fake_script_calls
-
-is_windows = platform.system() == 'Windows'
 
 # This relies on the expected repository structure to find a path to
 # source of the charm under test.
@@ -680,7 +677,6 @@ class _TestMain(abc.ABC):
             self._simulate_event(event_spec)
             self.assertIn(calls, fake_script_calls(self, clear=True))
 
-    @unittest.skipIf(is_windows, 'TODO windows multiline args are hard')
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(InstallEvent, 'install',
@@ -811,9 +807,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
                 self.assertTrue(hook_path.exists(), 'Missing hook: ' + event_hook)
                 if self.hooks_are_symlinks:
                     self.assertTrue(hook_path.is_symlink())
-                    if not is_windows:
-                        # TODO(benhoyt): fix this now that tests are running on GitHub Actions
-                        self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
+                    self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
                 elif event_hook in initial_hooks:
                     self.assertFalse(hook_path.is_symlink())
                 else:
@@ -916,7 +910,6 @@ class _TestMainWithDispatch(_TestMain):
         self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
-    @unittest.skipIf(is_windows, "this is UNIXish; TODO: write equivalent windows test")
     def test_non_executable_hook_and_dispatch(self):
         (self.hooks_dir / "install").write_text("")
         state = self._simulate_event(EventSpec(InstallEvent, 'install'))
@@ -963,8 +956,6 @@ class _TestMainWithDispatch(_TestMain):
     def test_hook_and_dispatch_but_hook_is_dispatch(self):
         event = EventSpec(InstallEvent, 'install')
         hook_path = self.hooks_dir / 'install'
-        if is_windows:
-            hook_path = hook_path.with_suffix('.bat')
         for ((rel, ind), path) in {
                 # relative and indirect
                 (True, True): Path('../dispatch'),
@@ -976,8 +967,6 @@ class _TestMainWithDispatch(_TestMain):
                 (False, True): self.JUJU_CHARM_DIR / 'dispatch',
         }.items():
             with self.subTest(path=path, rel=rel, ind=ind):
-                if is_windows:
-                    path = path.with_suffix('.sh')
                 # sanity check
                 self.assertEqual(path.is_absolute(), not rel)
                 self.assertEqual(path.with_suffix('').name == 'dispatch', ind)
@@ -992,7 +981,6 @@ class _TestMainWithDispatch(_TestMain):
                 finally:
                     hook_path.unlink()
 
-    @unittest.skipIf(is_windows, "this needs rethinking on Windows")
     def test_hook_and_dispatch_but_hook_is_dispatch_copy(self):
         hook_path = self.hooks_dir / 'install'
         path = (self.hooks_dir / self.charm_exec_path).resolve()
@@ -1025,10 +1013,6 @@ class _TestMainWithDispatch(_TestMain):
         self.assertEqual(calls, expected)
 
 
-# NOTE
-#  AIUI On windows dispatch must be a script (see TestMainWithDispatchAsScript),
-#  because Juju won't call python even if we rename dispatch to dispatch.py
-@unittest.skipIf(is_windows, "Juju on windows won't make this work (see note)")
 class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
     def _setup_entry_point(self, directory, entry_point):
         path = self.JUJU_CHARM_DIR / 'dispatch'
@@ -1091,17 +1075,10 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
 
     has_dispatch = True
 
-    if is_windows:
-        suffix = '.BAT'
-        script = '@ECHO OFF\n"{}" "{}"\n'
-    else:
-        suffix = ''
-        script = '#!/bin/sh\nexec "{}" "{}"\n'
-
     def _setup_entry_point(self, directory, entry_point):
-        path = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
+        path = (self.JUJU_CHARM_DIR / 'dispatch')
         if not path.exists():
-            path.write_text(self.script.format(
+            path.write_text('#!/bin/sh\nexec "{}" "{}"\n'.format(
                 sys.executable,
                 self.JUJU_CHARM_DIR / 'src/charm.py'))
             path.chmod(0o755)
@@ -1149,7 +1126,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
             echo '["disks/0"]'
             """,
         )
-        dispatch = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
+        dispatch = (self.JUJU_CHARM_DIR / 'dispatch')
         subprocess.check_call([str(dispatch)], env=env, cwd=str(self.JUJU_CHARM_DIR))
 
 

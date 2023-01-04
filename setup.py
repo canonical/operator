@@ -67,13 +67,10 @@ version = {!r}
             "Programming Language :: Python :: 3",
             "License :: OSI Approved :: Apache Software License",
             "Development Status :: 4 - Beta",
-
             "Intended Audience :: Developers",
             "Intended Audience :: System Administrators",
             "Operating System :: MacOS :: MacOS X",
             "Operating System :: POSIX :: Linux",
-            # include Windows once we're running tests there also
-            # "Operating System :: Microsoft :: Windows",
         ],
         python_requires='>=3.8',
         install_requires=["PyYAML"],
