@@ -17,16 +17,19 @@
 Global Variables:
 
     SIMULATE_CAN_CONNECT: This enables can_connect simulation for the test
-    harness.  It should be set *before* you create Harness instances and not
-    changed after.  You *should* set this to true - it will help your tests be
-    more accurate!  This causes all containers' can_connect states initially
-    be False rather than True and causes the testing with the harness to model
+    harness. As of ops 2.0, it defaults to True, so you shouldn't need to
+    think about it. It makes your tests more accurate (you can disable it by
+    setting it to False before you create Harness instances).
+
+    When True, it causes all containers' can_connect states to initially be
+    False rather than True and causes the testing with the harness to model
     and track can_connect state for containers accurately.  This means that
     calls that require communication with the container API (e.g.
     Container.push, Container.get_plan, Container.add_layer, etc.) will only
     succeed if Container.can_connect() returns True and will raise exceptions
     otherwise.  can_connect state evolves automatically to track with events
-    associated with container state, (e.g.  calling container_pebble_ready).
+    associated with container state (e.g., calling container_pebble_ready).
+
     If SIMULATE_CAN_CONNECT is True, can_connect state for containers can also
     be manually controlled using Harness.set_can_connect.
 """
@@ -110,7 +113,7 @@ if TYPE_CHECKING:
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
 
-SIMULATE_CAN_CONNECT = False
+SIMULATE_CAN_CONNECT = True
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
@@ -183,14 +186,6 @@ class Harness(Generic[CharmType]):
         # TODO: will be removed in the next breaking-changes release
         #  together with self._oci_resources
         self._deprecated_oci_resources_do_not_use = {}  # type: Dict[Any, Any]
-
-        # TODO: If/when we decide to allow breaking changes for a release,
-        #  change SIMULATE_CAN_CONNECT default value to True and remove the
-        #  warning message below.  This warning was added 2022-03-22
-        if not SIMULATE_CAN_CONNECT:
-            warnings.warn(
-                'Please set ops.testing.SIMULATE_CAN_CONNECT=True. '
-                'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
 
     @property
     def _oci_resources(self):
@@ -317,8 +312,7 @@ class Harness(Generic[CharmType]):
         to the test suite, so if you want to introspect what happens at each step, you need to fire
         them directly (e.g. Charm.on.install.emit()).  In your hook callback functions, you should
         not assume that workload containers are active; guard such code with checks to
-        Container.can_connect().  You are encouraged to test this by setting the global
-        SIMULATE_CAN_CONNECT variable to True.
+        Container.can_connect().
 
         To use this with all the normal hooks, you should instantiate the harness, setup any
         relations that you want active when the charm starts, and then call this method.  This
@@ -932,7 +926,7 @@ class Harness(Generic[CharmType]):
     def container_pebble_ready(self, container_name: str):
         """Fire the pebble_ready hook for the associated container.
 
-        This will do nothing if begin() has not been called. If
+        This will do nothing if begin() has not been called. Assuming
         SIMULATE_CAN_CONNECT is True, this will switch the given
         container's can_connect state to True before the hook
         function is called.
@@ -1605,7 +1599,7 @@ class _TestingModelBackend:
     def _set_can_connect(self, pebble_client: '_TestingPebbleClient', val: bool):
         """Manually sets the can_connect state for the given mock client."""
         if not SIMULATE_CAN_CONNECT:
-            raise RuntimeError('must set SIMULATE_CAN_CONNECT=True before using set_can_connect')
+            raise RuntimeError('SIMULATE_CAN_CONNECT must be True to use set_can_connect')
         if pebble_client not in self._pebble_clients_can_connect:
             msg = 'cannot set can_connect for the client - are you running a "real" pebble test?'
             raise RuntimeError(msg)

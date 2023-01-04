@@ -1131,6 +1131,7 @@ def test_recursive_push_and_pull(case):
             resource: foo-image
         ''')
     harness.begin()
+    harness.set_can_connect('foo', True)
     c = harness.model.unit.containers['foo']
 
     # create push test case filesystem structure
@@ -1213,6 +1214,7 @@ class TestApplication(unittest.TestCase):
     # Tests fix for https://github.com/canonical/operator/issues/694.
     def test_mocked_get_services(self):
         self.harness.begin()
+        self.harness.set_can_connect('bar', True)
         c = self.harness.charm.unit.get_container('bar')
         c.add_layer('layer1', {
             'summary': 'layer',

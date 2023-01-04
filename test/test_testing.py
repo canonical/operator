@@ -128,7 +128,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_get(rel_id, 'test-app', is_app=True), {})
         self.assertEqual(backend.relation_get(rel_id, 'test-app/0', is_app=False), {})
 
-    def test_can_connect_legacy(self):
+    def test_simulate_can_connect_disabled(self):
         # This tests the old behavior where we weren't simulating can_connect status of containers
         # like it runs in Juju.
         tmp = ops.testing.SIMULATE_CAN_CONNECT
@@ -152,14 +152,7 @@ class TestHarness(unittest.TestCase):
         c = harness.model.unit.get_container('foo')
         self.assertTrue(c.can_connect())
 
-    def test_simulate_can_connect(self):
-        tmp = ops.testing.SIMULATE_CAN_CONNECT
-        ops.testing.SIMULATE_CAN_CONNECT = True
-
-        def reset_can_connect():
-            ops.testing.SIMULATE_CAN_CONNECT = tmp
-        self.addCleanup(reset_can_connect)
-
+    def test_can_connect(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             containers:
@@ -2030,6 +2023,7 @@ class TestHarness(unittest.TestCase):
               foo:
                 resource: foo-image
             ''')
+        harness.set_can_connect('foo', True)
         self.addCleanup(harness.cleanup)
         harness.begin()
         c = harness.model.unit.containers['foo']
@@ -2622,6 +2616,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
+        harness.set_can_connect('foo', True)
         initial_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(initial_plan.to_yaml(), '{}\n')
         container = harness.model.unit.get_container('foo')
@@ -2662,6 +2657,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
+        harness.set_can_connect('foo', True)
         with self.assertRaises(KeyError):
             harness.get_container_pebble_plan('unknown')
         plan = harness.get_container_pebble_plan('foo')
@@ -3020,11 +3016,15 @@ class _TestingPebbleClientMixin:
     def get_testing_client(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
+            containers:
+              mycontainer: {}
             ''')
         self.addCleanup(harness.cleanup)
         backend = harness._backend
 
-        return backend.get_pebble('/custom/socket/path')
+        client = backend.get_pebble('/charm/containers/mycontainer/pebble.socket')
+        harness.set_can_connect('mycontainer', True)
+        return client
 
 
 # For testing non file ops of the pebble testing client.
@@ -4234,6 +4234,9 @@ class TestPebbleStorageAPIsUsingMocks(
         harness.attach_storage(store_id)
 
         harness.begin()
+        harness.set_can_connect('c1', True)
+        harness.set_can_connect('c2', True)
+        harness.set_can_connect('c3', True)
 
         # push file to c1 storage mount, check that we can see it in charm container storage path.
         c1 = harness.model.unit.get_container('c1')
