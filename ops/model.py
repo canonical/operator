@@ -14,6 +14,7 @@
 
 """Representations of Juju's model, application, unit, and other entities."""
 import datetime
+import enum
 import ipaddress
 import json
 import logging
@@ -28,7 +29,7 @@ import typing
 import weakref
 from abc import ABC, abstractmethod
 from pathlib import Path
-from subprocess import PIPE, CalledProcessError, CompletedProcess, run
+from subprocess import PIPE, CalledProcessError, run
 from typing import (
     Any,
     BinaryIO,
@@ -51,41 +52,45 @@ from typing import (
 
 import ops
 import ops.pebble as pebble
-from ops._private import yaml
+from ops._private import timeconv, yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
+    from subprocess import CompletedProcess  # noqa
+
     from pebble import (  # pyright: reportMissingTypeStubs=false
         CheckInfo,
         CheckLevel,
         Client,
         ExecProcess,
         FileInfo,
+        LayerDict,
         Plan,
         ServiceInfo,
-        _LayerDict,
     )
     from typing_extensions import TypedDict
 
     from ops.framework import _SerializedData
+    from ops.testing import _ConfigOption
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
     Numerical = Union[int, float]
 
     # all types that can be (de) serialized to json(/yaml) fom Python builtins
-    JsonObject = Union[Numerical, bool, str,
+    JsonObject = Union[None, Numerical, bool, str,
                        Dict[str, 'JsonObject'],
                        List['JsonObject'],
                        Tuple['JsonObject', ...]]
 
     # a k8s spec is a mapping from names/"types" to json/yaml spec objects
-    _K8sSpec = Mapping[str, JsonObject]
+    # public since it is used in ops.testing
+    K8sSpec = Mapping[str, JsonObject]
 
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
-    _Layer = Union[str, _LayerDict, pebble.Layer]
+    _Layer = Union[str, LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
     _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -257,6 +262,31 @@ class Model:
         """
         return self._bindings.get(binding_key)
 
+    def get_secret(self, *, id: Optional[str] = None, label: Optional[str] = None) -> 'Secret':
+        """Get the :class:`Secret` with the given ID or label.
+
+        You must provide at least one of `id` or `label`. If you provide both,
+        the secret will be fetched by ID, and the secret's label will be
+        updated to the label you provided.
+
+        Args:
+            id: Secret ID if fetching by ID.
+            label: Secret label if fetching by label (or updating it).
+
+        Raises:
+            SecretNotFoundError: If a secret with this ID or label doesn't exist.
+        """
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
+        try:
+            content = self._backend.secret_get(id=id, label=label)
+            return Secret(self._backend, id=id, label=label, content=content)
+        except ModelError:
+            # TODO(benhoyt): remove the secret-info-get fallback once
+            #  juju/juju#14916 is fixed (should be in Juju 3.0.3)
+            info = self._backend.secret_info_get(id=id, label=label)
+            return Secret(self._backend, id=info.id, label=info.label)
+
 
 _T = TypeVar('_T', bound='UnitOrApplication')
 
@@ -352,7 +382,7 @@ class Application:
             )
 
         if not self._is_our_app:
-            raise RuntimeError('cannot to set status for a remote application {}'.format(self))
+            raise RuntimeError('cannot set status for a remote application {}'.format(self))
 
         if not self._backend.is_leader():
             raise RuntimeError('cannot set application status as a non-leader unit')
@@ -385,6 +415,50 @@ class Application:
 
     def __repr__(self):
         return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
+
+    def add_secret(self, content: Dict[str, str], *,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None,
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional['SecretRotate'] = None) -> 'Secret':
+        """Create a :class:`Secret` owned by this application.
+
+        Args:
+            content: A key-value mapping containing the payload of the secret,
+                for example :code:`{"password": "foo123"}`.
+            label: Private label to assign to this secret, which can later be
+                used for lookup.
+            description: Description of the secret's purpose.
+            expire: Time in the future (or timedelta from now) at which the
+                secret is due to expire. When that time elapses, Juju will
+                notify the charm by sending a SecretExpired event. None (the
+                default) means the secret will never expire.
+            rotate: Rotation policy/time. Every time this elapses, Juju will
+                notify the charm by sending a SecretRotate event. None (the
+                default) means to use the Juju default, which is never rotate.
+        """
+        Secret._validate_content(content)
+        id = self._backend.secret_add(
+            content,
+            label=label,
+            description=description,
+            expire=_calculate_expiry(expire),
+            rotate=rotate,
+            owner='application')
+        return Secret(self._backend, id=id, label=label, content=content)
+
+
+def _calculate_expiry(expire: Optional[Union[datetime.datetime, datetime.timedelta]],
+                      ) -> Optional[datetime.datetime]:
+    if expire is None:
+        return None
+    if isinstance(expire, datetime.datetime):
+        return expire
+    elif isinstance(expire, datetime.timedelta):
+        return datetime.datetime.now() + expire
+    else:
+        raise TypeError('Expiration time must be a datetime or timedelta from now, not '
+                        + type(expire).__name__)
 
 
 class Unit:
@@ -506,6 +580,25 @@ class Unit:
             return self.containers[container_name]
         except KeyError:
             raise ModelError('container {!r} not found'.format(container_name))
+
+    def add_secret(self, content: Dict[str, str], *,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None,
+                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                   rotate: Optional['SecretRotate'] = None) -> 'Secret':
+        """Create a :class:`Secret` owned by this unit.
+
+        See :meth:`Application.add_secret` for parameter details.
+        """
+        Secret._validate_content(content)
+        id = self._backend.secret_add(
+            content,
+            label=label,
+            description=description,
+            expire=_calculate_expiry(expire),
+            rotate=rotate,
+            owner='unit')
+        return Secret(self._backend, id=id, label=label, content=content)
 
 
 class LazyMapping(Mapping[str, str], ABC):
@@ -806,6 +899,292 @@ class NetworkInterface:
             subnet = None
         self.subnet = subnet  # type: Optional[_Network]
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
+
+
+class SecretRotate(enum.Enum):
+    """Secret rotation policies."""
+
+    NEVER = 'never'  # the default in juju
+    HOURLY = 'hourly'
+    DAILY = 'daily'
+    WEEKLY = 'weekly'
+    MONTHLY = 'monthly'
+    QUARTERLY = 'quarterly'
+    YEARLY = 'yearly'
+
+
+class SecretInfo:
+    """Secret information (metadata)."""
+
+    def __init__(self,
+                 id: str,
+                 label: Optional[str],
+                 revision: int,
+                 expires: Optional[datetime.datetime],
+                 rotation: Optional[SecretRotate],
+                 rotates: Optional[datetime.datetime]):
+        self.id = Secret._canonicalize_id(id)
+        self.label = label
+        self.revision = revision
+        self.expires = expires
+        self.rotation = rotation
+        self.rotates = rotates
+
+    @classmethod
+    def from_dict(cls, id: str, d: '_SerializedData') -> 'SecretInfo':
+        """Create new SecretInfo object from ID and dict parsed from JSON."""
+        expires = typing.cast(Optional[str], d.get('expires'))
+        try:
+            rotation = SecretRotate(typing.cast(Optional[str], d.get('rotation')))
+        except ValueError:
+            rotation = None
+        rotates = typing.cast(Optional[str], d.get('rotates'))
+        return cls(
+            id=id,
+            label=typing.cast(Optional[str], d.get('label')),
+            revision=typing.cast(int, d['revision']),
+            expires=timeconv.parse_rfc3339(expires) if expires is not None else None,
+            rotation=rotation,
+            rotates=timeconv.parse_rfc3339(rotates) if rotates is not None else None,
+        )
+
+    def __repr__(self):
+        return ('SecretInfo('
+                'id={self.id!r}, '
+                'label={self.label!r}, '
+                'revision={self.revision}, '
+                'expires={self.expires!r}, '
+                'rotation={self.rotation}, '
+                'rotates={self.rotates!r})'
+                ).format(self=self)
+
+
+class Secret:
+    """Represents a single secret in the model.
+
+    This class should not be instantiated directly, instead use
+    :meth:`Model.get_secret` (for observers and owners), or
+    :meth:`Application.add_secret` or :meth:`Unit.add_secret` (for owners).
+
+    All secret events have a :code:`.secret` attribute which provides the
+    :class:`Secret` associated with that event.
+    """
+
+    _key_re = re.compile(r'^([a-z](?:-?[a-z0-9]){2,})$')  # copied from Juju code
+
+    def __init__(self, backend: '_ModelBackend',
+                 id: Optional[str] = None,
+                 label: Optional[str] = None,
+                 content: Optional[Dict[str, str]] = None):
+        if not (id or label):
+            raise TypeError('Must provide an id or label, or both')
+        if id is not None:
+            id = self._canonicalize_id(id)
+        self._backend = backend
+        self._id = id
+        self._label = label
+        self._content = content
+
+    def __repr__(self):
+        fields = []  # type: List[str]
+        if self._id is not None:
+            fields.append('id={!r}'.format(self._id))
+        if self._label is not None:
+            fields.append('label={!r}'.format(self._label))
+        return '<Secret ' + ' '.join(fields) + '>'
+
+    @staticmethod
+    def _canonicalize_id(id: str) -> str:
+        """Return the canonical form of the given secret ID, with the 'secret:' prefix."""
+        id = id.strip()
+        if not id.startswith('secret:'):
+            id = 'secret:' + id  # add the prefix if not there already
+        return id
+
+    @classmethod
+    def _validate_content(cls, content: Optional[Dict[str, str]]):
+        """Ensure the given secret content is valid, or raise ValueError."""
+        if not isinstance(content, dict):
+            raise TypeError(f'Secret content must be a dict, not {type(content).__name__}')
+        if not content:
+            raise ValueError('Secret content must not be empty')
+
+        invalid_keys: List[str] = []
+        invalid_value_keys: List[str] = []
+        invalid_value_types: Set[str] = set()
+        for k, v in content.items():
+            if not cls._key_re.match(k):
+                invalid_keys.append(k)
+            if not isinstance(v, str):
+                invalid_value_keys.append(k)
+                invalid_value_types.add(type(v).__name__)
+
+        if invalid_keys:
+            raise ValueError(
+                f'Invalid secret keys: {invalid_keys}. '
+                f'Keys should be lowercase letters and digits, at least 3 characters long, '
+                f'start with a letter, and not start or end with a hyphen.')
+
+        if invalid_value_keys:
+            invalid_types = ' or '.join(sorted(invalid_value_types))
+            raise TypeError(f'Invalid secret values for keys: {invalid_value_keys}. '
+                            f'Values should be of type str, not {invalid_types}.')
+
+    @property
+    def id(self) -> Optional[str]:
+        """Unique identifier for this secret.
+
+        This will be None if you obtained the secret using
+        :meth:`Model.get_secret` with a label but no ID.
+        """
+        return self._id
+
+    @property
+    def label(self) -> Optional[str]:
+        """Label used to reference this secret locally.
+
+        This label is locally unique, that is, Juju will ensure that the
+        entity (the owner or observer) only has one secret with this label at
+        once.
+
+        This will be None if you obtained the secret using
+        :meth:`Model.get_secret` with an ID but no label.
+        """
+        return self._label
+
+    def get_content(self, *, refresh: bool = False) -> Dict[str, str]:
+        """Get the secret's content.
+
+        Args:
+            refresh: If true, fetch the latest revision's content and tell
+                Juju to update to tracking that revision. The default is to
+                get the content of the currently-tracked revision. This
+                parameter is only meaningful for secret observers, not owners.
+        """
+        if refresh or self._content is None:
+            self._content = self._backend.secret_get(
+                id=self.id, label=self.label, refresh=refresh)
+        return self._content
+
+    def peek_content(self) -> Dict[str, str]:
+        """Get the content of the latest revision of this secret.
+
+        This returns the content of the latest revision without updating the
+        tracking.
+        """
+        return self._backend.secret_get(id=self.id, label=self.label, peek=True)
+
+    def get_info(self) -> SecretInfo:
+        """Get this secret's information (metadata).
+
+        Only secret owners can fetch this information.
+        """
+        return self._backend.secret_info_get(id=self.id, label=self.label)
+
+    def set_content(self, content: Dict[str, str]):
+        """Update the content of this secret.
+
+        This will create a new secret revision, and notify all units tracking
+        the secret (the "observers") that a new revision is available with a
+        :class:`ops.charm.SecretChangedEvent`.
+
+        Args:
+            content: A key-value mapping containing the payload of the secret,
+                for example :code:`{"password": "foo123"}`.
+        """
+        self._validate_content(content)
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_set(typing.cast(str, self.id), content=content)
+
+    def set_info(self, *,
+                 label: Optional[str] = None,
+                 description: Optional[str] = None,
+                 expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+                 rotate: Optional[SecretRotate] = None):
+        """Update this secret's information (metadata).
+
+        This will not create a new secret revision (that applies only to
+        :meth:`set_content`). Once attributes are set, they cannot be unset.
+
+        Args:
+            label: New label to apply.
+            description: New description to apply.
+            expire: New expiration time (or timedelta from now) to apply.
+            rotate: New rotation policy to apply. The new policy will take
+                effect only after the currently-scheduled rotation.
+        """
+        if label is None and description is None and expire is None and rotate is None:
+            raise TypeError('Must provide a label, description, expiration time, '
+                            'or rotation policy')
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_set(typing.cast(str, self.id),
+                                 label=label,
+                                 description=description,
+                                 expire=_calculate_expiry(expire),
+                                 rotate=rotate)
+
+    def grant(self, relation: 'Relation', *, unit: Optional[Unit] = None):
+        """Grant read access to this secret.
+
+        If the application or unit has already been granted access to this
+        secret, do nothing.
+
+        Args:
+            relation: The relation used to scope the life of this secret.
+            unit: If specified, grant access to only this unit, rather than
+                all units in the application.
+        """
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_grant(
+            typing.cast(str, self.id),
+            relation.id,
+            unit=unit.name if unit is not None else None)
+
+    def revoke(self, relation: 'Relation', *, unit: Optional[Unit] = None):
+        """Revoke read access to this secret.
+
+        If the application or unit does not have access to this secret, do
+        nothing.
+
+        Args:
+            relation: The relation used to scope the life of this secret.
+            unit: If specified, revoke access to only this unit, rather than
+                all units in the application.
+        """
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_revoke(
+            typing.cast(str, self.id),
+            relation.id,
+            unit=unit.name if unit is not None else None)
+
+    def remove_revision(self, revision: int):
+        """Remove the given secret revision.
+
+        This is normally called when handling :class:`ops.charm.SecretRemoveEvent`
+        or :class:`ops.charm.SecretExpiredEvent`.
+
+        Args:
+            revision: The secret revision to remove. If being called from a
+                secret event, this should usually be set to
+                :attr:`SecretEvent.revision`.
+        """
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_remove(typing.cast(str, self.id), revision=revision)
+
+    def remove_all_revisions(self):
+        """Remove all revisions of this secret.
+
+        This is called when the secret is no longer needed, for example when
+        handling :class:`ops.charm.RelationBrokenEvent`.
+        """
+        if self._id is None:
+            self._id = self.get_info().id
+        self._backend.secret_remove(typing.cast(str, self.id))
 
 
 class Relation:
@@ -1239,7 +1618,7 @@ class Pod:
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def set_spec(self, spec: '_K8sSpec', k8s_resources: Optional['_K8sSpec'] = None):
+    def set_spec(self, spec: 'K8sSpec', k8s_resources: Optional['K8sSpec'] = None):
         """Set the specification for pods that Juju should start in kubernetes.
 
         See `juju help-tool pod-spec-set` for details of what should be passed.
@@ -1310,7 +1689,7 @@ class Storage:
 
     Attributes:
         name: Simple string name of the storage
-        id: The index number for storage
+        index: The index number for storage
     """
 
     def __init__(self, storage_name: str, storage_index: int, backend: '_ModelBackend'):
@@ -1426,17 +1805,17 @@ class Container:
             #  instance that is in fact 'ready'.
             self._pebble.get_system_info()
         except pebble.ConnectionError as e:
-            logger.debug("Pebble API is not ready; ConnectionError: %s", e.message())
+            logger.debug("Pebble API is not ready; ConnectionError: %s", e)
             return False
         except FileNotFoundError as e:
             # In some cases, charm authors can attempt to hit the Pebble API before it has had the
             # chance to create the UNIX socket in the shared volume.
-            logger.debug("Pebble API is not ready; UNIX socket not found:", str(e))
+            logger.debug("Pebble API is not ready; UNIX socket not found: %s", e)
             return False
         except pebble.APIError as e:
             # An API error is only raised when the Pebble API returns invalid JSON, or the response
             # cannot be read. Both of these are a likely indicator that something is wrong.
-            logger.warning("Pebble API is not ready; APIError: %s", str(e))
+            logger.warning("Pebble API is not ready; APIError: %s", e)
             return False
         return True
 
@@ -1496,7 +1875,12 @@ class Container:
         self._pebble.add_layer(label, layer, combine=combine)
 
     def get_plan(self) -> 'Plan':
-        """Get the current effective pebble configuration."""
+        """Get the combined Pebble configuration.
+
+        This will immediately reflect changes from any previous
+        :meth:`add_layer` calls, regardless of whether :meth:`replan` or
+        :meth:`restart` have been called.
+        """
         return self._pebble.get_plan()
 
     def get_services(self, *service_names: str) -> '_ServiceInfoMapping':
@@ -1665,9 +2049,6 @@ class Container:
             dest_dir: Remote destination directory inside which the source dir/files will be
                 placed.  This must be an absolute path.
         """
-        if os.name == 'nt':
-            raise RuntimeError('Container.push_path is not supported on Windows-based systems')
-
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[StrOrPath], source_path)
         else:
@@ -1748,9 +2129,6 @@ class Container:
             dest_dir: Local destination directory inside which the source dir/files will be
                 placed.
         """
-        if os.name == 'nt':
-            raise RuntimeError('Container.pull_path is not supported on Windows-based systems')
-
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[StrOrPath], source_path)
         else:
@@ -2072,6 +2450,10 @@ class InvalidStatusError(ModelError):
     """Raised if trying to set an Application or Unit status to something invalid."""
 
 
+class SecretNotFoundError(ModelError):
+    """Raised when the specified secret does not exist."""
+
+
 _ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
 
 
@@ -2110,6 +2492,10 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
 
     for key, value in input.items():
         # Ensure the key is of a valid format, and raise a ValueError if not
+        if not isinstance(key, str):
+            # technically a type error, but for consistency with the
+            # other exceptions raised on key validation...
+            raise ValueError('invalid key {!r}; must be a string'.format(key))
         if not _ACTION_RESULT_KEY_REGEX.match(key):
             raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
                              "'some.key'".format(key))
@@ -2245,7 +2631,7 @@ class _ModelBackend:
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool
                      ) -> '_RelationDataContent_Raw':
-        if not isinstance(is_app, bool):   # pyright:
+        if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if is_app:
@@ -2266,7 +2652,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -2282,15 +2668,16 @@ class _ModelBackend:
         args.extend(["--file", "-"])
 
         try:
-            content = yaml.safe_dump({key: value}, encoding='utf8')  # type: ignore
-            return self._run(*args, input_stream=content)  # type: ignore
+            content = yaml.safe_dump({key: value}, encoding='utf8')
+            self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
-    def config_get(self):
-        return self._run('config-get', return_output=True, use_json=True)
+    def config_get(self) -> Dict[str, '_ConfigOption']:
+        out = self._run('config-get', return_output=True, use_json=True)
+        return typing.cast(Dict[str, '_ConfigOption'], out)
 
     def is_leader(self) -> bool:
         """Obtain the current leadership status for the unit the charm code is executing on.
@@ -2323,12 +2710,12 @@ class _ModelBackend:
         try:
             spec_path = tmpdir / 'spec.yaml'
             with spec_path.open("wt", encoding="utf8") as f:
-                yaml.safe_dump(spec, stream=f)  # type: ignore
+                yaml.safe_dump(spec, stream=f)
             args = ['--file', str(spec_path)]
             if k8s_resources:
                 k8s_res_path = tmpdir / 'k8s-resources.yaml'
                 with k8s_res_path.open("wt", encoding="utf8") as f:
-                    yaml.safe_dump(k8s_resources, stream=f)  # type: ignore
+                    yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:
@@ -2368,7 +2755,7 @@ class _ModelBackend:
         else:
             return typing.cast('_StatusDict', content)
 
-    def status_set(self, status: str, message: str = '', *, is_app: bool = False):
+    def status_set(self, status: str, message: str = '', *, is_app: bool = False) -> None:
         """Set a status of a unit or an application.
 
         Args:
@@ -2379,9 +2766,9 @@ class _ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
-        return self._run('status-set', '--application={}'.format(is_app), status, message)
+        self._run('status-set', '--application={}'.format(is_app), status, message)
 
-    def storage_list(self, name: str):
+    def storage_list(self, name: str) -> List[int]:
         storages = self._run('storage-list', name, return_output=True, use_json=True)
         storages = typing.cast(List[str], storages)
         return [int(s.split('/')[1]) for s in storages]
@@ -2395,41 +2782,46 @@ class _ModelBackend:
             raise RuntimeError('unable to find storage key in {output!r}'.format(output=output))
         key = match.groupdict()["storage_key"]
 
-        id = int(key.split("/")[1])
+        index = int(key.split("/")[1])
         location = self.storage_get(key, "location")
-        return id, location
+        return index, location
 
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
+        if not len(attribute) > 0:  # assume it's an empty string.
+            raise RuntimeError('calling storage_get with `attribute=""` will return a dict '
+                               'and not a string. This usage is not supported.')
         out = self._run('storage-get', '-s', storage_name_id, attribute,
                         return_output=True, use_json=True)
         return typing.cast(str, out)
 
-    def storage_add(self, name: str, count: int = 1):
+    def storage_add(self, name: str, count: int = 1) -> None:
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError('storage count must be integer, got: {} ({})'.format(count,
                                                                                  type(count)))
         self._run('storage-add', '{}={}'.format(name, count))
 
-    def action_get(self):
-        return self._run('action-get', return_output=True, use_json=True)
+    def action_get(self) -> Dict[str, str]:  # todo: what do we know about this dict?
+        out = self._run('action-get', return_output=True, use_json=True)
+        return typing.cast(Dict[str, str], out)
 
-    def action_set(self, results: '_SerializedData'):
+    def action_set(self, results: '_SerializedData') -> None:
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
         self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
 
-    def action_log(self, message: str):
+    def action_log(self, message: str) -> None:
         self._run('action-log', message)
 
-    def action_fail(self, message: str = ''):
+    def action_fail(self, message: str = '') -> None:
         self._run('action-fail', message)
 
-    def application_version_set(self, version: str):
+    def application_version_set(self, version: str) -> None:
         self._run('application-version-set', '--', version)
 
     @classmethod
-    def log_split(cls, message: str, max_len: int = MAX_LOG_LINE_LEN):
+    def log_split(cls, message: str, max_len: int = MAX_LOG_LINE_LEN
+                  ) -> Generator[str, None, None]:
         """Helper to handle log messages that are potentially too long.
 
         This is a generator that splits a message string into multiple chunks if it is too long
@@ -2442,7 +2834,7 @@ class _ModelBackend:
             yield message[:max_len]
             message = message[max_len:]
 
-    def juju_log(self, level: str, message: str):
+    def juju_log(self, level: str, message: str) -> None:
         """Pass a log message on to the juju logger."""
         for line in self.log_split(message):
             self._run('juju-log', '--log-level', level, "--", line)
@@ -2466,7 +2858,7 @@ class _ModelBackend:
             raise
 
     def add_metrics(self, metrics: Mapping[str, 'Numerical'],
-                    labels: Optional[Mapping[str, str]] = None):
+                    labels: Optional[Mapping[str, str]] = None) -> None:
         cmd = ['add-metric']  # type: List[str]
         if labels:
             label_args = []  # type: List[str]
@@ -2505,6 +2897,116 @@ class _ModelBackend:
     def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
                              key: str, value: str):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
+
+    def secret_get(self, *,
+                   id: Optional[str] = None,
+                   label: Optional[str] = None,
+                   refresh: bool = False,
+                   peek: bool = False) -> Dict[str, str]:
+        args: List[str] = []
+        if id is not None:
+            args.append(id)
+        if label is not None:
+            args.extend(['--label', label])
+        if refresh:
+            args.append('--refresh')
+        if peek:
+            args.append('--peek')
+        # IMPORTANT: Don't call shared _run_for_secret method here; we want to
+        # be extra sensitive inside secret_get to ensure we never
+        # accidentally log or output secrets, even if _run_for_secret changes.
+        try:
+            result = self._run('secret-get', *args, return_output=True, use_json=True)
+        except ModelError as e:
+            if 'not found' in str(e):
+                raise SecretNotFoundError() from e
+            raise
+        return typing.cast(Dict[str, str], result)
+
+    def _run_for_secret(self, *args: str, return_output: bool = False,
+                        use_json: bool = False) -> Union[str, 'JsonObject', None]:
+        try:
+            return self._run(*args, return_output=return_output, use_json=use_json)
+        except ModelError as e:
+            if 'not found' in str(e):
+                raise SecretNotFoundError() from e
+            raise
+
+    def secret_info_get(self, *,
+                        id: Optional[str] = None,
+                        label: Optional[str] = None) -> SecretInfo:
+        args = []  # type: List[str]
+        if id is not None:
+            args.append(id)
+        if label is not None:
+            args.extend(['--label', label])
+        result = self._run_for_secret('secret-info-get', *args, return_output=True, use_json=True)
+        info_dicts = typing.cast(Dict[str, 'JsonObject'], result)
+        id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
+        return SecretInfo.from_dict(id, typing.cast('_SerializedData', info_dicts[id]))
+
+    def secret_set(self, id: str, *,
+                   content: Optional[Dict[str, str]] = None,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None,
+                   expire: Optional[datetime.datetime] = None,
+                   rotate: Optional[SecretRotate] = None):
+        args = [id]
+        if label is not None:
+            args.extend(['--label', label])
+        if description is not None:
+            args.extend(['--description', description])
+        if expire is not None:
+            args.extend(['--expire', expire.isoformat()])
+        if rotate is not None:
+            args += ['--rotate', rotate.value]
+        if content is not None:
+            # The content has already been validated with Secret._validate_content
+            for k, v in content.items():
+                args.append('{}={}'.format(k, v))
+        self._run_for_secret('secret-set', *args)
+
+    def secret_add(self, content: Dict[str, str], *,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None,
+                   expire: Optional[datetime.datetime] = None,
+                   rotate: Optional[SecretRotate] = None,
+                   owner: Optional[str] = None) -> str:
+        args = []  # type: List[str]
+        if label is not None:
+            args.extend(['--label', label])
+        if description is not None:
+            args.extend(['--description', description])
+        if expire is not None:
+            args.extend(['--expire', expire.isoformat()])
+        if rotate is not None:
+            args += ['--rotate', rotate.value]
+        if owner is not None:
+            args += ['--owner', owner]
+        # The content has already been validated with Secret._validate_content
+        for k, v in content.items():
+            args.append('{}={}'.format(k, v))
+        result = self._run('secret-add', *args, return_output=True)
+        secret_id = typing.cast(str, result)
+        return secret_id.strip()
+
+    def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
+        args = [id, '--relation', str(relation_id)]
+        if unit is not None:
+            args += ['--unit', str(unit)]
+        self._run_for_secret('secret-grant', *args)
+
+    def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
+        args = [id, '--relation', str(relation_id)]
+        if unit is not None:
+            args += ['--unit', str(unit)]
+        self._run_for_secret('secret-revoke', *args)
+
+    def secret_remove(self, id: str, *, revision: Optional[int] = None):
+        args = [id]
+        if revision is not None:
+            args.extend(['--revision', str(revision)])
+        self._run_for_secret('secret-remove', *args)
 
 
 class _ModelBackendValidator:

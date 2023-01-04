@@ -58,6 +58,11 @@ class Charm(CharmBase):
             on_log_info_action=[],
             on_log_debug_action=[],
 
+            on_secret_changed=[],
+            on_secret_remove=[],
+            on_secret_rotate=[],
+            on_secret_expired=[],
+
             # Observed event type names per invocation. A list is used to preserve the
             # order in which charm handlers have observed the events.
             observed_event_types=[],
@@ -75,6 +80,11 @@ class Charm(CharmBase):
         self.framework.observe(self.on.mon_relation_departed, self._on_mon_relation_departed)
         self.framework.observe(self.on.ha_relation_broken, self._on_ha_relation_broken)
         self.framework.observe(self.on.test_pebble_ready, self._on_test_pebble_ready)
+
+        self.framework.observe(self.on.secret_remove, self._on_secret_remove)
+        self.framework.observe(self.on.secret_rotate, self._on_secret_rotate)
+        self.framework.observe(self.on.secret_changed, self._on_secret_changed)
+        self.framework.observe(self.on.secret_expired, self._on_secret_expired)
 
         actions = self.charm_dir / 'actions.yaml'
         if actions.exists() and actions.read_bytes():
@@ -159,6 +169,42 @@ class Charm(CharmBase):
         assert event.handle.kind == 'start_action', (
             'event action name cannot be different from the one being handled')
         self._stored.on_start_action.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
+
+    def _on_secret_changed(self, event):
+        # subprocess and isinstance don't mix well
+        assert type(event.secret).__name__ == 'Secret', (
+            'SecretEvent.secret must be a Secret instance, not '
+            '{}'.format(type(event.secret)))
+        assert event.secret.id, 'secret must have an ID'
+        self._stored.on_secret_changed.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
+
+    def _on_secret_remove(self, event):
+        # subprocess and isinstance don't mix well
+        assert type(event.secret).__name__ == 'Secret', (
+            'SecretEvent.secret must be a Secret instance, not '
+            '{}'.format(type(event.secret)))
+        assert event.secret.id, 'secret must have an ID'
+        self._stored.on_secret_remove.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
+
+    def _on_secret_rotate(self, event):
+        # subprocess and isinstance don't mix well
+        assert type(event.secret).__name__ == 'Secret', (
+            'SecretEvent.secret must be a Secret instance, not '
+            '{}'.format(type(event.secret)))
+        assert event.secret.id, 'secret must have an ID'
+        self._stored.on_secret_rotate.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
+
+    def _on_secret_expired(self, event):
+        # subprocess and isinstance don't mix well
+        assert type(event.secret).__name__ == 'Secret', (
+            'SecretEvent.secret must be a Secret instance, not '
+            '{}'.format(type(event.secret)))
+        assert event.secret.id, 'secret must have an ID'
+        self._stored.on_secret_expired.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
     def _on_foo_bar_action(self, event):
