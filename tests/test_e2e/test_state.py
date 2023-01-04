@@ -22,8 +22,6 @@ from scenario.structs import (
 # setup_tests()  # noqa & keep this on top
 
 
-
-
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
     "relation_joined",

@@ -33,9 +33,9 @@ I like metaphors, so here we go:
 
 # Core concepts not as a metaphor
 Each scene maps to a single event. 
-The Scenario encapsulates the charm and its metadata. A scenario can play scenes, which represent the several events one can fire on a charm and the context in which they occur.
-
-Crucially, this decoupling of charm and context allows us to swap out easily any part of this flow, and even share context data across charms, codebases, teams...
+The Scenario encapsulates the charm and its metadata. A scenario can play scenes, which represent the several events one can fire on a charm and the c
+Crucially, this decoupling of charm and context aontext in which they occur.
+llows us to swap out easily any part of this flow, and even share context data across charms, codebases, teams...
 
 In this spirit, but that I still have to think through how useful it really is, a Scenario exposes a `playbook`: a sequence of scenes it can run sequentially (although given that each Scene's input state is totally disconnected from any other's, the ordering of the sequence is irrelevant) and potentially share with other projects. More on this later.
 
