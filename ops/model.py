@@ -2039,9 +2039,6 @@ class Container:
             dest_dir: Remote destination directory inside which the source dir/files will be
                 placed.  This must be an absolute path.
         """
-        if os.name == 'nt':
-            raise RuntimeError('Container.push_path is not supported on Windows-based systems')
-
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[StrOrPath], source_path)
         else:
@@ -2122,9 +2119,6 @@ class Container:
             dest_dir: Local destination directory inside which the source dir/files will be
                 placed.
         """
-        if os.name == 'nt':
-            raise RuntimeError('Container.pull_path is not supported on Windows-based systems')
-
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[StrOrPath], source_path)
         else:
