@@ -693,13 +693,16 @@ class Layer:
 
     The format of this is documented at
     https://github.com/canonical/pebble/#layer-specification.
-
-    Attributes:
-        summary: A summary of the purpose of this layer
-        description: A long form description of this layer
-        services: A mapping of name to :class:`Service` defined by this layer
-        checks: A mapping of check to :class:`Check` defined by this layer
     """
+
+    #: Summary of the purpose of this layer.
+    summary: str
+    #: Long-form description of this layer.
+    description: str
+    #: Mapping of name to :class:`Service` defined by this layer.
+    services: Dict[str, 'Service']
+    #: Mapping of check to :class:`Check` defined by this layer.
+    checks: Dict[str, 'Check']
 
     def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
         if isinstance(raw, str):
@@ -708,14 +711,12 @@ class Layer:
             d = raw or {}
         d = typing.cast('LayerDict', d)
 
-        self.summary = d.get('summary', '')  # type: str
-        self.description = d.get('description', '')  # type: str
+        self.summary = d.get('summary', '')
+        self.description = d.get('description', '')
         self.services = {name: Service(name, service)
-                         for name, service in d.get('services', {}).items()
-                         }  # type: Dict[str, Service]
+                         for name, service in d.get('services', {}).items()}
         self.checks = {name: Check(name, check)
-                       for name, check in d.get('checks', {}).items()
-                       }  # type: Dict[str, Check]
+                       for name, check in d.get('checks', {}).items()}
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
