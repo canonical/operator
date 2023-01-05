@@ -1536,6 +1536,16 @@ class UnknownStatus(StatusBase):
 
 
 @StatusBase.register
+class ErrorStatus(StatusBase):
+    """The unit status is error.
+
+    The unit-agent has encountered an error (the application or unit requires
+    human intervention in order to operate correctly).
+    """
+    name = 'error'
+
+
+@StatusBase.register
 class ActiveStatus(StatusBase):
     """The unit is ready.
 
