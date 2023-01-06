@@ -3616,10 +3616,8 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
     def test_start_started_service(self):
-        # If you try to start a service which is started, you get a ChangeError:
-        # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
-        # ChangeError: cannot perform the following tasks:
-        # - Start service "serv" (service "serv" was previously started)
+        # Pebble maintains idempotency even if you start a service
+        # which is already started.
         client = self.get_testing_client()
         client.add_layer('foo', '''\
             summary: foo
@@ -3634,26 +3632,23 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
-        with self.assertRaises(pebble.ChangeError):
-            client.start_services(['bar', 'foo'])
-        # bar could have been started, but won't be, because foo did not validate
+        client.start_services(['bar', 'foo'])
+        # foo and bar are both started
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
         bar_info = infos[0]
         self.assertEqual('bar', bar_info.name)
         # Default when not specified is DISABLED
         self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
-        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, bar_info.current)
         foo_info = infos[1]
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
     def test_stop_stopped_service(self):
-        # If you try to stop a service which is stop, you get a ChangeError:
-        # $ PYTHONPATH=. python3 ./test/pebble_cli.py stop other serv
-        # ChangeError: cannot perform the following tasks:
-        # - Stop service "other" (service "other" is not active)
+        # Pebble maintains idempotency even if you stop a service
+        # which is already stopped.
         client = self.get_testing_client()
         client.add_layer('foo', '''\
             summary: foo
@@ -3668,9 +3663,8 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
-        with self.assertRaises(pebble.ChangeError):
-            client.stop_services(['foo', 'bar'])
-        # foo could have been stopped, but won't be, because bar did not validate
+        client.stop_services(['foo', 'bar'])
+        # foo and bar are both stopped
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
         bar_info = infos[0]
@@ -3681,7 +3675,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         foo_info = infos[1]
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
-        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
 
     @ unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self):
