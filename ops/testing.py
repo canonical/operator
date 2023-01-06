@@ -2175,20 +2175,7 @@ class _TestingPebbleClient:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
                 raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
-            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
-            if current == pebble.ServiceStatus.ACTIVE:
-                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
-                #  can be started before starting any, and gives a list of things that couldn't
-                #  be done, but this is good enough for now
-                raise pebble.ChangeError('''\
-cannot perform the following tasks:
-- Start service "{}" (service "{}" was previously started)
-'''.format(name, name), change=1234)  # type:ignore # the change id is not respected
         for name in services:
-            # If you try to start a service which is started, you get a ChangeError:
-            # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
-            # ChangeError: cannot perform the following tasks:
-            # - Start service "serv" (service "serv" was previously started)
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def stop_services(
@@ -2201,7 +2188,6 @@ cannot perform the following tasks:
 
         self._check_connection()
 
-        # TODO: handle invalid names
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.stop() which currently ignores the return value
         known_services = self._render_services()
@@ -2210,15 +2196,6 @@ cannot perform the following tasks:
                 # TODO: jam 2021-04-20 This needs a better error type
                 #  400 Bad Request: service "bal" does not exist
                 raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
-            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
-            if current != pebble.ServiceStatus.ACTIVE:
-                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
-                #  can be started before starting any, and gives a list of things that couldn't
-                #  be done, but this is good enough for now
-                raise pebble.ChangeError('''\
-ChangeError: cannot perform the following tasks:
-- Stop service "{}" (service "{}" is not active)
-'''.format(name, name), change=1234)  # type: ignore # the change id is not respected
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
 
@@ -2232,7 +2209,6 @@ ChangeError: cannot perform the following tasks:
 
         self._check_connection()
 
-        # TODO: handle invalid names
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.restart() which currently ignores the return value
         known_services = self._render_services()
