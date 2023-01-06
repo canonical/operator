@@ -102,7 +102,6 @@ class EventSpec:
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
 
-    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
     @patch('sys.stderr', new_callable=io.StringIO)
     def test_breakpoint(self, fake_stderr):
         class MyCharm(CharmBase):
@@ -110,19 +109,18 @@ class CharmInitTestCase(unittest.TestCase):
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': 'all'})
 
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+            breakpoint()
 
         self.assertEqual(mock.call_count, 1)
         self.assertIn('Starting pdb to debug charm operator', fake_stderr.getvalue())
 
-    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
     def test_no_debug_breakpoint(self):
         class MyCharm(CharmBase):
             pass
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': ''})
 
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+            breakpoint()
 
         self.assertEqual(mock.call_count, 0)
 

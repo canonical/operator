@@ -36,7 +36,6 @@ import sys
 import tempfile
 import threading
 import time
-import types
 import typing
 import urllib.error
 import urllib.parse
@@ -267,17 +266,6 @@ def _format_timeout(timeout: float) -> str:
     as accepted by the Pebble API (which uses Go's time.ParseDuration).
     """
     return '{:.3f}s'.format(timeout)
-
-
-def _json_loads(s: '_StrOrBytes') -> Dict[Any, Any]:
-    """Like json.loads(), but handle str or bytes.
-
-    This is needed because an HTTP response's read() method returns bytes on
-    Python 3.5, and json.load doesn't handle bytes.
-    """
-    if isinstance(s, bytes):
-        s = s.decode('utf-8')
-    return json.loads(s)
 
 
 def _start_thread(target: Callable[..., Any], *args: Any, **kwargs: Any) -> threading.Thread:
@@ -705,18 +693,16 @@ class Layer:
 
     The format of this is documented at
     https://github.com/canonical/pebble/#layer-specification.
-
-    Attributes:
-        summary: A summary of the purpose of this layer
-        description: A long form description of this layer
-        services: A mapping of name to :class:`Service` defined by this layer
-        checks: A mapping of check to :class:`Check` defined by this layer
     """
 
-    # This is how you do type annotations, but it is not supported by Python 3.5
-    # summary: str
-    # description: str
-    # services: Mapping[str, 'Service']
+    #: Summary of the purpose of this layer.
+    summary: str
+    #: Long-form description of this layer.
+    description: str
+    #: Mapping of name to :class:`Service` defined by this layer.
+    services: Dict[str, 'Service']
+    #: Mapping of check to :class:`Check` defined by this layer.
+    checks: Dict[str, 'Check']
 
     def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
         if isinstance(raw, str):
@@ -725,14 +711,12 @@ class Layer:
             d = raw or {}
         d = typing.cast('LayerDict', d)
 
-        self.summary = d.get('summary', '')  # type: str
-        self.description = d.get('description', '')  # type: str
+        self.summary = d.get('summary', '')
+        self.description = d.get('description', '')
         self.services = {name: Service(name, service)
-                         for name, service in d.get('services', {}).items()
-                         }  # type: Dict[str, Service]
+                         for name, service in d.get('services', {}).items()}
         self.checks = {name: Check(name, check)
-                       for name, check in d.get('checks', {}).items()
-                       }  # type: Dict[str, Check]
+                       for name, check in d.get('checks', {}).items()}
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
@@ -1459,7 +1443,7 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        raw_resp = _json_loads(response.read())  # type: Dict[str, Any]
+        raw_resp = json.loads(response.read())  # type: Dict[str, Any]
         return raw_resp
 
     @staticmethod
@@ -1485,11 +1469,6 @@ class Client:
         if query:
             url = url + '?' + urllib.parse.urlencode(query, doseq=True)
 
-        # python 3.5 urllib requests require their data to be a bytes object -
-        # generators won't work.
-        if sys.version_info[:2] < (3, 6) and isinstance(data, types.GeneratorType):
-            data = b''.join(data)
-
         if headers is None:
             headers = {}
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
@@ -1500,7 +1479,7 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                body = _json_loads(e.read())  # type: Dict[str, Any]
+                body = json.loads(e.read())  # type: Dict[str, Any]
                 message = body['result']['message']  # type: str
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
@@ -1912,7 +1891,7 @@ class Client:
         }
         response = self._request_raw('POST', '/v1/files', None, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        resp = _json_loads(response.read())
+        resp = json.loads(response.read())
         # we need to cast the Dict[Any, Any] to _FilesResponse
         self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 

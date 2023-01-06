@@ -3255,7 +3255,7 @@ class TestRealPebble(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as cm:
             self._get_health()
         self.assertEqual(cm.exception.code, 502)
-        health = pebble._json_loads(cm.exception.read())
+        health = json.loads(cm.exception.read())
         self.assertEqual(health, {
             'result': {'healthy': False},
             'status': 'Bad Gateway',
@@ -3274,7 +3274,7 @@ class TestRealPebble(unittest.TestCase):
 
     def _get_health(self):
         f = urllib.request.urlopen('http://localhost:4000/v1/health')
-        return pebble._json_loads(f.read())
+        return json.loads(f.read())
 
     def test_exec_wait(self):
         process = self.client.exec(['true'])
