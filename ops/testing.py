@@ -2176,10 +2176,6 @@ class _TestingPebbleClient:
                 # TODO: jam 2021-04-20 This needs a better error type
                 raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
         for name in services:
-            # If you try to start a service which is started, you get a ChangeError:
-            # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
-            # ChangeError: cannot perform the following tasks:
-            # - Start service "serv" (service "serv" was previously started)
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def stop_services(
