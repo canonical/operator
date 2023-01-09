@@ -14,7 +14,7 @@ import warnings
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Literal, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Literal, Tuple, Union, Sequence
 from uuid import uuid4
 
 from scenario.logger import logger as pkg_logger
@@ -670,11 +670,47 @@ class RelationSpec:
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, obj):
         meta = RelationMeta.from_dict(obj.pop("meta"))
         return cls(meta=meta, **obj)
+
+    @property
+    def changed(self):
+        """Sugar to generate a <this relation>-changed event."""
+        from scenario import structs
+        return structs.Event(self.meta.endpoint + '-changed',
+                             meta=structs.EventMeta(relation=self.meta))
+
+    @property
+    def joined(self):
+        """Sugar to generate a <this relation>-joined event."""
+        from scenario import structs
+        return structs.Event(self.meta.endpoint + '-joined',
+                             meta=structs.EventMeta(relation=self.meta))
+
+    @property
+    def created(self):
+        """Sugar to generate a <this relation>-created event."""
+        from scenario import structs
+        return structs.Event(self.meta.endpoint + '-created',
+                             meta=structs.EventMeta(relation=self.meta))
+
+    @property
+    def departed(self):
+        """Sugar to generate a <this relation>-departed event."""
+        from scenario import structs
+        return structs.Event(self.meta.endpoint + '-departed',
+                             meta=structs.EventMeta(relation=self.meta))
+
+    @property
+    def removed(self):
+        """Sugar to generate a <this relation>-removed event."""
+        from scenario import structs
+        return structs.Event(self.meta.endpoint + '-removed',
+                             meta=structs.EventMeta(relation=self.meta))
 
 
 @dataclass
@@ -698,13 +734,13 @@ class Status:
 @dataclass
 class State:
     config: Dict[str, Union[str, int, float, bool]] = None
-    relations: List[RelationSpec] = field(default_factory=list)
-    networks: List[NetworkSpec] = field(default_factory=list)
-    containers: List[ContainerSpec] = field(default_factory=list)
+    relations: Sequence[RelationSpec] = field(default_factory=list)
+    networks: Sequence[NetworkSpec] = field(default_factory=list)
+    containers: Sequence[ContainerSpec] = field(default_factory=list)
     status: Status = field(default_factory=Status)
     leader: bool = False
     model: Model = Model()
-    juju_log: List[Tuple[str, str]] = field(default_factory=list)
+    juju_log: Sequence[Tuple[str, str]] = field(default_factory=list)
 
     # todo: add pebble stuff, unit/app status, etc...
     #  actions?

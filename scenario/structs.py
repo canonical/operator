@@ -1,7 +1,7 @@
 import dataclasses
 import typing
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Tuple, Type
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Iterable
 
 if typing.TYPE_CHECKING:
     try:
@@ -25,11 +25,28 @@ class DCBase:
         return dataclasses.replace(self)
 
 
+# from show-relation!
+@dataclass
+class RelationMeta(memo.RelationMeta, DCBase):
+    pass
+
+
+@dataclass
+class RelationSpec(memo.RelationSpec, DCBase):
+    pass
+
+
+@dataclass
+class EventMeta(DCBase):
+    relation: RelationMeta = None  # if this is a relation event, the metadata of the relation
+
+
 @dataclass
 class Event(DCBase):
     name: str
     args: Tuple[Any] = ()
     kwargs: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    meta: EventMeta = None
 
     @property
     def is_meta(self):
@@ -42,17 +59,6 @@ class Event(DCBase):
     def as_scene(self, state: "State") -> "Scene":
         """Utility to get to a single-event Scenario from a single event instance."""
         return Scene(context=Context(state=state), event=self)
-
-
-# from show-relation!
-@dataclass
-class RelationMeta(memo.RelationMeta, DCBase):
-    pass
-
-
-@dataclass
-class RelationSpec(memo.RelationSpec, DCBase):
-    pass
 
 
 def relation(
@@ -183,6 +189,19 @@ class Context(DCBase):
 
     def to_dict(self):
         return dataclasses.asdict(self)
+
+    def with_can_connect(self, container_name: str, can_connect: bool):
+        return self.replace(state=self.state.with_can_connect(container_name, can_connect))
+
+    def with_leadership(self, leader: bool):
+        return self.replace(state=self.state.with_leadership(leader))
+
+    def with_unit_status(self, status: str, message: str):
+        return self.replace(state=self.state.with_unit_status(status, message))
+
+    def with_relations(self, relations: Iterable[RelationSpec]):
+        return self.replace(state=self.state.replace(relations=tuple(relations)))
+
 
 
 @dataclass

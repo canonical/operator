@@ -181,7 +181,7 @@ class Runtime:
         return meta["name"] + "/0"  # todo allow override
 
     def _get_event_env(self, scene: "Scene", charm_root: Path):
-        return {
+        env = {
             "JUJU_VERSION": self._juju_version,
             "JUJU_UNIT_NAME": self.unit_name,
             "_": "./dispatch",
@@ -191,6 +191,16 @@ class Runtime:
             "JUJU_CHARM_DIR": str(charm_root.absolute())
             # todo consider setting pwd, (python)path
         }
+
+        if scene.event.meta and scene.event.meta.relation:
+            relation = scene.event.meta.relation
+            env.update(
+                {
+                    'JUJU_RELATION': relation.endpoint,
+                    'JUJU_RELATION_ID': str(relation.relation_id),
+                 }
+            )
+        return env
 
     def _drop_meta(self, charm_root: Path):
         logger.debug("Dropping metadata.yaml, config.yaml, actions.yaml...")

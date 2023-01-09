@@ -146,13 +146,11 @@ def test_status_leader(scenario, start_scene, leader):
   leader_scene.context.state.leader = leader
 
   out = scenario.play(leader_scene)
-  if leader:
-    assert out.context_out.state.status.unit == ('active', 'I rule')
-  else:
-    assert out.context_out.state.status.unit == ('active', 'I follow')
+  expected_status = ('active', 'I rule') if leader else ('active', 'I follow')
+  assert out.context_out.state.status.unit == expected_status
 ```
 
-By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask to the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
+By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
 
 An example involving relations:
 

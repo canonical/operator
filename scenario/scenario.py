@@ -12,7 +12,7 @@ from scenario.consts import (
     META_EVENTS,
 )
 from scenario.logger import logger as pkg_logger
-from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene
+from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene, State
 
 if typing.TYPE_CHECKING:
     from ops.charm import CharmBase
@@ -223,7 +223,8 @@ class Scenario:
         return results
 
 
-def events_to_scenes(events: typing.Sequence[Union[str, Event]]):
+def events_to_scenes(events: typing.Sequence[Union[str, Event]],
+                     context: Optional[Context] = None):
     def _to_event(obj):
         if isinstance(obj, str):
             return Event(obj)
@@ -235,6 +236,7 @@ def events_to_scenes(events: typing.Sequence[Union[str, Event]]):
     scenes = map(Scene, map(_to_event, events))
     for i, scene in enumerate(scenes):
         scene.name = f"<Scene {i}: {scene.event.name}>"
+        scene.context = context
         yield scene
 
 
@@ -251,17 +253,40 @@ class StartupScenario(Scenario):
                     "leader-elected" if leader else "leader-settings-changed",
                     "config-changed",
                     "install",
-                )
+                ),
+                context=Context(state=State(leader=leader))
             )
         )
         super().__init__(charm_spec, playbook, juju_version)
 
 
 class TeardownScenario(Scenario):
-    def __init__(self, charm_spec: CharmSpec, juju_version: str = "3.0.0"):
+    def __init__(self, charm_spec: CharmSpec, leader: bool = True, juju_version: str = "3.0.0"):
         playbook: Playbook = Playbook(
             events_to_scenes(
-                (BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, "stop", "remove")
+                (BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, "stop", "remove"),
+                context=Context(state=State(leader=leader))
             )
         )
         super().__init__(charm_spec, playbook, juju_version)
+
+
+def check_builtin_sequences(charm_spec: CharmSpec, leader: Optional[bool] = None):
+    """Test that the builtin StartupScenario and TeardownScenario pass.
+
+    This will play both scenarios with and without leadership, and raise any exceptions.
+    If leader is True, it will exclude the non-leader cases, and vice-versa.
+    """
+
+    out = {
+        'startup': {},
+        'teardown': {},
+    }
+    if leader in {True, None}:
+        out['startup'][True] = StartupScenario(charm_spec=charm_spec, leader=True).play_until_complete()
+        out['teardown'][True] = TeardownScenario(charm_spec=charm_spec, leader=True).play_until_complete()
+    if leader in {False, None}:
+        out['startup'][False] = StartupScenario(charm_spec=charm_spec, leader=False).play_until_complete()
+        out['teardown'][False] = TeardownScenario(charm_spec=charm_spec, leader=False).play_until_complete()
+
+    return out
