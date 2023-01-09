@@ -196,9 +196,9 @@ class Runtime:
             relation = scene.event.meta.relation
             env.update(
                 {
-                    'JUJU_RELATION': relation.endpoint,
-                    'JUJU_RELATION_ID': str(relation.relation_id),
-                 }
+                    "JUJU_RELATION": relation.endpoint,
+                    "JUJU_RELATION_ID": str(relation.relation_id),
+                }
             )
         return env
 
@@ -253,7 +253,7 @@ class Runtime:
         scene: "Scene",
         pre_event: Optional[Callable[["_CT"], None]] = None,
         post_event: Optional[Callable[["_CT"], None]] = None,
-        memo_mode: MemoModes = 'replay'
+        memo_mode: MemoModes = "replay",
     ) -> RuntimeRunResult:
         """Plays a scene on the charm.
 

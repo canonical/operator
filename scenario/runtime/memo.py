@@ -14,7 +14,7 @@ import warnings
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Literal, Tuple, Union, Sequence
+from typing import Any, Callable, Dict, Generator, List, Literal, Sequence, Tuple, Union
 from uuid import uuid4
 
 from scenario.logger import logger as pkg_logger
@@ -670,7 +670,9 @@ class RelationSpec:
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    remote_units_data: Dict[str, Dict[str, str]] = dataclasses.field(default_factory=dict)
+    remote_units_data: Dict[str, Dict[str, str]] = dataclasses.field(
+        default_factory=dict
+    )
 
     @classmethod
     def from_dict(cls, obj):
@@ -681,36 +683,46 @@ class RelationSpec:
     def changed(self):
         """Sugar to generate a <this relation>-changed event."""
         from scenario import structs
-        return structs.Event(self.meta.endpoint + '-changed',
-                             meta=structs.EventMeta(relation=self.meta))
+
+        return structs.Event(
+            self.meta.endpoint + "-changed", meta=structs.EventMeta(relation=self.meta)
+        )
 
     @property
     def joined(self):
         """Sugar to generate a <this relation>-joined event."""
         from scenario import structs
-        return structs.Event(self.meta.endpoint + '-joined',
-                             meta=structs.EventMeta(relation=self.meta))
+
+        return structs.Event(
+            self.meta.endpoint + "-joined", meta=structs.EventMeta(relation=self.meta)
+        )
 
     @property
     def created(self):
         """Sugar to generate a <this relation>-created event."""
         from scenario import structs
-        return structs.Event(self.meta.endpoint + '-created',
-                             meta=structs.EventMeta(relation=self.meta))
+
+        return structs.Event(
+            self.meta.endpoint + "-created", meta=structs.EventMeta(relation=self.meta)
+        )
 
     @property
     def departed(self):
         """Sugar to generate a <this relation>-departed event."""
         from scenario import structs
-        return structs.Event(self.meta.endpoint + '-departed',
-                             meta=structs.EventMeta(relation=self.meta))
+
+        return structs.Event(
+            self.meta.endpoint + "-departed", meta=structs.EventMeta(relation=self.meta)
+        )
 
     @property
     def removed(self):
         """Sugar to generate a <this relation>-removed event."""
         from scenario import structs
-        return structs.Event(self.meta.endpoint + '-removed',
-                             meta=structs.EventMeta(relation=self.meta))
+
+        return structs.Event(
+            self.meta.endpoint + "-removed", meta=structs.EventMeta(relation=self.meta)
+        )
 
 
 @dataclass

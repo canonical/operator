@@ -3,7 +3,18 @@ import os
 import typing
 from contextlib import contextmanager
 from dataclasses import asdict
-from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union, Type, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    TextIO,
+    Type,
+    TypeVar,
+    Union,
+)
 
 from scenario import Runtime
 from scenario.consts import (
@@ -14,8 +25,8 @@ from scenario.consts import (
     META_EVENTS,
 )
 from scenario.logger import logger as pkg_logger
-from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene, State
 from scenario.runtime import memo
+from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene, State
 
 if typing.TYPE_CHECKING:
     from ops.charm import CharmBase
@@ -200,10 +211,11 @@ class Scenario:
         add_to_playbook: bool = False,
         pre_event: Optional[Callable[["_CT"], None]] = None,
         post_event: Optional[Callable[["_CT"], None]] = None,
-        memo_mode: memo.MemoModes = 'replay'
+        memo_mode: memo.MemoModes = "replay",
     ) -> PlayResult:
-        result = self._runtime.play(scene, pre_event=pre_event, post_event=post_event,
-                                    memo_mode=memo_mode)
+        result = self._runtime.play(
+            scene, pre_event=pre_event, post_event=post_event, memo_mode=memo_mode
+        )
         # todo verify that if state was mutated, it was mutated
         #  in a way that makes sense:
         #  e.g. - charm cannot modify leadership status, etc...
@@ -232,8 +244,9 @@ class Scenario:
         return results
 
 
-def events_to_scenes(events: typing.Sequence[Union[str, Event]],
-                     context: Optional[Context] = None):
+def events_to_scenes(
+    events: typing.Sequence[Union[str, Event]], context: Optional[Context] = None
+):
     def _to_event(obj):
         if isinstance(obj, str):
             return Event(obj)
@@ -263,18 +276,20 @@ class StartupScenario(Scenario):
                     "config-changed",
                     "install",
                 ),
-                context=Context(state=State(leader=leader))
+                context=Context(state=State(leader=leader)),
             )
         )
         super().__init__(charm_spec, playbook, juju_version)
 
 
 class TeardownScenario(Scenario):
-    def __init__(self, charm_spec: CharmSpec, leader: bool = True, juju_version: str = "3.0.0"):
+    def __init__(
+        self, charm_spec: CharmSpec, leader: bool = True, juju_version: str = "3.0.0"
+    ):
         playbook: Playbook = Playbook(
             events_to_scenes(
                 (BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, "stop", "remove"),
-                context=Context(state=State(leader=leader))
+                context=Context(state=State(leader=leader)),
             )
         )
         super().__init__(charm_spec, playbook, juju_version)
@@ -288,15 +303,23 @@ def check_builtin_sequences(charm_spec: CharmSpec, leader: Optional[bool] = None
     """
 
     out = {
-        'startup': {},
-        'teardown': {},
+        "startup": {},
+        "teardown": {},
     }
     if leader in {True, None}:
-        out['startup'][True] = StartupScenario(charm_spec=charm_spec, leader=True).play_until_complete()
-        out['teardown'][True] = TeardownScenario(charm_spec=charm_spec, leader=True).play_until_complete()
+        out["startup"][True] = StartupScenario(
+            charm_spec=charm_spec, leader=True
+        ).play_until_complete()
+        out["teardown"][True] = TeardownScenario(
+            charm_spec=charm_spec, leader=True
+        ).play_until_complete()
     if leader in {False, None}:
-        out['startup'][False] = StartupScenario(charm_spec=charm_spec, leader=False).play_until_complete()
-        out['teardown'][False] = TeardownScenario(charm_spec=charm_spec, leader=False).play_until_complete()
+        out["startup"][False] = StartupScenario(
+            charm_spec=charm_spec, leader=False
+        ).play_until_complete()
+        out["teardown"][False] = TeardownScenario(
+            charm_spec=charm_spec, leader=False
+        ).play_until_complete()
 
     return out
 

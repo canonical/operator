@@ -1,7 +1,7 @@
 import dataclasses
 import typing
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Iterable
+from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Type
 
 if typing.TYPE_CHECKING:
     try:
@@ -38,7 +38,9 @@ class RelationSpec(memo.RelationSpec, DCBase):
 
 @dataclass
 class EventMeta(DCBase):
-    relation: RelationMeta = None  # if this is a relation event, the metadata of the relation
+    relation: RelationMeta = (
+        None  # if this is a relation event, the metadata of the relation
+    )
 
 
 @dataclass
@@ -193,7 +195,9 @@ class Context(DCBase):
         return dataclasses.asdict(self)
 
     def with_can_connect(self, container_name: str, can_connect: bool):
-        return self.replace(state=self.state.with_can_connect(container_name, can_connect))
+        return self.replace(
+            state=self.state.with_can_connect(container_name, can_connect)
+        )
 
     def with_leadership(self, leader: bool):
         return self.replace(state=self.state.with_leadership(leader))
@@ -203,7 +207,6 @@ class Context(DCBase):
 
     def with_relations(self, relations: Iterable[RelationSpec]):
         return self.replace(state=self.state.replace(relations=tuple(relations)))
-
 
 
 @dataclass

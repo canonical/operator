@@ -5,14 +5,7 @@ from ops.charm import CharmBase, CharmEvents, StartEvent
 from ops.framework import EventBase, Framework
 
 from scenario.scenario import Scenario
-from scenario.structs import (
-    CharmSpec,
-    Context,
-    Scene,
-    State,
-    event,
-    relation,
-)
+from scenario.structs import CharmSpec, Context, Scene, State, event, relation
 
 
 @pytest.fixture(scope="function")
@@ -55,35 +48,46 @@ def test_called(mycharm):
         post_event._called = True
 
         from ops.model import ActiveStatus
-        charm.unit.status = ActiveStatus('yabadoodle')
+
+        charm.unit.status = ActiveStatus("yabadoodle")
 
         assert charm.called
 
     out = scenario.play(
         Scene(
             event("start"),
-            context=Context(
-                state=State(config={"foo": "bar"}, leader=True))),
-        pre_event=pre_event, post_event=post_event)
+            context=Context(state=State(config={"foo": "bar"}, leader=True)),
+        ),
+        pre_event=pre_event,
+        post_event=post_event,
+    )
 
     assert pre_event._called
     assert post_event._called
 
     assert out.delta() == [
-        {'op': 'replace', 'path': '/state/status/unit', 'value': ('active', 'yabadoodle')}
+        {
+            "op": "replace",
+            "path": "/state/status/unit",
+            "value": ("active", "yabadoodle"),
+        }
     ]
 
 
 def test_relation_data_access(mycharm):
     mycharm._call = lambda *_: True
-    scenario = Scenario(CharmSpec(
-        mycharm,
-        meta={"name": "foo",
-              "requires": {"relation_test":
-                               {"interface": "azdrubales"}}}))
+    scenario = Scenario(
+        CharmSpec(
+            mycharm,
+            meta={
+                "name": "foo",
+                "requires": {"relation_test": {"interface": "azdrubales"}},
+            },
+        )
+    )
 
     def check_relation_data(charm):
-        foo_relations = charm.model.relations['relation_test']
+        foo_relations = charm.model.relations["relation_test"]
         assert len(foo_relations) == 1
         foo_rel = foo_relations[0]
         assert len(foo_rel.units) == 2
@@ -95,28 +99,31 @@ def test_relation_data_access(mycharm):
         remote_app_data = foo_rel.data[foo_rel.app]
 
         assert remote_units_data == {
-            'karlos/0': {'foo': 'bar'},
-            'karlos/1': {'baz': 'qux'}}
+            "karlos/0": {"foo": "bar"},
+            "karlos/1": {"baz": "qux"},
+        }
 
-        assert remote_app_data == {'yaba': 'doodle'}
+        assert remote_app_data == {"yaba": "doodle"}
 
     scene = Scene(
         context=Context(
-            state=State(relations=[
-                relation(endpoint="relation_test",
-                         interface="azdrubales",
-                         remote_app_name="karlos",
-                         remote_app_data={'yaba': 'doodle'},
-                         remote_unit_ids=[0, 1],
-                         remote_units_data={
-                             '0': {'foo': 'bar'},
-                             '1': {'baz': 'qux'}
-                         }
-                         )
-            ])),
-        event=event('update-status')
+            state=State(
+                relations=[
+                    relation(
+                        endpoint="relation_test",
+                        interface="azdrubales",
+                        remote_app_name="karlos",
+                        remote_app_data={"yaba": "doodle"},
+                        remote_unit_ids=[0, 1],
+                        remote_units_data={"0": {"foo": "bar"}, "1": {"baz": "qux"}},
+                    )
+                ]
+            )
+        ),
+        event=event("update-status"),
     )
 
-    scenario.play(scene,
-                  post_event=check_relation_data,
-                  )
+    scenario.play(
+        scene,
+        post_event=check_relation_data,
+    )
