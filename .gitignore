@@ -6,4 +6,4 @@ build/
 __pycache__/
 *.py[cod]
 .idea
-*.eggi-info
+*.egg-info
