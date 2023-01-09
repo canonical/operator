@@ -1186,6 +1186,10 @@ class ExecProcess:
             the caller can use to stream error output from the process. It is
             None if stderr was passed to :meth:`Client.exec` or combine_stderr
             was True.
+        returncode: After the ExecProcess results have been obtained, either by
+            calling :meth: `Client.wait` or :meth: `Client.get_output`,
+            you can retrieve the exit code via this attribute. Until then,
+            it will be None.
     """
 
     def __init__(
@@ -1208,6 +1212,8 @@ class ExecProcess:
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
+        self.returncode = None
+
         self._client = client
         self._timeout = timeout
         self._control_ws = control_ws
@@ -1273,6 +1279,7 @@ class ExecProcess:
         exit_code = -1
         if change.tasks:
             exit_code = change.tasks[0].data.get('exit-code', -1)
+        self.returncode = exit_code
         return exit_code
 
     def wait_output(self) -> Tuple['_StrOrBytes', Optional['_StrOrBytes']]:

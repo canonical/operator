@@ -2700,7 +2700,9 @@ class TestExec(unittest.TestCase):
         process = self.client.exec(['true'])
         self.assertIsNotNone(process.stdout)
         self.assertIsNotNone(process.stderr)
+        self.assertIsNone(process.returncode)
         process.wait()
+        self.assertEqual(process.returncode, 0)
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['true'])),
@@ -2711,8 +2713,10 @@ class TestExec(unittest.TestCase):
         self.add_responses('456', 1)
 
         process = self.client.exec(['false'])
+        self.assertIsNone(process.returncode)
         with self.assertRaises(pebble.ExecError) as cm:
             process.wait()
+        self.assertEqual(process.returncode, 1)
         self.assertEqual(cm.exception.command, ['false'])
         self.assertEqual(cm.exception.exit_code, 1)
         self.assertEqual(cm.exception.stdout, None)
