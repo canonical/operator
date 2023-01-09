@@ -1,7 +1,9 @@
 import json
+import os
 import typing
+from contextlib import contextmanager
 from dataclasses import asdict
-from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union, Type, TypeVar
 
 from scenario import Runtime
 from scenario.consts import (
@@ -13,11 +15,14 @@ from scenario.consts import (
 )
 from scenario.logger import logger as pkg_logger
 from scenario.structs import CharmSpec, Context, Event, InjectRelation, Scene, State
+from scenario.runtime import memo
 
 if typing.TYPE_CHECKING:
     from ops.charm import CharmBase
     from ops.framework import BoundEvent, EventBase
+    from ops.testing import CharmType
 
+    _CT = TypeVar("_CT", bound=Type[CharmType])
 
 CharmMeta = Optional[Union[str, TextIO, dict]]
 AssertionType = Callable[["BoundEvent", "Context", "Emitter"], Optional[bool]]
@@ -193,8 +198,12 @@ class Scenario:
         self,
         scene: Scene,
         add_to_playbook: bool = False,
+        pre_event: Optional[Callable[["_CT"], None]] = None,
+        post_event: Optional[Callable[["_CT"], None]] = None,
+        memo_mode: memo.MemoModes = 'replay'
     ) -> PlayResult:
-        result = self._runtime.play(scene)
+        result = self._runtime.play(scene, pre_event=pre_event, post_event=post_event,
+                                    memo_mode=memo_mode)
         # todo verify that if state was mutated, it was mutated
         #  in a way that makes sense:
         #  e.g. - charm cannot modify leadership status, etc...
@@ -290,3 +299,16 @@ def check_builtin_sequences(charm_spec: CharmSpec, leader: Optional[bool] = None
         out['teardown'][False] = TeardownScenario(charm_spec=charm_spec, leader=False).play_until_complete()
 
     return out
+
+
+@contextmanager
+def memo_mode(mode: memo.MemoModes):
+    previous = os.getenv(memo.MEMO_MODE_KEY)
+    os.environ[memo.MEMO_MODE_KEY] = mode
+
+    yield
+
+    if previous:
+        os.environ[memo.MEMO_MODE_KEY] = previous
+    else:
+        os.unsetenv(memo.MEMO_MODE_KEY)

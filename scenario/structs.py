@@ -71,6 +71,7 @@ def relation(
     local_unit_data: Dict[str, str] = None,
     local_app_data: Dict[str, str] = None,
     remote_app_data: Dict[str, str] = None,
+    remote_units_data: Dict[str, Dict[str, str]] = None,
 ):
     """Helper function to construct a RelationMeta object with some sensible defaults."""
     metadata = RelationMeta(
@@ -85,6 +86,7 @@ def relation(
         local_unit_data=local_unit_data or {},
         local_app_data=local_app_data or {},
         remote_app_data=remote_app_data or {},
+        remote_units_data=remote_units_data or {},
     )
 
 

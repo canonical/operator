@@ -253,6 +253,7 @@ class Runtime:
         scene: "Scene",
         pre_event: Optional[Callable[["_CT"], None]] = None,
         post_event: Optional[Callable[["_CT"], None]] = None,
+        memo_mode: MemoModes = 'replay'
     ) -> RuntimeRunResult:
         """Plays a scene on the charm.
 
@@ -276,7 +277,7 @@ class Runtime:
 
             memo_scene = self._scene_to_memo_scene(scene, env)
             with TemporaryEventDB(memo_scene, charm_root) as db_path:
-                env.update(self._get_runtime_env(0, db_path))
+                env.update(self._get_runtime_env(0, db_path, mode=memo_mode))
 
                 logger.info(" - redirecting root logging")
                 self._redirect_root_logger()

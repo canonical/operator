@@ -670,7 +670,7 @@ class RelationSpec:
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(default_factory=dict)
+    remote_units_data: Dict[str, Dict[str, str]] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, obj):
@@ -881,7 +881,7 @@ def get_from_state(scene: Scene, question: Tuple[str, Tuple[Any], Dict[str, Any]
                     return relation.local_unit_data.get(this_unit_name, {})
                 else:
                     unit_id = obj_name.split("/")[-1]
-                    return relation.local_unit_data[unit_id]
+                    return relation.remote_units_data[unit_id]
 
             elif meth == "is_leader":
                 return state.leader
