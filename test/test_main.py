@@ -143,10 +143,7 @@ class CharmInitTestCase(unittest.TestCase):
                             fh.write(b'name: test')
                         mock_charmdir.return_value = tmpdirname
 
-                        with warnings.catch_warnings(record=True) as warnings_cm:
-                            main(charm_class, **kwargs)
-
-        return warnings_cm
+                        main(charm_class, **kwargs)
 
     def test_init_signature_passthrough(self):
         class MyCharm(CharmBase):
@@ -154,8 +151,9 @@ class CharmInitTestCase(unittest.TestCase):
             def __init__(self, *args):
                 super().__init__(*args)
 
-        warn_cm = self._check(MyCharm)
-        self.assertFalse(warn_cm)
+        with warnings.catch_warnings(record=True) as warn_cm:
+            self._check(MyCharm)
+        self.assertEqual(warn_cm, [])
 
     def test_init_signature_both_arguments(self):
         class MyCharm(CharmBase):
@@ -163,13 +161,10 @@ class CharmInitTestCase(unittest.TestCase):
             def __init__(self, framework, somekey):
                 super().__init__(framework, somekey)
 
-        warn_cm = self._check(MyCharm)
-        self.assertEqual(len(warn_cm), 1)
-        (warn,) = warn_cm
-        self.assertTrue(issubclass(warn.category, DeprecationWarning))
-        self.assertEqual(str(warn.message), (
-            "the second argument, 'key', has been deprecated and will be removed "
-            "after the 0.7 release"))
+        msg = ("the second argument, 'key', has been deprecated and will be removed "
+               "after the 0.7 release")
+        with self.assertWarnsRegex(DeprecationWarning, msg):
+            self._check(MyCharm)
 
     def test_init_signature_only_framework(self):
         class MyCharm(CharmBase):
@@ -177,8 +172,9 @@ class CharmInitTestCase(unittest.TestCase):
             def __init__(self, framework):
                 super().__init__(framework)
 
-        warn_cm = self._check(MyCharm)
-        self.assertFalse(warn_cm)
+        with warnings.catch_warnings(record=True) as warn_cm:
+            self._check(MyCharm)
+        self.assertEqual(warn_cm, [])
 
     def test_storage_no_storage(self):
         # here we patch juju_backend_available so it refuses to set it up
@@ -195,6 +191,13 @@ class CharmInitTestCase(unittest.TestCase):
             juju_backend_available.return_value = True
             with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
                 self._check(CharmBase, use_juju_for_storage=True)
+
+    def test_controller_storage_deprecated(self):
+        with patch('ops.storage.juju_backend_available') as juju_backend_available:
+            juju_backend_available.return_value = True
+            with self.assertWarnsRegex(DeprecationWarning, 'Controller storage'):
+                with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
+                    self._check(CharmBase, use_juju_for_storage=True)
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
