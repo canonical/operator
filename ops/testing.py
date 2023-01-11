@@ -180,10 +180,6 @@ class Harness(Generic[CharmType]):
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
 
-        # TODO: will be removed in the next breaking-changes release
-        #  together with self._oci_resources
-        self._deprecated_oci_resources_do_not_use = {}  # type: Dict[Any, Any]
-
         # TODO: If/when we decide to allow breaking changes for a release,
         #  change SIMULATE_CAN_CONNECT default value to True and remove the
         #  warning message below.  This warning was added 2022-03-22
@@ -191,13 +187,6 @@ class Harness(Generic[CharmType]):
             warnings.warn(
                 'Please set ops.testing.SIMULATE_CAN_CONNECT=True. '
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
-
-    @property
-    def _oci_resources(self):
-        warnings.warn('Harness._oci_resources is deprecated and will be '
-                      'removed in a future release.',
-                      category=DeprecationWarning)
-        return self._deprecated_oci_resources_do_not_use
 
     def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
