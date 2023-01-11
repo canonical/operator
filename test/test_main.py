@@ -688,7 +688,7 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script_calls(self)]
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
-        self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
+        self.assertRegex(calls.pop(0), 'Using local storage: not a Kubernetes podspec charm')
         self.assertRegex(calls.pop(0), 'Initializing SQLite local storage: ')
 
         self.maxDiff = None
@@ -905,7 +905,7 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -924,7 +924,7 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'WARNING', '--',
              'Legacy hooks/install exists but is not executable.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -1006,7 +1006,7 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -1153,7 +1153,7 @@ class TestStorageHeuristics(unittest.TestCase):
         meta = CharmMeta.from_yaml("series: [ecs]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
             self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
-            self.assertLogged('Using local storage: not a kubernetes charm')
+            self.assertLogged('Using local storage: not a Kubernetes podspec charm')
 
     def test_not_if_already_local(self):
         meta = CharmMeta.from_yaml("series: [kubernetes]")

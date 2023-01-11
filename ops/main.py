@@ -340,9 +340,10 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     if db_path.exists():
         return False
 
-    # if you're not in k8s you don't need controller storage
-    if 'kubernetes' not in meta.series:
-        logger.debug("Using local storage: not a kubernetes charm")
+    # only use controller storage for Kubernetes podspec charms
+    is_podspec = 'kubernetes' in meta.series
+    if not is_podspec:
+        logger.debug("Using local storage: not a Kubernetes podspec charm")
         return False
 
     # are we in a new enough Juju?
