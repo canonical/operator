@@ -128,7 +128,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_get(rel_id, 'test-app', is_app=True), {})
         self.assertEqual(backend.relation_get(rel_id, 'test-app/0', is_app=False), {})
 
-    def test_can_connect(self):
+    def test_can_connect_default(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             containers:
@@ -153,6 +153,29 @@ class TestHarness(unittest.TestCase):
         harness.container_pebble_ready('foo')
         self.assertTrue(c.can_connect())
         c.get_plan()  # shouldn't raise ConnectionError
+
+    def test_can_connect_begin_with_initial_hooks(self):
+        harness = Harness(CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+              bar:
+                resource: bar-image
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        harness.begin_with_initial_hooks()
+        self.assertTrue(harness.model.unit.containers['foo'].can_connect())
+        self.assertTrue(harness.model.unit.containers['bar'].can_connect())
+
+        harness.set_can_connect('foo', False)
+        self.assertFalse(harness.model.unit.containers['foo'].can_connect())
+
+        harness.set_can_connect('foo', True)
+        container = harness.model.unit.containers['foo']
+        self.assertTrue(container.can_connect())
+        container.get_plan()  # shouldn't raise ConnectionError
 
     def test_add_relation_and_unit(self):
         harness = Harness(CharmBase, meta='''
@@ -2000,9 +2023,9 @@ class TestHarness(unittest.TestCase):
               foo:
                 resource: foo-image
             ''')
-        harness.set_can_connect('foo', True)
         self.addCleanup(harness.cleanup)
         harness.begin()
+        harness.set_can_connect('foo', True)
         c = harness.model.unit.containers['foo']
 
         dir_path = '/tmp/foo/dir'

@@ -282,18 +282,19 @@ class Harness(Generic[CharmType]):
     def begin_with_initial_hooks(self) -> None:
         """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
 
-        This triggers install, relation-created, config-changed, start, and any relation-joined
-        hooks based on what relations have been defined+added before you called begin. This does
-        NOT trigger a pebble-ready hook. Note that all of these are fired before returning control
+        This triggers install, relation-created, config-changed, start, pebble-ready (for any
+        containers), and any relation-joined hooks based on what relations have been added before
+        you called begin. Note that all of these are fired before returning control
         to the test suite, so if you want to introspect what happens at each step, you need to fire
-        them directly (e.g. Charm.on.install.emit()).  In your hook callback functions, you should
-        not assume that workload containers are active; guard such code with checks to
-        Container.can_connect().
+        them directly (e.g. Charm.on.install.emit()).
 
         To use this with all the normal hooks, you should instantiate the harness, setup any
-        relations that you want active when the charm starts, and then call this method.  This
+        relations that you want active when the charm starts, and then call this method. This
         method will automatically create and add peer relations that are specified in
         metadata.yaml.
+
+        If the charm metadata specifies containers, this sets can_connect to True for all
+        containers (in addition to triggering pebble-ready for each).
 
         Example::
 
@@ -314,6 +315,7 @@ class Harness(Generic[CharmType]):
             # To be fired.
         """
         self.begin()
+
         charm = cast(CharmBase, self._charm)
         # Checking if disks have been added
         # storage-attached events happen before install
@@ -323,6 +325,7 @@ class Harness(Generic[CharmType]):
                 self.attach_storage(s.full_id)
         # Storage done, emit install event
         charm.on.install.emit()
+
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
         # of joined units for a given relation.
@@ -350,8 +353,15 @@ class Harness(Generic[CharmType]):
             charm.on.leader_elected.emit()
         else:
             charm.on.leader_settings_changed.emit()
+
         charm.on.config_changed.emit()
+
         charm.on.start.emit()
+
+        # Set can_connect and fire pebble-ready for any containers.
+        for container_name in self._meta.containers:
+            self.set_can_connect(container_name, True)
+
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
