@@ -155,15 +155,14 @@ class CharmInitTestCase(unittest.TestCase):
             self._check(MyCharm)
         self.assertEqual(warn_cm, [])
 
-    def test_init_signature_both_arguments(self):
+    def test_init_signature_old_key_argument(self):
         class MyCharm(CharmBase):
 
             def __init__(self, framework, somekey):
                 super().__init__(framework, somekey)
 
-        msg = ("the second argument, 'key', has been deprecated and will be removed "
-               "after the 0.7 release")
-        with self.assertWarnsRegex(DeprecationWarning, msg):
+        # Support for "key" has been deprecated since ops 0.7 and was removed in 2.0
+        with self.assertRaises(TypeError):
             self._check(MyCharm)
 
     def test_init_signature_only_framework(self):

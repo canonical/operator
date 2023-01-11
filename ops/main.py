@@ -14,7 +14,6 @@
 
 """Main entry point to the Operator Framework."""
 
-import inspect
 import logging
 import os
 import shutil
@@ -421,17 +420,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     framework = ops.framework.Framework(store, charm_dir, meta, model)
     framework.set_breakpointhook()
     try:
-        sig = inspect.signature(charm_class)
-        try:
-            sig.bind(framework)
-        except TypeError:
-            msg = (
-                "the second argument, 'key', has been deprecated and will be "
-                "removed after the 0.7 release")
-            warnings.warn(msg, DeprecationWarning)
-            charm = charm_class(framework, None)
-        else:
-            charm = charm_class(framework)
+        charm = charm_class(framework)
         dispatcher.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant
