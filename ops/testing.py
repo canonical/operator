@@ -12,24 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Infrastructure to build unittests for Charms using the Operator Framework.
-
-Global Variables:
-
-    SIMULATE_CAN_CONNECT: This enables can_connect simulation for the test
-    harness.  It should be set *before* you create Harness instances and not
-    changed after.  You *should* set this to true - it will help your tests be
-    more accurate!  This causes all containers' can_connect states initially
-    be False rather than True and causes the testing with the harness to model
-    and track can_connect state for containers accurately.  This means that
-    calls that require communication with the container API (e.g.
-    Container.push, Container.get_plan, Container.add_layer, etc.) will only
-    succeed if Container.can_connect() returns True and will raise exceptions
-    otherwise.  can_connect state evolves automatically to track with events
-    associated with container state, (e.g.  calling container_pebble_ready).
-    If SIMULATE_CAN_CONNECT is True, can_connect state for containers can also
-    be manually controlled using Harness.set_can_connect.
-"""
+"""Infrastructure to build unit tests for charms using the Operator Framework."""
 
 
 import dataclasses
@@ -107,10 +90,6 @@ if TYPE_CHECKING:
     })
     RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
 
-# Toggles Container.can_connect simulation globally for all harness instances.
-# For this to work, it must be set *before* Harness instances are created.
-
-SIMULATE_CAN_CONNECT = False
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
@@ -180,14 +159,6 @@ class Harness(Generic[CharmType]):
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
 
-        # TODO: If/when we decide to allow breaking changes for a release,
-        #  change SIMULATE_CAN_CONNECT default value to True and remove the
-        #  warning message below.  This warning was added 2022-03-22
-        if not SIMULATE_CAN_CONNECT:
-            warnings.warn(
-                'Please set ops.testing.SIMULATE_CAN_CONNECT=True. '
-                'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
-
     def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
 
@@ -240,9 +211,9 @@ class Harness(Generic[CharmType]):
         return self._framework._event_context(event_name)  # pyright: reportPrivateUsage=false
 
     def set_can_connect(self, container: Union[str, model.Container], val: bool):
-        """Change the simulated can_connect status of a container's underlying pebble client.
+        """Change the simulated connection status of a container's underlying Pebble client.
 
-        Calling this method raises an exception if SIMULATE_CAN_CONNECT is False.
+        After calling this, :meth:`ops.model.Container.can_connect` will return val.
         """
         if isinstance(container, str):
             container = self.model.unit.get_container(container)
@@ -301,19 +272,19 @@ class Harness(Generic[CharmType]):
     def begin_with_initial_hooks(self) -> None:
         """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
 
-        This triggers install, relation-created, config-changed, start, and any relation-joined
-        hooks based on what relations have been defined+added before you called begin. This does
-        NOT trigger a pebble-ready hook. Note that all of these are fired before returning control
+        This triggers install, relation-created, config-changed, start, pebble-ready (for any
+        containers), and any relation-joined hooks based on what relations have been added before
+        you called begin. Note that all of these are fired before returning control
         to the test suite, so if you want to introspect what happens at each step, you need to fire
-        them directly (e.g. Charm.on.install.emit()).  In your hook callback functions, you should
-        not assume that workload containers are active; guard such code with checks to
-        Container.can_connect().  You are encouraged to test this by setting the global
-        SIMULATE_CAN_CONNECT variable to True.
+        them directly (e.g. Charm.on.install.emit()).
 
         To use this with all the normal hooks, you should instantiate the harness, setup any
-        relations that you want active when the charm starts, and then call this method.  This
+        relations that you want active when the charm starts, and then call this method. This
         method will automatically create and add peer relations that are specified in
         metadata.yaml.
+
+        If the charm metadata specifies containers, this sets can_connect to True for all
+        containers (in addition to triggering pebble-ready for each).
 
         Example::
 
@@ -334,6 +305,7 @@ class Harness(Generic[CharmType]):
             # To be fired.
         """
         self.begin()
+
         charm = cast(CharmBase, self._charm)
         # Checking if disks have been added
         # storage-attached events happen before install
@@ -343,6 +315,7 @@ class Harness(Generic[CharmType]):
                 self.attach_storage(s.full_id)
         # Storage done, emit install event
         charm.on.install.emit()
+
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
         # of joined units for a given relation.
@@ -370,8 +343,15 @@ class Harness(Generic[CharmType]):
             charm.on.leader_elected.emit()
         else:
             charm.on.leader_settings_changed.emit()
+
         charm.on.config_changed.emit()
+
         charm.on.start.emit()
+
+        # Set can_connect and fire pebble-ready for any containers.
+        for container_name in self._meta.containers:
+            self.container_pebble_ready(container_name)
+
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
@@ -922,16 +902,15 @@ class Harness(Generic[CharmType]):
     def container_pebble_ready(self, container_name: str):
         """Fire the pebble_ready hook for the associated container.
 
-        This will do nothing if begin() has not been called. If
-        SIMULATE_CAN_CONNECT is True, this will switch the given
-        container's can_connect state to True before the hook
-        function is called.
+        This will switch the given container's can_connect state to True
+        before the hook function is called.
+
+        It will do nothing if begin() has not been called.
         """
         if self._charm is None:
             return
         container = self.model.unit.get_container(container_name)
-        if SIMULATE_CAN_CONNECT:
-            self.set_can_connect(container, True)
+        self.set_can_connect(container, True)
         self.charm.on[container_name].pebble_ready.emit(container)
 
     def get_workload_version(self) -> str:
@@ -1594,8 +1573,6 @@ class _TestingModelBackend:
 
     def _set_can_connect(self, pebble_client: '_TestingPebbleClient', val: bool):
         """Manually sets the can_connect state for the given mock client."""
-        if not SIMULATE_CAN_CONNECT:
-            raise RuntimeError('must set SIMULATE_CAN_CONNECT=True before using set_can_connect')
         if pebble_client not in self._pebble_clients_can_connect:
             msg = 'cannot set can_connect for the client - are you running a "real" pebble test?'
             raise RuntimeError(msg)
@@ -1855,7 +1832,7 @@ class _TestingModelBackend:
             # attached/detached later.
             self._pebble_clients[container] = client
 
-        self._pebble_clients_can_connect[client] = not SIMULATE_CAN_CONNECT
+        self._pebble_clients_can_connect[client] = False
         return client
 
     def planned_units(self) -> int:
@@ -2104,7 +2081,9 @@ class _TestingPebbleClient:
 
     def _check_connection(self):
         if not self._backend._can_connect(self):  # pyright: reportPrivateUsage=false
-            raise pebble.ConnectionError('cannot connect to pebble')
+            msg = ('Cannot connect to Pebble; did you forget to call '
+                   'begin_with_initial_hooks() or set_can_connect()?')
+            raise pebble.ConnectionError(msg)
 
     def get_system_info(self) -> pebble.SystemInfo:
         self._check_connection()
