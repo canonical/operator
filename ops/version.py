@@ -36,11 +36,12 @@ def _get_version():
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 cwd=p,
-                check=True)
+                check=True,
+                encoding='utf-8')
         except Exception:
             pass
         else:
-            version = proc.stdout.strip().decode('utf8')
+            version = proc.stdout.strip()
             if '-' in version:
                 # version will look like <tag>-<#commits>-g<hex>[-dirty]
                 # in terms of PEP 440, the tag we'll make sure is a 'public version identifier';

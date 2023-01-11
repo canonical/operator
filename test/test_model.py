@@ -18,7 +18,6 @@ import ipaddress
 import json
 import os
 import pathlib
-import sys
 import tempfile
 import types
 import unittest
@@ -301,14 +300,12 @@ class TestModel(unittest.TestCase):
         # this will fire more backend calls
         with self.harness._event_context('foo_event'):
             data_repr = repr(rel_db1.data)
-        # the CountEqual and weird (and brittle) splitting is to accommodate python 3.5
-        # TODO: switch to assertEqual when we drop 3.5
-        self.assertCountEqual(
-            data_repr[1:-1].split(', '),
-            ["<ops.model.Unit myapp/0>: {}",
-             "<ops.model.Application myapp>: <n/a>",
-             "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}",
-             "<ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}"])
+        self.assertEqual(
+            data_repr,
+            ('{<ops.model.Unit myapp/0>: {}, '
+             '<ops.model.Application myapp>: <n/a>, '
+             "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}, "
+             "<ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}}"))
 
     def test_relation_data_modify_our(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
@@ -597,13 +594,7 @@ class TestModel(unittest.TestCase):
                 ('relation_get', 1, 'remoteapp1/0', False),
                 ('is_leader',),
                 ('relation_get', 1, 'remoteapp1', True)]
-            # in < 3.5 dicts are unsorted
-            major, minor, *_ = sys.version_info
-            if (major, minor) > (3, 5):
-                self.assertBackendCalls(expected_backend_calls)
-            else:
-                backend_calls = set(self.harness._get_backend_calls())
-                self.assertEqual(backend_calls, set(expected_backend_calls))
+            self.assertBackendCalls(expected_backend_calls)
 
     def test_relation_no_units(self):
         self.harness.add_relation('db1', 'remoteapp1')
@@ -949,6 +940,14 @@ class TestModel(unittest.TestCase):
 
     def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
+
+    def test_run_error(self):
+        model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+        fake_script(self, 'status-get', """echo 'ERROR cannot get status' >&2; exit 1""")
+        with self.assertRaises(ops.model.ModelError) as cm:
+            _ = model.unit.status.message
+        self.assertEqual(str(cm.exception), 'ERROR cannot get status\n')
+        self.assertEqual(cm.exception.args[0], 'ERROR cannot get status\n')
 
 
 class PushPullCase:
@@ -2262,9 +2261,8 @@ class TestModelBackend(unittest.TestCase):
                     content = t.read()
                 finally:
                     t.close()
-                self.assertEqual(content.decode('utf-8'), dedent("""\
-                    foo: bar
-                    """))
+                decoded = content.decode('utf-8').replace('\r\n', '\n')
+                self.assertEqual(decoded, 'foo: bar\n')
 
         # before 2.7.0, it just fails always (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'

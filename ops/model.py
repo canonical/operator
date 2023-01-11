@@ -2548,9 +2548,10 @@ class _ModelBackend:
         self._hook_is_running = ''
 
     def _run(self, *args: str, return_output: bool = False,
-             use_json: bool = False, input_stream: Optional[bytes] = None
+             use_json: bool = False, input_stream: Optional[str] = None
              ) -> Union[str, 'JsonObject', None]:
-        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True)  # type: Dict[str, Any]
+        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True,
+                      encoding='utf-8')  # type: Dict[str, Any]
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
@@ -2571,7 +2572,7 @@ class _ModelBackend:
             if result.stdout is None:
                 return ''
             else:
-                text = result.stdout.decode('utf8')
+                text = typing.cast(str, result.stdout)
                 if use_json:
                     return json.loads(text)
                 else:
@@ -2668,7 +2669,7 @@ class _ModelBackend:
         args.extend(["--file", "-"])
 
         try:
-            content = yaml.safe_dump({key: value}, encoding='utf8')
+            content = yaml.safe_dump({key: value})
             self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
