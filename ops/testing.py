@@ -159,16 +159,6 @@ class Harness(Generic[CharmType]):
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
 
-        # TODO: will be removed in the next breaking-changes release
-        #  together with self._oci_resources
-        self._deprecated_oci_resources_do_not_use = {}  # type: Dict[Any, Any]
-
-    @property
-    def _oci_resources(self):
-        warnings.warn('Deprecation warning: Harness.`_oci_resources` is '
-                      'deprecated and will be removed in a future release.')
-        return self._deprecated_oci_resources_do_not_use
-
     def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
 

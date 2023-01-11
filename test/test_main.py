@@ -143,10 +143,7 @@ class CharmInitTestCase(unittest.TestCase):
                             fh.write(b'name: test')
                         mock_charmdir.return_value = tmpdirname
 
-                        with warnings.catch_warnings(record=True) as warnings_cm:
-                            main(charm_class, **kwargs)
-
-        return warnings_cm
+                        main(charm_class, **kwargs)
 
     def test_init_signature_passthrough(self):
         class MyCharm(CharmBase):
@@ -154,22 +151,19 @@ class CharmInitTestCase(unittest.TestCase):
             def __init__(self, *args):
                 super().__init__(*args)
 
-        warn_cm = self._check(MyCharm)
-        self.assertFalse(warn_cm)
+        with warnings.catch_warnings(record=True) as warn_cm:
+            self._check(MyCharm)
+        self.assertEqual(warn_cm, [])
 
-    def test_init_signature_both_arguments(self):
+    def test_init_signature_old_key_argument(self):
         class MyCharm(CharmBase):
 
             def __init__(self, framework, somekey):
                 super().__init__(framework, somekey)
 
-        warn_cm = self._check(MyCharm)
-        self.assertEqual(len(warn_cm), 1)
-        (warn,) = warn_cm
-        self.assertTrue(issubclass(warn.category, DeprecationWarning))
-        self.assertEqual(str(warn.message), (
-            "the second argument, 'key', has been deprecated and will be removed "
-            "after the 0.7 release"))
+        # Support for "key" has been deprecated since ops 0.7 and was removed in 2.0
+        with self.assertRaises(TypeError):
+            self._check(MyCharm)
 
     def test_init_signature_only_framework(self):
         class MyCharm(CharmBase):
@@ -177,8 +171,9 @@ class CharmInitTestCase(unittest.TestCase):
             def __init__(self, framework):
                 super().__init__(framework)
 
-        warn_cm = self._check(MyCharm)
-        self.assertFalse(warn_cm)
+        with warnings.catch_warnings(record=True) as warn_cm:
+            self._check(MyCharm)
+        self.assertEqual(warn_cm, [])
 
     def test_storage_no_storage(self):
         # here we patch juju_backend_available so it refuses to set it up
@@ -195,6 +190,13 @@ class CharmInitTestCase(unittest.TestCase):
             juju_backend_available.return_value = True
             with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
                 self._check(CharmBase, use_juju_for_storage=True)
+
+    def test_controller_storage_deprecated(self):
+        with patch('ops.storage.juju_backend_available') as juju_backend_available:
+            juju_backend_available.return_value = True
+            with self.assertWarnsRegex(DeprecationWarning, 'Controller storage'):
+                with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
+                    self._check(CharmBase, use_juju_for_storage=True)
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
@@ -685,7 +687,7 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script_calls(self)]
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
-        self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
+        self.assertRegex(calls.pop(0), 'Using local storage: not a Kubernetes podspec charm')
         self.assertRegex(calls.pop(0), 'Initializing SQLite local storage: ')
 
         self.maxDiff = None
@@ -902,7 +904,7 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -921,7 +923,7 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'WARNING', '--',
              'Legacy hooks/install exists but is not executable.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -1003,7 +1005,7 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Legacy {} exited with status 0.'.format(hook)],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -1150,7 +1152,7 @@ class TestStorageHeuristics(unittest.TestCase):
         meta = CharmMeta.from_yaml("series: [ecs]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
             self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
-            self.assertLogged('Using local storage: not a kubernetes charm')
+            self.assertLogged('Using local storage: not a Kubernetes podspec charm')
 
     def test_not_if_already_local(self):
         meta = CharmMeta.from_yaml("series: [kubernetes]")

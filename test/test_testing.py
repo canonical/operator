@@ -24,7 +24,6 @@ import shutil
 import sys
 import tempfile
 import textwrap
-import typing
 import unittest
 import uuid
 from io import BytesIO, StringIO
@@ -1807,9 +1806,8 @@ class TestHarness(unittest.TestCase):
 
     def test_event_context_inverse(self):
         class MyCharm(CharmBase):
-            def __init__(self, framework: Framework,
-                         key: typing.Optional = None):
-                super().__init__(framework, key)
+            def __init__(self, framework: Framework):
+                super().__init__(framework)
                 self.framework.observe(self.on.db_relation_joined,
                                        self._join_db)
 
