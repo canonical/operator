@@ -128,30 +128,6 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_get(rel_id, 'test-app', is_app=True), {})
         self.assertEqual(backend.relation_get(rel_id, 'test-app/0', is_app=False), {})
 
-    def test_simulate_can_connect_disabled(self):
-        # This tests the old behavior where we weren't simulating can_connect status of containers
-        # like it runs in Juju.
-        tmp = ops.testing.SIMULATE_CAN_CONNECT
-        ops.testing.SIMULATE_CAN_CONNECT = False
-
-        def reset_can_connect():
-            ops.testing.SIMULATE_CAN_CONNECT = tmp
-        self.addCleanup(reset_can_connect)
-
-        harness = Harness(CharmBase, meta='''
-            name: test-app
-            containers:
-              foo:
-                resource: foo-image
-            ''')
-        self.addCleanup(harness.cleanup)
-
-        self.assertRaises(RuntimeError, harness.set_can_connect, 'foo', False)
-
-        harness.begin()
-        c = harness.model.unit.get_container('foo')
-        self.assertTrue(c.can_connect())
-
     def test_can_connect(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
@@ -165,7 +141,8 @@ class TestHarness(unittest.TestCase):
         c = harness.model.unit.get_container('foo')
 
         self.assertFalse(c.can_connect())
-        self.assertRaises(pebble.ConnectionError, c.get_plan)
+        with self.assertRaises(pebble.ConnectionError):
+            c.get_plan()
 
         harness.set_can_connect('foo', True)
         self.assertTrue(c.can_connect())
@@ -175,7 +152,7 @@ class TestHarness(unittest.TestCase):
 
         harness.container_pebble_ready('foo')
         self.assertTrue(c.can_connect())
-        c.get_plan()
+        c.get_plan()  # shouldn't raise ConnectionError
 
     def test_add_relation_and_unit(self):
         harness = Harness(CharmBase, meta='''

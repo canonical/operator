@@ -12,27 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Infrastructure to build unittests for Charms using the Operator Framework.
-
-Global Variables:
-
-    SIMULATE_CAN_CONNECT: This enables can_connect simulation for the test
-    harness. As of ops 2.0, it defaults to True, so you shouldn't need to
-    think about it. It makes your tests more accurate (you can disable it by
-    setting it to False before you create Harness instances).
-
-    When True, it causes all containers' can_connect states to initially be
-    False rather than True and causes the testing with the harness to model
-    and track can_connect state for containers accurately.  This means that
-    calls that require communication with the container API (e.g.
-    Container.push, Container.get_plan, Container.add_layer, etc.) will only
-    succeed if Container.can_connect() returns True and will raise exceptions
-    otherwise.  can_connect state evolves automatically to track with events
-    associated with container state (e.g., calling container_pebble_ready).
-
-    If SIMULATE_CAN_CONNECT is True, can_connect state for containers can also
-    be manually controlled using Harness.set_can_connect.
-"""
+"""Infrastructure to build unit tests for charms using the Operator Framework."""
 
 
 import dataclasses
@@ -110,10 +90,6 @@ if TYPE_CHECKING:
     })
     RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
 
-# Toggles Container.can_connect simulation globally for all harness instances.
-# For this to work, it must be set *before* Harness instances are created.
-
-SIMULATE_CAN_CONNECT = True
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
@@ -245,9 +221,9 @@ class Harness(Generic[CharmType]):
         return self._framework._event_context(event_name)  # pyright: reportPrivateUsage=false
 
     def set_can_connect(self, container: Union[str, model.Container], val: bool):
-        """Change the simulated can_connect status of a container's underlying pebble client.
+        """Change the simulated connection status of a container's underlying Pebble client.
 
-        Calling this method raises an exception if SIMULATE_CAN_CONNECT is False.
+        After calling this, :meth:`ops.model.Container.can_connect` will return val.
         """
         if isinstance(container, str):
             container = self.model.unit.get_container(container)
@@ -926,16 +902,15 @@ class Harness(Generic[CharmType]):
     def container_pebble_ready(self, container_name: str):
         """Fire the pebble_ready hook for the associated container.
 
-        This will do nothing if begin() has not been called. Assuming
-        SIMULATE_CAN_CONNECT is True, this will switch the given
-        container's can_connect state to True before the hook
-        function is called.
+        This will switch the given container's can_connect state to True
+        before the hook function is called.
+
+        It will do nothing if begin() has not been called.
         """
         if self._charm is None:
             return
         container = self.model.unit.get_container(container_name)
-        if SIMULATE_CAN_CONNECT:
-            self.set_can_connect(container, True)
+        self.set_can_connect(container, True)
         self.charm.on[container_name].pebble_ready.emit(container)
 
     def get_workload_version(self) -> str:
@@ -1598,8 +1573,6 @@ class _TestingModelBackend:
 
     def _set_can_connect(self, pebble_client: '_TestingPebbleClient', val: bool):
         """Manually sets the can_connect state for the given mock client."""
-        if not SIMULATE_CAN_CONNECT:
-            raise RuntimeError('SIMULATE_CAN_CONNECT must be True to use set_can_connect')
         if pebble_client not in self._pebble_clients_can_connect:
             msg = 'cannot set can_connect for the client - are you running a "real" pebble test?'
             raise RuntimeError(msg)
@@ -1859,7 +1832,7 @@ class _TestingModelBackend:
             # attached/detached later.
             self._pebble_clients[container] = client
 
-        self._pebble_clients_can_connect[client] = not SIMULATE_CAN_CONNECT
+        self._pebble_clients_can_connect[client] = False
         return client
 
     def planned_units(self) -> int:
