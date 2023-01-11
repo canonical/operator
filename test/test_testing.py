@@ -166,6 +166,7 @@ class TestHarness(unittest.TestCase):
                 self.framework.observe(self.on.bar_pebble_ready, self._on_pebble_ready)
 
             def _on_pebble_ready(self, event: PebbleReadyEvent):
+                assert event.workload.can_connect()
                 pebble_ready_calls[event.workload.name] += 1
 
         harness = Harness(MyCharm, meta='''
