@@ -14,7 +14,6 @@
 
 """Main entry point to the Operator Framework."""
 
-import inspect
 import logging
 import os
 import shutil
@@ -340,9 +339,10 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     if db_path.exists():
         return False
 
-    # if you're not in k8s you don't need controller storage
-    if 'kubernetes' not in meta.series:
-        logger.debug("Using local storage: not a kubernetes charm")
+    # only use controller storage for Kubernetes podspec charms
+    is_podspec = 'kubernetes' in meta.series
+    if not is_podspec:
+        logger.debug("Using local storage: not a Kubernetes podspec charm")
         return False
 
     # are we in a new enough Juju?
@@ -398,6 +398,10 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     if use_juju_for_storage is None:
         use_juju_for_storage = _should_use_controller_storage(charm_state_path, meta)
+    elif use_juju_for_storage:
+        warnings.warn("Controller storage is deprecated; it's intended for "
+                      "podspec charms and will be removed in a future release.",
+                      category=DeprecationWarning)
 
     if use_juju_for_storage:
         if dispatcher.is_restricted_context():
@@ -416,17 +420,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     framework = ops.framework.Framework(store, charm_dir, meta, model)
     framework.set_breakpointhook()
     try:
-        sig = inspect.signature(charm_class)
-        try:
-            sig.bind(framework)
-        except TypeError:
-            msg = (
-                "the second argument, 'key', has been deprecated and will be "
-                "removed after the 0.7 release")
-            warnings.warn(msg, DeprecationWarning)
-            charm = charm_class(framework, None)
-        else:
-            charm = charm_class(framework)
+        charm = charm_class(framework)
         dispatcher.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant

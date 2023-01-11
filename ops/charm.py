@@ -961,8 +961,6 @@ class CharmBase(Object):
     Args:
         framework: The framework responsible for managing the Model and events for this
             charm.
-        key: Ignored; will remove after deprecation period of the signature change.
-
     """
 
     # note that without the #: below, sphinx will copy the whole of CharmEvents
@@ -974,7 +972,7 @@ class CharmBase(Object):
         @property
         def on(self) -> CharmEvents: ...  # noqa
 
-    def __init__(self, framework: Framework, key: Optional[str] = None):
+    def __init__(self, framework: Framework):
         super().__init__(framework, None)
 
         for relation_name in self.framework.meta.relations:
