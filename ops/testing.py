@@ -2081,7 +2081,9 @@ class _TestingPebbleClient:
 
     def _check_connection(self):
         if not self._backend._can_connect(self):  # pyright: reportPrivateUsage=false
-            raise pebble.ConnectionError('cannot connect to pebble')
+            msg = ('Cannot connect to Pebble; did you forget to call '
+                   'begin_with_initial_hooks() or set_can_connect()?')
+            raise pebble.ConnectionError(msg)
 
     def get_system_info(self) -> pebble.SystemInfo:
         self._check_connection()
