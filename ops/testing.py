@@ -194,8 +194,9 @@ class Harness(Generic[CharmType]):
 
     @property
     def _oci_resources(self):
-        warnings.warn('Deprecation warning: Harness.`_oci_resources` is '
-                      'deprecated and will be removed in a future release.')
+        warnings.warn('Harness._oci_resources is deprecated and will be '
+                      'removed in a future release.',
+                      category=DeprecationWarning)
         return self._deprecated_oci_resources_do_not_use
 
     def _event_context(self, event_name: str):
