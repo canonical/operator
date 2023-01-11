@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import collections
 import datetime
 import importlib
 import inspect
@@ -155,7 +157,18 @@ class TestHarness(unittest.TestCase):
         c.get_plan()  # shouldn't raise ConnectionError
 
     def test_can_connect_begin_with_initial_hooks(self):
-        harness = Harness(CharmBase, meta='''
+        pebble_ready_calls = collections.defaultdict(int)
+
+        class MyCharm(CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+                self.framework.observe(self.on.bar_pebble_ready, self._on_pebble_ready)
+
+            def _on_pebble_ready(self, event: PebbleReadyEvent):
+                pebble_ready_calls[event.workload.name] += 1
+
+        harness = Harness(MyCharm, meta='''
             name: test-app
             containers:
               foo:
@@ -166,6 +179,7 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         harness.begin_with_initial_hooks()
+        self.assertEqual(dict(pebble_ready_calls), {'foo': 1, 'bar': 1})
         self.assertTrue(harness.model.unit.containers['foo'].can_connect())
         self.assertTrue(harness.model.unit.containers['bar'].can_connect())
 

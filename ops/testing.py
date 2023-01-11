@@ -360,7 +360,7 @@ class Harness(Generic[CharmType]):
 
         # Set can_connect and fire pebble-ready for any containers.
         for container_name in self._meta.containers:
-            self.set_can_connect(container_name, True)
+            self.container_pebble_ready(container_name)
 
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
