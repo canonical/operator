@@ -32,6 +32,7 @@ Global Variables:
 """
 
 
+import dataclasses
 import datetime
 import fnmatch
 import inspect
@@ -40,42 +41,94 @@ import pathlib
 import random
 import signal
 import tempfile
-import typing
 import uuid
 import warnings
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AnyStr,
+    BinaryIO,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    TextIO,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
+from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.model import RelationNotFoundError
 
 if TYPE_CHECKING:
+    from typing_extensions import Literal, TypedDict
+
     from ops.model import UnitOrApplication
+
+    ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
+    _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
+    _FileOrDir = Union['_File', '_Directory']
+    _FileKwargs = TypedDict('_FileKwargs', {
+        'permissions': int,
+        'last_modified': datetime.datetime,
+        'user_id': Optional[int],
+        'user': Optional[str],
+        'group_id': Optional[int],
+        'group': Optional[str],
+    })
+
+    _RelationEntities = TypedDict('_RelationEntities', {
+        'app': str,
+        'units': List[str]
+    })
+
+    _ConfigValue = Union[str, int, float, bool]
+    _ConfigOption = TypedDict('_ConfigOption', {
+        'type': Literal['string', 'int', 'float', 'boolean'],
+        'description': str,
+        'default': _ConfigValue
+    })
+    _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
+    _RawStatus = TypedDict('_RawStatus', {
+        'status': _StatusName,
+        'message': str,
+    })
+    RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
 
 # Toggles Container.can_connect simulation globally for all harness instances.
 # For this to work, it must be set *before* Harness instances are created.
+
 SIMULATE_CAN_CONNECT = False
 
-# OptionalYAML is something like metadata.yaml or actions.yaml. You can
+# YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
-OptionalYAML = typing.Optional[typing.Union[str, typing.TextIO]]
+YAMLStringOrFile = Union[str, TextIO]
 
 
 # An instance of an Application or Unit, or the name of either.
 # This is done here to avoid a scoping issue with the `model` property
 # of the Harness class below.
-AppUnitOrName = typing.Union[str, model.Application, model.Unit]
+AppUnitOrName = Union[str, model.Application, model.Unit]
 
 
 # CharmType represents user charms that are derived from CharmBase.
-CharmType = typing.TypeVar('CharmType', bound=charm.CharmBase)
+CharmType = TypeVar('CharmType', bound=charm.CharmBase)
 
 
 # noinspection PyProtectedMember
-class Harness(typing.Generic[CharmType]):
+class Harness(Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
     The model that is created is from the viewpoint of the charm that you are testing.
@@ -108,33 +161,42 @@ class Harness(typing.Generic[CharmType]):
 
     def __init__(
             self,
-            charm_cls: typing.Type[CharmType],
+            charm_cls: Type[CharmType],
             *,
-            meta: OptionalYAML = None,
-            actions: OptionalYAML = None,
-            config: OptionalYAML = None):
+            meta: Optional[YAMLStringOrFile] = None,
+            actions: Optional[YAMLStringOrFile] = None,
+            config: Optional[YAMLStringOrFile] = None):
         self._charm_cls = charm_cls
-        self._charm = None
+        self._charm = None  # type: Optional[CharmType]
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
-        self._unit_name = self._meta.name + '/0'
-        self._hooks_enabled = True
-        self._relation_id_counter = 0
+        self._unit_name = self._meta.name + '/0'  # type: str
+        self._hooks_enabled = True  # type: bool
+        self._relation_id_counter = 0  # type: int
         config_ = self._get_config(config)
         self._backend = _TestingModelBackend(self._unit_name, self._meta, config_)
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
-        self._oci_resources = {}
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
 
+        # TODO: will be removed in the next breaking-changes release
+        #  together with self._oci_resources
+        self._deprecated_oci_resources_do_not_use = {}  # type: Dict[Any, Any]
+
         # TODO: If/when we decide to allow breaking changes for a release,
-        # change SIMULATE_CAN_CONNECT default value to True and remove the
-        # warning message below.  This warning was added 2022-03-22
+        #  change SIMULATE_CAN_CONNECT default value to True and remove the
+        #  warning message below.  This warning was added 2022-03-22
         if not SIMULATE_CAN_CONNECT:
             warnings.warn(
-                'Please set ops.testing.SIMULATE_CAN_CONNECT=True.'
+                'Please set ops.testing.SIMULATE_CAN_CONNECT=True. '
                 'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
+
+    @property
+    def _oci_resources(self):
+        warnings.warn('Deprecation warning: Harness.`_oci_resources` is '
+                      'deprecated and will be removed in a future release.')
+        return self._deprecated_oci_resources_do_not_use
 
     def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
@@ -185,9 +247,9 @@ class Harness(typing.Generic[CharmType]):
         >>>         harness.charm.event_handler(event)
 
         """
-        return self._framework._event_context(event_name)
+        return self._framework._event_context(event_name)  # pyright: reportPrivateUsage=false
 
-    def set_can_connect(self, container: typing.Union[str, model.Container], val: bool):
+    def set_can_connect(self, container: Union[str, model.Container], val: bool):
         """Change the simulated can_connect status of a container's underlying pebble client.
 
         Calling this method raises an exception if SIMULATE_CAN_CONNECT is False.
@@ -201,8 +263,12 @@ class Harness(typing.Generic[CharmType]):
         """Return the instance of the charm class that was passed to __init__.
 
         Note that the Charm is not instantiated until you have called
-        :meth:`.begin()`.
+        :meth:`.begin()`. Until then, attempting to access this property will raise
+        an exception.
         """
+        if self._charm is None:
+            raise RuntimeError('The charm instance is not available yet. '
+                               'Call Harness.begin() first.')
         return self._charm
 
     @property
@@ -234,7 +300,7 @@ class Harness(typing.Generic[CharmType]):
 
         TestEvents.__name__ = self._charm_cls.on.__class__.__name__
 
-        class TestCharm(self._charm_cls):
+        class TestCharm(self._charm_cls):  # type: ignore
             on = TestEvents()
 
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
@@ -278,7 +344,7 @@ class Harness(typing.Generic[CharmType]):
             # To be fired.
         """
         self.begin()
-
+        charm = cast(CharmBase, self._charm)
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
@@ -286,7 +352,7 @@ class Harness(typing.Generic[CharmType]):
                 s = model.Storage(storage_name, storage_index, self._backend)
                 self.attach_storage(s.full_id)
         # Storage done, emit install event
-        self._charm.on.install.emit()
+        charm.on.install.emit()
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
         # of joined units for a given relation.
@@ -294,7 +360,7 @@ class Harness(typing.Generic[CharmType]):
         random.shuffle(items)
         this_app_name = self._meta.name
         for relname, rel_meta in items:
-            if rel_meta.role == charm.RelationRole.peer:
+            if rel_meta.role == RelationRole.peer:
                 # If the user has directly added a relation, leave it be, but otherwise ensure
                 # that peer relations are always established at before leader-elected.
                 rel_ids = self._backend._relation_ids_map.get(relname)
@@ -311,17 +377,17 @@ class Harness(typing.Generic[CharmType]):
                     app_name = self._backend._relation_app_and_units[rel_id]["app"]
                     self._emit_relation_created(relname, rel_id, app_name)
         if self._backend._is_leader:
-            self._charm.on.leader_elected.emit()
+            charm.on.leader_elected.emit()
         else:
-            self._charm.on.leader_settings_changed.emit()
-        self._charm.on.config_changed.emit()
-        self._charm.on.start.emit()
+            charm.on.leader_settings_changed.emit()
+        charm.on.config_changed.emit()
+        charm.on.start.emit()
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
         if post_setup_sts.get("status") == "maintenance" and not post_setup_sts.get("message"):
             self._backend.status_set("unknown", "", is_app=False)
-        all_ids = list(self._backend._relation_names.items())
+        all_ids = list(self._backend._relation_names.items())  # pyright:ReportPrivateUsage=false
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
             rel_app_and_units = self._backend._relation_app_and_units[rel_id]
@@ -333,13 +399,12 @@ class Harness(typing.Generic[CharmType]):
             relation = self._model.get_relation(rel_name, rel_id)
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
-                self._charm.on[rel_name].relation_changed.emit(
-                    relation, app, None)
+                charm.on[rel_name].relation_changed.emit(relation, app, None)
             for unit_name in sorted(rel_app_and_units["units"]):
                 remote_unit = self._model.get_unit(unit_name)
-                self._charm.on[rel_name].relation_joined.emit(
+                charm.on[rel_name].relation_joined.emit(
                     relation, remote_unit.app, remote_unit)
-                self._charm.on[rel_name].relation_changed.emit(
+                charm.on[rel_name].relation_changed.emit(
                     relation, remote_unit.app, remote_unit)
 
     def cleanup(self) -> None:
@@ -350,7 +415,8 @@ class Harness(typing.Generic[CharmType]):
         """
         self._backend._cleanup()
 
-    def _create_meta(self, charm_metadata, action_metadata):
+    def _create_meta(self, charm_metadata: Optional[YAMLStringOrFile],
+                     action_metadata: Optional[YAMLStringOrFile]) -> CharmMeta:
         """Create a CharmMeta object.
 
         Handle the cases where a user doesn't supply explicit metadata snippets.
@@ -377,9 +443,9 @@ class Harness(typing.Generic[CharmType]):
         elif isinstance(action_metadata, str):
             action_metadata = dedent(action_metadata)
 
-        return charm.CharmMeta.from_yaml(charm_metadata, action_metadata)
+        return CharmMeta.from_yaml(charm_metadata, action_metadata)
 
-    def _get_config(self, charm_config: typing.Optional[dict]):
+    def _get_config(self, charm_config: Optional['YAMLStringOrFile']):
         """If the user passed a config to Harness, use it.
 
         Otherwise, attempt to load one from charm_dir/config.yaml.
@@ -397,14 +463,16 @@ class Harness(typing.Generic[CharmType]):
                 charm_config = '{}'
         elif isinstance(charm_config, str):
             charm_config = dedent(charm_config)
-        charm_config = yaml.safe_load(charm_config)
 
-        if not isinstance(charm_config, dict):
-            raise TypeError(charm_config)
-        return charm_config
+        assert isinstance(charm_config, str)  # type guard
+        config = yaml.safe_load(charm_config)
+
+        if not isinstance(config, dict):  # pyright: reportUnnecessaryIsInstance=false
+            raise TypeError(config)
+        return cast('RawConfig', config)
 
     def add_oci_resource(self, resource_name: str,
-                         contents: typing.Mapping[str, str] = None) -> None:
+                         contents: Optional[Mapping[str, str]] = None) -> None:
         """Add oci resources to the backend.
 
         This will register an oci resource and create a temporary file for processing metadata
@@ -428,7 +496,7 @@ class Harness(typing.Generic[CharmType]):
         as_yaml = yaml.safe_dump(contents)
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
 
-    def add_resource(self, resource_name: str, content: typing.AnyStr) -> None:
+    def add_resource(self, resource_name: str, content: AnyStr) -> None:
         """Add content for a resource to the backend.
 
         This will register the content, so that a call to `Model.resources.fetch(resource_name)`
@@ -502,7 +570,7 @@ class Harness(typing.Generic[CharmType]):
         return rel_id
 
     def add_storage(self, storage_name: str, count: int = 1,
-                    *, attach: bool = False) -> typing.List[str]:
+                    *, attach: bool = False) -> List[str]:
         """Create a new storage device and attach it to this unit.
 
         To have repeatable tests, each device will be initialized with
@@ -524,7 +592,7 @@ class Harness(typing.Generic[CharmType]):
 
         storage_indices = self._backend.storage_add(storage_name, count)
 
-        ids = []
+        ids = []  # type: List[str]
         for storage_index in storage_indices:
             s = model.Storage(storage_name, storage_index, self._backend)
             ids.append(s.full_id)
@@ -543,14 +611,16 @@ class Harness(typing.Generic[CharmType]):
             storage_id: The full storage ID of the storage unit being detached, including the
                 storage key, e.g. my-storage/0.
         """
-        if self.charm is None:
+        if self._charm is None:
             raise RuntimeError('cannot detach storage before Harness is initialised')
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
-        if self._backend._storage_is_attached(storage_name, storage_index) and self._hooks_enabled:
+        storage_attached = self._backend._storage_is_attached(  # pyright:ReportPrivateUsage=false
+            storage_name, storage_index)
+        if storage_attached and self._hooks_enabled:
             self.charm.on[storage_name].storage_detaching.emit(
                 model.Storage(storage_name, storage_index, self._backend))
-        self._backend._storage_detach(storage_id)
+        self._backend._storage_detach(storage_id)  # pyright:ReportPrivateUsage=false
 
     def attach_storage(self, storage_id: str) -> None:
         """Attach a storage device.
@@ -565,7 +635,7 @@ class Harness(typing.Generic[CharmType]):
         """
         if not self._backend._storage_attach(storage_id):
             return  # storage was already attached
-        if not self.charm or not self._hooks_enabled:
+        if not self._charm or not self._hooks_enabled:
             return  # don't need to run hook callback
 
         storage_name, storage_index = storage_id.split('/', 1)
@@ -595,11 +665,12 @@ class Harness(typing.Generic[CharmType]):
         if storage_name not in self._meta.storages:
             raise RuntimeError(
                 "the key '{}' is not specified as a storage key in metadata".format(storage_name))
-        is_attached = self._backend._storage_is_attached(storage_name, storage_index)
-        if self.charm is not None and self._hooks_enabled and is_attached:
+        is_attached = self._backend._storage_is_attached(  # pyright:ReportPrivateUsage=false
+            storage_name, storage_index)
+        if self._charm is not None and self._hooks_enabled and is_attached:
             self.charm.on[storage_name].storage_detaching.emit(
                 model.Storage(storage_name, storage_index, self._backend))
-        self._backend._storage_remove(storage_id)
+        self._backend._storage_remove(storage_id)  # pyright:ReportPrivateUsage=false
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
@@ -617,21 +688,22 @@ class Harness(typing.Generic[CharmType]):
             The relation_id created by this add_relation.
         """
         relation_id = self._next_relation_id()
-        self._backend._relation_ids_map.setdefault(relation_name, []).append(relation_id)
+        self._backend._relation_ids_map.setdefault(  # pyright:ReportPrivateUsage=false
+            relation_name, []).append(relation_id)
         self._backend._relation_names[relation_id] = relation_name
-        self._backend._relation_list_map[relation_id] = []
-        self._backend._relation_data_raw[relation_id] = {
+        self._backend._relation_list_map[relation_id] = []  # pyright:ReportPrivateUsage=false
+        self._backend._relation_data_raw[relation_id] = {  # pyright:ReportPrivateUsage=false
             remote_app: {},
             self._backend.unit_name: {},
             self._backend.app_name: {}}
 
-        self._backend._relation_app_and_units[relation_id] = {
+        self._backend._relation_app_and_units[relation_id] = {  # pyright:ReportPrivateUsage=false
             "app": remote_app,
             "units": [],
         }
         # Reload the relation_ids list
         if self._model is not None:
-            self._model.relations._invalidate(relation_name)
+            self._model.relations._invalidate(relation_name)  # pyright:ReportPrivateUsage=false
         self._emit_relation_created(relation_name, relation_id, remote_app)
         return relation_id
 
@@ -644,24 +716,32 @@ class Harness(typing.Generic[CharmType]):
         Raises:
             RelationNotFoundError: if relation id is not valid
         """
+        rel_names = self._backend._relation_names   # pyright:ReportPrivateUsage=false
         try:
-            relation_name = self._backend._relation_names[relation_id]
+            relation_name = rel_names[relation_id]
             remote_app = self._backend.relation_remote_app_name(relation_id)
         except KeyError as e:
             raise model.RelationNotFoundError from e
 
-        for unit_name in self._backend._relation_list_map[relation_id].copy():
+        rel_list_map = self._backend._relation_list_map  # pyright:ReportPrivateUsage=false
+        for unit_name in rel_list_map[relation_id].copy():
             self.remove_relation_unit(relation_id, unit_name)
 
         self._emit_relation_broken(relation_name, relation_id, remote_app)
         if self._model is not None:
-            self._model.relations._invalidate(relation_name)
+            self._model.relations._invalidate(relation_name)  # pyright:ReportPrivateUsage=false
 
-        self._backend._relation_app_and_units.pop(relation_id)
-        self._backend._relation_data_raw.pop(relation_id)
-        self._backend._relation_list_map.pop(relation_id)
-        self._backend._relation_ids_map[relation_name].remove(relation_id)
-        self._backend._relation_names.pop(relation_id)
+        self._backend._relation_app_and_units.pop(relation_id)  # pyright:ReportPrivateUsage=false
+        self._backend._relation_data_raw.pop(relation_id)  # pyright:ReportPrivateUsage=false
+        rel_list_map.pop(relation_id)
+        ids_map = self._backend._relation_ids_map  # pyright:ReportPrivateUsage=false
+        ids_map[relation_name].remove(relation_id)
+        rel_names.pop(relation_id)
+
+        # Remove secret grants that give access via this relation
+        for secret in self._backend._secrets:
+            secret.grants = {rid: names for rid, names in secret.grants.items()
+                             if rid != relation_id}
 
     def _emit_relation_created(self, relation_name: str, relation_id: int,
                                remote_app: str) -> None:
@@ -680,8 +760,7 @@ class Harness(typing.Generic[CharmType]):
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_broken.emit(
-            relation, app)
+        self._charm.on[relation_name].relation_broken.emit(relation, app)
 
     def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Add a new unit to a relation.
@@ -708,15 +787,20 @@ class Harness(typing.Generic[CharmType]):
         # we can write remote unit data iff we are not in a hook env
         relation_name = self._backend._relation_names[relation_id]
         relation = self._model.get_relation(relation_name, relation_id)
-        self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
 
-        if not remote_unit_name.startswith(relation.app.name):
+        if not relation:
+            raise RuntimeError('Relation id {} is mapped to relation name {},'
+                               'but no relation matching that name was found.')
+
+        self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
+        app = cast(model.Application, relation.app)  # should not be None since we're testing
+        if not remote_unit_name.startswith(app.name):
             warnings.warn(
                 'Remote unit name invalid: the remote application of {} is called {!r}; '
                 'the remote unit name should be {}/<some-number>, not {!r}.'
-                ''.format(relation_name, relation.app.name, relation.app.name, remote_unit_name))
-
-        self._backend._relation_app_and_units[relation_id]["units"].append(remote_unit_name)
+                ''.format(relation_name, app.name, app.name, remote_unit_name))
+        app_and_units = self._backend._relation_app_and_units  # pyright: ReportPrivateUsage=false
+        app_and_units[relation_id]["units"].append(remote_unit_name)
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
         remote_unit = self._model.get_unit(remote_unit_name)
@@ -741,10 +825,10 @@ class Harness(typing.Generic[CharmType]):
 
         This will trigger a `relation_departed` event. This would
         normally be followed by a `relation_changed` event triggered
-        by Juju. However when using the test harness a
-        `relation_changed` event must be triggererd using
+        by Juju. However, when using the test harness, a
+        `relation_changed` event must be triggered using
         :meth:`.update_relation_data`. This deviation from normal Juju
-        behaviour, facilitates testing by making each step in the
+        behaviour facilitates testing by making each step in the
         charm life cycle explicit.
 
         Args:
@@ -760,6 +844,14 @@ class Harness(typing.Generic[CharmType]):
         # gather data to invalidate cache later
         remote_unit = self._model.get_unit(remote_unit_name)
         relation = self._model.get_relation(relation_name, relation_id)
+
+        if not relation:
+            # This should not really happen, since there being a relation name mapped
+            # to this ID in _relation_names should guarantee that you created the relation
+            # following the proper path, but still...
+            raise RuntimeError('Relation id {} is mapped to relation name {},'
+                               'but no relation matching that name was found.')
+
         unit_cache = relation.data.get(remote_unit, None)
 
         # remove the unit from the list of units in the relation
@@ -775,7 +867,7 @@ class Harness(typing.Generic[CharmType]):
         if unit_cache is not None:
             unit_cache._invalidate()
 
-    def _emit_relation_departed(self, relation_id, unit_name):
+    def _emit_relation_departed(self, relation_id: int, unit_name: str):
         """Trigger relation-departed event for a given relation id and unit."""
         if self._charm is None or not self._hooks_enabled:
             return
@@ -787,9 +879,10 @@ class Harness(typing.Generic[CharmType]):
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)
+        self._charm.on[rel_name].relation_departed.emit(
+            relation, app, unit, unit_name)
 
-    def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> typing.Mapping:
+    def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> Mapping[str, str]:
         """Get the relation data bucket for a single app or unit in a given relation.
 
         This ignores all of the safety checks of who can and can't see data in relations (eg,
@@ -805,12 +898,12 @@ class Harness(typing.Generic[CharmType]):
         Raises:
             KeyError: if relation_id doesn't exist
         """
-        if hasattr(app_or_unit, 'name'):
-            app_or_unit = app_or_unit.name
-        # bypass access control by going directly to raw
-        return self._backend._relation_data_raw[relation_id].get(app_or_unit, None)
+        name = _get_app_or_unit_name(app_or_unit)
 
-    def get_pod_spec(self) -> (typing.Mapping, typing.Mapping):
+        # bypass access control by going directly to raw
+        return self._backend._relation_data_raw[relation_id].get(name, None)
+
+    def get_pod_spec(self) -> Tuple[Mapping[Any, Any], Mapping[Any, Any]]:
         """Return the content of the pod spec as last set by the charm.
 
         This returns both the pod spec and any k8s_resources that were supplied.
@@ -839,12 +932,12 @@ class Harness(typing.Generic[CharmType]):
     def container_pebble_ready(self, container_name: str):
         """Fire the pebble_ready hook for the associated container.
 
-        This will do nothing if the begin() has not been called.  If
+        This will do nothing if begin() has not been called. If
         SIMULATE_CAN_CONNECT is True, this will switch the given
         container's can_connect state to True before the hook
         function is called.
         """
-        if self.charm is None:
+        if self._charm is None:
             return
         container = self.model.unit.get_container(container_name)
         if SIMULATE_CAN_CONNECT:
@@ -855,7 +948,7 @@ class Harness(typing.Generic[CharmType]):
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version
 
-    def set_model_info(self, name: str = None, uuid: str = None) -> None:
+    def set_model_info(self, name: Optional[str] = None, uuid: Optional[str] = None) -> None:
         """Set the name and uuid of the Model that this is representing.
 
         This cannot be called once begin() has been called. But it lets you set the value that
@@ -864,8 +957,10 @@ class Harness(typing.Generic[CharmType]):
         This is a convenience method to invoke both Harness.set_model_name
         and Harness.set_model_uuid at once.
         """
-        self.set_model_name(name)
-        self.set_model_uuid(uuid)
+        if name is not None:
+            self.set_model_name(name)
+        if uuid is not None:
+            self.set_model_uuid(uuid)
 
     def set_model_name(self, name: str) -> None:
         """Set the name of the Model that this is representing.
@@ -891,7 +986,7 @@ class Harness(typing.Generic[CharmType]):
             self,
             relation_id: int,
             app_or_unit: str,
-            key_values: typing.Mapping,
+            key_values: Mapping[str, str],
     ) -> None:
         """Update the relation data for a given unit or application in a given relation.
 
@@ -909,6 +1004,11 @@ class Harness(typing.Generic[CharmType]):
             entity = self._model.get_unit(app_or_unit)
         else:
             entity = self._model.get_app(app_or_unit)
+
+        if not relation:
+            raise RuntimeError('Relation id {} is mapped to relation name {},'
+                               'but no relation matching that name was found.')
+
         rel_data = relation.data.get(entity, None)
         if rel_data is not None:
             # rel_data may have cached now-stale data, so _invalidate() it.
@@ -918,7 +1018,10 @@ class Harness(typing.Generic[CharmType]):
         old_values = self._backend._relation_data_raw[relation_id][app_or_unit].copy()
         assert isinstance(old_values, dict), old_values
 
-        databag = self.model.relations._get_unique(relation.name, relation_id).data[entity]
+        # get a new relation instance to ensure a clean state
+        new_relation_instance = self.model.relations._get_unique(relation.name, relation_id)
+        assert new_relation_instance is not None  # type guard; this passed before...
+        databag = new_relation_instance.data[entity]
         # ensure that WE as harness can temporarily write the databag
         with self._event_context(''):
             values_have_changed = False
@@ -948,7 +1051,7 @@ class Harness(typing.Generic[CharmType]):
                 return
         self._emit_relation_changed(relation_id, app_or_unit)
 
-    def _emit_relation_changed(self, relation_id, app_or_unit):
+    def _emit_relation_changed(self, relation_id: int, app_or_unit: str):
         if self._charm is None or not self._hooks_enabled:
             return
         rel_name = self._backend._relation_names[relation_id]
@@ -967,8 +1070,8 @@ class Harness(typing.Generic[CharmType]):
 
     def _update_config(
             self,
-            key_values: typing.Mapping[str, str] = None,
-            unset: typing.Iterable[str] = (),
+            key_values: Optional[Mapping[str, '_ConfigValue']] = None,
+            unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
 
@@ -1004,8 +1107,8 @@ class Harness(typing.Generic[CharmType]):
 
     def update_config(
             self,
-            key_values: typing.Mapping[str, typing.Union[str, float, int, bool]] = None,
-            unset: typing.Iterable[str] = (),
+            key_values: Optional[Mapping[str, '_ConfigValue']] = None,
+            unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
 
@@ -1069,7 +1172,7 @@ class Harness(typing.Generic[CharmType]):
         """
         self._backend._planned_units = None
 
-    def _get_backend_calls(self, reset: bool = True) -> list:
+    def _get_backend_calls(self, reset: bool = True) -> List[Tuple[Any, ...]]:
         """Return the calls that we have made to the TestingModelBackend.
 
         This is useful mostly for testing the framework itself, so that we can assert that we
@@ -1087,8 +1190,198 @@ class Harness(typing.Generic[CharmType]):
             self._backend._calls.clear()
         return calls
 
+    def add_model_secret(self, owner: AppUnitOrName, content: Dict[str, str]) -> str:
+        """Add a secret owned by the remote application or unit specified.
 
-def _record_calls(cls):
+        This is named :code:`add_model_secret` instead of :code:`add_secret`
+        to avoid confusion with the :meth:`ops.model.Application.add_secret`
+        and :meth:`ops.model.Unit.add_secret` methods used by secret owner
+        charms.
+
+        Args:
+            owner: The name of the remote application (or specific remote
+                unit) that will own the secret.
+            content: A key-value mapping containing the payload of the secret,
+                for example :code:`{"password": "foo123"}`.
+
+        Return:
+            The ID of the newly-secret added.
+        """
+        owner_name = _get_app_or_unit_name(owner)
+        model.Secret._validate_content(content)
+        return self._backend._secret_add(content, owner_name)
+
+    def _ensure_secret(self, secret_id: str) -> '_Secret':
+        secret = self._backend._get_secret(secret_id)
+        if secret is None:
+            raise RuntimeError(f'Secret {secret_id!r} not found')
+        return secret
+
+    def set_secret_content(self, secret_id: str, content: Dict[str, str]):
+        """Update a secret's content, add a new revision, and fire *secret-changed*.
+
+        Args:
+            secret_id: The ID of the secret to update. This should normally be
+                the return value of :meth:`add_model_secret`.
+            content: A key-value mapping containing the new payload.
+        """
+        model.Secret._validate_content(content)
+        secret = self._ensure_secret(secret_id)
+        if secret.owner_name in [self.model.app.name, self.model.unit.name]:
+            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, '
+                               f"can't call set_secret_content")
+        new_revision = _SecretRevision(
+            revision=secret.revisions[-1].revision + 1,
+            content=content,
+        )
+        secret.revisions.append(new_revision)
+        self.charm.on.secret_changed.emit(secret_id, secret.label)
+
+    def grant_secret(self, secret_id: str, observer: AppUnitOrName):
+        """Grant read access to this secret for the given observer application or unit.
+
+        If the given application or unit has already been granted access to
+        this secret, do nothing.
+
+        Args:
+            secret_id: The ID of the secret to grant access to. This should
+                normally be the return value of :meth:`add_model_secret`.
+            observer: The name of the application (or specific unit) to grant
+                access to. You must already have created a relation between
+                this application and the charm under test.
+        """
+        secret = self._ensure_secret(secret_id)
+        if secret.owner_name in [self.model.app.name, self.model.unit.name]:
+            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
+                               f"can't call grant_secret")
+        app_or_unit_name = _get_app_or_unit_name(observer)
+        relation_id = self._secret_relation_id_to(secret)
+        if relation_id not in secret.grants:
+            secret.grants[relation_id] = set()
+        secret.grants[relation_id].add(app_or_unit_name)
+
+    def revoke_secret(self, secret_id: str, observer: AppUnitOrName):
+        """Revoke read access to this secret for the given observer application or unit.
+
+        If the given application or unit does not have access to this secret,
+        do nothing.
+
+        Args:
+            secret_id: The ID of the secret to revoke access for. This should
+                normally be the return value of :meth:`add_model_secret`.
+            observer: The name of the application (or specific unit) to revoke
+                access to. You must already have created a relation between
+                this application and the charm under test.
+        """
+        secret = self._ensure_secret(secret_id)
+        if secret.owner_name in [self.model.app.name, self.model.unit.name]:
+            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
+                               f"can't call revoke_secret")
+        app_or_unit_name = _get_app_or_unit_name(observer)
+        relation_id = self._secret_relation_id_to(secret)
+        if relation_id not in secret.grants:
+            return
+        secret.grants[relation_id].discard(app_or_unit_name)
+
+    def _secret_relation_id_to(self, secret: '_Secret') -> int:
+        """Get the relation ID of relation between this charm and the secret owner."""
+        owner_app = secret.owner_name.split('/')[0]
+        relation_id = self._backend._relation_id_to(owner_app)
+        if relation_id is None:
+            raise RuntimeError(f'No relation between this charm ({self.model.app.name}) '
+                               f'and secret owner ({owner_app})')
+        return relation_id
+
+    def get_secret_grants(self, secret_id: str, relation_id: int) -> Set[str]:
+        """Return the set of app and unit names granted to secret for this relation.
+
+        Args:
+            secret_id: The ID of the secret to get grants for.
+            relation_id: The ID of the relation granted access.
+        """
+        secret = self._ensure_secret(secret_id)
+        return secret.grants.get(relation_id, set())
+
+    def get_secret_revisions(self, secret_id: str) -> List[int]:
+        """Return the list of revision IDs for the given secret, oldest first.
+
+        Args:
+            secret_id: The ID of the secret to get revisions for.
+        """
+        secret = self._ensure_secret(secret_id)
+        return [r.revision for r in secret.revisions]
+
+    def trigger_secret_rotation(self, secret_id: str, *, label: Optional[str] = None):
+        """Trigger a secret-rotate event for the given secret.
+
+        This event is fired by Juju when a secret's rotation time elapses,
+        however, time-based events cannot be simulated appropriately in the
+        harness, so this fires it manually.
+
+        Args:
+            secret_id: The ID of the secret associated with the event.
+            label: Label value to send to the event. If None, the secret's
+                label is used.
+        """
+        secret = self._ensure_secret(secret_id)
+        if label is None:
+            label = secret.label
+        self.charm.on.secret_rotate.emit(secret_id, label)
+
+    def trigger_secret_removal(self, secret_id: str, revision: int, *,
+                               label: Optional[str] = None):
+        """Trigger a secret-remove event for the given secret and revision.
+
+        This event is fired by Juju for a specific revision when all the
+        secret's observers have refreshed to a later revision, however, in the
+        harness you call this method to fire the event manually.
+
+        Args:
+            secret_id: The ID of the secret associated with the event.
+            revision: Revision number to provide to the event. This should be
+                an item from the list returned by :meth:`get_secret_revisions`.
+            label: Label value to send to the event. If None, the secret's
+                label is used.
+        """
+        secret = self._ensure_secret(secret_id)
+        if label is None:
+            label = secret.label
+        self.charm.on.secret_remove.emit(secret_id, label, revision)
+
+    def trigger_secret_expiration(self, secret_id: str, revision: int, *,
+                                  label: Optional[str] = None):
+        """Trigger a secret-expired event for the given secret.
+
+        This event is fired by Juju when a secret's expiration time elapses,
+        however, time-based events cannot be simulated appropriately in the
+        harness, so this fires it manually.
+
+        Args:
+            secret_id: The ID of the secret associated with the event.
+            revision: Revision number to provide to the event. This should be
+                an item from the list returned by :meth:`get_secret_revisions`.
+            label: Label value to send to the event. If None, the secret's
+                label is used.
+        """
+        secret = self._ensure_secret(secret_id)
+        if label is None:
+            label = secret.label
+        self.charm.on.secret_expired.emit(secret_id, label, revision)
+
+
+def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
+    """Return name of given application or unit (return strings directly)."""
+    if isinstance(app_or_unit, model.Application):
+        return app_or_unit.name
+    elif isinstance(app_or_unit, model.Unit):
+        return app_or_unit.name
+    elif isinstance(app_or_unit, str):
+        return app_or_unit
+    else:
+        raise TypeError('Expected Application | Unit | str, got {}'.format(type(app_or_unit)))
+
+
+def _record_calls(cls: Any):
     """Replace methods on cls with methods that record that they have been called.
 
     Iterate all attributes of cls, and for public methods, replace them with a wrapped method
@@ -1098,8 +1391,8 @@ def _record_calls(cls):
         if meth_name.startswith('_'):
             continue
 
-        def decorator(orig_method):
-            def wrapped(self, *args, **kwargs):
+        def decorator(orig_method: Any):
+            def wrapped(self: '_TestingModelBackend', *args: Any, **kwargs: Any):
                 full_args = (orig_method.__name__,) + args
                 if kwargs:
                     full_args = full_args + (kwargs,)
@@ -1111,7 +1404,7 @@ def _record_calls(cls):
     return cls
 
 
-def _copy_docstrings(source_cls):
+def _copy_docstrings(source_cls: Any):
     """Copy the docstrings from source_cls to target_cls.
 
     Use this as:
@@ -1121,8 +1414,8 @@ def _copy_docstrings(source_cls):
     And for any public method that exists on both classes, it will copy the
     __doc__ for that method.
     """
-    def decorator(target_cls):
-        for meth_name, orig_method in target_cls.__dict__.items():
+    def decorator(target_cls: Any):
+        for meth_name, _ in target_cls.__dict__.items():
             if meth_name.startswith('_'):
                 continue
             source_method = source_cls.__dict__.get(meth_name)
@@ -1132,15 +1425,8 @@ def _copy_docstrings(source_cls):
     return decorator
 
 
-class _ResourceEntry:
-    """Tracks the contents of a Resource."""
-
-    def __init__(self, resource_name):
-        self.name = resource_name
-
-
 @_record_calls
-class _TestingConfig(dict):
+class _TestingConfig(Dict[str, '_ConfigValue']):
     """Represents the Juju Config."""
     _supported_types = {
         'string': str,
@@ -1149,7 +1435,7 @@ class _TestingConfig(dict):
         'float': float
     }
 
-    def __init__(self, config: dict):
+    def __init__(self, config: 'RawConfig'):
         super().__init__()
         self._spec = config
         self._defaults = self._load_defaults(config)
@@ -1160,17 +1446,17 @@ class _TestingConfig(dict):
             self._config_set(key, value)
 
     @staticmethod
-    def _load_defaults(charm_config: dict):
+    def _load_defaults(charm_config: 'RawConfig') -> Dict[str, '_ConfigValue']:
         """Load default values from config.yaml.
 
         Handle the case where a user doesn't supply explicit config snippets.
         """
         if not charm_config:
             return {}
-        charm_config = charm_config.get('options', {})
-        return {key: value.get('default', None) for key, value in charm_config.items()}
+        cfg = charm_config.get('options', {})  # type: Dict[str, '_ConfigOption']
+        return {key: value.get('default', None) for key, value in cfg.items()}
 
-    def _config_set(self, key, value):
+    def _config_set(self, key: str, value: '_ConfigValue'):
         # this is only called by the harness itself
         # we don't do real serialization/deserialization, but we do check that the value
         # has the expected type.
@@ -1197,15 +1483,15 @@ class _TestingConfig(dict):
                                                       type(value).__name__))
 
         # call 'normal' setattr.
-        dict.__setitem__(self, key, value)
+        dict.__setitem__(self, key, value)  # type: ignore
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Any, value: Any):
         # if a charm attempts to config[foo] = bar:
         raise TypeError("'ConfigData' object does not support item assignment")
 
 
-class _TestingRelationDataContents(dict):
-    def __setitem__(self, key, value):
+class _TestingRelationDataContents(Dict[str, str]):
+    def __setitem__(self, key: str, value: str):
         if not isinstance(key, str):
             raise model.RelationDataError(
                 'relation data keys must be strings, not {}'.format(type(key)))
@@ -1218,7 +1504,26 @@ class _TestingRelationDataContents(dict):
         return _TestingRelationDataContents(super().copy())
 
 
-@_copy_docstrings(model._ModelBackend)
+@dataclasses.dataclass
+class _SecretRevision:
+    revision: int
+    content: Dict[str, str]
+
+
+@dataclasses.dataclass
+class _Secret:
+    id: str
+    owner_name: str
+    revisions: List[_SecretRevision]
+    rotate_policy: Optional[str]
+    expire_time: Optional[datetime.datetime]
+    label: Optional[str] = None
+    description: Optional[str] = None
+    tracked: int = 1
+    grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
+
+
+@_copy_docstrings(model._ModelBackend)  # pyright: reportPrivateUsage=false
 @_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
@@ -1228,45 +1533,55 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name, meta, config):
+    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: 'RawConfig'):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
         self.model_uuid = str(uuid.uuid4())
 
         self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
-        self._calls = []
+        # this is used by the _record_calls decorator
+        self._calls = []  # type: List[Tuple[Any, ...]]
         self._meta = meta
-        self._relation_ids_map = {}  # relation name to [relation_ids,...]
-        self._relation_names = {}  # reverse map from relation_id to relation_name
-        self._relation_list_map = {}  # relation_id: [unit_name,...]
+        # relation name to [relation_ids,...]
+        self._relation_ids_map = {}   # type: Dict[str, List[int]]
+        # reverse map from relation_id to relation_name
+        self._relation_names = {}  # type: Dict[int, str]
+        # relation_id: [unit_name,...]
+        self._relation_list_map = {}  # type: Dict[int, List[str]]
         # {relation_id: {name: Dict[str: str]}}
         self._relation_data_raw = {}  # type: Dict[int, Dict[str, Dict[str, str]]]
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
-        self._relation_app_and_units = {}
+        self._relation_app_and_units = {}  # type: Dict[int, _RelationEntities]
         self._config = _TestingConfig(config)
-        self._is_leader = False
-        self._resources_map = {}  # {resource_name: resource_content}
-        self._pod_spec = None
-        self._app_status = {'status': 'unknown', 'message': ''}
-        self._unit_status = {'status': 'maintenance', 'message': ''}
-        self._workload_version = None
-        self._resource_dir = None
+        self._is_leader = False  # type: bool
+        # {resource_name: resource_content}
+        # where resource_content is (path, content)
+        self._resources_map = {}  # type: Dict[str, Tuple[str, Union[str, bytes]]]
+        # fixme: understand how this is used and adjust the type
+        self._pod_spec = None  # type: Optional[Tuple[model.K8sSpec, Any]]
+        self._app_status = {'status': 'unknown', 'message': ''}  # type: _RawStatus
+        self._unit_status = {'status': 'maintenance', 'message': ''}  # type: _RawStatus
+        self._workload_version = None  # type: Optional[str]
+        self._resource_dir = None  # type: Optional[tempfile.TemporaryDirectory[Any]]
         # Format:
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
-        self._storage_list = {k: {} for k in self._meta.storages}
+        self._storage_list = {k: {} for k in self._meta.storages
+                              }  # type: Dict[str, Dict[int, Dict[str, Any]]]
 
-        self._storage_attached = {k: set() for k in self._meta.storages}
+        self._storage_attached = {k: set() for k in self._meta.storages
+                                  }  # type: Dict[str, Set[int]]
         self._storage_index_counter = 0
         # {container_name : _TestingPebbleClient}
-        self._pebble_clients = {}  # type: {str: _TestingPebbleClient}
-        self._pebble_clients_can_connect = {}  # type: {_TestingPebbleClient: bool}
-        self._planned_units = None
+        self._pebble_clients = {}  # type: Dict[str, _TestingPebbleClient]
+        self._pebble_clients_can_connect = {}  # type: Dict[_TestingPebbleClient, bool]
+        self._planned_units = None  # type: Optional[int]
         self._hook_is_running = ''
+        self._secrets: List[_Secret] = []
 
-    def _validate_relation_access(self, relation_name, relations):
+    def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
 
         This is called whenever relation data is accessed via model.get_relation(...).
@@ -1274,20 +1589,20 @@ class _TestingModelBackend:
         if len(relations) > 0:
             return
 
-        relations = list(self._meta.peers.keys())
-        relations.extend(self._meta.requires.keys())
-        relations.extend(self._meta.provides.keys())
-        if self._hook_is_running == 'leader_elected' and relation_name in relations:
+        valid_relation_endpoints = list(self._meta.peers.keys())  # type: List[str]
+        valid_relation_endpoints.extend(self._meta.requires.keys())
+        valid_relation_endpoints.extend(self._meta.provides.keys())
+        if self._hook_is_running == 'leader_elected' and relation_name in valid_relation_endpoints:
             raise RuntimeError(
                 'cannot access relation data without first adding the relation: '
                 'use Harness.add_relation({!r}, <app>) before calling set_leader'
                 .format(relation_name))
 
-    def _can_connect(self, pebble_client) -> bool:
+    def _can_connect(self, pebble_client: '_TestingPebbleClient') -> bool:
         """Returns whether the mock client is active and can support API calls with no errors."""
         return self._pebble_clients_can_connect[pebble_client]
 
-    def _set_can_connect(self, pebble_client, val):
+    def _set_can_connect(self, pebble_client: '_TestingPebbleClient', val: bool):
         """Manually sets the can_connect state for the given mock client."""
         if not SIMULATE_CAN_CONNECT:
             raise RuntimeError('must set SIMULATE_CAN_CONNECT=True before using set_can_connect')
@@ -1300,6 +1615,7 @@ class _TestingModelBackend:
         if self._resource_dir is not None:
             self._resource_dir.cleanup()
             self._resource_dir = None
+        self._harness_tmp_dir.cleanup()
 
     def _get_resource_dir(self) -> pathlib.Path:
         if self._resource_dir is None:
@@ -1307,23 +1623,25 @@ class _TestingModelBackend:
             # $AGENT_DIR/resources/$RESOURCE_NAME/$RESOURCE_FILENAME
             # However, charms shouldn't depend on this.
             self._resource_dir = tempfile.TemporaryDirectory(prefix='tmp-ops-test-resource-')
-        return pathlib.Path(self._resource_dir.name)
+        res_dir_name = cast(str, self._resource_dir.name)
+        return pathlib.Path(res_dir_name)
 
-    def relation_ids(self, relation_name):
+    def relation_ids(self, relation_name: str) -> List[int]:
         try:
             return self._relation_ids_map[relation_name]
         except KeyError as e:
             if relation_name not in self._meta.relations:
                 raise model.ModelError('{} is not a known relation'.format(relation_name)) from e
-            return []
+            no_ids = []  # type: List[int]
+            return no_ids
 
-    def relation_list(self, relation_id):
+    def relation_list(self, relation_id: int):
         try:
             return self._relation_list_map[relation_id]
         except KeyError as e:
             raise model.RelationNotFoundError from e
 
-    def relation_remote_app_name(self, relation_id: int) -> typing.Optional[str]:
+    def relation_remote_app_name(self, relation_id: int) -> Optional[str]:
         if relation_id not in self._relation_app_and_units:
             # Non-existent or dead relation
             return None
@@ -1334,7 +1652,7 @@ class _TestingModelBackend:
             return None
         return self._relation_app_and_units[relation_id]['app']
 
-    def relation_get(self, relation_id, member_name, is_app):
+    def relation_get(self, relation_id: int, member_name: str, is_app: bool):
         if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
                 relation_id) and member_name != self.app_name and member_name != self.unit_name:
             # TODO: if juju gets fixed to set JUJU_REMOTE_APP for this case, then we may opt to
@@ -1382,16 +1700,16 @@ class _TestingModelBackend:
         else:
             bucket[key] = value
 
-    def config_get(self):
+    def config_get(self) -> _TestingConfig:
         return self._config
 
     def is_leader(self):
         return self._is_leader
 
-    def application_version_set(self, version):
+    def application_version_set(self, version: str):
         self._workload_version = version
 
-    def resource_get(self, resource_name):
+    def resource_get(self, resource_name: str):
         if resource_name not in self._resources_map:
             raise model.ModelError(
                 "ERROR could not download resource: HTTP request failed: "
@@ -1411,16 +1729,16 @@ class _TestingModelBackend:
                 resource_file.write(contents)
         return resource_filename
 
-    def pod_spec_set(self, spec, k8s_resources):
+    def pod_spec_set(self, spec: 'model.K8sSpec', k8s_resources: Any):  # fixme: any
         self._pod_spec = (spec, k8s_resources)
 
-    def status_get(self, *, is_app=False):
+    def status_get(self, *, is_app: bool = False):
         if is_app:
             return self._app_status
         else:
             return self._unit_status
 
-    def status_set(self, status, message='', *, is_app=False):
+    def status_set(self, status: '_StatusName', message: str = '', *, is_app: bool = False):
         if is_app:
             self._app_status = {'status': status, 'message': message}
         else:
@@ -1436,7 +1754,7 @@ class _TestingModelBackend:
         return list(index for index in self._storage_list[name]
                     if include_detached or self._storage_is_attached(name, index))
 
-    def storage_get(self, storage_name_id, attribute):
+    def storage_get(self, storage_name_id: str, attribute: str) -> Any:
         name, index = storage_name_id.split("/", 1)
         index = int(index)
         try:
@@ -1448,14 +1766,14 @@ class _TestingModelBackend:
             raise model.ModelError(
                 'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
 
-    def storage_add(self, name: str, count: int = 1) -> typing.List[int]:
+    def storage_add(self, name: str, count: int = 1) -> List[int]:
         if '/' in name:
             raise model.ModelError('storage name cannot contain "/"')
 
         if name not in self._storage_list:
             self._storage_list[name] = {}
-        result = []
-        for i in range(count):
+        result = []  # type: List[int]
+        for _ in range(count):
             index = self._storage_index_counter
             self._storage_index_counter += 1
             self._storage_list[name][index] = {
@@ -1471,7 +1789,7 @@ class _TestingModelBackend:
         index = int(index)
 
         for client in self._pebble_clients.values():
-            client._fs.remove_mount(name)
+            client._fs.remove_mount(name)  # pyright: ReportPrivateUsage=false
 
         if self._storage_is_attached(name, index):
             self._storage_attached[name].remove(index)
@@ -1488,7 +1806,8 @@ class _TestingModelBackend:
                 if mount.storage != name:
                     continue
                 for index, store in self._storage_list[mount.storage].items():
-                    client._fs.add_mount(mount.storage, mount.location, store['location'])
+                    fs = client._fs  # pyright: reportPrivateUsage=false
+                    fs.add_mount(mount.storage, mount.location, store['location'])
 
         index = int(index)
         if not self._storage_is_attached(name, index):
@@ -1496,7 +1815,7 @@ class _TestingModelBackend:
             return True
         return False
 
-    def _storage_is_attached(self, storage_name, storage_index):
+    def _storage_is_attached(self, storage_name: str, storage_index: int):
         return storage_index in self._storage_attached[storage_name]
 
     def _storage_remove(self, storage_id: str):
@@ -1508,32 +1827,32 @@ class _TestingModelBackend:
         index = int(index)
         self._storage_list[name].pop(index, None)
 
-    def action_get(self):
-        raise NotImplementedError(self.action_get)
+    def action_get(self):  # type:ignore
+        raise NotImplementedError(self.action_get)  # type:ignore
 
-    def action_set(self, results):
-        raise NotImplementedError(self.action_set)
+    def action_set(self, results):  # type:ignore
+        raise NotImplementedError(self.action_set)  # type:ignore
 
-    def action_log(self, message):
-        raise NotImplementedError(self.action_log)
+    def action_log(self, message):  # type:ignore
+        raise NotImplementedError(self.action_log)  # type:ignore
 
-    def action_fail(self, message=''):
-        raise NotImplementedError(self.action_fail)
+    def action_fail(self, message=''):  # type:ignore
+        raise NotImplementedError(self.action_fail)  # type:ignore
 
-    def network_get(self, endpoint_name, relation_id=None):
-        raise NotImplementedError(self.network_get)
+    def network_get(self, endpoint_name, relation_id=None):  # type:ignore
+        raise NotImplementedError(self.network_get)  # type:ignore
 
-    def add_metrics(self, metrics, labels=None):
-        raise NotImplementedError(self.add_metrics)
+    def add_metrics(self, metrics, labels=None):  # type:ignore
+        raise NotImplementedError(self.add_metrics)  # type:ignore
 
     @classmethod
-    def log_split(cls, message, max_len):
-        raise NotImplementedError(cls.log_split)
+    def log_split(cls, message, max_len=model.MAX_LOG_LINE_LEN):  # type:ignore
+        raise NotImplementedError(cls.log_split)  # type:ignore
 
-    def juju_log(self, level, msg):
-        raise NotImplementedError(self.juju_log)
+    def juju_log(self, level, msg):  # type:ignore
+        raise NotImplementedError(self.juju_log)  # type:ignore
 
-    def get_pebble(self, socket_path: str) -> 'pebble.Client':
+    def get_pebble(self, socket_path: str) -> '_TestingPebbleClient':
         container = socket_path.split('/')[3]  # /charm/containers/<container_name>/pebble.socket
         client = self._pebble_clients.get(container, None)
         if client is None:
@@ -1549,7 +1868,7 @@ class _TestingModelBackend:
         self._pebble_clients_can_connect[client] = not SIMULATE_CAN_CONNECT
         return client
 
-    def planned_units(self):
+    def planned_units(self) -> int:
         """Simulate fetching the number of planned application units from the model.
 
         If self._planned_units is None, then we simulate what the Juju controller will do, which is
@@ -1560,17 +1879,220 @@ class _TestingModelBackend:
         if self._planned_units is not None:
             return self._planned_units
 
-        units = []
-        peer_names = set(self._meta.peers.keys())
+        units = set()  # type: Set[str]
+        peer_names = set(self._meta.peers.keys())  # type: Set[str]
         for peer_id, peer_name in self._relation_names.items():
             if peer_name not in peer_names:
                 continue
             peer_units = self._relation_list_map[peer_id]
-            units += peer_units
+            units.update(peer_units)
 
-        count = len(set(units))  # de-dupe and get length.
+        return len(units) + 1  # Account for this unit.
 
-        return count + 1  # Account for this unit.
+    def _get_secret(self, id: str) -> Optional[_Secret]:
+        return next((s for s in self._secrets if s.id == id), None)
+
+    def _ensure_secret(self, id: str) -> _Secret:
+        secret = self._get_secret(id)
+        if secret is None:
+            raise model.SecretNotFoundError(f'Secret {id!r} not found')
+        return secret
+
+    def _ensure_secret_id_or_label(self, id: Optional[str], label: Optional[str]):
+        secret = None
+        if id is not None:
+            secret = self._get_secret(id)
+            if secret is not None and label is not None:
+                secret.label = label  # both id and label given, update label
+        if secret is None and label is not None:
+            secret = next((s for s in self._secrets if s.label == label), None)
+        if secret is None:
+            raise model.SecretNotFoundError(
+                f'Secret not found by ID ({id!r}) or label ({label!r})')
+        return secret
+
+    def secret_get(self, *,
+                   id: Optional[str] = None,
+                   label: Optional[str] = None,
+                   refresh: bool = False,
+                   peek: bool = False) -> Dict[str, str]:
+        secret = self._ensure_secret_id_or_label(id, label)
+
+        # Check that caller has permission to get this secret
+        if secret.owner_name in [self.app_name, self.unit_name]:
+            # Owner or peer is calling, get latest revision
+            peek = True
+            if refresh:
+                raise ValueError('Secret owner cannot use refresh=True')
+        else:
+            # Observer is calling: does secret have a grant on relation between
+            # this charm (the observer) and the secret owner's app?
+            owner_app = secret.owner_name.split('/')[0]
+            relation_id = self._relation_id_to(owner_app)
+            if relation_id is None:
+                raise model.SecretNotFoundError(
+                    f'Secret {id!r} does not have relation to {owner_app!r}')
+            grants = secret.grants.get(relation_id, set())
+            if self.app_name not in grants and self.unit_name not in grants:
+                raise model.SecretNotFoundError(
+                    f'Secret {id!r} not granted access to {self.app_name!r} or {self.unit_name!r}')
+
+        if peek or refresh:
+            revision = secret.revisions[-1]
+            if refresh:
+                secret.tracked = revision.revision
+        else:
+            revision = next((r for r in secret.revisions if r.revision == secret.tracked), None)
+            if revision is None:
+                raise model.SecretNotFoundError(f'Secret {id!r} tracked revision was removed')
+
+        return revision.content
+
+    def _relation_id_to(self, remote_app: str) -> Optional[int]:
+        """Return relation ID of relation from charm's app to remote app."""
+        for relation_id, app_units in self._relation_app_and_units.items():
+            if app_units['app'] == remote_app:
+                return relation_id
+        return None
+
+    def _ensure_secret_owner(self, secret: _Secret):
+        if secret.owner_name not in [self.app_name, self.unit_name]:
+            raise model.SecretNotFoundError(
+                f'You must own secret {secret.id!r} to perform this operation')
+
+    def secret_info_get(self, *,
+                        id: Optional[str] = None,
+                        label: Optional[str] = None) -> model.SecretInfo:
+        secret = self._ensure_secret_id_or_label(id, label)
+        self._ensure_secret_owner(secret)
+
+        rotates = None
+        rotation = None
+        if secret.rotate_policy is not None:
+            rotation = model.SecretRotate(secret.rotate_policy)
+            if secret.rotate_policy != model.SecretRotate.NEVER:
+                # Just set a fake rotation time some time in the future
+                rotates = datetime.datetime.now() + datetime.timedelta(days=1)
+
+        return model.SecretInfo(
+            id=secret.id,
+            label=secret.label,
+            revision=secret.tracked,
+            expires=secret.expire_time,
+            rotation=rotation,
+            rotates=rotates,
+        )
+
+    def secret_set(self, id: str, *,
+                   content: Optional[Dict[str, str]] = None,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None,
+                   expire: Optional[datetime.datetime] = None,
+                   rotate: Optional[model.SecretRotate] = None) -> None:
+        secret = self._ensure_secret(id)
+        self._ensure_secret_owner(secret)
+
+        if content is None:
+            content = secret.revisions[-1].content
+        revision = _SecretRevision(
+            revision=secret.revisions[-1].revision + 1,
+            content=content
+        )
+        secret.revisions.append(revision)
+        if label is not None:
+            if label:
+                secret.label = label
+            else:
+                secret.label = None  # clear label
+        if description is not None:
+            if description:
+                secret.description = description
+            else:
+                secret.description = None  # clear description
+        if expire is not None:
+            secret.expire_time = expire
+        if rotate is not None:
+            if rotate != model.SecretRotate.NEVER:
+                secret.rotate_policy = rotate.value
+            else:
+                secret.rotate_policy = None  # clear rotation policy
+
+    @classmethod
+    def _generate_secret_id(cls) -> str:
+        # Not a proper Juju secrets-style xid, but that's okay
+        return 'secret:' + str(uuid.uuid4())
+
+    def secret_add(self, content: Dict[str, str], *,
+                   label: Optional[str] = None,
+                   description: Optional[str] = None,
+                   expire: Optional[datetime.datetime] = None,
+                   rotate: Optional[model.SecretRotate] = None,
+                   owner: Optional[str] = None) -> str:
+        if owner == 'unit':
+            owner_name = self.unit_name
+        else:
+            owner_name = self.app_name
+        return self._secret_add(content, owner_name,
+                                label=label,
+                                description=description,
+                                expire=expire,
+                                rotate=rotate)
+
+    def _secret_add(self, content: Dict[str, str], owner_name: str, *,
+                    label: Optional[str] = None,
+                    description: Optional[str] = None,
+                    expire: Optional[datetime.datetime] = None,
+                    rotate: Optional[model.SecretRotate] = None) -> str:
+        id = self._generate_secret_id()
+        revision = _SecretRevision(
+            revision=1,
+            content=content,
+        )
+        secret = _Secret(
+            id=id,
+            owner_name=owner_name,
+            revisions=[revision],
+            rotate_policy=rotate.value if rotate is not None else None,
+            expire_time=expire,
+            label=label,
+            description=description,
+        )
+        self._secrets.append(secret)
+        return id
+
+    def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
+        secret = self._ensure_secret(id)
+        self._ensure_secret_owner(secret)
+
+        if relation_id not in secret.grants:
+            secret.grants[relation_id] = set()
+        remote_app_name = self._relation_app_and_units[relation_id]['app']
+        secret.grants[relation_id].add(unit or remote_app_name)
+
+    def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
+        secret = self._ensure_secret(id)
+        self._ensure_secret_owner(secret)
+
+        if relation_id not in secret.grants:
+            return
+        remote_app_name = self._relation_app_and_units[relation_id]['app']
+        secret.grants[relation_id].discard(unit or remote_app_name)
+
+    def secret_remove(self, id: str, *, revision: Optional[int] = None) -> None:
+        secret = self._ensure_secret(id)
+        self._ensure_secret_owner(secret)
+
+        if revision is not None:
+            revisions = [r for r in secret.revisions if r.revision != revision]
+            if len(revisions) == len(secret.revisions):
+                raise model.SecretNotFoundError(f'Secret {id!r} revision {revision} not found')
+            if revisions:
+                secret.revisions = revisions
+            else:
+                # Last revision removed, remove entire secret
+                self._secrets = [s for s in self._secrets if s.id != id]
+        else:
+            self._secrets = [s for s in self._secrets if s.id != id]
 
 
 @_copy_docstrings(pebble.Client)
@@ -1584,14 +2106,14 @@ class _TestingPebbleClient:
 
     def __init__(self, backend: _TestingModelBackend):
         self._backend = _TestingModelBackend
-        self._layers = {}
+        self._layers = {}  # type: Dict[str, pebble.Layer]
         # Has a service been started/stopped?
-        self._service_status = {}
+        self._service_status = {}  # type: Dict[str, pebble.ServiceStatus]
         self._fs = _TestingFilesystem()
         self._backend = backend
 
     def _check_connection(self):
-        if not self._backend._can_connect(self):
+        if not self._backend._can_connect(self):  # pyright: reportPrivateUsage=false
             raise pebble.ConnectionError('cannot connect to pebble')
 
     def get_system_info(self) -> pebble.SystemInfo:
@@ -1600,15 +2122,16 @@ class _TestingPebbleClient:
 
     def get_warnings(
             self, select: pebble.WarningState = pebble.WarningState.PENDING,
-    ) -> typing.List['pebble.Warning']:
+    ) -> List['pebble.Warning']:
         raise NotImplementedError(self.get_warnings)
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
         raise NotImplementedError(self.ack_warnings)
 
     def get_changes(
-            self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS, service: str = None,
-    ) -> typing.List[pebble.Change]:
+            self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS,
+            service: Optional[str] = None,
+    ) -> List[pebble.Change]:
         raise NotImplementedError(self.get_changes)
 
     def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
@@ -1617,7 +2140,7 @@ class _TestingPebbleClient:
     def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
         raise NotImplementedError(self.abort_change)
 
-    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+    def autostart_services(self, timeout: float = 30.0, delay: float = 0.1):
         self._check_connection()
         for name, service in self._render_services().items():
             # TODO: jam 2021-04-20 This feels awkward that Service.startup might be a string or
@@ -1630,12 +2153,12 @@ class _TestingPebbleClient:
             if startup == pebble.ServiceStartup.ENABLED:
                 self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
-    def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> pebble.ChangeID:
+    def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
         return self.autostart_services(timeout, delay)
 
     def start_services(
-            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
-    ) -> pebble.ChangeID:
+            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+    ):
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
@@ -1652,25 +2175,12 @@ class _TestingPebbleClient:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
                 raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
-            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
-            if current == pebble.ServiceStatus.ACTIVE:
-                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
-                #  can be started before starting any, and gives a list of things that couldn't
-                #  be done, but this is good enough for now
-                raise pebble.ChangeError('''\
-cannot perform the following tasks:
-- Start service "{}" (service "{}" was previously started)
-'''.format(name, name), change=1234)  # the change id is not respected
         for name in services:
-            # If you try to start a service which is started, you get a ChangeError:
-            # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
-            # ChangeError: cannot perform the following tasks:
-            # - Start service "serv" (service "serv" was previously started)
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def stop_services(
-            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
-    ) -> pebble.ChangeID:
+            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+    ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
             raise TypeError('stop_services should take a list of names, not just "{}"'.format(
@@ -1678,7 +2188,6 @@ cannot perform the following tasks:
 
         self._check_connection()
 
-        # TODO: handle invalid names
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.stop() which currently ignores the return value
         known_services = self._render_services()
@@ -1687,21 +2196,12 @@ cannot perform the following tasks:
                 # TODO: jam 2021-04-20 This needs a better error type
                 #  400 Bad Request: service "bal" does not exist
                 raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
-            current = self._service_status.get(name, pebble.ServiceStatus.INACTIVE)
-            if current != pebble.ServiceStatus.ACTIVE:
-                # TODO: jam 2021-04-20 I believe pebble actually validates all the service names
-                #  can be started before starting any, and gives a list of things that couldn't
-                #  be done, but this is good enough for now
-                raise pebble.ChangeError('''\
-ChangeError: cannot perform the following tasks:
-- Stop service "{}" (service "{}" is not active)
-'''.format(name, name), change=1234)  # the change id is not respected
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
 
     def restart_services(
-            self, services: typing.List[str], timeout: float = 30.0, delay: float = 0.1,
-    ) -> pebble.ChangeID:
+            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+    ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
             raise TypeError('restart_services should take a list of names, not just "{}"'.format(
@@ -1709,7 +2209,6 @@ ChangeError: cannot perform the following tasks:
 
         self._check_connection()
 
-        # TODO: handle invalid names
         # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
         # Container.restart() which currently ignores the return value
         known_services = self._render_services()
@@ -1727,7 +2226,7 @@ ChangeError: cannot perform the following tasks:
         raise NotImplementedError(self.wait_change)
 
     def add_layer(
-            self, label: str, layer: typing.Union[str, dict, pebble.Layer], *,
+            self, label: str, layer: Union[str, 'pebble.LayerDict', pebble.Layer], *,
             combine: bool = False):
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
@@ -1745,8 +2244,6 @@ ChangeError: cannot perform the following tasks:
         self._check_connection()
 
         if label in self._layers:
-            # TODO: jam 2021-04-19 These should not be RuntimeErrors but should be proper error
-            #  types. https://github.com/canonical/operator/issues/514
             if not combine:
                 raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
             layer = self._layers[label]
@@ -1764,15 +2261,15 @@ ChangeError: cannot perform the following tasks:
                 elif service.override == 'merge':
                     if combine and name in layer.services:
                         s = layer.services[name]
-                        s._merge(service)
+                        s._merge(service)  # type: ignore # noqa
                     else:
                         layer.services[name] = service
 
         else:
             self._layers[label] = layer_obj
 
-    def _render_services(self) -> typing.Mapping[str, pebble.Service]:
-        services = {}
+    def _render_services(self) -> Dict[str, pebble.Service]:
+        services = {}  # type: Dict[str, pebble.Service]
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
@@ -1790,14 +2287,14 @@ ChangeError: cannot perform the following tasks:
             plan.services[name] = services[name]
         return plan
 
-    def get_services(self, names: typing.List[str] = None) -> typing.List[pebble.ServiceInfo]:
+    def get_services(self, names: Optional[List[str]] = None) -> List[pebble.ServiceInfo]:
         if isinstance(names, str):
             raise TypeError('start_services should take a list of names, not just "{}"'.format(
                 names))
 
         self._check_connection()
         services = self._render_services()
-        infos = []
+        infos = []  # type: List[pebble.ServiceInfo]
         if names is None:
             names = sorted(services.keys())
         for name in sorted(names):
@@ -1818,15 +2315,19 @@ ChangeError: cannot perform the following tasks:
             infos.append(info)
         return infos
 
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> typing.Union[typing.BinaryIO,
-                                                                          typing.TextIO]:
+    def pull(self, path: str, *,
+             encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
         self._check_connection()
         return self._fs.open(path, encoding=encoding)
 
     def push(
-            self, path: str, source: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO], *,
-            encoding: str = 'utf-8', make_dirs: bool = False, permissions: int = None,
-            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+            self, path: str, source: 'ReadableBuffer', *,
+            encoding: str = 'utf-8', make_dirs: bool = False, permissions: Optional[int] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None
+    ) -> None:
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
@@ -1845,8 +2346,8 @@ ChangeError: cannot perform the following tasks:
                 'paths must be absolute, got {!r}'.format(e.args[0])
             )
 
-    def list_files(self, path: str, *, pattern: str = None,
-                   itself: bool = False) -> typing.List[pebble.FileInfo]:
+    def list_files(self, path: str, *, pattern: Optional[str] = None,
+                   itself: bool = False) -> List[pebble.FileInfo]:
         self._check_connection()
         try:
             files = [self._fs.get_path(path)]
@@ -1869,11 +2370,19 @@ ChangeError: cannot perform the following tasks:
             _File: pebble.FileType.FILE,
             _Directory: pebble.FileType.DIRECTORY,
         }
+
+        def get_pebble_file_type(file: '_FileOrDir') -> pebble.FileType:
+            pebble_type = type_mappings.get(type(file))
+            if not pebble_type:
+                raise ValueError('unable to convert file {} '
+                                 '(type not one of {})'.format(file, type_mappings))
+            return pebble_type
+
         return [
             pebble.FileInfo(
                 path=str(file.path),
                 name=file.name,
-                type=type_mappings.get(type(file)),
+                type=get_pebble_file_type(file),
                 size=file.size if isinstance(file, _File) else None,
                 permissions=file.kwargs.get('permissions'),
                 last_modified=file.last_modified,
@@ -1886,8 +2395,14 @@ ChangeError: cannot perform the following tasks:
         ]
 
     def make_dir(
-            self, path: str, *, make_parents: bool = False, permissions: int = None,
-            user_id: int = None, user: str = None, group_id: int = None, group: str = None):
+            self, path: str, *,
+            make_parents: bool = False,
+            permissions: Optional[int] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None
+    ) -> None:
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
@@ -1926,10 +2441,10 @@ ChangeError: cannot perform the following tasks:
                 'generic-file-error', 'cannot remove non-empty directory without recursive=True')
         self._fs.delete_path(path)
 
-    def exec(self, command, **kwargs):
-        raise NotImplementedError(self.exec)
+    def exec(self, command, **kwargs):  # type:ignore
+        raise NotImplementedError(self.exec)  # type:ignore
 
-    def send_signal(self, sig: typing.Union[int, str], *service_names: str):
+    def send_signal(self, sig: Union[int, str], *service_names: str):
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')
         self._check_connection()
@@ -1967,8 +2482,8 @@ ChangeError: cannot perform the following tasks:
                 status='Internal Server Error',
                 message=message)
 
-    def get_checks(self, level=None, names=None):
-        raise NotImplementedError(self.get_checks)
+    def get_checks(self, level=None, names=None):  # type:ignore
+        raise NotImplementedError(self.get_checks)  # type:ignore
 
 
 class NonAbsolutePathError(Exception):
@@ -1994,7 +2509,7 @@ class _TestingStorageMount:
 
         src.mkdir(exist_ok=True, parents=True)
 
-    def contains(self, path: typing.Union[str, pathlib.PurePosixPath]) -> bool:
+    def contains(self, path: '_StringOrPath') -> bool:
         """Returns true whether path resides within this simulated storage mount's location."""
         try:
             pathlib.PurePosixPath(path).relative_to(self._location)
@@ -2002,8 +2517,7 @@ class _TestingStorageMount:
         except Exception:
             return False
 
-    def check_contains(self, path: typing.Union[str,
-                       pathlib.PurePosixPath]) -> pathlib.PurePosixPath:
+    def check_contains(self, path: '_StringOrPath') -> pathlib.PurePosixPath:
         """Raises if path does not reside within this simulated storage mount's location."""
         if not self.contains(path):
             msg = 'the provided path "{!s}" does not reside within the mount location "{!s}"' \
@@ -2018,9 +2532,9 @@ class _TestingStorageMount:
 
     def create_dir(
             self,
-            path: pathlib.PurePosixPath,
+            path: '_StringOrPath',
             make_parents: bool = False,
-            **kwargs) -> '_Directory':
+            **kwargs: Any) -> '_Directory':
         if not pathlib.PurePosixPath(path).is_absolute():
             raise NonAbsolutePathError(str(path))
         path = self.check_contains(path)
@@ -2041,44 +2555,46 @@ class _TestingStorageMount:
 
     def create_file(
             self,
-            path: pathlib.PurePosixPath,
-            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
+            path: '_StringOrPath',
+            data: 'ReadableBuffer',
             encoding: str = 'utf-8',
             make_dirs: bool = False,
-            **kwargs
+            **kwargs: Any
     ) -> '_File':
-        path = self.check_contains(path)
-        srcpath = self._srcpath(path)
+        posixpath = self.check_contains(path)  # type: pathlib.PurePosixPath
+        srcpath = self._srcpath(posixpath)
 
         dirname = srcpath.parent
         if not dirname.exists():
             if not make_dirs:
-                raise FileNotFoundError(str(path.parent))
+                raise FileNotFoundError(str(posixpath.parent))
             dirname.mkdir(parents=True, exist_ok=True)
 
         if isinstance(data, str):
             data = data.encode(encoding=encoding)
-        elif not isinstance(data, bytes):
+        elif isinstance(data, (StringIO, BytesIO)):
             data = data.getvalue()
             if isinstance(data, str):
                 data = data.encode()
 
+        byte_data = cast(bytes, data)
+
         with srcpath.open('wb') as f:
-            f.write(data)
+            f.write(byte_data)
 
-        return _File(path, data, encoding=encoding, **kwargs)
+        return _File(posixpath, byte_data, encoding=encoding, **kwargs)
 
-    def list_dir(self, path: pathlib.PurePosixPath) -> typing.List['_File']:
-        path = self.check_contains(path)
-        srcpath = self._srcpath(path)
+    def list_dir(self, path: '_StringOrPath') -> List['_FileOrDir']:
+        _path = self.check_contains(path)
+        srcpath = self._srcpath(_path)
 
-        results = []
+        results = []  # type: List[_FileOrDir]
         if not srcpath.exists():
-            raise FileNotFoundError(str(path))
+            raise FileNotFoundError(str(_path))
         if not srcpath.is_dir():
-            raise NotADirectoryError(str(path))
+            raise NotADirectoryError(str(_path))
         for fpath in srcpath.iterdir():
-            mountpath = path / fpath.name
+            mountpath = _path / fpath.name
             if fpath.is_dir():
                 results.append(_Directory(mountpath))
             elif fpath.is_file():
@@ -2090,9 +2606,9 @@ class _TestingStorageMount:
 
     def open(
             self,
-            path: typing.Union[str, pathlib.PurePosixPath],
-            encoding: typing.Optional[str] = 'utf-8',
-    ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
+            path: '_StringOrPath',
+            encoding: Optional[str] = 'utf-8',
+    ) -> Union[BinaryIO, TextIO]:
         path = self.check_contains(path)
 
         file = self.get_path(path)
@@ -2100,8 +2616,7 @@ class _TestingStorageMount:
             raise IsADirectoryError(str(file.path))
         return file.open(encoding=encoding)
 
-    def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]
-                 ) -> typing.Union['_Directory', '_File']:
+    def get_path(self, path: '_StringOrPath') -> '_FileOrDir':
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
         if srcpath.is_dir():
@@ -2111,7 +2626,7 @@ class _TestingStorageMount:
         with srcpath.open('rb') as f:
             return _File(path, f.read())
 
-    def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
+    def delete_path(self, path: '_StringOrPath') -> None:
         path = self.check_contains(path)
         srcpath = self._srcpath(path)
         if srcpath.exists():
@@ -2123,23 +2638,24 @@ class _TestingStorageMount:
 class _TestingFilesystem:
     r"""An in-memory mock of a pebble-controlled container's filesystem.
 
-    For now, the filesystem is assumed to be a POSIX-style filesytem; Windows-style directories
+    For now, the filesystem is assumed to be a POSIX-style filesystem; Windows-style directories
     (e.g. \, \foo\bar, C:\foo\bar) are not supported.
     """
 
     def __init__(self):
         self.root = _Directory(pathlib.PurePosixPath('/'))
-        self._mounts = {}
+        self._mounts = {}  # type: Dict[str, _TestingStorageMount]
 
-    def add_mount(self, name, mount_path, backing_src_path):
+    def add_mount(self, name: str, mount_path: Union[str, pathlib.Path],
+                  backing_src_path: Union[str, pathlib.Path]):
         self._mounts[name] = _TestingStorageMount(
             pathlib.PurePosixPath(mount_path), pathlib.Path(backing_src_path))
 
-    def remove_mount(self, name):
+    def remove_mount(self, name: str):
         if name in self._mounts:
             del self._mounts[name]
 
-    def create_dir(self, path: str, make_parents: bool = False, **kwargs) -> '_Directory':
+    def create_dir(self, path: str, make_parents: bool = False, **kwargs: Any) -> '_Directory':
         if not path.startswith('/'):
             raise NonAbsolutePathError(path)
         for mount in self._mounts.values():
@@ -2179,10 +2695,10 @@ class _TestingFilesystem:
     def create_file(
             self,
             path: str,
-            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
-            encoding: typing.Optional[str] = 'utf-8',
+            data: 'ReadableBuffer',
+            encoding: str = 'utf-8',
             make_dirs: bool = False,
-            **kwargs
+            **kwargs: Any
     ) -> '_File':
         if not path.startswith('/'):
             raise NonAbsolutePathError(path)
@@ -2207,7 +2723,7 @@ class _TestingFilesystem:
                 'generic-file-error', 'parent is not a directory: {}'.format(str(dir_)))
         return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
-    def list_dir(self, path) -> typing.List['_File']:
+    def list_dir(self, path: '_StringOrPath') -> List['_FileOrDir']:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.list_dir(path)
@@ -2223,14 +2739,13 @@ class _TestingFilesystem:
             if not isinstance(current_dir, _Directory):
                 # For now, ignoring other possible cases besides File and Directory (e.g. Symlink).
                 raise NotImplementedError()
-
-        return [child for child in current_dir]
+        return list(current_dir)
 
     def open(
             self,
-            path: typing.Union[str, pathlib.PurePosixPath],
-            encoding: typing.Optional[str] = 'utf-8',
-    ) -> typing.Union[typing.BinaryIO, typing.TextIO]:
+            path: '_StringOrPath',
+            encoding: Optional[str] = 'utf-8',
+    ) -> Union[BinaryIO, TextIO]:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.open(path, encoding)
@@ -2240,8 +2755,7 @@ class _TestingFilesystem:
             raise IsADirectoryError(str(file.path))
         return file.open(encoding=encoding)
 
-    def get_path(self, path: typing.Union[str, pathlib.PurePosixPath]) \
-            -> typing.Union['_Directory', '_File']:
+    def get_path(self, path: '_StringOrPath') -> '_FileOrDir':
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.get_path(path)
@@ -2250,27 +2764,33 @@ class _TestingFilesystem:
         current_object = self.root
         for token in tokens:
             # ASSUMPTION / TESTME: object might be file
+            if isinstance(current_object, _File):
+                raise RuntimeError('cannot expand path {!r} from {!r}: '
+                                   'not a directory'.format(token, current_object))
             if token in current_object:
                 current_object = current_object[token]
             else:
                 raise FileNotFoundError(str(current_object.path / token))
         return current_object
 
-    def delete_path(self, path: typing.Union[str, pathlib.PurePosixPath]) -> None:
+    def delete_path(self, path: '_StringOrPath') -> None:
         for mount in self._mounts.values():
             if mount.contains(path):
                 return mount.delete_path(path)
         path = pathlib.PurePosixPath(path)
         parent_dir = self.get_path(path.parent)
+        if not isinstance(parent_dir, _Directory):
+            raise RuntimeError('cannot delete {}: parent {!r}'
+                               'is not a directory'.format(path.name, parent_dir))
         del parent_dir[path.name]
 
 
 class _Directory:
-    def __init__(self, path: pathlib.PurePosixPath, **kwargs):
+    def __init__(self, path: pathlib.PurePosixPath, **kwargs: Any):
         self.path = path
-        self._children = {}
+        self._children = {}  # type: Dict[str, Union[_Directory, _File]]
         self.last_modified = datetime.datetime.now()
-        self.kwargs = kwargs
+        self.kwargs = cast('_FileKwargs', kwargs)
 
     @property
     def name(self) -> str:
@@ -2281,10 +2801,10 @@ class _Directory:
     def __contains__(self, child: str) -> bool:
         return child in self._children
 
-    def __iter__(self) -> typing.Iterator[typing.Union['_File', '_Directory']]:
+    def __iter__(self) -> Iterator['_FileOrDir']:
         return (value for value in self._children.values())
 
-    def __getitem__(self, key: str) -> typing.Union['_File', '_Directory']:
+    def __getitem__(self, key: str) -> '_FileOrDir':
         return self._children[key]
 
     def __delitem__(self, key: str) -> None:
@@ -2296,40 +2816,44 @@ class _Directory:
     def __len__(self):
         return len(self._children)
 
-    def create_dir(self, name: str, **kwargs) -> '_Directory':
-        self._children[name] = _Directory(self.path / name, **kwargs)
-        return self._children[name]
+    def create_dir(self, name: str, **kwargs: Any) -> '_Directory':
+        dirc = _Directory(self.path / name, **kwargs)
+        self._children[name] = dirc
+        return dirc
 
     def create_file(
             self,
             name: str,
-            data: typing.Union[bytes, str, typing.BinaryIO, typing.TextIO],
-            encoding: typing.Optional[str] = 'utf-8',
-            **kwargs
+            data: 'ReadableBuffer',
+            encoding: Optional[str] = 'utf-8',
+            **kwargs: Any
     ) -> '_File':
-        self._children[name] = _File(self.path / name, data, encoding=encoding, **kwargs)
-        return self._children[name]
+        file = _File(self.path / name, data, encoding=encoding, **kwargs)
+        self._children[name] = file
+        return file
 
 
 class _File:
     def __init__(
             self,
             path: pathlib.PurePosixPath,
-            data: typing.Union[str, bytes, typing.BinaryIO, typing.TextIO],
-            encoding: typing.Optional[str] = 'utf-8',
-            **kwargs):
+            data: 'ReadableBuffer',
+            encoding: Optional[str] = 'utf-8',
+            **kwargs: Any):
 
-        if hasattr(data, 'read'):
-            data = data.read()
-        if isinstance(data, str):
-            data = data.encode(encoding)
-        data_size = len(data)
+        if hasattr(data, 'read'):  # if BytesIO/StringIO:
+            data = data.read()  # type: ignore
+        if isinstance(data, str):  # if str/StringIO
+            data = data.encode(encoding)  # type: ignore
+
+        byte_data = cast(bytes, data)  # it's bytes by now; pyright doesn't like redeclaring vars
+        data_size = len(byte_data)
 
         self.path = path
-        self.data = data
+        self.data = byte_data
         self.size = data_size
         self.last_modified = datetime.datetime.now()
-        self.kwargs = kwargs
+        self.kwargs = cast('_FileKwargs', kwargs)
 
     @property
     def name(self) -> str:
@@ -2337,9 +2861,10 @@ class _File:
 
     def open(
             self,
-            encoding: typing.Optional[str] = 'utf-8',
-    ) -> typing.Union[typing.TextIO, typing.BinaryIO]:
+            encoding: Optional[str] = 'utf-8',
+    ) -> Union[TextIO, BinaryIO]:
         if encoding is None:
             return BytesIO(self.data)
         else:
-            return StringIO(self.data.decode(encoding))
+            raw = self.data.decode(encoding)
+            return StringIO(raw)

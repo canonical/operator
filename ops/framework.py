@@ -297,7 +297,7 @@ class EventSource(Generic[_EventType]):
         self.event_kind = None  # type: Optional[str]  # noqa
         self.emitter_type = None  # type: Optional[Type[Object]]  # noqa
 
-    def _set_name(self, emitter_type: 'Type[Object]', event_kind: str):
+    def __set_name__(self, emitter_type: 'Type[Object]', event_kind: str):
         if self.event_kind is not None:
             raise RuntimeError(
                 'EventSource({}) reused as {}.{} and {}.{}'.format(
@@ -369,39 +369,7 @@ class HandleKind:
         return obj_type.__name__
 
 
-class _Metaclass(type):
-    """Helper class to ensure proper instantiation of Object-derived classes.
-
-    This class currently has a single purpose: events derived from EventSource
-    that are class attributes of Object-derived classes need to be told what
-    their name is in that class. For example, in
-
-        class SomeObject(Object):
-            something_happened = EventSource(SomethingHappened)
-
-    the instance of EventSource needs to know it's called 'something_happened'.
-
-    Starting from python 3.6 we could use __set_name__ on EventSource for this,
-    but until then this (meta)class does the equivalent work.
-
-    TODO: when we drop support for 3.5 drop this class, and rename _set_name in
-          EventSource to __set_name__; everything should continue to work.
-
-    """
-
-    def __new__(cls, *a, **kw):  # type: ignore
-        k = super().__new__(cls, *a, **kw)  # type: ignore
-        # k is now the Object-derived class; loop over its class attributes
-        for n, v in vars(k).items():
-            # we could do duck typing here if we want to support
-            # non-EventSource-derived shenanigans. We don't.
-            if isinstance(v, EventSource):
-                # this is what 3.6+ does automatically for us:
-                v._set_name(k, n)  # noqa
-        return k
-
-
-class Object(metaclass=_Metaclass):
+class Object:
     """Initialize an Object as a new leaf in :class:`Framework`, identified by `key`.
 
     Args:
@@ -484,6 +452,15 @@ class ObjectEvents(Object):
 
         event_type: a type of the event to define.
 
+        Note that attempting to define the same event kind more than once will
+        raise a 'overlaps with existing type' runtime error. Ops uses a
+        labeling system to track and reconstruct events between hook executions
+        (each time a hook runs, the Juju Agent invokes a fresh instance of ops;
+        there is no ops process that persists on the host between hooks).
+        Having duplicate Python objects creates duplicate labels. Overwriting a
+        previously created label means that only the latter code path will be
+        run when the current event, if it does get deferred, is reemitted. This
+        is usually not what is desired, and is error-prone and ambigous.
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
@@ -498,7 +475,7 @@ class ObjectEvents(Object):
             pass
 
         event_descriptor = EventSource(event_type)
-        event_descriptor._set_name(cls, event_kind)  # noqa
+        event_descriptor.__set_name__(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
 
     def _event_kinds(self) -> List[str]:
@@ -532,7 +509,7 @@ class PrefixedEvents:
         self._emitter = emitter
         self._prefix = key.replace("-", "_") + '_'
 
-    def __getattr__(self, name: str) -> Union['PrefixedEvents', EventSource[Any]]:
+    def __getattr__(self, name: str) -> BoundEvent[Any]:
         return getattr(self._emitter, self._prefix + name)
 
 
@@ -580,7 +557,7 @@ class Framework(Object):
     # Override properties from Object so that we can set them in __init__.
     model = None  # type: 'Model' # pyright: reportGeneralTypeIssues=false
     meta = None  # type: 'CharmMeta' # pyright: reportGeneralTypeIssues=false
-    charm_dir = None  # type: 'Path' # pyright: reportGeneralTypeIssues=false
+    charm_dir = None  # type: Path # pyright: reportGeneralTypeIssues=false
 
     # to help the type checker and IDEs:
 
@@ -589,11 +566,19 @@ class Framework(Object):
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
-    def __init__(self, storage: Union[SQLiteStorage, JujuStorage], charm_dir: 'Path',
+    def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
+                 charm_dir: Union[str, pathlib.Path],
                  meta: 'CharmMeta', model: 'Model'):
         super().__init__(self, None)
 
-        self.charm_dir = charm_dir
+        # an old, deprecated __init__ interface accepted an Optional charm_dir,
+        #  so we have to keep supporting it:
+        if charm_dir is None:
+            logger.warning('Framework should not be initialized with `charm_dir` set to None.')
+            self.charm_dir = None  # type: ignore
+        else:
+            self.charm_dir = pathlib.Path(charm_dir)
+
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]

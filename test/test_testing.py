@@ -130,7 +130,7 @@ class TestHarness(unittest.TestCase):
 
     def test_can_connect_legacy(self):
         # This tests the old behavior where we weren't simulating can_connect status of containers
-        # like it runs in juju.
+        # like it runs in Juju.
         tmp = ops.testing.SIMULATE_CAN_CONNECT
         ops.testing.SIMULATE_CAN_CONNECT = False
 
@@ -334,7 +334,7 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         harness.charm.observe_relation_events('foo')
 
-        # relation remote app is None to mirror production juju behavior where juju doesn't
+        # relation remote app is None to mirror production Juju behavior where Juju doesn't
         # communicate the remote app to ops.
         rel_id = harness.add_relation('foo', None)
 
@@ -2183,7 +2183,8 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
         harness.set_leader(True)
-        self.assertIsNone(harness.charm)
+        with self.assertRaises(RuntimeError):
+            _ = harness.charm
         harness.begin_with_initial_hooks()
         self.assertIsNotNone(harness.charm)
         self.assertEqual(
@@ -2207,7 +2208,8 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
-        self.assertIsNone(harness.charm)
+        with self.assertRaises(RuntimeError):
+            _ = harness.charm
         harness.begin_with_initial_hooks()
         self.assertIsNotNone(harness.charm)
         self.assertEqual(
@@ -2238,7 +2240,8 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
-        self.assertIsNone(harness.charm)
+        with self.assertRaises(RuntimeError):
+            _ = harness.charm
         harness.begin_with_initial_hooks()
         self.assertIsNotNone(harness.charm)
         rel_id = harness.model.get_relation('peer').id
@@ -3613,10 +3616,8 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
     def test_start_started_service(self):
-        # If you try to start a service which is started, you get a ChangeError:
-        # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
-        # ChangeError: cannot perform the following tasks:
-        # - Start service "serv" (service "serv" was previously started)
+        # Pebble maintains idempotency even if you start a service
+        # which is already started.
         client = self.get_testing_client()
         client.add_layer('foo', '''\
             summary: foo
@@ -3631,26 +3632,23 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
-        with self.assertRaises(pebble.ChangeError):
-            client.start_services(['bar', 'foo'])
-        # bar could have been started, but won't be, because foo did not validate
+        client.start_services(['bar', 'foo'])
+        # foo and bar are both started
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
         bar_info = infos[0]
         self.assertEqual('bar', bar_info.name)
         # Default when not specified is DISABLED
         self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
-        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, bar_info.current)
         foo_info = infos[1]
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
     def test_stop_stopped_service(self):
-        # If you try to stop a service which is stop, you get a ChangeError:
-        # $ PYTHONPATH=. python3 ./test/pebble_cli.py stop other serv
-        # ChangeError: cannot perform the following tasks:
-        # - Stop service "other" (service "other" is not active)
+        # Pebble maintains idempotency even if you stop a service
+        # which is already stopped.
         client = self.get_testing_client()
         client.add_layer('foo', '''\
             summary: foo
@@ -3665,9 +3663,8 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
-        with self.assertRaises(pebble.ChangeError):
-            client.stop_services(['foo', 'bar'])
-        # foo could have been stopped, but won't be, because bar did not validate
+        client.stop_services(['foo', 'bar'])
+        # foo and bar are both stopped
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
         bar_info = infos[0]
@@ -3678,7 +3675,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         foo_info = infos[1]
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
-        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
 
     @ unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self):
@@ -4310,3 +4307,239 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIs
     @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         pass
+
+
+class TestSecrets(unittest.TestCase):
+    def test_add_model_secret_by_app_name_str(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter2'})
+
+    def test_add_model_secret_by_app_instance(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        app = harness.model.get_app('database')
+        secret_id = harness.add_model_secret(app, {'password': 'hunter3'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter3'})
+
+    def test_add_model_secret_by_unit_instance(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        unit = harness.model.get_unit('database/0')
+        secret_id = harness.add_model_secret(unit, {'password': 'hunter4'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter4'})
+
+    def test_add_model_secret_invalid_content(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        with self.assertRaises(ValueError):
+            harness.add_model_secret('database', {'x': 'y'})  # key too short
+
+    def test_set_secret_content(self):
+        harness = Harness(EventRecorder, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'foo': '1'})
+        harness.grant_secret(secret_id, 'webapp')
+        harness.begin()
+        harness.framework.observe(harness.charm.on.secret_changed, harness.charm.record_event)
+        harness.set_secret_content(secret_id, {'foo': '2'})
+
+        self.assertEqual(len(harness.charm.events), 1)
+        event = harness.charm.events[0]
+        self.assertIsInstance(event, ops.charm.SecretChangedEvent)
+        self.assertEqual(event.secret.get_content(), {'foo': '1'})
+        self.assertEqual(event.secret.get_content(refresh=True), {'foo': '2'})
+        self.assertEqual(event.secret.get_content(), {'foo': '2'})
+
+        self.assertEqual(harness.get_secret_revisions(secret_id), [1, 2])
+
+    def test_set_secret_content_wrong_owner(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        secret = harness.model.app.add_secret({'foo': 'bar'})
+        with self.assertRaises(RuntimeError):
+            harness.set_secret_content(secret.id, {'bar': 'foo'})
+
+    def test_set_secret_content_invalid_secret_id(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        with self.assertRaises(RuntimeError):
+            harness.set_secret_content('asdf', {'foo': 'bar'})
+
+    def test_set_secret_content_invalid_content(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        secret_id = harness.add_model_secret('database', {'foo': 'bar'})
+        with self.assertRaises(ValueError):
+            harness.set_secret_content(secret_id, {'x': 'y'})
+
+    def test_grant_secret_and_revoke_secret(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter2'})
+
+        harness.revoke_secret(secret_id, 'webapp')
+        with self.assertRaises(model.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_grant_secret_wrong_app(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'otherapp')
+        with self.assertRaises(model.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_grant_secret_wrong_unit(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'webapp/1')  # should be webapp/0
+        with self.assertRaises(model.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_grant_secret_no_relation(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        with self.assertRaises(RuntimeError):
+            harness.grant_secret(secret_id, 'webapp')
+
+    def test_get_secret_grants(self):
+        harness = Harness(CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        relation_id = harness.add_relation('db', 'webapp')
+        harness.add_relation_unit(relation_id, 'webapp/0')
+
+        secret = harness.model.app.add_secret({'foo': 'x'})
+        self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
+        secret.grant(harness.model.get_relation('db'))
+        self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp'})
+
+        secret.revoke(harness.model.get_relation('db'))
+        self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
+        secret.grant(harness.model.get_relation('db'), unit=harness.model.get_unit('webapp/0'))
+        self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp/0'})
+
+    def test_trigger_secret_rotation(self):
+        harness = Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        harness.begin()
+        harness.framework.observe(harness.charm.on.secret_rotate, harness.charm.record_event)
+        harness.trigger_secret_rotation(secret.id)
+        harness.trigger_secret_rotation(secret.id, label='override')
+
+        self.assertEqual(len(harness.charm.events), 2)
+        event = harness.charm.events[0]
+        self.assertIsInstance(event, ops.charm.SecretRotateEvent)
+        self.assertEqual(event.secret.label, 'lbl')
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+        event = harness.charm.events[1]
+        self.assertIsInstance(event, ops.charm.SecretRotateEvent)
+        self.assertEqual(event.secret.label, 'override')
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_rotation('nosecret')
+
+    def test_trigger_secret_removal(self):
+        harness = Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        harness.begin()
+        harness.framework.observe(harness.charm.on.secret_remove, harness.charm.record_event)
+        harness.trigger_secret_removal(secret.id, 1)
+        harness.trigger_secret_removal(secret.id, 42, label='override')
+
+        self.assertEqual(len(harness.charm.events), 2)
+        event = harness.charm.events[0]
+        self.assertIsInstance(event, ops.charm.SecretRemoveEvent)
+        self.assertEqual(event.secret.label, 'lbl')
+        self.assertEqual(event.revision, 1)
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+        event = harness.charm.events[1]
+        self.assertIsInstance(event, ops.charm.SecretRemoveEvent)
+        self.assertEqual(event.secret.label, 'override')
+        self.assertEqual(event.revision, 42)
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_removal('nosecret', 1)
+
+    def test_trigger_secret_expiration(self):
+        harness = Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        harness.begin()
+        harness.framework.observe(harness.charm.on.secret_remove, harness.charm.record_event)
+        harness.trigger_secret_removal(secret.id, 1)
+        harness.trigger_secret_removal(secret.id, 42, label='override')
+
+        self.assertEqual(len(harness.charm.events), 2)
+        event = harness.charm.events[0]
+        self.assertIsInstance(event, ops.charm.SecretRemoveEvent)
+        self.assertEqual(event.secret.label, 'lbl')
+        self.assertEqual(event.revision, 1)
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+        event = harness.charm.events[1]
+        self.assertIsInstance(event, ops.charm.SecretRemoveEvent)
+        self.assertEqual(event.secret.label, 'override')
+        self.assertEqual(event.revision, 42)
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_removal('nosecret', 1)
+
+
+class EventRecorder(CharmBase):
+    def __init__(self, framework):
+        super().__init__(framework)
+        self.events = []
+
+    def record_event(self, event):
+        self.events.append(event)

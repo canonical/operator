@@ -10,7 +10,7 @@ software component that can be shared.
 
 This project extends the operator pattern to enable
 [charmed operators](https://juju.is/universal-operators), not just for Kubernetes but also
-operators for traditional Linux or Windows application management.
+operators for traditional Linux application management.
 
 Operators use a [Charmed Operator Lifecycle Manager
 (Charmed OLM)](https://juju.is/operator-lifecycle-manager) to coordinate their work in a cluster.
@@ -88,7 +88,7 @@ is to feel natural for somebody used to coding in Python, and reasonably easy to
 who is not a pythonista.
 
 The dependencies of the operator framework are kept as minimal as possible; currently that's Python
-3.5 or greater, and `PyYAML` (both are included by default in Ubuntu's cloud images from 16.04 on).
+3.8 or greater, and `PyYAML` (both are included by default in Ubuntu's cloud images from 20.04 on).
 
 For a brief intro on how to get started, check out the
 [Hello, World!](https://juju.is/docs/sdk/hello-world) section of the documentation!

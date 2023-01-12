@@ -28,7 +28,6 @@ import io
 import json
 import logging
 import os
-import re
 import select
 import shutil
 import signal
@@ -37,7 +36,6 @@ import sys
 import tempfile
 import threading
 import time
-import types
 import typing
 import urllib.error
 import urllib.parse
@@ -59,7 +57,7 @@ from typing import (
     Union,
 )
 
-from ops._private import yaml
+from ops._private import timeconv, yaml
 from ops._vendor import websocket
 
 if TYPE_CHECKING:
@@ -199,13 +197,13 @@ if TYPE_CHECKING:
                           {'services': Dict[str, _ServiceDict],
                            'checks': Dict[str, _CheckDict]},
                           total=False)
-
-    _LayerDict = TypedDict('_LayerDict',
-                           {'summary': str,
-                            'description': str,
-                            'services': Dict[str, _ServiceDict],
-                            'checks': Dict[str, _CheckDict]},
-                           total=False)
+    # public as it is accessed by ops.testing
+    LayerDict = TypedDict('LayerDict',
+                          {'summary': str,
+                           'description': str,
+                           'services': Dict[str, _ServiceDict],
+                           'checks': Dict[str, _CheckDict]},
+                          total=False)
 
     _Error = TypedDict('_Error',
                        {'kind': str,
@@ -261,45 +259,6 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
                             socket_path=self.socket_path)
 
 
-# Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
-_TIMESTAMP_RE = re.compile(
-    r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
-
-# Matches [-+]HH:MM
-_TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
-
-
-def _parse_timestamp(s: str):
-    """Parse timestamp from Go-encoded JSON.
-
-    This parses RFC3339 timestamps (which are a subset of ISO8601 timestamps)
-    that Go's encoding/json package produces for time.Time values.
-
-    Unfortunately we can't use datetime.fromisoformat(), as that does not
-    support more than 6 digits for the fractional second, nor the 'Z' for UTC.
-    Also, it was only introduced in Python 3.7.
-    """
-    match = _TIMESTAMP_RE.match(s)
-    if not match:
-        raise ValueError('invalid timestamp {!r}'.format(s))
-    y, m, d, hh, mm, ss, sfrac, zone = match.groups()
-
-    if zone in ('Z', 'z'):
-        tz = datetime.timezone.utc
-    else:
-        match = _TIMEOFFSET_RE.match(zone)
-        if not match:
-            raise ValueError('invalid timestamp {!r}'.format(s))
-        sign, zh, zm = match.groups()
-        tz_delta = datetime.timedelta(hours=int(zh), minutes=int(zm))
-        tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
-
-    microsecond = round(float(sfrac or '0') * 1000000)
-
-    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
-                             microsecond=microsecond, tzinfo=tz)
-
-
 def _format_timeout(timeout: float) -> str:
     """Format timeout for use in the Pebble API.
 
@@ -307,17 +266,6 @@ def _format_timeout(timeout: float) -> str:
     as accepted by the Pebble API (which uses Go's time.ParseDuration).
     """
     return '{:.3f}s'.format(timeout)
-
-
-def _json_loads(s: '_StrOrBytes') -> Dict[Any, Any]:
-    """Like json.loads(), but handle str or bytes.
-
-    This is needed because an HTTP response's read() method returns bytes on
-    Python 3.5, and json.load doesn't handle bytes.
-    """
-    if isinstance(s, bytes):
-        s = s.decode('utf-8')
-    return json.loads(s)
 
 
 def _start_thread(target: Callable[..., Any], *args: Any, **kwargs: Any) -> threading.Thread:
@@ -332,14 +280,6 @@ class Error(Exception):
 
     def __repr__(self):
         return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.args)
-
-    def name(self):
-        """Return a string representation of the model plus class."""
-        return '<{}.{}>'.format(type(self).__module__, type(self).__name__)
-
-    def message(self):
-        """Return the message passed as an argument."""
-        return self.args[0]
 
 
 class TimeoutError(TimeoutError, Error):
@@ -389,14 +329,7 @@ class APIError(Error):
 
 
 class ChangeError(Error):
-    """Raised by actions when a change is ready but has an error.
-
-    For example, this happens when you attempt to start an already-started
-    service:
-
-    cannot perform the following tasks:
-    - Start service "test" (service "test" was previously started)
-    """
+    """Raised by actions when a change is ready but has an error."""
 
     def __init__(self, err: str, change: 'Change'):
         """This shouldn't be instantiated directly."""
@@ -527,9 +460,9 @@ class Warning:
         """Create new Warning object from dict parsed from JSON."""
         return cls(
             message=d['message'],
-            first_added=_parse_timestamp(d['first-added']),
-            last_added=_parse_timestamp(d['last-added']),
-            last_shown=(_parse_timestamp(d['last-shown'])  # type: ignore
+            first_added=timeconv.parse_rfc3339(d['first-added']),
+            last_added=timeconv.parse_rfc3339(d['last-added']),
+            last_shown=(timeconv.parse_rfc3339(d['last-shown'])  # type: ignore
                         if d.get('last-shown') else None),
             expire_after=d['expire-after'],
             repeat_after=d['repeat-after'],
@@ -618,8 +551,9 @@ class Task:
             status=d['status'],
             log=d.get('log') or [],
             progress=TaskProgress.from_dict(d['progress']),
-            spawn_time=_parse_timestamp(d['spawn-time']),
-            ready_time=_parse_timestamp(d['ready-time']) if d.get('ready-time') else None,
+            spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
+            ready_time=(timeconv.parse_rfc3339(d['ready-time'])
+                        if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
 
@@ -682,8 +616,8 @@ class Change:
             tasks=[Task.from_dict(t) for t in d.get('tasks') or []],
             ready=d['ready'],
             err=d.get('err'),
-            spawn_time=_parse_timestamp(d['spawn-time']),
-            ready_time=(_parse_timestamp(d['ready-time'])  # type: ignore
+            spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
+            ready_time=(timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
                         if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
@@ -749,7 +683,7 @@ class Plan:
 
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
-        return yaml.safe_dump(self.to_dict())  # type: ignore
+        return yaml.safe_dump(self.to_dict())
 
     __str__ = to_yaml
 
@@ -759,41 +693,36 @@ class Layer:
 
     The format of this is documented at
     https://github.com/canonical/pebble/#layer-specification.
-
-    Attributes:
-        summary: A summary of the purpose of this layer
-        description: A long form description of this layer
-        services: A mapping of name to :class:`Service` defined by this layer
-        checks: A mapping of check to :class:`Check` defined by this layer
     """
 
-    # This is how you do type annotations, but it is not supported by Python 3.5
-    # summary: str
-    # description: str
-    # services: Mapping[str, 'Service']
+    #: Summary of the purpose of this layer.
+    summary: str
+    #: Long-form description of this layer.
+    description: str
+    #: Mapping of name to :class:`Service` defined by this layer.
+    services: Dict[str, 'Service']
+    #: Mapping of check to :class:`Check` defined by this layer.
+    checks: Dict[str, 'Check']
 
-    def __init__(self, raw: Optional[Union[str, '_LayerDict']] = None):
+    def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
         if isinstance(raw, str):
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
             d = raw or {}
-        d = typing.cast('_LayerDict', d)
+        d = typing.cast('LayerDict', d)
 
-        self.summary = d.get('summary', '')  # type: str
-        self.description = d.get('description', '')  # type: str
+        self.summary = d.get('summary', '')
+        self.description = d.get('description', '')
         self.services = {name: Service(name, service)
-                         for name, service in d.get('services', {}).items()
-                         }  # type: Dict[str, Service]
+                         for name, service in d.get('services', {}).items()}
         self.checks = {name: Check(name, check)
-                       for name, check in d.get('checks', {}).items()
-                       }  # type: Dict[str, Check]
+                       for name, check in d.get('checks', {}).items()}
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
-        yamlstr = yaml.safe_dump(self.to_dict())  # type: ignore
-        return typing.cast(str, yamlstr)
+        return yaml.safe_dump(self.to_dict())
 
-    def to_dict(self) -> '_LayerDict':
+    def to_dict(self) -> 'LayerDict':
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -802,7 +731,7 @@ class Layer:
             ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
         ]
         dct = {name: value for name, value in fields if value}
-        return typing.cast('_LayerDict', dct)
+        return typing.cast('LayerDict', dct)
 
     def __repr__(self) -> str:
         return 'Layer({!r})'.format(self.to_dict())
@@ -1077,7 +1006,7 @@ class FileInfo:
             type=file_type,
             size=d.get('size'),
             permissions=int(d['permissions'], 8),
-            last_modified=_parse_timestamp(d['last-modified']),
+            last_modified=timeconv.parse_rfc3339(d['last-modified']),
             user_id=d.get('user-id'),
             user=d.get('user'),
             group_id=d.get('group-id'),
@@ -1514,7 +1443,7 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        raw_resp = _json_loads(response.read())  # type: Dict[str, Any]
+        raw_resp = json.loads(response.read())  # type: Dict[str, Any]
         return raw_resp
 
     @staticmethod
@@ -1540,11 +1469,6 @@ class Client:
         if query:
             url = url + '?' + urllib.parse.urlencode(query, doseq=True)
 
-        # python 3.5 urllib requests require their data to be a bytes object -
-        # generators won't work.
-        if sys.version_info[:2] < (3, 6) and isinstance(data, types.GeneratorType):
-            data = b''.join(data)
-
         if headers is None:
             headers = {}
         request = urllib.request.Request(url, method=method, data=data, headers=headers)
@@ -1555,7 +1479,7 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                body = _json_loads(e.read())  # type: Dict[str, Any]
+                body = json.loads(e.read())  # type: Dict[str, Any]
                 message = body['result']['message']  # type: str
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
@@ -1809,7 +1733,7 @@ class Client:
             change_id, timeout))
 
     def add_layer(
-            self, label: str, layer: Union[str, '_LayerDict', Layer], *,
+            self, label: str, layer: Union[str, 'LayerDict', Layer], *,
             combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
@@ -1910,14 +1834,6 @@ class Client:
 
         f = parser.get_file(path, encoding)
 
-        # The opened file remains usable after removing/unlinking on posix
-        # platforms until it is closed.  This prevents callers from
-        # interacting with it on disk.  But e.g. Windows doesn't allow
-        # removing opened files, and so we use the tempfile lib's
-        # helper class to auto-delete on close/gc for us.
-        if os.name != 'posix' or sys.platform == 'cygwin':
-            return tempfile._TemporaryFileWrapper(  # type: ignore
-                f, f.name, delete=True)  # type: ignore
         parser.remove_files()
         return f
 
@@ -1975,7 +1891,7 @@ class Client:
         }
         response = self._request_raw('POST', '/v1/files', None, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        resp = _json_loads(response.read())
+        resp = json.loads(response.read())
         # we need to cast the Dict[Any, Any] to _FilesResponse
         self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
@@ -2302,9 +2218,6 @@ class Client:
 
         if stdin is not None:
             if _has_fileno(stdin):
-                if sys.platform == 'win32':
-                    raise NotImplementedError('file-based stdin not supported on Windows')
-
                 # Create a pipe so _reader_to_websocket can select() on the
                 # reader as well as this cancel_reader; when we write anything
                 # to cancel_writer it'll trigger the select and end the thread.

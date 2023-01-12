@@ -117,11 +117,6 @@ def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
         charm: An instance of the Charm class.
 
     """
-    # XXX: on windows this function does not accomplish what it wants to:
-    #      it creates symlinks with no extension pointing to a .py
-    #      and juju only knows how to handle .exe, .bat, .cmd, and .ps1
-    #      so it does its job, but does not accomplish anything as the
-    #      hooks aren't 'callable'.
     link_to = os.path.realpath(os.environ.get("JUJU_DISPATCH_PATH", sys.argv[0]))
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
@@ -160,6 +155,14 @@ def _get_event_args(charm: 'CharmBase',
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
         return [container], {}
+    elif issubclass(event_type, ops.charm.SecretEvent):
+        args: List[Any] = [
+            os.environ['JUJU_SECRET_ID'],
+            os.environ.get('JUJU_SECRET_LABEL'),
+        ]
+        if issubclass(event_type, (ops.charm.SecretRemoveEvent, ops.charm.SecretExpiredEvent)):
+            args.append(int(os.environ['JUJU_SECRET_REVISION']))
+        return args, {}
     elif issubclass(event_type, ops.charm.StorageEvent):
         storage_id = os.environ.get("JUJU_STORAGE_ID", "")
         if storage_id:
@@ -170,12 +173,12 @@ def _get_event_args(charm: 'CharmBase',
             storage_name = "-".join(bound_event.event_kind.split("_")[:-2])
 
         storages = model.storages[storage_name]
-        id, storage_location = model._backend._storage_event_details()
+        index, storage_location = model._backend._storage_event_details()
         if len(storages) == 1:
             storage = storages[0]
         else:
             # If there's more than one value, pick the right one. We'll realize the key on lookup
-            storage = next((s for s in storages if s.id == id), None)
+            storage = next((s for s in storages if s.index == index), None)
         storage = cast(Union[ops.storage.JujuStorage, ops.storage.SQLiteStorage], storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
@@ -399,7 +402,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     if use_juju_for_storage:
         if dispatcher.is_restricted_context():
             # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
-            #  Though we eventually expect that juju will run collect-metrics in a
+            #  Though we eventually expect that Juju will run collect-metrics in a
             #  non-restricted context. Once we can determine that we are running collect-metrics
             #  in a non-restricted context, we should fire the event as normal.
             logger.debug('"%s" is not supported when using Juju for storage\n'
