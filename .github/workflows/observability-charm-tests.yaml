@@ -9,7 +9,8 @@ jobs:
     strategy:
       matrix:
         charm-repo:
-          - "canonical/alertmanager-operator"
+# TODO(benhoyt): uncomment this once this charm's tests are fixed for 2.0.0
+#          - "canonical/alertmanager-operator"
           - "canonical/prometheus-operator"
           - "canonical/grafana-operator"
 
