@@ -1206,9 +1206,9 @@ class TestMultipartParser(unittest.TestCase):
                     self.assertEqual(test.error, str(err))
                 else:
                     if test.error:
-                        self.fail('missing expected error: {!r}'.format(test.error))
+                        self.fail(f'missing expected error: {test.error!r}')
 
-                    msg = 'test case {} ({}), chunk size {}'.format(i + 1, test.name, chunk_size)
+                    msg = f'test case {i + 1} ({test.name}), chunk size {chunk_size}'
                     self.assertEqual(test.want_headers, headers, msg)
                     self.assertEqual(test.want_bodies, bodies, msg)
                     self.assertEqual(test.want_bodies_done, bodies_done, msg)
@@ -2617,7 +2617,7 @@ class TestExec(unittest.TestCase):
             'command': command,
             'environment': environment or {},
             'working-dir': working_dir,
-            'timeout': '{:.3f}s'.format(timeout) if timeout is not None else None,
+            'timeout': f'{timeout:.3f}s' if timeout is not None else None,
             'user-id': user_id,
             'user': user,
             'group-id': group_id,
@@ -3316,7 +3316,7 @@ class TestRealPebble(unittest.TestCase):
         self.assertEqual(err, b'')
 
     def test_push_pull(self):
-        fname = os.path.join(tempfile.gettempdir(), 'pebbletest-{}'.format(uuid.uuid4()))
+        fname = os.path.join(tempfile.gettempdir(), f'pebbletest-{uuid.uuid4()}')
         content = 'foo\nbar\nbaz-42'
         self.client.push(fname, content)
         with self.client.pull(fname) as f:

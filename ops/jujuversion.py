@@ -38,7 +38,7 @@ class JujuVersion:
     def __init__(self, version: str):
         m = re.match(self.PATTERN, version, re.VERBOSE)
         if not m:
-            raise RuntimeError('"{}" is not a valid Juju version string'.format(version))
+            raise RuntimeError(f'"{version}" is not a valid Juju version string')
 
         d = m.groupdict()
         self.major = int(m.group('major'))
@@ -49,11 +49,11 @@ class JujuVersion:
 
     def __repr__(self):
         if self.tag:
-            s = '{}.{}-{}{}'.format(self.major, self.minor, self.tag, self.patch)
+            s = f'{self.major}.{self.minor}-{self.tag}{self.patch}'
         else:
-            s = '{}.{}.{}'.format(self.major, self.minor, self.patch)
+            s = f'{self.major}.{self.minor}.{self.patch}'
         if self.build > 0:
-            s += '.{}'.format(self.build)
+            s += f'.{self.build}'
         return s
 
     def __eq__(self, other: Union[str, 'JujuVersion']) -> bool:
@@ -62,7 +62,7 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):  # pyright: reportUnnecessaryIsInstance=false
-            raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
+            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
         return (
             self.major == other.major
             and self.minor == other.minor
@@ -76,7 +76,7 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
-            raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
+            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
         if self.major != other.major:
             return self.major < other.major
         elif self.minor != other.minor:

@@ -239,7 +239,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
     def connect(self):
         """Override connect to use Unix socket (instead of TCP socket)."""
         if not hasattr(socket, 'AF_UNIX'):
-            raise NotImplementedError('Unix sockets not supported on {}'.format(sys.platform))
+            raise NotImplementedError(f'Unix sockets not supported on {sys.platform}')
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
         if self.timeout is not _not_provided:
@@ -265,7 +265,7 @@ def _format_timeout(timeout: float) -> str:
     The format is in seconds with a millisecond resolution and an 's' suffix,
     as accepted by the Pebble API (which uses Go's time.ParseDuration).
     """
-    return '{:.3f}s'.format(timeout)
+    return f'{timeout:.3f}s'
 
 
 def _start_thread(target: Callable[..., Any], *args: Any, **kwargs: Any) -> threading.Thread:
@@ -279,7 +279,7 @@ class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
 
     def __repr__(self):
-        return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.args)
+        return f'<{type(self).__module__}.{type(self).__name__} {self.args}>'
 
 
 class TimeoutError(TimeoutError, Error):
@@ -305,10 +305,10 @@ class PathError(Error):
         self.message = message  # type: ignore
 
     def __str__(self):
-        return '{} - {}'.format(self.kind, self.message)
+        return f'{self.kind} - {self.message}'
 
     def __repr__(self):
-        return 'PathError({!r}, {!r})'.format(self.kind, self.message)
+        return f'PathError({self.kind!r}, {self.message!r})'
 
 
 class APIError(Error):
@@ -324,8 +324,7 @@ class APIError(Error):
         self.message = message  # type: ignore
 
     def __repr__(self):
-        return 'APIError({!r}, {!r}, {!r}, {!r})'.format(
-            self.body, self.code, self.status, self.message)
+        return f'APIError({self.body!r}, {self.code!r}, {self.status!r}, {self.message!r})'
 
 
 class ChangeError(Error):
@@ -343,7 +342,7 @@ class ChangeError(Error):
         for i, task in enumerate(self.change.tasks):
             if not task.log:
                 continue
-            parts.append('\n----- Logs from task {} -----\n'.format(i))
+            parts.append(f'\n----- Logs from task {i} -----\n')
             parts.append('\n'.join(task.log))
 
         if len(parts) > 1:
@@ -352,7 +351,7 @@ class ChangeError(Error):
         return ''.join(parts)
 
     def __repr__(self):
-        return 'ChangeError({!r}, {!r})'.format(self.err, self.change)
+        return f'ChangeError({self.err!r}, {self.change!r})'
 
 
 class ExecError(Error):
@@ -385,15 +384,14 @@ class ExecError(Error):
         self.stderr = stderr
 
     def __str__(self):
-        message = 'non-zero exit code {} executing {!r}'.format(
-            self.exit_code, self.command)
+        message = f'non-zero exit code {self.exit_code} executing {self.command!r}'
 
         for name, out in [('stdout', self.stdout), ('stderr', self.stderr)]:
             if out is None:
                 continue
             truncated = ' [truncated]' if len(out) > self.STR_MAX_OUTPUT else ''
             out = out[:self.STR_MAX_OUTPUT]
-            message = '{}, {}={!r}{}'.format(message, name, out, truncated)
+            message = f'{message}, {name}={out!r}{truncated}'
 
         return message
 
@@ -425,7 +423,7 @@ class SystemInfo:
         return cls(version=d['version'])
 
     def __repr__(self):
-        return 'SystemInfo(version={self.version!r})'.format(self=self)
+        return f'SystemInfo(version={self.version!r})'
 
 
 class Warning:
@@ -513,7 +511,7 @@ class TaskID(str):
     """Task ID (a more strongly-typed string)."""
 
     def __repr__(self):
-        return 'TaskID({!r})'.format(str(self))
+        return f'TaskID({str(self)!r})'
 
 
 class Task:
@@ -575,7 +573,7 @@ class ChangeID(str):
     """Change ID (a more strongly-typed string)."""
 
     def __repr__(self):
-        return 'ChangeID({!r})'.format(str(self))
+        return f'ChangeID({str(self)!r})'
 
 
 class Change:
@@ -734,7 +732,7 @@ class Layer:
         return typing.cast('LayerDict', dct)
 
     def __repr__(self) -> str:
-        return 'Layer({!r})'.format(self.to_dict())
+        return f'Layer({self.to_dict()!r})'
 
     __str__ = to_yaml
 
@@ -808,7 +806,7 @@ class Service:
                 setattr(self, name, value)
 
     def __repr__(self) -> str:
-        return 'Service({!r})'.format(self.to_dict())
+        return f'Service({self.to_dict()!r})'
 
     def __eq__(self, other: Union['_ServiceDict', 'Service']) -> bool:
         """Compare this service description to another."""
@@ -818,7 +816,7 @@ class Service:
             return self.to_dict() == other.to_dict()
         else:
             raise ValueError(
-                "Cannot compare pebble.Service to {}".format(type(other))
+                f"Cannot compare pebble.Service to {type(other)}"
             )
 
 
@@ -927,7 +925,7 @@ class Check:
         return typing.cast('_CheckDict', dct)
 
     def __repr__(self) -> str:
-        return 'Check({!r})'.format(self.to_dict())
+        return f'Check({self.to_dict()!r})'
 
     def __eq__(self, other: Union['_CheckDict', 'Check']) -> bool:
         """Compare this check configuration to another."""
@@ -936,7 +934,7 @@ class Check:
         elif isinstance(other, Check):
             return self.to_dict() == other.to_dict()
         else:
-            raise ValueError("Cannot compare pebble.Check to {}".format(type(other)))
+            raise ValueError(f"Cannot compare pebble.Check to {type(other)}")
 
 
 class CheckLevel(enum.Enum):
@@ -1305,7 +1303,7 @@ def _websocket_to_writer(ws: websocket.WebSocket, writer: '_WebsocketWriter',
             command = payload.get('command')
             if command != 'end':
                 # A command we don't recognize, keep going
-                logger.warning('Invalid I/O command {!r}'.format(command))
+                logger.warning(f'Invalid I/O command {command!r}')
                 continue
             # Received "end" command (EOF signal), stop thread
             break
@@ -1328,7 +1326,7 @@ class _WebsocketWriter(io.BufferedIOBase):
     def write(self, chunk: '_StrOrBytes') -> int:
         """Write chunk to the websocket."""
         if not isinstance(chunk, bytes):
-            raise TypeError('value to write must be bytes, not {}'.format(type(chunk).__name__))
+            raise TypeError(f'value to write must be bytes, not {type(chunk).__name__}')
         self.ws.send_binary(chunk)  # type: ignore
         return len(chunk)
 
@@ -1368,7 +1366,7 @@ class _WebsocketReader(io.BufferedIOBase):
                 command = payload.get('command')
                 if command != 'end':
                     # A command we don't recognize, keep going
-                    logger.warning('Invalid I/O command {!r}'.format(command))
+                    logger.warning(f'Invalid I/O command {command!r}')
                     continue
                 # Received "end" command, return EOF designator
                 self.eof = True
@@ -1402,8 +1400,7 @@ class Client:
         unless a custom opener is provided).
         """
         if not isinstance(socket_path, str):
-            raise TypeError('`socket_path` should be a string, '
-                            'not: {}'.format(type(socket_path)))
+            raise TypeError(f'`socket_path` should be a string, not: {type(socket_path)}')
         if opener is None:
             opener = self._get_default_opener(socket_path)
         self.socket_path = socket_path
@@ -1455,7 +1452,7 @@ class Client:
         """
         ctype, options = cgi.parse_header(headers.get('Content-Type', ''))
         if ctype != expected:
-            raise ProtocolError('expected Content-Type {!r}, got {!r}'.format(expected, ctype))
+            raise ProtocolError(f'expected Content-Type {expected!r}, got {ctype!r}')
         return options
 
     def _request_raw(
@@ -1484,7 +1481,7 @@ class Client:
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}  # type: Dict[str, Any]
-                message = '{} - {}'.format(type(e2).__name__, e2)
+                message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message)
         except urllib.error.URLError as e:
             raise ConnectionError(e.reason)
@@ -1520,13 +1517,13 @@ class Client:
 
     def get_change(self, change_id: ChangeID) -> Change:
         """Get single change by ID."""
-        resp = self._request('GET', '/v1/changes/{}'.format(change_id))
+        resp = self._request('GET', f'/v1/changes/{change_id}')
         return Change.from_dict(resp['result'])
 
     def abort_change(self, change_id: ChangeID) -> Change:
         """Abort change with given ID."""
         body = {'action': 'abort'}
-        resp = self._request('POST', '/v1/changes/{}'.format(change_id), body=body)
+        resp = self._request('POST', f'/v1/changes/{change_id}', body=body)
         return Change.from_dict(resp['result'])
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
@@ -1629,13 +1626,12 @@ class Client:
     ) -> ChangeID:
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
             raise TypeError(
-                'services must be of type Iterable[str], not {}'.format(
-                    type(services).__name__))
+                f'services must be of type Iterable[str], not {type(services).__name__}')
 
         services = list(services)
         for s in services:
             if not isinstance(s, str):
-                raise TypeError('service names must be str, not {}'.format(type(s).__name__))
+                raise TypeError(f'service names must be str, not {type(s).__name__}')
 
         body = {'action': action, 'services': services}
         resp = self._request('POST', '/v1/services', body=body)
@@ -1696,8 +1692,7 @@ class Client:
                 # Catch timeout from wait endpoint and loop to check deadline
                 pass
 
-        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
-            change_id, timeout))
+        raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def _wait_change(self, change_id: ChangeID, timeout: Optional[float] = None) -> Change:
         """Call the wait-change API endpoint directly."""
@@ -1706,13 +1701,12 @@ class Client:
             query['timeout'] = _format_timeout(timeout)
 
         try:
-            resp = self._request('GET', '/v1/changes/{}/wait'.format(change_id), query)
+            resp = self._request('GET', f'/v1/changes/{change_id}/wait', query)
         except APIError as e:
             if e.code == 404:
                 raise NotImplementedError('server does not implement wait-change endpoint')
             if e.code == 504:
-                raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
-                    change_id, timeout))
+                raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
             raise
 
         return Change.from_dict(resp['result'])
@@ -1729,8 +1723,7 @@ class Client:
 
             time.sleep(delay)
 
-        raise TimeoutError('timed out waiting for change {} ({} seconds)'.format(
-            change_id, timeout))
+        raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def add_layer(
             self, label: str, layer: Union[str, 'LayerDict', Layer], *,
@@ -1743,7 +1736,7 @@ class Client:
         layer override rules; if the layer doesn't exist, it is added as usual.
         """
         if not isinstance(label, str):
-            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+            raise TypeError(f'label must be a str, not {type(label).__name__}')
 
         if isinstance(layer, str):
             layer_yaml = layer
@@ -1752,8 +1745,8 @@ class Client:
         elif isinstance(layer, Layer):
             layer_yaml = layer.to_yaml()
         else:
-            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
-                type(layer).__name__))
+            raise TypeError(
+                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}')
 
         body = {
             'action': 'add',
@@ -1807,7 +1800,7 @@ class Client:
         options = self._ensure_content_type(response.headers, 'multipart/form-data')
         boundary = options.get('boundary', '')
         if not boundary:
-            raise ProtocolError('invalid boundary {!r}'.format(boundary))
+            raise ProtocolError(f'invalid boundary {boundary!r}')
 
         parser = _FilesParser(boundary)
 
@@ -1830,7 +1823,7 @@ class Client:
 
         filename = filenames[0]
         if filename != path:
-            raise ProtocolError('path not expected: {!r}'.format(filename))
+            raise ProtocolError(f'path not expected: {filename!r}')
 
         f = parser.get_file(path, encoding)
 
@@ -1842,7 +1835,7 @@ class Client:
         result = resp['result'] or []  # in case it's null instead of []
         paths = {item['path']: item for item in result}
         if path not in paths:
-            raise ProtocolError('path not found in response metadata: {}'.format(resp))
+            raise ProtocolError(f'path not found in response metadata: {resp}')
         error = paths[path].get('error')
         if error:
             raise PathError(error['kind'], error['message'])
@@ -2163,8 +2156,7 @@ class Client:
             not.
         """
         if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
-            raise TypeError('command must be a list of str, not {}'.format(
-                type(command).__name__))
+            raise TypeError(f'command must be a list of str, not {type(command).__name__}')
         if len(command) < 1:
             raise ValueError('command must contain at least one item')
 
@@ -2210,7 +2202,7 @@ class Client:
             change = self.wait_change(ChangeID(change_id))
             if change.err:
                 raise ChangeError(change.err, change)
-            raise ConnectionError('unexpected error connecting to websockets: {}'.format(e))
+            raise ConnectionError(f'unexpected error connecting to websockets: {e}')
 
         cancel_stdin = None  # type: Optional[Callable[[], None]]
         cancel_reader = None  # type: Optional[int]
@@ -2287,7 +2279,7 @@ class Client:
 
     def _websocket_url(self, task_id: str, websocket_id: str) -> str:
         base_url = self.base_url.replace('http://', 'ws://')
-        url = '{}/v1/tasks/{}/websocket/{}'.format(base_url, task_id, websocket_id)
+        url = f'{base_url}/v1/tasks/{task_id}/websocket/{websocket_id}'
         return url
 
     def send_signal(self, sig: Union[int, str], services: Iterable[str]):
@@ -2307,7 +2299,7 @@ class Client:
                             'not {}'.format(type(services).__name__))
         for s in services:
             if not isinstance(s, str):  # pyright: reportUnnecessaryIsInstance=false
-                raise TypeError('service names must be str, not {}'.format(type(s).__name__))
+                raise TypeError(f'service names must be str, not {type(s).__name__}')
 
         if isinstance(sig, int):
             sig = signal.Signals(sig).name
@@ -2379,7 +2371,7 @@ class _FilesParser:
         content_disposition = self._headers.get_content_disposition()
         if content_disposition != 'form-data':
             raise ProtocolError(
-                'unexpected content disposition: {!r}'.format(content_disposition))
+                f'unexpected content disposition: {content_disposition!r}')
 
         name = self._headers.get_param('name', header='content-disposition')
         if name == 'files':
@@ -2389,7 +2381,7 @@ class _FilesParser:
             self._prepare_tempfile(filename)
         elif name != 'response':
             raise ProtocolError(
-                'unexpected name in content-disposition header: {!r}'.format(name))
+                f'unexpected name in content-disposition header: {name!r}')
 
         self._part_type = typing.cast('Literal["response", "files"]', name)
 

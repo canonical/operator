@@ -36,7 +36,7 @@ def parse_rfc3339(s: str) -> datetime.datetime:
     """
     match = _TIMESTAMP_RE.match(s)
     if not match:
-        raise ValueError('invalid timestamp {!r}'.format(s))
+        raise ValueError(f'invalid timestamp {s!r}')
     y, m, d, hh, mm, ss, sfrac, zone = match.groups()
 
     if zone in ('Z', 'z'):
@@ -44,7 +44,7 @@ def parse_rfc3339(s: str) -> datetime.datetime:
     else:
         match = _TIMEOFFSET_RE.match(zone)
         if not match:
-            raise ValueError('invalid timestamp {!r}'.format(s))
+            raise ValueError(f'invalid timestamp {s!r}')
         sign, zh, zm = match.groups()
         tz_delta = datetime.timedelta(hours=int(zh), minutes=int(zm))
         tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)

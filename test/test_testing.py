@@ -1546,7 +1546,7 @@ class TestHarness(unittest.TestCase):
 
         stor_id = harness.add_storage("test")[0]
         with self.assertRaises(RuntimeError) as cm:
-            harness.detach_storage("test/{}".format(stor_id))
+            harness.detach_storage(f"test/{stor_id}")
         self.assertEqual(cm.exception.args[0],
                          "cannot detach storage before Harness is initialised")
 
@@ -2976,7 +2976,7 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertIsNotNone(backend._resource_dir)
         self.assertTrue(
             str(path).startswith(str(backend._resource_dir.name)),
-            msg='expected {} to be a subdirectory of {}'.format(path, backend._resource_dir.name))
+            msg=f'expected {path} to be a subdirectory of {backend._resource_dir.name}')
 
     def test_resource_get_no_resource(self):
         harness = Harness(CharmBase, meta='''
@@ -3956,7 +3956,7 @@ class _PebbleStorageAPIsTestMixin:
             -1,      # Less than 0o000
         )):
             with self.assertRaises(pebble.PathError) as cm:
-                client.make_dir(self.prefix + '/dir3_{}'.format(i), permissions=bad_permission)
+                client.make_dir(self.prefix + f'/dir3_{i}', permissions=bad_permission)
             self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_remove_path(self):

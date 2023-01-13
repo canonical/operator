@@ -68,7 +68,7 @@ TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
 
 VERSION_LOGLINE = [
     'juju-log', '--log-level', 'DEBUG', '--',
-    'Operator Framework {} up and running.'.format(version),
+    f'Operator Framework {version} up and running.',
 ]
 
 logger = logging.getLogger(__name__)
@@ -699,7 +699,7 @@ class _TestMain(abc.ABC):
             '    raise RuntimeError."failing as requested".\n'
             'RuntimeError: failing as requested'
         )
-        self.assertEqual(len(calls), 1, "expected 1 call, but got extra: {}".format(calls[1:]))
+        self.assertEqual(len(calls), 1, f"expected 1 call, but got extra: {calls[1:]}")
 
     def test_sets_model_name(self):
         self._prepare_actions()
@@ -900,9 +900,9 @@ class _TestMainWithDispatch(_TestMain):
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', '--',
-             'Running legacy {}.'.format(hook)],
+             f'Running legacy {hook}.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Legacy {} exited with status 0.'.format(hook)],
+             f'Legacy {hook} exited with status 0.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
@@ -949,9 +949,9 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', '--', 'Running legacy {}.'.format(hook)],
+            ['juju-log', '--log-level', 'INFO', '--', f'Running legacy {hook}.'],
             ['juju-log', '--log-level', 'WARNING', '--',
-             'Legacy {} exited with status 42.'.format(hook)],
+             f'Legacy {hook} exited with status 42.'],
         ]
         self.assertEqual(calls, expected)
 
@@ -998,12 +998,12 @@ class _TestMainWithDispatch(_TestMain):
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', '--',
-             'Running legacy {}.'.format(hook)],
+             f'Running legacy {hook}.'],
             VERSION_LOGLINE,    # because it called itself
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Charm called itself via {}.'.format(hook)],
+             f'Charm called itself via {hook}.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Legacy {} exited with status 0.'.format(hook)],
+             f'Legacy {hook} exited with status 0.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
