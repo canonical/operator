@@ -157,7 +157,7 @@ def _join_and(keys: List[str]) -> str:
         return ""
     if len(keys) == 1:
         return keys[0]
-    return ", ".join(keys[:-1]) + ", and " + keys[-1]
+    return f"{', '.join(keys[:-1])}, and {keys[-1]}"
 
 
 class _Missing:

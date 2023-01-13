@@ -1464,7 +1464,7 @@ class Client:
         """Make a request to the Pebble server; return the raw HTTPResponse object."""
         url = self.base_url + path
         if query:
-            url = url + '?' + urllib.parse.urlencode(query, doseq=True)
+            url = f"{url}?{urllib.parse.urlencode(query, doseq=True)}"
 
         if headers is None:
             headers = {}
@@ -1919,7 +1919,7 @@ class Client:
             source_io = source  # type: _AnyStrFileLikeIO
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
-        content_type = 'multipart/form-data; boundary="' + boundary.decode('utf-8') + '"'
+        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""  # NOQA: test_quote_backslashes
 
         def generator() -> Generator[bytes, None, None]:
             yield b''.join([

@@ -166,11 +166,11 @@ class TestFramework(BaseTestCase):
                 self.reprs = []
 
             def on_any(self, event):
-                self.seen.append("on_any:" + event.handle.kind)
+                self.seen.append(f"on_any:{event.handle.kind}")
                 self.reprs.append(repr(event))
 
             def on_foo(self, event):
-                self.seen.append("on_foo:" + event.handle.kind)
+                self.seen.append(f"on_foo:{event.handle.kind}")
                 self.reprs.append(repr(event))
 
         pub = MyNotifier(framework, "1")
@@ -530,7 +530,7 @@ class TestFramework(BaseTestCase):
         pub.on.foo.emit()
 
         self.assertEqual(obs.seen, ["on_foo:foo"])
-        fqn = pub.on.__class__.__module__ + "." + pub.on.__class__.__qualname__
+        fqn = f"{pub.on.__class__.__module__}.{pub.on.__class__.__qualname__}"
         self.assertEqual(repr(pub.on), f"<{fqn}: bar, foo>")
 
     def test_conflicting_event_attributes(self):

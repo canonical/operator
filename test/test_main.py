@@ -64,7 +64,7 @@ from .test_helpers import fake_script, fake_script_calls
 
 # This relies on the expected repository structure to find a path to
 # source of the charm under test.
-TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
+TEST_CHARM_DIR = Path(f"{__file__}/../charms/test_main").resolve()
 
 VERSION_LOGLINE = [
     'juju-log', '--log-level', 'DEBUG', '--',
@@ -599,7 +599,7 @@ class _TestMain(abc.ABC):
         for event_spec, expected_event_data in events_under_test:
             state = self._simulate_event(event_spec)
 
-            state_key = 'on_' + event_spec.event_name
+            state_key = f"on_{event_spec.event_name}"
             handled_events = getattr(state, state_key, [])
 
             # Make sure that a handler for that event was called once.
@@ -611,7 +611,7 @@ class _TestMain(abc.ABC):
             self.assertEqual(list(state.observed_event_types), [event_spec.event_type.__name__])
 
             if event_spec.event_name in expected_event_data:
-                self.assertEqual(state[event_spec.event_name + '_data'],
+                self.assertEqual(state[f"{event_spec.event_name}_data"],
                                  expected_event_data[event_spec.event_name])
 
     def test_event_not_implemented(self):
@@ -792,7 +792,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events."""
-        all_event_hooks = ['hooks/' + e.replace("_", "-")
+        all_event_hooks = [f"hooks/{e.replace('_', '-')}"
                            for e in self.charm_module.Charm.on.events().keys()]
         initial_events = {
             EventSpec(InstallEvent, 'install'),
@@ -800,13 +800,13 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
             EventSpec(StartEvent, 'start'),
             EventSpec(UpgradeCharmEvent, 'upgrade-charm'),
         }
-        initial_hooks = {'hooks/' + ev.event_name for ev in initial_events}
+        initial_hooks = {f"hooks/{ev.event_name}" for ev in initial_events}
 
         def _assess_event_links(event_spec):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 hook_path = self.JUJU_CHARM_DIR / event_hook
-                self.assertTrue(hook_path.exists(), 'Missing hook: ' + event_hook)
+                self.assertTrue(hook_path.exists(), f"Missing hook: {event_hook}")
                 if self.hooks_are_symlinks:
                     self.assertTrue(hook_path.is_symlink())
                     self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
@@ -864,7 +864,7 @@ class _TestMainWithDispatch(_TestMain):
 
         Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
-        all_event_hooks = ['hooks/' + e.replace("_", "-")
+        all_event_hooks = [f"hooks/{e.replace('_', '-')}"
                            for e in self.charm_module.Charm.on.events().keys()]
         initial_events = {
             EventSpec(InstallEvent, 'install'),
@@ -877,7 +877,7 @@ class _TestMainWithDispatch(_TestMain):
             self.assertNotIn(self.hooks_dir / event_spec.event_name, self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 self.assertFalse((self.JUJU_CHARM_DIR / event_hook).exists(),
-                                 'Spurious hook: ' + event_hook)
+                                 f"Spurious hook: {event_hook}")
 
         for initial_event in initial_events:
             self._setup_charm_dir()

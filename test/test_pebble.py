@@ -2586,7 +2586,7 @@ class TestExec(unittest.TestCase):
         self.addCleanup(time_patcher.stop)
 
     def add_responses(self, change_id, exit_code, change_err=None):
-        task_id = 'T' + change_id  # create a task_id based on change_id
+        task_id = f"T{change_id}"  # create a task_id based on change_id
         self.client.responses.append({
             'change': change_id,
             'result': {'task-id': task_id},
@@ -3334,7 +3334,7 @@ class TestRealPebble(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             process = self.client.exec(['pwd'], working_dir=temp_dir)
             out, err = process.wait_output()
-            self.assertEqual(out, temp_dir + '\n')
+            self.assertEqual(out, f"{temp_dir}\n")
             self.assertEqual(err, '')
 
     def test_exec_environment(self):

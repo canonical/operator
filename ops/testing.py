@@ -149,7 +149,7 @@ class Harness(Generic[CharmType]):
         self._charm = None  # type: Optional[CharmType]
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
-        self._unit_name = self._meta.name + '/0'  # type: str
+        self._unit_name = f"{self._meta.name}/0"  # type: str
         self._hooks_enabled = True  # type: bool
         self._relation_id_counter = 0  # type: int
         config_ = self._get_config(config)
@@ -1987,7 +1987,7 @@ class _TestingModelBackend:
     @classmethod
     def _generate_secret_id(cls) -> str:
         # Not a proper Juju secrets-style xid, but that's okay
-        return 'secret:' + str(uuid.uuid4())
+        return f"secret:{str(uuid.uuid4())}"
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,

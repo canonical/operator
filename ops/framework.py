@@ -464,13 +464,13 @@ class ObjectEvents(Object):
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
-            raise RuntimeError(prefix + 'is not a valid python identifier: ' + event_kind)
+            raise RuntimeError(f"{prefix}is not a valid python identifier: {event_kind}")
         elif keyword.iskeyword(event_kind):
-            raise RuntimeError(prefix + 'is a python keyword: ' + event_kind)
+            raise RuntimeError(f"{prefix}is a python keyword: {event_kind}")
         try:
             getattr(cls, event_kind)
             raise RuntimeError(
-                prefix + f'overlaps with an existing type {cls} attribute: {event_kind}')
+                f"{prefix}overlaps with an existing type {cls} attribute: {event_kind}")
         except AttributeError:
             pass
 
@@ -507,7 +507,7 @@ class PrefixedEvents:
 
     def __init__(self, emitter: Object, key: str):
         self._emitter = emitter
-        self._prefix = key.replace("-", "_") + '_'
+        self._prefix = f"{key.replace('-', '_')}_"
 
     def __getattr__(self, name: str) -> BoundEvent[Any]:
         return getattr(self._emitter, self._prefix + name)

@@ -977,24 +977,24 @@ class CharmBase(Object):
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
-            self.on.define_event(relation_name + '_relation_created', RelationCreatedEvent)
-            self.on.define_event(relation_name + '_relation_joined', RelationJoinedEvent)
-            self.on.define_event(relation_name + '_relation_changed', RelationChangedEvent)
-            self.on.define_event(relation_name + '_relation_departed', RelationDepartedEvent)
-            self.on.define_event(relation_name + '_relation_broken', RelationBrokenEvent)
+            self.on.define_event(f"{relation_name}_relation_created", RelationCreatedEvent)
+            self.on.define_event(f"{relation_name}_relation_joined", RelationJoinedEvent)
+            self.on.define_event(f"{relation_name}_relation_changed", RelationChangedEvent)
+            self.on.define_event(f"{relation_name}_relation_departed", RelationDepartedEvent)
+            self.on.define_event(f"{relation_name}_relation_broken", RelationBrokenEvent)
 
         for storage_name in self.framework.meta.storages:
             storage_name = storage_name.replace('-', '_')
-            self.on.define_event(storage_name + '_storage_attached', StorageAttachedEvent)
-            self.on.define_event(storage_name + '_storage_detaching', StorageDetachingEvent)
+            self.on.define_event(f"{storage_name}_storage_attached", StorageAttachedEvent)
+            self.on.define_event(f"{storage_name}_storage_detaching", StorageDetachingEvent)
 
         for action_name in self.framework.meta.actions:
             action_name = action_name.replace('-', '_')
-            self.on.define_event(action_name + '_action', ActionEvent)
+            self.on.define_event(f"{action_name}_action", ActionEvent)
 
         for container_name in self.framework.meta.containers:
             container_name = container_name.replace('-', '_')
-            self.on.define_event(container_name + '_pebble_ready', PebbleReadyEvent)
+            self.on.define_event(f"{container_name}_pebble_ready", PebbleReadyEvent)
 
     @property
     def app(self) -> model.Application:

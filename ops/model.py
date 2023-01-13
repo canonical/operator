@@ -990,14 +990,14 @@ class Secret:
             fields.append(f'id={self._id!r}')
         if self._label is not None:
             fields.append(f'label={self._label!r}')
-        return '<Secret ' + ' '.join(fields) + '>'
+        return f"<Secret {' '.join(fields)}>"
 
     @staticmethod
     def _canonicalize_id(id: str) -> str:
         """Return the canonical form of the given secret ID, with the 'secret:' prefix."""
         id = id.strip()
         if not id.startswith('secret:'):
-            id = 'secret:' + id  # add the prefix if not there already
+            id = f"secret:{id}"  # add the prefix if not there already
         return id
 
     @classmethod
