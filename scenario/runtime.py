@@ -208,8 +208,8 @@ class Runtime:
         with tempfile.TemporaryDirectory() as tempdir:
             temppath = Path(tempdir)
             (temppath / 'metadata.yaml').write_text(yaml.safe_dump(spec.meta))
-            (temppath / 'config.yaml').write_text(yaml.safe_dump(spec.config))
-            (temppath / 'actions.yaml').write_text(yaml.safe_dump(spec.actions))
+            (temppath / 'config.yaml').write_text(yaml.safe_dump(spec.config or {}))
+            (temppath / 'actions.yaml').write_text(yaml.safe_dump(spec.actions or {}))
             yield temppath
 
     def play(

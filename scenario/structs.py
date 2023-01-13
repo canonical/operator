@@ -1,9 +1,13 @@
 import copy
 import dataclasses
+import inspect
 import typing
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Sequence, Tuple, Union
 from typing import Optional, Type
 from uuid import uuid4
+
+import yaml
 
 from scenario.logger import logger as scenario_logger
 
@@ -227,28 +231,33 @@ class CharmSpec(_DCBase):
     """Charm spec."""
 
     charm_type: Type["CharmType"]
-    meta: Optional[Dict[str, Any]] = None
+    meta: Optional[Dict[str, Any]]
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
 
-    # todo: implement
-    # @staticmethod
-    # def from_charm_type(charm_type: Type["CharmType"]):
-    #     charm_source_path = Path(inspect.getfile(charm_type))
-    #     charm_root = charm_source_path.parent.parent
-    #
-    #     meta = yaml.safe_load(charm_root / 'metadata.yaml')
-    #     config_file = charm_root / 'config.yaml'
-    #
-    #     if config_file.exists():
-    #         config = yaml.safe_load(config_file)
-    #
-    #     return CharmSpec(
-    #         charm_type=charm_type,
-    #         meta=meta,
-    #         actions=actions,
-    #         config=config
-    #     )
+    @staticmethod
+    def from_charm(charm_type: Type["CharmType"]):
+        charm_source_path = Path(inspect.getfile(charm_type))
+        charm_root = charm_source_path.parent.parent
+
+        meta = yaml.safe_load(charm_root / 'metadata.yaml')
+
+        actions = config = None
+
+        config_path = charm_root / 'config.yaml'
+        if config_path.exists():
+            config = yaml.safe_load(config_path)
+
+        actions_path = charm_root / 'actions.yaml'
+        if actions_path.exists():
+            actions = yaml.safe_load(actions_path)
+
+        return CharmSpec(
+            charm_type=charm_type,
+            meta=meta,
+            actions=actions,
+            config=config
+        )
 
 
 @dataclasses.dataclass
