@@ -36,7 +36,7 @@ def mycharm():
     return MyCharm
 
 
-def test_called(mycharm):
+def test_charm_heals_on_start(mycharm):
     mycharm._call = lambda *_: True
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
 
@@ -46,11 +46,9 @@ def test_called(mycharm):
 
     def post_event(charm):
         post_event._called = True
-
         from ops.model import ActiveStatus
 
         charm.unit.status = ActiveStatus("yabadoodle")
-
         assert charm.called
 
     out = scenario.play(

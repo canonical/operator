@@ -75,7 +75,7 @@ class PlayResult:
     def __init__(
         self,
         charm: "CharmBase",
-        scene_in: "Scene",
+        scene_in: "Scene",  # todo: consider removing
         event: "EventBase",
         context_out: "Context",
     ):
@@ -288,7 +288,10 @@ class TeardownScenario(Scenario):
     ):
         playbook: Playbook = Playbook(
             events_to_scenes(
-                (BREAK_ALL_RELATIONS, DETACH_ALL_STORAGES, "stop", "remove"),
+                (BREAK_ALL_RELATIONS,
+                 DETACH_ALL_STORAGES,
+                 "stop",
+                 "remove"),
                 context=Context(state=State(leader=leader)),
             )
         )

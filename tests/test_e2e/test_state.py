@@ -65,18 +65,20 @@ def mycharm():
 
 @pytest.fixture
 def dummy_state():
-    return State(config={"foo": "bar"}, leader=True)
+    return State(config={"foo": "bar"},
+                 leader=True)
 
 
-@pytest.fixture
+@pytest.fixture(scope='function')
 def start_scene(dummy_state):
-    return Scene(event("start"), context=Context(state=dummy_state))
+    return Scene(event("start"),
+                 context=Context(state=dummy_state))
 
 
 def test_bare_event(start_scene, mycharm):
     mycharm._call = lambda *_: True
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
-    out = scenario.play(start_scene)
+    out = scenario.play(scene=start_scene)
 
     assert isinstance(out.charm, mycharm)
     assert out.charm.called
@@ -201,7 +203,10 @@ def test_relation_set(start_scene: Scene, mycharm):
             },
         )
     )
+
     scene = start_scene.copy()
+
+    scene.context.state.leader = True
     scene.context.state.relations = [  # we could also append...
         relation(
             endpoint="foo",
@@ -211,6 +216,7 @@ def test_relation_set(start_scene: Scene, mycharm):
             local_unit_data={},
         )
     ]
+
     out = scenario.play(scene)
 
     assert asdict(out.context_out.state.relations[0]) == asdict(
