@@ -6,15 +6,14 @@ from ops.charm import CharmBase, CharmEvents, StartEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
-from scenario.scenario import Scenario, sort_patch
+from scenario.scenario import Scenario
 from scenario.structs import (
     CharmSpec,
     ContainerSpec,
-    Context,
     Scene,
     State,
     event,
-    relation,
+    relation, sort_patch,
 )
 
 # from tests.setup_tests import setup_tests
@@ -46,19 +45,18 @@ def mycharm():
 
     class MyCharm(CharmBase):
         _call = None
+        called = False
         on = MyCharmEvents()
 
         def __init__(self, framework: Framework, key: Optional[str] = None):
             super().__init__(framework, key)
-            self.called = False
-
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
         def _on_event(self, event):
             if self._call:
-                self.called = True
-                self._call(event)
+                MyCharm.called = True
+                MyCharm._call(self, event)
 
     return MyCharm
 
@@ -71,29 +69,28 @@ def dummy_state():
 
 @pytest.fixture(scope='function')
 def start_scene(dummy_state):
-    return Scene(event("start"),
-                 context=Context(state=dummy_state))
+    return Scene(event("start"), state=dummy_state)
+
+
+@pytest.fixture(scope='function')
+def scenario(mycharm):
+    return Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
 
 
 def test_bare_event(start_scene, mycharm):
-    mycharm._call = lambda *_: True
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
     out = scenario.play(scene=start_scene)
-
-    assert isinstance(out.charm, mycharm)
-    assert out.charm.called
-    assert isinstance(out.event, StartEvent)
-    assert out.charm.unit.name == "foo/0"
-    assert out.charm.model.uuid == start_scene.context.state.model.uuid
+    out.juju_log = []  # ignore logging output in the delta
+    assert start_scene.state.delta(out) == []
 
 
 def test_leader_get(start_scene, mycharm):
-    def call(charm, _):
+    def pre_event(charm):
         assert charm.unit.is_leader()
 
-    mycharm._call = call
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
-    scenario.play(start_scene)
+    scenario.play(start_scene,
+                  pre_event=pre_event)
 
 
 def test_status_setting(start_scene, mycharm):
@@ -105,34 +102,33 @@ def test_status_setting(start_scene, mycharm):
     mycharm._call = call
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
     out = scenario.play(start_scene)
-    assert out.context_out.state.status.unit == ("active", "foo test")
-    assert out.context_out.state.status.app == ("waiting", "foo barz")
-    assert out.context_out.state.status.app_version == ""
-    assert out.delta() == sort_patch(
-        [
+    assert out.status.unit == ("active", "foo test")
+    assert out.status.app == ("waiting", "foo barz")
+    assert out.status.app_version == ""
+
+    out.juju_log = []  # ignore logging output in the delta
+    assert out.delta(start_scene.state) == sort_patch([
             {
                 "op": "replace",
-                "path": "/state/status/app",
+                "path": "/status/app",
                 "value": ("waiting", "foo barz"),
             },
             {
                 "op": "replace",
-                "path": "/state/status/unit",
+                "path": "/status/unit",
                 "value": ("active", "foo test"),
             },
-        ]
-    )
+        ])
 
 
 @pytest.mark.parametrize("connect", (True, False))
 def test_container(start_scene: Scene, connect, mycharm):
-    def call(charm: CharmBase, _):
+    def pre_event(charm: CharmBase):
         container = charm.unit.get_container("foo")
         assert container is not None
         assert container.name == "foo"
         assert container.can_connect() is connect
 
-    mycharm._call = call
     scenario = Scenario(
         CharmSpec(
             mycharm,
@@ -143,19 +139,26 @@ def test_container(start_scene: Scene, connect, mycharm):
         )
     )
     scene = start_scene.copy()
-    scene.context.state.containers = (ContainerSpec(name="foo", can_connect=connect),)
-    scenario.play(scene)
+    scene.state.containers = (ContainerSpec(name="foo", can_connect=connect),)
+    scenario.play(scene, pre_event=pre_event)
 
 
 def test_relation_get(start_scene: Scene, mycharm):
-    def call(charm: CharmBase, _):
+    def pre_event(charm: CharmBase):
         rel = charm.model.get_relation("foo")
         assert rel is not None
         assert rel.data[charm.app]["a"] == "because"
-        assert rel.data[rel.app]["a"] == "b"
-        assert not rel.data[charm.unit]  # empty
 
-    mycharm._call = call
+        assert rel.data[rel.app]["a"] == "b"
+        assert rel.data[charm.unit]["c"] == "d"
+
+        for unit in rel.units:
+            if unit is charm.unit:
+                continue
+            if unit.name == 'remote/1':
+                assert rel.data[unit]['e'] == 'f'
+            else:
+                assert not rel.data[unit]
 
     scenario = Scenario(
         CharmSpec(
@@ -167,7 +170,7 @@ def test_relation_get(start_scene: Scene, mycharm):
         )
     )
     scene = start_scene.copy()
-    scene.context.state.relations = [
+    scene.state.relations = [
         relation(
             endpoint="foo",
             interface="bar",
@@ -176,24 +179,41 @@ def test_relation_get(start_scene: Scene, mycharm):
             remote_unit_ids=[0, 1, 2],
             remote_app_data={"a": "b"},
             local_unit_data={"c": "d"},
+            remote_units_data={0: {}, 1: {"e": "f"}, 2: {}}
         ),
     ]
-    scenario.play(scene)
+    scenario.play(scene,
+                  pre_event=pre_event)
 
 
 def test_relation_set(start_scene: Scene, mycharm):
-    def call(charm: CharmBase, _):
+    def event_handler(charm: CharmBase, _):
         rel = charm.model.get_relation("foo")
         rel.data[charm.app]["a"] = "b"
         rel.data[charm.unit]["c"] = "d"
 
+        # this will NOT raise an exception because we're not in an event context!
+        # we're right before the event context is entered in fact.
+        # todo: how do we warn against the user abusing pre/post_event to mess with an unguarded state?
         with pytest.raises(Exception):
             rel.data[rel.app]["a"] = "b"
         with pytest.raises(Exception):
             rel.data[charm.model.get_unit("remote/1")]["c"] = "d"
 
-    mycharm._call = call
+        assert charm.unit.is_leader()
 
+    def pre_event(charm: CharmBase):
+        assert charm.model.get_relation("foo")
+
+        # this would NOT raise an exception because we're not in an event context!
+        # we're right before the event context is entered in fact.
+        # todo: how do we warn against the user abusing pre/post_event to mess with an unguarded state?
+        # with pytest.raises(Exception):
+        #     rel.data[rel.app]["a"] = "b"
+        # with pytest.raises(Exception):
+        #     rel.data[charm.model.get_unit("remote/1")]["c"] = "d"
+
+    mycharm._call = event_handler
     scenario = Scenario(
         CharmSpec(
             mycharm,
@@ -206,8 +226,8 @@ def test_relation_set(start_scene: Scene, mycharm):
 
     scene = start_scene.copy()
 
-    scene.context.state.leader = True
-    scene.context.state.relations = [  # we could also append...
+    scene.state.leader = True
+    scene.state.relations = [
         relation(
             endpoint="foo",
             interface="bar",
@@ -217,9 +237,11 @@ def test_relation_set(start_scene: Scene, mycharm):
         )
     ]
 
-    out = scenario.play(scene)
+    assert not mycharm.called
+    out = scenario.play(scene, pre_event=pre_event)
+    assert mycharm.called
 
-    assert asdict(out.context_out.state.relations[0]) == asdict(
+    assert asdict(out.relations[0]) == asdict(
         relation(
             endpoint="foo",
             interface="bar",
@@ -229,11 +251,5 @@ def test_relation_set(start_scene: Scene, mycharm):
         )
     )
 
-    assert out.context_out.state.relations[0].local_app_data == {"a": "b"}
-    assert out.context_out.state.relations[0].local_unit_data == {"c": "d"}
-    assert out.delta() == sort_patch(
-        [
-            {"op": "add", "path": "/state/relations/0/local_app_data/a", "value": "b"},
-            {"op": "add", "path": "/state/relations/0/local_unit_data/c", "value": "d"},
-        ]
-    )
+    assert out.relations[0].local_app_data == {"a": "b"}
+    assert out.relations[0].local_unit_data == {"c": "d"}

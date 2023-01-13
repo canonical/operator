@@ -5,7 +5,7 @@ import inspect
 import logging
 import os
 import warnings
-from typing import TYPE_CHECKING, Any, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Optional, Tuple, Type, Callable
 
 import ops.charm
 import ops.framework
@@ -14,68 +14,26 @@ import ops.storage
 from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
-
-if TYPE_CHECKING:
-    from ops.charm import CharmBase, EventBase
-
-from ops.framework import Handle
 from ops.main import (
     _Dispatcher,
     _get_charm_dir,
-    _get_event_args,
-    _should_use_controller_storage,
+    _emit_charm_event,
+    _should_use_controller_storage, CHARM_STATE_FILE,
 )
+from scenario.logger import logger as scenario_logger
 
-CHARM_STATE_FILE = ".unit-state.db"
+if TYPE_CHECKING:
+    from ops.testing import CharmType
+    from ops.charm import CharmBase, EventBase
 
-logger = logging.getLogger()
-
-
-def patched_bound_event_emit(self, *args: Any, **kwargs: Any) -> "EventBase":
-    """Emit event to all registered observers.
-
-    The current storage state is committed before and after each observer is notified.
-    """
-    framework = self.emitter.framework
-    key = framework._next_event_key()  # noqa
-    event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
-    event.framework = framework
-    framework._emit(event)  # noqa
-    return event
+logger = scenario_logger.getChild('ops_main_mock')
 
 
-from ops import framework
-
-framework.BoundEvent.emit = patched_bound_event_emit
-
-
-def _emit_charm_event(charm: "CharmBase", event_name: str) -> Optional["EventBase"]:
-    """Emits a charm event based on a Juju event name.
-
-    Args:
-        charm: A charm instance to emit an event from.
-        event_name: A Juju event name to emit on a charm.
-    """
-    event_to_emit = None
-    try:
-        event_to_emit = getattr(charm.on, event_name)
-    except AttributeError:
-        logger.debug("Event %s not defined for %s.", event_name, charm)
-
-    # If the event is not supported by the charm implementation, do
-    # not error out or try to emit it. This is to support rollbacks.
-    if event_to_emit is not None:
-        args, kwargs = _get_event_args(charm, event_to_emit)
-        logger.debug("Emitting Juju event %s.", event_name)
-        return event_to_emit.emit(*args, **kwargs)
-
-
-def main(
-    charm_class: Type[ops.charm.CharmBase],
-    use_juju_for_storage: Optional[bool] = None,
-    pre_event=None,
-    post_event=None,
-) -> Optional[Tuple["CharmBase", Optional["EventBase"]]]:
+def main(charm_class: Type[ops.charm.CharmBase],
+         use_juju_for_storage: Optional[bool] = None,
+         pre_event: Optional[Callable[["CharmType"], None]] = None,
+         post_event: Optional[Callable[["CharmType"], None]] = None,
+         ) -> Optional[Tuple["CharmBase", Optional["EventBase"]]]:
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
@@ -164,7 +122,7 @@ def main(
         if pre_event:
             pre_event(charm)
 
-        event = _emit_charm_event(charm, dispatcher.event_name)
+        _emit_charm_event(charm, dispatcher.event_name)
 
         if post_event:
             post_event(charm)
@@ -172,5 +130,3 @@ def main(
         framework.commit()
     finally:
         framework.close()
-
-    return charm, event
