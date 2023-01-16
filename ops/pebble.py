@@ -63,7 +63,8 @@ from ops._vendor import websocket
 if TYPE_CHECKING:
     from email.message import Message
 
-    from typing_extensions import Literal, Protocol, TypedDict
+    from typing_extensions import TypedDict
+    from typing import Literal, Protocol
 
     # callback types for _MultiParser header and body handlers
     class _BodyHandler(Protocol):
@@ -96,13 +97,14 @@ if TYPE_CHECKING:
     _TextOrBinaryIO = Union[TextIO, BinaryIO]
     _IOSource = Union[str, bytes, _AnyStrFileLikeIO]
 
-    _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
-    _InfoDict = TypedDict('_InfoDict',
-                          {"name": str,
-                           "level": Optional[Union['CheckLevel', str]],
-                           "status": Union['CheckStatus', str],
-                           "failures": int,
-                           "threshold": int})
+    class _SystemInfoDict(TypedDict):
+        version: str
+    class _InfoDict(TypedDict):
+        name: str
+        level: Optional[Union['CheckLevel', str]]
+        status: Union['CheckStatus', str]
+        failures: int
+        threshold: int
     _FileInfoDict = TypedDict('_FileInfoDict',
                               {"path": str,
                                "name": str,
@@ -114,19 +116,21 @@ if TYPE_CHECKING:
                                "group-id": Optional[int],
                                "group": Optional[str],
                                "type": Union['FileType', str]})
-    _HttpDict = TypedDict('_HttpDict', {'url': str})
-    _TcpDict = TypedDict('_TcpDict', {'port': int})
-    _ExecDict = TypedDict('_ExecDict', {'command': str})
-    _CheckDict = TypedDict('_CheckDict',
-                           {'override': str,
-                            'level': Union['CheckLevel', str],
-                            'period': Optional[str],
-                            'timeout': Optional[str],
-                            'http': Optional[_HttpDict],
-                            'tcp': Optional[_TcpDict],
-                            'exec': Optional[_ExecDict],
-                            'threshold': Optional[int]},
-                           total=False)
+    class _HttpDict(TypedDict):
+        url: str
+    class _TcpDict(TypedDict):
+        port: int
+    class _ExecDict(TypedDict):
+        command: str
+    class _CheckDict(TypedDict, total=False):
+        override: str
+        level: Union['CheckLevel', str]
+        period: Optional[str]
+        timeout: Optional[str]
+        http: Optional[_HttpDict]
+        tcp: Optional[_TcpDict]
+        exec: Optional[_ExecDict]
+        threshold: Optional[int]
 
     _AuthDict = TypedDict('_AuthDict',
                           {'permissions': Optional[str],
@@ -138,10 +142,10 @@ if TYPE_CHECKING:
                            'make-dirs': Optional[bool],
                            'make-parents': Optional[bool],
                            }, total=False)
-    _ServiceInfoDict = TypedDict('_ServiceInfoDict',
-                                 {'startup': Union['ServiceStartup', str],
-                                  'current': Union['ServiceStatus', str],
-                                  'name': str})
+    class _ServiceInfoDict(TypedDict):
+        startup: Union['ServiceStartup', str]
+        current: Union['ServiceStatus', str]
+        name: str
     _ServiceDict = TypedDict('_ServiceDict',
                              {'summary': str,
                               'description': str,
@@ -165,10 +169,10 @@ if TYPE_CHECKING:
                               },
                              total=False)
 
-    _ProgressDict = TypedDict('_ProgressDict',
-                              {'label': str,
-                               'done': int,
-                               'total': int})
+    class _ProgressDict(TypedDict):
+        label: str
+        done: int
+        total: int
     _TaskData = Dict[str, Any]
     _TaskDict = TypedDict('_TaskDict',
                           {'id': 'TaskID',
@@ -193,26 +197,24 @@ if TYPE_CHECKING:
                              'ready-time': Optional[str],
                              'data': Optional[_ChangeData]})
 
-    _PlanDict = TypedDict('_PlanDict',
-                          {'services': Dict[str, _ServiceDict],
-                           'checks': Dict[str, _CheckDict]},
-                          total=False)
+    class _PlanDict(TypedDict, total=False):
+        services: Dict[str, _ServiceDict]
+        checks: Dict[str, _CheckDict]
     # public as it is accessed by ops.testing
-    LayerDict = TypedDict('LayerDict',
-                          {'summary': str,
-                           'description': str,
-                           'services': Dict[str, _ServiceDict],
-                           'checks': Dict[str, _CheckDict]},
-                          total=False)
+    class LayerDict(TypedDict, total=False):
+        summary: str
+        description: str
+        services: Dict[str, _ServiceDict]
+        checks: Dict[str, _CheckDict]
 
-    _Error = TypedDict('_Error',
-                       {'kind': str,
-                        'message': str})
-    _Item = TypedDict('_Item',
-                      {'path': str,
-                       'error': _Error})
-    _FilesResponse = TypedDict('_FilesResponse',
-                               {'result': List[_Item]})
+    class _Error(TypedDict):
+        kind: str
+        message: str
+    class _Item(TypedDict):
+        path: str
+        error: _Error
+    class _FilesResponse(TypedDict):
+        result: List[_Item]
 
 logger = logging.getLogger(__name__)
 
@@ -1478,7 +1480,7 @@ class Client:
             try:
                 body = json.loads(e.read())  # type: Dict[str, Any]
                 message = body['result']['message']  # type: str
-            except (IOError, ValueError, KeyError) as e2:
+            except (OSError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}  # type: Dict[str, Any]
                 message = f'{type(e2).__name__} - {e2}'

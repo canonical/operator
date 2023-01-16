@@ -46,7 +46,7 @@ class InfrastructureTests(unittest.TestCase):
         # ensure we're not using unneeded backslash to escape strings
         issues = []
         for filepath in get_python_filepaths():
-            with open(filepath, "rt", encoding="utf8") as fh:
+            with open(filepath, encoding="utf8") as fh:
                 for idx, line in enumerate(fh, 1):
                     if (r'\"' in line or r"\'" in line) and "NOQA" not in line:
                         issues.append((filepath, idx, line.rstrip()))
@@ -62,7 +62,7 @@ class InfrastructureTests(unittest.TestCase):
             if os.stat(filepath).st_size == 0:
                 continue
 
-            with open(filepath, "rt", encoding="utf8") as fh:
+            with open(filepath, encoding="utf8") as fh:
                 for line in itertools.islice(fh, 5):
                     if regex.match(line):
                         break
@@ -85,7 +85,7 @@ class InfrastructureTests(unittest.TestCase):
         self.assertEqual(setup_version, ops.__version__)
 
     def test_setup_description(self):
-        with open("README.md", "rt", encoding="utf8") as fh:
+        with open("README.md", encoding="utf8") as fh:
             disk_readme = fh.read().strip()
 
         setup_readme = self._run_setup('--long-description')
@@ -118,7 +118,7 @@ class ImportersTestCase(unittest.TestCase):
         fd, testfile = tempfile.mkstemp()
         self.addCleanup(os.unlink, testfile)
 
-        with open(fd, 'wt', encoding='utf8') as fh:
+        with open(fd, 'w', encoding='utf8') as fh:
             fh.write(self.template.format(module_name=name))
 
         environ = os.environ.copy()

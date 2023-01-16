@@ -34,30 +34,28 @@ from ops._private import yaml
 from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 if TYPE_CHECKING:
-    from typing_extensions import Literal, Required, TypedDict
+    from typing_extensions import Required, TypedDict
+    from typing import Literal
 
     from ops.framework import Handle, JsonObject, _SerializedData
     from ops.model import Container, Numerical, Relation, Storage
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
-    _ActionMetaDict = TypedDict(
-        '_ActionMetaDict', {
-            'title': str,
-            'description': str,
-            'params': Dict[str, _ActionParam],
-            'required': List[str]},
-        total=False)
+    class _ActionMetaDict(TypedDict, total=False):
+        title: str
+        description: str
+        params: Dict[str, _ActionParam]
+        required: List[str]
 
     _Scopes = Literal['global', 'container']
-    _RelationMetaDict = TypedDict(
-        '_RelationMetaDict', {
-            'interface': Required[str],
-            'limit': int,
-            'scope': _Scopes},
-        total=False)
+    class _RelationMetaDict(TypedDict, total=False):
+        interface: Required[str]
+        limit: int
+        scope: _Scopes
 
-    _MultipleRange = TypedDict('_MultipleRange', {'range': str})
+    class _MultipleRange(TypedDict):
+        range: str
     _StorageMetaDict = TypedDict('_StorageMetaDict', {
         'type': Required[str],
         'description': int,
@@ -69,21 +67,19 @@ if TYPE_CHECKING:
         'multiple': _MultipleRange
     })
 
-    _ResourceMetaDict = TypedDict(
-        '_ResourceMetaDict', {
-            'type': Required[str],
-            'filename': str,
-            'description': str},
-        total=False)
+    class _ResourceMetaDict(TypedDict, total=False):
+        type: Required[str]
+        filename: str
+        description: str
 
-    _PayloadMetaDict = TypedDict('_PayloadMetaDict', {'type': str})
+    class _PayloadMetaDict(TypedDict):
+        type: str
 
-    _MountDict = TypedDict(
-        '_MountDict', {'storage': Required[str],
-                       'location': str},
-        total=False)
-    _ContainerMetaDict = TypedDict(
-        '_ContainerMetaDict', {'mounts': List[_MountDict]})
+    class _MountDict(TypedDict, total=False):
+        storage: Required[str]
+        location: str
+    class _ContainerMetaDict(TypedDict):
+        mounts: List[_MountDict]
 
     _CharmMetaDict = TypedDict(
         '_CharmMetaDict', {  # all are optional
@@ -108,23 +104,20 @@ if TYPE_CHECKING:
         }, total=False)
 
     # can't put in *Event because *Event.snapshot needs it.
-    _WorkloadEventSnapshot = TypedDict('_WorkloadEventSnapshot', {
-        'container_name': str
-    }, total=False)
+    class _WorkloadEventSnapshot(TypedDict, total=False):
+        container_name: str
 
-    _RelationDepartedEventSnapshot = TypedDict('_RelationDepartedEventSnapshot', {
-        'relation_name': str,
-        'relation_id': int,
-        'app_name': Optional[str],
-        'unit_name': Optional[str],
-        'departing_unit': Optional[str]
-    }, total=False)
+    class _RelationDepartedEventSnapshot(TypedDict, total=False):
+        relation_name: str
+        relation_id: int
+        app_name: Optional[str]
+        unit_name: Optional[str]
+        departing_unit: Optional[str]
 
-    _StorageEventSnapshot = TypedDict('_StorageEventSnapshot', {
-        'storage_name': str,
-        'storage_index': int,
-        'storage_location': str,
-    }, total=False)
+    class _StorageEventSnapshot(TypedDict, total=False):
+        storage_name: str
+        storage_index: int
+        storage_location: str
 
 
 class HookEvent(EventBase):
@@ -425,12 +418,11 @@ class RelationEvent(HookEvent):
 
     """
     if TYPE_CHECKING:
-        _RelationEventSnapshot = TypedDict('_RelationEventSnapshot', {
-            'relation_name': Required[str],
-            'relation_id': Required[int],
-            'app_name': Optional[str],
-            'unit_name': Optional[str]
-        }, total=False)
+        class _RelationEventSnapshot(TypedDict, total=False):
+            relation_name: Required[str]
+            relation_id: Required[int]
+            app_name: Optional[str]
+            unit_name: Optional[str]
 
     def __init__(self, handle: 'Handle', relation: 'Relation',
                  app: Optional[model.Application] = None,
@@ -1195,7 +1187,7 @@ class RelationMeta:
         self.scope = raw.get('scope') or self._default_scope
         if self.scope not in self.VALID_SCOPES:
             raise TypeError("scope should be one of {}; not '{}'".format(
-                ', '.join("'{}'".format(s) for s in self.VALID_SCOPES), self.scope))
+                ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope))
 
 
 class StorageMeta:

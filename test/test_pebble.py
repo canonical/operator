@@ -1178,7 +1178,7 @@ class TestMultipartParser(unittest.TestCase):
 
                 def handle_header(data):
                     headers.append(bytes(data))
-                    bodies.append(bytes())
+                    bodies.append(b'')
                     bodies_done.append(False)
 
                 def handle_body(data, done=False):
