@@ -1,2 +1,3 @@
-PyYAML
-websocket-client
+PyYAML==6.0
+websockets==10.4
+websocket-client==1.4.2
