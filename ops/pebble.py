@@ -1197,10 +1197,10 @@ class ExecProcess:
             os.close(self._cancel_reader)
 
         # Close websockets (shutdown doesn't send CLOSE message or wait for response).
-        self._control_ws.shutdown()
-        self._stdio_ws.shutdown()
+        self._control_ws.shutdown()     # type: ignore
+        self._stdio_ws.shutdown()       # type: ignore
         if self._stderr_ws is not None:
-            self._stderr_ws.shutdown()
+            self._stderr_ws.shutdown()  # type: ignore
 
         if change.err:
             raise ChangeError(change.err, change)
