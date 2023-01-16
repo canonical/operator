@@ -131,7 +131,7 @@ class Handle:
             if key:
                 self._path = f"{kind}[{key}]"
             else:
-                self._path = kind
+                self._path = f"{kind}"  # don't need f-string, but consistent with above
 
     def nest(self, kind: str, key: str) -> 'Handle':
         """Create a new handle as child of the current one."""
