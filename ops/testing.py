@@ -56,14 +56,16 @@ from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.model import RelationNotFoundError
 
 if TYPE_CHECKING:
-    from typing_extensions import TypedDict
     from typing import Literal
+
+    from typing_extensions import TypedDict
 
     from ops.model import UnitOrApplication
 
     ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
     _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
     _FileOrDir = Union['_File', '_Directory']
+
     class _FileKwargs(TypedDict):
         permissions: int
         last_modified: datetime.datetime
@@ -77,15 +79,18 @@ if TYPE_CHECKING:
         units: List[str]
 
     _ConfigValue = Union[str, int, float, bool]
+
     class _ConfigOption(TypedDict):
         type: Literal['string', 'int', 'float', 'boolean']
         description: str
         default: _ConfigValue
     _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
+
     class _RawStatus(TypedDict):
         status: _StatusName
         message: str
-    class RawConfig(TypedDict):
+
+    class _RawConfig(TypedDict):
         options: Dict[str, _ConfigOption]
 
 
@@ -437,7 +442,7 @@ class Harness(Generic[CharmType]):
 
         if not isinstance(config, dict):  # pyright: reportUnnecessaryIsInstance=false
             raise TypeError(config)
-        return cast('RawConfig', config)
+        return cast('_RawConfig', config)
 
     def add_oci_resource(self, resource_name: str,
                          contents: Optional[Mapping[str, str]] = None) -> None:
@@ -1402,7 +1407,7 @@ class _TestingConfig(Dict[str, '_ConfigValue']):
         'float': float
     }
 
-    def __init__(self, config: 'RawConfig'):
+    def __init__(self, config: '_RawConfig'):
         super().__init__()
         self._spec = config
         self._defaults = self._load_defaults(config)
@@ -1413,7 +1418,7 @@ class _TestingConfig(Dict[str, '_ConfigValue']):
             self._config_set(key, value)
 
     @staticmethod
-    def _load_defaults(charm_config: 'RawConfig') -> Dict[str, '_ConfigValue']:
+    def _load_defaults(charm_config: '_RawConfig') -> Dict[str, '_ConfigValue']:
         """Load default values from config.yaml.
 
         Handle the case where a user doesn't supply explicit config snippets.
@@ -1500,7 +1505,7 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: 'RawConfig'):
+    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: '_RawConfig'):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
@@ -2190,7 +2195,7 @@ class _TestingPebbleClient:
         raise NotImplementedError(self.wait_change)
 
     def add_layer(
-            self, label: str, layer: Union[str, 'pebble.LayerDict', pebble.Layer], *,
+            self, label: str, layer: Union[str, 'pebble._LayerDict', pebble.Layer], *,
             combine: bool = False):
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass

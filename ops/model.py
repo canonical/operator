@@ -64,9 +64,9 @@ if typing.TYPE_CHECKING:
         Client,
         ExecProcess,
         FileInfo,
-        LayerDict,
         Plan,
         ServiceInfo,
+        _LayerDict,
     )
     from typing_extensions import TypedDict
 
@@ -92,7 +92,7 @@ if typing.TYPE_CHECKING:
         message: str
 
     # the data structure we can use to initialize pebble layers with.
-    _Layer = Union[str, LayerDict, pebble.Layer]
+    _Layer = Union[str, _LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
     _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]

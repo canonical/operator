@@ -62,9 +62,9 @@ from ops._vendor import websocket
 
 if TYPE_CHECKING:
     from email.message import Message
+    from typing import Literal, Protocol
 
     from typing_extensions import TypedDict
-    from typing import Literal, Protocol
 
     # callback types for _MultiParser header and body handlers
     class _BodyHandler(Protocol):
@@ -99,6 +99,7 @@ if TYPE_CHECKING:
 
     class _SystemInfoDict(TypedDict):
         version: str
+
     class _InfoDict(TypedDict):
         name: str
         level: Optional[Union['CheckLevel', str]]
@@ -116,12 +117,16 @@ if TYPE_CHECKING:
                                "group-id": Optional[int],
                                "group": Optional[str],
                                "type": Union['FileType', str]})
+
     class _HttpDict(TypedDict):
         url: str
+
     class _TcpDict(TypedDict):
         port: int
+
     class _ExecDict(TypedDict):
         command: str
+
     class _CheckDict(TypedDict, total=False):
         override: str
         level: Union['CheckLevel', str]
@@ -142,6 +147,7 @@ if TYPE_CHECKING:
                            'make-dirs': Optional[bool],
                            'make-parents': Optional[bool],
                            }, total=False)
+
     class _ServiceInfoDict(TypedDict):
         startup: Union['ServiceStartup', str]
         current: Union['ServiceStatus', str]
@@ -200,8 +206,8 @@ if TYPE_CHECKING:
     class _PlanDict(TypedDict, total=False):
         services: Dict[str, _ServiceDict]
         checks: Dict[str, _CheckDict]
-    # public as it is accessed by ops.testing
-    class LayerDict(TypedDict, total=False):
+
+    class _LayerDict(TypedDict, total=False):
         summary: str
         description: str
         services: Dict[str, _ServiceDict]
@@ -210,9 +216,11 @@ if TYPE_CHECKING:
     class _Error(TypedDict):
         kind: str
         message: str
+
     class _Item(TypedDict):
         path: str
         error: _Error
+
     class _FilesResponse(TypedDict):
         result: List[_Item]
 
@@ -704,12 +712,12 @@ class Layer:
     #: Mapping of check to :class:`Check` defined by this layer.
     checks: Dict[str, 'Check']
 
-    def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
+    def __init__(self, raw: Optional[Union[str, '_LayerDict']] = None):
         if isinstance(raw, str):
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
             d = raw or {}
-        d = typing.cast('LayerDict', d)
+        d = typing.cast('_LayerDict', d)
 
         self.summary = d.get('summary', '')
         self.description = d.get('description', '')
@@ -722,7 +730,7 @@ class Layer:
         """Convert this layer to its YAML representation."""
         return yaml.safe_dump(self.to_dict())
 
-    def to_dict(self) -> 'LayerDict':
+    def to_dict(self) -> '_LayerDict':
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -731,7 +739,7 @@ class Layer:
             ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
         ]
         dct = {name: value for name, value in fields if value}
-        return typing.cast('LayerDict', dct)
+        return typing.cast('_LayerDict', dct)
 
     def __repr__(self) -> str:
         return f'Layer({self.to_dict()!r})'
@@ -1728,7 +1736,7 @@ class Client:
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def add_layer(
-            self, label: str, layer: Union[str, 'LayerDict', Layer], *,
+            self, label: str, layer: Union[str, '_LayerDict', Layer], *,
             combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
