@@ -2483,8 +2483,8 @@ class _MultipartParser:
         self._max_lookahead = max_lookahead
         self._max_boundary_length = max_boundary_length
 
-        self._buf = bytearray()
-        self._pos = 0  # current position in buf
+        self._buf: bytearray = bytearray()
+        self._pos: int = 0  # current position in buf
         self._done = False  # whether we have found the terminal boundary and are done parsing
         self._header_terminator = b'\r\n\r\n'
 
