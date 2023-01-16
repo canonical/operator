@@ -134,14 +134,14 @@ class TestLogging(unittest.TestCase):
         with patch('sys.stderr', buffer):
             ops.log.setup_root_logging(self.backend, debug=True)
             logger = logging.getLogger()
-            logger.debug(f"{'l' * MAX_LOG_LINE_LEN}")
+            logger.debug('l' * MAX_LOG_LINE_LEN)
 
         self.assertEqual(len(self.backend.calls()), 1)
 
         self.backend.calls(clear=True)
 
         with patch('sys.stderr', buffer):
-            logger.debug(f"{'l' * (MAX_LOG_LINE_LEN + 9)}")
+            logger.debug('l' * (MAX_LOG_LINE_LEN + 9))
 
         calls = self.backend.calls()
         self.assertEqual(len(calls), 3)

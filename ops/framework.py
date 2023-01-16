@@ -131,7 +131,7 @@ class Handle:
             if key:
                 self._path = f"{kind}[{key}]"
             else:
-                self._path = f"{kind}"
+                self._path = kind
 
     def nest(self, kind: str, key: str) -> 'Handle':
         """Create a new handle as child of the current one."""
@@ -507,7 +507,7 @@ class PrefixedEvents:
 
     def __init__(self, emitter: Object, key: str):
         self._emitter = emitter
-        self._prefix = f"{key.replace('-', '_')}_"
+        self._prefix = key.replace('-', '_') + '_'
 
     def __getattr__(self, name: str) -> BoundEvent[Any]:
         return getattr(self._emitter, self._prefix + name)
