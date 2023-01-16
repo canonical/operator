@@ -57,8 +57,9 @@ from typing import (
     Union,
 )
 
+import websocket
+
 from ops._private import timeconv, yaml
-from ops._vendor import websocket
 
 if TYPE_CHECKING:
     from email.message import Message
