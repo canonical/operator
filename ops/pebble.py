@@ -1190,10 +1190,10 @@ class ExecProcess:
             os.close(self._cancel_reader)
 
         # Close websockets (shutdown doesn't send CLOSE message or wait for response).
-        self._control_ws.shutdown()
-        self._stdio_ws.shutdown()
+        self._control_ws.shutdown()     # type: ignore
+        self._stdio_ws.shutdown()       # type: ignore
         if self._stderr_ws is not None:
-            self._stderr_ws.shutdown()
+            self._stderr_ws.shutdown()  # type: ignore
 
         if change.err:
             raise ChangeError(change.err, change)
@@ -1292,7 +1292,7 @@ def _websocket_to_writer(ws: websocket.WebSocket, writer: '_WebsocketWriter',
                          encoding: str):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
-        chunk = ws.recv()  # type: '_StrOrBytes'
+        chunk: typing.AnyStr = ws.recv()  # type: ignore
 
         if isinstance(chunk, str):
             try:
@@ -1355,7 +1355,7 @@ class _WebsocketReader(io.BufferedIOBase):
             return b''
 
         while not self.remaining:
-            chunk = self.ws.recv()  # type: '_StrOrBytes'
+            chunk: typing.AnyStr = self.ws.recv()  # type: ignore
 
             if isinstance(chunk, str):
                 try:

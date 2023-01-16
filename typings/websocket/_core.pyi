@@ -253,7 +253,7 @@ class WebSocket:
         """
         ...
     
-    def recv(self): # -> Literal['']:
+    def recv(self): # -> str | bytes:
         """
         Receive string data(byte array) from the server.
 
