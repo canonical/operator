@@ -1206,9 +1206,9 @@ class TestMultipartParser(unittest.TestCase):
                     self.assertEqual(test.error, str(err))
                 else:
                     if test.error:
-                        self.fail('missing expected error: {!r}'.format(test.error))
+                        self.fail(f'missing expected error: {test.error!r}')
 
-                    msg = 'test case {} ({}), chunk size {}'.format(i + 1, test.name, chunk_size)
+                    msg = f'test case {i + 1} ({test.name}), chunk size {chunk_size}'
                     self.assertEqual(test.want_headers, headers, msg)
                     self.assertEqual(test.want_bodies, bodies, msg)
                     self.assertEqual(test.want_bodies_done, bodies_done, msg)
@@ -2586,7 +2586,7 @@ class TestExec(unittest.TestCase):
         self.addCleanup(time_patcher.stop)
 
     def add_responses(self, change_id, exit_code, change_err=None):
-        task_id = 'T' + change_id  # create a task_id based on change_id
+        task_id = f"T{change_id}"  # create a task_id based on change_id
         self.client.responses.append({
             'change': change_id,
             'result': {'task-id': task_id},
@@ -2617,7 +2617,7 @@ class TestExec(unittest.TestCase):
             'command': command,
             'environment': environment or {},
             'working-dir': working_dir,
-            'timeout': '{:.3f}s'.format(timeout) if timeout is not None else None,
+            'timeout': f'{timeout:.3f}s' if timeout is not None else None,
             'user-id': user_id,
             'user': user,
             'group-id': group_id,
@@ -3316,7 +3316,7 @@ class TestRealPebble(unittest.TestCase):
         self.assertEqual(err, b'')
 
     def test_push_pull(self):
-        fname = os.path.join(tempfile.gettempdir(), 'pebbletest-{}'.format(uuid.uuid4()))
+        fname = os.path.join(tempfile.gettempdir(), f'pebbletest-{uuid.uuid4()}')
         content = 'foo\nbar\nbaz-42'
         self.client.push(fname, content)
         with self.client.pull(fname) as f:
@@ -3334,7 +3334,7 @@ class TestRealPebble(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             process = self.client.exec(['pwd'], working_dir=temp_dir)
             out, err = process.wait_output()
-            self.assertEqual(out, temp_dir + '\n')
+            self.assertEqual(out, f"{temp_dir}\n")
             self.assertEqual(err, '')
 
     def test_exec_environment(self):

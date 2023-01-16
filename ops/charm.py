@@ -439,7 +439,7 @@ class RelationEvent(HookEvent):
 
         if unit is not None and unit.app != app:
             raise RuntimeError(
-                'cannot create RelationEvent with application {} and unit {}'.format(app, unit))
+                f'cannot create RelationEvent with application {app} and unit {unit}')
 
         self.relation = relation
         self.app = app
@@ -977,24 +977,24 @@ class CharmBase(Object):
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
-            self.on.define_event(relation_name + '_relation_created', RelationCreatedEvent)
-            self.on.define_event(relation_name + '_relation_joined', RelationJoinedEvent)
-            self.on.define_event(relation_name + '_relation_changed', RelationChangedEvent)
-            self.on.define_event(relation_name + '_relation_departed', RelationDepartedEvent)
-            self.on.define_event(relation_name + '_relation_broken', RelationBrokenEvent)
+            self.on.define_event(f"{relation_name}_relation_created", RelationCreatedEvent)
+            self.on.define_event(f"{relation_name}_relation_joined", RelationJoinedEvent)
+            self.on.define_event(f"{relation_name}_relation_changed", RelationChangedEvent)
+            self.on.define_event(f"{relation_name}_relation_departed", RelationDepartedEvent)
+            self.on.define_event(f"{relation_name}_relation_broken", RelationBrokenEvent)
 
         for storage_name in self.framework.meta.storages:
             storage_name = storage_name.replace('-', '_')
-            self.on.define_event(storage_name + '_storage_attached', StorageAttachedEvent)
-            self.on.define_event(storage_name + '_storage_detaching', StorageDetachingEvent)
+            self.on.define_event(f"{storage_name}_storage_attached", StorageAttachedEvent)
+            self.on.define_event(f"{storage_name}_storage_detaching", StorageDetachingEvent)
 
         for action_name in self.framework.meta.actions:
             action_name = action_name.replace('-', '_')
-            self.on.define_event(action_name + '_action', ActionEvent)
+            self.on.define_event(f"{action_name}_action", ActionEvent)
 
         for container_name in self.framework.meta.containers:
             container_name = container_name.replace('-', '_')
-            self.on.define_event(container_name + '_pebble_ready', PebbleReadyEvent)
+            self.on.define_event(f"{container_name}_pebble_ready", PebbleReadyEvent)
 
     @property
     def app(self) -> model.Application:
@@ -1182,7 +1182,7 @@ class RelationMeta:
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        assert isinstance(role, RelationRole), "role should be one of {!r}, not {!r}".format(list(RelationRole), role)  # noqa
+        assert isinstance(role, RelationRole), f"role should be one of {list(RelationRole)!r}, not {role!r}"  # noqa
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
@@ -1190,7 +1190,7 @@ class RelationMeta:
 
         self.limit = limit = raw.get('limit', None)
         if limit is not None and not isinstance(limit, int):  # type: ignore  # noqa
-            raise TypeError("limit should be an int, not {}".format(type(limit)))
+            raise TypeError(f"limit should be an int, not {type(limit)}")
 
         self.scope = raw.get('scope') or self._default_scope
         if self.scope not in self.VALID_SCOPES:
@@ -1367,5 +1367,5 @@ class ContainerStorageMeta:
                 )
         else:
             raise AttributeError(
-                "{.__class__.__name__} has no such attribute: {}!".format(self, name)
+                f"{self.__class__.__name__} has no such attribute: {name}!"
             )

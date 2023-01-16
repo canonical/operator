@@ -516,10 +516,10 @@ start:
             def _on_start_action(self, event):
                 event.defer()
 
-        fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
+        fake_script(self, f"{cmd_type}-get", """echo '{"foo-name": "name", "silent": true}'""")
         self.meta = self._get_action_test_meta()
 
-        os.environ['JUJU_{}_NAME'.format(cmd_type.upper())] = 'start'
+        os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'start'
         framework = self.create_framework()
         charm = MyCharm(framework)
 

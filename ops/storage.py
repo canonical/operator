@@ -59,7 +59,7 @@ class SQLiteStorage:
 
         if not os.path.exists(str(filename)):
             # sqlite3.connect creates the file silently if it does not exist
-            logger.debug("Initializing SQLite local storage: {}.".format(filename))
+            logger.debug(f"Initializing SQLite local storage: {filename}.")
 
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
@@ -396,4 +396,4 @@ class NoSnapshotError(Exception):
         self.handle_path = handle_path
 
     def __str__(self):
-        return 'no snapshot data found for {} object'.format(self.handle_path)
+        return f'no snapshot data found for {self.handle_path} object'

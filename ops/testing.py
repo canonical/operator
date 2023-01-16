@@ -149,7 +149,7 @@ class Harness(Generic[CharmType]):
         self._charm = None  # type: Optional[CharmType]
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
-        self._unit_name = self._meta.name + '/0'  # type: str
+        self._unit_name = f"{self._meta.name}/0"  # type: str
         self._hooks_enabled = True  # type: bool
         self._relation_id_counter = 0  # type: int
         config_ = self._get_config(config)
@@ -459,9 +459,9 @@ class Harness(Generic[CharmType]):
                         'password': 'password',
                         }
         if resource_name not in self._meta.resources.keys():
-            raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not a defined resources')
         if self._meta.resources[resource_name].type != "oci-image":
-            raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not an OCI Image')
 
         as_yaml = yaml.safe_dump(contents)
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
@@ -478,11 +478,11 @@ class Harness(Generic[CharmType]):
                 returned by resource-get. If contents is a string, it will be encoded in utf-8
         """
         if resource_name not in self._meta.resources.keys():
-            raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not a defined resources')
         record = self._meta.resources[resource_name]
         if record.type != "file":
             raise RuntimeError(
-                'Resource {} is not a file, but actually {}'.format(resource_name, record.type))
+                f'Resource {resource_name} is not a file, but actually {record.type}')
         filename = record.filename
         if filename is None:
             filename = resource_name
@@ -558,7 +558,7 @@ class Harness(Generic[CharmType]):
         """
         if storage_name not in self._meta.storages:
             raise RuntimeError(
-                "the key '{}' is not specified as a storage key in metadata".format(storage_name))
+                f"the key '{storage_name}' is not specified as a storage key in metadata")
 
         storage_indices = self._backend.storage_add(storage_name, count)
 
@@ -634,7 +634,7 @@ class Harness(Generic[CharmType]):
         storage_index = int(storage_index)
         if storage_name not in self._meta.storages:
             raise RuntimeError(
-                "the key '{}' is not specified as a storage key in metadata".format(storage_name))
+                f"the key '{storage_name}' is not specified as a storage key in metadata")
         is_attached = self._backend._storage_is_attached(  # pyright:ReportPrivateUsage=false
             storage_name, storage_index)
         if self._charm is not None and self._hooks_enabled and is_attached:
@@ -896,7 +896,7 @@ class Harness(Generic[CharmType]):
         """
         client = self._backend._pebble_clients.get(container_name)
         if client is None:
-            raise KeyError('no known pebble client for container "{}"'.format(container_name))
+            raise KeyError(f'no known pebble client for container "{container_name}"')
         return client.get_plan()
 
     def container_pebble_ready(self, container_name: str):
@@ -1064,7 +1064,7 @@ class Harness(Generic[CharmType]):
                     if value is not None:
                         config._config_set(key, value)
                 else:
-                    raise ValueError("unknown config option: '{}'".format(key))
+                    raise ValueError(f"unknown config option: '{key}'")
 
         for key in unset:
             # When the key is unset, revert to the default if one exists
@@ -1347,7 +1347,7 @@ def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     elif isinstance(app_or_unit, str):
         return app_or_unit
     else:
-        raise TypeError('Expected Application | Unit | str, got {}'.format(type(app_or_unit)))
+        raise TypeError(f'Expected Application | Unit | str, got {type(app_or_unit)}')
 
 
 def _record_calls(cls: Any):
@@ -1463,10 +1463,10 @@ class _TestingRelationDataContents(Dict[str, str]):
     def __setitem__(self, key: str, value: str):
         if not isinstance(key, str):
             raise model.RelationDataError(
-                'relation data keys must be strings, not {}'.format(type(key)))
+                f'relation data keys must be strings, not {type(key)}')
         if not isinstance(value, str):
             raise model.RelationDataError(
-                'relation data values must be strings, not {}'.format(type(value)))
+                f'relation data values must be strings, not {type(value)}')
         super().__setitem__(key, value)
 
     def copy(self):
@@ -1598,7 +1598,7 @@ class _TestingModelBackend:
             return self._relation_ids_map[relation_name]
         except KeyError as e:
             if relation_name not in self._meta.relations:
-                raise model.ModelError('{} is not a known relation'.format(relation_name)) from e
+                raise model.ModelError(f'{relation_name} is not a known relation') from e
             no_ids = []  # type: List[int]
             return no_ids
 
@@ -1731,7 +1731,7 @@ class _TestingModelBackend:
                 return self._storage_list[name][index][attribute]
         except KeyError:
             raise model.ModelError(
-                'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
+                f'ERROR invalid value "{name}/{index}" for option -s: storage not found')
 
     def storage_add(self, name: str, count: int = 1) -> List[int]:
         if '/' in name:
@@ -1987,7 +1987,7 @@ class _TestingModelBackend:
     @classmethod
     def _generate_secret_id(cls) -> str:
         # Not a proper Juju secrets-style xid, but that's okay
-        return 'secret:' + str(uuid.uuid4())
+        return f"secret:{str(uuid.uuid4())}"
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -2131,8 +2131,7 @@ class _TestingPebbleClient:
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
-            raise TypeError('start_services should take a list of names, not just "{}"'.format(
-                services))
+            raise TypeError(f'start_services should take a list of names, not just "{services}"')
 
         self._check_connection()
 
@@ -2143,7 +2142,7 @@ class _TestingPebbleClient:
         for name in services:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
-                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
@@ -2152,8 +2151,7 @@ class _TestingPebbleClient:
     ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
-            raise TypeError('stop_services should take a list of names, not just "{}"'.format(
-                services))
+            raise TypeError(f'stop_services should take a list of names, not just "{services}"')
 
         self._check_connection()
 
@@ -2164,7 +2162,7 @@ class _TestingPebbleClient:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
                 #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
 
@@ -2173,8 +2171,7 @@ class _TestingPebbleClient:
     ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
-            raise TypeError('restart_services should take a list of names, not just "{}"'.format(
-                services))
+            raise TypeError(f'restart_services should take a list of names, not just "{services}"')
 
         self._check_connection()
 
@@ -2185,7 +2182,7 @@ class _TestingPebbleClient:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
                 #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
@@ -2200,21 +2197,21 @@ class _TestingPebbleClient:
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
         if not isinstance(label, str):
-            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+            raise TypeError(f'label must be a str, not {type(label).__name__}')
 
         if isinstance(layer, (str, dict)):
             layer_obj = pebble.Layer(layer)
         elif isinstance(layer, pebble.Layer):
             layer_obj = layer
         else:
-            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
-                type(layer).__name__))
+            raise TypeError(
+                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}')
 
         self._check_connection()
 
         if label in self._layers:
             if not combine:
-                raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+                raise RuntimeError(f'400 Bad Request: layer "{label}" already exists')
             layer = self._layers[label]
             for name, service in layer_obj.services.items():
                 # 'override' is actually single quoted in the real error, but
@@ -2258,8 +2255,7 @@ class _TestingPebbleClient:
 
     def get_services(self, names: Optional[List[str]] = None) -> List[pebble.ServiceInfo]:
         if isinstance(names, str):
-            raise TypeError('start_services should take a list of names, not just "{}"'.format(
-                names))
+            raise TypeError(f'start_services should take a list of names, not just "{names}"')
 
         self._check_connection()
         services = self._render_services()
@@ -2301,18 +2297,18 @@ class _TestingPebbleClient:
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
                 'generic-file-error',
-                'permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
+                f'permissions not within 0o000 to 0o777: {permissions:#o}')
         try:
             self._fs.create_file(
                 path, source, encoding=encoding, make_dirs=make_dirs, permissions=permissions,
                 user_id=user_id, user=user, group_id=group_id, group=group)
         except FileNotFoundError as e:
             raise pebble.PathError(
-                'not-found', 'parent directory not found: {}'.format(e.args[0]))
+                'not-found', f'parent directory not found: {e.args[0]}')
         except NonAbsolutePathError as e:
             raise pebble.PathError(
                 'generic-file-error',
-                'paths must be absolute, got {!r}'.format(e.args[0])
+                f'paths must be absolute, got {e.args[0]!r}'
             )
 
     def list_files(self, path: str, *, pattern: Optional[str] = None,
@@ -2324,7 +2320,7 @@ class _TestingPebbleClient:
             # conform with the real pebble api
             raise pebble.APIError(
                 body={}, code=404, status='Not Found',
-                message="stat {}: no such file or directory".format(path))
+                message=f"stat {path}: no such file or directory")
 
         if not itself:
             try:
@@ -2343,8 +2339,8 @@ class _TestingPebbleClient:
         def get_pebble_file_type(file: '_FileOrDir') -> pebble.FileType:
             pebble_type = type_mappings.get(type(file))
             if not pebble_type:
-                raise ValueError('unable to convert file {} '
-                                 '(type not one of {})'.format(file, type_mappings))
+                raise ValueError(
+                    f'unable to convert file {file} (type not one of {type_mappings})')
             return pebble_type
 
         return [
@@ -2376,7 +2372,7 @@ class _TestingPebbleClient:
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
                 'generic-file-error',
-                'permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
+                f'permissions not within 0o000 to 0o777: {permissions:#o}')
         try:
             self._fs.create_dir(
                 path, make_parents=make_parents, permissions=permissions,
@@ -2384,14 +2380,14 @@ class _TestingPebbleClient:
         except FileNotFoundError as e:
             # Parent directory doesn't exist and make_parents is False
             raise pebble.PathError(
-                'not-found', 'parent directory not found: {}'.format(e.args[0]))
+                'not-found', f'parent directory not found: {e.args[0]}')
         except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
-            raise pebble.PathError('generic-file-error', 'not a directory: {}'.format(e.args[0]))
+            raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}')
         except NonAbsolutePathError as e:
             raise pebble.PathError(
                 'generic-file-error',
-                'paths must be absolute, got {!r}'.format(e.args[0])
+                f'paths must be absolute, got {e.args[0]!r}'
             )
 
     def remove_path(self, path: str, *, recursive: bool = False):
@@ -2403,7 +2399,7 @@ class _TestingPebbleClient:
                 # Pebble doesn't give not-found error when recursive is specified
                 return
             raise pebble.PathError(
-                'not-found', 'remove {}: no such file or directory'.format(path))
+                'not-found', f'remove {path}: no such file or directory')
 
         if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
             raise pebble.PathError(
@@ -2428,7 +2424,7 @@ class _TestingPebbleClient:
         for service in service_names:
             if service not in plan.services or not self.get_services([service])[0].is_running():
                 # conform with the real pebble api
-                message = 'cannot send signal to "{}": service is not running'.format(service)
+                message = f'cannot send signal to "{service}": service is not running'
                 body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
                         'result': {'message': message}}
                 raise pebble.APIError(
@@ -2440,9 +2436,7 @@ class _TestingPebbleClient:
             signal.Signals[sig]
         except KeyError:
             # conform with the real pebble api
-            message = 'cannot send signal to "{}": invalid signal name "{}"'.format(
-                service_names[0],
-                sig)
+            message = f'cannot send signal to "{service_names[0]}": invalid signal name "{sig}"'
             body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
                     'result': {'message': message}}
             raise pebble.APIError(
@@ -2570,7 +2564,7 @@ class _TestingStorageMount:
                 with fpath.open('rb') as f:
                     results.append(_File(mountpath, f.read()))
             else:
-                raise RuntimeError('unsupported file type at path {}'.format(fpath))
+                raise RuntimeError(f'unsupported file type at path {fpath}')
         return results
 
     def open(
@@ -2689,7 +2683,7 @@ class _TestingFilesystem:
                 raise
         if not isinstance(dir_, _Directory):
             raise pebble.PathError(
-                'generic-file-error', 'parent is not a directory: {}'.format(str(dir_)))
+                'generic-file-error', f'parent is not a directory: {str(dir_)}')
         return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
     def list_dir(self, path: '_StringOrPath') -> List['_FileOrDir']:

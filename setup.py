@@ -46,11 +46,10 @@ version_backup.unlink(missing_ok=True)
 version_path.rename(version_backup)
 try:
     with version_path.open("wt", encoding="utf8") as fh:
-        fh.write('''\
-# this is a generated file
+        fh.write(f'''# this is a generated file
 
-version = {!r}
-'''.format(version))
+version = {version!r}
+''')
 
     setup(
         name="ops",

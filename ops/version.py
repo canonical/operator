@@ -26,7 +26,7 @@ _FALLBACK = '1.0'  # this gets bumped after release
 
 
 def _get_version():
-    version = _FALLBACK + ".dev0+unknown"
+    version = f"{_FALLBACK}.dev0+unknown"
 
     p = Path(__file__).parent
     if (p.parent / '.git').exists():
@@ -47,7 +47,7 @@ def _get_version():
                 # in terms of PEP 440, the tag we'll make sure is a 'public version identifier';
                 # everything after the first - needs to be a 'local version'
                 public, local = version.split('-', 1)
-                version = public + '+' + local.replace('-', '.')
+                version = f"{public}+{local.replace('-', '.')}"
                 # version now <tag>+<#commits>.g<hex>[.dirty]
                 # which is PEP440-compliant (as long as <tag> is :-)
     return version
