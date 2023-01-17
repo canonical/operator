@@ -216,11 +216,11 @@ if TYPE_CHECKING:
                                {'result': List[_Item]})
 
     class _WebSocket(Protocol):
-        def connect(self, url: str, socket: socket.socket): ...
-        def shutdown(self): ...
-        def send(self, payload: str): ...
-        def send_binary(self, payload: bytes): ...
-        def recv(self) -> typing.AnyStr: ...
+        def connect(self, url: str, socket: socket.socket): ...  # noqa
+        def shutdown(self): ...                                  # noqa
+        def send(self, payload: str): ...                        # noqa
+        def send_binary(self, payload: bytes): ...               # noqa
+        def recv(self) -> typing.AnyStr: ...                     # noqa
 
 logger = logging.getLogger(__name__)
 
