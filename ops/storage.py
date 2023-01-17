@@ -22,7 +22,7 @@ import subprocess
 import typing
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Generator, List, Optional, Tuple, Union
 
 import yaml  # pyright: reportMissingModuleSource=false
 
@@ -299,10 +299,8 @@ class JujuStorage:
 
 
 # we load yaml.CSafeX if available, falling back to slower yaml.SafeX.
-_dtype = Union[Type[yaml.SafeDumper], Type[yaml.cyaml.CSafeDumper]]
-_ltype = Union[Type[yaml.SafeLoader], Type[yaml.cyaml.CSafeLoader]]
-_BaseDumper: _dtype = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
-_BaseLoader: _ltype = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
+_BaseDumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
+_BaseLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 
 
 class _SimpleLoader(_BaseLoader):  # type: ignore
