@@ -57,7 +57,7 @@ from typing import (
     Union,
 )
 
-import websocket
+import websocket  # type: ignore
 
 from ops._private import timeconv, yaml
 
@@ -214,6 +214,13 @@ if TYPE_CHECKING:
                        'error': _Error})
     _FilesResponse = TypedDict('_FilesResponse',
                                {'result': List[_Item]})
+
+    class _WebSocket(Protocol):
+        def connect(self, url: str, socket: socket.socket): ...
+        def shutdown(self): ...
+        def send(self, payload: str): ...
+        def send_binary(self, payload: bytes): ...
+        def recv(self) -> typing.AnyStr: ...
 
 logger = logging.getLogger(__name__)
 
@@ -1123,9 +1130,9 @@ class ExecProcess:
         stderr: Optional['_Writeable'],
         client: 'Client',
         timeout: Optional[float],
-        control_ws: websocket.WebSocket,
-        stdio_ws: websocket.WebSocket,
-        stderr_ws: Optional[websocket.WebSocket],
+        control_ws: '_WebSocket',
+        stdio_ws: '_WebSocket',
+        stderr_ws: Optional['_WebSocket'],
         command: List[str],
         encoding: Optional[str],
         change_id: ChangeID,
@@ -1190,10 +1197,10 @@ class ExecProcess:
             os.close(self._cancel_reader)
 
         # Close websockets (shutdown doesn't send CLOSE message or wait for response).
-        self._control_ws.shutdown()     # type: ignore
-        self._stdio_ws.shutdown()       # type: ignore
+        self._control_ws.shutdown()
+        self._stdio_ws.shutdown()
         if self._stderr_ws is not None:
-            self._stderr_ws.shutdown()  # type: ignore
+            self._stderr_ws.shutdown()
 
         if change.err:
             raise ChangeError(change.err, change)
@@ -1251,7 +1258,7 @@ class ExecProcess:
             'signal': {'name': sig},
         }
         msg = json.dumps(payload, sort_keys=True)
-        self._control_ws.send(msg)  # type: ignore
+        self._control_ws.send(msg)
 
 
 def _has_fileno(f: Any) -> bool:
@@ -1266,7 +1273,7 @@ def _has_fileno(f: Any) -> bool:
 
 
 def _reader_to_websocket(reader: '_WebsocketReader',
-                         ws: websocket.WebSocket,
+                         ws: '_WebSocket',
                          encoding: str,
                          cancel_reader: Optional[int] = None,
                          bufsize: int = 16 * 1024):
@@ -1283,16 +1290,16 @@ def _reader_to_websocket(reader: '_WebsocketReader',
             break
         if isinstance(chunk, str):
             chunk = chunk.encode(encoding)
-        ws.send_binary(chunk)  # type: ignore
+        ws.send_binary(chunk)
 
     ws.send('{"command":"end"}')  # type: ignore # Send "end" command as TEXT frame to signal EOF
 
 
-def _websocket_to_writer(ws: websocket.WebSocket, writer: '_WebsocketWriter',
+def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
                          encoding: str):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
-        chunk: typing.AnyStr = ws.recv()  # type: ignore
+        chunk: _StrOrBytes = ws.recv()
 
         if isinstance(chunk, str):
             try:
@@ -1317,7 +1324,7 @@ def _websocket_to_writer(ws: websocket.WebSocket, writer: '_WebsocketWriter',
 class _WebsocketWriter(io.BufferedIOBase):
     """A writable file-like object that sends what's written to it to a websocket."""
 
-    def __init__(self, ws: websocket.WebSocket):
+    def __init__(self, ws: '_WebSocket'):
         self.ws = ws
 
     def writable(self):
@@ -1328,18 +1335,18 @@ class _WebsocketWriter(io.BufferedIOBase):
         """Write chunk to the websocket."""
         if not isinstance(chunk, bytes):
             raise TypeError(f'value to write must be bytes, not {type(chunk).__name__}')
-        self.ws.send_binary(chunk)  # type: ignore
+        self.ws.send_binary(chunk)
         return len(chunk)
 
     def close(self):
         """Send end-of-file message to websocket."""
-        self.ws.send('{"command":"end"}')  # type: ignore
+        self.ws.send('{"command":"end"}')
 
 
 class _WebsocketReader(io.BufferedIOBase):
     """A readable file-like object whose reads come from a websocket."""
 
-    def __init__(self, ws: websocket.WebSocket):
+    def __init__(self, ws: '_WebSocket'):
         self.ws = ws
         self.remaining = b''
         self.eof = False
@@ -1355,7 +1362,7 @@ class _WebsocketReader(io.BufferedIOBase):
             return b''
 
         while not self.remaining:
-            chunk: typing.AnyStr = self.ws.recv()  # type: ignore
+            chunk: _StrOrBytes = self.ws.recv()
 
             if isinstance(chunk, str):
                 try:
@@ -2191,13 +2198,13 @@ class Client:
         change_id = resp['change']
         task_id = resp['result']['task-id']
 
-        stderr_ws = None  # type: Optional[websocket.WebSocket]
+        stderr_ws = None  # type: Optional['_WebSocket']
         try:
             control_ws = self._connect_websocket(task_id, 'control')
             stdio_ws = self._connect_websocket(task_id, 'stdio')
             if not combine_stderr:
                 stderr_ws = self._connect_websocket(task_id, 'stderr')
-        except websocket.WebSocketException as e:
+        except websocket.WebSocketException as e:  # type: ignore
             # Error connecting to websockets, probably due to the exec/change
             # finishing early with an error. Call wait_change to pick that up.
             change = self.wait_change(ChangeID(change_id))
@@ -2246,7 +2253,7 @@ class Client:
                 t = _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
                 threads.append(t)
             else:
-                ws = typing.cast(websocket.WebSocket, stderr_ws)
+                ws = typing.cast('_WebSocket', stderr_ws)
                 process_stderr = _WebsocketReader(ws)
                 if encoding is not None:
                     process_stderr = io.TextIOWrapper(
@@ -2270,12 +2277,12 @@ class Client:
         )
         return process
 
-    def _connect_websocket(self, task_id: str, websocket_id: str) -> websocket.WebSocket:
+    def _connect_websocket(self, task_id: str, websocket_id: str) -> '_WebSocket':
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(self.socket_path)
         url = self._websocket_url(task_id, websocket_id)
-        ws = websocket.WebSocket(skip_utf8_validation=True)
-        ws.connect(url, socket=sock)  # type: ignore
+        ws: '_WebSocket' = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
+        ws.connect(url, socket=sock)
         return ws
 
     def _websocket_url(self, task_id: str, websocket_id: str) -> str:
