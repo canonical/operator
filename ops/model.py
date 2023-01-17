@@ -56,8 +56,6 @@ from ops._private import timeconv, yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
-    from subprocess import CompletedProcess  # noqa
-
     from pebble import (  # pyright: reportMissingTypeStubs=false
         CheckInfo,
         CheckLevel,
@@ -2552,17 +2550,13 @@ class _ModelBackend:
             args += ('--format=json',)
         try:
             result = run(args, **kwargs)
-
-            # pyright infers the first match when argument overloading/unpacking is used,
-            # so this needs to be coerced into the right type
-            result = typing.cast('CompletedProcess[bytes]', result)  # type: ignore
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
             if result.stdout is None:
                 return ''
             else:
-                text = typing.cast(str, result.stdout)
+                text = result.stdout
                 if use_json:
                     return json.loads(text)
                 else:
