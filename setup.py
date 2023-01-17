@@ -14,9 +14,11 @@
 
 """Setup script for the Operator Framework."""
 
-from importlib.util import spec_from_file_location, module_from_spec
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from setuptools import setup, find_packages
+from typing import List
+
+from setuptools import find_packages, setup
 
 
 def _read_me() -> str:
@@ -24,6 +26,12 @@ def _read_me() -> str:
     with open("README.md", "rt", encoding="utf8") as fh:
         readme = fh.read()
     return readme
+
+
+def _requirements() -> List[str]:
+    file = Path((__file__)).parent.joinpath('requirements.txt')
+    with open(file, 'r') as fh:
+        return fh.readlines()
 
 
 def _get_version() -> str:
@@ -72,10 +80,7 @@ version = {version!r}
             "Operating System :: POSIX :: Linux",
         ],
         python_requires='>=3.8',
-        install_requires=[
-            'PyYAML',
-            'websocket-client',
-        ],
+        install_requires=_requirements(),
         package_data={'ops': ['py.typed']},
     )
 

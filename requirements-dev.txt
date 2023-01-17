@@ -1,3 +1,8 @@
-PyYAML==6.0
-pyright==v1.1.289
+ipdb==0.13.11
+logassert==7
+pyright==1.1.289
+pytest==7.2.1
+pytest-operator==0.23.0
 typing_extensions==4.2.0
+
+-r requirements.txt
