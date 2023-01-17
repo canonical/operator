@@ -2556,7 +2556,7 @@ class _ModelBackend:
             if result.stdout is None:
                 return ''
             else:
-                text = result.stdout
+                text = typing.cast(str, result.stdout)  # type: ignore
                 if use_json:
                     return json.loads(text)
                 else:
