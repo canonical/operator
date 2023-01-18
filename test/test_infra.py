@@ -31,9 +31,6 @@ def get_python_filepaths(include_tests=True):
         roots.append('test')
     for root in roots:
         for dirpath, dirnames, filenames in os.walk(root):
-            if dirpath == 'ops':
-                # Don't scan ops/_vendor directory
-                dirnames[:] = [x for x in dirnames if x != '_vendor']
             for filename in filenames:
                 if filename.endswith(".py"):
                     python_paths.append(os.path.join(dirpath, filename))
