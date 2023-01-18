@@ -78,7 +78,14 @@ def wrap_tool(
                 )
 
             elif tool_name == "config_get":
-                return input_state.config[args[0]]
+                state_config = input_state.config
+                if state_config:
+                    if args:  # one specific key requested
+                        return state_config[args[0]]
+                    return state_config  # full config
+
+                # todo fetch default config value from config.yaml
+                return state_config
 
             elif tool_name == "action_get":
                 raise NotImplementedError("action_get")

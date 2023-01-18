@@ -240,17 +240,18 @@ class CharmSpec(_DCBase):
         charm_source_path = Path(inspect.getfile(charm_type))
         charm_root = charm_source_path.parent.parent
 
-        meta = yaml.safe_load(charm_root / 'metadata.yaml')
+        metadata_path = charm_root / 'metadata.yaml'
+        meta = yaml.safe_load(metadata_path.open())
 
         actions = config = None
 
         config_path = charm_root / 'config.yaml'
         if config_path.exists():
-            config = yaml.safe_load(config_path)
+            config = yaml.safe_load(config_path.open())
 
         actions_path = charm_root / 'actions.yaml'
         if actions_path.exists():
-            actions = yaml.safe_load(actions_path)
+            actions = yaml.safe_load(actions_path.open())
 
         return CharmSpec(
             charm_type=charm_type,
