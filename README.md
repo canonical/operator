@@ -88,7 +88,7 @@ is to feel natural for somebody used to coding in Python, and reasonably easy to
 who is not a pythonista.
 
 The dependencies of the operator framework are kept as minimal as possible; currently that's Python
-3.8 or greater, and a couple of python libraries outlined in [requirements.txt](requirements.txt).
+3.8 or greater, and the small of Python libraries referenced in [requirements.txt](requirements.txt).
 
 For a brief intro on how to get started, check out the
 [Hello, World!](https://juju.is/docs/sdk/hello-world) section of the documentation!
