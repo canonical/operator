@@ -29,9 +29,19 @@ def _read_me() -> str:
 
 
 def _requirements() -> List[str]:
-    file = Path((__file__)).parent.joinpath('requirements.txt')
-    with open(file, 'r') as fh:
-        return fh.readlines()
+    """Return the required packages to run the project."""
+    reqs = []
+    with open(Path(__file__).parent / 'requirements.txt', encoding='utf-8') as fh:
+        for line in fh.readlines():
+            # Handle blank lines and comments in requirements.txt files
+            # TODO(tinvaan): DRY, consider setuptools offering for requirements parsing
+            # https://setuptools.pypa.io/en/latest/pkg_resources.html#requirements-parsing
+            line = line.strip()
+            if line and not line.startswith("#"):
+                req = [val for val in line.split(' ') if '==' in val]
+                if len(req) > 0:
+                    reqs.append(req[0])
+    return reqs
 
 
 def _get_version() -> str:
