@@ -1,72 +1,74 @@
-from typing import Optional, Type
+from typing import Optional
 
 import pytest
-from ops.charm import CharmBase, CharmEvents, StartEvent
-from ops.framework import EventBase, Framework
 
+from ops.charm import CharmBase
+from ops.framework import Framework
+from ops.model import BlockedStatus, ActiveStatus
 from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, Context, Scene, State, event, relation
+from scenario.structs import CharmSpec, Scene, State, event, relation, Status
 
 
 @pytest.fixture(scope="function")
 def mycharm():
-    class MyCharmEvents(CharmEvents):
-        @classmethod
-        def define_event(cls, event_kind: str, event_type: "Type[EventBase]"):
-            if getattr(cls, event_kind, None):
-                delattr(cls, event_kind)
-            return super().define_event(event_kind, event_type)
-
     class MyCharm(CharmBase):
         _call = None
-        on = MyCharmEvents()
+        called = False
 
         def __init__(self, framework: Framework, key: Optional[str] = None):
             super().__init__(framework, key)
-            self.called = False
 
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
         def _on_event(self, event):
-            if self._call:
-                self.called = True
-                self._call(event)
+            if MyCharm._call:
+                MyCharm.called = True
+                MyCharm._call(self, event)
 
     return MyCharm
 
 
 def test_charm_heals_on_start(mycharm):
-    mycharm._call = lambda *_: True
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
 
     def pre_event(charm):
         pre_event._called = True
+        assert not charm.is_ready()
+        assert charm.unit.status == BlockedStatus("foo")
         assert not charm.called
+
+    def call(charm, _):
+        if charm.unit.status.message == "foo":
+            charm.unit.status = ActiveStatus("yabadoodle")
 
     def post_event(charm):
         post_event._called = True
-        from ops.model import ActiveStatus
 
-        charm.unit.status = ActiveStatus("yabadoodle")
+        assert charm.is_ready()
+        assert charm.unit.status == ActiveStatus("yabadoodle")
         assert charm.called
+
+    mycharm._call = call
+
+    initial_state = State(
+        config={"foo": "bar"}, leader=True,
+        status=Status(unit=('blocked', 'foo'))
+    )
 
     out = scenario.play(
         Scene(
-            event("start"),
-            context=Context(state=State(config={"foo": "bar"}, leader=True)),
-        ),
-        pre_event=pre_event,
-        post_event=post_event,
+            event("update-status"),
+            state=initial_state),
     )
 
-    assert pre_event._called
-    assert post_event._called
+    assert out.status.unit == ('active', 'yabadoodle')
 
-    assert out.delta() == [
+    out.juju_log = []  # exclude juju log from delta
+    assert out.delta(initial_state) == [
         {
             "op": "replace",
-            "path": "/state/status/unit",
+            "path": "/status/unit",
             "value": ("active", "yabadoodle"),
         }
     ]
@@ -104,7 +106,6 @@ def test_relation_data_access(mycharm):
         assert remote_app_data == {"yaba": "doodle"}
 
     scene = Scene(
-        context=Context(
             state=State(
                 relations=[
                     relation(
@@ -112,14 +113,13 @@ def test_relation_data_access(mycharm):
                         interface="azdrubales",
                         remote_app_name="karlos",
                         remote_app_data={"yaba": "doodle"},
-                        remote_unit_ids=[0, 1],
-                        remote_units_data={"0": {"foo": "bar"}, "1": {"baz": "qux"}},
+                        remote_units_data={0: {"foo": "bar"},
+                                           1: {"baz": "qux"}},
                     )
                 ]
-            )
-        ),
-        event=event("update-status"),
-    )
+            ),
+            event=event("update-status"),
+        )
 
     scenario.play(
         scene,
