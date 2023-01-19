@@ -4,16 +4,16 @@ on: [push, pull_request]
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-20.04, windows-2019, macOS-11]
+    name: Build wheels on ubuntu (where else???)
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
 
       - uses: actions/setup-python@v3
+
+      - name: Install wheel
+        run: pip install wheel
 
       - name: Build wheel
         run: pip wheel -w ./wheelhouse/ .
