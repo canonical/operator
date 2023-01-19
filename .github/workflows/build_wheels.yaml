@@ -1,10 +1,14 @@
 name: Build
 
-on: [push, pull_request]
+on:
+  push:
+    tags:
+      - '*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
 
 jobs:
-  build_wheels:
-    name: Build wheels on ubuntu (where else???)
+  build_wheel:
+    name: Build wheel on ubuntu (where else???)
     runs-on: ubuntu-latest
 
     steps:
@@ -16,8 +20,30 @@ jobs:
         run: pip install wheel
 
       - name: Build wheel
-        run: pip wheel -w ./wheelhouse/ .
+        run: pip wheel -w ./dist/ .
 
       - uses: actions/upload-artifact@v3
         with:
-          path: ./wheelhouse/*.whl
+          path: ./dist/*.whl
+
+      - name: release
+        uses: actions/create-release@v1
+        id: create_release
+        with:
+          draft: false
+          prerelease: false
+          tag_name: ${{ github.ref }}  # the tag
+          release_name: ${{ github.ref }}
+
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: upload wheel
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/scenario-${{ github.ref }}-py3-none-any.whl
+          asset_name: scenario-${{ github.ref }}-py3-none-any.whl
+          asset_content_type: application/wheel
