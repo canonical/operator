@@ -21,9 +21,9 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
-          - CIBW_BUILD: cp38-*
-          - CIBW_ARCHS: "x86_64 universal2 arm64"
-          - CIBW_PROJECT_REQUIRES_PYTHON: ">=3.8"
+          CIBW_BUILD: cp38-*
+          CIBW_ARCHS: "x86_64 universal2 arm64"
+          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.8"
 
       - uses: actions/upload-artifact@v3
         with:
