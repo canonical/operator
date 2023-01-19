@@ -131,7 +131,7 @@ class Runtime:
             }
         }
         patch_module(model, decorate=model_decorator_specs,
-                     scene=scene)
+                     scene=scene, charm_spec=self._charm_spec)
 
         yield
 

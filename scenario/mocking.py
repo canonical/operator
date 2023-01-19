@@ -5,7 +5,7 @@ from typing import Dict, Optional, Tuple, Any, TYPE_CHECKING, Callable, Type
 from scenario.logger import logger as scenario_logger
 
 if TYPE_CHECKING:
-    from scenario.scenario import Scene
+    from scenario.scenario import Scene, CharmSpec
 
 logger = scenario_logger.getChild('mocking')
 
@@ -14,6 +14,7 @@ Simulator = Callable[
      str,  # namespace
      str,  # tool name
      "Scene",  # scene
+     Optional["CharmSpec"],  # charm spec
      Tuple[Any, ...],  # call args
      Dict[str, Any]],  # call kwargs
     None]
@@ -24,6 +25,7 @@ def wrap_tool(
         namespace: str,
         tool_name: str,
         scene: "Scene",
+        charm_spec: Optional["CharmSpec"],
         call_args: Tuple[Any, ...],
         call_kwargs: Dict[str, Any]
 ):
@@ -79,13 +81,14 @@ def wrap_tool(
 
             elif tool_name == "config_get":
                 state_config = input_state.config
-                if state_config:
-                    if args:  # one specific key requested
-                        return state_config[args[0]]
-                    return state_config  # full config
+                if not state_config:
+                    state_config = {key: value.get('default') for key, value in charm_spec.config.items()}
 
-                # todo fetch default config value from config.yaml
-                return state_config
+                if args:  # one specific key requested
+                    # Fixme: may raise KeyError if the key isn't defaulted. What do we do then?
+                    return state_config[args[0]]
+
+                return state_config  # full config
 
             elif tool_name == "action_get":
                 raise NotImplementedError("action_get")
@@ -155,14 +158,36 @@ def wrap_tool(
         # PEBBLE CALLS
         elif namespace == "Client":
             if tool_name == "_request":
+                # fixme: can't differentiate between containers ATM, because Client._request
+                #  does not pass around the container name as argument
+                container = input_state.containers[0]
+
                 if args == ("GET", "/v1/system-info"):
-                    # fixme: can't differentiate between containers ATM, because Client._request
-                    #  does not pass around the container name as argument
-                    if input_state.containers[0].can_connect:
+                    if container.can_connect:
                         return {"result": {"version": "unknown"}}
                     else:
                         wrap_errors = False  # this is what pebble.Client expects!
                         raise FileNotFoundError("")
+
+                elif args[:2] == ("GET", "/v1/services"):
+                    service_names = list(args[2]['names'].split(','))
+                    result = []
+
+                    for layer in container.layers:
+                        if not service_names:
+                            break
+
+                        for name in service_names:
+                            if name in layer['services']:
+                                service_names.remove(name)
+                                result.append(layer['services'][name])
+
+                    # todo: what do we do if we don't find the requested service(s)?
+                    return {'result': result}
+
+                else:
+                    raise NotImplementedError(f'_request: {args}')
+
             elif tool_name == "pull":
                 raise NotImplementedError("pull")
             elif tool_name == "push":
@@ -171,6 +196,7 @@ def wrap_tool(
 
         else:
             raise QuestionNotImplementedError(namespace)
+
     except Exception as e:
         if not wrap_errors:
             # reraise
@@ -232,6 +258,7 @@ def wrap(
         namespace: str,
         tool_name: str,
         scene: "Scene",
+        charm_spec: "CharmSpec",
         simulator: Simulator = wrap_tool
 ):
     @functools.wraps(fn)
@@ -241,6 +268,7 @@ def wrap(
             namespace=namespace,
             tool_name=tool_name,
             scene=scene,
+            charm_spec=charm_spec,
             call_args=call_args,
             call_kwargs=call_kwargs)
 
@@ -254,7 +282,9 @@ def wrap(
 def patch_module(
         module,
         decorate: Dict[str, Dict[str, DecorateSpec]],
-        scene: "Scene"):
+        scene: "Scene",
+        charm_spec: "CharmSpec" = None
+):
     """Patch a module by decorating methods in a number of classes.
 
     Decorate: a dict mapping class names to methods of that class that should be decorated.
@@ -275,12 +305,15 @@ def patch_module(
             continue
 
         patch_class(specs, obj,
-                    scene=scene)
+                    scene=scene,
+                    charm_spec=charm_spec)
 
 
 def patch_class(specs: Dict[str, DecorateSpec],
                 obj: Type,
-                scene: "Scene"):
+                scene: "Scene",
+                charm_spec: "CharmSpec",
+                ):
     for meth_name, fn in obj.__dict__.items():
         spec = specs.get(meth_name)
 
@@ -292,6 +325,7 @@ def patch_class(specs: Dict[str, DecorateSpec],
                           namespace=obj.__name__,
                           tool_name=meth_name,
                           scene=scene,
+                          charm_spec=charm_spec,
                           simulator=spec.simulator)
 
         setattr(obj, meth_name, wrapped_fn)

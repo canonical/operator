@@ -17,6 +17,8 @@ if typing.TYPE_CHECKING:
     except ImportError:
         from typing_extensions import Self
     from ops.testing import CharmType
+    from ops.pebble import LayerDict
+
 
 logger = scenario_logger.getChild('structs')
 
@@ -127,6 +129,7 @@ class Model(_DCBase):
 class ContainerSpec(_DCBase):
     name: str
     can_connect: bool = False
+    layers: Tuple["LayerDict"] = ()
     # todo mock filesystem and pebble proc?
 
 
@@ -331,7 +334,7 @@ class SceneMeta(_DCBase):
 class Scene(_DCBase):
     event: Event
     state: State = dataclasses.field(default_factory=State)
-    # data that doesn't belong to the event nor
+    # data that doesn't belong to the event nor the state
     meta: SceneMeta = SceneMeta()
 
 
