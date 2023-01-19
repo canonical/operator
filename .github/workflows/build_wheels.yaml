@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-python@v3
 
       - name: Build wheel
-        run: python setup.py bdist_wheel -d ./wheelhouse/
+        run: pip wheel -w ./wheelhouse/ .
 
       - uses: actions/upload-artifact@v3
         with:
