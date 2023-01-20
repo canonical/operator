@@ -32,10 +32,10 @@ import urllib.request
 import uuid
 
 import pytest
+import websocket
 
 import ops.pebble as pebble
 from ops._private import yaml
-from ops._vendor import websocket
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000

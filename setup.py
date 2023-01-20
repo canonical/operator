@@ -72,7 +72,10 @@ version = {version!r}
             "Operating System :: POSIX :: Linux",
         ],
         python_requires='>=3.8',
-        install_requires=["PyYAML"],
+        install_requires=[
+            'PyYAML',
+            'websocket-client',
+        ],
         package_data={'ops': ['py.typed']},
     )
 
