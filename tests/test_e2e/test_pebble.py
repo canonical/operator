@@ -1,14 +1,13 @@
 import tempfile
-from io import StringIO
 from pathlib import Path
 from typing import Optional
 
 import pytest
-from ops.charm import ActionEvent, CharmBase, StartEvent
+from ops.charm import CharmBase
 from ops.framework import Framework
 
 from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, ContainerSpec, ExecOutput, Scene, State, event
+from scenario.structs import CharmSpec, ContainerSpec, ExecOutput, Scene, State, event, container
 
 
 @pytest.fixture(scope="function")
@@ -52,6 +51,7 @@ def test_containers_from_meta(charm_cls):
     scenario.play(scene)
 
 
+
 @pytest.mark.parametrize("can_connect", (True, False))
 def test_connectivity(charm_cls, can_connect):
     scenario = Scenario(
@@ -59,7 +59,7 @@ def test_connectivity(charm_cls, can_connect):
     )
     scene = Scene(
         event("start"),
-        state=State(containers=[ContainerSpec(name="foo", can_connect=can_connect)]),
+        state=State(containers=[container(name="foo", can_connect=can_connect)]),
     )
 
     def callback(self: CharmBase, evt):

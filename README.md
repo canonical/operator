@@ -44,7 +44,10 @@ In this spirit, but that I still have to think through how useful it really is, 
 Writing a scenario test consists of two broad steps:
 
 - define a scene
-- play it
+  - an event 
+  - an input state
+- play the scene (obtain the output state)
+- assert that the output state is how you expect it to be
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, and no leadership.
@@ -64,7 +67,7 @@ class MyCharm(CharmBase):
 def test_scenario_base():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
     out = scenario.play(Scene(event=event('start'), context=Context()))
-    assert out.context_out.state.status.unit == ('unknown', '')
+    assert out.status.unit == ('unknown', '')
 ```
 
 Now let's start making it more complicated.
@@ -89,7 +92,7 @@ class MyCharm(CharmBase):
 def test_scenario_base():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
     out = scenario.play(Scene(event=event('start'), context=Context()))
-    assert out.context_out.state.status.unit == ('unknown', '')
+    assert out.status.unit == ('unknown', '')
 
 
 def test_status_leader():
@@ -100,7 +103,7 @@ def test_status_leader():
             context=Context(
                 state=State(leader=True)
             )))
-    assert out.context_out.state.status.unit == ('active', 'I rule')
+    assert out.status.unit == ('active', 'I rule')
 ```
 
 This is starting to get messy, but fortunately scenarios are easily turned into fixtures. We can rewrite this more
@@ -108,8 +111,8 @@ concisely (and parametrically) as:
 
 ```python
 import pytest
-from scenario.scenario import Scenario, Scene
-from scenario.structs import CharmSpec, event, Context
+from scenario.scenario import Scenario, Scene, State
+from scenario.structs import CharmSpec, event
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
@@ -132,12 +135,12 @@ def scenario():
 
 @pytest.fixture
 def start_scene():
-  return Scene(event=event('start'), context=Context())
+  return Scene(event=event('start'), state=State())
 
 
 def test_scenario_base(scenario, start_scene):
   out = scenario.play(start_scene)
-  assert out.context_out.state.status.unit == ('unknown', '')
+  assert out.status.unit == ('unknown', '')
 
 
 @pytest.mark.parametrize('leader', [True, False])
@@ -147,15 +150,18 @@ def test_status_leader(scenario, start_scene, leader):
 
   out = scenario.play(leader_scene)
   expected_status = ('active', 'I rule') if leader else ('active', 'I follow')
-  assert out.context_out.state.status.unit == expected_status
+  assert out.status.unit == expected_status
 ```
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
 
-An example involving relations:
+## Relations
+
+You can write scenario tests to verify the shape of relation data:
 
 ```python
 from scenario.structs import relation
+from ops.charm import CharmBase
 
 
 # This charm copies over remote app data to local unit data
@@ -181,9 +187,9 @@ def test_relation_data(scenario, start_scene):
     ),
   ]
   out = scenario.play(scene)
-  assert out.context_out.state.relations[0].local_unit_data == {"abc": "baz!"}
+  assert out.relations[0].local_unit_data == {"abc": "baz!"}
   # one could probably even do:
-  assert out.context_out.state.relations == [
+  assert out.relations == [
     relation(
       endpoint="foo",
       interface="bar",
@@ -195,108 +201,114 @@ def test_relation_data(scenario, start_scene):
   # which is very idiomatic and superbly explicit. Noice.
 ```
 
+## Containers
 
-# Playbooks
+When testing a kubernetes charm, you can mock container interactions.
+When using the null state (`State()`), there will be no containers. So if the charm were to `self.unit.containers`, it would get back an empty dict.
 
-A playbook encapsulates a sequence of scenes. 
+To give the charm access to some containers, you need to pass them to the input state, like so:
+`State(containers=[...])`
 
-For example:
+An example of a scene including some containers:
 ```python
-from scenario.scenario import Playbook
-from scenario.structs import State, Scene, Event, Context
-playbook = Playbook(
-        (
-            Scene(Event("update-status"),
-                  context=Context(state=State(config={'foo':'bar'}))),
-            Scene(Event("config-changed"), 
-                  context=Context(state=State(config={'foo':'baz'}))),
-        )
-    )
-```
-
-This allows us to write concisely common event sequences, such as the charm startup/teardown sequences. These are the only ones that are built-into the framework.
-This is the new `Harness.begin_with_initial_hooks`:
-```python
-import pytest
-from scenario.scenario import StartupScenario
-from scenario.structs import CharmSpec
-
-@pytest.mark.parametrize("leader", (True, False))
-def test_setup(leader, mycharm):
-    scenario = StartupScenario(CharmSpec(mycharm, meta={"name": "foo"}), leader=leader)
-    scenario.play_until_complete()
-```
-
-The idea is that users can write down sequences common to their use case 
-(or multiple charms in a bundle) and share them between tests.
-
-
-# Caveats
-The way we're injecting memo calls is by rewriting parts of `ops.main`, and `ops.framework` using the python ast module. This means that we're seriously messing with your venv. This is a temporary measure and will be factored out of the code as we move out of the alpha phase.
-
-Options we're considering:
-- have a script that generates our own `ops` lib, distribute that along with the scenario source, and in your scenario tests you'll have to import from the patched-ops we provide instead of the 'canonical' ops module.
-- trust you to run all of this in ephemeral contexts (e.g. containers, tox env...)  for now, **YOU SHOULD REALLY DO THAT**
-
-
-# Advanced Mockery
-The Harness mocks data by providing a separate backend. When the charm code asks: am I leader? there's a variable
-in `harness._backend` that decides whether the return value is True or False.
-A Scene exposes two layers of data to the charm: memos and a state.
-
-- Memos are strict, cached input->output mappings. They basically map a function call to a hardcoded return value, or
-  multiple return values.
-- A State is a static database providing the same mapping, but only a single return value is supported per input.
-
-Scenario tests mock the data by operating at the hook tool call level, not the backend level. Every backend call that
-would normally result in a hook tool call is instead redirected to query the available memos, and as a fallback, is
-going to query the State we define as part of a Scene. If neither one can provide an answer, the hook tool call is
-propagated -- which unless you have taken care of mocking that executable as well, will likely result in an error.
-
-Let's see the difference with an example:
-
-Suppose the charm does:
-
-```python
-    ...
-
-
-def _on_start(self, _):
-    assert self.unit.is_leader()
-
-    import time
-    time.sleep(31)
-
-    assert not self.unit.is_leader()
-
-    if self.unit.is_leader():
-        self.unit.status = ActiveStatus('I rule')
-    else:
-        self.unit.status = ActiveStatus('I follow')
-```
-
-Suppose we want this test to pass. How could we mock this using Scenario?
-
-```python
+from scenario.structs import Scene, event, container, State
 scene = Scene(
-    event=event('start'),
-    context=Context(memos=[
-        {'name': '_ModelBackend.leader_get',
-         'values': ['True', 'False'],
-         'caching_mode': 'strict'}
-    ])
+    event("start"),
+    state=State(containers=[
+      container(name="foo", can_connect=True),
+      container(name="bar", can_connect=False)
+    ]),
 )
 ```
-What this means in words is: the mocked hook-tool 'leader-get' call will return True at first, but False the second time around.
 
-Since we didn't pass a State to the Context object, when the runtime fails to find a third value for leader-get, it will fall back and use the static value provided by the default State -- False. So if the charm were to call `is_leader` at any point after the first two calls, it would consistently get False.
+In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it would give `False`.
 
-NOTE: the API is work in progress. We're working on exposing friendlier ways of defining memos.
-The good news is that you can generate memos by scraping them off of a live unit using `jhack replay`.
+You can also configure a container to have some files in it:
+
+```python
+from scenario.structs import Scene, event, container, State
+from pathlib import Path
+
+local_file = Path('/path/to/local/real/file.txt')
+
+scene = Scene(
+    event("start"),
+    state=State(containers=[
+      container(name="foo", 
+                can_connect=True,
+                filesystem={'local': {'share': {'config.yaml': local_file}}})
+    ]),
+)
+```
+
+In this case, if the charm were to:
+```python
+def _on_start(self, _):
+    foo = self.unit.get_container('foo')
+    content = foo.pull('/local/share/config.yaml').read()
+```
+
+then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempdir` for nicely wrapping strings and passing them to the charm via the container.
+
+`container.push` works similarly, so you can write a test like:
+
+```python
+from ops.charm import CharmBase
+from scenario.structs import Scene, event, State, container
+
+class MyCharm(CharmBase):
+    def _on_start(self, _):
+        foo = self.unit.get_container('foo')
+        foo.push('/local/share/config.yaml', "TEST", make_dirs=True)
+
+def test_pebble_push(scenario, start_scene):
+  out = scenario.play(Scene(
+    event=event('start'), 
+    state=State(
+      containers=[container(name='foo')]
+    )))
+  assert out.get_container('foo').filesystem['local']['share']['config.yaml'].read_text() == "TEST"
+```
+
+`container.exec` is a little bit more complicated. 
+You need to specify, for each possible command the charm might run on the container, what the result of that would be: its return code, what will be written to stdout/stderr.
+
+```python
+from ops.charm import CharmBase
+from scenario.structs import Scene, event, State, container, ExecOutput
+
+LS_LL = """
+.rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml    
+.rw-rw-r--  497 ubuntu ubuntu 18 jan 12:05 -- config.yaml        
+.rw-rw-r--  900 ubuntu ubuntu 18 jan 12:05 -- CONTRIBUTING.md    
+drwxrwxr-x    - ubuntu ubuntu 18 jan 12:06 -- lib                
+"""
+
+
+class MyCharm(CharmBase):
+    def _on_start(self, _):
+        foo = self.unit.get_container('foo')
+        proc = foo.exec(['ls', '-ll'])
+        stdout, _ = proc.wait_output()
+        assert stdout == LS_LL
+
+
+def test_pebble_exec(scenario, start_scene):
+    scenario.play(Scene(
+        event=event('start'),
+        state=State(
+            containers=[container(
+                name='foo',
+                exec_mock={
+                    ('ls', '-ll'):  # this is the command we're mocking
+                        ExecOutput(return_code=0,  # this data structure contains all we need to mock the call.
+                                   stdout=LS_LL)
+                }
+            )]
+        )))
+```
 
 
 # TODOS:
 - Figure out how to distribute this. I'm thinking `pip install ops[scenario]`
 - Better syntax for memo generation
-- Consider consolidating memo and State (e.g. passing a Sequence object to a State value...)
-- Expose instructions or facilities re. how to use this without borking your venv.
