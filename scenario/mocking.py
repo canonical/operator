@@ -3,26 +3,30 @@ import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Any, TYPE_CHECKING, Callable, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, Union
 
 from scenario.logger import logger as scenario_logger
 from scenario.structs import ExecOutput
 
 if TYPE_CHECKING:
-    from scenario.scenario import Scene, CharmSpec
     from ops import pebble
 
-logger = scenario_logger.getChild('mocking')
+    from scenario.scenario import CharmSpec, Scene
+
+logger = scenario_logger.getChild("mocking")
 
 Simulator = Callable[
-    [Callable[[Any], Any],  # simulated function
-     str,  # namespace
-     str,  # tool name
-     "Scene",  # scene
-     Optional["CharmSpec"],  # charm spec
-     Tuple[Any, ...],  # call args
-     Dict[str, Any]],  # call kwargs
-    None]
+    [
+        Callable[[Any], Any],  # simulated function
+        str,  # namespace
+        str,  # tool name
+        "Scene",  # scene
+        Optional["CharmSpec"],  # charm spec
+        Tuple[Any, ...],  # call args
+        Dict[str, Any],
+    ],  # call kwargs
+    None,
+]
 
 
 class _MockExecProcess:
@@ -52,13 +56,13 @@ class _MockExecProcess:
 
 
 def wrap_tool(
-        fn: Callable,
-        namespace: str,
-        tool_name: str,
-        scene: "Scene",
-        charm_spec: Optional["CharmSpec"],
-        call_args: Tuple[Any, ...],
-        call_kwargs: Dict[str, Any]
+    fn: Callable,
+    namespace: str,
+    tool_name: str,
+    scene: "Scene",
+    charm_spec: Optional["CharmSpec"],
+    call_args: Tuple[Any, ...],
+    call_kwargs: Dict[str, Any],
 ):
     # all builtin tools we wrap are methods:
     # _self = call_args[0]
@@ -76,7 +80,9 @@ def wrap_tool(
             if tool_name == "relation_get":
                 rel_id, obj_name, app = args
                 relation = next(
-                    filter(lambda r: r.meta.relation_id == rel_id, input_state.relations)
+                    filter(
+                        lambda r: r.meta.relation_id == rel_id, input_state.relations
+                    )
                 )
                 if app and obj_name == this_app_name:
                     return relation.local_app_data
@@ -93,7 +99,9 @@ def wrap_tool(
 
             elif tool_name == "status_get":
                 status, message = (
-                    input_state.status.app if call_kwargs.get("app") else input_state.status.unit
+                    input_state.status.app
+                    if call_kwargs.get("app")
+                    else input_state.status.unit
                 )
                 return {"status": status, "message": message}
 
@@ -103,7 +111,9 @@ def wrap_tool(
             elif tool_name == "relation_list":
                 rel_id = args[0]
                 relation = next(
-                    filter(lambda r: r.meta.relation_id == rel_id, input_state.relations)
+                    filter(
+                        lambda r: r.meta.relation_id == rel_id, input_state.relations
+                    )
                 )
                 return tuple(
                     f"{relation.meta.remote_app_name}/{unit_id}"
@@ -113,7 +123,10 @@ def wrap_tool(
             elif tool_name == "config_get":
                 state_config = input_state.config
                 if not state_config:
-                    state_config = {key: value.get('default') for key, value in charm_spec.config.items()}
+                    state_config = {
+                        key: value.get("default")
+                        for key, value in charm_spec.config.items()
+                    }
 
                 if args:  # one specific key requested
                     # Fixme: may raise KeyError if the key isn't defaulted. What do we do then?
@@ -158,7 +171,9 @@ def wrap_tool(
             elif tool_name == "relation_set":
                 rel_id, key, value, app = args
                 relation = next(
-                    filter(lambda r: r.meta.relation_id == rel_id, scene.state.relations)
+                    filter(
+                        lambda r: r.meta.relation_id == rel_id, scene.state.relations
+                    )
                 )
                 if app:
                     if not scene.state.leader:
@@ -194,13 +209,17 @@ def wrap_tool(
             #  generic/abstract way...
 
             client: "pebble.Client" = call_args[0]
-            container_name = client.socket_path.split('/')[-2]
+            container_name = client.socket_path.split("/")[-2]
             try:
-                container = next(filter(lambda x: x.name == container_name, input_state.containers))
+                container = next(
+                    filter(lambda x: x.name == container_name, input_state.containers)
+                )
             except StopIteration:
-                raise RuntimeError(f'container with name={container_name!r} not found. '
-                                   f'Did you forget a ContainerSpec, or is the socket path '
-                                   f'{client.socket_path!r} wrong?')
+                raise RuntimeError(
+                    f"container with name={container_name!r} not found. "
+                    f"Did you forget a ContainerSpec, or is the socket path "
+                    f"{client.socket_path!r} wrong?"
+                )
 
             if tool_name == "_request":
                 if args == ("GET", "/v1/system-info"):
@@ -211,7 +230,7 @@ def wrap_tool(
                         raise FileNotFoundError("")
 
                 elif args[:2] == ("GET", "/v1/services"):
-                    service_names = list(args[2]['names'].split(','))
+                    service_names = list(args[2]["names"].split(","))
                     result = []
 
                     for layer in container.layers:
@@ -219,28 +238,24 @@ def wrap_tool(
                             break
 
                         for name in service_names:
-                            if name in layer['services']:
+                            if name in layer["services"]:
                                 service_names.remove(name)
-                                result.append(layer['services'][name])
+                                result.append(layer["services"][name])
 
                     # todo: what do we do if we don't find the requested service(s)?
-                    return {'result': result}
+                    return {"result": result}
 
                 else:
-                    raise NotImplementedError(f'_request: {args}')
+                    raise NotImplementedError(f"_request: {args}")
 
             elif tool_name == "exec":
                 cmd = tuple(args[0])
                 out = container.exec_mock.get(cmd)
                 if not out:
-                    raise RuntimeError(f'mock for cmd {cmd} not found.')
+                    raise RuntimeError(f"mock for cmd {cmd} not found.")
 
                 change_id = out._run()
-                return _MockExecProcess(
-                    change_id=change_id,
-                    command=cmd,
-                    out=out
-                )
+                return _MockExecProcess(change_id=change_id, command=cmd, out=out)
 
             elif tool_name == "pull":
                 # todo double-check how to surface error
@@ -265,10 +280,10 @@ def wrap_tool(
                 path_txt, contents = args
 
                 pos = container.filesystem
-                tokens = path_txt.split('/')[1:]
+                tokens = path_txt.split("/")[1:]
                 for token in tokens[:-1]:
                     nxt = pos.get(token)
-                    if not nxt and call_kwargs['make_dirs']:
+                    if not nxt and call_kwargs["make_dirs"]:
                         pos[token] = {}
                         pos = pos[token]
                     elif not nxt:
@@ -316,14 +331,14 @@ class DecorateSpec:
 
 
 def _log_call(
-        namespace: str,
-        tool_name: str,
-        args,
-        kwargs,
-        recorded_output: Any = None,
-        # use print, not logger calls, else the root logger will recurse if
-        # juju-log calls are being @wrapped as well.
-        log_fn: Callable[[str], None] = logger.debug,
+    namespace: str,
+    tool_name: str,
+    args,
+    kwargs,
+    recorded_output: Any = None,
+    # use print, not logger calls, else the root logger will recurse if
+    # juju-log calls are being @wrapped as well.
+    log_fn: Callable[[str], None] = logger.debug,
 ):
     try:
         output_repr = repr(recorded_output)
@@ -348,12 +363,12 @@ class QuestionNotImplementedError(StateError):
 
 
 def wrap(
-        fn: Callable,
-        namespace: str,
-        tool_name: str,
-        scene: "Scene",
-        charm_spec: "CharmSpec",
-        simulator: Simulator = wrap_tool
+    fn: Callable,
+    namespace: str,
+    tool_name: str,
+    scene: "Scene",
+    charm_spec: "CharmSpec",
+    simulator: Simulator = wrap_tool,
 ):
     @functools.wraps(fn)
     def wrapper(*call_args, **call_kwargs):
@@ -364,7 +379,8 @@ def wrap(
             scene=scene,
             charm_spec=charm_spec,
             call_args=call_args,
-            call_kwargs=call_kwargs)
+            call_kwargs=call_kwargs,
+        )
 
         _log_call(namespace, tool_name, call_args, call_kwargs, out)
         return out
@@ -374,10 +390,10 @@ def wrap(
 
 # todo: figure out how to allow users to manually tag individual functions for wrapping
 def patch_module(
-        module,
-        decorate: Dict[str, Dict[str, DecorateSpec]],
-        scene: "Scene",
-        charm_spec: "CharmSpec" = None
+    module,
+    decorate: Dict[str, Dict[str, DecorateSpec]],
+    scene: "Scene",
+    charm_spec: "CharmSpec" = None,
 ):
     """Patch a module by decorating methods in a number of classes.
 
@@ -398,16 +414,15 @@ def patch_module(
         if not specs:
             continue
 
-        patch_class(specs, obj,
-                    scene=scene,
-                    charm_spec=charm_spec)
+        patch_class(specs, obj, scene=scene, charm_spec=charm_spec)
 
 
-def patch_class(specs: Dict[str, DecorateSpec],
-                obj: Type,
-                scene: "Scene",
-                charm_spec: "CharmSpec",
-                ):
+def patch_class(
+    specs: Dict[str, DecorateSpec],
+    obj: Type,
+    scene: "Scene",
+    charm_spec: "CharmSpec",
+):
     for meth_name, fn in obj.__dict__.items():
         spec = specs.get(meth_name)
 
@@ -415,11 +430,13 @@ def patch_class(specs: Dict[str, DecorateSpec],
             continue
 
         # todo: use mock.patch and lift after exit
-        wrapped_fn = wrap(fn,
-                          namespace=obj.__name__,
-                          tool_name=meth_name,
-                          scene=scene,
-                          charm_spec=charm_spec,
-                          simulator=spec.simulator)
+        wrapped_fn = wrap(
+            fn,
+            namespace=obj.__name__,
+            tool_name=meth_name,
+            scene=scene,
+            charm_spec=charm_spec,
+            simulator=spec.simulator,
+        )
 
         setattr(obj, meth_name, wrapped_fn)

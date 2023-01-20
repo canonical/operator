@@ -13,7 +13,8 @@ from scenario.structs import (
     Scene,
     State,
     event,
-    relation, sort_patch,
+    relation,
+    sort_patch,
 )
 
 # from tests.setup_tests import setup_tests
@@ -63,16 +64,15 @@ def mycharm():
 
 @pytest.fixture
 def dummy_state():
-    return State(config={"foo": "bar"},
-                 leader=True)
+    return State(config={"foo": "bar"}, leader=True)
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def start_scene(dummy_state):
     return Scene(event("start"), state=dummy_state)
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def scenario(mycharm):
     return Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
 
@@ -89,8 +89,7 @@ def test_leader_get(start_scene, mycharm):
         assert charm.unit.is_leader()
 
     scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
-    scenario.play(start_scene,
-                  pre_event=pre_event)
+    scenario.play(start_scene, pre_event=pre_event)
 
 
 def test_status_setting(start_scene, mycharm):
@@ -107,7 +106,8 @@ def test_status_setting(start_scene, mycharm):
     assert out.status.app_version == ""
 
     out.juju_log = []  # ignore logging output in the delta
-    assert out.delta(start_scene.state) == sort_patch([
+    assert out.delta(start_scene.state) == sort_patch(
+        [
             {
                 "op": "replace",
                 "path": "/status/app",
@@ -118,7 +118,8 @@ def test_status_setting(start_scene, mycharm):
                 "path": "/status/unit",
                 "value": ("active", "foo test"),
             },
-        ])
+        ]
+    )
 
 
 @pytest.mark.parametrize("connect", (True, False))
@@ -155,8 +156,8 @@ def test_relation_get(start_scene: Scene, mycharm):
         for unit in rel.units:
             if unit is charm.unit:
                 continue
-            if unit.name == 'remote/1':
-                assert rel.data[unit]['e'] == 'f'
+            if unit.name == "remote/1":
+                assert rel.data[unit]["e"] == "f"
             else:
                 assert not rel.data[unit]
 
@@ -179,11 +180,10 @@ def test_relation_get(start_scene: Scene, mycharm):
             remote_unit_ids=[0, 1, 2],
             remote_app_data={"a": "b"},
             local_unit_data={"c": "d"},
-            remote_units_data={0: {}, 1: {"e": "f"}, 2: {}}
+            remote_units_data={0: {}, 1: {"e": "f"}, 2: {}},
         ),
     ]
-    scenario.play(scene,
-                  pre_event=pre_event)
+    scenario.play(scene, pre_event=pre_event)
 
 
 def test_relation_set(start_scene: Scene, mycharm):

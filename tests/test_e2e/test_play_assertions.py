@@ -1,12 +1,12 @@
 from typing import Optional
 
 import pytest
-
 from ops.charm import CharmBase
 from ops.framework import Framework
-from ops.model import BlockedStatus, ActiveStatus
+from ops.model import ActiveStatus, BlockedStatus
+
 from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, Scene, State, event, relation, Status
+from scenario.structs import CharmSpec, Scene, State, Status, event, relation
 
 
 @pytest.fixture(scope="function")
@@ -52,17 +52,14 @@ def test_charm_heals_on_start(mycharm):
     mycharm._call = call
 
     initial_state = State(
-        config={"foo": "bar"}, leader=True,
-        status=Status(unit=('blocked', 'foo'))
+        config={"foo": "bar"}, leader=True, status=Status(unit=("blocked", "foo"))
     )
 
     out = scenario.play(
-        Scene(
-            event("update-status"),
-            state=initial_state),
+        Scene(event("update-status"), state=initial_state),
     )
 
-    assert out.status.unit == ('active', 'yabadoodle')
+    assert out.status.unit == ("active", "yabadoodle")
 
     out.juju_log = []  # exclude juju log from delta
     assert out.delta(initial_state) == [
@@ -106,20 +103,19 @@ def test_relation_data_access(mycharm):
         assert remote_app_data == {"yaba": "doodle"}
 
     scene = Scene(
-            state=State(
-                relations=[
-                    relation(
-                        endpoint="relation_test",
-                        interface="azdrubales",
-                        remote_app_name="karlos",
-                        remote_app_data={"yaba": "doodle"},
-                        remote_units_data={0: {"foo": "bar"},
-                                           1: {"baz": "qux"}},
-                    )
-                ]
-            ),
-            event=event("update-status"),
-        )
+        state=State(
+            relations=[
+                relation(
+                    endpoint="relation_test",
+                    interface="azdrubales",
+                    remote_app_name="karlos",
+                    remote_app_data={"yaba": "doodle"},
+                    remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
+                )
+            ]
+        ),
+        event=event("update-status"),
+    )
 
     scenario.play(
         scene,

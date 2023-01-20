@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Type, TypeVar
 import yaml
 
 from scenario.logger import logger as scenario_logger
-from scenario.mocking import patch_module, DecorateSpec
+from scenario.mocking import DecorateSpec, patch_module
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
@@ -40,9 +40,9 @@ class Runtime:
     """
 
     def __init__(
-            self,
-            charm_spec: "CharmSpec",
-            juju_version: str = "3.0.0",
+        self,
+        charm_spec: "CharmSpec",
+        juju_version: str = "3.0.0",
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -52,8 +52,8 @@ class Runtime:
 
     @staticmethod
     def from_local_file(
-            local_charm_src: Path,
-            charm_cls_name: str,
+        local_charm_src: Path,
+        charm_cls_name: str,
     ) -> "Runtime":
         sys.path.extend((str(local_charm_src / "src"), str(local_charm_src / "lib")))
 
@@ -75,12 +75,12 @@ class Runtime:
 
     @contextmanager
     def patching(self, scene: "Scene"):
-        """Install the runtime: patch all required backend calls.
-        """
+        """Install the runtime: patch all required backend calls."""
 
         # copy input state to act as blueprint for output state
         logger.info(f"Installing {self}... ")
         from ops import pebble
+
         logger.info("patching ops.pebble")
 
         pebble_decorator_specs = {
@@ -95,11 +95,10 @@ class Runtime:
                 "exec": DecorateSpec(),
             }
         }
-        patch_module(pebble,
-                     decorate=pebble_decorator_specs,
-                     scene=scene)
+        patch_module(pebble, decorate=pebble_decorator_specs, scene=scene)
 
         from ops import model
+
         logger.info("patching ops.model")
         model_decorator_specs = {
             "_ModelBackend": {
@@ -125,7 +124,6 @@ class Runtime:
                 "storage_add": DecorateSpec(),
                 "juju_log": DecorateSpec(),
                 "planned_units": DecorateSpec(),
-
                 # todo different ops version support?
                 # "secret_get": DecorateSpec(),
                 # "secret_set": DecorateSpec(),
@@ -133,8 +131,12 @@ class Runtime:
                 # "secret_remove": DecorateSpec(),
             }
         }
-        patch_module(model, decorate=model_decorator_specs,
-                     scene=scene, charm_spec=self._charm_spec)
+        patch_module(
+            model,
+            decorate=model_decorator_specs,
+            scene=scene,
+            charm_spec=self._charm_spec,
+        )
 
         yield
 
@@ -147,6 +149,7 @@ class Runtime:
             pass
 
         from scenario import ops_main_mock
+
         ops_main_mock.setup_root_logging = _patch_logger
 
     @staticmethod
@@ -163,9 +166,9 @@ class Runtime:
         return meta["name"] + "/0"  # todo allow override
 
     def _get_event_env(self, scene: "Scene", charm_root: Path):
-        if scene.event.name.endswith('_action'):
+        if scene.event.name.endswith("_action"):
             # todo: do we need some special metadata, or can we assume action names are always dashes?
-            action_name = scene.event.name[:-len('_action')].replace('_', '-')
+            action_name = scene.event.name[: -len("_action")].replace("_", "-")
         else:
             action_name = ""
 
@@ -217,17 +220,17 @@ class Runtime:
         spec = self._charm_spec
         with tempfile.TemporaryDirectory() as tempdir:
             temppath = Path(tempdir)
-            (temppath / 'metadata.yaml').write_text(yaml.safe_dump(spec.meta))
-            (temppath / 'config.yaml').write_text(yaml.safe_dump(spec.config or {}))
-            (temppath / 'actions.yaml').write_text(yaml.safe_dump(spec.actions or {}))
+            (temppath / "metadata.yaml").write_text(yaml.safe_dump(spec.meta))
+            (temppath / "config.yaml").write_text(yaml.safe_dump(spec.config or {}))
+            (temppath / "actions.yaml").write_text(yaml.safe_dump(spec.actions or {}))
             yield temppath
 
     def play(
-            self,
-            scene: "Scene",
-            pre_event: Optional[Callable[["CharmType"], None]] = None,
-            post_event: Optional[Callable[["CharmType"], None]] = None,
-    ) -> 'State':
+        self,
+        scene: "Scene",
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+    ) -> "State":
         """Plays a scene on the charm.
 
         This will set the environment up and call ops.main.main().
@@ -250,13 +253,13 @@ class Runtime:
                 self._redirect_root_logger()
 
                 logger.info(" - preparing env")
-                env = self._get_event_env(scene,
-                                          charm_root=temporary_charm_root)
+                env = self._get_event_env(scene, charm_root=temporary_charm_root)
                 os.environ.update(env)
 
                 logger.info(" - Entering ops.main (mocked).")
                 # we don't import from ops.main because we need some extras, such as the pre/post_event hooks
                 from scenario.ops_main_mock import main as mocked_main
+
                 try:
                     mocked_main(
                         self._wrap(self._charm_type),
@@ -273,5 +276,5 @@ class Runtime:
                 logger.info(" - clearing env")
                 self._cleanup_env(env)
 
-            logger.info('event fired; done.')
+            logger.info("event fired; done.")
             return scene.state

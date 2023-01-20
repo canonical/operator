@@ -3,9 +3,9 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
 
 import yaml
-
-from ops.charm import CharmEvents, CharmBase
+from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase
+
 from scenario.runtime import Runtime
 from scenario.structs import CharmSpec, Scene, event
 
@@ -36,7 +36,7 @@ def test_event_hooks():
             "requires": {"ingress-per-unit": {"interface": "ingress_per_unit"}},
         }
         temppath = Path(tempdir)
-        meta_file = (temppath / 'metadata.yaml')
+        meta_file = temppath / "metadata.yaml"
         meta_file.write_text(yaml.safe_dump(meta))
 
         runtime = Runtime(
@@ -48,9 +48,9 @@ def test_event_hooks():
 
         pre_event = MagicMock(return_value=None)
         post_event = MagicMock(return_value=None)
-        runtime.play(Scene(event=event('foo')),
-                     pre_event=pre_event,
-                     post_event=post_event)
+        runtime.play(
+            Scene(event=event("foo")), pre_event=pre_event, post_event=post_event
+        )
 
         assert pre_event.called
         assert post_event.called
@@ -68,7 +68,7 @@ def test_event_emission():
         class MyEvt(EventBase):
             pass
 
-        my_charm_type.on.define_event('bar', MyEvt)
+        my_charm_type.on.define_event("bar", MyEvt)
 
         runtime = Runtime(
             CharmSpec(
@@ -77,7 +77,7 @@ def test_event_emission():
             ),
         )
 
-        runtime.play(Scene(event=event('bar')))
+        runtime.play(Scene(event=event("bar")))
 
         assert my_charm_type._event
         assert isinstance(my_charm_type._event, MyEvt)

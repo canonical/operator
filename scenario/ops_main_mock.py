@@ -5,7 +5,7 @@ import inspect
 import logging
 import os
 import warnings
-from typing import TYPE_CHECKING, Optional, Tuple, Type, Callable
+from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type
 
 import ops.charm
 import ops.framework
@@ -15,25 +15,28 @@ from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
 from ops.main import (
+    CHARM_STATE_FILE,
     _Dispatcher,
-    _get_charm_dir,
     _emit_charm_event,
-    _should_use_controller_storage, CHARM_STATE_FILE,
+    _get_charm_dir,
+    _should_use_controller_storage,
 )
+
 from scenario.logger import logger as scenario_logger
 
 if TYPE_CHECKING:
-    from ops.testing import CharmType
     from ops.charm import CharmBase, EventBase
+    from ops.testing import CharmType
 
-logger = scenario_logger.getChild('ops_main_mock')
+logger = scenario_logger.getChild("ops_main_mock")
 
 
-def main(charm_class: Type[ops.charm.CharmBase],
-         use_juju_for_storage: Optional[bool] = None,
-         pre_event: Optional[Callable[["CharmType"], None]] = None,
-         post_event: Optional[Callable[["CharmType"], None]] = None,
-         ) -> Optional[Tuple["CharmBase", Optional["EventBase"]]]:
+def main(
+    charm_class: Type[ops.charm.CharmBase],
+    use_juju_for_storage: Optional[bool] = None,
+    pre_event: Optional[Callable[["CharmType"], None]] = None,
+    post_event: Optional[Callable[["CharmType"], None]] = None,
+) -> Optional[Tuple["CharmBase", Optional["EventBase"]]]:
     """Setup the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).

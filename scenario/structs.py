@@ -3,14 +3,13 @@ import dataclasses
 import inspect
 import tempfile
 import typing
-from io import StringIO, BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Sequence, Tuple, Union
-from typing import Optional, Type
-from ops import testing
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Type, Union
 from uuid import uuid4
 
 import yaml
+from ops import testing
 
 from scenario.logger import logger as scenario_logger
 
@@ -19,10 +18,10 @@ if typing.TYPE_CHECKING:
         from typing import Self
     except ImportError:
         from typing_extensions import Self
-    from ops.testing import CharmType
     from ops.pebble import LayerDict
+    from ops.testing import CharmType
 
-logger = scenario_logger.getChild('structs')
+logger = scenario_logger.getChild("structs")
 
 ATTACH_ALL_STORAGES = "ATTACH_ALL_STORAGES"
 CREATE_ALL_RELATIONS = "CREATE_ALL_RELATIONS"
@@ -76,40 +75,35 @@ class RelationSpec(_DCBase):
     def changed_event(self):
         """Sugar to generate a <this relation>-changed event."""
         return Event(
-            name=self.meta.endpoint + "-changed",
-            meta=EventMeta(relation=self.meta)
+            name=self.meta.endpoint + "-changed", meta=EventMeta(relation=self.meta)
         )
 
     @property
     def joined_event(self):
         """Sugar to generate a <this relation>-joined event."""
         return Event(
-            name=self.meta.endpoint + "-joined",
-            meta=EventMeta(relation=self.meta)
+            name=self.meta.endpoint + "-joined", meta=EventMeta(relation=self.meta)
         )
 
     @property
     def created_event(self):
         """Sugar to generate a <this relation>-created event."""
         return Event(
-            name=self.meta.endpoint + "-created",
-            meta=EventMeta(relation=self.meta)
+            name=self.meta.endpoint + "-created", meta=EventMeta(relation=self.meta)
         )
 
     @property
     def departed_event(self):
         """Sugar to generate a <this relation>-departed event."""
         return Event(
-            name=self.meta.endpoint + "-departed",
-            meta=EventMeta(relation=self.meta)
+            name=self.meta.endpoint + "-departed", meta=EventMeta(relation=self.meta)
         )
 
     @property
     def removed_event(self):
         """Sugar to generate a <this relation>-removed event."""
         return Event(
-            name=self.meta.endpoint + "-removed",
-            meta=EventMeta(relation=self.meta)
+            name=self.meta.endpoint + "-removed", meta=EventMeta(relation=self.meta)
         )
 
 
@@ -129,10 +123,7 @@ class Model(_DCBase):
 
 _SimpleFS = Dict[
     str,  # file/dirname
-    Union[
-        "_SimpleFS",  # subdir
-        Path  # local-filesystem path resolving to a file.
-    ]
+    Union["_SimpleFS", Path],  # subdir  # local-filesystem path resolving to a file.
 ]
 
 # for now, proc mock allows you to map one command to one mocked output.
@@ -140,6 +131,8 @@ _SimpleFS = Dict[
 
 
 _CHANGE_IDS = 0
+
+
 @dataclasses.dataclass
 class ExecOutput:
     return_code: int = 0
@@ -299,24 +292,21 @@ class CharmSpec(_DCBase):
         charm_source_path = Path(inspect.getfile(charm_type))
         charm_root = charm_source_path.parent.parent
 
-        metadata_path = charm_root / 'metadata.yaml'
+        metadata_path = charm_root / "metadata.yaml"
         meta = yaml.safe_load(metadata_path.open())
 
         actions = config = None
 
-        config_path = charm_root / 'config.yaml'
+        config_path = charm_root / "config.yaml"
         if config_path.exists():
             config = yaml.safe_load(config_path.open())
 
-        actions_path = charm_root / 'actions.yaml'
+        actions_path = charm_root / "actions.yaml"
         if actions_path.exists():
             actions = yaml.safe_load(actions_path.open())
 
         return CharmSpec(
-            charm_type=charm_type,
-            meta=meta,
-            actions=actions,
-            config=config
+            charm_type=charm_type, meta=meta, actions=actions, config=config
         )
 
 
@@ -376,14 +366,15 @@ class Event(_DCBase):
 #         return unit_name.split("/")[0] if unit_name else ""
 #
 
+
 @dataclasses.dataclass
 class SceneMeta(_DCBase):
-    unit_id: str = '0'
-    app_name: str = 'local'
+    unit_id: str = "0"
+    app_name: str = "local"
 
     @property
     def unit_name(self):
-        return self.app_name + '/' + self.unit_id
+        return self.app_name + "/" + self.unit_id
 
 
 @dataclasses.dataclass
@@ -410,21 +401,25 @@ class InjectRelation(Inject):
 
 
 def relation(
-        endpoint: str,
-        interface: str,
-        remote_app_name: str = "remote",
-        relation_id: int = 0,
-        remote_unit_ids: List[int] = None,  # defaults to (0,) if remote_units_data is not provided
-        # mapping from unit ID to databag contents
-        local_unit_data: Dict[str, str] = None,
-        local_app_data: Dict[str, str] = None,
-        remote_app_data: Dict[str, str] = None,
-        remote_units_data: Dict[int, Dict[str, str]] = None,
+    endpoint: str,
+    interface: str,
+    remote_app_name: str = "remote",
+    relation_id: int = 0,
+    remote_unit_ids: List[
+        int
+    ] = None,  # defaults to (0,) if remote_units_data is not provided
+    # mapping from unit ID to databag contents
+    local_unit_data: Dict[str, str] = None,
+    local_app_data: Dict[str, str] = None,
+    remote_app_data: Dict[str, str] = None,
+    remote_units_data: Dict[int, Dict[str, str]] = None,
 ):
     """Helper function to construct a RelationMeta object with some sensible defaults."""
     if remote_unit_ids and remote_units_data:
         if not set(remote_unit_ids) == set(remote_units_data):
-            raise ValueError(f"{remote_unit_ids} should include any and all IDs from {remote_units_data}")
+            raise ValueError(
+                f"{remote_unit_ids} should include any and all IDs from {remote_units_data}"
+            )
     elif remote_unit_ids:
         remote_units_data = {x: {} for x in remote_unit_ids}
     elif remote_units_data:
@@ -450,13 +445,13 @@ def relation(
 
 
 def network(
-        private_address: str = "1.1.1.1",
-        mac_address: str = "",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
+    private_address: str = "1.1.1.1",
+    mac_address: str = "",
+    hostname: str = "",
+    cidr: str = "",
+    interface_name: str = "",
+    egress_subnets=("1.1.1.2/32",),
+    ingress_addresses=("1.1.1.2",),
 ) -> Network:
     """Construct a network object."""
     return Network(

@@ -1,9 +1,9 @@
 from typing import Optional, Type
 
 import pytest
-
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
+
 from scenario.scenario import check_builtin_sequences
 from scenario.structs import CharmSpec
 

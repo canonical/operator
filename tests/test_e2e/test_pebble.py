@@ -4,16 +4,11 @@ from pathlib import Path
 from typing import Optional
 
 import pytest
-from ops.charm import CharmBase, StartEvent, ActionEvent
+from ops.charm import ActionEvent, CharmBase, StartEvent
 from ops.framework import Framework
 
 from scenario.scenario import Scenario
-from scenario.structs import (
-    CharmSpec,
-    Scene,
-    State,
-    event, ContainerSpec, ExecOutput,
-)
+from scenario.structs import CharmSpec, ContainerSpec, ExecOutput, Scene, State, event
 
 
 @pytest.fixture(scope="function")
@@ -33,9 +28,7 @@ def charm_cls():
 
 
 def test_no_containers(charm_cls):
-    scenario = Scenario(
-        CharmSpec(charm_cls,
-                  meta={"name": "foo"}))
+    scenario = Scenario(CharmSpec(charm_cls, meta={"name": "foo"}))
     scene = Scene(event("start"), state=State())
 
     def callback(self: CharmBase, evt):
@@ -47,36 +40,30 @@ def test_no_containers(charm_cls):
 
 def test_containers_from_meta(charm_cls):
     scenario = Scenario(
-        CharmSpec(charm_cls,
-                  meta={"name": "foo",
-                        "containers": {"foo": {}}}))
+        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
+    )
     scene = Scene(event("start"), state=State())
 
     def callback(self: CharmBase, evt):
         assert self.unit.containers
-        assert self.unit.get_container('foo')
+        assert self.unit.get_container("foo")
 
     charm_cls.callback = callback
     scenario.play(scene)
 
 
-@pytest.mark.parametrize('can_connect', (True, False))
+@pytest.mark.parametrize("can_connect", (True, False))
 def test_connectivity(charm_cls, can_connect):
     scenario = Scenario(
-        CharmSpec(charm_cls,
-                  meta={"name": "foo",
-                        "containers": {"foo": {}}}))
+        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
+    )
     scene = Scene(
         event("start"),
-        state=State(
-            containers=[
-                ContainerSpec(name='foo', can_connect=can_connect)
-            ]
-        )
+        state=State(containers=[ContainerSpec(name="foo", can_connect=can_connect)]),
     )
 
     def callback(self: CharmBase, evt):
-        assert can_connect == self.unit.get_container('foo').can_connect()
+        assert can_connect == self.unit.get_container("foo").can_connect()
 
     charm_cls.callback = callback
     scenario.play(scene)
@@ -84,9 +71,8 @@ def test_connectivity(charm_cls, can_connect):
 
 def test_fs_push(charm_cls):
     scenario = Scenario(
-        CharmSpec(charm_cls,
-                  meta={"name": "foo",
-                        "containers": {"foo": {}}}))
+        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
+    )
 
     text = "lorem ipsum/n alles amat gloriae foo"
     file = tempfile.NamedTemporaryFile()
@@ -98,64 +84,54 @@ def test_fs_push(charm_cls):
         state=State(
             containers=[
                 ContainerSpec(
-                    name='foo',
-                    can_connect=True,
-                    filesystem={'bar':
-                                    {'baz.txt': pth}
-                                })
+                    name="foo", can_connect=True, filesystem={"bar": {"baz.txt": pth}}
+                )
             ]
-        )
+        ),
     )
 
     def callback(self: CharmBase, evt):
-        container = self.unit.get_container('foo')
-        baz = container.pull('/bar/baz.txt')
+        container = self.unit.get_container("foo")
+        baz = container.pull("/bar/baz.txt")
         assert baz.read() == text
 
     charm_cls.callback = callback
     scenario.play(scene)
 
 
-@pytest.mark.parametrize('make_dirs', (True, False))
+@pytest.mark.parametrize("make_dirs", (True, False))
 def test_fs_pull(charm_cls, make_dirs):
     scenario = Scenario(
-        CharmSpec(charm_cls,
-                  meta={"name": "foo",
-                        "containers": {"foo": {}}}))
+        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
+    )
 
     scene = Scene(
         event("start"),
-        state=State(
-            containers=[
-                ContainerSpec(
-                    name='foo',
-                    can_connect=True)
-            ]
-        )
+        state=State(containers=[ContainerSpec(name="foo", can_connect=True)]),
     )
 
     text = "lorem ipsum/n alles amat gloriae foo"
 
     def callback(self: CharmBase, evt):
-        container = self.unit.get_container('foo')
+        container = self.unit.get_container("foo")
         if make_dirs:
-            container.push('/bar/baz.txt', text, make_dirs=make_dirs)
+            container.push("/bar/baz.txt", text, make_dirs=make_dirs)
             # check that pulling immediately 'works'
-            baz = container.pull('/bar/baz.txt')
+            baz = container.pull("/bar/baz.txt")
             assert baz.read() == text
         else:
             with pytest.raises(FileNotFoundError):
-                container.push('/bar/baz.txt', text, make_dirs=make_dirs)
+                container.push("/bar/baz.txt", text, make_dirs=make_dirs)
 
             # check that nothing was changed
             with pytest.raises(FileNotFoundError):
-                container.pull('/bar/baz.txt')
+                container.pull("/bar/baz.txt")
 
     charm_cls.callback = callback
     out = scenario.play(scene)
 
     if make_dirs:
-        file = out.get_container('foo').filesystem['bar']['baz.txt']
+        file = out.get_container("foo").filesystem["bar"]["baz.txt"]
         assert file.read_text() == text
     else:
         # nothing has changed
@@ -183,33 +159,36 @@ PS = """
 """
 
 
-@pytest.mark.parametrize('cmd, out', (
-        ('ls', LS),
-        ('ps', PS),
-))
+@pytest.mark.parametrize(
+    "cmd, out",
+    (
+        ("ls", LS),
+        ("ps", PS),
+    ),
+)
 def test_exec(charm_cls, cmd, out):
     scenario = Scenario(
-        CharmSpec(charm_cls,
-                  meta={"name": "foo",
-                        "containers": {"foo": {}}}))
+        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
+    )
 
     scene = Scene(
         event("start"),
         state=State(
             containers=[
                 ContainerSpec(
-                    name='foo',
+                    name="foo",
                     can_connect=True,
-                    exec_mock={(cmd, ): ExecOutput(stdout='hello pebble')})
+                    exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
+                )
             ]
-        )
+        ),
     )
 
     def callback(self: CharmBase, evt):
-        container = self.unit.get_container('foo')
+        container = self.unit.get_container("foo")
         proc = container.exec([cmd])
         proc.wait()
-        assert proc.stdout.read() == 'hello pebble'
+        assert proc.stdout.read() == "hello pebble"
 
     charm_cls.callback = callback
     scenario.play(scene)
