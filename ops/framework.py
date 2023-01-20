@@ -50,6 +50,7 @@ from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     from typing import Literal, Protocol, Type
 
     from ops.charm import CharmMeta

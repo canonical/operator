@@ -34,16 +34,14 @@ from ops._private import yaml
 from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 if TYPE_CHECKING:
-    from typing import Literal
-
     from typing_extensions import Required, TypedDict
+    from typing import Literal
 
     from ops.framework import Handle, JsonObject, _SerializedData
     from ops.model import Container, Numerical, Relation, Storage
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
-
     class _ActionMetaDict(TypedDict, total=False):
         title: str
         description: str
@@ -51,7 +49,6 @@ if TYPE_CHECKING:
         required: List[str]
 
     _Scopes = Literal['global', 'container']
-
     class _RelationMetaDict(TypedDict, total=False):
         interface: Required[str]
         limit: int
@@ -81,7 +78,6 @@ if TYPE_CHECKING:
     class _MountDict(TypedDict, total=False):
         storage: Required[str]
         location: str
-
     class _ContainerMetaDict(TypedDict):
         mounts: List[_MountDict]
 
