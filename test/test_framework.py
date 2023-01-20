@@ -1233,11 +1233,11 @@ class TestStoredState(BaseTestCase):
         ), (
             lambda: set(),
             'a',
-            {'a'},
+            set(['a']),
             lambda a, b: a.add(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            lambda: {'a'},
+            lambda: set(['a']),
             'a',
             set(),
             lambda a, b: a.discard(b),

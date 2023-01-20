@@ -87,9 +87,7 @@ if typing.TYPE_CHECKING:
     # public since it is used in ops.testing
     K8sSpec = Mapping[str, JsonObject]
 
-    class _StatusDict(TypedDict):
-        status: str
-        message: str
+    _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
     _Layer = Union[str, LayerDict, pebble.Layer]
@@ -111,10 +109,11 @@ if typing.TYPE_CHECKING:
     UnitOrApplication = Union['Unit', 'Application']
     UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
 
-    class _AddressDict(TypedDict):
-        address: str  # Juju < 2.9
-        value: str  # Juju >= 2.9
-        cidr: str
+    _AddressDict = TypedDict('_AddressDict', {
+        'address': str,  # Juju < 2.9
+        'value': str,  # Juju >= 2.9
+        'cidr': str
+    })
     _BindAddressDict = TypedDict('_BindAddressDict', {
         'interface-name': str,
         'addresses': List[_AddressDict]

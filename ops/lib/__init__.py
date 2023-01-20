@@ -185,7 +185,7 @@ def _parse_lib(spec):
     logger.debug("    Parsing %r", spec.name)
 
     try:
-        with open(spec.origin, encoding='utf-8') as f:
+        with open(spec.origin, 'rt', encoding='utf-8') as f:
             libinfo = {}
             for n, line in enumerate(f):
                 if len(libinfo) == len(_NEEDED_KEYS):

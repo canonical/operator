@@ -347,7 +347,7 @@ class TestLibParser(TestCase):
     def test_other_encoding(self):
         """Check that we don't crash when a library is not UTF-8."""
         m = self._mkmod('foo')
-        with open(m.origin, 'w', encoding='latin-1') as f:
+        with open(m.origin, 'wt', encoding='latin-1') as f:
             f.write(dedent('''
             LIBNAME = "foo"
             LIBAPI = 2

@@ -151,7 +151,7 @@ def main():
             try:
                 with open(args.layer_path, encoding='utf-8') as f:
                     layer_yaml = f.read()
-            except OSError as e:
+            except IOError as e:
                 parser.error(f'cannot read layer YAML: {e}')
             client.add_layer(args.label, layer_yaml, combine=bool(args.combine))
             result = f'Layer {args.label!r} added successfully from {args.layer_path!r}'

@@ -21,7 +21,7 @@ from setuptools import setup, find_packages
 
 def _read_me() -> str:
     """Return the README content from the file."""
-    with open("README.md", encoding="utf8") as fh:
+    with open("README.md", "rt", encoding="utf8") as fh:
         readme = fh.read()
     return readme
 

@@ -56,37 +56,39 @@ from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.model import RelationNotFoundError
 
 if TYPE_CHECKING:
-    from typing_extensions import TypedDict
-    from typing import Literal
+    from typing_extensions import Literal, TypedDict
 
     from ops.model import UnitOrApplication
 
     ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
     _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
     _FileOrDir = Union['_File', '_Directory']
-    class _FileKwargs(TypedDict):
-        permissions: int
-        last_modified: datetime.datetime
-        user_id: Optional[int]
-        user: Optional[str]
-        group_id: Optional[int]
-        group: Optional[str]
+    _FileKwargs = TypedDict('_FileKwargs', {
+        'permissions': int,
+        'last_modified': datetime.datetime,
+        'user_id': Optional[int],
+        'user': Optional[str],
+        'group_id': Optional[int],
+        'group': Optional[str],
+    })
 
-    class _RelationEntities(TypedDict):
-        app: str
-        units: List[str]
+    _RelationEntities = TypedDict('_RelationEntities', {
+        'app': str,
+        'units': List[str]
+    })
 
     _ConfigValue = Union[str, int, float, bool]
-    class _ConfigOption(TypedDict):
-        type: Literal['string', 'int', 'float', 'boolean']
-        description: str
-        default: _ConfigValue
+    _ConfigOption = TypedDict('_ConfigOption', {
+        'type': Literal['string', 'int', 'float', 'boolean'],
+        'description': str,
+        'default': _ConfigValue
+    })
     _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
-    class _RawStatus(TypedDict):
-        status: _StatusName
-        message: str
-    class RawConfig(TypedDict):
-        options: Dict[str, _ConfigOption]
+    _RawStatus = TypedDict('_RawStatus', {
+        'status': _StatusName,
+        'message': str,
+    })
+    RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
 
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
