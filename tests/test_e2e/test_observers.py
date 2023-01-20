@@ -1,20 +1,15 @@
-import pytest
-from dataclasses import asdict
-from typing import Optional, Type
+from typing import Optional
 
 import pytest
-from ops.charm import CharmBase, CharmEvents, StartEvent, ActionEvent
-from ops.framework import EventBase, Framework
-from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
+from ops.charm import CharmBase, StartEvent, ActionEvent
+from ops.framework import Framework
 
 from scenario.scenario import Scenario
 from scenario.structs import (
     CharmSpec,
-    ContainerSpec,
     Scene,
     State,
     event,
-    relation, sort_patch,
 )
 
 

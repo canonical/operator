@@ -1,11 +1,16 @@
 import functools
+import tempfile
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple, Any, TYPE_CHECKING, Callable, Type
+from io import StringIO
+from pathlib import Path
+from typing import Dict, Optional, Tuple, Any, TYPE_CHECKING, Callable, Type, Union
 
 from scenario.logger import logger as scenario_logger
+from scenario.structs import ExecOutput
 
 if TYPE_CHECKING:
     from scenario.scenario import Scene, CharmSpec
+    from ops import pebble
 
 logger = scenario_logger.getChild('mocking')
 
@@ -18,6 +23,32 @@ Simulator = Callable[
      Tuple[Any, ...],  # call args
      Dict[str, Any]],  # call kwargs
     None]
+
+
+class _MockExecProcess:
+    def __init__(self, command: Tuple[str], change_id: int, out: ExecOutput):
+        self._command = command
+        self._change_id = change_id
+        self._out = out
+        self._waited = False
+        self.stdout = StringIO(self._out.stdout)
+        self.stderr = StringIO(self._out.stderr)
+
+    def wait(self):
+        self._waited = True
+        exit_code = self._out.return_code
+        if exit_code != 0:
+            raise pebble.ExecError(list(self._command), exit_code, None, None)
+
+    def wait_output(self):
+        out = self._out
+        exit_code = out.return_code
+        if exit_code != 0:
+            raise pebble.ExecError(list(self._command), exit_code, None, None)
+        return out.stdout, out.stderr
+
+    def send_signal(self, sig: Union[int, str]):
+        pass
 
 
 def wrap_tool(
@@ -157,11 +188,21 @@ def wrap_tool(
 
         # PEBBLE CALLS
         elif namespace == "Client":
-            if tool_name == "_request":
-                # fixme: can't differentiate between containers ATM, because Client._request
-                #  does not pass around the container name as argument
-                container = input_state.containers[0]
+            # fixme: can't differentiate between containers, because Client._request
+            #  does not pass around the container name as argument. Here we do it a bit ugly
+            #  and extract it from 'self'. We could figure out a way to pass in a spec in a more
+            #  generic/abstract way...
 
+            client: "pebble.Client" = call_args[0]
+            container_name = client.socket_path.split('/')[-2]
+            try:
+                container = next(filter(lambda x: x.name == container_name, input_state.containers))
+            except StopIteration:
+                raise RuntimeError(f'container with name={container_name!r} not found. '
+                                   f'Did you forget a ContainerSpec, or is the socket path '
+                                   f'{client.socket_path!r} wrong?')
+
+            if tool_name == "_request":
                 if args == ("GET", "/v1/system-info"):
                     if container.can_connect:
                         return {"result": {"version": "unknown"}}
@@ -188,11 +229,61 @@ def wrap_tool(
                 else:
                     raise NotImplementedError(f'_request: {args}')
 
+            elif tool_name == "exec":
+                cmd = tuple(args[0])
+                out = container.exec_mock.get(cmd)
+                if not out:
+                    raise RuntimeError(f'mock for cmd {cmd} not found.')
+
+                change_id = out._run()
+                return _MockExecProcess(
+                    change_id=change_id,
+                    command=cmd,
+                    out=out
+                )
+
             elif tool_name == "pull":
-                raise NotImplementedError("pull")
+                # todo double-check how to surface error
+                wrap_errors = False
+
+                path_txt = args[0]
+                pos = container.filesystem
+                for token in path_txt.split("/")[1:]:
+                    pos = pos.get(token)
+                    if not pos:
+                        raise FileNotFoundError(path_txt)
+                local_path = Path(pos)
+                if not local_path.exists() or not local_path.is_file():
+                    raise FileNotFoundError(local_path)
+                return local_path.open()
+
             elif tool_name == "push":
                 setter = True
-                raise NotImplementedError("push")
+                # todo double-check how to surface error
+                wrap_errors = False
+
+                path_txt, contents = args
+
+                pos = container.filesystem
+                tokens = path_txt.split('/')[1:]
+                for token in tokens[:-1]:
+                    nxt = pos.get(token)
+                    if not nxt and call_kwargs['make_dirs']:
+                        pos[token] = {}
+                        pos = pos[token]
+                    elif not nxt:
+                        raise FileNotFoundError(path_txt)
+                    else:
+                        pos = pos[token]
+
+                # dump contents
+                # fixme: memory leak here if tmp isn't regularly cleaned up
+                file = tempfile.NamedTemporaryFile(delete=False)
+                pth = Path(file.name)
+                pth.write_text(contents)
+
+                pos[tokens[-1]] = pth
+                return
 
         else:
             raise QuestionNotImplementedError(namespace)
@@ -219,6 +310,9 @@ class DecorateSpec:
 
     # the function to be called instead of the decorated one
     simulator: Simulator = wrap_tool
+
+    # extra-args: callable to extract any other arguments from 'self' and pass them along.
+    extra_args: Optional[Callable[[Any], Dict[str, Any]]] = None
 
 
 def _log_call(

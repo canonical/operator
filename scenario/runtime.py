@@ -82,6 +82,7 @@ class Runtime:
         logger.info(f"Installing {self}... ")
         from ops import pebble
         logger.info("patching ops.pebble")
+
         pebble_decorator_specs = {
             "Client": {
                 # todo: we could be more fine-grained and decorate individual Container methods,
@@ -91,9 +92,11 @@ class Runtime:
                 # and deal in objects that cannot be json-serialized
                 "pull": DecorateSpec(),
                 "push": DecorateSpec(),
+                "exec": DecorateSpec(),
             }
         }
-        patch_module(pebble, decorate=pebble_decorator_specs,
+        patch_module(pebble,
+                     decorate=pebble_decorator_specs,
                      scene=scene)
 
         from ops import model

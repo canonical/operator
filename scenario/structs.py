@@ -1,10 +1,13 @@
 import copy
 import dataclasses
 import inspect
+import tempfile
 import typing
+from io import StringIO, BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Sequence, Tuple, Union
 from typing import Optional, Type
+from ops import testing
 from uuid import uuid4
 
 import yaml
@@ -18,7 +21,6 @@ if typing.TYPE_CHECKING:
         from typing_extensions import Self
     from ops.testing import CharmType
     from ops.pebble import LayerDict
-
 
 logger = scenario_logger.getChild('structs')
 
@@ -125,12 +127,66 @@ class Model(_DCBase):
     uuid: str = str(uuid4())
 
 
+_SimpleFS = Dict[
+    str,  # file/dirname
+    Union[
+        "_SimpleFS",  # subdir
+        Path  # local-filesystem path resolving to a file.
+    ]
+]
+
+# for now, proc mock allows you to map one command to one mocked output.
+# todo extend: one input -> multiple outputs, at different times
+
+
+_CHANGE_IDS = 0
+@dataclasses.dataclass
+class ExecOutput:
+    return_code: int = 0
+    stdout: str = ""
+    stderr: str = ""
+
+    # change ID: used internally to keep track of mocked processes
+    _change_id: int = -1
+
+    def _run(self) -> int:
+        global _CHANGE_IDS
+        _CHANGE_IDS = self._change_id = _CHANGE_IDS + 1
+        return _CHANGE_IDS
+
+
+_ExecMock = Dict[Tuple[str, ...], ExecOutput]
+
+
 @dataclasses.dataclass
 class ContainerSpec(_DCBase):
     name: str
     can_connect: bool = False
     layers: Tuple["LayerDict"] = ()
-    # todo mock filesystem and pebble proc?
+
+    # this is how you specify the contents of the filesystem: suppose you want to express that your
+    # container has:
+    # - /home/foo/bar.py
+    # - /bin/bash
+    # - /bin/baz
+    #
+    # this becomes:
+    # filesystem = {
+    #     'home': {
+    #         'foo': Path('/path/to/local/file/containing/bar.py')
+    #     },
+    #     'bin': {
+    #         'bash': Path('/path/to/local/bash'),
+    #         'baz': Path('/path/to/local/baz')
+    #     }
+    # }
+    # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
+    # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
+    # create a tempfile and insert its path in the mock filesystem tree
+    # charm-created tempfiles will NOT be automatically deleted -- you have to clean them up yourself!
+    filesystem: _SimpleFS = dataclasses.field(default_factory=dict)
+
+    exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass

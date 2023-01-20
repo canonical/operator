@@ -42,8 +42,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
+#      - name: Setup upterm session
+#        uses: lhotari/action-upterm@v1
 
       - name: upload wheel
         uses: actions/upload-release-asset@v1
