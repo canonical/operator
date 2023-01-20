@@ -182,19 +182,20 @@ class ContainerSpec(_DCBase):
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
 
 
-def container(name: str,
-              can_connect: bool = False,
-              layers: Tuple["LayerDict"] = (),
-              filesystem: _SimpleFS = None,
-              exec_mock: _ExecMock = None
-              ) -> ContainerSpec:
+def container(
+    name: str,
+    can_connect: bool = False,
+    layers: Tuple["LayerDict"] = (),
+    filesystem: _SimpleFS = None,
+    exec_mock: _ExecMock = None,
+) -> ContainerSpec:
     """Helper function to instantiate a ContainerSpec."""
     return ContainerSpec(
         name=name,
         can_connect=can_connect,
         layers=layers,
         filesystem=filesystem or {},
-        exec_mock=exec_mock or {}
+        exec_mock=exec_mock or {},
     )
 
 
@@ -417,18 +418,18 @@ class InjectRelation(Inject):
 
 
 def relation(
-        endpoint: str,
-        interface: str,
-        remote_app_name: str = "remote",
-        relation_id: int = 0,
-        remote_unit_ids: List[
-            int
-        ] = None,  # defaults to (0,) if remote_units_data is not provided
-        # mapping from unit ID to databag contents
-        local_unit_data: Dict[str, str] = None,
-        local_app_data: Dict[str, str] = None,
-        remote_app_data: Dict[str, str] = None,
-        remote_units_data: Dict[int, Dict[str, str]] = None,
+    endpoint: str,
+    interface: str,
+    remote_app_name: str = "remote",
+    relation_id: int = 0,
+    remote_unit_ids: List[
+        int
+    ] = None,  # defaults to (0,) if remote_units_data is not provided
+    # mapping from unit ID to databag contents
+    local_unit_data: Dict[str, str] = None,
+    local_app_data: Dict[str, str] = None,
+    remote_app_data: Dict[str, str] = None,
+    remote_units_data: Dict[int, Dict[str, str]] = None,
 ):
     """Helper function to construct a RelationMeta object with some sensible defaults."""
     if remote_unit_ids and remote_units_data:
@@ -461,13 +462,13 @@ def relation(
 
 
 def network(
-        private_address: str = "1.1.1.1",
-        mac_address: str = "",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
+    private_address: str = "1.1.1.1",
+    mac_address: str = "",
+    hostname: str = "",
+    cidr: str = "",
+    interface_name: str = "",
+    egress_subnets=("1.1.1.2/32",),
+    ingress_addresses=("1.1.1.2",),
 ) -> Network:
     """Construct a network object."""
     return Network(

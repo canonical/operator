@@ -7,7 +7,15 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 
 from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, ContainerSpec, ExecOutput, Scene, State, event, container
+from scenario.structs import (
+    CharmSpec,
+    ContainerSpec,
+    ExecOutput,
+    Scene,
+    State,
+    container,
+    event,
+)
 
 
 @pytest.fixture(scope="function")
@@ -49,7 +57,6 @@ def test_containers_from_meta(charm_cls):
 
     charm_cls.callback = callback
     scenario.play(scene)
-
 
 
 @pytest.mark.parametrize("can_connect", (True, False))
