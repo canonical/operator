@@ -1,6 +1,6 @@
 import functools
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, Union
@@ -134,6 +134,16 @@ def wrap_tool(
 
                 return state_config  # full config
 
+            elif tool_name == "network_get":
+                name, relation_id = args
+
+                network = next(
+                    filter(
+                        lambda r: r.name == name, input_state.networks
+                    )
+                )
+                return network.network.hook_tool_output_fmt()
+
             elif tool_name == "action_get":
                 raise NotImplementedError("action_get")
             elif tool_name == "relation_remote_app_name":
@@ -144,8 +154,6 @@ def wrap_tool(
                 raise NotImplementedError("storage_list")
             elif tool_name == "storage_get":
                 raise NotImplementedError("storage_get")
-            elif tool_name == "network_get":
-                raise NotImplementedError("network_get")
             elif tool_name == "planned_units":
                 raise NotImplementedError("planned_units")
             else:

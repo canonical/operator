@@ -213,6 +213,15 @@ class BindAddress(_DCBase):
     interfacename: str  # noqa legacy
     addresses: List[Address]
 
+    def hook_tool_output_fmt(self):
+        # dumps itself to dict in the same format the hook tool would
+        return {
+            "bind-addresses": self.mac_address,
+            "interface-name": self.interface_name,
+            "interfacename": self.interfacename,
+            "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
+        }
+
 
 @dataclasses.dataclass
 class Network(_DCBase):
@@ -221,6 +230,15 @@ class Network(_DCBase):
     egress_subnets: List[str]
     ingress_addresses: List[str]
 
+    def hook_tool_output_fmt(self):
+        # dumps itself to dict in the same format the hook tool would
+        return {
+            "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
+            "bind-address": self.bind_address,
+            "egress-subnets": self.egress_subnets,
+            "ingress-addresses": self.ingress_addresses,
+        }
+
 
 @dataclasses.dataclass
 class NetworkSpec(_DCBase):
@@ -228,10 +246,6 @@ class NetworkSpec(_DCBase):
     bind_id: int
     network: Network
     is_default: bool = False
-
-    @classmethod
-    def from_dict(cls, obj):
-        return cls(**obj)
 
 
 @dataclasses.dataclass
@@ -327,17 +341,6 @@ class CharmSpec(_DCBase):
         )
 
 
-@dataclasses.dataclass
-class Memo(_DCBase):
-    calls: Dict[str, Any]
-    cursor: int = 0
-    caching_policy: Literal["loose", "strict"] = "strict"
-
-    @classmethod
-    def from_dict(cls, obj):
-        return Memo(**obj)
-
-
 def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
     return sorted(patch, key=key)
 
@@ -363,25 +366,6 @@ class Event(_DCBase):
     def is_meta(self):
         """Is this a meta event?"""
         return self.name in META_EVENTS
-
-
-# @dataclass
-# class Event:
-#     env: Dict[str, str]
-#
-#     @property
-#     def name(self):
-#         return self.env["JUJU_DISPATCH_PATH"].split("/")[1]
-#
-#     @property
-#     def unit_name(self):
-#         return self.env.get("JUJU_UNIT_NAME", "")
-#
-#     @property
-#     def app_name(self):
-#         unit_name = self.unit_name
-#         return unit_name.split("/")[0] if unit_name else ""
-#
 
 
 @dataclasses.dataclass
@@ -506,6 +490,6 @@ def _derive_args(event_name: str):
     return tuple(args)
 
 
-def event(name: str, append_args: Tuple[Any] = (), **kwargs) -> Event:
+def event(name: str, append_args: Tuple[Any] = (), meta: EventMeta = None, **kwargs) -> Event:
     """This routine will attempt to generate event args for you, based on the event name."""
-    return Event(name=name, args=_derive_args(name) + append_args, kwargs=kwargs)
+    return Event(name=name, args=_derive_args(name) + append_args, kwargs=kwargs, meta=meta)
