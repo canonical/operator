@@ -2286,7 +2286,8 @@ class _TestingPebbleClient:
         try:
             return self._fs.open(path, encoding=encoding)
         except FileNotFoundError:
-            raise pebble.PathError('not-found', f'stat {path}: no such file or directory')
+            raise pebble.NotFoundError(
+                'not-found', f'stat {path}: no such file or directory', path)
         except IsADirectoryError:
             raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
 

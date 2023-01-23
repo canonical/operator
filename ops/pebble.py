@@ -308,6 +308,7 @@ class PathError(Error):
     Attributes:
         kind: A short string representing the kind of error. Possible values
             are 'not-found', 'permission-denied', and 'generic-file-error'.
+        message: A human-readable error message.
     """
 
     def __init__(self, kind: str, message: str):
@@ -320,6 +321,26 @@ class PathError(Error):
 
     def __repr__(self):
         return f'PathError({self.kind!r}, {self.message!r})'
+
+
+class NotFoundError(FileNotFoundError, PathError):
+    """A subclass of PathError specifically for file-not-found errors.
+
+    This also inherits from the builtin FileNotFoundError so that you can
+    simply catch the builtin FileNotFoundError instead of catching
+    :class:`PathError` and checking the :code:`kind` attribute.
+
+    Attributes:
+        filename: The filename (path) of the file in question. Named
+            "filename" instead of "path" to match the attribute of the builtin
+            :code:`OSError` class.
+    """
+
+    def __init__(self, kind: str, message: str, filename: str):
+        """This shouldn't be instantiated directly."""
+        self.kind = kind
+        self.message = message
+        self.filename = filename
 
 
 class APIError(Error):
@@ -1853,6 +1874,8 @@ class Client:
             raise ProtocolError(f'path not found in response metadata: {resp}')
         error = paths[path].get('error')
         if error:
+            if error['kind'] == 'not-found':
+                raise NotFoundError(error['kind'], error['message'], path)
             raise PathError(error['kind'], error['message'])
 
     def push(
