@@ -516,10 +516,10 @@ start:
             def _on_start_action(self, event):
                 event.defer()
 
-        fake_script(self, cmd_type + '-get', """echo '{"foo-name": "name", "silent": true}'""")
+        fake_script(self, f"{cmd_type}-get", """echo '{"foo-name": "name", "silent": true}'""")
         self.meta = self._get_action_test_meta()
 
-        os.environ['JUJU_{}_NAME'.format(cmd_type.upper())] = 'start'
+        os.environ[f'JUJU_{cmd_type.upper()}_NAME'] = 'start'
         framework = self.create_framework()
         charm = MyCharm(framework)
 
@@ -590,3 +590,50 @@ containers:
 
         with self.assertRaises(RuntimeError):
             meta.containers["test1"].mounts["data"].location
+
+    def test_secret_events(self):
+        class MyCharm(CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.seen = []
+                self.framework.observe(self.on.secret_changed, self.on_secret_changed)
+                self.framework.observe(self.on.secret_rotate, self.on_secret_rotate)
+                self.framework.observe(self.on.secret_remove, self.on_secret_remove)
+                self.framework.observe(self.on.secret_expired, self.on_secret_expired)
+
+            def on_secret_changed(self, event):
+                assert event.secret.id == 'secret:changed'
+                assert event.secret.label is None
+                self.seen.append(type(event).__name__)
+
+            def on_secret_rotate(self, event):
+                assert event.secret.id == 'secret:rotate'
+                assert event.secret.label == 'rot'
+                self.seen.append(type(event).__name__)
+
+            def on_secret_remove(self, event):
+                assert event.secret.id == 'secret:remove'
+                assert event.secret.label == 'rem'
+                assert event.revision == 7
+                self.seen.append(type(event).__name__)
+
+            def on_secret_expired(self, event):
+                assert event.secret.id == 'secret:expired'
+                assert event.secret.label == 'exp'
+                assert event.revision == 42
+                self.seen.append(type(event).__name__)
+
+        self.meta = CharmMeta.from_yaml(metadata='name: my-charm')
+        charm = MyCharm(self.create_framework())
+
+        charm.on.secret_changed.emit('secret:changed', None)
+        charm.on.secret_rotate.emit('secret:rotate', 'rot')
+        charm.on.secret_remove.emit('secret:remove', 'rem', 7)
+        charm.on.secret_expired.emit('secret:expired', 'exp', 42)
+
+        self.assertEqual(charm.seen, [
+            'SecretChangedEvent',
+            'SecretRotateEvent',
+            'SecretRemoveEvent',
+            'SecretExpiredEvent',
+        ])

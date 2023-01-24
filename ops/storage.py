@@ -45,7 +45,7 @@ def _run(args: List[str], **kw: Any):
     cmd = shutil.which(args[0])  # type: Optional[str]
     if cmd is None:
         raise FileNotFoundError(args[0])
-    return subprocess.run([cmd, *args[1:]], **kw)
+    return subprocess.run([cmd, *args[1:]], encoding='utf-8', **kw)
 
 
 class SQLiteStorage:
@@ -59,7 +59,7 @@ class SQLiteStorage:
 
         if not os.path.exists(str(filename)):
             # sqlite3.connect creates the file silently if it does not exist
-            logger.debug("Initializing SQLite local storage: {}.".format(filename))
+            logger.debug(f"Initializing SQLite local storage: {filename}.")
 
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
@@ -358,7 +358,8 @@ class _JujuStorageBackend:
         # have the same default style.
         encoded_value = yaml.dump(value, Dumper=_SimpleDumper, default_flow_style=None)
         content = yaml.dump(
-            {key: encoded_value}, encoding='utf8', default_style='|',
+            {key: encoded_value},
+            default_style='|',
             default_flow_style=False,
             Dumper=_SimpleDumper)
         _run(["state-set", "--file", "-"], input=content, check=True)
@@ -372,7 +373,7 @@ class _JujuStorageBackend:
             CalledProcessError: if 'state-get' returns an error code.
         """
         # We don't capture stderr here so it can end up in debug logs.
-        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True, universal_newlines=True)
+        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
         return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore
@@ -395,4 +396,4 @@ class NoSnapshotError(Exception):
         self.handle_path = handle_path
 
     def __str__(self):
-        return 'no snapshot data found for {} object'.format(self.handle_path)
+        return f'no snapshot data found for {self.handle_path} object'

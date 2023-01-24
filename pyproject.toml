@@ -1,11 +1,9 @@
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
-omit = ["ops/_vendor/**"]
 
 [tool.coverage.report]
 show_missing = true
-omit = ["ops/_vendor/**"]
 
 # Formatting tools configuration
 [tool.autopep8]
@@ -14,17 +12,15 @@ ignore = ["E203", "W503"]
 recursive = true
 jobs = -1
 aggressive = 3
-exclude = "ops/_vendor/**"
 
 [tool.isort]
 profile = "black"
-skip = "ops/_vendor"
 
 # Linting tools configuration
 [tool.flake8]
 max-line-length = 99
 max-doc-length = 99
-exclude = ["ops/_vendor", ".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
+exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
 select = ["E", "W", "F", "C", "N", "R", "D", "H"]
 ignore = ["D105", "D107", "E203", "W503"]
 # D100, D101, D102, D103, D104: Ignore missing docstrings in tests
@@ -34,9 +30,10 @@ docstring-convention = "google"
 [tool.pyright]
 include = ["ops/jujuversion.py", "ops/log.py", "ops/model.py", "ops/version.py",
     "ops/__init__.py", "ops/framework.py", "ops/pebble.py", "ops/charm.py",
-    "ops/storage.py", "ops/main.py", "ops/testing.py"]
-pythonVersion = "3.5" # check no python > 3.5 features are used
+    "ops/storage.py", "ops/main.py", "ops/testing.py", "ops/_private/timeconv.py"]
+pythonVersion = "3.8" # check no python > 3.8 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"
 reportIncompatibleMethodOverride = false
 reportImportCycles = false
+reportTypeCommentUsage = false
