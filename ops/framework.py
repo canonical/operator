@@ -50,8 +50,7 @@ from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from typing_extensions import Literal, Protocol, Type
+    from typing import Literal, Protocol, Type
 
     from ops.charm import CharmMeta
     from ops.model import JsonObject, Model, _ModelBackend
@@ -613,8 +612,10 @@ class Framework(Object):
 
         # Parse the env var once, which may be used multiple times later
         debug_at = os.environ.get('JUJU_DEBUG_AT')
-        self._juju_debug_at = (set(x.strip() for x in debug_at.split(','))
-                               if debug_at else set())  # type: Set[str]
+        if debug_at:
+            self._juju_debug_at = {x.strip() for x in debug_at.split(',')}
+        else:
+            self._juju_debug_at: Set[str] = set()
 
     def set_breakpointhook(self):
         """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
