@@ -1195,7 +1195,7 @@ class RelationMeta:
         self.scope = raw.get('scope') or self._default_scope
         if self.scope not in self.VALID_SCOPES:
             raise TypeError("scope should be one of {}; not '{}'".format(
-                ', '.join("'{}'".format(s) for s in self.VALID_SCOPES), self.scope))
+                ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope))
 
 
 class StorageMeta:
