@@ -2160,7 +2160,7 @@ class Container:
             name=path.name,
             type=ftype,
             size=info.st_size,
-            permissions=typing.cast(int, stat.S_IMODE(info.st_mode)),  # type: ignore
+            permissions=stat.S_IMODE(info.st_mode),
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pwd.getpwuid(info.st_uid).pw_name,
@@ -2556,7 +2556,7 @@ class _ModelBackend:
             if result.stdout is None:
                 return ''
             else:
-                text = typing.cast(str, result.stdout)  # type: ignore
+                text = typing.cast(str, result.stdout)
                 if use_json:
                     return json.loads(text)
                 else:
