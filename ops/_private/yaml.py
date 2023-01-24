@@ -23,9 +23,9 @@ _safe_loader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 _safe_dumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
 
 
-def safe_load(stream: Union[str, TextIO]):
+def safe_load(stream: Union[str, TextIO]) -> Any:
     """Same as yaml.safe_load, but use fast C loader if available."""
-    return yaml.load(stream, Loader=_safe_loader)
+    return yaml.load(stream, Loader=_safe_loader)  # type: ignore
 
 
 @overload
@@ -40,4 +40,4 @@ def safe_dump(data: Any, stream: Optional[Union[str, TextIO]] = None, **kwargs: 
 
     If `encoding:str` is provided, return bytes. Else, return str.
     """
-    return yaml.dump(data, stream=stream, Dumper=_safe_dumper, **kwargs)
+    return yaml.dump(data, stream=stream, Dumper=_safe_dumper, **kwargs)  # type: ignore

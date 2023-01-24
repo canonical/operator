@@ -1510,7 +1510,7 @@ class Client:
             try:
                 body = json.loads(e.read())  # type: Dict[str, Any]
                 message = body['result']['message']  # type: str
-            except (IOError, ValueError, KeyError) as e2:
+            except (OSError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}  # type: Dict[str, Any]
                 message = f'{type(e2).__name__} - {e2}'
