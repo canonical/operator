@@ -1,3 +1,15 @@
-PyYAML
-pyright==1.1.257
+isort==5.11.4
+logassert==7
+autopep8==1.6.0
+flake8==4.0.1
+flake8-docstrings==1.6.0
+flake8-builtins==2.1.0
+pyproject-flake8==4.0.1
+pep8-naming==0.13.2
+pytest==7.2.1
+pyright==1.1.291
+pytest-operator==0.23.0
+coverage[toml]==7.0.5
 typing_extensions==4.2.0
+
+-r requirements.txt
