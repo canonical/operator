@@ -40,7 +40,7 @@ llows us to swap out easily any part of this flow, and even share context data a
 In this spirit, but that I still have to think through how useful it really is, a Scenario exposes a `playbook`: a sequence of scenes it can run sequentially (although given that each Scene's input state is totally disconnected from any other's, the ordering of the sequence is irrelevant) and potentially share with other projects. More on this later.
 
 
-![image](https://user-images.githubusercontent.com/6230162/214538381-ba969ac3-a302-4122-8960-c5efc1fe8b6d.png)
+![image](https://user-images.githubusercontent.com/6230162/214538871-a44e29c6-3fd5-46a3-82c8-d7fa34452dcf.png)
 
 
 # Writing scenario tests
