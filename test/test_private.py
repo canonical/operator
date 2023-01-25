@@ -41,7 +41,7 @@ class TestYAML(unittest.TestCase):
         self.assertEqual(s, 'baz: 123\nfoo: bar\n')
 
         f = io.StringIO()
-        s = yaml.safe_dump({'foo': 'bar', 'baz': 123}, stream=f)
+        yaml.safe_dump({'foo': 'bar', 'baz': 123}, stream=f)
         self.assertEqual(f.getvalue(), 'baz: 123\nfoo: bar\n')
 
         # Should error -- it's not safe to dump an instance of a user-defined class
