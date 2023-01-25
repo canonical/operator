@@ -3850,6 +3850,19 @@ class _PebbleStorageAPIsTestMixin:
             client.push('file', '')
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
+    def test_pull_not_found(self):
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.pull("/not/found")
+        self.assertEqual(cm.exception.kind, "not-found")
+        self.assertIn("/not/found", cm.exception.message)
+
+    def test_pull_directory(self):
+        self.client.make_dir(f"{self.prefix}/subdir")
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.pull(f"{self.prefix}/subdir")
+        self.assertEqual(cm.exception.kind, "generic-file-error")
+        self.assertIn(f"{self.prefix}/subdir", cm.exception.message)
+
     def test_list_files_not_found_raises(self):
         client = self.client
         with self.assertRaises(pebble.APIError) as cm:

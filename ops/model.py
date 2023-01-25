@@ -1934,6 +1934,10 @@ class Container:
             A readable file-like object, whose read() method will return str
             objects decoded according to the specified encoding, or bytes if
             encoding is None.
+
+        Raises:
+            pebble.PathError: If there was an error reading the file at path,
+                for example, if the file doesn't exist or is a directory.
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
