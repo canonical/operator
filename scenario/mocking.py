@@ -106,7 +106,8 @@ def wrap_tool(
                 return {"status": status, "message": message}
 
             elif tool_name == "relation_ids":
-                return [rel.meta.relation_id for rel in input_state.relations]
+                endpoint = args[0]
+                return [rel.meta.relation_id for rel in input_state.relations if rel.meta.endpoint == endpoint]
 
             elif tool_name == "relation_list":
                 rel_id = args[0]
