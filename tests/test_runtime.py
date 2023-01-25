@@ -18,8 +18,8 @@ def charm_type():
         on = _CharmEvents()
         _event = None
 
-        def __init__(self, framework, key=None):
-            super().__init__(framework, key)
+        def __init__(self, framework):
+            super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._catchall)
 

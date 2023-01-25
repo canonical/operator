@@ -26,7 +26,7 @@ def _read_me() -> str:
     return readme
 
 
-version = "0.2.2"
+version = "1.0.0"
 
 setup(
     name="scenario",

@@ -14,8 +14,8 @@ def mycharm():
         _call = None
         called = False
 
-        def __init__(self, framework: Framework, key: Optional[str] = None):
-            super().__init__(framework, key)
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
 
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)

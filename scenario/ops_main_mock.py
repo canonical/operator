@@ -108,7 +108,7 @@ def main(
                 "removed after the 0.7 release"
             )
             warnings.warn(msg, DeprecationWarning)
-            charm = charm_class(framework, None)
+            charm = charm_class(framework)
         else:
             charm = charm_class(framework)
         dispatcher.ensure_event_links(charm)
