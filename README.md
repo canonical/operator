@@ -1,3 +1,5 @@
+NOTE: [we're trying](https://github.com/canonical/operator/pull/887) to merge this in ops main. Stay tuned! 
+
 Ops-Scenario
 ============
 
