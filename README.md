@@ -60,9 +60,9 @@ available. The charm has no config, no relations, no networks, and no leadership
 With that, we can write the simplest possible scenario test:
 
 ```python
+from ops.charm import CharmBase
 from scenario.scenario import Scenario, Scene, State
 from scenario.structs import CharmSpec, event
-from ops.charm import CharmBase
 
 
 class MyCharm(CharmBase):
@@ -72,17 +72,17 @@ class MyCharm(CharmBase):
 def test_scenario_base():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
     out = scenario.play(Scene(event=event("start"), state=State()))
-    assert out.status.unit == ('unknown', '')
+    assert out.status.unit == ("unknown", "")
 ```
 
 Now let's start making it more complicated.
 Our charm sets a special state if it has leadership on 'start':
 
 ```python
-from scenario.scenario import Scenario, Scene, State
-from scenario.structs import CharmSpec, event
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
+from scenario.scenario import Scenario, Scene, State
+from scenario.structs import CharmSpec, event
 
 
 class MyCharm(CharmBase):
@@ -92,19 +92,19 @@ class MyCharm(CharmBase):
 
     def _on_start(self, _):
         if self.unit.is_leader():
-            self.unit.status = ActiveStatus('I rule')
+            self.unit.status = ActiveStatus("I rule")
 
 
 def test_scenario_base():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
     out = scenario.play(Scene(event=event("start"), state=State()))
-    assert out.status.unit == ('unknown', '')
+    assert out.status.unit == ("unknown", "")
 
 
 def test_status_leader():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
     out = scenario.play(Scene(event=event("start"), state=State(leader=True)))
-    assert out.status.unit == ('active', 'I rule')
+    assert out.status.unit == ("active", "I rule")
 ```
 
 This is starting to get messy, but fortunately scenarios are easily turned into fixtures. We can rewrite this more
