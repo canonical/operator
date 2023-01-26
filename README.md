@@ -60,8 +60,8 @@ available. The charm has no config, no relations, no networks, and no leadership
 With that, we can write the simplest possible scenario test:
 
 ```python
-from scenario.scenario import Scenario, Scene
-from scenario.structs import CharmSpec, event, Context
+from scenario.scenario import Scenario, Scene, State
+from scenario.structs import CharmSpec, event
 from ops.charm import CharmBase
 
 
@@ -71,7 +71,7 @@ class MyCharm(CharmBase):
 
 def test_scenario_base():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
-    out = scenario.play(Scene(event=event('start'), context=Context()))
+    out = scenario.play(Scene(event=event("start"), state=State()))
     assert out.status.unit == ('unknown', '')
 ```
 
@@ -79,14 +79,15 @@ Now let's start making it more complicated.
 Our charm sets a special state if it has leadership on 'start':
 
 ```python
-from scenario.scenario import Scenario, Scene
-from scenario.structs import CharmSpec, event, Context, State
+from scenario.scenario import Scenario, Scene, State
+from scenario.structs import CharmSpec, event
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
 
 class MyCharm(CharmBase):
-    def __init__(self, ...):
+    def __init__(self, *args):
+        super().__init__(*args)
         self.framework.observe(self.on.start, self._on_start)
 
     def _on_start(self, _):
@@ -96,18 +97,13 @@ class MyCharm(CharmBase):
 
 def test_scenario_base():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
-    out = scenario.play(Scene(event=event('start'), context=Context()))
+    out = scenario.play(Scene(event=event("start"), state=State()))
     assert out.status.unit == ('unknown', '')
 
 
 def test_status_leader():
     scenario = Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
-    out = scenario.play(
-        Scene(
-            event=event('start'),
-            context=Context(
-                state=State(leader=True)
-            )))
+    out = scenario.play(Scene(event=event("start"), state=State(leader=True)))
     assert out.status.unit == ('active', 'I rule')
 ```
 
@@ -116,46 +112,48 @@ concisely (and parametrically) as:
 
 ```python
 import pytest
-from scenario.scenario import Scenario, Scene, State
-from scenario.structs import CharmSpec, event
+
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
+from scenario.scenario import Scenario, Scene, State
+from scenario.structs import CharmSpec, event
 
 
 class MyCharm(CharmBase):
-  def __init__(self, ...):
-    self.framework.observe(self.on.start, self._on_start)
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.framework.observe(self.on.start, self._on_start)
 
-  def _on_start(self, _):
-    if self.unit.is_leader():
-      self.unit.status = ActiveStatus('I rule')
-    else:
-      self.unit.status = ActiveStatus('I follow')
+    def _on_start(self, _):
+        if self.unit.is_leader():
+            self.unit.status = ActiveStatus("I rule")
+        else:
+            self.unit.status = ActiveStatus("I follow")
 
 
 @pytest.fixture
 def scenario():
-  return Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
+    return Scenario(CharmSpec(MyCharm, meta={"name": "foo"}))
 
 
 @pytest.fixture
 def start_scene():
-  return Scene(event=event('start'), state=State())
+    return Scene(event=event("start"), state=State())
 
 
 def test_scenario_base(scenario, start_scene):
-  out = scenario.play(start_scene)
-  assert out.status.unit == ('unknown', '')
+    out = scenario.play(start_scene)
+    assert out.status.unit == ("active", "I follow")
 
 
-@pytest.mark.parametrize('leader', [True, False])
+@pytest.mark.parametrize("leader", [True, False])
 def test_status_leader(scenario, start_scene, leader):
-  leader_scene = start_scene.copy()
-  leader_scene.context.state.leader = leader
+    leader_scene = start_scene.copy()
+    leader_scene.state.leader = leader
 
-  out = scenario.play(leader_scene)
-  expected_status = ('active', 'I rule') if leader else ('active', 'I follow')
-  assert out.status.unit == expected_status
+    out = scenario.play(leader_scene)
+    expected_status = ("active", "I rule") if leader else ("active", "I follow")
+    assert out.status.unit == expected_status
 ```
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
@@ -317,3 +315,8 @@ def test_pebble_exec(scenario, start_scene):
 # TODOS:
 - Figure out how to distribute this. I'm thinking `pip install ops[scenario]`
 - Better syntax for memo generation
+<<<<<<< HEAD
+=======
+- Consider consolidating memo and State (e.g. passing a Sequence object to a State value...)
+- Expose instructions or facilities re. how to use this without borking your venv.
+>>>>>>> f9b8896 (now, the first 3 examples are valid and green)
