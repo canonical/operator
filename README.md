@@ -315,8 +315,3 @@ def test_pebble_exec(scenario, start_scene):
 # TODOS:
 - Figure out how to distribute this. I'm thinking `pip install ops[scenario]`
 - Better syntax for memo generation
-<<<<<<< HEAD
-=======
-- Consider consolidating memo and State (e.g. passing a Sequence object to a State value...)
-- Expose instructions or facilities re. how to use this without borking your venv.
->>>>>>> f9b8896 (now, the first 3 examples are valid and green)
