@@ -27,6 +27,7 @@ import os
 import sys
 
 from ops import pebble
+from ops._private import timeconv
 
 
 def main():
@@ -40,7 +41,7 @@ def main():
     p = subparsers.add_parser('ack', help='acknowledge warnings up to given time')
     p.add_argument('--timestamp', help='time to acknowledge up to (YYYY-mm-ddTHH:MM:SS.f+ZZ:zz'
                                        'format), default current time',
-                   type=pebble._parse_timestamp)
+                   type=timeconv.parse_rfc3339)
 
     p = subparsers.add_parser('add', help='add a configuration layer dynamically')
     p.add_argument('--combine', action='store_true', help='combine layer instead of appending')

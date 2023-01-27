@@ -17,7 +17,6 @@ import importlib.util
 import io
 import logging
 import os
-import platform
 import shutil
 import subprocess
 import sys
@@ -45,6 +44,11 @@ from ops.charm import (
     RelationDepartedEvent,
     RelationEvent,
     RelationJoinedEvent,
+    SecretChangedEvent,
+    SecretEvent,
+    SecretExpiredEvent,
+    SecretRemoveEvent,
+    SecretRotateEvent,
     StartEvent,
     StorageAttachedEvent,
     UpdateStatusEvent,
@@ -58,8 +62,6 @@ from ops.version import version
 
 from .charms.test_main.src.charm import MyCharmEvents
 from .test_helpers import fake_script, fake_script_calls
-
-is_windows = platform.system() == 'Windows'
 
 # This relies on the expected repository structure to find a path to
 # source of the charm under test.
@@ -81,7 +83,8 @@ class EventSpec:
     def __init__(self, event_type, event_name, env_var=None,
                  relation_id=None, remote_app=None, remote_unit=None,
                  model_name=None, set_in_env=None, workload_name=None,
-                 departing_unit_name=None):
+                 departing_unit_name=None, secret_id=None, secret_label=None,
+                 secret_revision=None):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -92,12 +95,14 @@ class EventSpec:
         self.model_name = model_name
         self.set_in_env = set_in_env
         self.workload_name = workload_name
+        self.secret_id = secret_id
+        self.secret_label = secret_label
+        self.secret_revision = secret_revision
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
 
-    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
     @patch('sys.stderr', new_callable=io.StringIO)
     def test_breakpoint(self, fake_stderr):
         class MyCharm(CharmBase):
@@ -105,19 +110,18 @@ class CharmInitTestCase(unittest.TestCase):
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': 'all'})
 
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+            breakpoint()
 
         self.assertEqual(mock.call_count, 1)
         self.assertIn('Starting pdb to debug charm operator', fake_stderr.getvalue())
 
-    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
     def test_no_debug_breakpoint(self):
         class MyCharm(CharmBase):
             pass
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': ''})
 
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+            breakpoint()
 
         self.assertEqual(mock.call_count, 0)
 
@@ -366,6 +370,15 @@ class _TestMain(abc.ABC):
         })
         if event_spec.set_in_env is not None:
             env.update(event_spec.set_in_env)
+        if issubclass(event_spec.event_type, SecretEvent):
+            env.update({
+                'JUJU_SECRET_ID': event_spec.secret_id,
+                'JUJU_SECRET_LABEL': event_spec.secret_label or '',
+            })
+        if issubclass(event_spec.event_type, (SecretRemoveEvent, SecretExpiredEvent)):
+            env.update({
+                'JUJU_SECRET_REVISION': str(event_spec.secret_revision or ''),
+            })
         if issubclass(event_spec.event_type, RelationEvent):
             rel_name = event_spec.event_name.split('_')[0]
             env.update({
@@ -543,6 +556,37 @@ class _TestMain(abc.ABC):
             EventSpec(PebbleReadyEvent, 'test_pebble_ready',
                       workload_name='test'),
             {'container_name': 'test'},
+        ), (
+            EventSpec(SecretChangedEvent, 'secret_changed',
+                      secret_id='secret:12345',
+                      secret_label='foo'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
+        ), (
+            EventSpec(SecretRotateEvent, 'secret_rotate',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
+        ), (
+            EventSpec(SecretRemoveEvent, 'secret_remove',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
+        ), (
+            EventSpec(SecretExpiredEvent, 'secret_expired',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
         )]
 
         logger.debug('Expected events %s', events_under_test)
@@ -650,7 +694,6 @@ class _TestMain(abc.ABC):
             self._simulate_event(event_spec)
             self.assertIn(calls, fake_script_calls(self, clear=True))
 
-    @unittest.skipIf(is_windows, 'TODO windows multiline args are hard')
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(InstallEvent, 'install',
@@ -783,9 +826,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
                 self.assertTrue(hook_path.exists(), 'Missing hook: ' + event_hook)
                 if self.hooks_are_symlinks:
                     self.assertTrue(hook_path.is_symlink())
-                    if not is_windows:
-                        # TODO(benhoyt): fix this now that tests are running on GitHub Actions
-                        self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
+                    self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
                 elif event_hook in initial_hooks:
                     self.assertFalse(hook_path.is_symlink())
                 else:
@@ -888,7 +929,6 @@ class _TestMainWithDispatch(_TestMain):
         self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
-    @unittest.skipIf(is_windows, "this is UNIXish; TODO: write equivalent windows test")
     def test_non_executable_hook_and_dispatch(self):
         (self.hooks_dir / "install").write_text("")
         state = self._simulate_event(EventSpec(InstallEvent, 'install'))
@@ -935,8 +975,6 @@ class _TestMainWithDispatch(_TestMain):
     def test_hook_and_dispatch_but_hook_is_dispatch(self):
         event = EventSpec(InstallEvent, 'install')
         hook_path = self.hooks_dir / 'install'
-        if is_windows:
-            hook_path = hook_path.with_suffix('.bat')
         for ((rel, ind), path) in {
                 # relative and indirect
                 (True, True): Path('../dispatch'),
@@ -948,8 +986,6 @@ class _TestMainWithDispatch(_TestMain):
                 (False, True): self.JUJU_CHARM_DIR / 'dispatch',
         }.items():
             with self.subTest(path=path, rel=rel, ind=ind):
-                if is_windows:
-                    path = path.with_suffix('.sh')
                 # sanity check
                 self.assertEqual(path.is_absolute(), not rel)
                 self.assertEqual(path.with_suffix('').name == 'dispatch', ind)
@@ -964,7 +1000,6 @@ class _TestMainWithDispatch(_TestMain):
                 finally:
                     hook_path.unlink()
 
-    @unittest.skipIf(is_windows, "this needs rethinking on Windows")
     def test_hook_and_dispatch_but_hook_is_dispatch_copy(self):
         hook_path = self.hooks_dir / 'install'
         path = (self.hooks_dir / self.charm_exec_path).resolve()
@@ -997,10 +1032,6 @@ class _TestMainWithDispatch(_TestMain):
         self.assertEqual(calls, expected)
 
 
-# NOTE
-#  AIUI On windows dispatch must be a script (see TestMainWithDispatchAsScript),
-#  because Juju won't call python even if we rename dispatch to dispatch.py
-@unittest.skipIf(is_windows, "Juju on windows won't make this work (see note)")
 class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
     def _setup_entry_point(self, directory, entry_point):
         path = self.JUJU_CHARM_DIR / 'dispatch'
@@ -1063,17 +1094,10 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
 
     has_dispatch = True
 
-    if is_windows:
-        suffix = '.BAT'
-        script = '@ECHO OFF\n"{}" "{}"\n'
-    else:
-        suffix = ''
-        script = '#!/bin/sh\nexec "{}" "{}"\n'
-
     def _setup_entry_point(self, directory, entry_point):
-        path = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
+        path = (self.JUJU_CHARM_DIR / 'dispatch')
         if not path.exists():
-            path.write_text(self.script.format(
+            path.write_text('#!/bin/sh\nexec "{}" "{}"\n'.format(
                 sys.executable,
                 self.JUJU_CHARM_DIR / 'src/charm.py'))
             path.chmod(0o755)
@@ -1121,7 +1145,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
             echo '["disks/0"]'
             """,
         )
-        dispatch = (self.JUJU_CHARM_DIR / 'dispatch').with_suffix(self.suffix)
+        dispatch = (self.JUJU_CHARM_DIR / 'dispatch')
         subprocess.check_call([str(dispatch)], env=env, cwd=str(self.JUJU_CHARM_DIR))
 
 

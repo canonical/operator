@@ -297,7 +297,7 @@ class EventSource(Generic[_EventType]):
         self.event_kind = None  # type: Optional[str]  # noqa
         self.emitter_type = None  # type: Optional[Type[Object]]  # noqa
 
-    def _set_name(self, emitter_type: 'Type[Object]', event_kind: str):
+    def __set_name__(self, emitter_type: 'Type[Object]', event_kind: str):
         if self.event_kind is not None:
             raise RuntimeError(
                 'EventSource({}) reused as {}.{} and {}.{}'.format(
@@ -369,39 +369,7 @@ class HandleKind:
         return obj_type.__name__
 
 
-class _Metaclass(type):
-    """Helper class to ensure proper instantiation of Object-derived classes.
-
-    This class currently has a single purpose: events derived from EventSource
-    that are class attributes of Object-derived classes need to be told what
-    their name is in that class. For example, in
-
-        class SomeObject(Object):
-            something_happened = EventSource(SomethingHappened)
-
-    the instance of EventSource needs to know it's called 'something_happened'.
-
-    Starting from python 3.6 we could use __set_name__ on EventSource for this,
-    but until then this (meta)class does the equivalent work.
-
-    TODO: when we drop support for 3.5 drop this class, and rename _set_name in
-          EventSource to __set_name__; everything should continue to work.
-
-    """
-
-    def __new__(cls, *a, **kw):  # type: ignore
-        k = super().__new__(cls, *a, **kw)  # type: ignore
-        # k is now the Object-derived class; loop over its class attributes
-        for n, v in vars(k).items():
-            # we could do duck typing here if we want to support
-            # non-EventSource-derived shenanigans. We don't.
-            if isinstance(v, EventSource):
-                # this is what 3.6+ does automatically for us:
-                v._set_name(k, n)  # noqa
-        return k
-
-
-class Object(metaclass=_Metaclass):
+class Object:
     """Initialize an Object as a new leaf in :class:`Framework`, identified by `key`.
 
     Args:
@@ -507,7 +475,7 @@ class ObjectEvents(Object):
             pass
 
         event_descriptor = EventSource(event_type)
-        event_descriptor._set_name(cls, event_kind)  # noqa
+        event_descriptor.__set_name__(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
 
     def _event_kinds(self) -> List[str]:
