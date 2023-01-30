@@ -65,11 +65,11 @@ from .test_helpers import fake_script, fake_script_calls
 
 # This relies on the expected repository structure to find a path to
 # source of the charm under test.
-TEST_CHARM_DIR = Path(__file__ + '/../charms/test_main').resolve()
+TEST_CHARM_DIR = Path(f"{__file__}/../charms/test_main").resolve()
 
 VERSION_LOGLINE = [
     'juju-log', '--log-level', 'DEBUG', '--',
-    'Operator Framework {} up and running.'.format(version),
+    f'Operator Framework {version} up and running.',
 ]
 
 logger = logging.getLogger(__name__)
@@ -144,10 +144,7 @@ class CharmInitTestCase(unittest.TestCase):
                             fh.write(b'name: test')
                         mock_charmdir.return_value = tmpdirname
 
-                        with warnings.catch_warnings(record=True) as warnings_cm:
-                            main(charm_class, **kwargs)
-
-        return warnings_cm
+                        main(charm_class, **kwargs)
 
     def test_init_signature_passthrough(self):
         class MyCharm(CharmBase):
@@ -155,22 +152,19 @@ class CharmInitTestCase(unittest.TestCase):
             def __init__(self, *args):
                 super().__init__(*args)
 
-        warn_cm = self._check(MyCharm)
-        self.assertFalse(warn_cm)
+        with warnings.catch_warnings(record=True) as warn_cm:
+            self._check(MyCharm)
+        self.assertEqual(warn_cm, [])
 
-    def test_init_signature_both_arguments(self):
+    def test_init_signature_old_key_argument(self):
         class MyCharm(CharmBase):
 
             def __init__(self, framework, somekey):
                 super().__init__(framework, somekey)
 
-        warn_cm = self._check(MyCharm)
-        self.assertEqual(len(warn_cm), 1)
-        (warn,) = warn_cm
-        self.assertTrue(issubclass(warn.category, DeprecationWarning))
-        self.assertEqual(str(warn.message), (
-            "the second argument, 'key', has been deprecated and will be removed "
-            "after the 0.7 release"))
+        # Support for "key" has been deprecated since ops 0.7 and was removed in 2.0
+        with self.assertRaises(TypeError):
+            self._check(MyCharm)
 
     def test_init_signature_only_framework(self):
         class MyCharm(CharmBase):
@@ -178,8 +172,9 @@ class CharmInitTestCase(unittest.TestCase):
             def __init__(self, framework):
                 super().__init__(framework)
 
-        warn_cm = self._check(MyCharm)
-        self.assertFalse(warn_cm)
+        with warnings.catch_warnings(record=True) as warn_cm:
+            self._check(MyCharm)
+        self.assertEqual(warn_cm, [])
 
     def test_storage_no_storage(self):
         # here we patch juju_backend_available so it refuses to set it up
@@ -196,6 +191,13 @@ class CharmInitTestCase(unittest.TestCase):
             juju_backend_available.return_value = True
             with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
                 self._check(CharmBase, use_juju_for_storage=True)
+
+    def test_controller_storage_deprecated(self):
+        with patch('ops.storage.juju_backend_available') as juju_backend_available:
+            juju_backend_available.return_value = True
+            with self.assertWarnsRegex(DeprecationWarning, 'Controller storage'):
+                with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
+                    self._check(CharmBase, use_juju_for_storage=True)
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
@@ -598,7 +600,7 @@ class _TestMain(abc.ABC):
         for event_spec, expected_event_data in events_under_test:
             state = self._simulate_event(event_spec)
 
-            state_key = 'on_' + event_spec.event_name
+            state_key = f"on_{event_spec.event_name}"
             handled_events = getattr(state, state_key, [])
 
             # Make sure that a handler for that event was called once.
@@ -610,7 +612,7 @@ class _TestMain(abc.ABC):
             self.assertEqual(list(state.observed_event_types), [event_spec.event_type.__name__])
 
             if event_spec.event_name in expected_event_data:
-                self.assertEqual(state[event_spec.event_name + '_data'],
+                self.assertEqual(state[f"{event_spec.event_name}_data"],
                                  expected_event_data[event_spec.event_name])
 
     def test_event_not_implemented(self):
@@ -702,7 +704,7 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script_calls(self)]
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
-        self.assertRegex(calls.pop(0), 'Using local storage: not a kubernetes charm')
+        self.assertRegex(calls.pop(0), 'Using local storage: not a Kubernetes podspec charm')
         self.assertRegex(calls.pop(0), 'Initializing SQLite local storage: ')
 
         self.maxDiff = None
@@ -714,7 +716,7 @@ class _TestMain(abc.ABC):
             '    raise RuntimeError."failing as requested".\n'
             'RuntimeError: failing as requested'
         )
-        self.assertEqual(len(calls), 1, "expected 1 call, but got extra: {}".format(calls[1:]))
+        self.assertEqual(len(calls), 1, f"expected 1 call, but got extra: {calls[1:]}")
 
     def test_sets_model_name(self):
         self._prepare_actions()
@@ -807,7 +809,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events."""
-        all_event_hooks = ['hooks/' + name.replace("_", "-")
+        all_event_hooks = [f"hooks/{name.replace('_', '-')}"
                            for name, event_source in self.charm_module.Charm.on.events().items()
                            if not event_source.event_type.__name__ == "CustomEvent"]
 
@@ -817,13 +819,13 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
             EventSpec(StartEvent, 'start'),
             EventSpec(UpgradeCharmEvent, 'upgrade-charm'),
         }
-        initial_hooks = {'hooks/' + ev.event_name for ev in initial_events}
+        initial_hooks = {f"hooks/{ev.event_name}" for ev in initial_events}
 
         def _assess_event_links(event_spec):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 hook_path = self.JUJU_CHARM_DIR / event_hook
-                self.assertTrue(hook_path.exists(), 'Missing hook: ' + event_hook)
+                self.assertTrue(hook_path.exists(), f"Missing hook: {event_hook}")
                 if self.hooks_are_symlinks:
                     self.assertTrue(hook_path.is_symlink())
                     self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
@@ -881,7 +883,7 @@ class _TestMainWithDispatch(_TestMain):
 
         Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
-        all_event_hooks = ['hooks/' + e.replace("_", "-")
+        all_event_hooks = [f"hooks/{e.replace('_', '-')}"
                            for e in self.charm_module.Charm.on.events().keys()]
         initial_events = {
             EventSpec(InstallEvent, 'install'),
@@ -894,7 +896,7 @@ class _TestMainWithDispatch(_TestMain):
             self.assertNotIn(self.hooks_dir / event_spec.event_name, self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 self.assertFalse((self.JUJU_CHARM_DIR / event_hook).exists(),
-                                 'Spurious hook: ' + event_hook)
+                                 f"Spurious hook: {event_hook}")
 
         for initial_event in initial_events:
             self._setup_charm_dir()
@@ -917,11 +919,11 @@ class _TestMainWithDispatch(_TestMain):
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', '--',
-             'Running legacy {}.'.format(hook)],
+             f'Running legacy {hook}.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Legacy {} exited with status 0.'.format(hook)],
+             f'Legacy {hook} exited with status 0.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -940,7 +942,7 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'WARNING', '--',
              'Legacy hooks/install exists but is not executable.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -966,9 +968,9 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', '--', 'Running legacy {}.'.format(hook)],
+            ['juju-log', '--log-level', 'INFO', '--', f'Running legacy {hook}.'],
             ['juju-log', '--log-level', 'WARNING', '--',
-             'Legacy {} exited with status 42.'.format(hook)],
+             f'Legacy {hook} exited with status 42.'],
         ]
         self.assertEqual(calls, expected)
 
@@ -1015,14 +1017,14 @@ class _TestMainWithDispatch(_TestMain):
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'INFO', '--',
-             'Running legacy {}.'.format(hook)],
+             f'Running legacy {hook}.'],
             VERSION_LOGLINE,    # because it called itself
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Charm called itself via {}.'.format(hook)],
+             f'Charm called itself via {hook}.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Legacy {} exited with status 0.'.format(hook)],
+             f'Legacy {hook} exited with status 0.'],
             ['juju-log', '--log-level', 'DEBUG', '--',
-             'Using local storage: not a kubernetes charm'],
+             'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
         ]
@@ -1169,7 +1171,7 @@ class TestStorageHeuristics(unittest.TestCase):
         meta = CharmMeta.from_yaml("series: [ecs]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
             self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
-            self.assertLogged('Using local storage: not a kubernetes charm')
+            self.assertLogged('Using local storage: not a Kubernetes podspec charm')
 
     def test_not_if_already_local(self):
         meta = CharmMeta.from_yaml("series: [kubernetes]")

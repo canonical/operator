@@ -12,24 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Infrastructure to build unittests for Charms using the Operator Framework.
-
-Global Variables:
-
-    SIMULATE_CAN_CONNECT: This enables can_connect simulation for the test
-    harness.  It should be set *before* you create Harness instances and not
-    changed after.  You *should* set this to true - it will help your tests be
-    more accurate!  This causes all containers' can_connect states initially
-    be False rather than True and causes the testing with the harness to model
-    and track can_connect state for containers accurately.  This means that
-    calls that require communication with the container API (e.g.
-    Container.push, Container.get_plan, Container.add_layer, etc.) will only
-    succeed if Container.can_connect() returns True and will raise exceptions
-    otherwise.  can_connect state evolves automatically to track with events
-    associated with container state, (e.g.  calling container_pebble_ready).
-    If SIMULATE_CAN_CONNECT is True, can_connect state for containers can also
-    be manually controlled using Harness.set_can_connect.
-"""
+"""Infrastructure to build unit tests for charms using the Operator Framework."""
 
 
 import dataclasses
@@ -107,10 +90,6 @@ if TYPE_CHECKING:
     })
     RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
 
-# Toggles Container.can_connect simulation globally for all harness instances.
-# For this to work, it must be set *before* Harness instances are created.
-
-SIMULATE_CAN_CONNECT = False
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
@@ -147,7 +126,7 @@ class Harness(Generic[CharmType]):
 
     Args:
         charm_cls: The Charm class that you'll be testing.
-        meta: charm.CharmBase is a A string or file-like object containing the contents of
+        meta: A string or file-like object containing the contents of
             metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
             parent directory of the Charm, and if not found fall back to a trivial
             'name: test-charm' metadata.
@@ -170,7 +149,7 @@ class Harness(Generic[CharmType]):
         self._charm = None  # type: Optional[CharmType]
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
-        self._unit_name = self._meta.name + '/0'  # type: str
+        self._unit_name = f"{self._meta.name}/0"  # type: str
         self._hooks_enabled = True  # type: bool
         self._relation_id_counter = 0  # type: int
         config_ = self._get_config(config)
@@ -179,24 +158,6 @@ class Harness(Generic[CharmType]):
         self._storage = storage.SQLiteStorage(':memory:')
         self._framework = framework.Framework(
             self._storage, self._charm_dir, self._meta, self._model)
-
-        # TODO: will be removed in the next breaking-changes release
-        #  together with self._oci_resources
-        self._deprecated_oci_resources_do_not_use = {}  # type: Dict[Any, Any]
-
-        # TODO: If/when we decide to allow breaking changes for a release,
-        #  change SIMULATE_CAN_CONNECT default value to True and remove the
-        #  warning message below.  This warning was added 2022-03-22
-        if not SIMULATE_CAN_CONNECT:
-            warnings.warn(
-                'Please set ops.testing.SIMULATE_CAN_CONNECT=True. '
-                'See https://juju.is/docs/sdk/testing#heading--simulate-can-connect for details.')
-
-    @property
-    def _oci_resources(self):
-        warnings.warn('Deprecation warning: Harness.`_oci_resources` is '
-                      'deprecated and will be removed in a future release.')
-        return self._deprecated_oci_resources_do_not_use
 
     def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
@@ -250,9 +211,9 @@ class Harness(Generic[CharmType]):
         return self._framework._event_context(event_name)  # pyright: reportPrivateUsage=false
 
     def set_can_connect(self, container: Union[str, model.Container], val: bool):
-        """Change the simulated can_connect status of a container's underlying pebble client.
+        """Change the simulated connection status of a container's underlying Pebble client.
 
-        Calling this method raises an exception if SIMULATE_CAN_CONNECT is False.
+        After calling this, :meth:`ops.model.Container.can_connect` will return val.
         """
         if isinstance(container, str):
             container = self.model.unit.get_container(container)
@@ -311,19 +272,19 @@ class Harness(Generic[CharmType]):
     def begin_with_initial_hooks(self) -> None:
         """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
 
-        This triggers install, relation-created, config-changed, start, and any relation-joined
-        hooks based on what relations have been defined+added before you called begin. This does
-        NOT trigger a pebble-ready hook. Note that all of these are fired before returning control
+        This triggers install, relation-created, config-changed, start, pebble-ready (for any
+        containers), and any relation-joined hooks based on what relations have been added before
+        you called begin. Note that all of these are fired before returning control
         to the test suite, so if you want to introspect what happens at each step, you need to fire
-        them directly (e.g. Charm.on.install.emit()).  In your hook callback functions, you should
-        not assume that workload containers are active; guard such code with checks to
-        Container.can_connect().  You are encouraged to test this by setting the global
-        SIMULATE_CAN_CONNECT variable to True.
+        them directly (e.g. Charm.on.install.emit()).
 
         To use this with all the normal hooks, you should instantiate the harness, setup any
-        relations that you want active when the charm starts, and then call this method.  This
+        relations that you want active when the charm starts, and then call this method. This
         method will automatically create and add peer relations that are specified in
         metadata.yaml.
+
+        If the charm metadata specifies containers, this sets can_connect to True for all
+        containers (in addition to triggering pebble-ready for each).
 
         Example::
 
@@ -344,6 +305,7 @@ class Harness(Generic[CharmType]):
             # To be fired.
         """
         self.begin()
+
         charm = cast(CharmBase, self._charm)
         # Checking if disks have been added
         # storage-attached events happen before install
@@ -353,6 +315,7 @@ class Harness(Generic[CharmType]):
                 self.attach_storage(s.full_id)
         # Storage done, emit install event
         charm.on.install.emit()
+
         # Juju itself iterates what relation to fire based on a map[int]relation, so it doesn't
         # guarantee a stable ordering between relation events. It *does* give a stable ordering
         # of joined units for a given relation.
@@ -380,8 +343,15 @@ class Harness(Generic[CharmType]):
             charm.on.leader_elected.emit()
         else:
             charm.on.leader_settings_changed.emit()
+
         charm.on.config_changed.emit()
+
         charm.on.start.emit()
+
+        # Set can_connect and fire pebble-ready for any containers.
+        for container_name in self._meta.containers:
+            self.container_pebble_ready(container_name)
+
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
@@ -489,9 +459,9 @@ class Harness(Generic[CharmType]):
                         'password': 'password',
                         }
         if resource_name not in self._meta.resources.keys():
-            raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not a defined resources')
         if self._meta.resources[resource_name].type != "oci-image":
-            raise RuntimeError('Resource {} is not an OCI Image'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not an OCI Image')
 
         as_yaml = yaml.safe_dump(contents)
         self._backend._resources_map[resource_name] = ('contents.yaml', as_yaml)
@@ -508,11 +478,11 @@ class Harness(Generic[CharmType]):
                 returned by resource-get. If contents is a string, it will be encoded in utf-8
         """
         if resource_name not in self._meta.resources.keys():
-            raise RuntimeError('Resource {} is not a defined resources'.format(resource_name))
+            raise RuntimeError(f'Resource {resource_name} is not a defined resources')
         record = self._meta.resources[resource_name]
         if record.type != "file":
             raise RuntimeError(
-                'Resource {} is not a file, but actually {}'.format(resource_name, record.type))
+                f'Resource {resource_name} is not a file, but actually {record.type}')
         filename = record.filename
         if filename is None:
             filename = resource_name
@@ -588,7 +558,7 @@ class Harness(Generic[CharmType]):
         """
         if storage_name not in self._meta.storages:
             raise RuntimeError(
-                "the key '{}' is not specified as a storage key in metadata".format(storage_name))
+                f"the key '{storage_name}' is not specified as a storage key in metadata")
 
         storage_indices = self._backend.storage_add(storage_name, count)
 
@@ -664,7 +634,7 @@ class Harness(Generic[CharmType]):
         storage_index = int(storage_index)
         if storage_name not in self._meta.storages:
             raise RuntimeError(
-                "the key '{}' is not specified as a storage key in metadata".format(storage_name))
+                f"the key '{storage_name}' is not specified as a storage key in metadata")
         is_attached = self._backend._storage_is_attached(  # pyright:ReportPrivateUsage=false
             storage_name, storage_index)
         if self._charm is not None and self._hooks_enabled and is_attached:
@@ -926,22 +896,21 @@ class Harness(Generic[CharmType]):
         """
         client = self._backend._pebble_clients.get(container_name)
         if client is None:
-            raise KeyError('no known pebble client for container "{}"'.format(container_name))
+            raise KeyError(f'no known pebble client for container "{container_name}"')
         return client.get_plan()
 
     def container_pebble_ready(self, container_name: str):
         """Fire the pebble_ready hook for the associated container.
 
-        This will do nothing if begin() has not been called. If
-        SIMULATE_CAN_CONNECT is True, this will switch the given
-        container's can_connect state to True before the hook
-        function is called.
+        This will switch the given container's can_connect state to True
+        before the hook function is called.
+
+        It will do nothing if begin() has not been called.
         """
         if self._charm is None:
             return
         container = self.model.unit.get_container(container_name)
-        if SIMULATE_CAN_CONNECT:
-            self.set_can_connect(container, True)
+        self.set_can_connect(container, True)
         self.charm.on[container_name].pebble_ready.emit(container)
 
     def get_workload_version(self) -> str:
@@ -1095,7 +1064,7 @@ class Harness(Generic[CharmType]):
                     if value is not None:
                         config._config_set(key, value)
                 else:
-                    raise ValueError("unknown config option: '{}'".format(key))
+                    raise ValueError(f"unknown config option: '{key}'")
 
         for key in unset:
             # When the key is unset, revert to the default if one exists
@@ -1378,7 +1347,7 @@ def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     elif isinstance(app_or_unit, str):
         return app_or_unit
     else:
-        raise TypeError('Expected Application | Unit | str, got {}'.format(type(app_or_unit)))
+        raise TypeError(f'Expected Application | Unit | str, got {type(app_or_unit)}')
 
 
 def _record_calls(cls: Any):
@@ -1494,10 +1463,10 @@ class _TestingRelationDataContents(Dict[str, str]):
     def __setitem__(self, key: str, value: str):
         if not isinstance(key, str):
             raise model.RelationDataError(
-                'relation data keys must be strings, not {}'.format(type(key)))
+                f'relation data keys must be strings, not {type(key)}')
         if not isinstance(value, str):
             raise model.RelationDataError(
-                'relation data values must be strings, not {}'.format(type(value)))
+                f'relation data values must be strings, not {type(value)}')
         super().__setitem__(key, value)
 
     def copy(self):
@@ -1604,8 +1573,6 @@ class _TestingModelBackend:
 
     def _set_can_connect(self, pebble_client: '_TestingPebbleClient', val: bool):
         """Manually sets the can_connect state for the given mock client."""
-        if not SIMULATE_CAN_CONNECT:
-            raise RuntimeError('must set SIMULATE_CAN_CONNECT=True before using set_can_connect')
         if pebble_client not in self._pebble_clients_can_connect:
             msg = 'cannot set can_connect for the client - are you running a "real" pebble test?'
             raise RuntimeError(msg)
@@ -1631,7 +1598,7 @@ class _TestingModelBackend:
             return self._relation_ids_map[relation_name]
         except KeyError as e:
             if relation_name not in self._meta.relations:
-                raise model.ModelError('{} is not a known relation'.format(relation_name)) from e
+                raise model.ModelError(f'{relation_name} is not a known relation') from e
             no_ids = []  # type: List[int]
             return no_ids
 
@@ -1764,7 +1731,7 @@ class _TestingModelBackend:
                 return self._storage_list[name][index][attribute]
         except KeyError:
             raise model.ModelError(
-                'ERROR invalid value "{}/{}" for option -s: storage not found'.format(name, index))
+                f'ERROR invalid value "{name}/{index}" for option -s: storage not found')
 
     def storage_add(self, name: str, count: int = 1) -> List[int]:
         if '/' in name:
@@ -1865,7 +1832,7 @@ class _TestingModelBackend:
             # attached/detached later.
             self._pebble_clients[container] = client
 
-        self._pebble_clients_can_connect[client] = not SIMULATE_CAN_CONNECT
+        self._pebble_clients_can_connect[client] = False
         return client
 
     def planned_units(self) -> int:
@@ -2020,7 +1987,7 @@ class _TestingModelBackend:
     @classmethod
     def _generate_secret_id(cls) -> str:
         # Not a proper Juju secrets-style xid, but that's okay
-        return 'secret:' + str(uuid.uuid4())
+        return f"secret:{str(uuid.uuid4())}"
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -2114,7 +2081,9 @@ class _TestingPebbleClient:
 
     def _check_connection(self):
         if not self._backend._can_connect(self):  # pyright: reportPrivateUsage=false
-            raise pebble.ConnectionError('cannot connect to pebble')
+            msg = ('Cannot connect to Pebble; did you forget to call '
+                   'begin_with_initial_hooks() or set_can_connect()?')
+            raise pebble.ConnectionError(msg)
 
     def get_system_info(self) -> pebble.SystemInfo:
         self._check_connection()
@@ -2162,8 +2131,7 @@ class _TestingPebbleClient:
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
-            raise TypeError('start_services should take a list of names, not just "{}"'.format(
-                services))
+            raise TypeError(f'start_services should take a list of names, not just "{services}"')
 
         self._check_connection()
 
@@ -2174,7 +2142,7 @@ class _TestingPebbleClient:
         for name in services:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
-                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
@@ -2183,8 +2151,7 @@ class _TestingPebbleClient:
     ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
-            raise TypeError('stop_services should take a list of names, not just "{}"'.format(
-                services))
+            raise TypeError(f'stop_services should take a list of names, not just "{services}"')
 
         self._check_connection()
 
@@ -2195,7 +2162,7 @@ class _TestingPebbleClient:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
                 #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
 
@@ -2204,8 +2171,7 @@ class _TestingPebbleClient:
     ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
-            raise TypeError('restart_services should take a list of names, not just "{}"'.format(
-                services))
+            raise TypeError(f'restart_services should take a list of names, not just "{services}"')
 
         self._check_connection()
 
@@ -2216,7 +2182,7 @@ class _TestingPebbleClient:
             if name not in known_services:
                 # TODO: jam 2021-04-20 This needs a better error type
                 #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError('400 Bad Request: service "{}" does not exist'.format(name))
+                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
@@ -2231,21 +2197,21 @@ class _TestingPebbleClient:
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
         if not isinstance(label, str):
-            raise TypeError('label must be a str, not {}'.format(type(label).__name__))
+            raise TypeError(f'label must be a str, not {type(label).__name__}')
 
         if isinstance(layer, (str, dict)):
             layer_obj = pebble.Layer(layer)
         elif isinstance(layer, pebble.Layer):
             layer_obj = layer
         else:
-            raise TypeError('layer must be str, dict, or pebble.Layer, not {}'.format(
-                type(layer).__name__))
+            raise TypeError(
+                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}')
 
         self._check_connection()
 
         if label in self._layers:
             if not combine:
-                raise RuntimeError('400 Bad Request: layer "{}" already exists'.format(label))
+                raise RuntimeError(f'400 Bad Request: layer "{label}" already exists')
             layer = self._layers[label]
             for name, service in layer_obj.services.items():
                 # 'override' is actually single quoted in the real error, but
@@ -2289,8 +2255,7 @@ class _TestingPebbleClient:
 
     def get_services(self, names: Optional[List[str]] = None) -> List[pebble.ServiceInfo]:
         if isinstance(names, str):
-            raise TypeError('start_services should take a list of names, not just "{}"'.format(
-                names))
+            raise TypeError(f'start_services should take a list of names, not just "{names}"')
 
         self._check_connection()
         services = self._render_services()
@@ -2318,7 +2283,12 @@ class _TestingPebbleClient:
     def pull(self, path: str, *,
              encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
         self._check_connection()
-        return self._fs.open(path, encoding=encoding)
+        try:
+            return self._fs.open(path, encoding=encoding)
+        except FileNotFoundError:
+            raise pebble.PathError('not-found', f'stat {path}: no such file or directory')
+        except IsADirectoryError:
+            raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
 
     def push(
             self, path: str, source: 'ReadableBuffer', *,
@@ -2332,18 +2302,18 @@ class _TestingPebbleClient:
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
                 'generic-file-error',
-                'permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
+                f'permissions not within 0o000 to 0o777: {permissions:#o}')
         try:
             self._fs.create_file(
                 path, source, encoding=encoding, make_dirs=make_dirs, permissions=permissions,
                 user_id=user_id, user=user, group_id=group_id, group=group)
         except FileNotFoundError as e:
             raise pebble.PathError(
-                'not-found', 'parent directory not found: {}'.format(e.args[0]))
+                'not-found', f'parent directory not found: {e.args[0]}')
         except NonAbsolutePathError as e:
             raise pebble.PathError(
                 'generic-file-error',
-                'paths must be absolute, got {!r}'.format(e.args[0])
+                f'paths must be absolute, got {e.args[0]!r}'
             )
 
     def list_files(self, path: str, *, pattern: Optional[str] = None,
@@ -2355,7 +2325,7 @@ class _TestingPebbleClient:
             # conform with the real pebble api
             raise pebble.APIError(
                 body={}, code=404, status='Not Found',
-                message="stat {}: no such file or directory".format(path))
+                message=f"stat {path}: no such file or directory")
 
         if not itself:
             try:
@@ -2374,8 +2344,8 @@ class _TestingPebbleClient:
         def get_pebble_file_type(file: '_FileOrDir') -> pebble.FileType:
             pebble_type = type_mappings.get(type(file))
             if not pebble_type:
-                raise ValueError('unable to convert file {} '
-                                 '(type not one of {})'.format(file, type_mappings))
+                raise ValueError(
+                    f'unable to convert file {file} (type not one of {type_mappings})')
             return pebble_type
 
         return [
@@ -2407,7 +2377,7 @@ class _TestingPebbleClient:
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
                 'generic-file-error',
-                'permissions not within 0o000 to 0o777: {:#o}'.format(permissions))
+                f'permissions not within 0o000 to 0o777: {permissions:#o}')
         try:
             self._fs.create_dir(
                 path, make_parents=make_parents, permissions=permissions,
@@ -2415,14 +2385,14 @@ class _TestingPebbleClient:
         except FileNotFoundError as e:
             # Parent directory doesn't exist and make_parents is False
             raise pebble.PathError(
-                'not-found', 'parent directory not found: {}'.format(e.args[0]))
+                'not-found', f'parent directory not found: {e.args[0]}')
         except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
-            raise pebble.PathError('generic-file-error', 'not a directory: {}'.format(e.args[0]))
+            raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}')
         except NonAbsolutePathError as e:
             raise pebble.PathError(
                 'generic-file-error',
-                'paths must be absolute, got {!r}'.format(e.args[0])
+                f'paths must be absolute, got {e.args[0]!r}'
             )
 
     def remove_path(self, path: str, *, recursive: bool = False):
@@ -2434,7 +2404,7 @@ class _TestingPebbleClient:
                 # Pebble doesn't give not-found error when recursive is specified
                 return
             raise pebble.PathError(
-                'not-found', 'remove {}: no such file or directory'.format(path))
+                'not-found', f'remove {path}: no such file or directory')
 
         if isinstance(file_or_dir, _Directory) and len(file_or_dir) > 0 and not recursive:
             raise pebble.PathError(
@@ -2459,7 +2429,7 @@ class _TestingPebbleClient:
         for service in service_names:
             if service not in plan.services or not self.get_services([service])[0].is_running():
                 # conform with the real pebble api
-                message = 'cannot send signal to "{}": service is not running'.format(service)
+                message = f'cannot send signal to "{service}": service is not running'
                 body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
                         'result': {'message': message}}
                 raise pebble.APIError(
@@ -2471,9 +2441,7 @@ class _TestingPebbleClient:
             signal.Signals[sig]
         except KeyError:
             # conform with the real pebble api
-            message = 'cannot send signal to "{}": invalid signal name "{}"'.format(
-                service_names[0],
-                sig)
+            message = f'cannot send signal to "{service_names[0]}": invalid signal name "{sig}"'
             body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
                     'result': {'message': message}}
             raise pebble.APIError(
@@ -2601,7 +2569,7 @@ class _TestingStorageMount:
                 with fpath.open('rb') as f:
                     results.append(_File(mountpath, f.read()))
             else:
-                raise RuntimeError('unsupported file type at path {}'.format(fpath))
+                raise RuntimeError(f'unsupported file type at path {fpath}')
         return results
 
     def open(
@@ -2720,7 +2688,7 @@ class _TestingFilesystem:
                 raise
         if not isinstance(dir_, _Directory):
             raise pebble.PathError(
-                'generic-file-error', 'parent is not a directory: {}'.format(str(dir_)))
+                'generic-file-error', f'parent is not a directory: {str(dir_)}')
         return dir_.create_file(path_obj.name, data, encoding=encoding, **kwargs)
 
     def list_dir(self, path: '_StringOrPath') -> List['_FileOrDir']:

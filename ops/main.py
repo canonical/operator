@@ -14,7 +14,6 @@
 
 """Main entry point to the Operator Framework."""
 
-import inspect
 import logging
 import os
 import shutil
@@ -58,7 +57,7 @@ def _get_charm_dir():
     charm_dir = os.environ.get("JUJU_CHARM_DIR")
     if charm_dir is None:
         # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = Path('{}/../../..'.format(__file__)).resolve()
+        charm_dir = Path(f'{__file__}/../../..').resolve()
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
@@ -74,7 +73,7 @@ def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource[Any]',
         link_to: What the event link should point to
     """
     # type guard
-    assert bound_event.event_kind, "unbound EventSource {}".format(bound_event)
+    assert bound_event.event_kind, f"unbound EventSource {bound_event}"
 
     if issubclass(bound_event.event_type, ops.charm.HookEvent):
         event_dir = charm.framework.charm_dir / 'hooks'
@@ -82,13 +81,13 @@ def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource[Any]',
     elif issubclass(bound_event.event_type, ops.charm.ActionEvent):
         if not bound_event.event_kind.endswith("_action"):
             raise RuntimeError(
-                'action event name {} needs _action suffix'.format(bound_event.event_kind))
+                f'action event name {bound_event.event_kind} needs _action suffix')
         event_dir = charm.framework.charm_dir / 'actions'
         # The event_kind is suffixed with "_action" while the executable is not.
         event_path = event_dir / bound_event.event_kind[:-len('_action')].replace('_', '-')
     else:
         raise RuntimeError(
-            'cannot create a symlink: unsupported event type {}'.format(bound_event.event_type))
+            f'cannot create a symlink: unsupported event type {bound_event.event_type}')
 
     event_dir.mkdir(exist_ok=True)
     if not event_path.exists():
@@ -193,7 +192,7 @@ def _get_event_args(charm: 'CharmBase',
 
     if not remote_app_name and remote_unit_name:
         if '/' not in remote_unit_name:
-            raise RuntimeError('invalid remote unit name: {}'.format(remote_unit_name))
+            raise RuntimeError(f'invalid remote unit name: {remote_unit_name}')
         remote_app_name = remote_unit_name.split('/')[0]
 
     kwargs = {}  # type: Dict[str, Any]
@@ -293,7 +292,7 @@ class _Dispatcher:
         """Sets the name attribute to that which can be inferred from the given path."""
         name = path.name.replace('-', '_')
         if path.parent.name == 'actions':
-            name = '{}_action'.format(name)
+            name = f'{name}_action'
         self.event_name = name
 
     def _init_legacy(self):
@@ -340,9 +339,10 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     if db_path.exists():
         return False
 
-    # if you're not in k8s you don't need controller storage
-    if 'kubernetes' not in meta.series:
-        logger.debug("Using local storage: not a kubernetes charm")
+    # only use controller storage for Kubernetes podspec charms
+    is_podspec = 'kubernetes' in meta.series
+    if not is_podspec:
+        logger.debug("Using local storage: not a Kubernetes podspec charm")
         return False
 
     # are we in a new enough Juju?
@@ -398,6 +398,10 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     if use_juju_for_storage is None:
         use_juju_for_storage = _should_use_controller_storage(charm_state_path, meta)
+    elif use_juju_for_storage:
+        warnings.warn("Controller storage is deprecated; it's intended for "
+                      "podspec charms and will be removed in a future release.",
+                      category=DeprecationWarning)
 
     if use_juju_for_storage:
         if dispatcher.is_restricted_context():
@@ -416,17 +420,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     framework = ops.framework.Framework(store, charm_dir, meta, model)
     framework.set_breakpointhook()
     try:
-        sig = inspect.signature(charm_class)
-        try:
-            sig.bind(framework)
-        except TypeError:
-            msg = (
-                "the second argument, 'key', has been deprecated and will be "
-                "removed after the 0.7 release")
-            warnings.warn(msg, DeprecationWarning)
-            charm = charm_class(framework, None)
-        else:
-            charm = charm_class(framework)
+        charm = charm_class(framework)
         dispatcher.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant

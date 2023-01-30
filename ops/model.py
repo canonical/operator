@@ -56,8 +56,6 @@ from ops._private import timeconv, yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
-    from subprocess import CompletedProcess  # noqa
-
     from pebble import (  # pyright: reportMissingTypeStubs=false
         CheckInfo,
         CheckLevel,
@@ -378,17 +376,17 @@ class Application:
     def status(self, value: 'StatusBase'):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(
-                'invalid value provided for application {} status: {}'.format(self, value)
+                f'invalid value provided for application {self} status: {value}'
             )
 
         if not self._is_our_app:
-            raise RuntimeError('cannot set status for a remote application {}'.format(self))
+            raise RuntimeError(f'cannot set status for a remote application {self}')
 
         if not self._backend.is_leader():
             raise RuntimeError('cannot set application status as a non-leader unit')
 
         for _key in {'name', 'message'}:
-            assert isinstance(getattr(value, _key), str), 'status.%s must be a string' % _key
+            assert isinstance(getattr(value, _key), str), f'status.{_key} must be a string'
         self._backend.status_set(value.name, value.message, is_app=True)
         self._status = value
 
@@ -409,12 +407,12 @@ class Application:
         """
         if not self._is_our_app:
             raise RuntimeError(
-                'cannot get planned units for a remote application {}.'.format(self))
+                f'cannot get planned units for a remote application {self}.')
 
         return self._backend.planned_units()
 
     def __repr__(self):
-        return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
+        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
     def add_secret(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -519,18 +517,18 @@ class Unit:
     def status(self, value: 'StatusBase'):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(
-                'invalid value provided for unit {} status: {}'.format(self, value)
+                f'invalid value provided for unit {self} status: {value}'
             )
 
         if not self._is_our_unit:
-            raise RuntimeError('cannot set status for a remote unit {}'.format(self))
+            raise RuntimeError(f'cannot set status for a remote unit {self}')
 
         # fixme: if value.messages
         self._backend.status_set(value.name, value.message, is_app=False)
         self._status = value
 
     def __repr__(self):
-        return '<{}.{} {}>'.format(type(self).__module__, type(self).__name__, self.name)
+        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
     def is_leader(self) -> bool:
         """Return whether this unit is the leader of its application.
@@ -548,8 +546,7 @@ class Unit:
             return self._backend.is_leader()
         else:
             raise RuntimeError(
-                'leadership status of remote units ({}) is not visible to other'
-                ' applications'.format(self)
+                f'leadership status of remote units ({self}) is not visible to other applications'
             )
 
     def set_workload_version(self, version: str) -> None:
@@ -567,7 +564,7 @@ class Unit:
     def containers(self) -> Mapping[str, 'Container']:
         """Return a mapping of containers indexed by name."""
         if not self._is_our_unit:
-            raise RuntimeError('cannot get container for a remote unit {}'.format(self))
+            raise RuntimeError(f'cannot get container for a remote unit {self}')
         return self._containers
 
     def get_container(self, container_name: str) -> 'Container':
@@ -579,7 +576,7 @@ class Unit:
         try:
             return self.containers[container_name]
         except KeyError:
-            raise ModelError('container {!r} not found'.format(container_name))
+            raise ModelError(f'container {container_name!r} not found')
 
     def add_secret(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -792,7 +789,7 @@ def _cast_network_address(raw: str) -> '_NetworkAddress':
     try:
         return ipaddress.ip_address(raw)
     except ValueError:
-        logger.debug("could not cast {} to IPv4/v6 address".format(raw))
+        logger.debug(f"could not cast {raw} to IPv4/v6 address")
         return raw
 
 
@@ -988,17 +985,17 @@ class Secret:
     def __repr__(self):
         fields = []  # type: List[str]
         if self._id is not None:
-            fields.append('id={!r}'.format(self._id))
+            fields.append(f'id={self._id!r}')
         if self._label is not None:
-            fields.append('label={!r}'.format(self._label))
-        return '<Secret ' + ' '.join(fields) + '>'
+            fields.append(f'label={self._label!r}')
+        return f"<Secret {' '.join(fields)}>"
 
     @staticmethod
     def _canonicalize_id(id: str) -> str:
         """Return the canonical form of the given secret ID, with the 'secret:' prefix."""
         id = id.strip()
         if not id.startswith('secret:'):
-            id = 'secret:' + id  # add the prefix if not there already
+            id = f"secret:{id}"  # add the prefix if not there already
         return id
 
     @classmethod
@@ -1237,10 +1234,7 @@ class Relation:
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
-        return '<{}.{} {}:{}>'.format(type(self).__module__,
-                                      type(self).__name__,
-                                      self.name,
-                                      self.id)
+        return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
 
 class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
@@ -1348,9 +1342,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         app = self.relation.app
         if app is None:
             raise RelationDataAccessError(
-                "Remote application instance cannot be retrieved for {}.".format(
-                    self.relation
-                )
+                f"Remote application instance cannot be retrieved for {self.relation}."
             )
 
         # is this a peer relation?
@@ -1382,10 +1374,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # this is independent of whether we're in testing code or production.
         if not isinstance(key, str):
             raise RelationDataTypeError(
-                'relation data keys must be strings, not {}'.format(type(key)))
+                f'relation data keys must be strings, not {type(key)}')
         if not isinstance(value, str):
             raise RelationDataTypeError(
-                'relation data values must be strings, not {}'.format(type(value)))
+                f'relation data values must be strings, not {type(value)}')
 
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
@@ -1405,9 +1397,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             if self._backend.is_leader():
                 return  # all good
             raise RelationDataAccessError(
-                "{} is not leader and cannot write application data.".format(
-                    self._backend.unit_name
-                )
+                f"{self._backend.unit_name} is not leader and cannot write application data."
             )
         else:
             # we are attempting to write a unit databag
@@ -1496,7 +1486,7 @@ class StatusBase:
         return self.message == other.message
 
     def __repr__(self):
-        return "{.__class__.__name__}({!r})".format(self, self.message)
+        return f"{self.__class__.__name__}({self.message!r})"
 
     @classmethod
     def from_name(cls, name: str, message: str):
@@ -1511,7 +1501,7 @@ class StatusBase:
     def register(cls, child: Type['StatusBase']):
         """Register a Status for the child's name."""
         if not isinstance(getattr(child, 'name'), str):
-            raise TypeError("Can't register StatusBase subclass %s: " % child,
+            raise TypeError(f"Can't register StatusBase subclass {child}: ",
                             "missing required `name: str` class attribute")
         cls._statuses[child.name] = child
         return child
@@ -1603,7 +1593,7 @@ class Resources:
         on disk, otherwise it raises a NameError.
         """
         if name not in self._paths:
-            raise NameError('invalid resource name: {}'.format(name))
+            raise NameError(f'invalid resource name: {name}')
         if self._paths[name] is None:
             self._paths[name] = Path(self._backend.resource_get(name))
         return typing.cast(Path, self._paths[name])
@@ -1654,9 +1644,9 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __getitem__(self, storage_name: str) -> List['Storage']:
         if storage_name not in self._storage_map:
-            meant = ', or '.join(['{!r}'.format(k) for k in self._storage_map.keys()])
+            meant = ', or '.join(repr(k) for k in self._storage_map.keys())
             raise KeyError(
-                'Storage {!r} not found. Did you mean {}?'.format(storage_name, meant))
+                f'Storage {storage_name!r} not found. Did you mean {meant}?')
         storage_list = self._storage_map[storage_name]
         if storage_list is None:
             storage_list = self._storage_map[storage_name] = []
@@ -1712,7 +1702,7 @@ class Storage:
     @property
     def full_id(self) -> str:
         """Returns the canonical storage name and id/index based identifier."""
-        return '{}/{}'.format(self.name, self._index)
+        return f'{self.name}/{self._index}'
 
     @property
     def location(self) -> Path:
@@ -1747,11 +1737,10 @@ class MultiPushPullError(Exception):
         self.message = message
 
     def __str__(self):
-        return '{} ({} errors): {}, ...'.format(
-            self.message, len(self.errors), self.errors[0][1])
+        return f'{self.message} ({len(self.errors)} errors): {self.errors[0][1]}, ...'
 
     def __repr__(self):
-        return 'MultiError({!r}, {} errors)'.format(self.message, len(self.errors))
+        return f'MultiError({self.message!r}, {len(self.errors)} errors)'
 
 
 class Container:
@@ -1769,7 +1758,7 @@ class Container:
         self.name = name
 
         if pebble_client is None:
-            socket_path = '/charm/containers/{}/pebble.socket'.format(name)
+            socket_path = f'/charm/containers/{name}/pebble.socket'
             pebble_client = backend.get_pebble(socket_path)
         self._pebble = pebble_client  # type: 'Client'
 
@@ -1900,9 +1889,9 @@ class Container:
         """
         services = self.get_services(service_name)
         if not services:
-            raise ModelError('service {!r} not found'.format(service_name))
+            raise ModelError(f'service {service_name!r} not found')
         if len(services) > 1:
-            raise RuntimeError('expected 1 service, got {}'.format(len(services)))
+            raise RuntimeError(f'expected 1 service, got {len(services)}')
         return services[service_name]
 
     def get_checks(
@@ -1927,9 +1916,9 @@ class Container:
         """
         checks = self.get_checks(check_name)
         if not checks:
-            raise ModelError('check {!r} not found'.format(check_name))
+            raise ModelError(f'check {check_name!r} not found')
         if len(checks) > 1:
-            raise RuntimeError('expected 1 check, got {}'.format(len(checks)))
+            raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
     def pull(self, path: StrOrPath, *,
@@ -1945,6 +1934,10 @@ class Container:
             A readable file-like object, whose read() method will return str
             objects decoded according to the specified encoding, or bytes if
             encoding is None.
+
+        Raises:
+            pebble.PathError: If there was an error reading the file at path,
+                for example, if the file doesn't exist or is a directory.
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
@@ -2171,7 +2164,7 @@ class Container:
             name=path.name,
             type=ftype,
             size=info.st_size,
-            permissions=typing.cast(int, stat.S_IMODE(info.st_mode)),  # type: ignore
+            permissions=stat.S_IMODE(info.st_mode),
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pwd.getpwuid(info.st_uid).pw_name,
@@ -2221,8 +2214,7 @@ class Container:
         prefix = str(source_path.parent)
         if os.path.commonprefix([prefix, str(file_path)]) != prefix:
             raise RuntimeError(
-                'file "{}" does not have specified prefix "{}"'.format(
-                    file_path, prefix))
+                f'file "{file_path}" does not have specified prefix "{prefix}"')
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
@@ -2495,13 +2487,13 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
         if not isinstance(key, str):
             # technically a type error, but for consistency with the
             # other exceptions raised on key validation...
-            raise ValueError('invalid key {!r}; must be a string'.format(key))
+            raise ValueError(f'invalid key {key!r}; must be a string')
         if not _ACTION_RESULT_KEY_REGEX.match(key):
             raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
                              "'some.key'".format(key))
 
         if parent_key:
-            key = "{}.{}".format(parent_key, key)
+            key = f"{parent_key}.{key}"
 
         if isinstance(value, MutableMapping):
             value = typing.cast(Dict[str, 'JsonObject'], value)
@@ -2556,16 +2548,12 @@ class _ModelBackend:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
         if which_cmd is None:
-            raise RuntimeError('command not found: {}'.format(args[0]))
+            raise RuntimeError(f'command not found: {args[0]}')
         args = (which_cmd,) + args[1:]
         if use_json:
             args += ('--format=json',)
         try:
             result = run(args, **kwargs)
-
-            # pyright infers the first match when argument overloading/unpacking is used,
-            # so this needs to be coerced into the right type
-            result = typing.cast('CompletedProcess[bytes]', result)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
@@ -2639,7 +2627,7 @@ class _ModelBackend:
             version = JujuVersion.from_environ()
             if not version.has_app_data():
                 raise RuntimeError(
-                    'getting application data is not supported on Juju version {}'.format(version))
+                    f'getting application data is not supported on Juju version {version}')
 
         args = ['relation-get', '-r', str(relation_id), '-', member_name]
         if is_app:
@@ -2661,7 +2649,7 @@ class _ModelBackend:
             version = JujuVersion.from_environ()
             if not version.has_app_data():
                 raise RuntimeError(
-                    'setting application data is not supported on Juju version {}'.format(version))
+                    f'setting application data is not supported on Juju version {version}')
 
         args = ['relation-set', '-r', str(relation_id)]
         if is_app:
@@ -2730,7 +2718,7 @@ class _ModelBackend:
                 or an application.
         """
         content = self._run(
-            'status-get', '--include-data', '--application={}'.format(is_app),
+            'status-get', '--include-data', f'--application={is_app}',
             use_json=True,
             return_output=True)
         # Unit status looks like (in YAML):
@@ -2767,7 +2755,7 @@ class _ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
-        self._run('status-set', '--application={}'.format(is_app), status, message)
+        self._run('status-set', f'--application={is_app}', status, message)
 
     def storage_list(self, name: str) -> List[int]:
         storages = self._run('storage-list', name, return_output=True, use_json=True)
@@ -2780,7 +2768,7 @@ class _ModelBackend:
         # Match the entire string at once instead of going line by line
         match = self._STORAGE_KEY_RE.match(output)
         if match is None:
-            raise RuntimeError('unable to find storage key in {output!r}'.format(output=output))
+            raise RuntimeError(f'unable to find storage key in {output!r}')
         key = match.groupdict()["storage_key"]
 
         index = int(key.split("/")[1])
@@ -2797,9 +2785,8 @@ class _ModelBackend:
 
     def storage_add(self, name: str, count: int = 1) -> None:
         if not isinstance(count, int) or isinstance(count, bool):
-            raise TypeError('storage count must be integer, got: {} ({})'.format(count,
-                                                                                 type(count)))
-        self._run('storage-add', '{}={}'.format(name, count))
+            raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
+        self._run('storage-add', f'{name}={count}')
 
     def action_get(self) -> Dict[str, str]:  # todo: what do we know about this dict?
         out = self._run('action-get', return_output=True, use_json=True)
@@ -2809,7 +2796,7 @@ class _ModelBackend:
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
-        self._run('action-set', *["{}={}".format(k, v) for k, v in flat_results.items()])
+        self._run('action-set', *[f"{k}={v}" for k, v in flat_results.items()])
 
     def action_log(self, message: str) -> None:
         self._run('action-log', message)
@@ -2829,7 +2816,7 @@ class _ModelBackend:
         to safely pass to bash. Will only generate a single entry if the line is not too long.
         """
         if len(message) > max_len:
-            yield "Log string greater than {}. Splitting into multiple chunks: ".format(max_len)
+            yield f"Log string greater than {max_len}. Splitting into multiple chunks: "
 
         while message:
             yield message[:max_len]
@@ -2866,14 +2853,14 @@ class _ModelBackend:
             for k, v in labels.items():
                 _ModelBackendValidator.validate_metric_label(k)
                 _ModelBackendValidator.validate_label_value(k, v)
-                label_args.append('{}={}'.format(k, v))
+                label_args.append(f'{k}={v}')
             cmd.extend(['--labels', ','.join(label_args)])
 
         metric_args = []  # type: List[str]
         for k, v in metrics.items():
             _ModelBackendValidator.validate_metric_key(k)
             metric_value = _ModelBackendValidator.format_metric_value(v)
-            metric_args.append('{}={}'.format(k, metric_value))
+            metric_args.append(f'{k}={metric_value}')
         cmd.extend(metric_args)
         self._run(*cmd)
 
@@ -2964,7 +2951,7 @@ class _ModelBackend:
         if content is not None:
             # The content has already been validated with Secret._validate_content
             for k, v in content.items():
-                args.append('{}={}'.format(k, v))
+                args.append(f'{k}={v}')
         self._run_for_secret('secret-set', *args)
 
     def secret_add(self, content: Dict[str, str], *,
@@ -2986,7 +2973,7 @@ class _ModelBackend:
             args += ['--owner', owner]
         # The content has already been validated with Secret._validate_content
         for k, v in content.items():
-            args.append('{}={}'.format(k, v))
+            args.append(f'{k}={v}')
         result = self._run('secret-add', *args, return_output=True)
         secret_id = typing.cast(str, result)
         return secret_id.strip()
@@ -3019,8 +3006,7 @@ class _ModelBackendValidator:
     def validate_metric_key(cls, key: str):
         if cls.METRIC_KEY_REGEX.match(key) is None:
             raise ModelError(
-                'invalid metric key {!r}: must match {}'.format(
-                    key, cls.METRIC_KEY_REGEX.pattern))
+                f'invalid metric key {key!r}: must match {cls.METRIC_KEY_REGEX.pattern}')
 
     @classmethod
     def validate_metric_label(cls, label_name: str):
@@ -3046,8 +3032,8 @@ class _ModelBackendValidator:
         # used by add-metric as separators.
         if not value:
             raise ModelError(
-                'metric label {} has an empty value, which is not allowed'.format(label))
+                f'metric label {label} has an empty value, which is not allowed')
         v = str(value)
         if re.search('[,=]', v) is not None:
             raise ModelError(
-                'metric label values must not contain "," or "=": {}={!r}'.format(label, value))
+                f'metric label values must not contain "," or "=": {label}={value!r}')

@@ -190,8 +190,7 @@ class Charm(CharmBase):
     def _on_secret_changed(self, event):
         # subprocess and isinstance don't mix well
         assert type(event.secret).__name__ == 'Secret', (
-            'SecretEvent.secret must be a Secret instance, not '
-            '{}'.format(type(event.secret)))
+            f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}')
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_changed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
@@ -199,8 +198,7 @@ class Charm(CharmBase):
     def _on_secret_remove(self, event):
         # subprocess and isinstance don't mix well
         assert type(event.secret).__name__ == 'Secret', (
-            'SecretEvent.secret must be a Secret instance, not '
-            '{}'.format(type(event.secret)))
+            f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}')
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_remove.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
@@ -208,8 +206,7 @@ class Charm(CharmBase):
     def _on_secret_rotate(self, event):
         # subprocess and isinstance don't mix well
         assert type(event.secret).__name__ == 'Secret', (
-            'SecretEvent.secret must be a Secret instance, not '
-            '{}'.format(type(event.secret)))
+            f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}')
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_rotate.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
@@ -217,8 +214,7 @@ class Charm(CharmBase):
     def _on_secret_expired(self, event):
         # subprocess and isinstance don't mix well
         assert type(event.secret).__name__ == 'Secret', (
-            'SecretEvent.secret must be a Secret instance, not '
-            '{}'.format(type(event.secret)))
+            f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}')
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_expired.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)

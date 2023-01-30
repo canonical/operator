@@ -14,9 +14,11 @@
 
 """Setup script for the Operator Framework."""
 
-from importlib.util import spec_from_file_location, module_from_spec
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from setuptools import setup, find_packages
+from typing import List
+
+from setuptools import find_packages, setup
 
 
 def _read_me() -> str:
@@ -24,6 +26,19 @@ def _read_me() -> str:
     with open("README.md", "rt", encoding="utf8") as fh:
         readme = fh.read()
     return readme
+
+
+def _requirements() -> List[str]:
+    """Return the required packages to run the project."""
+    reqs = []
+    with open(Path(__file__).parent / 'requirements.txt', encoding='utf-8') as fh:
+        for line in fh.readlines():
+            # TODO(tinvaan): DRY, consider setuptools offering for requirements parsing
+            # https://setuptools.pypa.io/en/latest/pkg_resources.html#requirements-parsing
+            line = line.strip()
+            if line and not line.startswith("#"):
+                reqs.append(line)
+    return reqs
 
 
 def _get_version() -> str:
@@ -46,11 +61,10 @@ version_backup.unlink(missing_ok=True)
 version_path.rename(version_backup)
 try:
     with version_path.open("wt", encoding="utf8") as fh:
-        fh.write('''\
-# this is a generated file
+        fh.write(f'''# this is a generated file
 
-version = {!r}
-'''.format(version))
+version = {version!r}
+''')
 
     setup(
         name="ops",
@@ -73,7 +87,7 @@ version = {!r}
             "Operating System :: POSIX :: Linux",
         ],
         python_requires='>=3.8',
-        install_requires=["PyYAML"],
+        install_requires=_requirements(),
         package_data={'ops': ['py.typed']},
     )
 
