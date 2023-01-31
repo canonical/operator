@@ -120,7 +120,12 @@ class BaseTestCase(unittest.TestCase):
             data_fpath = tmpdir / "framework.data"
             charm_dir = tmpdir
 
-        framework = Framework(SQLiteStorage(data_fpath), charm_dir, meta=None, model=model)
+        framework = Framework(
+            SQLiteStorage(data_fpath),
+            charm_dir,
+            meta=None,
+            model=model,
+            event_name="foo_event")
         self.addCleanup(framework.close)
         return framework
 

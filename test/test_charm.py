@@ -66,7 +66,9 @@ class TestCharm(unittest.TestCase):
 
     def create_framework(self):
         model = Model(self.meta, _ModelBackend('local/0'))
-        framework = Framework(SQLiteStorage(':memory:'), self.tmpdir, self.meta, model)
+        # we can pass foo_event as event_name because we're not actually testing dispatch
+        framework = Framework(SQLiteStorage(':memory:'), self.tmpdir, self.meta,
+                              model, "foo_event")
         self.addCleanup(framework.close)
         return framework
 

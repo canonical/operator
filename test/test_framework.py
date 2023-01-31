@@ -62,7 +62,7 @@ class TestFramework(BaseTestCase):
 
     def test_deprecated_init(self):
         # For 0.7, this still works, but it is deprecated.
-        framework = Framework(':memory:', None, None, None)
+        framework = Framework(':memory:', None, None, None, "foo")
         self.assertLoggedWarning(
             "deprecated: Framework now takes a Storage not a path")
         self.assertIsInstance(framework._storage, SQLiteStorage)
@@ -392,7 +392,7 @@ class TestFramework(BaseTestCase):
         #    we'd get a foo=3).
         #
         self.assertEqual(obs.seen, ["on_foo:foo=2", "on_foo:foo=2"])
-        self.assertLoggedDebug("Re-emitting deferred <MyEvent via MyNotifier[1]/foo[1]>.")
+        self.assertLoggedDebug("Re-emitting deferred event <MyEvent via MyNotifier[1]/foo[1]>.")
 
     def test_weak_observer(self):
         framework = self.create_framework()
@@ -1255,8 +1255,8 @@ class TestStoredState(BaseTestCase):
             _stored = StoredState()
 
         class WrappedFramework(Framework):
-            def __init__(self, store, charm_dir, meta, model):
-                super().__init__(store, charm_dir, meta, model)
+            def __init__(self, store, charm_dir, meta, model, event_name):
+                super().__init__(store, charm_dir, meta, model, event_name)
                 self.snapshots = []
 
             def save_snapshot(self, value):
@@ -1267,7 +1267,7 @@ class TestStoredState(BaseTestCase):
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
             storage = SQLiteStorage(self.tmpdir / "framework.data")
-            framework = WrappedFramework(storage, self.tmpdir, None, None)
+            framework = WrappedFramework(storage, self.tmpdir, None, None, "foo")
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
@@ -1293,7 +1293,7 @@ class TestStoredState(BaseTestCase):
             framework.close()
 
             storage_copy = SQLiteStorage(self.tmpdir / "framework.data")
-            framework_copy = WrappedFramework(storage_copy, self.tmpdir, None, None)
+            framework_copy = WrappedFramework(storage_copy, self.tmpdir, None, None, "foo")
 
             obj_copy2 = SomeObject(framework_copy, '1')
 

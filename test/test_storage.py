@@ -31,7 +31,7 @@ class StoragePermutations(abc.ABC):
 
     def create_framework(self) -> framework.Framework:
         """Create a Framework that we can use to test the backend storage."""
-        return framework.Framework(self.create_storage(), None, None, None)
+        return framework.Framework(self.create_storage(), None, None, None, "foo")
 
     @abc.abstractmethod
     def create_storage(self) -> storage.SQLiteStorage:

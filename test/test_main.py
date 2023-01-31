@@ -55,7 +55,7 @@ from ops.charm import (
     UpgradeCharmEvent,
     WorkloadEvent,
 )
-from ops.framework import Framework, StoredStateData
+from ops.framework import Framework, FrameworkEvent, StoredStateData
 from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
 from ops.storage import SQLiteStorage
 from ops.version import version
@@ -330,7 +330,7 @@ class _TestMain(abc.ABC):
         for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
             self._setup_entry_point(actions_dir, action_name)
 
-    def _read_and_clear_state(self):
+    def _read_and_clear_state(self, event_name: str):
         if self.CHARM_STATE_FILE.stat().st_size:
             storage = SQLiteStorage(self.CHARM_STATE_FILE)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -340,7 +340,7 @@ class _TestMain(abc.ABC):
                         meta = CharmMeta.from_yaml(m, a)
                 else:
                     meta = CharmMeta.from_yaml(m)
-            framework = Framework(storage, self.JUJU_CHARM_DIR, meta, None)
+            framework = Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)
 
             class ThisCharmEvents(MyCharmEvents):
                 pass
@@ -426,7 +426,7 @@ class _TestMain(abc.ABC):
             env['JUJU_MODEL_NAME'] = event_spec.model_name
 
         self._call_event(Path(event_dir, event_filename), env)
-        return self._read_and_clear_state()
+        return self._read_and_clear_state(event_spec.event_name)
 
     def test_event_reemitted(self):
         # First run "install" to make sure all hooks are set up.
@@ -667,7 +667,7 @@ class _TestMain(abc.ABC):
                                                        '<CustomEvent via Charm/on/custom[5]>.'],
         ]
         calls = fake_script_calls(self)
-        self.assertEqual(calls, expected)
+        self.assertEqual(expected, calls)
 
     def test_logger(self):
         fake_script(self, 'action-get', "echo '{}'")
@@ -811,7 +811,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         """Test auto-creation of symlinks caused by initial events."""
         all_event_hooks = [f"hooks/{name.replace('_', '-')}"
                            for name, event_source in self.charm_module.Charm.on.events().items()
-                           if not event_source.event_type.__name__ == "CustomEvent"]
+                           if issubclass(event_source.event_type, FrameworkEvent)]
 
         initial_events = {
             EventSpec(InstallEvent, 'install'),

@@ -255,7 +255,7 @@ class EventBase:
            proceed.
 
         """
-        logger.debug("Deferring %s.", self)
+        logger.debug(f"Deferring {self}.")
         self.deferred = True
 
     def snapshot(self) -> '_SerializedData':
@@ -513,7 +513,7 @@ class PrefixedEvents:
 
 
 class FrameworkEvent(EventBase):
-    """Base class for events emitted by the Framework."""
+    """Events tied to the Framework's lifecycle."""
 
 
 class PreCommitEvent(FrameworkEvent):
@@ -571,7 +571,8 @@ class Framework(Object):
 
     def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
                  charm_dir: Union[str, pathlib.Path],
-                 meta: 'CharmMeta', model: 'Model'):
+                 meta: 'CharmMeta', model: 'Model',
+                 event_name: str = None):
         super().__init__(self, None)
 
         # an old, deprecated __init__ interface accepted an Optional charm_dir,
@@ -582,6 +583,10 @@ class Framework(Object):
         else:
             self.charm_dir = pathlib.Path(charm_dir)
 
+        if not isinstance(event_name, str):
+            raise TypeError(f'event_name should be of type str(), not {type(event_name)}')
+
+        self._event_name = event_name.replace('-', '_')
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
@@ -849,15 +854,19 @@ class Framework(Object):
             >>>     print('harness thinks it is not running an event hook.')
         """
         backend = self.model._backend if self.model else None  # type: Optional[_ModelBackend]
-
         if not backend:
             yield  # context does nothing in this case
             return
+
+        previous_event_name = self._event_name
+        self._event_name = event_name
 
         old = backend._hook_is_running
         backend._hook_is_running = event_name
         yield
         backend._hook_is_running = old
+
+        self._event_name = previous_event_name
 
     def _reemit(self, single_event_path: str = None):
         last_event_path = None
@@ -880,25 +889,18 @@ class Framework(Object):
             event = typing.cast(EventBase, event)
             event.deferred = False
             observer = self._observer.get(observer_path)
+
             if observer:
                 if single_event_path is None:
-                    logger.debug("Re-emitting deferred %s.", event)
-                elif isinstance(event, FrameworkEvent):
-                    pass  # We get two of these each hook execution: too much noise.
-                else:
-                    try:
-                        # this is the event that is causing this charm execution
-                        env_evt = os.environ.get('JUJU_DISPATCH_PATH', sys.argv[0]).split('/')[-1]
-                        if env_evt.replace('-', '_') != event.handle.kind:
-                            # if the event we are emitting now is not the event being
-                            # fired by juju, and it also is not an event we have deferred,
-                            # it must be a custom event
-                            logger.debug("Emitting custom event %s.", event)
-                    except (KeyError, ValueError) as e:
-                        logger.error(
-                            "Something went wrong when attempting to determine if "
-                            "the event being emitted is a custom one: "
-                            "({}){}".format(type(e).__name__, e))
+                    logger.debug(f"Re-emitting deferred event {event}.")
+                if issubclass(type(event), FrameworkEvent):
+                    # Ignore Framework events: they are "private" and not interesting.
+                    pass
+                elif self._event_name != event.handle.kind:
+                    # if the event we are emitting now is not the event being
+                    # dispatched, and it also is not an event we have deferred,
+                    # it must be a custom event
+                    logger.debug(f"Emitting custom event {event}.")
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
@@ -966,8 +968,9 @@ class Framework(Object):
             pdb.Pdb().set_trace(code_frame)
         else:
             logger.warning(
-                "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
-                name, indicated_breakpoints)
+                f"Breakpoint {name!r} skipped (not found in the requested "
+                f"breakpoints: {indicated_breakpoints})"
+            )
 
     def remove_unreferenced_events(self):
         """Remove events from storage that are not referenced.
