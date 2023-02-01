@@ -5,7 +5,15 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 
 from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, Scene, State, event, NetworkSpec, network, relation
+from scenario.structs import (
+    CharmSpec,
+    NetworkSpec,
+    Scene,
+    State,
+    event,
+    network,
+    relation,
+)
 
 
 @pytest.fixture(scope="function")
@@ -41,21 +49,13 @@ def test_ip_get(mycharm):
     )
 
     def fetch_unit_address(charm: CharmBase):
-        rel = charm.model.get_relation('metrics-endpoint')
-        assert str(charm.model.get_binding(rel).network.bind_address) == '1.1.1.1'
+        rel = charm.model.get_relation("metrics-endpoint")
+        assert str(charm.model.get_binding(rel).network.bind_address) == "1.1.1.1"
 
     scene = Scene(
         state=State(
-            relations=[
-                relation(endpoint='metrics-endpoint', interface='foo')
-            ],
-            networks=[
-                NetworkSpec(
-                    'metrics-endpoint',
-                    bind_id=0,
-                    network=network()
-                )
-            ]
+            relations=[relation(endpoint="metrics-endpoint", interface="foo")],
+            networks=[NetworkSpec("metrics-endpoint", bind_id=0, network=network())],
         ),
         event=event("update-status"),
     )

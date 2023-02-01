@@ -3,7 +3,18 @@ import dataclasses
 import inspect
 import typing
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Type, Union, Callable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 from uuid import uuid4
 
 import yaml
@@ -323,8 +334,7 @@ class State(_DCBase):
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
-        runtime = Runtime(charm_spec,
-                          juju_version=self.juju_version)
+        runtime = Runtime(charm_spec, juju_version=self.juju_version)
         return runtime.run(
             state=self,
             event=event,
@@ -496,6 +506,10 @@ def _derive_args(event_name: str):
     return tuple(args)
 
 
-def event(name: str, append_args: Tuple[Any] = (), meta: EventMeta = None, **kwargs) -> Event:
+def event(
+    name: str, append_args: Tuple[Any] = (), meta: EventMeta = None, **kwargs
+) -> Event:
     """This routine will attempt to generate event args for you, based on the event name."""
-    return Event(name=name, args=_derive_args(name) + append_args, kwargs=kwargs, meta=meta)
+    return Event(
+        name=name, args=_derive_args(name) + append_args, kwargs=kwargs, meta=meta
+    )

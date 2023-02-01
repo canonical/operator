@@ -10,7 +10,7 @@ from ops.pebble import Client, ExecError
 from scenario.logger import logger as scenario_logger
 
 if TYPE_CHECKING:
-    from scenario.state import CharmSpec, State, Event, ExecOutput
+    from scenario.state import CharmSpec, Event, ExecOutput, State
 
 logger = scenario_logger.getChild("mocking")
 
@@ -48,17 +48,17 @@ class _MockModelBackend(_ModelBackend):
         self._event = event
         self._charm_spec = charm_spec
 
-    def get_pebble(self, socket_path: str) -> 'Client':
-        return _MockPebbleClient(socket_path=socket_path,
-                                 state=self._state,
-                                 event=self._event,
-                                 charm_spec=self._charm_spec)
+    def get_pebble(self, socket_path: str) -> "Client":
+        return _MockPebbleClient(
+            socket_path=socket_path,
+            state=self._state,
+            event=self._event,
+            charm_spec=self._charm_spec,
+        )
 
     def relation_get(self, rel_id, obj_name, app):
         relation = next(
-            filter(
-                lambda r: r.meta.relation_id == rel_id, self._state.relations
-            )
+            filter(lambda r: r.meta.relation_id == rel_id, self._state.relations)
         )
         if app and obj_name == self._state.app_name:
             return relation.local_app_data
@@ -75,20 +75,20 @@ class _MockModelBackend(_ModelBackend):
 
     def status_get(self, *args, **kwargs):
         status, message = (
-            self._state.status.app
-            if kwargs.get("app")
-            else self._state.status.unit
+            self._state.status.app if kwargs.get("app") else self._state.status.unit
         )
         return {"status": status, "message": message}
 
     def relation_ids(self, endpoint, *args, **kwargs):
-        return [rel.meta.relation_id for rel in self._state.relations if rel.meta.endpoint == endpoint]
+        return [
+            rel.meta.relation_id
+            for rel in self._state.relations
+            if rel.meta.endpoint == endpoint
+        ]
 
     def relation_list(self, rel_id, *args, **kwargs):
         relation = next(
-            filter(
-                lambda r: r.meta.relation_id == rel_id, self._state.relations
-            )
+            filter(lambda r: r.meta.relation_id == rel_id, self._state.relations)
         )
         return tuple(
             f"{relation.meta.remote_app_name}/{unit_id}"
@@ -112,11 +112,7 @@ class _MockModelBackend(_ModelBackend):
     def network_get(self, *args, **kwargs):
         name, relation_id = args
 
-        network = next(
-            filter(
-                lambda r: r.name == name, self._state.networks
-            )
-        )
+        network = next(filter(lambda r: r.name == name, self._state.networks))
         return network.network.hook_tool_output_fmt()
 
     def action_get(self, *args, **kwargs):
@@ -156,9 +152,7 @@ class _MockModelBackend(_ModelBackend):
     def relation_set(self, *args, **kwargs):
         rel_id, key, value, app = args
         relation = next(
-            filter(
-                lambda r: r.meta.relation_id == rel_id, self._state.relations
-            )
+            filter(lambda r: r.meta.relation_id == rel_id, self._state.relations)
         )
         if app:
             if not self._state.leader:
@@ -196,15 +190,17 @@ class _MockModelBackend(_ModelBackend):
 
 
 class _MockPebbleClient(Client):
-
-    def __init__(self, socket_path: str,
-                 opener: Optional[urllib.request.OpenerDirector] = None,
-                 base_url: str = 'http://localhost',
-                 timeout: float = 5.0,
-                 *,
-                 state: "State",
-                 event: "Event",
-                 charm_spec: "CharmSpec"):
+    def __init__(
+        self,
+        socket_path: str,
+        opener: Optional[urllib.request.OpenerDirector] = None,
+        base_url: str = "http://localhost",
+        timeout: float = 5.0,
+        *,
+        state: "State",
+        event: "Event",
+        charm_spec: "CharmSpec",
+    ):
         super().__init__(socket_path, opener, base_url, timeout)
         self._state = state
         self._event = event

@@ -75,13 +75,7 @@ def test_get_relation(start_scene: Scene, mycharm):
     )
     scene = start_scene.copy()
     scene.state.relations = [
-        relation(
-            endpoint="foo",
-            interface="foo"
-        ),
-        relation(
-            endpoint="qux",
-            interface="qux"
-        ),
+        relation(endpoint="foo", interface="foo"),
+        relation(endpoint="qux", interface="qux"),
     ]
     scenario.play(scene, pre_event=pre_event)

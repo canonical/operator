@@ -37,9 +37,7 @@ def decompose_meta_event(meta_event: Event, state: State):
                 args=(
                     # right now, the Relation object hasn't been created by ops yet, so we can't pass it down.
                     # this will be replaced by a Relation instance before the event is fired.
-                    InjectRelation(
-                        relation.meta.endpoint, relation.meta.relation_id
-                    ),
+                    InjectRelation(relation.meta.endpoint, relation.meta.relation_id),
                 ),
             )
             logger.debug(f"decomposed meta {meta_event.name}: {event}")
@@ -83,9 +81,9 @@ def generate_builtin_sequences(template_states: Iterable[State]):
 
 
 def check_builtin_sequences(
-        charm_spec: CharmSpec,
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
+    charm_spec: CharmSpec,
+    pre_event: Optional[Callable[["CharmType"], None]] = None,
+    post_event: Optional[Callable[["CharmType"], None]] = None,
 ):
     """Test that all the builtin startup and teardown events can fire without errors.
 
@@ -100,10 +98,14 @@ def check_builtin_sequences(
     """
 
     for event, state in generate_builtin_sequences(
-            (
-                    State(leader=True),
-                    State(leader=False),
-            )
+        (
+            State(leader=True),
+            State(leader=False),
+        )
     ):
-        state.run(event=event, charm_spec=charm_spec,
-                  pre_event=pre_event, post_event=post_event)
+        state.run(
+            event=event,
+            charm_spec=charm_spec,
+            pre_event=pre_event,
+            post_event=post_event,
+        )

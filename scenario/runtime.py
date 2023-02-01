@@ -14,7 +14,8 @@ if TYPE_CHECKING:
     from ops.charm import CharmBase
     from ops.framework import EventBase
     from ops.testing import CharmType
-    from scenario.state import CharmSpec, State, Event
+
+    from scenario.state import CharmSpec, Event, State
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
@@ -167,9 +168,7 @@ class Runtime:
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
         """
-        logger.info(
-            f"Preparing to fire {event.name} on {self._charm_type.__name__}"
-        )
+        logger.info(f"Preparing to fire {event.name} on {self._charm_type.__name__}")
 
         # we make a copy to avoid mutating the input state
         output_state = state.copy()
@@ -183,8 +182,9 @@ class Runtime:
             self._redirect_root_logger()
 
             logger.info(" - preparing env")
-            env = self._get_event_env(state=state, event=event,
-                                      charm_root=temporary_charm_root)
+            env = self._get_event_env(
+                state=state, event=event, charm_root=temporary_charm_root
+            )
             os.environ.update(env)
 
             logger.info(" - Entering ops.main (mocked).")
@@ -197,7 +197,7 @@ class Runtime:
                     post_event=post_event,
                     state=output_state,
                     event=event,
-                    charm_spec=self._charm_spec
+                    charm_spec=self._charm_spec,
                 )
             except Exception as e:
                 raise RuntimeError(

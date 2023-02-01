@@ -11,35 +11,32 @@ import ops.model
 import ops.storage
 from ops.charm import CharmMeta
 from ops.log import setup_root_logging
-from ops.main import (
-    CHARM_STATE_FILE,
-    _Dispatcher,
-    _emit_charm_event,
-    _get_charm_dir,
-)
+from ops.main import CHARM_STATE_FILE, _Dispatcher, _emit_charm_event, _get_charm_dir
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockModelBackend
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
-    from scenario.state import CharmSpec, State, Event
+
+    from scenario.state import CharmSpec, Event, State
 
 logger = scenario_logger.getChild("ops_main_mock")
 
 
 def main(
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
-        state: "State" = None,
-        event: "Event" = None,
-        charm_spec: "CharmSpec" = None,
+    pre_event: Optional[Callable[["CharmType"], None]] = None,
+    post_event: Optional[Callable[["CharmType"], None]] = None,
+    state: "State" = None,
+    event: "Event" = None,
+    charm_spec: "CharmSpec" = None,
 ):
     """Set up the charm and dispatch the observed event."""
     charm_class = charm_spec.charm_type
     charm_dir = _get_charm_dir()
     model_backend = _MockModelBackend(  # pyright: reportPrivateUsage=false
-        state=state, event=event, charm_spec=charm_spec)
+        state=state, event=event, charm_spec=charm_spec
+    )
     debug = "JUJU_DEBUG" in os.environ
     setup_root_logging(model_backend, debug=debug)
     logger.debug(
