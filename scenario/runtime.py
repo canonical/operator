@@ -178,7 +178,7 @@ class Runtime:
         logger.info(" - generating virtual charm root")
         with self.virtual_charm_root() as temporary_charm_root:
             # todo consider forking out a real subprocess and do the mocking by
-            #  generating hook tool callables
+            #  generating hook tool executables
 
             logger.info(" - redirecting root logging")
             self._redirect_root_logger()
