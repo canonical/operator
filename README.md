@@ -26,7 +26,7 @@ I like metaphors, so here we go:
 - There is a theatre stage.
 - You pick an actor (a Charm) to put on the stage. Not just any actor: an improv one.
 - You arrange the stage with content that the actor will have to interact with. This consists of selecting:
-    - An initial situation (State) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what other actors are there around it, what is written in those books on the table?
+    - An initial situation (State) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what other actors are there around it, what is written in those pebble-shaped books on the table?
     - Something that has just happened (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the stage (relation-departed), or the content of one of the books changes).
 - How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a container), or write something down into one of the books.
 
