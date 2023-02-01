@@ -62,7 +62,7 @@ def test_charm_heals_on_start(mycharm):
     assert out.status.unit == ("active", "yabadoodle")
 
     out.juju_log = []  # exclude juju log from delta
-    assert out.delta(initial_state) == [
+    assert out.jsonpatch_delta(initial_state) == [
         {
             "op": "replace",
             "path": "/status/unit",

@@ -1,5 +1,4 @@
 import dataclasses
-import inspect
 import os
 import sys
 import tempfile
@@ -10,14 +9,12 @@ from typing import TYPE_CHECKING, Callable, Optional, Type, TypeVar
 import yaml
 
 from scenario.logger import logger as scenario_logger
-from scenario.mocking import DecorateSpec, patch_module
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
     from ops.framework import EventBase
     from ops.testing import CharmType
-
-    from scenario.structs import CharmSpec, Scene, State
+    from scenario.state import CharmSpec, State, Event
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
@@ -73,73 +70,6 @@ class Runtime:
         my_charm_type: Type["CharmBase"] = ldict["my_charm_type"]
         return Runtime(CharmSpec(my_charm_type))  # TODO add meta, options,...
 
-    @contextmanager
-    def patching(self, scene: "Scene"):
-        """Install the runtime: patch all required backend calls."""
-
-        # copy input state to act as blueprint for output state
-        logger.info(f"Installing {self}... ")
-        from ops import pebble
-
-        logger.info("patching ops.pebble")
-
-        pebble_decorator_specs = {
-            "Client": {
-                # todo: we could be more fine-grained and decorate individual Container methods,
-                #  e.g. can_connect, ... just like in _ModelBackend we don't just memo `_run`.
-                "_request": DecorateSpec(),
-                # some methods such as pebble.pull use _request_raw directly,
-                # and deal in objects that cannot be json-serialized
-                "pull": DecorateSpec(),
-                "push": DecorateSpec(),
-                "exec": DecorateSpec(),
-            }
-        }
-        patch_module(pebble, decorate=pebble_decorator_specs, scene=scene)
-
-        from ops import model
-
-        logger.info("patching ops.model")
-        model_decorator_specs = {
-            "_ModelBackend": {
-                "relation_get": DecorateSpec(),
-                "relation_set": DecorateSpec(),
-                "is_leader": DecorateSpec(),
-                "application_version_set": DecorateSpec(),
-                "status_get": DecorateSpec(),
-                "action_get": DecorateSpec(),
-                "add_metrics": DecorateSpec(),  # deprecated, I guess
-                "action_set": DecorateSpec(),
-                "action_fail": DecorateSpec(),
-                "action_log": DecorateSpec(),
-                "relation_ids": DecorateSpec(),
-                "relation_list": DecorateSpec(),
-                "relation_remote_app_name": DecorateSpec(),
-                "config_get": DecorateSpec(),
-                "resource_get": DecorateSpec(),
-                "storage_list": DecorateSpec(),
-                "storage_get": DecorateSpec(),
-                "network_get": DecorateSpec(),
-                "status_set": DecorateSpec(),
-                "storage_add": DecorateSpec(),
-                "juju_log": DecorateSpec(),
-                "planned_units": DecorateSpec(),
-                # todo different ops version support?
-                # "secret_get": DecorateSpec(),
-                # "secret_set": DecorateSpec(),
-                # "secret_grant": DecorateSpec(),
-                # "secret_remove": DecorateSpec(),
-            }
-        }
-        patch_module(
-            model,
-            decorate=model_decorator_specs,
-            scene=scene,
-            charm_spec=self._charm_spec,
-        )
-
-        yield
-
     @staticmethod
     def _redirect_root_logger():
         # the root logger set up by ops calls a hook tool: `juju-log`.
@@ -165,10 +95,10 @@ class Runtime:
             return "local/0"
         return meta["name"] + "/0"  # todo allow override
 
-    def _get_event_env(self, scene: "Scene", charm_root: Path):
-        if scene.event.name.endswith("_action"):
+    def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
+        if event.name.endswith("_action"):
             # todo: do we need some special metadata, or can we assume action names are always dashes?
-            action_name = scene.event.name[: -len("_action")].replace("_", "-")
+            action_name = event.name[: -len("_action")].replace("_", "-")
         else:
             action_name = ""
 
@@ -176,16 +106,16 @@ class Runtime:
             "JUJU_VERSION": self._juju_version,
             "JUJU_UNIT_NAME": self.unit_name,
             "_": "./dispatch",
-            "JUJU_DISPATCH_PATH": f"hooks/{scene.event.name}",
-            "JUJU_MODEL_NAME": scene.state.model.name,
+            "JUJU_DISPATCH_PATH": f"hooks/{event.name}",
+            "JUJU_MODEL_NAME": state.model.name,
             "JUJU_ACTION_NAME": action_name,
-            "JUJU_MODEL_UUID": scene.state.model.uuid,
+            "JUJU_MODEL_UUID": state.model.uuid,
             "JUJU_CHARM_DIR": str(charm_root.absolute())
             # todo consider setting pwd, (python)path
         }
 
-        if scene.event.meta and scene.event.meta.relation:
-            relation = scene.event.meta.relation
+        if event.meta and event.meta.relation:
+            relation = event.meta.relation
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
@@ -225,9 +155,10 @@ class Runtime:
             (temppath / "actions.yaml").write_text(yaml.safe_dump(spec.actions or {}))
             yield temppath
 
-    def play(
+    def run(
         self,
-        scene: "Scene",
+        state: "State",
+        event: "Event",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
@@ -237,44 +168,46 @@ class Runtime:
         After that it's up to ops.
         """
         logger.info(
-            f"Preparing to fire {scene.event.name} on {self._charm_type.__name__}"
+            f"Preparing to fire {event.name} on {self._charm_type.__name__}"
         )
 
-        # we make a copy to avoid mutating the input scene
-        scene = scene.copy()
+        # we make a copy to avoid mutating the input state
+        output_state = state.copy()
 
         logger.info(" - generating virtual charm root")
         with self.virtual_charm_root() as temporary_charm_root:
-            with self.patching(scene):
-                # todo consider forking out a real subprocess and do the mocking by
-                #  generating hook tool callables
+            # todo consider forking out a real subprocess and do the mocking by
+            #  generating hook tool callables
 
-                logger.info(" - redirecting root logging")
-                self._redirect_root_logger()
+            logger.info(" - redirecting root logging")
+            self._redirect_root_logger()
 
-                logger.info(" - preparing env")
-                env = self._get_event_env(scene, charm_root=temporary_charm_root)
-                os.environ.update(env)
+            logger.info(" - preparing env")
+            env = self._get_event_env(state=state, event=event,
+                                      charm_root=temporary_charm_root)
+            os.environ.update(env)
 
-                logger.info(" - Entering ops.main (mocked).")
-                # we don't import from ops.main because we need some extras, such as the pre/post_event hooks
-                from scenario.ops_main_mock import main as mocked_main
+            logger.info(" - Entering ops.main (mocked).")
+            # we don't import from ops.main because we need some extras, such as the pre/post_event hooks
+            from scenario.ops_main_mock import main as mocked_main
 
-                try:
-                    mocked_main(
-                        self._wrap(self._charm_type),
-                        pre_event=pre_event,
-                        post_event=post_event,
-                    )
-                except Exception as e:
-                    raise RuntimeError(
-                        f"Uncaught error in operator/charm code: {e}."
-                    ) from e
-                finally:
-                    logger.info(" - Exited ops.main.")
+            try:
+                mocked_main(
+                    pre_event=pre_event,
+                    post_event=post_event,
+                    state=output_state,
+                    event=event,
+                    charm_spec=self._charm_spec
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Uncaught error in operator/charm code: {e}."
+                ) from e
+            finally:
+                logger.info(" - Exited ops.main.")
 
-                logger.info(" - clearing env")
-                self._cleanup_env(env)
+            logger.info(" - clearing env")
+            self._cleanup_env(env)
 
-            logger.info("event fired; done.")
-            return scene.state
+        logger.info("event fired; done.")
+        return output_state

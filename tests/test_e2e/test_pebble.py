@@ -142,7 +142,7 @@ def test_fs_pull(charm_cls, make_dirs):
         assert file.read_text() == text
     else:
         # nothing has changed
-        assert not out.delta(scene.state)
+        assert not out.jsonpatch_delta(scene.state)
 
 
 LS = """

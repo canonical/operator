@@ -1,17 +1,16 @@
 import copy
 import dataclasses
 import inspect
-import tempfile
 import typing
-from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Type, Union, Callable
 from uuid import uuid4
 
 import yaml
 from ops import testing
 
 from scenario.logger import logger as scenario_logger
+from scenario.runtime import Runtime
 
 if typing.TYPE_CHECKING:
     try:
@@ -266,9 +265,18 @@ class State(_DCBase):
     model: Model = Model()
     juju_log: Sequence[Tuple[str, str]] = dataclasses.field(default_factory=list)
 
+    # meta stuff: actually belongs in event data structure.
+    juju_version: str = "3.0.0"
+    unit_id: str = "0"
+    app_name: str = "local"
+
     # todo: add pebble stuff, unit/app status, etc...
     #  actions?
     #  juju topology
+
+    @property
+    def unit_name(self):
+        return self.app_name + "/" + self.unit_id
 
     def with_can_connect(self, container_name: str, can_connect: bool):
         def replacer(container: ContainerSpec):
@@ -293,7 +301,7 @@ class State(_DCBase):
         except StopIteration as e:
             raise ValueError(f"container: {name}") from e
 
-    def delta(self, other: "State"):
+    def jsonpatch_delta(self, other: "State"):
         try:
             import jsonpatch
         except ModuleNotFoundError:
@@ -307,6 +315,22 @@ class State(_DCBase):
             dataclasses.asdict(other), dataclasses.asdict(self)
         ).patch
         return sort_patch(patch)
+
+    def run(
+        self,
+        event: "Event",
+        charm_spec: "CharmSpec",
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+    ) -> "State":
+        runtime = Runtime(charm_spec,
+                          juju_version=self.juju_version)
+        return runtime.run(
+            state=self,
+            event=event,
+            pre_event=pre_event,
+            post_event=post_event,
+        )
 
 
 @dataclasses.dataclass
@@ -366,24 +390,6 @@ class Event(_DCBase):
     def is_meta(self):
         """Is this a meta event?"""
         return self.name in META_EVENTS
-
-
-@dataclasses.dataclass
-class SceneMeta(_DCBase):
-    unit_id: str = "0"
-    app_name: str = "local"
-
-    @property
-    def unit_name(self):
-        return self.app_name + "/" + self.unit_id
-
-
-@dataclasses.dataclass
-class Scene(_DCBase):
-    event: Event
-    state: State = dataclasses.field(default_factory=State)
-    # data that doesn't belong to the event nor the state
-    meta: SceneMeta = SceneMeta()
 
 
 @dataclasses.dataclass
