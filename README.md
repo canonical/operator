@@ -60,7 +60,7 @@ available. The charm has no config, no relations, no networks, and no leadership
 With that, we can write the simplest possible scenario test:
 
 ```python
-from scenario.state import CharmSpec, event, State
+from scenario.state import _CharmSpec, event, State
 from ops.charm import CharmBase
 
 
@@ -69,8 +69,8 @@ class MyCharm(CharmBase):
 
 
 def test_scenario_base():
-    spec = CharmSpec(MyCharm, meta={"name": "foo"})
-    out = State().run(event=event('start'), charm_spec=CharmSpec(MyCharm, meta={"name": "foo"}))
+    spec = _CharmSpec(MyCharm, meta={"name": "foo"})
+    out = State().trigger(event=event('start'), charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"}))
     assert out.status.unit == ('unknown', '')
 ```
 
@@ -79,7 +79,7 @@ Our charm sets a special state if it has leadership on 'start':
 
 ```python
 import pytest
-from scenario.state import CharmSpec, event, State
+from scenario.state import _CharmSpec, event, State
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
@@ -97,8 +97,8 @@ class MyCharm(CharmBase):
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    spec = CharmSpec(MyCharm, meta={"name": "foo"})
-    out = State(leader=leader).run(event=event('start'), charm_spec=CharmSpec(MyCharm, meta={"name": "foo"}))
+    spec = _CharmSpec(MyCharm, meta={"name": "foo"})
+    out = State(leader=leader).trigger(event=event('start'), charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"}))
     assert out.status.unit == ('active', 'I rule' if leader else 'I am ruled')
 ```
 
@@ -111,7 +111,7 @@ You can write scenario tests to verify the shape of relation data:
 ```python
 from ops.charm import CharmBase
 
-from scenario.state import relation, State, event, CharmSpec
+from scenario.state import relation, State, event, _CharmSpec
 
 
 # This charm copies over remote app data to local unit data
@@ -135,7 +135,7 @@ def test_relation_data():
             remote_app_data={"cde": "baz!"},
         ),
     ]
-    ).run(charm_spec=CharmSpec(MyCharm, meta={"name": "foo"}), event=event('start'))
+    ).trigger(charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"}), event=event('start'))
 
     assert out.relations[0].local_unit_data == {"abc": "baz!"}
     # you can do this to check that there are no other differences:
@@ -201,7 +201,7 @@ then `content` would be the contents of our locally-supplied `file.txt`. You can
 
 ```python
 from ops.charm import CharmBase
-from scenario.state import event, State, container, CharmSpec
+from scenario.state import event, State, container, _CharmSpec
 
 
 class MyCharm(CharmBase):
@@ -213,9 +213,9 @@ class MyCharm(CharmBase):
 def test_pebble_push():
     out = State(
         containers=[container(name='foo')]
-    ).run(
+    ).trigger(
         event=event('start'),
-        charm_spec=CharmSpec(MyCharm, meta={"name": "foo"})
+        charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"})
     )
     assert out.get_container('foo').filesystem['local']['share']['config.yaml'].read_text() == "TEST"
 ```
@@ -226,7 +226,7 @@ You need to specify, for each possible command the charm might run on the contai
 ```python
 from ops.charm import CharmBase
 
-from scenario.state import event, State, container, ExecOutput, CharmSpec
+from scenario.state import event, State, container, ExecOutput, _CharmSpec
 
 LS_LL = """
 .rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml    
@@ -254,9 +254,9 @@ def test_pebble_exec():
                                stdout=LS_LL)
             }
         )]
-    ).run(
+    ).trigger(
         event=event('start'),
-        charm_spec=CharmSpec(MyCharm, meta={"name": "foo"})
+        charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"})
     )
 ```
 

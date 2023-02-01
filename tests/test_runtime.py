@@ -7,7 +7,7 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase
 
 from scenario.runtime import Runtime
-from scenario.state import CharmSpec, State, event
+from scenario.state import Event, State, _CharmSpec
 
 
 def charm_type():
@@ -40,7 +40,7 @@ def test_event_hooks():
         meta_file.write_text(yaml.safe_dump(meta))
 
         runtime = Runtime(
-            CharmSpec(
+            _CharmSpec(
                 charm_type(),
                 meta=meta,
             )
@@ -48,9 +48,9 @@ def test_event_hooks():
 
         pre_event = MagicMock(return_value=None)
         post_event = MagicMock(return_value=None)
-        runtime.run(
+        runtime.exec(
             state=State(),
-            event=event("foo"),
+            event=Event("foo"),
             pre_event=pre_event,
             post_event=post_event,
         )
@@ -74,13 +74,13 @@ def test_event_emission():
         my_charm_type.on.define_event("bar", MyEvt)
 
         runtime = Runtime(
-            CharmSpec(
+            _CharmSpec(
                 my_charm_type,
                 meta=meta,
             ),
         )
 
-        runtime.run(state=State(), event=event("bar"))
+        runtime.exec(state=State(), event=Event("bar"))
 
         assert my_charm_type._event
         assert isinstance(my_charm_type._event, MyEvt)

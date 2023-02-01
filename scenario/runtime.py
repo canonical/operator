@@ -4,7 +4,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union
 
 import yaml
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from ops.framework import EventBase
     from ops.testing import CharmType
 
-    from scenario.state import CharmSpec, Event, State
+    from scenario.state import Event, State, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
@@ -39,7 +39,7 @@ class Runtime:
 
     def __init__(
         self,
-        charm_spec: "CharmSpec",
+        charm_spec: "_CharmSpec",
         juju_version: str = "3.0.0",
     ):
         self._charm_spec = charm_spec
@@ -68,7 +68,7 @@ class Runtime:
             ) from e
 
         my_charm_type: Type["CharmBase"] = ldict["my_charm_type"]
-        return Runtime(CharmSpec(my_charm_type))  # TODO add meta, options,...
+        return Runtime(_CharmSpec(my_charm_type))  # TODO add meta, options,...
 
     @staticmethod
     def _redirect_root_logger():
@@ -114,8 +114,7 @@ class Runtime:
             # todo consider setting pwd, (python)path
         }
 
-        if event.meta and event.meta.relation:
-            relation = event.meta.relation
+        if relation := event.relation:
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
@@ -155,7 +154,7 @@ class Runtime:
             (temppath / "actions.yaml").write_text(yaml.safe_dump(spec.actions or {}))
             yield temppath
 
-    def run(
+    def exec(
         self,
         state: "State",
         event: "Event",
@@ -215,3 +214,40 @@ class Runtime:
 
         logger.info("event fired; done.")
         return output_state
+
+
+def trigger(
+    state: "State",
+    event: Union["Event", str],
+    charm_type: Type["CharmType"],
+    pre_event: Optional[Callable[["CharmType"], None]] = None,
+    post_event: Optional[Callable[["CharmType"], None]] = None,
+    # if not provided, will be autoloaded from charm_type.
+    meta: Optional[Dict[str, Any]] = None,
+    actions: Optional[Dict[str, Any]] = None,
+    config: Optional[Dict[str, Any]] = None,
+) -> "State":
+
+    from scenario.state import Event, _CharmSpec
+
+    if isinstance(event, str):
+        event = Event(event)
+
+    if not any((meta, actions, config)):
+        logger.debug("Autoloading charmspec...")
+        spec = _CharmSpec.autoload(charm_type)
+    else:
+        if not meta:
+            meta = {"name": str(charm_type.__name__)}
+        spec = _CharmSpec(
+            charm_type=charm_type, meta=meta, actions=actions, config=config
+        )
+
+    runtime = Runtime(charm_spec=spec, juju_version=state.juju_version)
+
+    return runtime.exec(
+        state=state,
+        event=event,
+        pre_event=pre_event,
+        post_event=post_event,
+    )

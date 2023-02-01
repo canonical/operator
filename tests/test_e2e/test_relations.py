@@ -4,7 +4,7 @@ import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 
-from scenario.state import CharmSpec, State, event, relation
+from scenario.state import Event, Relation, State, _CharmSpec
 
 
 @pytest.fixture(scope="function")
@@ -45,23 +45,21 @@ def test_get_relation(mycharm):
         config={"foo": "bar"},
         leader=True,
         relations=[
-            relation(endpoint="foo", interface="foo"),
-            relation(endpoint="qux", interface="qux"),
+            Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
+            Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
         ],
-    ).run(
-        event("start"),
-        CharmSpec(
-            mycharm,
-            meta={
-                "name": "local",
-                "requires": {
-                    "foo": {"interface": "foo"},
-                    "bar": {"interface": "bar"},
-                },
-                "provides": {
-                    "qux": {"interface": "qux"},
-                    "zoo": {"interface": "zoo"},
-                },
+    ).trigger(
+        "start",
+        mycharm,
+        meta={
+            "name": "local",
+            "requires": {
+                "foo": {"interface": "foo"},
+                "bar": {"interface": "bar"},
             },
-        ),
+            "provides": {
+                "qux": {"interface": "qux"},
+                "zoo": {"interface": "zoo"},
+            },
+        },
     )

@@ -1,6 +1,6 @@
 import typing
 from itertools import chain
-from typing import Callable, Iterable, Optional, TextIO, Union
+from typing import Any, Callable, Dict, Iterable, Optional, TextIO, Type, Union
 
 from scenario.logger import logger as scenario_logger
 from scenario.state import (
@@ -9,7 +9,6 @@ from scenario.state import (
     CREATE_ALL_RELATIONS,
     DETACH_ALL_STORAGES,
     META_EVENTS,
-    CharmSpec,
     Event,
     InjectRelation,
     State,
@@ -81,7 +80,10 @@ def generate_builtin_sequences(template_states: Iterable[State]):
 
 
 def check_builtin_sequences(
-    charm_spec: CharmSpec,
+    charm_type: Type["CharmType"],
+    meta: Optional[Dict[str, Any]] = None,
+    actions: Optional[Dict[str, Any]] = None,
+    config: Optional[Dict[str, Any]] = None,
     pre_event: Optional[Callable[["CharmType"], None]] = None,
     post_event: Optional[Callable[["CharmType"], None]] = None,
 ):
@@ -103,9 +105,12 @@ def check_builtin_sequences(
             State(leader=False),
         )
     ):
-        state.run(
+        state.trigger(
             event=event,
-            charm_spec=charm_spec,
+            charm_type=charm_type,
+            meta=meta,
+            actions=actions,
+            config=config,
             pre_event=pre_event,
             post_event=post_event,
         )

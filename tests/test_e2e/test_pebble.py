@@ -6,7 +6,7 @@ import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 
-from scenario.state import CharmSpec, ContainerSpec, ExecOutput, State, container, event
+from scenario.state import Container, Event, ExecOutput, State, _CharmSpec
 
 
 @pytest.fixture(scope="function")
@@ -27,9 +27,10 @@ def test_no_containers(charm_cls):
     def callback(self: CharmBase):
         assert not self.unit.containers
 
-    State().run(
-        charm_spec=CharmSpec(charm_cls, meta={"name": "foo"}),
-        event=event("start"),
+    State().trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo"},
+        event="start",
         post_event=callback,
     )
 
@@ -39,11 +40,10 @@ def test_containers_from_meta(charm_cls):
         assert self.unit.containers
         assert self.unit.get_container("foo")
 
-    State().run(
-        charm_spec=CharmSpec(
-            charm_cls, meta={"name": "foo", "containers": {"foo": {}}}
-        ),
-        event=event("start"),
+    State().trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
         post_event=callback,
     )
 
@@ -53,11 +53,10 @@ def test_connectivity(charm_cls, can_connect):
     def callback(self: CharmBase):
         assert can_connect == self.unit.get_container("foo").can_connect()
 
-    State(containers=[container(name="foo", can_connect=can_connect)]).run(
-        charm_spec=CharmSpec(
-            charm_cls, meta={"name": "foo", "containers": {"foo": {}}}
-        ),
-        event=event("start"),
+    State(containers=[Container(name="foo", can_connect=can_connect)]).trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
         post_event=callback,
     )
 
@@ -75,15 +74,14 @@ def test_fs_push(charm_cls):
 
     State(
         containers=[
-            container(
+            Container(
                 name="foo", can_connect=True, filesystem={"bar": {"baz.txt": pth}}
             )
         ]
-    ).run(
-        charm_spec=CharmSpec(
-            charm_cls, meta={"name": "foo", "containers": {"foo": {}}}
-        ),
-        event=event("start"),
+    ).trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
         post_event=callback,
     )
 
@@ -109,13 +107,12 @@ def test_fs_pull(charm_cls, make_dirs):
 
     charm_cls.callback = callback
 
-    state = State(containers=[container(name="foo", can_connect=True)])
+    state = State(containers=[Container(name="foo", can_connect=True)])
 
-    out = state.run(
-        charm_spec=CharmSpec(
-            charm_cls, meta={"name": "foo", "containers": {"foo": {}}}
-        ),
-        event=event("start"),
+    out = state.trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
         post_event=callback,
     )
 
@@ -165,16 +162,15 @@ def test_exec(charm_cls, cmd, out):
     charm_cls.callback = callback
     State(
         containers=[
-            container(
+            Container(
                 name="foo",
                 can_connect=True,
                 exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
             )
         ]
-    ).run(
-        charm_spec=CharmSpec(
-            charm_cls, meta={"name": "foo", "containers": {"foo": {}}}
-        ),
-        event=event("start"),
+    ).trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
         post_event=callback,
     )

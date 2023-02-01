@@ -10,7 +10,7 @@ from ops.pebble import Client, ExecError
 from scenario.logger import logger as scenario_logger
 
 if TYPE_CHECKING:
-    from scenario.state import CharmSpec, Event, ExecOutput, State
+    from scenario.state import Event, ExecOutput, State, _CharmSpec
 
 logger = scenario_logger.getChild("mocking")
 
@@ -42,7 +42,7 @@ class _MockExecProcess:
 
 
 class _MockModelBackend(_ModelBackend):
-    def __init__(self, state: "State", event: "Event", charm_spec: "CharmSpec"):
+    def __init__(self, state: "State", event: "Event", charm_spec: "_CharmSpec"):
         super().__init__(state.unit_name, state.model.name, state.model.uuid)
         self._state = state
         self._event = event
@@ -56,10 +56,16 @@ class _MockModelBackend(_ModelBackend):
             charm_spec=self._charm_spec,
         )
 
+    def _get_relation_by_id(self, rel_id):
+        try:
+            return next(
+                filter(lambda r: r.relation_id == rel_id, self._state.relations)
+            )
+        except StopIteration as e:
+            raise RuntimeError(f"Not found: relation with id={rel_id}.") from e
+
     def relation_get(self, rel_id, obj_name, app):
-        relation = next(
-            filter(lambda r: r.meta.relation_id == rel_id, self._state.relations)
-        )
+        relation = self._get_relation_by_id(rel_id)
         if app and obj_name == self._state.app_name:
             return relation.local_app_data
         elif app:
@@ -81,18 +87,14 @@ class _MockModelBackend(_ModelBackend):
 
     def relation_ids(self, endpoint, *args, **kwargs):
         return [
-            rel.meta.relation_id
-            for rel in self._state.relations
-            if rel.meta.endpoint == endpoint
+            rel.relation_id for rel in self._state.relations if rel.endpoint == endpoint
         ]
 
     def relation_list(self, rel_id, *args, **kwargs):
-        relation = next(
-            filter(lambda r: r.meta.relation_id == rel_id, self._state.relations)
-        )
+        relation = self._get_relation_by_id(rel_id)
         return tuple(
-            f"{relation.meta.remote_app_name}/{unit_id}"
-            for unit_id in relation.meta.remote_unit_ids
+            f"{relation.remote_app_name}/{unit_id}"
+            for unit_id in relation.remote_unit_ids
         )
 
     def config_get(self, *args, **kwargs):
@@ -113,7 +115,7 @@ class _MockModelBackend(_ModelBackend):
         name, relation_id = args
 
         network = next(filter(lambda r: r.name == name, self._state.networks))
-        return network.network.hook_tool_output_fmt()
+        return network.hook_tool_output_fmt()
 
     def action_get(self, *args, **kwargs):
         raise NotImplementedError("action_get")
@@ -151,9 +153,7 @@ class _MockModelBackend(_ModelBackend):
 
     def relation_set(self, *args, **kwargs):
         rel_id, key, value, app = args
-        relation = next(
-            filter(lambda r: r.meta.relation_id == rel_id, self._state.relations)
-        )
+        relation = self._get_relation_by_id(rel_id)
         if app:
             if not self._state.leader:
                 raise RuntimeError("needs leadership to set app data")
@@ -199,7 +199,7 @@ class _MockPebbleClient(Client):
         *,
         state: "State",
         event: "Event",
-        charm_spec: "CharmSpec",
+        charm_spec: "_CharmSpec",
     ):
         super().__init__(socket_path, opener, base_url, timeout)
         self._state = state
@@ -216,7 +216,7 @@ class _MockPebbleClient(Client):
         except StopIteration:
             raise RuntimeError(
                 f"container with name={container_name!r} not found. "
-                f"Did you forget a ContainerSpec, or is the socket path "
+                f"Did you forget a Container, or is the socket path "
                 f"{self.socket_path!r} wrong?"
             )
 

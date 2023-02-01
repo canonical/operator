@@ -19,7 +19,7 @@ from scenario.mocking import _MockModelBackend
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.state import CharmSpec, Event, State
+    from scenario.state import Event, State, _CharmSpec
 
 logger = scenario_logger.getChild("ops_main_mock")
 
@@ -29,7 +29,7 @@ def main(
     post_event: Optional[Callable[["CharmType"], None]] = None,
     state: "State" = None,
     event: "Event" = None,
-    charm_spec: "CharmSpec" = None,
+    charm_spec: "_CharmSpec" = None,
 ):
     """Set up the charm and dispatch the observed event."""
     charm_class = charm_spec.charm_type

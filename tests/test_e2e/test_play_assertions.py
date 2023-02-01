@@ -3,7 +3,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
-from scenario.state import CharmSpec, State, Status, event, relation
+from scenario.state import Event, Relation, State, Status, _CharmSpec
 
 
 @pytest.fixture(scope="function")
@@ -47,9 +47,10 @@ def test_charm_heals_on_start(mycharm):
         config={"foo": "bar"}, leader=True, status=Status(unit=("blocked", "foo"))
     )
 
-    out = initial_state.run(
-        charm_spec=CharmSpec(mycharm, meta={"name": "foo"}),
-        event=event("start"),
+    out = initial_state.trigger(
+        charm_type=mycharm,
+        meta={"name": "foo"},
+        event="start",
         post_event=post_event,
         pre_event=pre_event,
     )
@@ -90,22 +91,21 @@ def test_relation_data_access(mycharm):
 
     State(
         relations=[
-            relation(
+            Relation(
                 endpoint="relation_test",
                 interface="azdrubales",
+                relation_id=1,
                 remote_app_name="karlos",
                 remote_app_data={"yaba": "doodle"},
                 remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
             )
         ]
-    ).run(
-        charm_spec=CharmSpec(
-            mycharm,
-            meta={
-                "name": "foo",
-                "requires": {"relation_test": {"interface": "azdrubales"}},
-            },
-        ),
-        event=event("update-status"),
+    ).trigger(
+        charm_type=mycharm,
+        meta={
+            "name": "foo",
+            "requires": {"relation_test": {"interface": "azdrubales"}},
+        },
+        event="update-status",
         post_event=check_relation_data,
     )

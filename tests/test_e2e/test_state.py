@@ -6,7 +6,7 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
-from scenario.state import CharmSpec, ContainerSpec, State, event, relation, sort_patch
+from scenario.state import Container, Relation, State, sort_patch
 
 # from tests.setup_tests import setup_tests
 #
@@ -59,7 +59,7 @@ def state():
 
 
 def test_bare_event(state, mycharm):
-    out = state.run(event("start"), charm_spec=CharmSpec(mycharm, meta={"name": "foo"}))
+    out = state.trigger("start", mycharm, meta={"name": "foo"})
     out.juju_log = []  # ignore logging output in the delta
     assert state.jsonpatch_delta(out) == []
 
@@ -68,9 +68,10 @@ def test_leader_get(state, mycharm):
     def pre_event(charm):
         assert charm.unit.is_leader()
 
-    state.run(
-        event=event("start"),
-        charm_spec=CharmSpec(mycharm, meta={"name": "foo"}),
+    state.trigger(
+        "start",
+        mycharm,
+        meta={"name": "foo"},
         pre_event=pre_event,
     )
 
@@ -82,9 +83,10 @@ def test_status_setting(state, mycharm):
         charm.app.status = WaitingStatus("foo barz")
 
     mycharm._call = call
-    out = state.run(
-        charm_spec=CharmSpec(mycharm, meta={"name": "foo"}),
-        event=event("start"),
+    out = state.trigger(
+        "start",
+        mycharm,
+        meta={"name": "foo"},
     )
     assert out.status.unit == ("active", "foo test")
     assert out.status.app == ("waiting", "foo barz")
@@ -115,16 +117,14 @@ def test_container(connect, mycharm):
         assert container.name == "foo"
         assert container.can_connect() is connect
 
-    spec = CharmSpec(
+    State(containers=(Container(name="foo", can_connect=connect),)).trigger(
+        "start",
         mycharm,
         meta={
             "name": "foo",
             "containers": {"foo": {"resource": "bar"}},
         },
-    )
-
-    out = State(containers=(ContainerSpec(name="foo", can_connect=connect),)).run(
-        event=event("start"), pre_event=pre_event, charm_spec=spec
+        pre_event=pre_event,
     )
 
 
@@ -145,16 +145,9 @@ def test_relation_get(mycharm):
             else:
                 assert not rel.data[unit]
 
-    spec = CharmSpec(
-        mycharm,
-        meta={
-            "name": "local",
-            "requires": {"foo": {"interface": "bar"}},
-        },
-    )
     state = State(
         relations=[
-            relation(
+            Relation(
                 endpoint="foo",
                 interface="bar",
                 local_app_data={"a": "because"},
@@ -166,7 +159,15 @@ def test_relation_get(mycharm):
             )
         ]
     )
-    state.run(event=event("start"), pre_event=pre_event, charm_spec=spec)
+    state.trigger(
+        "start",
+        mycharm,
+        meta={
+            "name": "local",
+            "requires": {"foo": {"interface": "bar"}},
+        },
+        pre_event=pre_event,
+    )
 
 
 def test_relation_set(mycharm):
@@ -197,36 +198,33 @@ def test_relation_set(mycharm):
         #     rel.data[charm.model.get_unit("remote/1")]["c"] = "d"
 
     mycharm._call = event_handler
-    spec = CharmSpec(
-        mycharm,
+    relation = Relation(
+        endpoint="foo",
+        interface="bar",
+        remote_app_name="remote",
+        remote_unit_ids=[1, 4],
+        local_app_data={},
+        local_unit_data={},
+    )
+    state = State(
+        leader=True,
+        relations=[relation],
+    )
+
+    assert not mycharm.called
+    out = state.trigger(
+        event="start",
+        charm_type=mycharm,
         meta={
             "name": "foo",
             "requires": {"foo": {"interface": "bar"}},
         },
+        pre_event=pre_event,
     )
-
-    state = State(
-        leader=True,
-        relations=[
-            relation(
-                endpoint="foo",
-                interface="bar",
-                remote_unit_ids=[1, 4],
-                local_app_data={},
-                local_unit_data={},
-            )
-        ],
-    )
-
-    assert not mycharm.called
-    out = state.run(event=event("start"), charm_spec=spec, pre_event=pre_event)
     assert mycharm.called
 
     assert asdict(out.relations[0]) == asdict(
-        relation(
-            endpoint="foo",
-            interface="bar",
-            remote_unit_ids=[1, 4],
+        relation.replace(
             local_app_data={"a": "b"},
             local_unit_data={"c": "d"},
         )

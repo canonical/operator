@@ -2,7 +2,8 @@ import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 
-from scenario.state import CharmSpec, NetworkSpec, State, event, network, relation
+from scenario import trigger
+from scenario.state import Event, Network, Relation, State, _CharmSpec
 
 
 @pytest.fixture(scope="function")
@@ -32,17 +33,23 @@ def test_ip_get(mycharm):
         rel = charm.model.get_relation("metrics-endpoint")
         assert str(charm.model.get_binding(rel).network.bind_address) == "1.1.1.1"
 
-    State(
-        relations=[relation(endpoint="metrics-endpoint", interface="foo")],
-        networks=[NetworkSpec("metrics-endpoint", bind_id=0, network=network())],
-    ).run(
-        event("update-status"),
-        CharmSpec(
-            mycharm,
-            meta={
-                "name": "foo",
-                "requires": {"metrics-endpoint": {"interface": "foo"}},
-            },
+    trigger(
+        State(
+            relations=[
+                Relation(
+                    interface="foo",
+                    remote_app_name="remote",
+                    endpoint="metrics-endpoint",
+                    relation_id=1,
+                )
+            ],
+            networks=[Network.default("metrics-endpoint", bind_id=0)],
         ),
+        "update-status",
+        mycharm,
+        meta={
+            "name": "foo",
+            "requires": {"metrics-endpoint": {"interface": "foo"}},
+        },
         post_event=fetch_unit_address,
     )

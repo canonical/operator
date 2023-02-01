@@ -5,7 +5,7 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 
 from scenario.sequences import check_builtin_sequences
-from scenario.state import CharmSpec
+from scenario.state import _CharmSpec
 
 CHARM_CALLED = 0
 
@@ -36,6 +36,5 @@ def mycharm():
 
 
 def test_builtin_scenes(mycharm):
-    charm_spec = CharmSpec(mycharm, meta={"name": "foo"})
-    check_builtin_sequences(charm_spec)
+    check_builtin_sequences(mycharm, meta={"name": "foo"})
     assert CHARM_CALLED == 12
