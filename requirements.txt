@@ -1,2 +1,2 @@
-PyYAML
-websocket-client
+PyYAML==6.*
+websocket-client==1.*

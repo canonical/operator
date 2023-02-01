@@ -56,8 +56,6 @@ from ops._private import timeconv, yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
-    from subprocess import CompletedProcess  # noqa
-
     from pebble import (  # pyright: reportMissingTypeStubs=false
         CheckInfo,
         CheckLevel,
@@ -1936,6 +1934,10 @@ class Container:
             A readable file-like object, whose read() method will return str
             objects decoded according to the specified encoding, or bytes if
             encoding is None.
+
+        Raises:
+            pebble.PathError: If there was an error reading the file at path,
+                for example, if the file doesn't exist or is a directory.
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
@@ -2162,7 +2164,7 @@ class Container:
             name=path.name,
             type=ftype,
             size=info.st_size,
-            permissions=typing.cast(int, stat.S_IMODE(info.st_mode)),  # type: ignore
+            permissions=stat.S_IMODE(info.st_mode),
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pwd.getpwuid(info.st_uid).pw_name,
@@ -2552,10 +2554,6 @@ class _ModelBackend:
             args += ('--format=json',)
         try:
             result = run(args, **kwargs)
-
-            # pyright infers the first match when argument overloading/unpacking is used,
-            # so this needs to be coerced into the right type
-            result = typing.cast('CompletedProcess[bytes]', result)
         except CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:

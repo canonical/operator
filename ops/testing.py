@@ -126,7 +126,7 @@ class Harness(Generic[CharmType]):
 
     Args:
         charm_cls: The Charm class that you'll be testing.
-        meta: charm.CharmBase is a A string or file-like object containing the contents of
+        meta: A string or file-like object containing the contents of
             metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
             parent directory of the Charm, and if not found fall back to a trivial
             'name: test-charm' metadata.
@@ -2283,7 +2283,12 @@ class _TestingPebbleClient:
     def pull(self, path: str, *,
              encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
         self._check_connection()
-        return self._fs.open(path, encoding=encoding)
+        try:
+            return self._fs.open(path, encoding=encoding)
+        except FileNotFoundError:
+            raise pebble.PathError('not-found', f'stat {path}: no such file or directory')
+        except IsADirectoryError:
+            raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
 
     def push(
             self, path: str, source: 'ReadableBuffer', *,

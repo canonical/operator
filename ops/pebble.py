@@ -303,14 +303,18 @@ class ProtocolError(Error):
 
 
 class PathError(Error):
-    """Raised when there's an error with a specific path."""
+    """Raised when there's an error with a specific path.
+
+    Attributes:
+        kind: A short string representing the kind of error. Possible values
+            are "not-found", "permission-denied", and "generic-file-error".
+        message: A human-readable error message.
+    """
 
     def __init__(self, kind: str, message: str):
         """This shouldn't be instantiated directly."""
         self.kind = kind
-        # FIXME: pyright rightfully complains that super().message is a method
-        #  see: https://github.com/canonical/operator/issues/777
-        self.message = message  # type: ignore
+        self.message = message
 
     def __str__(self):
         return f'{self.kind} - {self.message}'
@@ -1486,7 +1490,7 @@ class Client:
             try:
                 body = json.loads(e.read())  # type: Dict[str, Any]
                 message = body['result']['message']  # type: str
-            except (IOError, ValueError, KeyError) as e2:
+            except (OSError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}  # type: Dict[str, Any]
                 message = f'{type(e2).__name__} - {e2}'
@@ -1797,6 +1801,10 @@ class Client:
             A readable file-like object, whose read() method will return str
             objects decoded according to the specified encoding, or bytes if
             encoding is None.
+
+        Raises:
+            PathError: If there was an error reading the file at path, for
+                example, if the file doesn't exist or is a directory.
         """
         query = {
             'action': 'read',

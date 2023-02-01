@@ -22,7 +22,7 @@ import subprocess
 import typing
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Generator, List, Optional, Tuple, Union
 
 import yaml  # pyright: reportMissingModuleSource=false
 
@@ -299,11 +299,11 @@ class JujuStorage:
 
 
 # we load yaml.CSafeX if available, falling back to slower yaml.SafeX.
-_BaseDumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)  # type: Type[yaml.SafeDumper]
-_BaseLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)  # type: Type[yaml.SafeLoader]
+_BaseDumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
+_BaseLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 
 
-class _SimpleLoader(_BaseLoader):
+class _SimpleLoader(_BaseLoader):  # type: ignore
     """Handle a couple basic python types.
 
     yaml.SafeLoader can handle all the basic int/float/dict/set/etc that we want. The only one
@@ -321,7 +321,7 @@ _SimpleLoader.add_constructor(  # type: ignore
     _SimpleLoader.construct_python_tuple)  # type: ignore
 
 
-class _SimpleDumper(_BaseDumper):
+class _SimpleDumper(_BaseDumper):  # type: ignore
     """Add types supported by 'marshal'.
 
     YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So
@@ -330,7 +330,7 @@ class _SimpleDumper(_BaseDumper):
     represent_tuple = yaml.Dumper.represent_tuple  # type: _TupleRepresenterType
 
 
-_SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)
+_SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)  # type: ignore
 
 
 def juju_backend_available() -> bool:

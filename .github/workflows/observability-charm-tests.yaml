@@ -25,7 +25,7 @@ jobs:
           echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
 
       - name: Install dependencies
-        run: pip install tox==4.2.8
+        run: pip install tox
 
       - name: Run the charm's unit tests
         run: tox -vve unit
