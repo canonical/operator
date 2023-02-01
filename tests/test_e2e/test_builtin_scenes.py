@@ -4,8 +4,8 @@ import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 
-from scenario.scenario import check_builtin_sequences
-from scenario.structs import CharmSpec
+from scenario.sequences import check_builtin_sequences
+from scenario.state import CharmSpec
 
 CHARM_CALLED = 0
 

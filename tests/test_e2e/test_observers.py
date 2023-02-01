@@ -4,8 +4,7 @@ import pytest
 from ops.charm import ActionEvent, CharmBase, StartEvent
 from ops.framework import Framework
 
-from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, Scene, State, event
+from scenario.state import CharmSpec, State, event
 
 
 @pytest.fixture(scope="function")
@@ -28,11 +27,12 @@ def charm_evts():
 
 def test_start_event(charm_evts):
     charm, evts = charm_evts
-    scenario = Scenario(
-        CharmSpec(charm, meta={"name": "foo"}, actions={"show_proxied_endpoints": {}})
+    State().run(
+        event=event("start"),
+        charm_spec=CharmSpec(
+            charm, meta={"name": "foo"}, actions={"show_proxied_endpoints": {}}
+        ),
     )
-    scene = Scene(event("start"), state=State())
-    scenario.play(scene)
     assert len(evts) == 1
     assert isinstance(evts[0], StartEvent)
 

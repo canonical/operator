@@ -206,16 +206,18 @@ class _MockPebbleClient(Client):
         self._event = event
         self._charm_spec = charm_spec
 
-        container_name = socket_path.split("/")[-2]
+    @property
+    def _container(self):
+        container_name = self.socket_path.split("/")[-2]
         try:
-            self._container = next(
-                filter(lambda x: x.name == container_name, state.containers)
+            return next(
+                filter(lambda x: x.name == container_name, self._state.containers)
             )
         except StopIteration:
             raise RuntimeError(
                 f"container with name={container_name!r} not found. "
                 f"Did you forget a ContainerSpec, or is the socket path "
-                f"{socket_path!r} wrong?"
+                f"{self.socket_path!r} wrong?"
             )
 
     def _request(self, *args, **kwargs):

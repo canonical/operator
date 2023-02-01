@@ -44,7 +44,6 @@ class Runtime:
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
-        self._charm_type = charm_spec.charm_type
         # TODO consider cleaning up venv on __delete__, but ideally you should be
         #  running this in a clean venv or a container anyway.
 
@@ -170,7 +169,8 @@ class Runtime:
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
         """
-        logger.info(f"Preparing to fire {event.name} on {self._charm_type.__name__}")
+        charm_type = self._charm_spec.charm_type
+        logger.info(f"Preparing to fire {event.name} on {charm_type.__name__}")
 
         # we make a copy to avoid mutating the input state
         output_state = state.copy()
@@ -199,7 +199,9 @@ class Runtime:
                     post_event=post_event,
                     state=output_state,
                     event=event,
-                    charm_spec=self._charm_spec,
+                    charm_spec=self._charm_spec.replace(
+                        charm_type=self._wrap(charm_type)
+                    ),
                 )
             except Exception as e:
                 raise RuntimeError(

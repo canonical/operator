@@ -1,12 +1,9 @@
-from typing import Optional
-
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
-from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, Scene, State, Status, event, relation
+from scenario.state import CharmSpec, State, Status, event, relation
 
 
 @pytest.fixture(scope="function")
@@ -30,11 +27,8 @@ def mycharm():
 
 
 def test_charm_heals_on_start(mycharm):
-    scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
-
     def pre_event(charm):
         pre_event._called = True
-        assert not charm.is_ready()
         assert charm.unit.status == BlockedStatus("foo")
         assert not charm.called
 
@@ -44,8 +38,6 @@ def test_charm_heals_on_start(mycharm):
 
     def post_event(charm):
         post_event._called = True
-
-        assert charm.is_ready()
         assert charm.unit.status == ActiveStatus("yabadoodle")
         assert charm.called
 
@@ -55,8 +47,11 @@ def test_charm_heals_on_start(mycharm):
         config={"foo": "bar"}, leader=True, status=Status(unit=("blocked", "foo"))
     )
 
-    out = scenario.play(
-        Scene(event("update-status"), state=initial_state),
+    out = initial_state.run(
+        charm_spec=CharmSpec(mycharm, meta={"name": "foo"}),
+        event=event("start"),
+        post_event=post_event,
+        pre_event=pre_event,
     )
 
     assert out.status.unit == ("active", "yabadoodle")
@@ -73,15 +68,6 @@ def test_charm_heals_on_start(mycharm):
 
 def test_relation_data_access(mycharm):
     mycharm._call = lambda *_: True
-    scenario = Scenario(
-        CharmSpec(
-            mycharm,
-            meta={
-                "name": "foo",
-                "requires": {"relation_test": {"interface": "azdrubales"}},
-            },
-        )
-    )
 
     def check_relation_data(charm):
         foo_relations = charm.model.relations["relation_test"]
@@ -102,22 +88,24 @@ def test_relation_data_access(mycharm):
 
         assert remote_app_data == {"yaba": "doodle"}
 
-    scene = Scene(
-        state=State(
-            relations=[
-                relation(
-                    endpoint="relation_test",
-                    interface="azdrubales",
-                    remote_app_name="karlos",
-                    remote_app_data={"yaba": "doodle"},
-                    remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
-                )
-            ]
+    State(
+        relations=[
+            relation(
+                endpoint="relation_test",
+                interface="azdrubales",
+                remote_app_name="karlos",
+                remote_app_data={"yaba": "doodle"},
+                remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
+            )
+        ]
+    ).run(
+        charm_spec=CharmSpec(
+            mycharm,
+            meta={
+                "name": "foo",
+                "requires": {"relation_test": {"interface": "azdrubales"}},
+            },
         ),
         event=event("update-status"),
-    )
-
-    scenario.play(
-        scene,
         post_event=check_relation_data,
     )

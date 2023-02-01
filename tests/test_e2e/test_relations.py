@@ -1,21 +1,10 @@
-from dataclasses import asdict
-from typing import Optional, Type
+from typing import Type
 
 import pytest
-from ops.charm import CharmBase, CharmEvents, StartEvent
+from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
-from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
-from scenario.scenario import Scenario
-from scenario.structs import (
-    CharmSpec,
-    ContainerSpec,
-    Scene,
-    State,
-    event,
-    relation,
-    sort_patch,
-)
+from scenario.state import CharmSpec, State, event, relation
 
 
 @pytest.fixture(scope="function")
@@ -45,19 +34,22 @@ def mycharm():
     return MyCharm
 
 
-@pytest.fixture(scope="function")
-def start_scene():
-    return Scene(event("start"), state=State(config={"foo": "bar"}, leader=True))
-
-
-def test_get_relation(start_scene: Scene, mycharm):
+def test_get_relation(mycharm):
     def pre_event(charm: CharmBase):
         assert charm.model.get_relation("foo")
         assert charm.model.get_relation("bar") is None
         assert charm.model.get_relation("qux")
         assert charm.model.get_relation("zoo") is None
 
-    scenario = Scenario(
+    State(
+        config={"foo": "bar"},
+        leader=True,
+        relations=[
+            relation(endpoint="foo", interface="foo"),
+            relation(endpoint="qux", interface="qux"),
+        ],
+    ).run(
+        event("start"),
         CharmSpec(
             mycharm,
             meta={
@@ -71,11 +63,5 @@ def test_get_relation(start_scene: Scene, mycharm):
                     "zoo": {"interface": "zoo"},
                 },
             },
-        )
+        ),
     )
-    scene = start_scene.copy()
-    scene.state.relations = [
-        relation(endpoint="foo", interface="foo"),
-        relation(endpoint="qux", interface="qux"),
-    ]
-    scenario.play(scene, pre_event=pre_event)
