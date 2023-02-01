@@ -163,7 +163,9 @@ class Runtime:
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
-        """Plays a scene on the charm.
+        """Runs an event with this state as initial state on a charm.
+
+        Returns the 'output state', that is, the state as mutated by the charm during the event handling.
 
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
