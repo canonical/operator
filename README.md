@@ -43,13 +43,16 @@ Comparing scenario tests with `Harness` tests:
 - TODO: Scenario can mock at the level of hook tools. Decoupling charm and context allows us to swap out easily any part of this flow, and even share context data across charms, codebases, teams...
 
 # Writing scenario tests
-Writing a scenario test consists of two broad steps:
+A scenario test consists of three broad steps:
 
-- Arrange
-    - an event
-    - an input state
-- Act: run the state (obtain the output state)
-- Assert: verify that the output state is how you expect it to be
+- Arrange:
+  - declare the input state
+  - select an event to fire
+- Act: 
+  - run the state (i.e. obtain the output state)
+- Assert: 
+  - verify that the output state is how you expect it to be
+  - verify that the delta with the input state is what you expect it to be
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, and no leadership.
