@@ -54,3 +54,9 @@ jobs:
           asset_path: ./dist/scenario-${{ steps.get_version.outputs.VERSION }}-py3-none-any.whl
           asset_name: scenario-${{ steps.get_version.outputs.VERSION }}-py3-none-any.whl
           asset_content_type: application/wheel
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
