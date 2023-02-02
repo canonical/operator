@@ -16,8 +16,8 @@ jobs:
 
       - uses: actions/setup-python@v3
 
-      - name: Install wheel
-        run: pip install wheel
+      - name: Install build
+        run: pip install build
 
       - name: Build wheel
         run: python -m build
