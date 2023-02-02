@@ -5,8 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-# this needs to MATCH EXACTLY the tag name for the publish pipeline to activate.
-version = "2.0.1"
+version = "2.0.1-rc1"
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
 ]

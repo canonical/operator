@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     tags:
-      - '*' # Push events to matching v*, i.e. v1.0, v20.15.10
+      - '*' # any tag
 
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+        run: echo "VERSION=$(sed -n 's/^ *version.*=.*"\([^"]*\)".*/\1/p' pyproject.toml)" >> $GITHUB_OUTPUT
 
       - name: release
         uses: actions/create-release@v1
