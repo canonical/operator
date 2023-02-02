@@ -106,27 +106,27 @@ class Relation(_DCBase):
     @property
     def changed_event(self):
         """Sugar to generate a <this relation>-changed event."""
-        return Event(name=self.endpoint + "-changed", relation_meta=self)
+        return Event(name=self.endpoint + "-changed", relation=self)
 
     @property
     def joined_event(self):
         """Sugar to generate a <this relation>-joined event."""
-        return Event(name=self.endpoint + "-joined", relation_meta=self)
+        return Event(name=self.endpoint + "-joined", relation=self)
 
     @property
     def created_event(self):
         """Sugar to generate a <this relation>-created event."""
-        return Event(name=self.endpoint + "-created", relation_meta=self)
+        return Event(name=self.endpoint + "-created", relation=self)
 
     @property
     def departed_event(self):
         """Sugar to generate a <this relation>-departed event."""
-        return Event(name=self.endpoint + "-departed", relation_meta=self)
+        return Event(name=self.endpoint + "-departed", relation=self)
 
     @property
     def removed_event(self):
         """Sugar to generate a <this relation>-removed event."""
-        return Event(name=self.endpoint + "-removed", relation_meta=self)
+        return Event(name=self.endpoint + "-removed", relation=self)
 
 
 def _random_model_name():
