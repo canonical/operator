@@ -20,7 +20,7 @@ jobs:
         run: pip install wheel
 
       - name: Build wheel
-        run: pip wheel -w ./dist/ .
+        run: python -m build
 
       - uses: actions/upload-artifact@v3
         with:
