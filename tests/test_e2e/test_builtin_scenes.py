@@ -4,8 +4,8 @@ import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 
-from scenario.scenario import check_builtin_sequences
-from scenario.structs import CharmSpec
+from scenario.sequences import check_builtin_sequences
+from scenario.state import _CharmSpec
 
 CHARM_CALLED = 0
 
@@ -18,8 +18,8 @@ def mycharm():
     class MyCharm(CharmBase):
         _call = None
 
-        def __init__(self, framework: Framework, key: Optional[str] = None):
-            super().__init__(framework, key)
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
             self.called = False
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
@@ -36,6 +36,5 @@ def mycharm():
 
 
 def test_builtin_scenes(mycharm):
-    charm_spec = CharmSpec(mycharm, meta={"name": "foo"})
-    check_builtin_sequences(charm_spec)
+    check_builtin_sequences(mycharm, meta={"name": "foo"})
     assert CHARM_CALLED == 12

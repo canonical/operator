@@ -1,11 +1,8 @@
-from typing import Optional
-
 import pytest
 from ops.charm import ActionEvent, CharmBase, StartEvent
 from ops.framework import Framework
 
-from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, Scene, State, event
+from scenario.state import Event, State, _CharmSpec
 
 
 @pytest.fixture(scope="function")
@@ -13,8 +10,8 @@ def charm_evts():
     events = []
 
     class MyCharm(CharmBase):
-        def __init__(self, framework: Framework, key: Optional[str] = None):
-            super().__init__(framework, key)
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
@@ -28,11 +25,12 @@ def charm_evts():
 
 def test_start_event(charm_evts):
     charm, evts = charm_evts
-    scenario = Scenario(
-        CharmSpec(charm, meta={"name": "foo"}, actions={"show_proxied_endpoints": {}})
+    State().trigger(
+        event="start",
+        charm_type=charm,
+        meta={"name": "foo"},
+        actions={"show_proxied_endpoints": {}},
     )
-    scene = Scene(event("start"), state=State())
-    scenario.play(scene)
     assert len(evts) == 1
     assert isinstance(evts[0], StartEvent)
 
@@ -42,9 +40,9 @@ def test_action_event(charm_evts):
     charm, evts = charm_evts
 
     scenario = Scenario(
-        CharmSpec(charm, meta={"name": "foo"}, actions={"show_proxied_endpoints": {}})
+        _CharmSpec(charm, meta={"name": "foo"}, actions={"show_proxied_endpoints": {}})
     )
-    scene = Scene(event("show_proxied_endpoints_action"), state=State())
+    scene = Scene(Event("show_proxied_endpoints_action"), state=State())
     scenario.play(scene)
     assert len(evts) == 1
     assert isinstance(evts[0], ActionEvent)

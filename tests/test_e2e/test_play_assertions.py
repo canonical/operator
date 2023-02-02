@@ -1,12 +1,9 @@
-from typing import Optional
-
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
-from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, Scene, State, Status, event, relation
+from scenario.state import Event, Relation, State, Status, _CharmSpec
 
 
 @pytest.fixture(scope="function")
@@ -15,8 +12,8 @@ def mycharm():
         _call = None
         called = False
 
-        def __init__(self, framework: Framework, key: Optional[str] = None):
-            super().__init__(framework, key)
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
 
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
@@ -30,11 +27,8 @@ def mycharm():
 
 
 def test_charm_heals_on_start(mycharm):
-    scenario = Scenario(CharmSpec(mycharm, meta={"name": "foo"}))
-
     def pre_event(charm):
         pre_event._called = True
-        assert not charm.is_ready()
         assert charm.unit.status == BlockedStatus("foo")
         assert not charm.called
 
@@ -44,8 +38,6 @@ def test_charm_heals_on_start(mycharm):
 
     def post_event(charm):
         post_event._called = True
-
-        assert charm.is_ready()
         assert charm.unit.status == ActiveStatus("yabadoodle")
         assert charm.called
 
@@ -55,14 +47,18 @@ def test_charm_heals_on_start(mycharm):
         config={"foo": "bar"}, leader=True, status=Status(unit=("blocked", "foo"))
     )
 
-    out = scenario.play(
-        Scene(event("update-status"), state=initial_state),
+    out = initial_state.trigger(
+        charm_type=mycharm,
+        meta={"name": "foo"},
+        event="start",
+        post_event=post_event,
+        pre_event=pre_event,
     )
 
     assert out.status.unit == ("active", "yabadoodle")
 
     out.juju_log = []  # exclude juju log from delta
-    assert out.delta(initial_state) == [
+    assert out.jsonpatch_delta(initial_state) == [
         {
             "op": "replace",
             "path": "/status/unit",
@@ -73,15 +69,6 @@ def test_charm_heals_on_start(mycharm):
 
 def test_relation_data_access(mycharm):
     mycharm._call = lambda *_: True
-    scenario = Scenario(
-        CharmSpec(
-            mycharm,
-            meta={
-                "name": "foo",
-                "requires": {"relation_test": {"interface": "azdrubales"}},
-            },
-        )
-    )
 
     def check_relation_data(charm):
         foo_relations = charm.model.relations["relation_test"]
@@ -102,22 +89,23 @@ def test_relation_data_access(mycharm):
 
         assert remote_app_data == {"yaba": "doodle"}
 
-    scene = Scene(
-        state=State(
-            relations=[
-                relation(
-                    endpoint="relation_test",
-                    interface="azdrubales",
-                    remote_app_name="karlos",
-                    remote_app_data={"yaba": "doodle"},
-                    remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
-                )
-            ]
-        ),
-        event=event("update-status"),
-    )
-
-    scenario.play(
-        scene,
+    State(
+        relations=[
+            Relation(
+                endpoint="relation_test",
+                interface="azdrubales",
+                relation_id=1,
+                remote_app_name="karlos",
+                remote_app_data={"yaba": "doodle"},
+                remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
+            )
+        ]
+    ).trigger(
+        charm_type=mycharm,
+        meta={
+            "name": "foo",
+            "requires": {"relation_test": {"interface": "azdrubales"}},
+        },
+        event="update-status",
         post_event=check_relation_data,
     )

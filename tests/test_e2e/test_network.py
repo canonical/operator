@@ -1,11 +1,9 @@
-from typing import Optional
-
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 
-from scenario.scenario import Scenario
-from scenario.structs import CharmSpec, Scene, State, event, NetworkSpec, network, relation
+from scenario import trigger
+from scenario.state import Event, Network, Relation, State, _CharmSpec
 
 
 @pytest.fixture(scope="function")
@@ -14,8 +12,8 @@ def mycharm():
         _call = None
         called = False
 
-        def __init__(self, framework: Framework, key: Optional[str] = None):
-            super().__init__(framework, key)
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
 
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
@@ -30,37 +28,28 @@ def mycharm():
 
 def test_ip_get(mycharm):
     mycharm._call = lambda *_: True
-    scenario = Scenario(
-        CharmSpec(
-            mycharm,
-            meta={
-                "name": "foo",
-                "requires": {"metrics-endpoint": {"interface": "foo"}},
-            },
-        )
-    )
 
     def fetch_unit_address(charm: CharmBase):
-        rel = charm.model.get_relation('metrics-endpoint')
-        assert str(charm.model.get_binding(rel).network.bind_address) == '1.1.1.1'
+        rel = charm.model.get_relation("metrics-endpoint")
+        assert str(charm.model.get_binding(rel).network.bind_address) == "1.1.1.1"
 
-    scene = Scene(
-        state=State(
+    trigger(
+        State(
             relations=[
-                relation(endpoint='metrics-endpoint', interface='foo')
-            ],
-            networks=[
-                NetworkSpec(
-                    'metrics-endpoint',
-                    bind_id=0,
-                    network=network()
+                Relation(
+                    interface="foo",
+                    remote_app_name="remote",
+                    endpoint="metrics-endpoint",
+                    relation_id=1,
                 )
-            ]
+            ],
+            networks=[Network.default("metrics-endpoint", bind_id=0)],
         ),
-        event=event("update-status"),
-    )
-
-    scenario.play(
-        scene,
+        "update-status",
+        mycharm,
+        meta={
+            "name": "foo",
+            "requires": {"metrics-endpoint": {"interface": "foo"}},
+        },
         post_event=fetch_unit_address,
     )

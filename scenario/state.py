@@ -1,17 +1,27 @@
 import copy
 import dataclasses
 import inspect
-import tempfile
 import typing
-from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 from uuid import uuid4
 
 import yaml
 from ops import testing
 
 from scenario.logger import logger as scenario_logger
+from scenario.runtime import Runtime, trigger
 
 if typing.TYPE_CHECKING:
     try:
@@ -44,13 +54,14 @@ class _DCBase:
         return copy.deepcopy(self)
 
 
+_RELATION_IDS_CTR = 0
+
+
 @dataclasses.dataclass
-class RelationMeta(_DCBase):
+class Relation(_DCBase):
     endpoint: str
-    interface: str
-    relation_id: int
     remote_app_name: str
-    remote_unit_ids: List[int] = dataclasses.field(default_factory=lambda: list((0,)))
+    remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
 
     # local limit
     limit: int = 1
@@ -60,10 +71,12 @@ class RelationMeta(_DCBase):
     scale: int = 1
     leader_id: int = 0
 
+    # we can derive this from the charm's metadata
+    interface: str = None
 
-@dataclasses.dataclass
-class RelationSpec(_DCBase):
-    meta: "RelationMeta"
+    # Every new Relation instance gets a new one, if there's trouble, override.
+    relation_id: int = -1
+
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
@@ -71,40 +84,49 @@ class RelationSpec(_DCBase):
         default_factory=dict
     )
 
+    def __post_init__(self):
+        global _RELATION_IDS_CTR
+        if self.relation_id == -1:
+            _RELATION_IDS_CTR += 1
+            self.relation_id = _RELATION_IDS_CTR
+
+        if self.remote_unit_ids and self.remote_units_data:
+            if not set(self.remote_unit_ids) == set(self.remote_units_data):
+                raise ValueError(
+                    f"{self.remote_unit_ids} should include any and all IDs from {self.remote_units_data}"
+                )
+        elif self.remote_unit_ids:
+            self.remote_units_data = {x: {} for x in self.remote_unit_ids}
+        elif self.remote_units_data:
+            self.remote_unit_ids = [x for x in self.remote_units_data]
+        else:
+            self.remote_unit_ids = [0]
+            self.remote_units_data = {0: {}}
+
     @property
     def changed_event(self):
         """Sugar to generate a <this relation>-changed event."""
-        return Event(
-            name=self.meta.endpoint + "-changed", meta=EventMeta(relation=self.meta)
-        )
+        return Event(name=self.endpoint + "-changed", relation_meta=self)
 
     @property
     def joined_event(self):
         """Sugar to generate a <this relation>-joined event."""
-        return Event(
-            name=self.meta.endpoint + "-joined", meta=EventMeta(relation=self.meta)
-        )
+        return Event(name=self.endpoint + "-joined", relation_meta=self)
 
     @property
     def created_event(self):
         """Sugar to generate a <this relation>-created event."""
-        return Event(
-            name=self.meta.endpoint + "-created", meta=EventMeta(relation=self.meta)
-        )
+        return Event(name=self.endpoint + "-created", relation_meta=self)
 
     @property
     def departed_event(self):
         """Sugar to generate a <this relation>-departed event."""
-        return Event(
-            name=self.meta.endpoint + "-departed", meta=EventMeta(relation=self.meta)
-        )
+        return Event(name=self.endpoint + "-departed", relation_meta=self)
 
     @property
     def removed_event(self):
         """Sugar to generate a <this relation>-removed event."""
-        return Event(
-            name=self.meta.endpoint + "-removed", meta=EventMeta(relation=self.meta)
-        )
+        return Event(name=self.endpoint + "-removed", relation_meta=self)
 
 
 def _random_model_name():
@@ -152,7 +174,7 @@ _ExecMock = Dict[Tuple[str, ...], ExecOutput]
 
 
 @dataclasses.dataclass
-class ContainerSpec(_DCBase):
+class Container(_DCBase):
     name: str
     can_connect: bool = False
     layers: Tuple["LayerDict"] = ()
@@ -182,23 +204,6 @@ class ContainerSpec(_DCBase):
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
 
 
-def container(
-    name: str,
-    can_connect: bool = False,
-    layers: Tuple["LayerDict"] = (),
-    filesystem: _SimpleFS = None,
-    exec_mock: _ExecMock = None,
-) -> ContainerSpec:
-    """Helper function to instantiate a ContainerSpec."""
-    return ContainerSpec(
-        name=name,
-        can_connect=can_connect,
-        layers=layers,
-        filesystem=filesystem or {},
-        exec_mock=exec_mock or {},
-    )
-
-
 @dataclasses.dataclass
 class Address(_DCBase):
     hostname: str
@@ -225,10 +230,15 @@ class BindAddress(_DCBase):
 
 @dataclasses.dataclass
 class Network(_DCBase):
+    name: str
+    bind_id: int
+
     bind_addresses: List[BindAddress]
     bind_address: str
     egress_subnets: List[str]
     ingress_addresses: List[str]
+
+    is_default: bool = False
 
     def hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
@@ -239,13 +249,37 @@ class Network(_DCBase):
             "ingress-addresses": self.ingress_addresses,
         }
 
-
-@dataclasses.dataclass
-class NetworkSpec(_DCBase):
-    name: str
-    bind_id: int
-    network: Network
-    is_default: bool = False
+    @classmethod
+    def default(
+        cls,
+        name,
+        bind_id,
+        private_address: str = "1.1.1.1",
+        mac_address: str = "",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        egress_subnets=("1.1.1.2/32",),
+        ingress_addresses=("1.1.1.2",),
+    ) -> "Network":
+        """Helper to create a minimal, heavily defaulted Network."""
+        return cls(
+            name=name,
+            bind_id=bind_id,
+            bind_addresses=[
+                BindAddress(
+                    mac_address=mac_address,
+                    interface_name=interface_name,
+                    interfacename=interface_name,
+                    addresses=[
+                        Address(hostname=hostname, value=private_address, cidr=cidr)
+                    ],
+                )
+            ],
+            bind_address=private_address,
+            egress_subnets=list(egress_subnets),
+            ingress_addresses=list(ingress_addresses),
+        )
 
 
 @dataclasses.dataclass
@@ -258,20 +292,29 @@ class Status(_DCBase):
 @dataclasses.dataclass
 class State(_DCBase):
     config: Dict[str, Union[str, int, float, bool]] = None
-    relations: Sequence[RelationSpec] = dataclasses.field(default_factory=list)
-    networks: Sequence[NetworkSpec] = dataclasses.field(default_factory=list)
-    containers: Sequence[ContainerSpec] = dataclasses.field(default_factory=list)
+    relations: Sequence[Relation] = dataclasses.field(default_factory=list)
+    networks: Sequence[Network] = dataclasses.field(default_factory=list)
+    containers: Sequence[Container] = dataclasses.field(default_factory=list)
     status: Status = dataclasses.field(default_factory=Status)
     leader: bool = False
     model: Model = Model()
     juju_log: Sequence[Tuple[str, str]] = dataclasses.field(default_factory=list)
 
+    # meta stuff: actually belongs in event data structure.
+    juju_version: str = "3.0.0"
+    unit_id: str = "0"
+    app_name: str = "local"
+
     # todo: add pebble stuff, unit/app status, etc...
     #  actions?
     #  juju topology
 
+    @property
+    def unit_name(self):
+        return self.app_name + "/" + self.unit_id
+
     def with_can_connect(self, container_name: str, can_connect: bool):
-        def replacer(container: ContainerSpec):
+        def replacer(container: Container):
             if container.name == container_name:
                 return container.replace(can_connect=can_connect)
             return container
@@ -287,13 +330,14 @@ class State(_DCBase):
             status=dataclasses.replace(self.status, unit=(status, message))
         )
 
-    def get_container(self, name) -> ContainerSpec:
+    def get_container(self, name) -> Container:
         try:
             return next(filter(lambda c: c.name == name, self.containers))
         except StopIteration as e:
             raise ValueError(f"container: {name}") from e
 
-    def delta(self, other: "State"):
+    # FIXME: not a great way to obtain a delta, but is "complete" todo figure out a better way.
+    def jsonpatch_delta(self, other: "State"):
         try:
             import jsonpatch
         except ModuleNotFoundError:
@@ -308,9 +352,33 @@ class State(_DCBase):
         ).patch
         return sort_patch(patch)
 
+    def trigger(
+        self,
+        event: Union["Event", str],
+        charm_type: Type["CharmType"],
+        # callbacks
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+        # if not provided, will be autoloaded from charm_type.
+        meta: Optional[Dict[str, Any]] = None,
+        actions: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None,
+    ):
+        """Fluent API for trigger."""
+        return trigger(
+            state=self,
+            event=event,
+            charm_type=charm_type,
+            pre_event=pre_event,
+            post_event=post_event,
+            meta=meta,
+            actions=actions,
+            config=config,
+        )
+
 
 @dataclasses.dataclass
-class CharmSpec(_DCBase):
+class _CharmSpec(_DCBase):
     """Charm spec."""
 
     charm_type: Type["CharmType"]
@@ -319,7 +387,7 @@ class CharmSpec(_DCBase):
     config: Optional[Dict[str, Any]] = None
 
     @staticmethod
-    def from_charm(charm_type: Type["CharmType"]):
+    def autoload(charm_type: Type["CharmType"]):
         charm_source_path = Path(inspect.getfile(charm_type))
         charm_root = charm_source_path.parent.parent
 
@@ -336,7 +404,7 @@ class CharmSpec(_DCBase):
         if actions_path.exists():
             actions = yaml.safe_load(actions_path.open())
 
-        return CharmSpec(
+        return _CharmSpec(
             charm_type=charm_type, meta=meta, actions=actions, config=config
         )
 
@@ -346,44 +414,18 @@ def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
 
 
 @dataclasses.dataclass
-class EventMeta(_DCBase):
-    # if this is a relation event, the metadata of the relation
-    relation: Optional[RelationMeta] = None
-    # todo add other meta for
-    #  - secret events
-    #  - pebble?
-    #  - action?
-
-
-@dataclasses.dataclass
 class Event(_DCBase):
     name: str
     args: Tuple[Any] = ()
     kwargs: Dict[str, Any] = dataclasses.field(default_factory=dict)
-    meta: EventMeta = None
 
-    @property
-    def is_meta(self):
-        """Is this a meta event?"""
-        return self.name in META_EVENTS
+    # if this is a relation event, the metadata of the relation
+    relation: Optional[Relation] = None
 
-
-@dataclasses.dataclass
-class SceneMeta(_DCBase):
-    unit_id: str = "0"
-    app_name: str = "local"
-
-    @property
-    def unit_name(self):
-        return self.app_name + "/" + self.unit_id
-
-
-@dataclasses.dataclass
-class Scene(_DCBase):
-    event: Event
-    state: State = dataclasses.field(default_factory=State)
-    # data that doesn't belong to the event nor the state
-    meta: SceneMeta = SceneMeta()
+    # todo add other meta for
+    #  - secret events
+    #  - pebble?
+    #  - action?
 
 
 @dataclasses.dataclass
@@ -399,77 +441,6 @@ class Inject(_DCBase):
 class InjectRelation(Inject):
     relation_name: str
     relation_id: Optional[int] = None
-
-
-def relation(
-    endpoint: str,
-    interface: str,
-    remote_app_name: str = "remote",
-    relation_id: int = 0,
-    remote_unit_ids: List[
-        int
-    ] = None,  # defaults to (0,) if remote_units_data is not provided
-    # mapping from unit ID to databag contents
-    local_unit_data: Dict[str, str] = None,
-    local_app_data: Dict[str, str] = None,
-    remote_app_data: Dict[str, str] = None,
-    remote_units_data: Dict[int, Dict[str, str]] = None,
-):
-    """Helper function to construct a RelationMeta object with some sensible defaults."""
-    if remote_unit_ids and remote_units_data:
-        if not set(remote_unit_ids) == set(remote_units_data):
-            raise ValueError(
-                f"{remote_unit_ids} should include any and all IDs from {remote_units_data}"
-            )
-    elif remote_unit_ids:
-        remote_units_data = {x: {} for x in remote_unit_ids}
-    elif remote_units_data:
-        remote_unit_ids = [x for x in remote_units_data]
-    else:
-        remote_unit_ids = [0]
-        remote_units_data = {0: {}}
-
-    metadata = RelationMeta(
-        endpoint=endpoint,
-        interface=interface,
-        remote_app_name=remote_app_name,
-        remote_unit_ids=remote_unit_ids,
-        relation_id=relation_id,
-    )
-    return RelationSpec(
-        meta=metadata,
-        local_unit_data=local_unit_data or {},
-        local_app_data=local_app_data or {},
-        remote_app_data=remote_app_data or {},
-        remote_units_data=remote_units_data,
-    )
-
-
-def network(
-    private_address: str = "1.1.1.1",
-    mac_address: str = "",
-    hostname: str = "",
-    cidr: str = "",
-    interface_name: str = "",
-    egress_subnets=("1.1.1.2/32",),
-    ingress_addresses=("1.1.1.2",),
-) -> Network:
-    """Construct a network object."""
-    return Network(
-        bind_addresses=[
-            BindAddress(
-                mac_address=mac_address,
-                interface_name=interface_name,
-                interfacename=interface_name,
-                addresses=[
-                    Address(hostname=hostname, value=private_address, cidr=cidr)
-                ],
-            )
-        ],
-        bind_address=private_address,
-        egress_subnets=list(egress_subnets),
-        ingress_addresses=list(ingress_addresses),
-    )
 
 
 def _derive_args(event_name: str):
@@ -488,8 +459,3 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
-
-
-def event(name: str, append_args: Tuple[Any] = (), meta: EventMeta = None, **kwargs) -> Event:
-    """This routine will attempt to generate event args for you, based on the event name."""
-    return Event(name=name, args=_derive_args(name) + append_args, kwargs=kwargs, meta=meta)

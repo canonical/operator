@@ -6,120 +6,91 @@ import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 
-from scenario.scenario import Scenario
-from scenario.structs import (
-    CharmSpec,
-    ContainerSpec,
-    ExecOutput,
-    Scene,
-    State,
-    container,
-    event,
-)
+from scenario.state import Container, Event, ExecOutput, State, _CharmSpec
 
 
 @pytest.fixture(scope="function")
 def charm_cls():
     class MyCharm(CharmBase):
-        callback = None
-
-        def __init__(self, framework: Framework, key: Optional[str] = None):
-            super().__init__(framework, key)
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
         def _on_event(self, event):
-            self.callback(event)
+            pass
 
     return MyCharm
 
 
 def test_no_containers(charm_cls):
-    scenario = Scenario(CharmSpec(charm_cls, meta={"name": "foo"}))
-    scene = Scene(event("start"), state=State())
-
-    def callback(self: CharmBase, evt):
+    def callback(self: CharmBase):
         assert not self.unit.containers
 
-    charm_cls.callback = callback
-    scenario.play(scene)
+    State().trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo"},
+        event="start",
+        post_event=callback,
+    )
 
 
 def test_containers_from_meta(charm_cls):
-    scenario = Scenario(
-        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    )
-    scene = Scene(event("start"), state=State())
-
-    def callback(self: CharmBase, evt):
+    def callback(self: CharmBase):
         assert self.unit.containers
         assert self.unit.get_container("foo")
 
-    charm_cls.callback = callback
-    scenario.play(scene)
+    State().trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
+        post_event=callback,
+    )
 
 
 @pytest.mark.parametrize("can_connect", (True, False))
 def test_connectivity(charm_cls, can_connect):
-    scenario = Scenario(
-        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    )
-    scene = Scene(
-        event("start"),
-        state=State(containers=[container(name="foo", can_connect=can_connect)]),
-    )
-
-    def callback(self: CharmBase, evt):
+    def callback(self: CharmBase):
         assert can_connect == self.unit.get_container("foo").can_connect()
 
-    charm_cls.callback = callback
-    scenario.play(scene)
+    State(containers=[Container(name="foo", can_connect=can_connect)]).trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
+        post_event=callback,
+    )
 
 
 def test_fs_push(charm_cls):
-    scenario = Scenario(
-        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    )
-
     text = "lorem ipsum/n alles amat gloriae foo"
     file = tempfile.NamedTemporaryFile()
     pth = Path(file.name)
     pth.write_text(text)
 
-    scene = Scene(
-        event("start"),
-        state=State(
-            containers=[
-                ContainerSpec(
-                    name="foo", can_connect=True, filesystem={"bar": {"baz.txt": pth}}
-                )
-            ]
-        ),
-    )
-
-    def callback(self: CharmBase, evt):
+    def callback(self: CharmBase):
         container = self.unit.get_container("foo")
         baz = container.pull("/bar/baz.txt")
         assert baz.read() == text
 
-    charm_cls.callback = callback
-    scenario.play(scene)
+    State(
+        containers=[
+            Container(
+                name="foo", can_connect=True, filesystem={"bar": {"baz.txt": pth}}
+            )
+        ]
+    ).trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
+        post_event=callback,
+    )
 
 
 @pytest.mark.parametrize("make_dirs", (True, False))
 def test_fs_pull(charm_cls, make_dirs):
-    scenario = Scenario(
-        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    )
-
-    scene = Scene(
-        event("start"),
-        state=State(containers=[ContainerSpec(name="foo", can_connect=True)]),
-    )
-
     text = "lorem ipsum/n alles amat gloriae foo"
 
-    def callback(self: CharmBase, evt):
+    def callback(self: CharmBase):
         container = self.unit.get_container("foo")
         if make_dirs:
             container.push("/bar/baz.txt", text, make_dirs=make_dirs)
@@ -135,14 +106,22 @@ def test_fs_pull(charm_cls, make_dirs):
                 container.pull("/bar/baz.txt")
 
     charm_cls.callback = callback
-    out = scenario.play(scene)
+
+    state = State(containers=[Container(name="foo", can_connect=True)])
+
+    out = state.trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
+        post_event=callback,
+    )
 
     if make_dirs:
         file = out.get_container("foo").filesystem["bar"]["baz.txt"]
         assert file.read_text() == text
     else:
         # nothing has changed
-        assert not out.delta(scene.state)
+        assert not out.jsonpatch_delta(state)
 
 
 LS = """
@@ -174,28 +153,24 @@ PS = """
     ),
 )
 def test_exec(charm_cls, cmd, out):
-    scenario = Scenario(
-        CharmSpec(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    )
-
-    scene = Scene(
-        event("start"),
-        state=State(
-            containers=[
-                ContainerSpec(
-                    name="foo",
-                    can_connect=True,
-                    exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
-                )
-            ]
-        ),
-    )
-
-    def callback(self: CharmBase, evt):
+    def callback(self: CharmBase):
         container = self.unit.get_container("foo")
         proc = container.exec([cmd])
         proc.wait()
         assert proc.stdout.read() == "hello pebble"
 
     charm_cls.callback = callback
-    scenario.play(scene)
+    State(
+        containers=[
+            Container(
+                name="foo",
+                can_connect=True,
+                exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
+            )
+        ]
+    ).trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event="start",
+        post_event=callback,
+    )
