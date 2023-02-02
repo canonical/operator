@@ -32,11 +32,11 @@ def decompose_meta_event(meta_event: Event, state: State):
     if meta_event.name in [CREATE_ALL_RELATIONS, BREAK_ALL_RELATIONS]:
         for relation in state.relations:
             event = Event(
-                relation.meta.endpoint + META_EVENTS[meta_event.name],
+                relation.endpoint + META_EVENTS[meta_event.name],
                 args=(
                     # right now, the Relation object hasn't been created by ops yet, so we can't pass it down.
                     # this will be replaced by a Relation instance before the event is fired.
-                    InjectRelation(relation.meta.endpoint, relation.meta.relation_id),
+                    InjectRelation(relation.endpoint, relation.relation_id),
                 ),
             )
             logger.debug(f"decomposed meta {meta_event.name}: {event}")
