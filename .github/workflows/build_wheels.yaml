@@ -36,7 +36,7 @@ jobs:
         with:
           draft: false
           prerelease: false
-          tag_name: ${{ steps.get_version.outputs.VERSION }}  # the tag
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
           release_name: ${{ steps.get_version.outputs.VERSION }}
 
         env:
