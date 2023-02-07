@@ -124,8 +124,7 @@ class BaseTestCase(unittest.TestCase):
             SQLiteStorage(data_fpath),
             charm_dir,
             meta=None,
-            model=model,
-            event_name="foo_event")
+            model=model)
         self.addCleanup(framework.close)
         return framework
 

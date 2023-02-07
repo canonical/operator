@@ -572,7 +572,7 @@ class Framework(Object):
     def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
                  charm_dir: Union[str, pathlib.Path],
                  meta: 'CharmMeta', model: 'Model',
-                 event_name: str = None):
+                 event_name: Optional[str] = None):
         super().__init__(self, None)
 
         # an old, deprecated __init__ interface accepted an Optional charm_dir,
@@ -583,10 +583,10 @@ class Framework(Object):
         else:
             self.charm_dir = pathlib.Path(charm_dir)
 
-        if not isinstance(event_name, str):
-            raise TypeError(f'event_name should be of type str(), not {type(event_name)}')
+        if event_name:
+            event_name = event_name.replace('-', '_')
+        self._event_name = event_name
 
-        self._event_name = event_name.replace('-', '_')
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
@@ -858,15 +858,15 @@ class Framework(Object):
             yield  # context does nothing in this case
             return
 
-        previous_event_name = self._event_name
+        old_event_name = self._event_name
         self._event_name = event_name
 
-        old = backend._hook_is_running
+        old_hook_is_running = backend._hook_is_running
         backend._hook_is_running = event_name
         yield
-        backend._hook_is_running = old
+        backend._hook_is_running = old_hook_is_running
 
-        self._event_name = previous_event_name
+        self._event_name = old_event_name
 
     def _reemit(self, single_event_path: str = None):
         last_event_path = None
@@ -893,10 +893,10 @@ class Framework(Object):
             if observer:
                 if single_event_path is None:
                     logger.debug("Re-emitting deferred event %s.", event)
-                if issubclass(type(event), LifecycleEvent):
-                    # Ignore Framework events: they are "private" and not interesting.
+                elif isinstance(event, LifecycleEvent):
+                    # Ignore Lifecycle events: they are "private" and not interesting.
                     pass
-                elif self._event_name != event.handle.kind:
+                elif self._event_name and self._event_name != event.handle.kind:
                     # if the event we are emitting now is not the event being
                     # dispatched, and it also is not an event we have deferred,
                     # it must be a custom event

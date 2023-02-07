@@ -62,7 +62,7 @@ class TestFramework(BaseTestCase):
 
     def test_deprecated_init(self):
         # For 0.7, this still works, but it is deprecated.
-        framework = Framework(':memory:', None, None, None, "foo")
+        framework = Framework(':memory:', None, None, None)
         self.assertLoggedWarning(
             "deprecated: Framework now takes a Storage not a path")
         self.assertIsInstance(framework._storage, SQLiteStorage)
