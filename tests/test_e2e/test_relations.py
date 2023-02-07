@@ -63,3 +63,25 @@ def test_get_relation(mycharm):
             },
         },
     )
+
+
+@pytest.mark.parametrize(
+    "evt_name", ("changed", "broken", "departed", "joined", "created")
+)
+def test_relation_events(mycharm, evt_name):
+    relation = Relation(endpoint="foo", interface="foo", remote_app_name="remote")
+
+    mycharm._call = lambda self, evt: None
+
+    State(relations=[relation,],).trigger(
+        getattr(relation, f"{evt_name}_event"),
+        mycharm,
+        meta={
+            "name": "local",
+            "requires": {
+                "foo": {"interface": "foo"},
+            },
+        },
+    )
+
+    assert mycharm.called
