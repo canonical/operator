@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import sys
+import warnings
 from ast import literal_eval
 from importlib.machinery import ModuleSpec
 from importlib.util import module_from_spec
@@ -60,6 +61,8 @@ def use(name: str, api: int, author: str) -> ModuleType:
         TypeError: if the name, api, or author are the wrong type.
         ValueError: if the name, api, or author are invalid.
     """
+    warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
+                  category=DeprecationWarning)
     if not isinstance(name, str):
         raise TypeError(f"invalid library name: {name!r} (must be a str)")
     if not isinstance(author, str):
@@ -100,6 +103,8 @@ def autoimport():
     DEPRECATED: This function is deprecated. Prefer charm libraries instead
     (https://juju.is/docs/sdk/library).
     """
+    warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
+                  category=DeprecationWarning)
     global _libraries
     _libraries = {}
     for spec in _find_all_specs(sys.path):

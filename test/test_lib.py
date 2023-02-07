@@ -24,8 +24,12 @@ from unittest import TestCase
 from unittest.mock import patch
 
 import logassert
+import pytest
 
 import ops.lib
+
+# Ignore deprecation warnings for this module.
+pytestmark = pytest.mark.filterwarnings('ignore::DeprecationWarning')
 
 
 def _mklib(topdir: str, pkgname: str, libname: str) -> Path:
@@ -609,3 +613,14 @@ class TestLibFunctional(TestCase):
 
         with self.assertRaises(ImportError):
             ops.lib.use('baz', 2, 'bob@example.com')
+
+
+class TestDeprecationWarning(TestCase):
+    def test_autoimport_deprecated(self):
+        with self.assertWarns(DeprecationWarning):
+            ops.lib.autoimport()
+
+    def test_use_deprecated(self):
+        with self.assertWarns(DeprecationWarning):
+            with self.assertRaises(ImportError):
+                ops.lib.use('foo', 1, 'bob@example.com')
