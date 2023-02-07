@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Infrastructure for the opslib functionality."""
+"""Infrastructure for the opslib functionality.
+
+DEPRECATED: The ops.lib functionality is deprecated, and is superseded by
+charm libraries (https://juju.is/docs/sdk/library) and regular Python imports.
+We now prefer to do version selection at build (charmcraft pack) time.
+"""
 
 import logging
 import os
@@ -40,6 +45,9 @@ _libauthor_re = re.compile(r'''^[A-Za-z0-9_+.-]+@[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.
 
 def use(name: str, api: int, author: str) -> ModuleType:
     """Use a library from the ops libraries.
+
+    DEPRECATED: This function is deprecated. Prefer charm libraries instead
+    (https://juju.is/docs/sdk/library).
 
     Args:
         name: the name of the library requested.
@@ -88,6 +96,9 @@ def autoimport():
     You only need to call this if you've installed a package or
     otherwise changed sys.path in the current run, and need to see the
     changes. Otherwise libraries are found on first call of `use`.
+
+    DEPRECATED: This function is deprecated. Prefer charm libraries instead
+    (https://juju.is/docs/sdk/library).
     """
     global _libraries
     _libraries = {}
