@@ -18,10 +18,9 @@ from typing import (
 from uuid import uuid4
 
 import yaml
-from ops import testing
 
 from scenario.logger import logger as scenario_logger
-from scenario.runtime import Runtime, trigger
+from scenario.runtime import trigger
 
 if typing.TYPE_CHECKING:
     try:
@@ -52,6 +51,62 @@ class _DCBase:
 
     def copy(self) -> "Self":
         return copy.deepcopy(self)
+
+
+@dataclasses.dataclass
+class Secret(_DCBase):
+    id: str
+
+    # mapping from revision IDs to each revision's contents
+    contents: Dict[int, Dict[str, str]]
+
+    owned_by_this_unit: bool = False
+
+    # has this secret been granted to this unit/app or neither?
+    granted: Literal["unit", "app", False] = False
+
+    # what revision is currently tracked by this charm. Only meaningful if owned_by_this_unit=False
+    revision: int = 0
+
+    label: str = None
+
+    # consumer-only events
+    @property
+    def changed_event(self):
+        """Sugar to generate a secret-changed event."""
+        if self.owned_by_this_unit:
+            raise ValueError(
+                "This unit will never receive secret-changed for a secret it owns."
+            )
+        return Event(name="secret-changed", secret=self)
+
+    # owner-only events
+    @property
+    def rotate_event(self):
+        """Sugar to generate a secret-rotate event."""
+        if not self.owned_by_this_unit:
+            raise ValueError(
+                "This unit will never receive secret-rotate for a secret it does not own."
+            )
+        return Event(name="secret-rotate", secret=self)
+
+    @property
+    def expired_event(self):
+        """Sugar to generate a secret-expired event."""
+        if not self.owned_by_this_unit:
+            raise ValueError(
+                "This unit will never receive secret-expire for a secret it does not own."
+            )
+        return Event(name="secret-expire", secret=self)
+
+    @property
+    def remove_event(self):
+        """Sugar to generate a secret-remove event."""
+        if not self.owned_by_this_unit:
+            raise ValueError(
+                "This unit will never receive secret-removed for a secret it does not own."
+            )
+        return Event(name="secret-removed", secret=self)
 
 
 _RELATION_IDS_CTR = 0
@@ -203,6 +258,16 @@ class Container(_DCBase):
 
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
 
+    @property
+    def pebble_ready_event(self):
+        """Sugar to generate a <this container's name>-pebble-ready event."""
+        if not self.can_connect:
+            logger.warning(
+                "you **can** fire pebble-ready while the container cannot connect, "
+                "but that's most likely not what you want."
+            )
+        return Event(name=self.name + "-pebble-ready", container=self)
+
 
 @dataclasses.dataclass
 class Address(_DCBase):
@@ -299,15 +364,15 @@ class State(_DCBase):
     leader: bool = False
     model: Model = Model()
     juju_log: Sequence[Tuple[str, str]] = dataclasses.field(default_factory=list)
+    secrets: List[Secret] = dataclasses.field(default_factory=list)
 
     # meta stuff: actually belongs in event data structure.
     juju_version: str = "3.0.0"
     unit_id: str = "0"
     app_name: str = "local"
 
-    # todo: add pebble stuff, unit/app status, etc...
+    # todo:
     #  actions?
-    #  juju topology
 
     @property
     def unit_name(self):
@@ -419,8 +484,14 @@ class Event(_DCBase):
     args: Tuple[Any] = ()
     kwargs: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
-    # if this is a relation event, the metadata of the relation
+    # if this is a relation event, the relation it refers to
     relation: Optional[Relation] = None
+
+    # if this is a secret event, the secret it refers to
+    secret: Optional[Secret] = None
+
+    # if this is a workload (container) event, the container it refers to
+    container: Optional[Container] = None
 
     # todo add other meta for
     #  - secret events

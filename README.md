@@ -46,13 +46,13 @@ Comparing scenario tests with `Harness` tests:
 A scenario test consists of three broad steps:
 
 - Arrange:
-  - declare the input state
-  - select an event to fire
-- Act: 
-  - run the state (i.e. obtain the output state)
-- Assert: 
-  - verify that the output state is how you expect it to be
-  - verify that the delta with the input state is what you expect it to be
+    - declare the input state
+    - select an event to fire
+- Act:
+    - run the state (i.e. obtain the output state)
+- Assert:
+    - verify that the output state is how you expect it to be
+    - verify that the delta with the input state is what you expect it to be
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, and no leadership.
@@ -60,7 +60,7 @@ available. The charm has no config, no relations, no networks, and no leadership
 With that, we can write the simplest possible scenario test:
 
 ```python
-from scenario.state import _CharmSpec, event, State
+from scenario.state import State
 from ops.charm import CharmBase
 
 
@@ -69,8 +69,9 @@ class MyCharm(CharmBase):
 
 
 def test_scenario_base():
-    spec = _CharmSpec(MyCharm, meta={"name": "foo"})
-    out = State().trigger(event=event('start'), charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"}))
+    out = State().trigger(
+        'start', 
+        MyCharm, meta={"name": "foo"})
     assert out.status.unit == ('unknown', '')
 ```
 
@@ -79,7 +80,7 @@ Our charm sets a special state if it has leadership on 'start':
 
 ```python
 import pytest
-from scenario.state import _CharmSpec, event, State
+from scenario.state import State
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
@@ -97,8 +98,10 @@ class MyCharm(CharmBase):
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    spec = _CharmSpec(MyCharm, meta={"name": "foo"})
-    out = State(leader=leader).trigger(event=event('start'), charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"}))
+    out = State(leader=leader).trigger(
+        'start', 
+        MyCharm,
+        meta={"name": "foo"})
     assert out.status.unit == ('active', 'I rule' if leader else 'I am ruled')
 ```
 
@@ -111,7 +114,7 @@ You can write scenario tests to verify the shape of relation data:
 ```python
 from ops.charm import CharmBase
 
-from scenario.state import relation, State, event, _CharmSpec
+from scenario.state import Relation, State
 
 
 # This charm copies over remote app data to local unit data
@@ -127,7 +130,7 @@ class MyCharm(CharmBase):
 
 def test_relation_data():
     out = State(relations=[
-        relation(
+        Relation(
             endpoint="foo",
             interface="bar",
             remote_app_name="remote",
@@ -135,12 +138,12 @@ def test_relation_data():
             remote_app_data={"cde": "baz!"},
         ),
     ]
-    ).trigger(charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"}), event=event('start'))
+    ).trigger("start", MyCharm, meta={"name": "foo"})
 
     assert out.relations[0].local_unit_data == {"abc": "baz!"}
     # you can do this to check that there are no other differences:
     assert out.relations == [
-        relation(
+        Relation(
             endpoint="foo",
             interface="bar",
             remote_app_name="remote",
@@ -162,10 +165,10 @@ To give the charm access to some containers, you need to pass them to the input 
 
 An example of a scene including some containers:
 ```python
-from scenario.state import container, State
+from scenario.state import Container, State
 state = State(containers=[
-    container(name="foo", can_connect=True),
-    container(name="bar", can_connect=False)
+    Container(name="foo", can_connect=True),
+    Container(name="bar", can_connect=False)
 ])
 ```
 
@@ -176,12 +179,12 @@ You can also configure a container to have some files in it:
 ```python
 from pathlib import Path
 
-from scenario.state import container, State
+from scenario.state import Container, State
 
 local_file = Path('/path/to/local/real/file.txt')
 
 state = State(containers=[
-    container(name="foo",
+    Container(name="foo",
               can_connect=True,
               filesystem={'local': {'share': {'config.yaml': local_file}}})
 ]
@@ -201,7 +204,7 @@ then `content` would be the contents of our locally-supplied `file.txt`. You can
 
 ```python
 from ops.charm import CharmBase
-from scenario.state import event, State, container, _CharmSpec
+from scenario.state import State, Container
 
 
 class MyCharm(CharmBase):
@@ -211,14 +214,18 @@ class MyCharm(CharmBase):
 
 
 def test_pebble_push():
+    container = Container(name='foo')
     out = State(
-        containers=[container(name='foo')]
+        containers=[container]
     ).trigger(
-        event=event('start'),
-        charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"})
+        container.pebble_ready_event,
+        MyCharm,
+        meta={"name": "foo", "containers": {"foo": {}}},
     )
     assert out.get_container('foo').filesystem['local']['share']['config.yaml'].read_text() == "TEST"
 ```
+
+`container.pebble_ready_event` is syntactic sugar for: `Event("foo-pebble-ready", container=container)`. The reason we need to associate the container with the event ins that the Framework uses an envvar to determine which container the pebble-ready event is about (it does not use the event name). Scenario needs that information, similarly, for injecting that envvar into the charm's runtime.
 
 `container.exec` is a little bit more complicated.
 You need to specify, for each possible command the charm might run on the container, what the result of that would be: its return code, what will be written to stdout/stderr.
@@ -226,7 +233,7 @@ You need to specify, for each possible command the charm might run on the contai
 ```python
 from ops.charm import CharmBase
 
-from scenario.state import event, State, container, ExecOutput, _CharmSpec
+from scenario.state import State, Container, ExecOutput
 
 LS_LL = """
 .rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml    
@@ -245,18 +252,20 @@ class MyCharm(CharmBase):
 
 
 def test_pebble_exec():
+    container = Container(
+        name='foo',
+        exec_mock={
+            ('ls', '-ll'):  # this is the command we're mocking
+                ExecOutput(return_code=0,  # this data structure contains all we need to mock the call.
+                           stdout=LS_LL)
+        }
+    )
     out = State(
-        containers=[container(
-            name='foo',
-            exec_mock={
-                ('ls', '-ll'):  # this is the command we're mocking
-                    ExecOutput(return_code=0,  # this data structure contains all we need to mock the call.
-                               stdout=LS_LL)
-            }
-        )]
+        containers=[container]
     ).trigger(
-        event=event('start'),
-        charm_spec=_CharmSpec(MyCharm, meta={"name": "foo"})
+        container.pebble_ready_event,
+        MyCharm,
+        meta={"name": "foo", "containers": {"foo": {}}},
     )
 ```
 

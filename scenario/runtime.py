@@ -121,6 +121,18 @@ class Runtime:
                     "JUJU_RELATION_ID": str(relation.relation_id),
                 }
             )
+
+        if container := event.container:
+            env.update({"JUJU_WORKLOAD_NAME": container.name})
+
+        if secret := event.secret:
+            env.update(
+                {
+                    "JUJU_SECRET_ID": secret.id,
+                    "JUJU_SECRET_LABEL": secret.label or "",
+                }
+            )
+
         return env
 
     @staticmethod

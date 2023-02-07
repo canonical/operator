@@ -105,8 +105,6 @@ def test_fs_pull(charm_cls, make_dirs):
             with pytest.raises(FileNotFoundError):
                 container.pull("/bar/baz.txt")
 
-    charm_cls.callback = callback
-
     state = State(containers=[Container(name="foo", can_connect=True)])
 
     out = state.trigger(
@@ -159,7 +157,6 @@ def test_exec(charm_cls, cmd, out):
         proc.wait()
         assert proc.stdout.read() == "hello pebble"
 
-    charm_cls.callback = callback
     State(
         containers=[
             Container(
@@ -172,5 +169,20 @@ def test_exec(charm_cls, cmd, out):
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
+        post_event=callback,
+    )
+
+
+def test_pebble_ready(charm_cls):
+    def callback(self: CharmBase):
+        foo = self.unit.get_container("foo")
+        assert foo.can_connect()
+
+    container = Container(name="foo", can_connect=True)
+
+    State(containers=[container]).trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event=container.pebble_ready_event,
         post_event=callback,
     )

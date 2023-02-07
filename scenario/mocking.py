@@ -2,7 +2,7 @@ import tempfile
 import urllib.request
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
 from ops.model import _ModelBackend
 from ops.pebble import Client, ExecError
@@ -176,8 +176,38 @@ class _MockModelBackend(_ModelBackend):
     def storage_add(self, *args, **kwargs):
         raise NotImplementedError("storage_add")
 
-    def secret_get(self, *args, **kwargs):
-        raise NotImplementedError("secret_get")
+    def secret_get(
+        self,
+        *,
+        id: str = None,
+        label: str = None,
+        refresh: bool = False,
+        peek: bool = False,
+    ) -> Dict[str, str]:
+        # cleanup id:
+        if id and id.startswith("secret:"):
+            id = id[7:]
+
+        if id:
+            try:
+                secret = next(filter(lambda s: s.id == id, self._state.secrets))
+            except StopIteration:
+                raise RuntimeError(f"not found: secret with id={id}.")
+        elif label:
+            try:
+                secret = next(filter(lambda s: s.label == label, self._state.secrets))
+            except StopIteration:
+                raise RuntimeError(f"not found: secret with label={label}.")
+        else:
+            raise RuntimeError(f"need id or label.")
+
+        revision = secret.revision
+        if peek or refresh:
+            revision = max(secret.contents.keys())
+            if refresh:
+                secret.revision = revision
+
+        return secret.contents[revision]
 
     def secret_set(self, *args, **kwargs):
         raise NotImplementedError("secret_set")
