@@ -255,7 +255,7 @@ class EventBase:
            proceed.
 
         """
-        logger.debug(f"Deferring {self}.")
+        logger.debug("Deferring %s.", self)
         self.deferred = True
 
     def snapshot(self) -> '_SerializedData':
@@ -892,7 +892,7 @@ class Framework(Object):
 
             if observer:
                 if single_event_path is None:
-                    logger.debug(f"Re-emitting deferred event {event}.")
+                    logger.debug("Re-emitting deferred event %s.", event)
                 if issubclass(type(event), FrameworkEvent):
                     # Ignore Framework events: they are "private" and not interesting.
                     pass
@@ -900,7 +900,7 @@ class Framework(Object):
                     # if the event we are emitting now is not the event being
                     # dispatched, and it also is not an event we have deferred,
                     # it must be a custom event
-                    logger.debug(f"Emitting custom event {event}.")
+                    logger.debug("Emitting custom event %s.", event)
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
