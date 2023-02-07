@@ -2926,7 +2926,7 @@ class _ModelBackend:
         args = []  # type: List[str]
         if id is not None:
             args.append(id)
-        if label is not None:
+        elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
             args.extend(['--label', label])
         result = self._run_for_secret('secret-info-get', *args, return_output=True, use_json=True)
         info_dicts = typing.cast(Dict[str, 'JsonObject'], result)
