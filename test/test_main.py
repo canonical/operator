@@ -55,7 +55,7 @@ from ops.charm import (
     UpgradeCharmEvent,
     WorkloadEvent,
 )
-from ops.framework import Framework, FrameworkEvent, StoredStateData
+from ops.framework import Framework, LifecycleEvent, StoredStateData
 from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
 from ops.storage import SQLiteStorage
 from ops.version import version
@@ -811,7 +811,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         """Test auto-creation of symlinks caused by initial events."""
         all_event_hooks = [f"hooks/{name.replace('_', '-')}"
                            for name, event_source in self.charm_module.Charm.on.events().items()
-                           if issubclass(event_source.event_type, FrameworkEvent)]
+                           if issubclass(event_source.event_type, LifecycleEvent)]
 
         initial_events = {
             EventSpec(InstallEvent, 'install'),

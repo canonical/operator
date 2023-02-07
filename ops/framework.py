@@ -512,19 +512,19 @@ class PrefixedEvents:
         return getattr(self._emitter, self._prefix + name)
 
 
-class FrameworkEvent(EventBase):
-    """Events tied to the Framework's lifecycle."""
+class LifecycleEvent(EventBase):
+    """Events tied to the lifecycle of the Framework object."""
 
 
-class PreCommitEvent(FrameworkEvent):
+class PreCommitEvent(LifecycleEvent):
     """Events that will be emitted first on commit."""
 
 
-class CommitEvent(FrameworkEvent):
+class CommitEvent(LifecycleEvent):
     """Events that will be emitted second on commit."""
 
 
-class FrameworkEvents(ObjectEvents):
+class LifecycleEvents(ObjectEvents):
     """Manager of all framework events."""
     pre_commit = EventSource(PreCommitEvent)
     commit = EventSource(CommitEvent)
@@ -555,7 +555,7 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 class Framework(Object):
     """Main interface to from the Charm to the Operator Framework internals."""
 
-    on = FrameworkEvents()
+    on = LifecycleEvents()
 
     # Override properties from Object so that we can set them in __init__.
     model = None  # type: 'Model' # pyright: reportGeneralTypeIssues=false
@@ -567,7 +567,7 @@ class Framework(Object):
     if TYPE_CHECKING:
         _stored = None  # type: 'StoredStateData'
         @property
-        def on(self) -> 'FrameworkEvents': ...  # noqa
+        def on(self) -> 'LifecycleEvents': ...  # noqa
 
     def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
                  charm_dir: Union[str, pathlib.Path],
@@ -893,7 +893,7 @@ class Framework(Object):
             if observer:
                 if single_event_path is None:
                     logger.debug("Re-emitting deferred event %s.", event)
-                if issubclass(type(event), FrameworkEvent):
+                if issubclass(type(event), LifecycleEvent):
                     # Ignore Framework events: they are "private" and not interesting.
                     pass
                 elif self._event_name != event.handle.kind:
