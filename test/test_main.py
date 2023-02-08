@@ -55,11 +55,12 @@ from ops.charm import (
     UpgradeCharmEvent,
     WorkloadEvent,
 )
-from ops.framework import Framework, StoredStateData
+from ops.framework import Framework, LifecycleEvent, StoredStateData
 from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
 from ops.storage import SQLiteStorage
 from ops.version import version
 
+from .charms.test_main.src.charm import MyCharmEvents
 from .test_helpers import fake_script, fake_script_calls
 
 # This relies on the expected repository structure to find a path to
@@ -329,7 +330,7 @@ class _TestMain(abc.ABC):
         for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
             self._setup_entry_point(actions_dir, action_name)
 
-    def _read_and_clear_state(self):
+    def _read_and_clear_state(self, event_name: str):
         if self.CHARM_STATE_FILE.stat().st_size:
             storage = SQLiteStorage(self.CHARM_STATE_FILE)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -339,9 +340,9 @@ class _TestMain(abc.ABC):
                         meta = CharmMeta.from_yaml(m, a)
                 else:
                     meta = CharmMeta.from_yaml(m)
-            framework = Framework(storage, self.JUJU_CHARM_DIR, meta, None)
+            framework = Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)
 
-            class ThisCharmEvents(CharmEvents):
+            class ThisCharmEvents(MyCharmEvents):
                 pass
 
             class Charm(self.charm_module.Charm):
@@ -425,7 +426,7 @@ class _TestMain(abc.ABC):
             env['JUJU_MODEL_NAME'] = event_spec.model_name
 
         self._call_event(Path(event_dir, event_filename), env)
-        return self._read_and_clear_state()
+        return self._read_and_clear_state(event_spec.event_name)
 
     def test_event_reemitted(self):
         # First run "install" to make sure all hooks are set up.
@@ -652,6 +653,22 @@ class _TestMain(abc.ABC):
 
         self.assertEqual(calls, expected)
 
+    def test_custom_event(self):
+        self._simulate_event(EventSpec(InstallEvent, 'install'))
+        # Clear the calls during 'install'
+        fake_script_calls(self, clear=True)
+        self._simulate_event(EventSpec(UpdateStatusEvent, 'update-status',
+                                       set_in_env={'EMIT_CUSTOM_EVENT': "1"}))
+
+        expected = [
+            VERSION_LOGLINE,
+            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event update_status.'],
+            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting custom event '
+                                                       '<CustomEvent via Charm/on/custom[5]>.'],
+        ]
+        calls = fake_script_calls(self)
+        self.assertEqual(expected, calls)
+
     def test_logger(self):
         fake_script(self, 'action-get', "echo '{}'")
 
@@ -792,8 +809,10 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events."""
-        all_event_hooks = [f"hooks/{e.replace('_', '-')}"
-                           for e in self.charm_module.Charm.on.events().keys()]
+        all_event_hooks = [f"hooks/{name.replace('_', '-')}"
+                           for name, event_source in self.charm_module.Charm.on.events().items()
+                           if issubclass(event_source.event_type, LifecycleEvent)]
+
         initial_events = {
             EventSpec(InstallEvent, 'install'),
             EventSpec(StorageAttachedEvent, 'disks-storage-attached'),

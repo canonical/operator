@@ -512,11 +512,15 @@ class PrefixedEvents:
         return getattr(self._emitter, self._prefix + name)
 
 
-class PreCommitEvent(EventBase):
+class LifecycleEvent(EventBase):
+    """Events tied to the lifecycle of the Framework object."""
+
+
+class PreCommitEvent(LifecycleEvent):
     """Events that will be emitted first on commit."""
 
 
-class CommitEvent(EventBase):
+class CommitEvent(LifecycleEvent):
     """Events that will be emitted second on commit."""
 
 
@@ -567,7 +571,8 @@ class Framework(Object):
 
     def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
                  charm_dir: Union[str, pathlib.Path],
-                 meta: 'CharmMeta', model: 'Model'):
+                 meta: 'CharmMeta', model: 'Model',
+                 event_name: Optional[str] = None):
         super().__init__(self, None)
 
         # an old, deprecated __init__ interface accepted an Optional charm_dir,
@@ -577,6 +582,10 @@ class Framework(Object):
             self.charm_dir = None  # type: ignore
         else:
             self.charm_dir = pathlib.Path(charm_dir)
+
+        if event_name:
+            event_name = event_name.replace('-', '_')
+        self._event_name = event_name
 
         self.meta = meta
         self.model = model
@@ -845,15 +854,19 @@ class Framework(Object):
             >>>     print('harness thinks it is not running an event hook.')
         """
         backend = self.model._backend if self.model else None  # type: Optional[_ModelBackend]
-
         if not backend:
             yield  # context does nothing in this case
             return
 
-        old = backend._hook_is_running
+        old_event_name = self._event_name
+        self._event_name = event_name
+
+        old_hook_is_running = backend._hook_is_running
         backend._hook_is_running = event_name
         yield
-        backend._hook_is_running = old
+        backend._hook_is_running = old_hook_is_running
+
+        self._event_name = old_event_name
 
     def _reemit(self, single_event_path: str = None):
         last_event_path = None
@@ -876,9 +889,19 @@ class Framework(Object):
             event = typing.cast(EventBase, event)
             event.deferred = False
             observer = self._observer.get(observer_path)
+
             if observer:
                 if single_event_path is None:
-                    logger.debug("Re-emitting %s.", event)
+                    logger.debug("Re-emitting deferred event %s.", event)
+                elif isinstance(event, LifecycleEvent):
+                    # Ignore Lifecycle events: they are "private" and not interesting.
+                    pass
+                elif self._event_name and self._event_name != event.handle.kind:
+                    # if the event we are emitting now is not the event being
+                    # dispatched, and it also is not an event we have deferred,
+                    # it must be a custom event
+                    logger.debug("Emitting custom event %s.", event)
+
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
