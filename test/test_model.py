@@ -2841,7 +2841,18 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.get_content(), {'foo': 'g'})
 
         self.assertEqual(fake_script_calls(self, clear=True),
-                         [['secret-get', '123', '--format=json']])
+                         [['secret-get', 'secret:123', '--format=json']])
+
+    def test_get_secret_label(self):
+        fake_script(self, 'secret-get', """echo '{"foo": "g"}'""")
+
+        secret = self.model.get_secret(label='lbl')
+        self.assertIsNone(secret.id)
+        self.assertEqual(secret.label, 'lbl')
+        self.assertEqual(secret.get_content(), {'foo': 'g'})
+
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-get', '--label', 'lbl', '--format=json']])
 
     def test_get_secret_id_and_label(self):
         fake_script(self, 'secret-get', """echo '{"foo": "h"}'""")
@@ -2852,7 +2863,7 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.get_content(), {'foo': 'h'})
 
         self.assertEqual(fake_script_calls(self, clear=True),
-                         [['secret-get', '123', '--label', 'l', '--format=json']])
+                         [['secret-get', 'secret:123', '--label', 'l', '--format=json']])
 
     def test_get_secret_no_args(self):
         with self.assertRaises(TypeError):
