@@ -2,7 +2,7 @@ import copy
 import dataclasses
 import inspect
 import typing
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import (
     Any,
     Callable,
@@ -18,8 +18,10 @@ from typing import (
 from uuid import uuid4
 
 import yaml
+from ops import pebble
 
 from scenario.logger import logger as scenario_logger
+from scenario.mocking import _MockFileSystem, _MockStorageMount
 from scenario.runtime import trigger
 
 if typing.TYPE_CHECKING:
@@ -198,11 +200,6 @@ class Model(_DCBase):
     uuid: str = str(uuid4())
 
 
-_SimpleFS = Dict[
-    str,  # file/dirname
-    Union["_SimpleFS", Path],  # subdir  # local-filesystem path resolving to a file.
-]
-
 # for now, proc mock allows you to map one command to one mocked output.
 # todo extend: one input -> multiple outputs, at different times
 
@@ -229,10 +226,22 @@ _ExecMock = Dict[Tuple[str, ...], ExecOutput]
 
 
 @dataclasses.dataclass
+class Mount(_DCBase):
+    location: Union[str, PurePosixPath]
+    src: Union[str, Path]
+
+    def __post_init__(self):
+        self.src = Path(self.src)
+
+
+@dataclasses.dataclass
 class Container(_DCBase):
     name: str
     can_connect: bool = False
-    layers: Tuple["LayerDict"] = ()
+    layers: Dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
+    service_status: Dict[str, pebble.ServiceStatus] = dataclasses.field(
+        default_factory=dict
+    )
 
     # this is how you specify the contents of the filesystem: suppose you want to express that your
     # container has:
@@ -241,22 +250,24 @@ class Container(_DCBase):
     # - /bin/baz
     #
     # this becomes:
-    # filesystem = {
-    #     'home': {
-    #         'foo': Path('/path/to/local/file/containing/bar.py')
-    #     },
-    #     'bin': {
-    #         'bash': Path('/path/to/local/bash'),
-    #         'baz': Path('/path/to/local/baz')
-    #     }
+    # mounts = {
+    #     'foo': Mount('/home/foo/', Path('/path/to/local/dir/containing/bar/py/'))
+    #     'bin': Mount('/bin/', Path('/path/to/local/dir/containing/bash/and/baz/'))
     # }
     # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
     # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
     # create a tempfile and insert its path in the mock filesystem tree
-    # charm-created tempfiles will NOT be automatically deleted -- you have to clean them up yourself!
-    filesystem: _SimpleFS = dataclasses.field(default_factory=dict)
+    mounts: Dict[str, Mount] = dataclasses.field(default_factory=dict)
 
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
+
+    @property
+    def filesystem(self) -> _MockFileSystem:
+        mounts = {
+            name: _MockStorageMount(src=spec.src, location=spec.location)
+            for name, spec in self.mounts.items()
+        }
+        return _MockFileSystem(mounts=mounts)
 
     @property
     def pebble_ready_event(self):
@@ -530,3 +541,8 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
+
+
+# todo: consider
+#  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:
+#     pass

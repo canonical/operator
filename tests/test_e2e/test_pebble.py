@@ -1,12 +1,13 @@
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 import pytest
+from ops import pebble
 from ops.charm import CharmBase
 from ops.framework import Framework
+from ops.pebble import ServiceStartup, ServiceStatus
 
-from scenario.state import Container, Event, ExecOutput, State, _CharmSpec
+from scenario.state import Container, ExecOutput, Mount, State
 
 
 @pytest.fixture(scope="function")
@@ -75,7 +76,7 @@ def test_fs_push(charm_cls):
     State(
         containers=[
             Container(
-                name="foo", can_connect=True, filesystem={"bar": {"baz.txt": pth}}
+                name="foo", can_connect=True, mounts={"bar": Mount("/bar/baz.txt", pth)}
             )
         ]
     ).trigger(
@@ -93,19 +94,26 @@ def test_fs_pull(charm_cls, make_dirs):
     def callback(self: CharmBase):
         container = self.unit.get_container("foo")
         if make_dirs:
-            container.push("/bar/baz.txt", text, make_dirs=make_dirs)
+            container.push("/foo/bar/baz.txt", text, make_dirs=make_dirs)
             # check that pulling immediately 'works'
-            baz = container.pull("/bar/baz.txt")
+            baz = container.pull("/foo/bar/baz.txt")
             assert baz.read() == text
         else:
-            with pytest.raises(FileNotFoundError):
-                container.push("/bar/baz.txt", text, make_dirs=make_dirs)
+            with pytest.raises(pebble.PathError):
+                container.push("/foo/bar/baz.txt", text, make_dirs=make_dirs)
 
             # check that nothing was changed
             with pytest.raises(FileNotFoundError):
-                container.pull("/bar/baz.txt")
+                container.pull("/foo/bar/baz.txt")
 
-    state = State(containers=[Container(name="foo", can_connect=True)])
+    td = tempfile.TemporaryDirectory()
+    state = State(
+        containers=[
+            Container(
+                name="foo", can_connect=True, mounts={"foo": Mount("/foo", td.name)}
+            )
+        ]
+    )
 
     out = state.trigger(
         charm_type=charm_cls,
@@ -115,8 +123,8 @@ def test_fs_pull(charm_cls, make_dirs):
     )
 
     if make_dirs:
-        file = out.get_container("foo").filesystem["bar"]["baz.txt"]
-        assert file.read_text() == text
+        file = out.get_container("foo").filesystem.open("/foo/bar/baz.txt")
+        assert file.read() == text
     else:
         # nothing has changed
         assert not out.jsonpatch_delta(state)
@@ -179,6 +187,60 @@ def test_pebble_ready(charm_cls):
         assert foo.can_connect()
 
     container = Container(name="foo", can_connect=True)
+
+    State(containers=[container]).trigger(
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event=container.pebble_ready_event,
+        post_event=callback,
+    )
+
+
+def test_pebble_plan(charm_cls):
+    def callback(self: CharmBase):
+        foo = self.unit.get_container("foo")
+
+        assert foo.get_plan().to_dict() == {
+            "services": {"fooserv": {"startup": "enabled"}}
+        }
+        fooserv = foo.get_services("fooserv")["fooserv"]
+        assert fooserv.startup == ServiceStartup.ENABLED
+        assert fooserv.current == ServiceStatus.INACTIVE
+
+        foo.add_layer(
+            "bar",
+            {
+                "summary": "bla",
+                "description": "deadbeef",
+                "services": {"barserv": {"startup": "disabled"}},
+            },
+        )
+
+        foo.replan()
+        assert foo.get_plan().to_dict() == {
+            "services": {
+                "barserv": {"startup": "disabled"},
+                "fooserv": {"startup": "enabled"},
+            }
+        }
+
+        assert foo.get_service("barserv").current == ServiceStatus.INACTIVE
+        foo.start("barserv")
+        assert foo.get_service("barserv").current == ServiceStatus.ACTIVE
+
+    container = Container(
+        name="foo",
+        can_connect=True,
+        layers={
+            "foo": pebble.Layer(
+                {
+                    "summary": "bla",
+                    "description": "deadbeef",
+                    "services": {"fooserv": {"startup": "enabled"}},
+                }
+            )
+        },
+    )
 
     State(containers=[container]).trigger(
         charm_type=charm_cls,

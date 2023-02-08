@@ -1,15 +1,17 @@
-import tempfile
+import pathlib
 import urllib.request
 from io import StringIO
-from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
+from ops import pebble
 from ops.model import _ModelBackend
 from ops.pebble import Client, ExecError
+from ops.testing import _TestingFilesystem, _TestingPebbleClient, _TestingStorageMount
 
 from scenario.logger import logger as scenario_logger
 
 if TYPE_CHECKING:
+    from scenario.state import Container as ContainerSpec
     from scenario.state import Event, ExecOutput, State, _CharmSpec
 
 logger = scenario_logger.getChild("mocking")
@@ -219,7 +221,36 @@ class _MockModelBackend(_ModelBackend):
         raise NotImplementedError("secret_remove")
 
 
-class _MockPebbleClient(Client):
+class _MockStorageMount(_TestingStorageMount):
+    def __init__(self, location: pathlib.PurePosixPath, src: pathlib.Path):
+        """Creates a new simulated storage mount.
+
+        Args:
+            location: The path within simulated filesystem at which this storage will be mounted.
+            src: The temporary on-disk location where the simulated storage will live.
+        """
+        self._src = src
+        self._location = location
+        if (
+            not src.exists()
+        ):  # we need to add this guard because the directory might exist already.
+            src.mkdir(exist_ok=True, parents=True)
+
+
+# todo consider duplicating the filesystem on State.copy() to be able to diff and have true state snapshots
+class _MockFileSystem(_TestingFilesystem):
+    def __init__(self, mounts: Dict[str, _MockStorageMount]):
+        super().__init__()
+        self._mounts = mounts
+
+    def add_mount(self, *args, **kwargs):
+        raise NotImplementedError("Cannot mutate mounts; declare them all in State.")
+
+    def remove_mount(self, *args, **kwargs):
+        raise NotImplementedError("Cannot mutate mounts; declare them all in State.")
+
+
+class _MockPebbleClient(_TestingPebbleClient):
     def __init__(
         self,
         socket_path: str,
@@ -231,13 +262,13 @@ class _MockPebbleClient(Client):
         event: "Event",
         charm_spec: "_CharmSpec",
     ):
-        super().__init__(socket_path, opener, base_url, timeout)
         self._state = state
+        self.socket_path = socket_path
         self._event = event
         self._charm_spec = charm_spec
 
     @property
-    def _container(self):
+    def _container(self) -> "ContainerSpec":
         container_name = self.socket_path.split("/")[-2]
         try:
             return next(
@@ -250,32 +281,17 @@ class _MockPebbleClient(Client):
                 f"{self.socket_path!r} wrong?"
             )
 
-    def _request(self, *args, **kwargs):
-        if args == ("GET", "/v1/system-info"):
-            if self._container.can_connect:
-                return {"result": {"version": "unknown"}}
-            else:
-                wrap_errors = False  # this is what Client expects!
-                raise FileNotFoundError("")
+    @property
+    def _fs(self):
+        return self._container.filesystem
 
-        elif args[:2] == ("GET", "/v1/services"):
-            service_names = list(args[2]["names"].split(","))
-            result = []
+    @property
+    def _layers(self) -> Dict[str, pebble.Layer]:
+        return self._container.layers
 
-            for layer in self._container.layers:
-                if not service_names:
-                    break
-
-                for name in service_names:
-                    if name in layer["services"]:
-                        service_names.remove(name)
-                        result.append(layer["services"][name])
-
-            # todo: what do we do if we don't find the requested service(s)?
-            return {"result": result}
-
-        else:
-            raise NotImplementedError(f"_request: {args}")
+    @property
+    def _service_status(self) -> Dict[str, pebble.ServiceStatus]:
+        return self._container.service_status
 
     def exec(self, *args, **kwargs):
         cmd = tuple(args[0])
@@ -286,45 +302,10 @@ class _MockPebbleClient(Client):
         change_id = out._run()
         return _MockExecProcess(change_id=change_id, command=cmd, out=out)
 
-    def pull(self, *args, **kwargs):
-        # todo double-check how to surface error
-        wrap_errors = False
-
-        path_txt = args[0]
-        pos = self._container.filesystem
-        for token in path_txt.split("/")[1:]:
-            pos = pos.get(token)
-            if not pos:
-                raise FileNotFoundError(path_txt)
-        local_path = Path(pos)
-        if not local_path.exists() or not local_path.is_file():
-            raise FileNotFoundError(local_path)
-        return local_path.open()
-
-    def push(self, *args, **kwargs):
-        setter = True
-        # todo double-check how to surface error
-        wrap_errors = False
-
-        path_txt, contents = args
-
-        pos = self._container.filesystem
-        tokens = path_txt.split("/")[1:]
-        for token in tokens[:-1]:
-            nxt = pos.get(token)
-            if not nxt and kwargs["make_dirs"]:
-                pos[token] = {}
-                pos = pos[token]
-            elif not nxt:
-                raise FileNotFoundError(path_txt)
-            else:
-                pos = pos[token]
-
-        # dump contents
-        # fixme: memory leak here if tmp isn't regularly cleaned up
-        file = tempfile.NamedTemporaryFile(delete=False)
-        pth = Path(file.name)
-        pth.write_text(contents)
-
-        pos[tokens[-1]] = pth
-        return
+    def _check_connection(self):
+        if not self._container.can_connect:  # pyright: reportPrivateUsage=false
+            msg = (
+                f"Cannot connect to Pebble; did you forget to set "
+                f"can_connect=True for container {self._container.name}?"
+            )
+            raise pebble.ConnectionError(msg)
