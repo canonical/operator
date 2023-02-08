@@ -2993,14 +2993,34 @@ class TestSecretClass(unittest.TestCase):
     def test_get_info(self):
         fake_script(self, 'secret-info-get', """echo '{"x": {"label": "y", "revision": 7}}'""")
 
+        # Secret with ID only
+        secret = self.make_secret(id='x')
+        info = secret.get_info()
+        self.assertEqual(info.id, 'secret:x')
+        self.assertEqual(info.label, 'y')
+        self.assertEqual(info.revision, 7)
+
+        # Secret with label only
+        secret = self.make_secret(label='y')
+        info = secret.get_info()
+        self.assertEqual(info.id, 'secret:x')
+        self.assertEqual(info.label, 'y')
+        self.assertEqual(info.revision, 7)
+
+        # Secret with ID and label
         secret = self.make_secret(id='x', label='y')
         info = secret.get_info()
         self.assertEqual(info.id, 'secret:x')
         self.assertEqual(info.label, 'y')
         self.assertEqual(info.revision, 7)
 
-        self.assertEqual(fake_script_calls(self, clear=True),
-                         [['secret-info-get', 'secret:x', '--label', 'y', '--format=json']])
+        self.assertEqual(
+            fake_script_calls(self, clear=True),
+            [
+                ['secret-info-get', 'secret:x', '--format=json'],
+                ['secret-info-get', '--label', 'y', '--format=json'],
+                ['secret-info-get', 'secret:x', '--format=json'],
+            ])
 
     def test_set_content(self):
         fake_script(self, 'secret-set', """exit 0""")

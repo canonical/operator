@@ -553,7 +553,7 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 
 
 class Framework(Object):
-    """Main interface to from the Charm to the Operator Framework internals."""
+    """Main interface from the Charm to the Operator Framework internals."""
 
     on = FrameworkEvents()
 

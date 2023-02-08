@@ -1116,7 +1116,7 @@ class Harness(Generic[CharmType]):
             self._charm.on.leader_elected.emit()
 
     def set_planned_units(self, num_units: int) -> None:
-        """Set the number of "planned" units  that "Application.planned_units" should return.
+        """Set the number of "planned" units that "Application.planned_units" should return.
 
         In real world circumstances, this number will be the number of units in the
         application. E.g., this number will be the number of peers this unit has, plus one, as we
