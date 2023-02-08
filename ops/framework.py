@@ -524,7 +524,7 @@ class CommitEvent(LifecycleEvent):
     """Events that will be emitted second on commit."""
 
 
-class LifecycleEvents(ObjectEvents):
+class FrameworkEvents(ObjectEvents):
     """Manager of all framework events."""
     pre_commit = EventSource(PreCommitEvent)
     commit = EventSource(CommitEvent)
@@ -555,7 +555,7 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 class Framework(Object):
     """Main interface to from the Charm to the Operator Framework internals."""
 
-    on = LifecycleEvents()
+    on = FrameworkEvents()
 
     # Override properties from Object so that we can set them in __init__.
     model = None  # type: 'Model' # pyright: reportGeneralTypeIssues=false
@@ -567,7 +567,7 @@ class Framework(Object):
     if TYPE_CHECKING:
         _stored = None  # type: 'StoredStateData'
         @property
-        def on(self) -> 'LifecycleEvents': ...  # noqa
+        def on(self) -> 'FrameworkEvents': ...  # noqa
 
     def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
                  charm_dir: Union[str, pathlib.Path],
@@ -968,9 +968,8 @@ class Framework(Object):
             pdb.Pdb().set_trace(code_frame)
         else:
             logger.warning(
-                f"Breakpoint {name!r} skipped (not found in the requested "
-                f"breakpoints: {indicated_breakpoints})"
-            )
+                "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
+                name, indicated_breakpoints)
 
     def remove_unreferenced_events(self):
         """Remove events from storage that are not referenced.
