@@ -174,19 +174,19 @@ state = State(containers=[
 
 In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it would give `False`.
 
-You can also configure a container to have some files in it:
+You can configure a container to have some files in it:
 
 ```python
 from pathlib import Path
 
-from scenario.state import Container, State
+from scenario.state import Container, State, Mount
 
 local_file = Path('/path/to/local/real/file.txt')
 
 state = State(containers=[
     Container(name="foo",
               can_connect=True,
-              filesystem={'local': {'share': {'config.yaml': local_file}}})
+              mounts={'local': Mount('/local/share/config.yaml', local_file)})
 ]
 )
 ```
@@ -203,8 +203,9 @@ then `content` would be the contents of our locally-supplied `file.txt`. You can
 `container.push` works similarly, so you can write a test like:
 
 ```python
+import tempfile
 from ops.charm import CharmBase
-from scenario.state import State, Container
+from scenario.state import State, Container, Mount
 
 
 class MyCharm(CharmBase):
@@ -214,7 +215,9 @@ class MyCharm(CharmBase):
 
 
 def test_pebble_push():
-    container = Container(name='foo')
+    local_file = tempfile.TemporaryFile()
+    container = Container(name='foo',
+                          mounts={'local': Mount('/local/share/config.yaml', local_file.name)})
     out = State(
         containers=[container]
     ).trigger(
@@ -222,12 +225,12 @@ def test_pebble_push():
         MyCharm,
         meta={"name": "foo", "containers": {"foo": {}}},
     )
-    assert out.get_container('foo').filesystem['local']['share']['config.yaml'].read_text() == "TEST"
+    assert local_file.open().read() == "TEST"
 ```
 
-`container.pebble_ready_event` is syntactic sugar for: `Event("foo-pebble-ready", container=container)`. The reason we need to associate the container with the event ins that the Framework uses an envvar to determine which container the pebble-ready event is about (it does not use the event name). Scenario needs that information, similarly, for injecting that envvar into the charm's runtime.
+`container.pebble_ready_event` is syntactic sugar for: `Event("foo-pebble-ready", container=container)`. The reason we need to associate the container with the event is that the Framework uses an envvar to determine which container the pebble-ready event is about (it does not use the event name). Scenario needs that information, similarly, for injecting that envvar into the charm's runtime.
 
-`container.exec` is a little bit more complicated.
+`container.exec` is a tad more complicated, but if you get to this low a level of simulation, you probably will have far worse issues to deal with.
 You need to specify, for each possible command the charm might run on the container, what the result of that would be: its return code, what will be written to stdout/stderr.
 
 ```python
@@ -271,5 +274,7 @@ def test_pebble_exec():
 
 
 # TODOS:
-- Figure out how to distribute this. I'm thinking `pip install ops[scenario]`
-- Better syntax for memo generation
+- State-State consistency checks.
+- State-Metadata consistency checks.
+- When ops supports namespace packages, allow `pip install ops[scenario]` and nest the whole package under `/ops`.
+- Recorder
