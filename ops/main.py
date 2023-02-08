@@ -417,7 +417,8 @@ def main(charm_class: Type[ops.charm.CharmBase],
         store = ops.storage.JujuStorage()
     else:
         store = ops.storage.SQLiteStorage(charm_state_path)
-    framework = ops.framework.Framework(store, charm_dir, meta, model)
+    framework = ops.framework.Framework(store, charm_dir, meta, model,
+                                        event_name=dispatcher.event_name)
     framework.set_breakpointhook()
     try:
         charm = charm_class(framework)
