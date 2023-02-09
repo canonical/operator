@@ -440,7 +440,7 @@ class State(_DCBase):
         meta: Optional[Dict[str, Any]] = None,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
-        on_no_event_handler: OnNoEventHandler = 'raise'
+        on_no_event_handler: OnNoEventHandler = "raise",
     ):
         """Fluent API for trigger."""
         return trigger(
@@ -452,7 +452,7 @@ class State(_DCBase):
             meta=meta,
             actions=actions,
             config=config,
-            on_no_event_handler=on_no_event_handler
+            on_no_event_handler=on_no_event_handler,
         )
 
 

@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, 
 
 import yaml
 
-from scenario.ops_main_mock import OnNoEventHandler
 from scenario.logger import logger as scenario_logger
+from scenario.ops_main_mock import OnNoEventHandler
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
@@ -173,7 +173,7 @@ class Runtime:
         event: "Event",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-        on_no_event_handler: OnNoEventHandler = 'raise'
+        on_no_event_handler: OnNoEventHandler = "raise",
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
@@ -215,7 +215,7 @@ class Runtime:
                     charm_spec=self._charm_spec.replace(
                         charm_type=self._wrap(charm_type)
                     ),
-                    on_no_event_handler=on_no_event_handler
+                    on_no_event_handler=on_no_event_handler,
                 )
             except Exception as e:
                 raise RuntimeError(
@@ -241,7 +241,7 @@ def trigger(
     meta: Optional[Dict[str, Any]] = None,
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
-    on_no_event_handler: OnNoEventHandler = 'raise'
+    on_no_event_handler: OnNoEventHandler = "raise",
 ) -> "State":
 
     from scenario.state import Event, _CharmSpec
@@ -266,5 +266,5 @@ def trigger(
         event=event,
         pre_event=pre_event,
         post_event=post_event,
-        on_no_event_handler=on_no_event_handler
+        on_no_event_handler=on_no_event_handler,
     )

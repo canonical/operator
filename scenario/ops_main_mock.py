@@ -96,8 +96,10 @@ def main(
                     f"to suppress this warning if you know what you're doing."
                 )
             elif on_no_event_handler != "pass":
-                raise ValueError(f"Bad on_no_event_handler value: {on_no_event_handler!r} "
-                                 f"(expected one of ['raise', 'warn', 'pass'])")
+                raise ValueError(
+                    f"Bad on_no_event_handler value: {on_no_event_handler!r} "
+                    f"(expected one of ['raise', 'warn', 'pass'])"
+                )
 
         _emit_charm_event(charm, dispatcher.event_name)
 
