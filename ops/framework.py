@@ -65,7 +65,7 @@ if TYPE_CHECKING:
         def restore(self, snapshot: Dict[str, '_StorableType']) -> None: ...  # noqa
 
     class _StoredObject(Protocol):
-        _under = None  # type: Any  # noqa
+        _under: Any = None  # noqa
 
     # serialized data structure
     _SerializedData = Dict[str, 'JsonObject']
@@ -118,7 +118,7 @@ class Handle:
         if isinstance(parent, Object):
             # if it's not an Object, it will be either a Handle (good) or None (no parent)
             parent = parent.handle
-        self._parent = parent  # type: Optional[Handle]
+        self._parent: Optional[Handle] = parent
         self._kind = kind
         self._key = key
         if parent:
@@ -196,11 +196,11 @@ class EventBase:
     # after being loaded from snapshot, or by `BoundEvent.emit()` if this
     # event is being fired for the first time.
     # TODO this is hard to debug, this should be refactored
-    framework = None  # type: Framework
+    framework: 'Framework' = None
 
     def __init__(self, handle: Handle):
         self.handle = handle
-        self.deferred = False  # type: bool
+        self.deferred: bool = False
 
     def __repr__(self):
         return f"<{self.__class__.__name__} via {self.handle}>"
@@ -292,9 +292,9 @@ class EventSource(Generic[_EventType]):
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
             raise RuntimeError(
                 f'Event requires a subclass of EventBase as an argument, got {event_type}')
-        self.event_type = event_type  # type: Type[_EventType]
-        self.event_kind = None  # type: Optional[str]  # noqa
-        self.emitter_type = None  # type: Optional[Type[Object]]  # noqa
+        self.event_type: Type[_EventType] = event_type
+        self.event_kind: Optional[str] = None  # noqa
+        self.emitter_type: Optional[Type[Object]] = None  # noqa
 
     def __set_name__(self, emitter_type: 'Type[Object]', event_kind: str):
         if self.event_kind is not None:
@@ -387,7 +387,7 @@ class Object:
     been created.
 
     """
-    handle_kind = HandleKind()  # type: str
+    handle_kind: str = HandleKind()
 
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
@@ -396,8 +396,8 @@ class Object:
         def on(self) -> 'ObjectEvents': ...  # noqa
 
     def __init__(self, parent: Union['Framework', 'Object'], key: Optional[str]):
-        self.framework = None  # type: Framework # noqa
-        self.handle = None  # type: Handle # noqa
+        self.framework: Framework = None  # noqa
+        self.handle: Handle = None  # noqa
 
         kind = self.handle_kind
         if isinstance(parent, Framework):
@@ -427,7 +427,7 @@ class ObjectEvents(Object):
     def __init__(self, parent: Optional[Object] = None, key: Optional[str] = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache = weakref.WeakKeyDictionary()  # type: weakref.WeakKeyDictionary[Object, 'ObjectEvents']  # noqa
+        self._cache: weakref.WeakKeyDictionary[Object, 'ObjectEvents'] = weakref.WeakKeyDictionary()  # noqa
 
     def __get__(self, emitter: Object, emitter_type: 'Type[Object]'):
         if emitter is None:
@@ -478,7 +478,7 @@ class ObjectEvents(Object):
         setattr(cls, event_kind, event_descriptor)
 
     def _event_kinds(self) -> List[str]:
-        event_kinds = []  # type: List[str]
+        event_kinds: List[str] = []
         # We have to iterate over the class rather than instance to allow for properties which
         # might call this method (e.g., event views), leading to infinite recursion.
         for attr_name, attr_value in inspect.getmembers(type(self)):
@@ -558,14 +558,14 @@ class Framework(Object):
     on = FrameworkEvents()
 
     # Override properties from Object so that we can set them in __init__.
-    model = None  # type: 'Model' # pyright: reportGeneralTypeIssues=false
-    meta = None  # type: 'CharmMeta' # pyright: reportGeneralTypeIssues=false
-    charm_dir = None  # type: Path # pyright: reportGeneralTypeIssues=false
+    model: 'Model' = None
+    meta: 'CharmMeta' = None
+    charm_dir: 'Path' = None
 
     # to help the type checker and IDEs:
 
     if TYPE_CHECKING:
-        _stored = None  # type: 'StoredStateData'
+        _stored: 'StoredStateData' = None
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
@@ -590,22 +590,22 @@ class Framework(Object):
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
-        self._observers = []  # type: _ObserverPath
+        self._observers: _ObserverPath = []
         # {observer_path: observing Object}
-        self._observer = weakref.WeakValueDictionary()  # type: _PathToObjectMapping  # noqa
+        self._observer: _PathToObjectMapping = weakref.WeakValueDictionary()  # noqa
         # {object_path: object}
-        self._objects = weakref.WeakValueDictionary()  # type: _PathToSerializableMapping  # noqa
+        self._objects: _PathToSerializableMapping = weakref.WeakValueDictionary()  # noqa
         # {(parent_path, kind): cls}
         # (parent_path, kind) is the address of _this_ object: the parent path
         # plus a 'kind' string that is the name of this object.
-        self._type_registry = {}  # type: Dict[_ObjectPath, Type[_Serializable]]
-        self._type_known = set()  # type: Set[Type[_Serializable]]
+        self._type_registry: Dict[_ObjectPath, Type[_Serializable]] = {}
+        self._type_known: Set[Type[_Serializable]] = set()
 
         if isinstance(storage, (str, pathlib.Path)):
             logger.warning(
                 "deprecated: Framework now takes a Storage not a path")
             storage = SQLiteStorage(storage)
-        self._storage = storage  # type: 'SQLiteStorage'
+        self._storage: 'SQLiteStorage' = storage
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
@@ -617,7 +617,7 @@ class Framework(Object):
             self._stored['event_count'] = 0
 
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
-        self._breakpoint_welcomed = False  # type: bool
+        self._breakpoint_welcomed: bool = False
 
         # Parse the env var once, which may be used multiple times later
         debug_at = os.environ.get('JUJU_DEBUG_AT')
@@ -679,13 +679,13 @@ class Framework(Object):
     def register_type(self, cls: 'Type[_Serializable]', parent: Optional['_ParentHandle'],
                       kind: str = None):
         """Register a type to a handle."""
-        parent_path = None  # type: Optional[str]
+        parent_path: Optional[str] = None
         if isinstance(parent, Object):
             parent_path = parent.handle.path
         elif isinstance(parent, Handle):
             parent_path = parent.path
 
-        kind = kind or cls.handle_kind  # type: str
+        kind: str = kind or cls.handle_kind
         self._type_registry[(parent_path, kind)] = cls
         self._type_known.add(cls)
 
@@ -714,7 +714,7 @@ class Framework(Object):
         parent_path = None
         if handle.parent:
             parent_path = handle.parent.path
-        cls = self._type_registry.get((parent_path, handle.kind))  # type: Type[_Serializable]
+        cls: Type[_Serializable] = self._type_registry.get((parent_path, handle.kind))
         if not cls:
             raise NoTypeError(handle.path)
         data = self._storage.load_snapshot(handle.path)
@@ -853,7 +853,7 @@ class Framework(Object):
             >>> with harness._event_context(''):
             >>>     print('harness thinks it is not running an event hook.')
         """
-        backend = self.model._backend if self.model else None  # type: Optional[_ModelBackend]
+        backend: Optional[_ModelBackend] = self.model._backend if self.model else None
         if not backend:
             yield  # context does nothing in this case
             return
@@ -979,7 +979,7 @@ class Framework(Object):
         database.
         """
         event_regex = re.compile(_event_regex)
-        to_remove = []  # type: List[str]
+        to_remove: List[str] = []
         for handle_path in self._storage.list_snapshots():
             if event_regex.match(handle_path):
                 notices = self._storage.notices(handle_path)
@@ -995,8 +995,8 @@ class StoredStateData(Object):
 
     def __init__(self, parent: Object, attr_name: str):
         super().__init__(parent, attr_name)
-        self._cache = {}  # type: Dict[str, '_StorableType']
-        self.dirty = False  # type: bool
+        self._cache: Dict[str, '_StorableType'] = {}
+        self.dirty: bool = False
 
     def __getitem__(self, key: str) -> '_StorableType':
         return self._cache.get(key)
@@ -1030,7 +1030,7 @@ class BoundStoredState:
         # to help the type checker and IDEs:
         @property
         def _data(self) -> StoredStateData:  # noqa
-            pass  # pyright: reportGeneralTypeIssues=false
+            pass
 
         @property  # noqa
         def _attr_name(self) -> str:  # noqa
@@ -1110,8 +1110,8 @@ class StoredState:
     """
 
     def __init__(self):
-        self.parent_type = None  # type: Optional[Type[Any]]
-        self.attr_name = None  # type: Optional[str]
+        self.parent_type: Optional[Type[Any]] = None
+        self.attr_name: Optional[str] = None
 
     if TYPE_CHECKING:
         @typing.overload

@@ -42,7 +42,7 @@ if typing.TYPE_CHECKING:
 
 
 def _run(args: List[str], **kw: Any):
-    cmd = shutil.which(args[0])  # type: Optional[str]
+    cmd: Optional[str] = shutil.which(args[0])
     if cmd is None:
         raise FileNotFoundError(args[0])
     return subprocess.run([cmd, *args[1:]], encoding='utf-8', **kw)
@@ -201,7 +201,7 @@ class JujuStorage:
     NOTICE_KEY = "#notices#"
 
     def __init__(self, backend: Optional['_JujuStorageBackend'] = None):
-        self._backend = backend or _JujuStorageBackend()  # type: _JujuStorageBackend
+        self._backend: _JujuStorageBackend = backend or _JujuStorageBackend()
 
     def close(self):
         """Part of the Storage API, close the storage backend.
@@ -327,7 +327,7 @@ class _SimpleDumper(_BaseDumper):  # type: ignore
     YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So
     we want to only support dumping out types that are safe to load.
     """
-    represent_tuple = yaml.Dumper.represent_tuple  # type: _TupleRepresenterType
+    represent_tuple: '_TupleRepresenterType' = yaml.Dumper.represent_tuple
 
 
 _SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)  # type: ignore

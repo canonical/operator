@@ -450,10 +450,10 @@ class RelationEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        snapshot = {
+        snapshot: 'RelationEvent._RelationEventSnapshot' = {
             'relation_name': self.relation.name,
             'relation_id': self.relation.id,
-        }  # type: 'RelationEvent._RelationEventSnapshot'
+        }
         if self.app:
             snapshot['app_name'] = self.app.name
         if self.unit:
@@ -626,7 +626,7 @@ class StorageEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        snapshot = {}  # type: '_StorageEventSnapshot'
+        snapshot: '_StorageEventSnapshot' = {}
         if isinstance(self.storage, model.Storage):
             snapshot["storage_name"] = self.storage.name
             snapshot["storage_index"] = self.storage.index
@@ -712,7 +712,7 @@ class WorkloadEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        snapshot = {}  # type: "_WorkloadEventSnapshot"
+        snapshot: "_WorkloadEventSnapshot" = {}
         if isinstance(self.workload, model.Container):
             snapshot['container_name'] = self.workload.name
         return snapshot
@@ -1083,13 +1083,13 @@ class CharmMeta:
                  raw: Optional['_CharmMetaDict'] = None,  # type: ignore
                  actions_raw: '_ActionsRaw' = None  # type: ignore
                  ):
-        raw = raw or cast('_CharmMetaDict', {})  # type: _CharmMetaDict
-        actions_raw = actions_raw or {}  # type: Dict[str, _ActionMetaDict]
+        raw: _CharmMetaDict = raw or cast('_CharmMetaDict', {})
+        actions_raw: Dict[str, _ActionMetaDict] = actions_raw or {}
 
         self.name = raw.get('name', '')
         self.summary = raw.get('summary', '')
         self.description = raw.get('description', '')
-        self.maintainers = []  # type: List[str]
+        self.maintainers: List[str] = []
         if 'maintainer' in raw:
             self.maintainers.append(raw['maintainer'])
         if 'maintainers' in raw:
@@ -1105,7 +1105,7 @@ class CharmMeta:
                          for name, rel in raw.get('provides', {}).items()}
         self.peers = {name: RelationMeta(RelationRole.peer, name, rel)
                       for name, rel in raw.get('peers', {}).items()}
-        self.relations = {}  # type: Dict[str, RelationMeta]
+        self.relations: Dict[str, RelationMeta] = {}
         self.relations.update(self.requires)
         self.relations.update(self.provides)
         self.relations.update(self.peers)
@@ -1283,7 +1283,7 @@ class ContainerMeta:
 
     def __init__(self, name: str, raw: '_ContainerMetaDict'):
         self.name = name
-        self._mounts = {}  # type: Dict[str, ContainerStorageMeta]
+        self._mounts: Dict[str, ContainerStorageMeta] = {}
 
         # This is not guaranteed to be populated/is not enforced yet
         if raw:
@@ -1345,7 +1345,7 @@ class ContainerStorageMeta:
 
     def __init__(self, storage: str, location: str):
         self.storage = storage
-        self._locations = [location]  # type: List[str]
+        self._locations: List[str] = [location]
 
     def add_location(self, location: str):
         """Add an additional mountpoint to a known storage."""
