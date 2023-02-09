@@ -84,7 +84,7 @@ def check_builtin_sequences(
     meta: Optional[Dict[str, Any]] = None,
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
-    template_state:State = None,
+    template_state: State = None,
     pre_event: Optional[Callable[["CharmType"], None]] = None,
     post_event: Optional[Callable[["CharmType"], None]] = None,
 ):
