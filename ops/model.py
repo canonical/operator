@@ -276,6 +276,9 @@ class Model:
         """
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
+        if id is not None:
+            # Canonicalize to "secret:<id>" form for consistency in backend calls.
+            id = Secret._canonicalize_id(id)
         try:
             content = self._backend.secret_get(id=id, label=label)
             return Secret(self._backend, id=id, label=label, content=content)
