@@ -84,13 +84,13 @@ def check_builtin_sequences(
     meta: Optional[Dict[str, Any]] = None,
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
+    template_state:State = None,
     pre_event: Optional[Callable[["CharmType"], None]] = None,
     post_event: Optional[Callable[["CharmType"], None]] = None,
 ):
     """Test that all the builtin startup and teardown events can fire without errors.
 
     This will play both scenarios with and without leadership, and raise any exceptions.
-    If leader is True, it will exclude the non-leader cases, and vice-versa.
 
     This is a baseline check that in principle all charms (except specific use-cases perhaps),
     should pass out of the box.
@@ -99,10 +99,12 @@ def check_builtin_sequences(
     pre_event and post_event hooks.
     """
 
+    template = template_state if template_state else State()
+
     for event, state in generate_builtin_sequences(
         (
-            State(leader=True),
-            State(leader=False),
+            template.replace(leader=True),
+            template.replace(leader=False),
         )
     ):
         state.trigger(
