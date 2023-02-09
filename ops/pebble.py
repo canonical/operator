@@ -1266,7 +1266,7 @@ class ExecProcess:
 def _has_fileno(f: Any) -> bool:
     """Return True if the file-like object has a valid fileno() method."""
     try:
-        f.fileno()  # type: ignore # noqa
+        f.fileno()
         return True
     except Exception:
         # Some types define a fileno method that raises io.UnsupportedOperation,

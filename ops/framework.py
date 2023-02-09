@@ -293,8 +293,8 @@ class EventSource(Generic[_EventType]):
             raise RuntimeError(
                 f'Event requires a subclass of EventBase as an argument, got {event_type}')
         self.event_type: Type[_EventType] = event_type
-        self.event_kind: Optional[str] = None  # noqa
-        self.emitter_type: Optional[Type[Object]] = None  # noqa
+        self.event_kind: Optional[str] = None
+        self.emitter_type: Optional[Type[Object]] = None
 
     def __set_name__(self, emitter_type: 'Type[Object]', event_kind: str):
         if self.event_kind is not None:
@@ -348,10 +348,10 @@ class BoundEvent(Generic[_EventType]):
         The current storage state is committed before and after each observer is notified.
         """
         framework = self.emitter.framework
-        key = framework._next_event_key()  # noqa
+        key = framework._next_event_key()
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         event.framework = framework
-        framework._emit(event)  # noqa
+        framework._emit(event)
 
 
 class HandleKind:
@@ -396,8 +396,8 @@ class Object:
         def on(self) -> 'ObjectEvents': ...  # noqa
 
     def __init__(self, parent: Union['Framework', 'Object'], key: Optional[str]):
-        self.framework: Framework = None  # noqa
-        self.handle: Handle = None  # noqa
+        self.framework: Framework = None
+        self.handle: Handle = None
 
         kind = self.handle_kind
         if isinstance(parent, Framework):
@@ -409,7 +409,7 @@ class Object:
         else:
             self.framework = parent.framework
             self.handle = Handle(parent, kind, key)
-        self.framework._track(self)  # noqa
+        self.framework._track(self)
 
         # TODO Detect conflicting handles here.
 
@@ -427,7 +427,8 @@ class ObjectEvents(Object):
     def __init__(self, parent: Optional[Object] = None, key: Optional[str] = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache: weakref.WeakKeyDictionary[Object, 'ObjectEvents'] = weakref.WeakKeyDictionary()  # noqa
+        self._cache: weakref.WeakKeyDictionary[Object, 'ObjectEvents'] = \
+            weakref.WeakKeyDictionary()
 
     def __get__(self, emitter: Object, emitter_type: 'Type[Object]'):
         if emitter is None:
@@ -592,9 +593,9 @@ class Framework(Object):
         # [(observer_path, method_name, parent_path, event_key)]
         self._observers: _ObserverPath = []
         # {observer_path: observing Object}
-        self._observer: _PathToObjectMapping = weakref.WeakValueDictionary()  # noqa
+        self._observer: _PathToObjectMapping = weakref.WeakValueDictionary()
         # {object_path: object}
-        self._objects: _PathToSerializableMapping = weakref.WeakValueDictionary()  # noqa
+        self._objects: _PathToSerializableMapping = weakref.WeakValueDictionary()
         # {(parent_path, kind): cls}
         # (parent_path, kind) is the address of _this_ object: the parent path
         # plus a 'kind' string that is the name of this object.
@@ -611,9 +612,9 @@ class Framework(Object):
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
         stored_handle = Handle(None, StoredStateData.handle_kind, '_stored')
         try:
-            self._stored = typing.cast(StoredStateData, self.load_snapshot(stored_handle))  # noqa
+            self._stored = typing.cast(StoredStateData, self.load_snapshot(stored_handle))
         except NoSnapshotError:
-            self._stored = StoredStateData(self, '_stored')  # noqa
+            self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
 
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
@@ -1029,11 +1030,11 @@ class BoundStoredState:
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
-        def _data(self) -> StoredStateData:  # noqa
+        def _data(self) -> StoredStateData:
             pass
 
-        @property  # noqa
-        def _attr_name(self) -> str:  # noqa
+        @property
+        def _attr_name(self) -> str:
             pass  # pyright: reportGeneralTypeIssues=false
 
     def __init__(self, parent: Object, attr_name: str):
@@ -1200,8 +1201,8 @@ def _unwrap_stored(parent_data: StoredStateData,
 
 def _wrapped_repr(obj: '_StoredObject') -> str:
     t = type(obj)
-    if obj._under:  # pyright: reportPrivateUsage=false  # noqa
-        return f"{t.__module__}.{t.__name__}({obj._under!r})"  # type: ignore # noqa
+    if obj._under:  # pyright: reportPrivateUsage=false
+        return f"{t.__module__}.{t.__name__}({obj._under!r})"  # type: ignore
     else:
         return f"{t.__module__}.{t.__name__}()"
 
@@ -1361,7 +1362,7 @@ class StoredSet(typing.MutableSet['_StorableType']):
     def __le__(self, other: Any):
         if isinstance(other, StoredSet):
             return self._under <= other._under
-        elif isinstance(other, collections.abc.Set):  # pyright: reportUnnecessaryIsInstance=false  # noqa
+        elif isinstance(other, collections.abc.Set):
             return self._under <= other
         else:
             return NotImplemented
@@ -1369,7 +1370,7 @@ class StoredSet(typing.MutableSet['_StorableType']):
     def __ge__(self, other: Any):
         if isinstance(other, StoredSet):
             return self._under >= other._under
-        elif isinstance(other, collections.abc.Set):  # pyright: reportUnnecessaryIsInstance=false  # noqa
+        elif isinstance(other, collections.abc.Set):
             return self._under >= other
         else:
             return NotImplemented
@@ -1377,7 +1378,7 @@ class StoredSet(typing.MutableSet['_StorableType']):
     def __eq__(self, other: Any):
         if isinstance(other, StoredSet):
             return self._under == other._under
-        elif isinstance(other, collections.abc.Set):  # pyright: reportUnnecessaryIsInstance=false  # noqa
+        elif isinstance(other, collections.abc.Set):
             return self._under == other
         else:
             return NotImplemented

@@ -2225,7 +2225,7 @@ class _TestingPebbleClient:
                 elif service.override == 'merge':
                     if combine and name in layer.services:
                         s = layer.services[name]
-                        s._merge(service)  # type: ignore # noqa
+                        s._merge(service)
                     else:
                         layer.services[name] = service
 

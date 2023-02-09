@@ -184,7 +184,7 @@ class ActionEvent(EventBase):
                                'action ({})'.format(event_action_name, env_action_name))
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
-        self.params = self.framework.model._backend.action_get()  # pyright: reportPrivateUsage=false  # noqa
+        self.params = self.framework.model._backend.action_get()
 
     def set_results(self, results: '_SerializedData'):
         """Report the result of the action.
@@ -1182,14 +1182,15 @@ class RelationMeta:
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        assert isinstance(role, RelationRole), f"role should be one of {list(RelationRole)!r}, not {role!r}"  # noqa
+        assert isinstance(role, RelationRole), \
+            f"role should be one of {list(RelationRole)!r}, not {role!r}"
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
         self.interface_name = raw['interface']
 
         self.limit = limit = raw.get('limit', None)
-        if limit is not None and not isinstance(limit, int):  # type: ignore  # noqa
+        if limit is not None and not isinstance(limit, int):  # type: ignore
             raise TypeError(f"limit should be an int, not {type(limit)}")
 
         self.scope = raw.get('scope') or self._default_scope
