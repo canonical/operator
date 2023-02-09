@@ -3,7 +3,7 @@
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable, Literal, Optional
 
 import ops.charm
 import ops.framework
@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 logger = scenario_logger.getChild("ops_main_mock")
 
+OnNoEventHandler = Literal["raise", "warn", "pass"]
+
 
 def main(
     pre_event: Optional[Callable[["CharmType"], None]] = None,
@@ -30,6 +32,7 @@ def main(
     state: "State" = None,
     event: "Event" = None,
     charm_spec: "_CharmSpec" = None,
+    on_no_event_handler: OnNoEventHandler = "raise",
 ):
     """Set up the charm and dispatch the observed event."""
     charm_class = charm_spec.charm_type
@@ -76,6 +79,25 @@ def main(
 
         if pre_event:
             pre_event(charm)
+
+        if not getattr(charm.on, dispatcher.event_name, None):
+            if on_no_event_handler == "raise":
+                raise RuntimeError(
+                    f"Charm has no registered observers for {dispatcher.event_name!r}. "
+                    f"This is probably not what you were looking for."
+                    f"You can pass `trigger(..., on_no_event_handler='ignore'|'pass')` "
+                    f"to suppress this exception if you know what you're doing."
+                )
+            elif on_no_event_handler == "warn":
+                logger.warning(
+                    f"Charm has no registered observers for {dispatcher.event_name!r}. "
+                    f"This is probably not what you were looking for."
+                    f"You can pass `trigger(..., on_no_event_handler='pass')` "
+                    f"to suppress this warning if you know what you're doing."
+                )
+            elif on_no_event_handler != "pass":
+                raise ValueError(f"Bad on_no_event_handler value: {on_no_event_handler!r} "
+                                 f"(expected one of ['raise', 'warn', 'pass'])")
 
         _emit_charm_event(charm, dispatcher.event_name)
 
