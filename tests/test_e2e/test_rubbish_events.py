@@ -2,6 +2,7 @@ import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
 
+from scenario.ops_main_mock import NoObserverError
 from scenario.state import State
 
 
@@ -42,21 +43,8 @@ def mycharm():
 
 @pytest.mark.parametrize("evt_name", ("rubbish", "foo", "bar", "kazoo_pebble_ready"))
 def test_rubbish_event_raises(mycharm, evt_name):
-    with pytest.raises(RuntimeError):
+    with pytest.raises(NoObserverError):
         State().trigger(evt_name, mycharm, meta={"name": "foo"})
-
-
-@pytest.mark.parametrize("evt_name", ("rubbish", "foo", "bar", "kazoo_pebble_ready"))
-def test_rubbish_event_warns(mycharm, evt_name, caplog):
-    State().trigger(evt_name, mycharm, meta={"name": "foo"}, on_no_event_handler="warn")
-    assert caplog.messages[0].startswith(
-        f"Charm has no registered observers for {evt_name!r}."
-    )
-
-
-@pytest.mark.parametrize("evt_name", ("rubbish", "foo", "bar", "kazoo_pebble_ready"))
-def test_rubbish_event_passes(mycharm, evt_name):
-    State().trigger(evt_name, mycharm, meta={"name": "foo"}, on_no_event_handler="pass")
 
 
 @pytest.mark.parametrize("evt_name", ("qux",))

@@ -22,7 +22,6 @@ from ops import pebble
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockFileSystem, _MockStorageMount
-from scenario.ops_main_mock import OnNoEventHandler
 from scenario.runtime import trigger
 
 if typing.TYPE_CHECKING:
@@ -30,7 +29,6 @@ if typing.TYPE_CHECKING:
         from typing import Self
     except ImportError:
         from typing_extensions import Self
-    from ops.pebble import LayerDict
     from ops.testing import CharmType
 
 logger = scenario_logger.getChild("structs")
@@ -440,7 +438,6 @@ class State(_DCBase):
         meta: Optional[Dict[str, Any]] = None,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
-        on_no_event_handler: OnNoEventHandler = "raise",
     ):
         """Fluent API for trigger."""
         return trigger(
@@ -452,7 +449,6 @@ class State(_DCBase):
             meta=meta,
             actions=actions,
             config=config,
-            on_no_event_handler=on_no_event_handler,
         )
 
 

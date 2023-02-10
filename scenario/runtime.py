@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, 
 import yaml
 
 from scenario.logger import logger as scenario_logger
-from scenario.ops_main_mock import OnNoEventHandler
+from scenario.ops_main_mock import NoObserverError
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
@@ -23,6 +23,10 @@ if TYPE_CHECKING:
 logger = scenario_logger.getChild("runtime")
 
 RUNTIME_MODULE = Path(__file__).parent
+
+
+class UncaughtCharmError(RuntimeError):
+    """Error raised if the charm raises while handling the event being dispatched."""
 
 
 @dataclasses.dataclass
@@ -173,7 +177,6 @@ class Runtime:
         event: "Event",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-        on_no_event_handler: OnNoEventHandler = "raise",
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
@@ -215,10 +218,11 @@ class Runtime:
                     charm_spec=self._charm_spec.replace(
                         charm_type=self._wrap(charm_type)
                     ),
-                    on_no_event_handler=on_no_event_handler,
                 )
+            except NoObserverError:
+                raise  # propagate along
             except Exception as e:
-                raise RuntimeError(
+                raise UncaughtCharmError(
                     f"Uncaught error in operator/charm code: {e}."
                 ) from e
             finally:
@@ -241,9 +245,7 @@ def trigger(
     meta: Optional[Dict[str, Any]] = None,
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
-    on_no_event_handler: OnNoEventHandler = "raise",
 ) -> "State":
-
     from scenario.state import Event, _CharmSpec
 
     if isinstance(event, str):
@@ -266,5 +268,4 @@ def trigger(
         event=event,
         pre_event=pre_event,
         post_event=post_event,
-        on_no_event_handler=on_no_event_handler,
     )

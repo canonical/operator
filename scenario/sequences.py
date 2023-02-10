@@ -40,34 +40,40 @@ def decompose_meta_event(meta_event: Event, state: State):
                 ),
             )
             logger.debug(f"decomposed meta {meta_event.name}: {event}")
-            yield event
+            yield event, state.copy()
 
     else:
         raise RuntimeError(f"unknown meta-event {meta_event.name}")
 
 
 def generate_startup_sequence(state_template: State):
-    yield from (
-        (Event(ATTACH_ALL_STORAGES), state_template.copy()),
-        (Event("start"), state_template.copy()),
-        (Event(CREATE_ALL_RELATIONS), state_template.copy()),
+    yield from chain(
+        decompose_meta_event(Event(ATTACH_ALL_STORAGES), state_template.copy()),
+        ((Event("start"), state_template.copy()),),
+        decompose_meta_event(Event(CREATE_ALL_RELATIONS), state_template.copy()),
         (
-            Event(
-                "leader-elected" if state_template.leader else "leader-settings-changed"
+            (
+                Event(
+                    "leader-elected"
+                    if state_template.leader
+                    else "leader-settings-changed"
+                ),
+                state_template.copy(),
             ),
-            state_template.copy(),
+            (Event("config-changed"), state_template.copy()),
+            (Event("install"), state_template.copy()),
         ),
-        (Event("config-changed"), state_template.copy()),
-        (Event("install"), state_template.copy()),
     )
 
 
 def generate_teardown_sequence(state_template: State):
-    yield from (
-        (Event(BREAK_ALL_RELATIONS), state_template.copy()),
-        (Event(DETACH_ALL_STORAGES), state_template.copy()),
-        (Event("stop"), state_template.copy()),
-        (Event("remove"), state_template.copy()),
+    yield from chain(
+        decompose_meta_event(Event(BREAK_ALL_RELATIONS), state_template.copy()),
+        decompose_meta_event(Event(DETACH_ALL_STORAGES), state_template.copy()),
+        (
+            (Event("stop"), state_template.copy()),
+            (Event("remove"), state_template.copy()),
+        ),
     )
 
 
