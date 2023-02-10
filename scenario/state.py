@@ -506,7 +506,7 @@ class StoredEvent(_DCBase):
 
     @property
     def name(self):
-        return self.handle_path.split('/')[-1].split('[')[0]
+        return self.handle_path.split("/")[-1].split("[")[0]
 
 
 @dataclasses.dataclass

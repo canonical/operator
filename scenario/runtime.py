@@ -42,9 +42,9 @@ class Runtime:
     """
 
     def __init__(
-            self,
-            charm_spec: "_CharmSpec",
-            juju_version: str = "3.0.0",
+        self,
+        charm_spec: "_CharmSpec",
+        juju_version: str = "3.0.0",
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -53,8 +53,8 @@ class Runtime:
 
     @staticmethod
     def from_local_file(
-            local_charm_src: Path,
-            charm_cls_name: str,
+        local_charm_src: Path,
+        charm_cls_name: str,
     ) -> "Runtime":
         sys.path.extend((str(local_charm_src / "src"), str(local_charm_src / "lib")))
 
@@ -200,18 +200,20 @@ class Runtime:
             if event_regex.match(handle_path):
                 notices = store.notices(handle_path)
                 for handle, owner, observer in notices:
-                    event = StoredEvent(handle_path=handle, owner=owner, observer=observer)
+                    event = StoredEvent(
+                        handle_path=handle, owner=owner, observer=observer
+                    )
                     event_queue.append(event)
 
         store.close()
         return state.replace(event_queue=event_queue)
 
     def exec(
-            self,
-            state: "State",
-            event: "Event",
-            pre_event: Optional[Callable[["CharmType"], None]] = None,
-            post_event: Optional[Callable[["CharmType"], None]] = None,
+        self,
+        state: "State",
+        event: "Event",
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
@@ -275,15 +277,15 @@ class Runtime:
 
 
 def trigger(
-        state: "State",
-        event: Union["Event", str],
-        charm_type: Type["CharmType"],
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
-        # if not provided, will be autoloaded from charm_type.
-        meta: Optional[Dict[str, Any]] = None,
-        actions: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None,
+    state: "State",
+    event: Union["Event", str],
+    charm_type: Type["CharmType"],
+    pre_event: Optional[Callable[["CharmType"], None]] = None,
+    post_event: Optional[Callable[["CharmType"], None]] = None,
+    # if not provided, will be autoloaded from charm_type.
+    meta: Optional[Dict[str, Any]] = None,
+    actions: Optional[Dict[str, Any]] = None,
+    config: Optional[Dict[str, Any]] = None,
 ) -> "State":
     from scenario.state import Event, _CharmSpec
 

@@ -1,5 +1,5 @@
 import pytest
-from ops.charm import CharmBase, UpdateStatusEvent, StartEvent
+from ops.charm import CharmBase, StartEvent, UpdateStatusEvent
 from ops.framework import Framework
 
 from scenario.state import State, StoredEvent
@@ -10,7 +10,7 @@ CHARM_CALLED = 0
 @pytest.fixture(scope="function")
 def mycharm():
     class MyCharm(CharmBase):
-        META = {'name': 'mycharm'}
+        META = {"name": "mycharm"}
         defer_next = 0
         captured = []
 
@@ -30,23 +30,21 @@ def mycharm():
 
 def test_defer(mycharm):
     mycharm.defer_next = True
-    out = State().trigger('start', mycharm, meta=mycharm.META)
+    out = State().trigger("start", mycharm, meta=mycharm.META)
     assert len(out.event_queue) == 1
-    assert out.event_queue[0].name == 'start'
+    assert out.event_queue[0].name == "start"
 
 
 def test_deferred_evt_emitted(mycharm):
     mycharm.defer_next = 2
     out = State(
-        event_queue=[
-            StoredEvent('MyCharm/on/update_status[1]', 'MyCharm', '_on_event')
-        ]
-    ).trigger('start', mycharm, meta=mycharm.META)
+        event_queue=[StoredEvent("MyCharm/on/update_status[1]", "MyCharm", "_on_event")]
+    ).trigger("start", mycharm, meta=mycharm.META)
 
     # we deferred the first 2 events we saw: update-status, start.
     assert len(out.event_queue) == 2
-    assert out.event_queue[0].name == 'start'
-    assert out.event_queue[1].name == 'update_status'
+    assert out.event_queue[0].name == "start"
+    assert out.event_queue[1].name == "update_status"
 
     # we saw start and update-status.
     assert len(mycharm.captured) == 2
