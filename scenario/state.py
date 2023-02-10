@@ -382,6 +382,12 @@ class State(_DCBase):
     unit_id: str = "0"
     app_name: str = "local"
 
+    # represents the OF's event queue. These events will be emitted before the event being dispatched,
+    # and represent the events that had been deferred during the previous run.
+    # If the charm defers any events during "this execution", they will be appended
+    # to this list.
+    event_queue: List["StoredEvent"] = dataclasses.field(default_factory=list)
+
     # todo:
     #  actions?
 
@@ -487,6 +493,20 @@ class _CharmSpec(_DCBase):
 
 def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
     return sorted(patch, key=key)
+
+
+@dataclasses.dataclass
+class StoredEvent(_DCBase):
+    handle_path: str
+    owner: str
+    observer: str
+
+    # needs to be marshal.dumps-able.
+    snapshot_data: Dict = dataclasses.field(default_factory=dict)
+
+    @property
+    def name(self):
+        return self.handle_path.split('/')[-1].split('[')[0]
 
 
 @dataclasses.dataclass

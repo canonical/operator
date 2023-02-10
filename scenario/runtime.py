@@ -1,5 +1,7 @@
 import dataclasses
+import marshal
 import os
+import re
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -7,6 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union
 
 import yaml
+from ops.framework import _event_regex
+from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
 
@@ -38,9 +42,9 @@ class Runtime:
     """
 
     def __init__(
-        self,
-        charm_spec: "_CharmSpec",
-        juju_version: str = "3.0.0",
+            self,
+            charm_spec: "_CharmSpec",
+            juju_version: str = "3.0.0",
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -49,8 +53,8 @@ class Runtime:
 
     @staticmethod
     def from_local_file(
-        local_charm_src: Path,
-        charm_cls_name: str,
+            local_charm_src: Path,
+            charm_cls_name: str,
     ) -> "Runtime":
         sys.path.extend((str(local_charm_src / "src"), str(local_charm_src / "lib")))
 
@@ -166,12 +170,48 @@ class Runtime:
             (temppath / "actions.yaml").write_text(yaml.safe_dump(spec.actions or {}))
             yield temppath
 
+    @staticmethod
+    def _get_store(temporary_charm_root: Path):
+        charm_state_path = temporary_charm_root / ".unit-state.db"
+        store = SQLiteStorage(charm_state_path)
+        return store
+
+    def _initialize_storage(self, state: "State", temporary_charm_root: Path):
+        """Before we start processing this event, expose the relevant parts of State through the storage."""
+        store = self._get_store(temporary_charm_root)
+        event_queue = state.event_queue
+
+        for event in event_queue:
+            store.save_notice(event.handle_path, event.owner, event.observer)
+            data = marshal.dumps(event.snapshot_data)
+            store.save_snapshot(event.handle_path, data)
+
+        store.close()
+
+    def _close_storage(self, state: "State", temporary_charm_root: Path):
+        """Now that we're done processing this event, read the charm state and expose it via State."""
+        from scenario.state import StoredEvent  # avoid cyclic import
+
+        store = self._get_store(temporary_charm_root)
+
+        event_queue = []
+        event_regex = re.compile(_event_regex)
+        for handle_path in store.list_snapshots():
+            if event_regex.match(handle_path):
+                notices = store.notices(handle_path)
+                for handle, owner, observer in notices:
+                    event = StoredEvent(handle_path=handle, owner=owner, observer=observer)
+                    event_queue.append(event)
+
+        store.close()
+        return state.replace(event_queue=event_queue)
+
     def exec(
-        self,
-        state: "State",
-        event: "Event",
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
+            self,
+            state: "State",
+            event: "Event",
+            pre_event: Optional[Callable[["CharmType"], None]] = None,
+            post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
@@ -190,6 +230,9 @@ class Runtime:
         with self.virtual_charm_root() as temporary_charm_root:
             # todo consider forking out a real subprocess and do the mocking by
             #  generating hook tool executables
+
+            logger.info(" - initializing storage")
+            self._initialize_storage(state, temporary_charm_root)
 
             logger.info(" - redirecting root logging")
             self._redirect_root_logger()
@@ -224,22 +267,24 @@ class Runtime:
             logger.info(" - clearing env")
             self._cleanup_env(env)
 
-        logger.info("event fired; done.")
+            logger.info(" - closing storage")
+            output_state = self._close_storage(output_state, temporary_charm_root)
+
+        logger.info("event dispatched. done.")
         return output_state
 
 
 def trigger(
-    state: "State",
-    event: Union["Event", str],
-    charm_type: Type["CharmType"],
-    pre_event: Optional[Callable[["CharmType"], None]] = None,
-    post_event: Optional[Callable[["CharmType"], None]] = None,
-    # if not provided, will be autoloaded from charm_type.
-    meta: Optional[Dict[str, Any]] = None,
-    actions: Optional[Dict[str, Any]] = None,
-    config: Optional[Dict[str, Any]] = None,
+        state: "State",
+        event: Union["Event", str],
+        charm_type: Type["CharmType"],
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+        # if not provided, will be autoloaded from charm_type.
+        meta: Optional[Dict[str, Any]] = None,
+        actions: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None,
 ) -> "State":
-
     from scenario.state import Event, _CharmSpec
 
     if isinstance(event, str):

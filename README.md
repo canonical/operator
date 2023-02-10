@@ -273,6 +273,52 @@ def test_pebble_exec():
 ```
 
 
+# Event queue
+
+Scenario allows you to accurately simulate the Operator Framework's event queue. The event queue is responsible for keeping track of the deferred events. 
+On the input side, you can verify that if the charm triggers with this and that event in its queue (they would be there because they had been deferred in the previous run), then the output state is valid.
+
+```python
+from scenario import State, StoredEvent
+
+
+class MyCharm(...):
+    [...]
+    def _on_start(self, e):
+        e.defer()
+
+        
+def test_defer(MyCharm):
+    out = State(
+      event_queue=[
+            StoredEvent('MyCharm/on/update_status[1]', 'MyCharm', '_on_event')
+        ]
+    ).trigger('start', MyCharm)
+    assert len(out.event_queue) == 1
+    assert out.event_queue[0].name == 'start'
+```
+
+On the output side, you can verify that an event that you expect to have been deferred during this trigger, has indeed been deferred.
+
+```python
+from scenario import State
+
+
+class MyCharm(...):
+    [...]
+    def _on_start(self, e):
+        e.defer()
+
+        
+def test_defer(MyCharm):
+    out = State().trigger('start', MyCharm)
+    assert len(out.event_queue) == 1
+    assert out.event_queue[0].name == 'start'
+```
+
+
+
+
 # TODOS:
 - State-State consistency checks.
 - State-Metadata consistency checks.
