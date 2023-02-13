@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 import marshal
 import os
 import re
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, 
 
 import yaml
 from ops.framework import _event_regex
+from ops.log import JujuLogHandler
 from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
@@ -25,6 +27,8 @@ if TYPE_CHECKING:
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
 logger = scenario_logger.getChild("runtime")
+# _stored_state_regex = "(.*)\/(\D+)\[(.*)\]"
+_stored_state_regex = "((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
 
 RUNTIME_MODULE = Path(__file__).parent
 
@@ -78,18 +82,6 @@ class Runtime:
 
         my_charm_type: Type["CharmBase"] = ldict["my_charm_type"]
         return Runtime(_CharmSpec(my_charm_type))  # TODO add meta, options,...
-
-    @staticmethod
-    def _redirect_root_logger():
-        # the root logger set up by ops calls a hook tool: `juju-log`.
-        # that is a problem for us because `juju-log` is itself memoized, which leads to recursion.
-        def _patch_logger(*args, **kwargs):
-            logger.debug("Hijacked root logger.")
-            pass
-
-        from scenario import ops_main_mock
-
-        ops_main_mock.setup_root_logging = _patch_logger
 
     @staticmethod
     def _cleanup_env(env):
@@ -184,9 +176,8 @@ class Runtime:
     def _initialize_storage(self, state: "State", temporary_charm_root: Path):
         """Before we start processing this event, expose the relevant parts of State through the storage."""
         store = self._get_store(temporary_charm_root)
-        deferred = state.deferred
 
-        for event in deferred:
+        for event in state.deferred:
             store.save_notice(event.handle_path, event.owner, event.observer)
             try:
                 marshal.dumps(event.snapshot_data)
@@ -196,16 +187,21 @@ class Runtime:
                 ) from e
             store.save_snapshot(event.handle_path, event.snapshot_data)
 
+        for stored_state in state.stored_state:
+            store.save_snapshot(stored_state.handle_path, stored_state.content)
+
         store.close()
 
     def _close_storage(self, state: "State", temporary_charm_root: Path):
         """Now that we're done processing this event, read the charm state and expose it via State."""
-        from scenario.state import DeferredEvent  # avoid cyclic import
+        from scenario.state import DeferredEvent, StoredState  # avoid cyclic import
 
         store = self._get_store(temporary_charm_root)
 
         deferred = []
+        stored_state = []
         event_regex = re.compile(_event_regex)
+        sst_regex = re.compile(_stored_state_regex)
         for handle_path in store.list_snapshots():
             if event_regex.match(handle_path):
                 notices = store.notices(handle_path)
@@ -215,8 +211,22 @@ class Runtime:
                     )
                     deferred.append(event)
 
+            else:
+                # it's a StoredState. TODO: No other option, right?
+                stored_state_snapshot = store.load_snapshot(handle_path)
+                match = sst_regex.match(handle_path)
+                if not match:
+                    logger.warning(f"could not parse handle path {handle_path!r} as stored state")
+                    continue
+
+                kwargs = match.groupdict()
+                sst = StoredState(
+                    content=stored_state_snapshot,
+                    **kwargs)
+                stored_state.append(sst)
+
         store.close()
-        return state.replace(deferred=deferred)
+        return state.replace(deferred=deferred, stored_state=stored_state)
 
     def exec(
         self,
@@ -245,9 +255,6 @@ class Runtime:
 
             logger.info(" - initializing storage")
             self._initialize_storage(state, temporary_charm_root)
-
-            logger.info(" - redirecting root logging")
-            self._redirect_root_logger()
 
             logger.info(" - preparing env")
             env = self._get_event_env(

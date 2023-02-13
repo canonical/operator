@@ -72,7 +72,7 @@ class MyCharm(CharmBase):
 
 def test_scenario_base():
     out = State().trigger(
-        'start', 
+        'start',
         MyCharm, meta={"name": "foo"})
     assert out.status.unit == ('unknown', '')
 ```
@@ -101,7 +101,7 @@ class MyCharm(CharmBase):
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
     out = State(leader=leader).trigger(
-        'start', 
+        'start',
         MyCharm,
         meta={"name": "foo"})
     assert out.status.unit == ('active', 'I rule' if leader else 'I am ruled')
@@ -277,7 +277,7 @@ def test_pebble_exec():
 
 # Deferred events
 
-Scenario allows you to accurately simulate the Operator Framework's event queue. The event queue is responsible for keeping track of the deferred events. 
+Scenario allows you to accurately simulate the Operator Framework's event queue. The event queue is responsible for keeping track of the deferred events.
 On the input side, you can verify that if the charm triggers with this and that event in its queue (they would be there because they had been deferred in the previous run), then the output state is valid.
 
 ```python
@@ -291,12 +291,12 @@ class MyCharm(...):
     def _on_start(self, e):
         e.defer()
 
-        
+
 def test_start_on_deferred_update_status(MyCharm):
     """Test charm execution if a 'start' is dispatched when in the previous run an update-status had been deferred."""
     out = State(
-      deferred=[
-            deferred('update_status', 
+        deferred=[
+            deferred('update_status',
                      handler=MyCharm._on_update_status)
         ]
     ).trigger('start', MyCharm)
@@ -317,7 +317,7 @@ deferred_install = Event('install').deferred(MyCharm._on_start)
 ...
 
 # relation events:
-foo_relation = Relation('foo') 
+foo_relation = Relation('foo')
 deferred_relation_changed_evt = foo_relation.changed_event.deferred(handler=MyCharm._on_foo_relation_changed)
 ```
 
@@ -332,7 +332,7 @@ class MyCharm(...):
     def _on_start(self, e):
         e.defer()
 
-        
+
 def test_defer(MyCharm):
     out = State().trigger('start', MyCharm)
     assert len(out.deferred) == 1
@@ -353,13 +353,13 @@ class MyCharm(...):
     def _on_foo_relation_changed(self, e):
         e.defer()
 
-        
+
 def test_start_on_deferred_update_status(MyCharm):
-    foo_relation = Relation('foo') 
+    foo_relation = Relation('foo')
     State(
-      relations=[foo_relation],
-      deferred=[
-            deferred('foo_relation_changed', 
+        relations=[foo_relation],
+        deferred=[
+            deferred('foo_relation_changed',
                      handler=MyCharm._on_foo_relation_changed,
                      relation=foo_relation)
         ]
@@ -374,7 +374,7 @@ from scenario import Relation
 class MyCharm(...):
     ...
 
-foo_relation = Relation('foo') 
+foo_relation = Relation('foo')
 foo_relation.changed_event.deferred(handler=MyCharm._on_foo_relation_changed)
 ```
 
@@ -388,12 +388,32 @@ For general-purpose usage, you will need to instantiate `DeferredEvent` directly
 from scenario import DeferredEvent
 
 my_deferred_event = DeferredEvent(
-   handle_path='MyCharm/MyCharmLib/on/database_ready[1]',
-   owner='MyCharmLib',  # the object observing the event. Could also be MyCharm.
-   observer='_on_database_ready'
+    handle_path='MyCharm/MyCharmLib/on/database_ready[1]',
+    owner='MyCharmLib',  # the object observing the event. Could also be MyCharm.
+    observer='_on_database_ready'
 )
 
 ```
+
+
+# StoredState
+
+Scenario's State includes a charm's StoredState.
+You can define it on the input side as:
+```python
+from scenario import State, StoredState
+
+state = State(stored_state=[
+    StoredState(
+        owner="MyCharmType",
+        content={
+            'foo': 'bar',
+            'baz': {42: 42},
+        })
+])
+```
+
+And you can run assertions on it on the output side the same as any other bit of state.
 
 
 # TODOS:

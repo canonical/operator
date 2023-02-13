@@ -127,6 +127,8 @@ def test_fs_pull(charm_cls, make_dirs):
         assert file.read() == text
     else:
         # nothing has changed
+        out.juju_log = []
+        out.stored_state = state.stored_state  # ignore stored state in delta.
         assert not out.jsonpatch_delta(state)
 
 

@@ -61,6 +61,7 @@ def state():
 def test_bare_event(state, mycharm):
     out = state.trigger("start", mycharm, meta={"name": "foo"})
     out.juju_log = []  # ignore logging output in the delta
+    out.stored_state = state.stored_state  # ignore stored state in delta.
     assert state.jsonpatch_delta(out) == []
 
 
@@ -93,6 +94,7 @@ def test_status_setting(state, mycharm):
     assert out.status.app_version == ""
 
     out.juju_log = []  # ignore logging output in the delta
+    out.stored_state = state.stored_state  # ignore stored state in delta.
     assert out.jsonpatch_delta(state) == sort_patch(
         [
             {

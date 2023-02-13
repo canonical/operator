@@ -373,6 +373,22 @@ class Status(_DCBase):
 
 
 @dataclasses.dataclass
+class StoredState(_DCBase):
+    # /-separated Object names. E.g. MyCharm/MyCharmLib.
+    # if None, this StoredState instance is owned by the Framework.
+    owner_path: Optional[str]
+
+    name: str = '_stored'
+    content: Dict[str, Any] = dataclasses.field(default_factory=dict)
+
+    data_type_name: str = "StoredStateData"
+
+    @property
+    def handle_path(self):
+        return f"{self.owner_path or ''}/{self.data_type_name}[{self.name}]"
+
+
+@dataclasses.dataclass
 class State(_DCBase):
     config: Dict[str, Union[str, int, float, bool]] = None
     relations: Sequence[Relation] = dataclasses.field(default_factory=list)
@@ -394,6 +410,7 @@ class State(_DCBase):
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
+    stored_state: List["StoredState"] = dataclasses.field(default_factory=dict)
 
     # todo:
     #  actions?
