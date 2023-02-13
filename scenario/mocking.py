@@ -1,12 +1,12 @@
+import datetime
 import pathlib
 import random
 import urllib.request
-import datetime
 from io import StringIO
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
 from ops import pebble
-from ops.model import _ModelBackend, SecretRotate, SecretInfo
+from ops.model import SecretInfo, SecretRotate, _ModelBackend
 from ops.pebble import Client, ExecError
 from ops.testing import _TestingFilesystem, _TestingPebbleClient, _TestingStorageMount
 
@@ -84,14 +84,14 @@ class _MockModelBackend(_ModelBackend):
         return self._state.leader
 
     def status_get(self, *, is_app: bool = False):
-        status, message = (
-            self._state.status.app if is_app else self._state.status.unit
-        )
+        status, message = self._state.status.app if is_app else self._state.status.unit
         return {"status": status, "message": message}
 
     def relation_ids(self, relation_name):
         return [
-            rel.relation_id for rel in self._state.relations if rel.endpoint == relation_name
+            rel.relation_id
+            for rel in self._state.relations
+            if rel.endpoint == relation_name
         ]
 
     def relation_list(self, relation_id: int):
@@ -113,7 +113,7 @@ class _MockModelBackend(_ModelBackend):
 
     def network_get(self, binding_name: str, relation_id: Optional[int] = None):
         if relation_id:
-            logger.warning('network-get -r not implemented')
+            logger.warning("network-get -r not implemented")
 
         network = next(filter(lambda r: r.name == binding_name, self._state.networks))
         return network.hook_tool_output_fmt()
@@ -165,15 +165,19 @@ class _MockModelBackend(_ModelBackend):
 
     @staticmethod
     def _generate_secret_id():
-        id = ''.join(map(str, [random.choice(list(range(10))) for _ in range(20)]))
+        id = "".join(map(str, [random.choice(list(range(10))) for _ in range(20)]))
         return f"secret:{id}"
 
-    def secret_add(self, content: Dict[str, str], *,
-                   label: Optional[str] = None,
-                   description: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: Optional[SecretRotate] = None,
-                   owner: Optional[str] = None) -> str:
+    def secret_add(
+        self,
+        content: Dict[str, str],
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[SecretRotate] = None,
+        owner: Optional[str] = None,
+    ) -> str:
         from scenario.state import Secret
 
         id = self._generate_secret_id()
@@ -184,7 +188,7 @@ class _MockModelBackend(_ModelBackend):
             description=description,
             expire=expire,
             rotate=rotate,
-            owner=owner
+            owner=owner,
         )
         self._state.secrets.append(secret)
         return id
@@ -205,12 +209,13 @@ class _MockModelBackend(_ModelBackend):
                 secret.revision = revision
 
         return secret.contents[revision]
-    def secret_info_get(self, *,
-                        id: Optional[str] = None,
-                        label: Optional[str] = None) -> SecretInfo:
+
+    def secret_info_get(
+        self, *, id: Optional[str] = None, label: Optional[str] = None
+    ) -> SecretInfo:
         secret = self._get_secret(id, label)
         if not secret.owner:
-            raise RuntimeError(f'not the owner of {secret}')
+            raise RuntimeError(f"not the owner of {secret}")
 
         return SecretInfo(
             id=secret.id,
@@ -218,18 +223,22 @@ class _MockModelBackend(_ModelBackend):
             revision=max(secret.contents),
             expires=secret.expire,
             rotation=secret.rotate,
-            rotates=None  # not implemented yet.
+            rotates=None,  # not implemented yet.
         )
 
-    def secret_set(self, id: str, *,
-                   content: Optional[Dict[str, str]] = None,
-                   label: Optional[str] = None,
-                   description: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: Optional[SecretRotate] = None):
+    def secret_set(
+        self,
+        id: str,
+        *,
+        content: Optional[Dict[str, str]] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[SecretRotate] = None,
+    ):
         secret = self._get_secret(id, label)
         if not secret.owner:
-            raise RuntimeError(f'not the owner of {secret}')
+            raise RuntimeError(f"not the owner of {secret}")
 
         revision = max(secret.contents.keys())
         secret.contents[revision + 1] = content
@@ -248,7 +257,7 @@ class _MockModelBackend(_ModelBackend):
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
         if not secret.owner:
-            raise RuntimeError(f'not the owner of {secret}')
+            raise RuntimeError(f"not the owner of {secret}")
 
         grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
 
@@ -260,7 +269,7 @@ class _MockModelBackend(_ModelBackend):
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
         if not secret.owner:
-            raise RuntimeError(f'not the owner of {secret}')
+            raise RuntimeError(f"not the owner of {secret}")
 
         grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
         secret.remote_grants[relation_id].remove(grantee)
@@ -268,7 +277,7 @@ class _MockModelBackend(_ModelBackend):
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         secret = self._get_secret(id)
         if not secret.owner:
-            raise RuntimeError(f'not the owner of {secret}')
+            raise RuntimeError(f"not the owner of {secret}")
 
         if revision:
             del secret.contents[revision]

@@ -8,11 +8,11 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Set,
     List,
     Literal,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     Union,
@@ -65,7 +65,7 @@ class Secret(_DCBase):
     contents: Dict[int, Dict[str, str]]
 
     # indicates if the secret is owned by THIS unit, THIS app or some other app/unit.
-    owner: Literal['unit', 'application', None] = None
+    owner: Literal["unit", "application", None] = None
 
     # has this secret been granted to this unit/app or neither? Only applicable if NOT owner
     granted: Literal["unit", "app", False] = False
@@ -337,16 +337,16 @@ class Network(_DCBase):
 
     @classmethod
     def default(
-            cls,
-            name,
-            bind_id,
-            private_address: str = "1.1.1.1",
-            mac_address: str = "",
-            hostname: str = "",
-            cidr: str = "",
-            interface_name: str = "",
-            egress_subnets=("1.1.1.2/32",),
-            ingress_addresses=("1.1.1.2",),
+        cls,
+        name,
+        bind_id,
+        private_address: str = "1.1.1.1",
+        mac_address: str = "",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        egress_subnets=("1.1.1.2/32",),
+        ingress_addresses=("1.1.1.2",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
@@ -439,16 +439,16 @@ class State(_DCBase):
         return sort_patch(patch)
 
     def trigger(
-            self,
-            event: Union["Event", str],
-            charm_type: Type["CharmType"],
-            # callbacks
-            pre_event: Optional[Callable[["CharmType"], None]] = None,
-            post_event: Optional[Callable[["CharmType"], None]] = None,
-            # if not provided, will be autoloaded from charm_type.
-            meta: Optional[Dict[str, Any]] = None,
-            actions: Optional[Dict[str, Any]] = None,
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        event: Union["Event", str],
+        charm_type: Type["CharmType"],
+        # callbacks
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+        # if not provided, will be autoloaded from charm_type.
+        meta: Optional[Dict[str, Any]] = None,
+        actions: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
         """Fluent API for trigger."""
         return trigger(
@@ -551,6 +551,7 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
+
 
 # todo: consider
 #  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:

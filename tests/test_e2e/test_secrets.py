@@ -3,7 +3,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import SecretRotate
 
-from scenario.state import Secret, State, Relation
+from scenario.state import Relation, Secret, State
 
 
 @pytest.fixture(scope="function")
@@ -71,7 +71,7 @@ def test_secret_changed_owner_evt_fails(mycharm):
                 0: {"a": "b"},
                 1: {"a": "c"},
             },
-            owner='unit',
+            owner="unit",
         ).changed_event
 
 
@@ -84,39 +84,40 @@ def test_consumer_events_failures(mycharm, evt_prefix):
                 contents={
                     0: {"a": "b"},
                     1: {"a": "c"},
-                }),
+                },
+            ),
             evt_prefix + "_event",
         )
 
 
 def test_add(mycharm):
     def post_event(charm: CharmBase):
-        charm.unit.add_secret({'foo': 'bar'}, label='mylabel')
+        charm.unit.add_secret({"foo": "bar"}, label="mylabel")
 
-    out = State().trigger("update-status", mycharm,
-                          meta={"name": "local"},
-                          post_event=post_event)
+    out = State().trigger(
+        "update-status", mycharm, meta={"name": "local"}, post_event=post_event
+    )
     assert out.secrets
     secret = out.secrets[0]
-    assert secret.contents[0] == {'foo': 'bar'}
-    assert secret.label == 'mylabel'
+    assert secret.contents[0] == {"foo": "bar"}
+    assert secret.label == "mylabel"
 
 
 def test_meta(mycharm):
     def post_event(charm: CharmBase):
-        assert charm.model.get_secret(label='mylabel')
+        assert charm.model.get_secret(label="mylabel")
 
         secret = charm.model.get_secret(id="foo")
         info = secret.get_info()
 
         assert secret.label is None
-        assert info.label == 'mylabel'
+        assert info.label == "mylabel"
         assert info.rotation == SecretRotate.HOURLY
 
     State(
         secrets=[
             Secret(
-                owner='unit',
+                owner="unit",
                 id="foo",
                 label="mylabel",
                 description="foobarbaz",
@@ -150,21 +151,21 @@ def test_meta_nonowner(mycharm):
     ).trigger("update-status", mycharm, meta={"name": "local"}, post_event=post_event)
 
 
-@pytest.mark.parametrize('app', (True, False))
+@pytest.mark.parametrize("app", (True, False))
 def test_grant(mycharm, app):
     def post_event(charm: CharmBase):
         secret = charm.model.get_secret(label="mylabel")
-        foo = charm.model.get_relation('foo')
+        foo = charm.model.get_relation("foo")
         if app:
             secret.grant(relation=foo)
         else:
             secret.grant(relation=foo, unit=foo.units.pop())
 
     out = State(
-        relations=[Relation('foo', 'remote')],
+        relations=[Relation("foo", "remote")],
         secrets=[
             Secret(
-                owner='unit',
+                owner="unit",
                 id="foo",
                 label="mylabel",
                 description="foobarbaz",
@@ -173,15 +174,18 @@ def test_grant(mycharm, app):
                     0: {"a": "b"},
                 },
             )
-        ]
-    ).trigger("update-status", mycharm,
-              meta={"name": "local",
-                    "requires": {"foo": {"interface": "bar"}}}, post_event=post_event)
+        ],
+    ).trigger(
+        "update-status",
+        mycharm,
+        meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
+        post_event=post_event,
+    )
 
     if app:
-        assert out.secrets[0].remote_grants[1] == {'remote'}
+        assert out.secrets[0].remote_grants[1] == {"remote"}
     else:
-        assert out.secrets[0].remote_grants[2] == {'remote/0'}
+        assert out.secrets[0].remote_grants[2] == {"remote/0"}
 
 
 def test_grant_nonowner(mycharm):
@@ -189,11 +193,11 @@ def test_grant_nonowner(mycharm):
         secret = charm.model.get_secret(id="foo")
         with pytest.raises(RuntimeError):
             secret = charm.model.get_secret(label="mylabel")
-            foo = charm.model.get_relation('foo')
+            foo = charm.model.get_relation("foo")
             secret.grant(relation=foo)
 
     out = State(
-        relations=[Relation('foo', 'remote')],
+        relations=[Relation("foo", "remote")],
         secrets=[
             Secret(
                 id="foo",
@@ -204,7 +208,10 @@ def test_grant_nonowner(mycharm):
                     0: {"a": "b"},
                 },
             )
-        ]
-    ).trigger("update-status", mycharm,
-              meta={"name": "local",
-                    "requires": {"foo": {"interface": "bar"}}}, post_event=post_event)
+        ],
+    ).trigger(
+        "update-status",
+        mycharm,
+        meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
+        post_event=post_event,
+    )

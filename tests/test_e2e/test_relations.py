@@ -73,7 +73,7 @@ def test_relation_events(mycharm, evt_name):
 
     mycharm._call = lambda self, evt: None
 
-    State(relations=[relation, ], ).trigger(
+    State(relations=[relation,],).trigger(
         getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
@@ -88,20 +88,24 @@ def test_relation_events(mycharm, evt_name):
 
 
 @pytest.mark.parametrize(
-    "evt_name", ("changed", "broken", "departed", "joined", "created"),
+    "evt_name",
+    ("changed", "broken", "departed", "joined", "created"),
 )
 @pytest.mark.parametrize(
-    "remote_app_name", ("remote", "prometheus", "aodeok123"),
+    "remote_app_name",
+    ("remote", "prometheus", "aodeok123"),
 )
 def test_relation_events(mycharm, evt_name, remote_app_name):
-    relation = Relation(endpoint="foo", interface="foo", remote_app_name=remote_app_name)
+    relation = Relation(
+        endpoint="foo", interface="foo", remote_app_name=remote_app_name
+    )
 
     def callback(charm: CharmBase, _):
-        assert charm.model.get_relation('foo').app.name == remote_app_name
+        assert charm.model.get_relation("foo").app.name == remote_app_name
 
     mycharm._call = callback
 
-    State(relations=[relation, ], ).trigger(
+    State(relations=[relation,],).trigger(
         getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
@@ -109,5 +113,5 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
             "requires": {
                 "foo": {"interface": "foo"},
             },
-        }
+        },
     )
