@@ -1,5 +1,6 @@
 import copy
 import dataclasses
+import datetime
 import inspect
 import typing
 from pathlib import Path, PurePosixPath
@@ -7,6 +8,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Set,
     List,
     Literal,
     Optional,
@@ -19,6 +21,7 @@ from uuid import uuid4
 
 import yaml
 from ops import pebble
+from ops.model import SecretRotate
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockFileSystem, _MockStorageMount
@@ -61,21 +64,29 @@ class Secret(_DCBase):
     # mapping from revision IDs to each revision's contents
     contents: Dict[int, Dict[str, str]]
 
-    owned_by_this_unit: bool = False
+    # indicates if the secret is owned by THIS unit, THIS app or some other app/unit.
+    owner: Literal['unit', 'application', None] = None
 
-    # has this secret been granted to this unit/app or neither?
+    # has this secret been granted to this unit/app or neither? Only applicable if NOT owner
     granted: Literal["unit", "app", False] = False
 
-    # what revision is currently tracked by this charm. Only meaningful if owned_by_this_unit=False
+    # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
 
-    label: str = None
+    # mapping from relation IDs to remote unit/apps to which this secret has been granted.
+    # Only applicable if owner
+    remote_grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
+
+    label: Optional[str] = None
+    description: Optional[str] = None
+    expire: Optional[datetime.datetime] = None
+    rotate: SecretRotate = SecretRotate.NEVER
 
     # consumer-only events
     @property
     def changed_event(self):
         """Sugar to generate a secret-changed event."""
-        if self.owned_by_this_unit:
+        if self.owner:
             raise ValueError(
                 "This unit will never receive secret-changed for a secret it owns."
             )
@@ -85,7 +96,7 @@ class Secret(_DCBase):
     @property
     def rotate_event(self):
         """Sugar to generate a secret-rotate event."""
-        if not self.owned_by_this_unit:
+        if not self.owner:
             raise ValueError(
                 "This unit will never receive secret-rotate for a secret it does not own."
             )
@@ -94,7 +105,7 @@ class Secret(_DCBase):
     @property
     def expired_event(self):
         """Sugar to generate a secret-expired event."""
-        if not self.owned_by_this_unit:
+        if not self.owner:
             raise ValueError(
                 "This unit will never receive secret-expire for a secret it does not own."
             )
@@ -103,7 +114,7 @@ class Secret(_DCBase):
     @property
     def remove_event(self):
         """Sugar to generate a secret-remove event."""
-        if not self.owned_by_this_unit:
+        if not self.owner:
             raise ValueError(
                 "This unit will never receive secret-removed for a secret it does not own."
             )
@@ -326,16 +337,16 @@ class Network(_DCBase):
 
     @classmethod
     def default(
-        cls,
-        name,
-        bind_id,
-        private_address: str = "1.1.1.1",
-        mac_address: str = "",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
+            cls,
+            name,
+            bind_id,
+            private_address: str = "1.1.1.1",
+            mac_address: str = "",
+            hostname: str = "",
+            cidr: str = "",
+            interface_name: str = "",
+            egress_subnets=("1.1.1.2/32",),
+            ingress_addresses=("1.1.1.2",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
@@ -428,16 +439,16 @@ class State(_DCBase):
         return sort_patch(patch)
 
     def trigger(
-        self,
-        event: Union["Event", str],
-        charm_type: Type["CharmType"],
-        # callbacks
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
-        # if not provided, will be autoloaded from charm_type.
-        meta: Optional[Dict[str, Any]] = None,
-        actions: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None,
+            self,
+            event: Union["Event", str],
+            charm_type: Type["CharmType"],
+            # callbacks
+            pre_event: Optional[Callable[["CharmType"], None]] = None,
+            post_event: Optional[Callable[["CharmType"], None]] = None,
+            # if not provided, will be autoloaded from charm_type.
+            meta: Optional[Dict[str, Any]] = None,
+            actions: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None,
     ):
         """Fluent API for trigger."""
         return trigger(
@@ -540,7 +551,6 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
-
 
 # todo: consider
 #  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:
