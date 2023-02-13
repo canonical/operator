@@ -1,10 +1,16 @@
 from dataclasses import asdict
 
 import pytest
-from ops.charm import CharmBase, RelationChangedEvent, StartEvent, UpdateStatusEvent, WorkloadEvent
+from ops.charm import (
+    CharmBase,
+    RelationChangedEvent,
+    StartEvent,
+    UpdateStatusEvent,
+    WorkloadEvent,
+)
 from ops.framework import Framework
 
-from scenario.state import DeferredEvent, Relation, State, deferred, Container
+from scenario.state import Container, DeferredEvent, Relation, State, deferred
 
 CHARM_CALLED = 0
 
@@ -78,9 +84,7 @@ def test_deferred_relation_evt(mycharm):
 def test_deferred_workload_evt(mycharm):
     ctr = Container("foo")
     evt1 = ctr.pebble_ready_event.deferred(handler=mycharm._on_event)
-    evt2 = deferred(
-        event="foo_pebble_ready", handler=mycharm._on_event, container=ctr
-    )
+    evt2 = deferred(event="foo_pebble_ready", handler=mycharm._on_event, container=ctr)
 
     assert asdict(evt2) == asdict(evt1)
 
@@ -138,9 +142,7 @@ def test_deferred_workload_event(mycharm):
 
     out = State(
         containers=[ctr],
-        deferred=[
-            ctr.pebble_ready_event.deferred(handler=mycharm._on_event)
-        ],
+        deferred=[ctr.pebble_ready_event.deferred(handler=mycharm._on_event)],
     ).trigger("start", mycharm, meta=mycharm.META)
 
     # we deferred the first 2 events we saw: foo_pebble_ready, start.

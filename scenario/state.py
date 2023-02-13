@@ -595,7 +595,7 @@ def deferred(
                     "cannot construct a deferred relation event without the relation instance. "
                     "Please pass one."
                 )
-        if not container and norm_evt.endswith('_pebble_ready'):
+        if not container and norm_evt.endswith("_pebble_ready"):
             raise ValueError(
                 "cannot construct a deferred workload event without the container instance. "
                 "Please pass one."
