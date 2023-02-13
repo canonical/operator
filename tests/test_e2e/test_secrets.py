@@ -182,10 +182,8 @@ def test_grant(mycharm, app):
         post_event=post_event,
     )
 
-    if app:
-        assert out.secrets[0].remote_grants[1] == {"remote"}
-    else:
-        assert out.secrets[0].remote_grants[2] == {"remote/0"}
+    vals = list(out.secrets[0].remote_grants.values())
+    assert vals == [{"remote"}] if app else [{"remote/0"}]
 
 
 def test_grant_nonowner(mycharm):

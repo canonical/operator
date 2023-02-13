@@ -4,18 +4,7 @@ import datetime
 import inspect
 import typing
 from pathlib import Path, PurePosixPath
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Set,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
 from uuid import uuid4
 
 import yaml
