@@ -163,7 +163,7 @@ When testing a kubernetes charm, you can mock container interactions.
 When using the null state (`State()`), there will be no containers. So if the charm were to `self.unit.containers`, it would get back an empty dict.
 
 To give the charm access to some containers, you need to pass them to the input state, like so:
-`State(containers=[...])`
+`State(containers=...)`
 
 An example of a scene including some containers:
 ```python
@@ -275,29 +275,50 @@ def test_pebble_exec():
 ```
 
 
-# Event queue
+# Deferred events
 
 Scenario allows you to accurately simulate the Operator Framework's event queue. The event queue is responsible for keeping track of the deferred events. 
 On the input side, you can verify that if the charm triggers with this and that event in its queue (they would be there because they had been deferred in the previous run), then the output state is valid.
 
 ```python
-from scenario import State, DeferredEvent
+from scenario import State, deferred
 
 
 class MyCharm(...):
-    [...]
+    ...
+    def _on_update_status(self, e):
+        e.defer()
     def _on_start(self, e):
         e.defer()
 
         
-def test_defer(MyCharm):
+def test_start_on_deferred_update_status(MyCharm):
+    """Test charm execution if a 'start' is dispatched when in the previous run an update-status had been deferred."""
     out = State(
       deferred=[
-            DeferredEvent('MyCharm/on/update_status[1]', 'MyCharm', '_on_event')
+            deferred('update_status', 
+                     handler=MyCharm._on_update_status)
         ]
     ).trigger('start', MyCharm)
     assert len(out.deferred) == 1
     assert out.deferred[0].name == 'start'
+```
+
+You can also generate the 'deferred' data structure (called a `DeferredEvent`) from the corresponding Event (and the handler):
+
+```python
+from scenario import Event, Relation
+
+class MyCharm(...):
+    ...
+
+deferred_start = Event('start').deferred(MyCharm._on_start)
+deferred_install = Event('install').deferred(MyCharm._on_start)
+...
+
+# relation events:
+foo_relation = Relation('foo') 
+deferred_relation_changed_evt = foo_relation.changed_event.deferred(handler=MyCharm._on_foo_relation_changed)
 ```
 
 On the output side, you can verify that an event that you expect to have been deferred during this trigger, has indeed been deferred.
@@ -307,7 +328,7 @@ from scenario import State
 
 
 class MyCharm(...):
-    [...]
+    ...
     def _on_start(self, e):
         e.defer()
 
@@ -319,6 +340,60 @@ def test_defer(MyCharm):
 ```
 
 
+## Deferring relation events
+
+If you want to test relation event deferrals, some extra care needs to be taken. RelationEvents hold references to the Relation instance they are about. So do they in Scenario. You can use the `deferred` helper to generate the data structure:
+
+```python
+from scenario import State, Relation, deferred
+
+
+class MyCharm(...):
+    ...
+    def _on_foo_relation_changed(self, e):
+        e.defer()
+
+        
+def test_start_on_deferred_update_status(MyCharm):
+    foo_relation = Relation('foo') 
+    State(
+      relations=[foo_relation],
+      deferred=[
+            deferred('foo_relation_changed', 
+                     handler=MyCharm._on_foo_relation_changed,
+                     relation=foo_relation)
+        ]
+    )
+```
+
+but you can also use a shortcut from the relation event itself, as mentioned above:
+
+```python
+from scenario import Relation
+
+class MyCharm(...):
+    ...
+
+foo_relation = Relation('foo') 
+foo_relation.changed_event.deferred(handler=MyCharm._on_foo_relation_changed)
+```
+
+
+## Fine-tuning
+The `deferred` helper Scenario provides will not support out of the box all custom event subclasses, or events emitted by charm libraries or objects other than the main charm class.
+
+For general-purpose usage, you will need to instantiate `DeferredEvent` directly.
+
+```python
+from scenario import DeferredEvent
+
+my_deferred_event = DeferredEvent(
+   handle_path='MyCharm/MyCharmLib/on/database_ready[1]',
+   owner='MyCharmLib',  # the object observing the event. Could also be MyCharm.
+   observer='_on_database_ready'
+)
+
+```
 
 
 # TODOS:

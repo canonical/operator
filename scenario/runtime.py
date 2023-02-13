@@ -191,7 +191,9 @@ class Runtime:
             try:
                 marshal.dumps(event.snapshot_data)
             except ValueError as e:
-                raise ValueError(f"unable to save the data for {event}, it must contain only simple types.") from e
+                raise ValueError(
+                    f"unable to save the data for {event}, it must contain only simple types."
+                ) from e
             store.save_snapshot(event.handle_path, event.snapshot_data)
 
         store.close()
