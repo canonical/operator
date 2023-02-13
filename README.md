@@ -15,6 +15,8 @@ config?...).
 The output is another context instance: the context after the charm has had a chance to interact with the mocked juju
 model.
 
+![state transition model depiction](resources/state-transition-model.png)
+
 Scenario-testing a charm, then, means verifying that:
 
 - the charm does not raise uncaught exceptions while handling the scene

@@ -29,7 +29,6 @@ if typing.TYPE_CHECKING:
         from typing import Self
     except ImportError:
         from typing_extensions import Self
-    from ops.pebble import LayerDict
     from ops.testing import CharmType
 
 logger = scenario_logger.getChild("structs")
