@@ -1,6 +1,7 @@
 import copy
 import dataclasses
 import inspect
+import re
 import typing
 from pathlib import Path, PurePosixPath
 from typing import (
@@ -37,6 +38,13 @@ ATTACH_ALL_STORAGES = "ATTACH_ALL_STORAGES"
 CREATE_ALL_RELATIONS = "CREATE_ALL_RELATIONS"
 BREAK_ALL_RELATIONS = "BREAK_ALL_RELATIONS"
 DETACH_ALL_STORAGES = "DETACH_ALL_STORAGES"
+RELATION_EVENTS_SUFFIX = {
+    "-relation-changed",
+    "-relation-broken",
+    "-relation-joined",
+    "-relation-departed",
+    "-relation-created",
+}
 META_EVENTS = {
     "CREATE_ALL_RELATIONS": "-relation-created",
     "BREAK_ALL_RELATIONS": "-relation-broken",
@@ -116,7 +124,7 @@ _RELATION_IDS_CTR = 0
 @dataclasses.dataclass
 class Relation(_DCBase):
     endpoint: str
-    remote_app_name: str
+    remote_app_name: str = 'remote'
     remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
 
     # local limit
@@ -385,7 +393,7 @@ class State(_DCBase):
     # and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
-    event_queue: List["StoredEvent"] = dataclasses.field(default_factory=list)
+    deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
 
     # todo:
     #  actions?
@@ -495,7 +503,7 @@ def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
 
 
 @dataclasses.dataclass
-class StoredEvent(_DCBase):
+class DeferredEvent(_DCBase):
     handle_path: str
     owner: str
     observer: str
@@ -528,6 +536,53 @@ class Event(_DCBase):
     #  - pebble?
     #  - action?
 
+    def __post_init__(self):
+        if '-' in self.name:
+            logger.warning(f"Only use underscores in event names. {self.name!r}")
+        self.name = self.name.replace('-', '_')
+
+    def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
+        """Construct a DeferredEvent from this Event."""
+        handler_repr = repr(handler)
+        handler_re = re.compile(r"<function (.*) at .*>")
+        match = handler_re.match(handler_repr)
+        if not match:
+            raise ValueError(f'cannot construct DeferredEvent from {handler}; please create one manually.')
+        owner_name, handler_name = match.groups()[0].split('.')[-2:]
+        handle_path = f"{owner_name}/on/{self.name}[{event_id}]"
+
+        snapshot_data = {}
+        if self.relation:
+            # this is a RelationEvent. The snapshot:
+            snapshot_data = {
+                'relation_name': self.relation.endpoint,
+                'relation_id': self.relation.relation_id
+                # 'app_name': local app name
+                # 'unit_name': local unit name
+            }
+
+        return DeferredEvent(
+            handle_path,
+            owner_name,
+            handler_name,
+            snapshot_data=snapshot_data,
+        )
+
+
+def deferred(event: Union[str, Event], handler: Callable, event_id: int = 1,
+             relation: Relation = None):
+    """Construct a DeferredEvent from an Event or an event name."""
+    if isinstance(event, str):
+        norm_evt = event.replace('_', '-')
+
+        if not relation:
+            if any(map(norm_evt.endswith, RELATION_EVENTS_SUFFIX)):
+                raise ValueError('cannot construct a deferred relation event without the relation instance. '
+                                 'Please pass one.')
+
+        event = Event(event, relation=relation)
+    return event.deferred(handler=handler, event_id=event_id)
+
 
 @dataclasses.dataclass
 class Inject(_DCBase):
@@ -546,15 +601,7 @@ class InjectRelation(Inject):
 
 def _derive_args(event_name: str):
     args = []
-    terms = {
-        "-relation-changed",
-        "-relation-broken",
-        "-relation-joined",
-        "-relation-departed",
-        "-relation-created",
-    }
-
-    for term in terms:
+    for term in RELATION_EVENTS_SUFFIX:
         # fixme: we can't disambiguate between relation IDs.
         if event_name.endswith(term):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))

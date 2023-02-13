@@ -184,34 +184,37 @@ class Runtime:
     def _initialize_storage(self, state: "State", temporary_charm_root: Path):
         """Before we start processing this event, expose the relevant parts of State through the storage."""
         store = self._get_store(temporary_charm_root)
-        event_queue = state.event_queue
+        deferred = state.deferred
 
-        for event in event_queue:
+        for event in deferred:
             store.save_notice(event.handle_path, event.owner, event.observer)
-            data = marshal.dumps(event.snapshot_data)
-            store.save_snapshot(event.handle_path, data)
+            try:
+                marshal.dumps(event.snapshot_data)
+            except ValueError as e:
+                raise ValueError(f"unable to save the data for {event}, it must contain only simple types.") from e
+            store.save_snapshot(event.handle_path, event.snapshot_data)
 
         store.close()
 
     def _close_storage(self, state: "State", temporary_charm_root: Path):
         """Now that we're done processing this event, read the charm state and expose it via State."""
-        from scenario.state import StoredEvent  # avoid cyclic import
+        from scenario.state import DeferredEvent  # avoid cyclic import
 
         store = self._get_store(temporary_charm_root)
 
-        event_queue = []
+        deferred = []
         event_regex = re.compile(_event_regex)
         for handle_path in store.list_snapshots():
             if event_regex.match(handle_path):
                 notices = store.notices(handle_path)
                 for handle, owner, observer in notices:
-                    event = StoredEvent(
+                    event = DeferredEvent(
                         handle_path=handle, owner=owner, observer=observer
                     )
-                    event_queue.append(event)
+                    deferred.append(event)
 
         store.close()
-        return state.replace(event_queue=event_queue)
+        return state.replace(deferred=deferred)
 
     def exec(
         self,
