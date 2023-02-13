@@ -106,6 +106,6 @@ def test_relation_data_access(mycharm):
             "name": "foo",
             "requires": {"relation_test": {"interface": "azdrubales"}},
         },
-        event="update-status",
+        event="update_status",
         post_event=check_relation_data,
     )

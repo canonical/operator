@@ -50,7 +50,7 @@ def test_event_hooks():
         post_event = MagicMock(return_value=None)
         runtime.exec(
             state=State(),
-            event=Event("update-status"),
+            event=Event("update_status"),
             pre_event=pre_event,
             post_event=post_event,
         )

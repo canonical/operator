@@ -170,27 +170,27 @@ class Relation(_DCBase):
     @property
     def changed_event(self):
         """Sugar to generate a <this relation>-relation-changed event."""
-        return Event(name=self.endpoint + "-relation-changed", relation=self)
+        return Event(name=self.endpoint + "_relation_changed", relation=self)
 
     @property
     def joined_event(self):
         """Sugar to generate a <this relation>-relation-joined event."""
-        return Event(name=self.endpoint + "-relation-joined", relation=self)
+        return Event(name=self.endpoint + "_relation_joined", relation=self)
 
     @property
     def created_event(self):
         """Sugar to generate a <this relation>-relation-created event."""
-        return Event(name=self.endpoint + "-relation-created", relation=self)
+        return Event(name=self.endpoint + "_relation_created", relation=self)
 
     @property
     def departed_event(self):
         """Sugar to generate a <this relation>-relation-departed event."""
-        return Event(name=self.endpoint + "-relation-departed", relation=self)
+        return Event(name=self.endpoint + "_relation_departed", relation=self)
 
     @property
     def broken_event(self):
         """Sugar to generate a <this relation>-relation-broken event."""
-        return Event(name=self.endpoint + "-relation-broken", relation=self)
+        return Event(name=self.endpoint + "_relation_broken", relation=self)
 
 
 def _random_model_name():
@@ -284,7 +284,7 @@ class Container(_DCBase):
                 "you **can** fire pebble-ready while the container cannot connect, "
                 "but that's most likely not what you want."
             )
-        return Event(name=self.name + "-pebble-ready", container=self)
+        return Event(name=self.name + "_pebble_ready", container=self)
 
 
 @dataclasses.dataclass
