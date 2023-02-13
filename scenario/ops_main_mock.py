@@ -3,7 +3,7 @@
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable, Literal, Optional
 
 import ops.charm
 import ops.framework
@@ -22,6 +22,10 @@ if TYPE_CHECKING:
     from scenario.state import Event, State, _CharmSpec
 
 logger = scenario_logger.getChild("ops_main_mock")
+
+
+class NoObserverError(RuntimeError):
+    """Error raised when the event being dispatched has no registered observers."""
 
 
 def main(
@@ -76,6 +80,12 @@ def main(
 
         if pre_event:
             pre_event(charm)
+
+        if not getattr(charm.on, dispatcher.event_name, None):
+            raise NoObserverError(
+                f"Charm has no registered observers for {dispatcher.event_name!r}. "
+                f"This is probably not what you were looking for."
+            )
 
         _emit_charm_event(charm, dispatcher.event_name)
 

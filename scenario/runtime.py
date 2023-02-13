@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, 
 import yaml
 
 from scenario.logger import logger as scenario_logger
+from scenario.ops_main_mock import NoObserverError
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
@@ -22,6 +23,10 @@ if TYPE_CHECKING:
 logger = scenario_logger.getChild("runtime")
 
 RUNTIME_MODULE = Path(__file__).parent
+
+
+class UncaughtCharmError(RuntimeError):
+    """Error raised if the charm raises while handling the event being dispatched."""
 
 
 @dataclasses.dataclass
@@ -214,8 +219,10 @@ class Runtime:
                         charm_type=self._wrap(charm_type)
                     ),
                 )
+            except NoObserverError:
+                raise  # propagate along
             except Exception as e:
-                raise RuntimeError(
+                raise UncaughtCharmError(
                     f"Uncaught error in operator/charm code: {e}."
                 ) from e
             finally:
@@ -239,7 +246,6 @@ def trigger(
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
 ) -> "State":
-
     from scenario.state import Event, _CharmSpec
 
     if isinstance(event, str):
