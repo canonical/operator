@@ -1,10 +1,10 @@
 from dataclasses import asdict
 
 import pytest
-from ops.charm import CharmBase, RelationChangedEvent, StartEvent, UpdateStatusEvent
+from ops.charm import CharmBase, RelationChangedEvent, StartEvent, UpdateStatusEvent, WorkloadEvent
 from ops.framework import Framework
 
-from scenario.state import DeferredEvent, Relation, State, deferred
+from scenario.state import DeferredEvent, Relation, State, deferred, Container
 
 CHARM_CALLED = 0
 
@@ -12,7 +12,11 @@ CHARM_CALLED = 0
 @pytest.fixture(scope="function")
 def mycharm():
     class MyCharm(CharmBase):
-        META = {"name": "mycharm", "requires": {"foo": {"interface": "bar"}}}
+        META = {
+            "name": "mycharm",
+            "requires": {"foo": {"interface": "bar"}},
+            "containers": {"foo": {"type": "oci-image"}},
+        }
         defer_next = 0
         captured = []
 
@@ -61,11 +65,21 @@ def test_deferred_relation_event_without_relation_raises(mycharm):
         deferred(event="foo_relation_changed", handler=mycharm._on_event)
 
 
-def test_deferred(mycharm):
+def test_deferred_relation_evt(mycharm):
     rel = Relation(endpoint="foo", remote_app_name="remote")
     evt1 = rel.changed_event.deferred(handler=mycharm._on_event)
     evt2 = deferred(
         event="foo_relation_changed", handler=mycharm._on_event, relation=rel
+    )
+
+    assert asdict(evt2) == asdict(evt1)
+
+
+def test_deferred_workload_evt(mycharm):
+    ctr = Container("foo")
+    evt1 = ctr.pebble_ready_event.deferred(handler=mycharm._on_event)
+    evt2 = deferred(
+        event="foo_pebble_ready", handler=mycharm._on_event, container=ctr
     )
 
     assert asdict(evt2) == asdict(evt1)
@@ -114,4 +128,28 @@ def test_deferred_relation_event_from_relation(mycharm):
     assert len(mycharm.captured) == 2
     upstat, start = mycharm.captured
     assert isinstance(upstat, RelationChangedEvent)
+    assert isinstance(start, StartEvent)
+
+
+def test_deferred_workload_event(mycharm):
+    mycharm.defer_next = 2
+
+    ctr = Container("foo")
+
+    out = State(
+        containers=[ctr],
+        deferred=[
+            ctr.pebble_ready_event.deferred(handler=mycharm._on_event)
+        ],
+    ).trigger("start", mycharm, meta=mycharm.META)
+
+    # we deferred the first 2 events we saw: foo_pebble_ready, start.
+    assert len(out.deferred) == 2
+    assert out.deferred[0].name == "foo_pebble_ready"
+    assert out.deferred[1].name == "start"
+
+    # we saw start and foo_pebble_ready.
+    assert len(mycharm.captured) == 2
+    upstat, start = mycharm.captured
+    assert isinstance(upstat, WorkloadEvent)
     assert isinstance(start, StartEvent)

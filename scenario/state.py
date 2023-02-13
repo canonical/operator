@@ -554,7 +554,14 @@ class Event(_DCBase):
         handle_path = f"{owner_name}/on/{self.name}[{event_id}]"
 
         snapshot_data = {}
-        if self.relation:
+
+        if self.container:
+            # this is a WorkloadEvent. The snapshot:
+            snapshot_data = {
+                "container_name": self.container.name,
+            }
+
+        elif self.relation:
             # this is a RelationEvent. The snapshot:
             snapshot_data = {
                 "relation_name": self.relation.endpoint,
@@ -575,7 +582,8 @@ def deferred(
     event: Union[str, Event],
     handler: Callable,
     event_id: int = 1,
-    relation: Relation = None,
+    relation: "Relation" = None,
+    container: "Container" = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
@@ -587,8 +595,13 @@ def deferred(
                     "cannot construct a deferred relation event without the relation instance. "
                     "Please pass one."
                 )
+        if not container and norm_evt.endswith('_pebble_ready'):
+            raise ValueError(
+                "cannot construct a deferred workload event without the container instance. "
+                "Please pass one."
+            )
 
-        event = Event(event, relation=relation)
+        event = Event(event, relation=relation, container=container)
     return event.deferred(handler=handler, event_id=event_id)
 
 
