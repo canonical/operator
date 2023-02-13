@@ -378,7 +378,7 @@ class StoredState(_DCBase):
     # if None, this StoredState instance is owned by the Framework.
     owner_path: Optional[str]
 
-    name: str = '_stored'
+    name: str = "_stored"
     content: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
     data_type_name: str = "StoredStateData"

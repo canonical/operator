@@ -216,13 +216,13 @@ class Runtime:
                 stored_state_snapshot = store.load_snapshot(handle_path)
                 match = sst_regex.match(handle_path)
                 if not match:
-                    logger.warning(f"could not parse handle path {handle_path!r} as stored state")
+                    logger.warning(
+                        f"could not parse handle path {handle_path!r} as stored state"
+                    )
                     continue
 
                 kwargs = match.groupdict()
-                sst = StoredState(
-                    content=stored_state_snapshot,
-                    **kwargs)
+                sst = StoredState(content=stored_state_snapshot, **kwargs)
                 stored_state.append(sst)
 
         store.close()
