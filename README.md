@@ -405,7 +405,7 @@ from scenario import State, StoredState
 
 state = State(stored_state=[
     StoredState(
-        owner="MyCharmType",
+        owner_path="MyCharmType",
         content={
             'foo': 'bar',
             'baz': {42: 42},
