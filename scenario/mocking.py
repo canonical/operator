@@ -68,6 +68,29 @@ class _MockModelBackend(_ModelBackend):
         except StopIteration as e:
             raise RuntimeError(f"Not found: relation with id={rel_id}.") from e
 
+    def _get_secret(self, id=None, label=None):
+        # cleanup id:
+        if id and id.startswith("secret:"):
+            id = id[7:]
+
+        if id:
+            try:
+                return next(filter(lambda s: s.id == id, self._state.secrets))
+            except StopIteration:
+                raise RuntimeError(f"not found: secret with id={id}.")
+        elif label:
+            try:
+                return next(filter(lambda s: s.label == label, self._state.secrets))
+            except StopIteration:
+                raise RuntimeError(f"not found: secret with label={label}.")
+        else:
+            raise RuntimeError(f"need id or label.")
+
+    @staticmethod
+    def _generate_secret_id():
+        id = "".join(map(str, [random.choice(list(range(10))) for _ in range(20)]))
+        return f"secret:{id}"
+
     def relation_get(self, rel_id, obj_name, app):
         relation = self._get_relation_by_id(rel_id)
         if app and obj_name == self._state.app_name:
@@ -144,29 +167,6 @@ class _MockModelBackend(_ModelBackend):
             tgt = relation.local_unit_data
         tgt[key] = value
         return None
-
-    def _get_secret(self, id=None, label=None):
-        # cleanup id:
-        if id and id.startswith("secret:"):
-            id = id[7:]
-
-        if id:
-            try:
-                return next(filter(lambda s: s.id == id, self._state.secrets))
-            except StopIteration:
-                raise RuntimeError(f"not found: secret with id={id}.")
-        elif label:
-            try:
-                return next(filter(lambda s: s.label == label, self._state.secrets))
-            except StopIteration:
-                raise RuntimeError(f"not found: secret with label={label}.")
-        else:
-            raise RuntimeError(f"need id or label.")
-
-    @staticmethod
-    def _generate_secret_id():
-        id = "".join(map(str, [random.choice(list(range(10))) for _ in range(20)]))
-        return f"secret:{id}"
 
     def secret_add(
         self,

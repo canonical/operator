@@ -11,7 +11,6 @@ from typing import (
     List,
     Literal,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Type,
@@ -378,13 +377,13 @@ class Status(_DCBase):
 @dataclasses.dataclass
 class State(_DCBase):
     config: Dict[str, Union[str, int, float, bool]] = None
-    relations: Sequence[Relation] = dataclasses.field(default_factory=list)
-    networks: Sequence[Network] = dataclasses.field(default_factory=list)
-    containers: Sequence[Container] = dataclasses.field(default_factory=list)
+    relations: List[Relation] = dataclasses.field(default_factory=list)
+    networks: List[Network] = dataclasses.field(default_factory=list)
+    containers: List[Container] = dataclasses.field(default_factory=list)
     status: Status = dataclasses.field(default_factory=Status)
     leader: bool = False
     model: Model = Model()
-    juju_log: Sequence[Tuple[str, str]] = dataclasses.field(default_factory=list)
+    juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
     # meta stuff: actually belongs in event data structure.
