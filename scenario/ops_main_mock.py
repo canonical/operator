@@ -3,7 +3,7 @@
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Callable, Literal, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 import ops.charm
 import ops.framework

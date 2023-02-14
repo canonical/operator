@@ -1,10 +1,12 @@
+import datetime
 import pathlib
+import random
 import urllib.request
 from io import StringIO
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
 from ops import pebble
-from ops.model import _ModelBackend
+from ops.model import SecretInfo, SecretRotate, _ModelBackend
 from ops.pebble import Client, ExecError
 from ops.testing import _TestingFilesystem, _TestingPebbleClient, _TestingStorageMount
 
@@ -66,6 +68,29 @@ class _MockModelBackend(_ModelBackend):
         except StopIteration as e:
             raise RuntimeError(f"Not found: relation with id={rel_id}.") from e
 
+    def _get_secret(self, id=None, label=None):
+        # cleanup id:
+        if id and id.startswith("secret:"):
+            id = id[7:]
+
+        if id:
+            try:
+                return next(filter(lambda s: s.id == id, self._state.secrets))
+            except StopIteration:
+                raise RuntimeError(f"not found: secret with id={id}.")
+        elif label:
+            try:
+                return next(filter(lambda s: s.label == label, self._state.secrets))
+            except StopIteration:
+                raise RuntimeError(f"not found: secret with label={label}.")
+        else:
+            raise RuntimeError(f"need id or label.")
+
+    @staticmethod
+    def _generate_secret_id():
+        id = "".join(map(str, [random.choice(list(range(10))) for _ in range(20)]))
+        return f"secret:{id}"
+
     def relation_get(self, rel_id, obj_name, app):
         relation = self._get_relation_by_id(rel_id)
         if app and obj_name == self._state.app_name:
@@ -81,25 +106,25 @@ class _MockModelBackend(_ModelBackend):
     def is_leader(self):
         return self._state.leader
 
-    def status_get(self, *args, **kwargs):
-        status, message = (
-            self._state.status.app if kwargs.get("app") else self._state.status.unit
-        )
+    def status_get(self, *, is_app: bool = False):
+        status, message = self._state.status.app if is_app else self._state.status.unit
         return {"status": status, "message": message}
 
-    def relation_ids(self, endpoint, *args, **kwargs):
+    def relation_ids(self, relation_name):
         return [
-            rel.relation_id for rel in self._state.relations if rel.endpoint == endpoint
+            rel.relation_id
+            for rel in self._state.relations
+            if rel.endpoint == relation_name
         ]
 
-    def relation_list(self, rel_id, *args, **kwargs):
-        relation = self._get_relation_by_id(rel_id)
+    def relation_list(self, relation_id: int):
+        relation = self._get_relation_by_id(relation_id)
         return tuple(
             f"{relation.remote_app_name}/{unit_id}"
             for unit_id in relation.remote_unit_ids
         )
 
-    def config_get(self, *args, **kwargs):
+    def config_get(self):
         state_config = self._state.config
         if not state_config:
             state_config = {
@@ -107,19 +132,172 @@ class _MockModelBackend(_ModelBackend):
                 for key, value in self._charm_spec.config.items()
             }
 
-        if args:  # one specific key requested
-            # Fixme: may raise KeyError if the key isn't defaulted. What do we do then?
-            return state_config[args[0]]
-
         return state_config  # full config
 
-    def network_get(self, *args, **kwargs):
-        name, relation_id = args
+    def network_get(self, binding_name: str, relation_id: Optional[int] = None):
+        if relation_id:
+            logger.warning("network-get -r not implemented")
 
-        network = next(filter(lambda r: r.name == name, self._state.networks))
+        network = next(filter(lambda r: r.name == binding_name, self._state.networks))
         return network.hook_tool_output_fmt()
 
-    def action_get(self, *args, **kwargs):
+    # setter methods: these can mutate the state.
+    def application_version_set(self, *args, **kwargs):
+        self._state.status.app_version = args[0]
+        return None
+
+    def status_set(self, *args, **kwargs):
+        if kwargs.get("is_app"):
+            self._state.status.app = args
+        else:
+            self._state.status.unit = args
+        return None
+
+    def juju_log(self, level: str, message: str):
+        self._state.juju_log.append((level, message))
+        return None
+
+    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+        relation = self._get_relation_by_id(relation_id)
+        if is_app:
+            if not self._state.leader:
+                raise RuntimeError("needs leadership to set app data")
+            tgt = relation.local_app_data
+        else:
+            tgt = relation.local_unit_data
+        tgt[key] = value
+        return None
+
+    def secret_add(
+        self,
+        content: Dict[str, str],
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[SecretRotate] = None,
+        owner: Optional[str] = None,
+    ) -> str:
+        from scenario.state import Secret
+
+        id = self._generate_secret_id()
+        secret = Secret(
+            id=id,
+            contents={0: content},
+            label=label,
+            description=description,
+            expire=expire,
+            rotate=rotate,
+            owner=owner,
+        )
+        self._state.secrets.append(secret)
+        return id
+
+    def secret_get(
+        self,
+        *,
+        id: str = None,
+        label: str = None,
+        refresh: bool = False,
+        peek: bool = False,
+    ) -> Dict[str, str]:
+        secret = self._get_secret(id, label)
+        revision = secret.revision
+        if peek or refresh:
+            revision = max(secret.contents.keys())
+            if refresh:
+                secret.revision = revision
+
+        return secret.contents[revision]
+
+    def secret_info_get(
+        self, *, id: Optional[str] = None, label: Optional[str] = None
+    ) -> SecretInfo:
+        secret = self._get_secret(id, label)
+        if not secret.owner:
+            raise RuntimeError(f"not the owner of {secret}")
+
+        return SecretInfo(
+            id=secret.id,
+            label=secret.label,
+            revision=max(secret.contents),
+            expires=secret.expire,
+            rotation=secret.rotate,
+            rotates=None,  # not implemented yet.
+        )
+
+    def secret_set(
+        self,
+        id: str,
+        *,
+        content: Optional[Dict[str, str]] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[SecretRotate] = None,
+    ):
+        secret = self._get_secret(id, label)
+        if not secret.owner:
+            raise RuntimeError(f"not the owner of {secret}")
+
+        revision = max(secret.contents.keys())
+        secret.contents[revision + 1] = content
+        if label:
+            secret.label = label
+        if description:
+            secret.description = description
+        if expire:
+            if isinstance(expire, datetime.timedelta):
+                expire = datetime.datetime.now() + expire
+            secret.expire = expire
+        if rotate:
+            secret.rotate = rotate
+        raise NotImplementedError("secret_set")
+
+    def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
+        secret = self._get_secret(id)
+        if not secret.owner:
+            raise RuntimeError(f"not the owner of {secret}")
+
+        grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
+
+        if not secret.remote_grants.get(relation_id):
+            secret.remote_grants[relation_id] = set()
+
+        secret.remote_grants[relation_id].add(grantee)
+
+    def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
+        secret = self._get_secret(id)
+        if not secret.owner:
+            raise RuntimeError(f"not the owner of {secret}")
+
+        grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
+        secret.remote_grants[relation_id].remove(grantee)
+
+    def secret_remove(self, id: str, *, revision: Optional[int] = None):
+        secret = self._get_secret(id)
+        if not secret.owner:
+            raise RuntimeError(f"not the owner of {secret}")
+
+        if revision:
+            del secret.contents[revision]
+        else:
+            secret.contents.clear()
+
+    # TODO:
+    def action_set(self, *args, **kwargs):
+        raise NotImplementedError("action_set")
+
+    def action_fail(self, *args, **kwargs):
+        raise NotImplementedError("action_fail")
+
+    def action_log(self, *args, **kwargs):
+        raise NotImplementedError("action_log")
+
+    def storage_add(self, *args, **kwargs):
+        raise NotImplementedError("storage_add")
+
+    def action_get(self):
         raise NotImplementedError("action_get")
 
     def relation_remote_app_name(self, *args, **kwargs):
@@ -136,89 +314,6 @@ class _MockModelBackend(_ModelBackend):
 
     def planned_units(self, *args, **kwargs):
         raise NotImplementedError("planned_units")
-
-    # setter methods: these can mutate the state.
-    def application_version_set(self, *args, **kwargs):
-        self._state.status.app_version = args[0]
-        return None
-
-    def status_set(self, *args, **kwargs):
-        if kwargs.get("is_app"):
-            self._state.status.app = args
-        else:
-            self._state.status.unit = args
-        return None
-
-    def juju_log(self, *args, **kwargs):
-        self._state.juju_log.append(args)
-        return None
-
-    def relation_set(self, *args, **kwargs):
-        rel_id, key, value, app = args
-        relation = self._get_relation_by_id(rel_id)
-        if app:
-            if not self._state.leader:
-                raise RuntimeError("needs leadership to set app data")
-            tgt = relation.local_app_data
-        else:
-            tgt = relation.local_unit_data
-        tgt[key] = value
-        return None
-
-    # TODO:
-    def action_set(self, *args, **kwargs):
-        raise NotImplementedError("action_set")
-
-    def action_fail(self, *args, **kwargs):
-        raise NotImplementedError("action_fail")
-
-    def action_log(self, *args, **kwargs):
-        raise NotImplementedError("action_log")
-
-    def storage_add(self, *args, **kwargs):
-        raise NotImplementedError("storage_add")
-
-    def secret_get(
-        self,
-        *,
-        id: str = None,
-        label: str = None,
-        refresh: bool = False,
-        peek: bool = False,
-    ) -> Dict[str, str]:
-        # cleanup id:
-        if id and id.startswith("secret:"):
-            id = id[7:]
-
-        if id:
-            try:
-                secret = next(filter(lambda s: s.id == id, self._state.secrets))
-            except StopIteration:
-                raise RuntimeError(f"not found: secret with id={id}.")
-        elif label:
-            try:
-                secret = next(filter(lambda s: s.label == label, self._state.secrets))
-            except StopIteration:
-                raise RuntimeError(f"not found: secret with label={label}.")
-        else:
-            raise RuntimeError(f"need id or label.")
-
-        revision = secret.revision
-        if peek or refresh:
-            revision = max(secret.contents.keys())
-            if refresh:
-                secret.revision = revision
-
-        return secret.contents[revision]
-
-    def secret_set(self, *args, **kwargs):
-        raise NotImplementedError("secret_set")
-
-    def secret_grant(self, *args, **kwargs):
-        raise NotImplementedError("secret_grant")
-
-    def secret_remove(self, *args, **kwargs):
-        raise NotImplementedError("secret_remove")
 
 
 class _MockStorageMount(_TestingStorageMount):

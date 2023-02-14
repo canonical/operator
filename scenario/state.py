@@ -1,25 +1,16 @@
 import copy
 import dataclasses
+import datetime
 import inspect
 import re
 import typing
 from pathlib import Path, PurePosixPath
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
 from uuid import uuid4
 
 import yaml
 from ops import pebble
+from ops.model import SecretRotate
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockFileSystem, _MockStorageMount
@@ -69,21 +60,29 @@ class Secret(_DCBase):
     # mapping from revision IDs to each revision's contents
     contents: Dict[int, Dict[str, str]]
 
-    owned_by_this_unit: bool = False
+    # indicates if the secret is owned by THIS unit, THIS app or some other app/unit.
+    owner: Literal["unit", "application", None] = None
 
-    # has this secret been granted to this unit/app or neither?
+    # has this secret been granted to this unit/app or neither? Only applicable if NOT owner
     granted: Literal["unit", "app", False] = False
 
-    # what revision is currently tracked by this charm. Only meaningful if owned_by_this_unit=False
+    # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
 
-    label: str = None
+    # mapping from relation IDs to remote unit/apps to which this secret has been granted.
+    # Only applicable if owner
+    remote_grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
+
+    label: Optional[str] = None
+    description: Optional[str] = None
+    expire: Optional[datetime.datetime] = None
+    rotate: SecretRotate = SecretRotate.NEVER
 
     # consumer-only events
     @property
     def changed_event(self):
         """Sugar to generate a secret-changed event."""
-        if self.owned_by_this_unit:
+        if self.owner:
             raise ValueError(
                 "This unit will never receive secret-changed for a secret it owns."
             )
@@ -93,7 +92,7 @@ class Secret(_DCBase):
     @property
     def rotate_event(self):
         """Sugar to generate a secret-rotate event."""
-        if not self.owned_by_this_unit:
+        if not self.owner:
             raise ValueError(
                 "This unit will never receive secret-rotate for a secret it does not own."
             )
@@ -102,7 +101,7 @@ class Secret(_DCBase):
     @property
     def expired_event(self):
         """Sugar to generate a secret-expired event."""
-        if not self.owned_by_this_unit:
+        if not self.owner:
             raise ValueError(
                 "This unit will never receive secret-expire for a secret it does not own."
             )
@@ -111,7 +110,7 @@ class Secret(_DCBase):
     @property
     def remove_event(self):
         """Sugar to generate a secret-remove event."""
-        if not self.owned_by_this_unit:
+        if not self.owner:
             raise ValueError(
                 "This unit will never receive secret-removed for a secret it does not own."
             )
@@ -391,13 +390,13 @@ class StoredState(_DCBase):
 @dataclasses.dataclass
 class State(_DCBase):
     config: Dict[str, Union[str, int, float, bool]] = None
-    relations: Sequence[Relation] = dataclasses.field(default_factory=list)
-    networks: Sequence[Network] = dataclasses.field(default_factory=list)
-    containers: Sequence[Container] = dataclasses.field(default_factory=list)
+    relations: List[Relation] = dataclasses.field(default_factory=list)
+    networks: List[Network] = dataclasses.field(default_factory=list)
+    containers: List[Container] = dataclasses.field(default_factory=list)
     status: Status = dataclasses.field(default_factory=Status)
     leader: bool = False
     model: Model = Model()
-    juju_log: Sequence[Tuple[str, str]] = dataclasses.field(default_factory=list)
+    juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
     # meta stuff: actually belongs in event data structure.
