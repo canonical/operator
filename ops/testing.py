@@ -146,12 +146,12 @@ class Harness(Generic[CharmType]):
             actions: Optional[YAMLStringOrFile] = None,
             config: Optional[YAMLStringOrFile] = None):
         self._charm_cls = charm_cls
-        self._charm = None  # type: Optional[CharmType]
+        self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
-        self._unit_name = f"{self._meta.name}/0"  # type: str
-        self._hooks_enabled = True  # type: bool
-        self._relation_id_counter = 0  # type: int
+        self._unit_name: str = f"{self._meta.name}/0"
+        self._hooks_enabled: bool = True
+        self._relation_id_counter: int = 0
         config_ = self._get_config(config)
         self._backend = _TestingModelBackend(self._unit_name, self._meta, config_)
         self._model = model.Model(self._meta, self._backend)
@@ -562,7 +562,7 @@ class Harness(Generic[CharmType]):
 
         storage_indices = self._backend.storage_add(storage_name, count)
 
-        ids = []  # type: List[str]
+        ids: List[str] = []
         for storage_index in storage_indices:
             s = model.Storage(storage_name, storage_index, self._backend)
             ids.append(s.full_id)
@@ -1422,7 +1422,7 @@ class _TestingConfig(Dict[str, '_ConfigValue']):
         """
         if not charm_config:
             return {}
-        cfg = charm_config.get('options', {})  # type: Dict[str, '_ConfigOption']
+        cfg: Dict[str, '_ConfigOption'] = charm_config.get('options', {})
         return {key: value.get('default', None) for key, value in cfg.items()}
 
     def _config_set(self, key: str, value: '_ConfigValue'):
@@ -1510,43 +1510,41 @@ class _TestingModelBackend:
 
         self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
         # this is used by the _record_calls decorator
-        self._calls = []  # type: List[Tuple[Any, ...]]
+        self._calls: List[Tuple[Any, ...]] = []
         self._meta = meta
         # relation name to [relation_ids,...]
-        self._relation_ids_map = {}   # type: Dict[str, List[int]]
+        self._relation_ids_map: Dict[str, List[int]] = {}
         # reverse map from relation_id to relation_name
-        self._relation_names = {}  # type: Dict[int, str]
+        self._relation_names: Dict[int, str] = {}
         # relation_id: [unit_name,...]
-        self._relation_list_map = {}  # type: Dict[int, List[str]]
+        self._relation_list_map: Dict[int, List[str]] = {}
         # {relation_id: {name: Dict[str: str]}}
-        self._relation_data_raw = {}  # type: Dict[int, Dict[str, Dict[str, str]]]
+        self._relation_data_raw: Dict[int, Dict[str, Dict[str, str]]] = {}
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
-        self._relation_app_and_units = {}  # type: Dict[int, _RelationEntities]
+        self._relation_app_and_units: Dict[int, _RelationEntities] = {}
         self._config = _TestingConfig(config)
-        self._is_leader = False  # type: bool
+        self._is_leader: bool = False
         # {resource_name: resource_content}
         # where resource_content is (path, content)
-        self._resources_map = {}  # type: Dict[str, Tuple[str, Union[str, bytes]]]
+        self._resources_map: Dict[str, Tuple[str, Union[str, bytes]]] = {}
         # fixme: understand how this is used and adjust the type
-        self._pod_spec = None  # type: Optional[Tuple[model.K8sSpec, Any]]
-        self._app_status = {'status': 'unknown', 'message': ''}  # type: _RawStatus
-        self._unit_status = {'status': 'maintenance', 'message': ''}  # type: _RawStatus
-        self._workload_version = None  # type: Optional[str]
-        self._resource_dir = None  # type: Optional[tempfile.TemporaryDirectory[Any]]
+        self._pod_spec: Optional[Tuple[model.K8sSpec, Any]] = None
+        self._app_status: _RawStatus = {'status': 'unknown', 'message': ''}
+        self._unit_status: _RawStatus = {'status': 'maintenance', 'message': ''}
+        self._workload_version: Optional[str] = None
+        self._resource_dir: Optional[tempfile.TemporaryDirectory[Any]] = None
         # Format:
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
-        self._storage_list = {k: {} for k in self._meta.storages
-                              }  # type: Dict[str, Dict[int, Dict[str, Any]]]
-
-        self._storage_attached = {k: set() for k in self._meta.storages
-                                  }  # type: Dict[str, Set[int]]
+        self._storage_list: Dict[str, Dict[int, Dict[str, Any]]] = {
+            k: {} for k in self._meta.storages}
+        self._storage_attached: Dict[str, Set[int]] = {k: set() for k in self._meta.storages}
         self._storage_index_counter = 0
         # {container_name : _TestingPebbleClient}
-        self._pebble_clients = {}  # type: Dict[str, _TestingPebbleClient]
-        self._pebble_clients_can_connect = {}  # type: Dict[_TestingPebbleClient, bool]
-        self._planned_units = None  # type: Optional[int]
+        self._pebble_clients: Dict[str, _TestingPebbleClient] = {}
+        self._pebble_clients_can_connect: Dict[_TestingPebbleClient, bool] = {}
+        self._planned_units: Optional[int] = None
         self._hook_is_running = ''
         self._secrets: List[_Secret] = []
 
@@ -1558,7 +1556,7 @@ class _TestingModelBackend:
         if len(relations) > 0:
             return
 
-        valid_relation_endpoints = list(self._meta.peers.keys())  # type: List[str]
+        valid_relation_endpoints: List[str] = list(self._meta.peers.keys())
         valid_relation_endpoints.extend(self._meta.requires.keys())
         valid_relation_endpoints.extend(self._meta.provides.keys())
         if self._hook_is_running == 'leader_elected' and relation_name in valid_relation_endpoints:
@@ -1599,7 +1597,7 @@ class _TestingModelBackend:
         except KeyError as e:
             if relation_name not in self._meta.relations:
                 raise model.ModelError(f'{relation_name} is not a known relation') from e
-            no_ids = []  # type: List[int]
+            no_ids: List[int] = []
             return no_ids
 
     def relation_list(self, relation_id: int):
@@ -1739,7 +1737,7 @@ class _TestingModelBackend:
 
         if name not in self._storage_list:
             self._storage_list[name] = {}
-        result = []  # type: List[int]
+        result: List[int] = []
         for _ in range(count):
             index = self._storage_index_counter
             self._storage_index_counter += 1
@@ -1846,8 +1844,8 @@ class _TestingModelBackend:
         if self._planned_units is not None:
             return self._planned_units
 
-        units = set()  # type: Set[str]
-        peer_names = set(self._meta.peers.keys())  # type: Set[str]
+        units: Set[str] = set()
+        peer_names: Set[str] = set(self._meta.peers.keys())
         for peer_id, peer_name in self._relation_names.items():
             if peer_name not in peer_names:
                 continue
@@ -2073,9 +2071,9 @@ class _TestingPebbleClient:
 
     def __init__(self, backend: _TestingModelBackend):
         self._backend = _TestingModelBackend
-        self._layers = {}  # type: Dict[str, pebble.Layer]
+        self._layers: Dict[str, pebble.Layer] = {}
         # Has a service been started/stopped?
-        self._service_status = {}  # type: Dict[str, pebble.ServiceStatus]
+        self._service_status: Dict[str, pebble.ServiceStatus] = {}
         self._fs = _TestingFilesystem()
         self._backend = backend
 
@@ -2227,7 +2225,7 @@ class _TestingPebbleClient:
                 elif service.override == 'merge':
                     if combine and name in layer.services:
                         s = layer.services[name]
-                        s._merge(service)  # type: ignore # noqa
+                        s._merge(service)
                     else:
                         layer.services[name] = service
 
@@ -2235,7 +2233,7 @@ class _TestingPebbleClient:
             self._layers[label] = layer_obj
 
     def _render_services(self) -> Dict[str, pebble.Service]:
-        services = {}  # type: Dict[str, pebble.Service]
+        services: Dict[str, pebble.Service] = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
@@ -2259,7 +2257,7 @@ class _TestingPebbleClient:
 
         self._check_connection()
         services = self._render_services()
-        infos = []  # type: List[pebble.ServiceInfo]
+        infos: List[pebble.ServiceInfo] = []
         if names is None:
             names = sorted(services.keys())
         for name in sorted(names):
@@ -2529,7 +2527,7 @@ class _TestingStorageMount:
             make_dirs: bool = False,
             **kwargs: Any
     ) -> '_File':
-        posixpath = self.check_contains(path)  # type: pathlib.PurePosixPath
+        posixpath: pathlib.PurePosixPath = self.check_contains(path)
         srcpath = self._srcpath(posixpath)
 
         dirname = srcpath.parent
@@ -2556,7 +2554,7 @@ class _TestingStorageMount:
         _path = self.check_contains(path)
         srcpath = self._srcpath(_path)
 
-        results = []  # type: List[_FileOrDir]
+        results: List[_FileOrDir] = []
         if not srcpath.exists():
             raise FileNotFoundError(str(_path))
         if not srcpath.is_dir():
@@ -2612,7 +2610,7 @@ class _TestingFilesystem:
 
     def __init__(self):
         self.root = _Directory(pathlib.PurePosixPath('/'))
-        self._mounts = {}  # type: Dict[str, _TestingStorageMount]
+        self._mounts: Dict[str, _TestingStorageMount] = {}
 
     def add_mount(self, name: str, mount_path: Union[str, pathlib.Path],
                   backing_src_path: Union[str, pathlib.Path]):
@@ -2756,7 +2754,7 @@ class _TestingFilesystem:
 class _Directory:
     def __init__(self, path: pathlib.PurePosixPath, **kwargs: Any):
         self.path = path
-        self._children = {}  # type: Dict[str, Union[_Directory, _File]]
+        self._children: Dict[str, Union[_Directory, _File]] = {}
         self.last_modified = datetime.datetime.now()
         self.kwargs = cast('_FileKwargs', kwargs)
 

@@ -23,7 +23,7 @@ from ops.charm import (  # noqa: E402 (module-level import after non-import code
     CharmBase,
     CharmEvents,
 )
-from ops.framework import EventBase, EventSource, StoredState  # noqa: E402
+from ops.framework import EventBase, EventSource, StoredState  # noqa: E402 (ditto)
 from ops.main import main  # noqa: E402 (ditto)
 
 logger = logging.getLogger()

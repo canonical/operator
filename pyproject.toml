@@ -34,6 +34,5 @@ pythonPlatform = "All"
 typeCheckingMode = "strict"
 reportIncompatibleMethodOverride = false
 reportImportCycles = false
-reportTypeCommentUsage = false
 reportMissingModuleSource = false
 stubPath = ""

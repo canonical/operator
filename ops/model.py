@@ -141,13 +141,13 @@ class Model:
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
-        relations = meta.relations  # type: _RelationsMeta_Raw
+        relations: _RelationsMeta_Raw = meta.relations
         self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
         self._config = ConfigData(self._backend)
-        resources = meta.resources  # type: Iterable[str]
+        resources: Iterable[str] = meta.resources
         self._resources = Resources(list(resources), self._backend)
         self._pod = Pod(self._backend)
-        storages = meta.storages  # type: Iterable[str]
+        storages: Iterable[str] = meta.storages
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
 
@@ -302,7 +302,7 @@ class _ModelCache:
 
         self._meta = meta
         self._backend = backend
-        self._weakrefs = weakref.WeakValueDictionary()  # type: _weakcachetype
+        self._weakrefs: _weakcachetype = weakref.WeakValueDictionary()
 
     @typing.overload
     def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...  # noqa
@@ -486,7 +486,7 @@ class Unit:
         self._status = None
 
         if self._is_our_unit and hasattr(meta, "containers"):
-            containers = meta.containers  # type: _ContainerMeta_Raw
+            containers: _ContainerMeta_Raw = meta.containers
             self._containers = ContainerMapping(iter(containers), backend)
 
     def _invalidate(self):
@@ -609,7 +609,7 @@ class LazyMapping(Mapping[str, str], ABC):
     """
 
     # key-value mapping
-    _lazy_data = None  # type: Optional[Dict[str, str]]
+    _lazy_data: Optional[Dict[str, str]] = None
 
     @abstractmethod
     def _load(self) -> Dict[str, str]:
@@ -646,14 +646,14 @@ class RelationMapping(Mapping[str, List['Relation']]):
 
     def __init__(self, relations_meta: '_RelationsMeta_Raw', our_unit: 'Unit',
                  backend: '_ModelBackend', cache: '_ModelCache'):
-        self._peers = set()  # type: Set[str]
+        self._peers: Set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
                 self._peers.add(name)
         self._our_unit = our_unit
         self._backend = backend
         self._cache = cache
-        self._data = {r: None for r in relations_meta}  # type: _RelationMapping_Raw
+        self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
 
     def __contains__(self, key: str):
         return key in self._data
@@ -666,7 +666,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
 
     def __getitem__(self, relation_name: str) -> List['Relation']:
         is_peer = relation_name in self._peers
-        relation_list = self._data[relation_name]  # type: Optional[List[Relation]]
+        relation_list: Optional[List[Relation]] = self._data[relation_name]
         if not isinstance(relation_list, list):
             relation_list = self._data[relation_name] = []  # type: ignore
             for rid in self._backend.relation_ids(relation_name):
@@ -721,7 +721,7 @@ class BindingMapping(Mapping[str, 'Binding']):
 
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
-        self._data = {}  # type: _BindingDictType
+        self._data: _BindingDictType = {}
 
     def get(self, binding_key: Union[str, 'Relation']) -> 'Binding':
         """Get a specific Binding for an endpoint/relation.
@@ -820,19 +820,19 @@ class Network:
     """
 
     def __init__(self, network_info: '_NetworkDict'):
-        self.interfaces = []  # type: List[NetworkInterface]
+        self.interfaces: List[NetworkInterface] = []
         # Treat multiple addresses on an interface as multiple logical
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
-            interface_name = interface_info.get('interface-name')  # type: str
-            addrs = interface_info.get('addresses')  # type: Optional[List[_AddressDict]]
+            interface_name: str = interface_info.get('interface-name')
+            addrs: Optional[List[_AddressDict]] = interface_info.get('addresses')
             if addrs is not None:
                 for address_info in addrs:
                     self.interfaces.append(NetworkInterface(interface_name, address_info))
-        self.ingress_addresses = []  # type: List[_NetworkAddress]
+        self.ingress_addresses: List[_NetworkAddress] = []
         for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(_cast_network_address(address))
-        self.egress_subnets = []  # type: List[_Network]
+        self.egress_subnets: List[_Network] = []
         for subnet in network_info.get('egress-subnets', []):
             self.egress_subnets.append(ipaddress.ip_network(subnet))
 
@@ -887,8 +887,8 @@ class NetworkInterface:
 
         # The value field may be empty.
         address_ = _cast_network_address(address) if address else None
-        self.address = address_  # type: Optional[_NetworkAddress]
-        cidr = address_info.get('cidr')  # type: str
+        self.address: Optional[_NetworkAddress] = address_
+        cidr: str = address_info.get('cidr')
         # The cidr field may be empty, see LP: #1864102.
         if cidr:
             subnet = ipaddress.ip_network(cidr)
@@ -897,7 +897,7 @@ class NetworkInterface:
             subnet = ipaddress.ip_network(address)
         else:
             subnet = None
-        self.subnet = subnet  # type: Optional[_Network]
+        self.subnet: Optional[_Network] = subnet
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
@@ -986,7 +986,7 @@ class Secret:
         self._content = content
 
     def __repr__(self):
-        fields = []  # type: List[str]
+        fields: List[str] = []
         if self._id is not None:
             fields.append(f'id={self._id!r}')
         if self._label is not None:
@@ -1209,8 +1209,8 @@ class Relation:
             backend: '_ModelBackend', cache: '_ModelCache'):
         self.name = relation_name
         self.id = relation_id
-        self.app = None  # type: Optional[Application]
-        self.units = set()  # type: Set[Unit]
+        self.app: Optional[Application] = None
+        self.units: Set[Unit] = set()
 
         if is_peer:
             # For peer relations, both the remote and the local app are the same.
@@ -1257,10 +1257,10 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
 
     def __init__(self, relation: Relation, our_unit: Unit, backend: '_ModelBackend'):
         self.relation = weakref.proxy(relation)
-        self._data = {
+        self._data: Dict[UnitOrApplication, RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
             our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
-        }  # type: Dict[UnitOrApplication, RelationDataContent]
+        }
         self._data.update({
             unit: RelationDataContent(self.relation, unit, backend)
             for unit in self.relation.units})
@@ -1305,7 +1305,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self.relation = relation
         self._entity = entity
         self._backend = backend
-        self._is_app = isinstance(entity, Application)  # type: bool
+        self._is_app: bool = isinstance(entity, Application)
 
     @property
     def _hook_is_running(self) -> bool:
@@ -1388,7 +1388,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
         # finally, we check whether we have permissions to write this databag
         if self._is_app:
-            is_our_app = self._backend.app_name == self._entity.name  # type: bool
+            is_our_app: bool = self._backend.app_name == self._entity.name
             if not is_our_app:
                 raise RelationDataAccessError(
                     "{} cannot write the data of remote application {}".format(
@@ -1469,7 +1469,7 @@ class StatusBase:
     directly use the child class to indicate their status.
     """
 
-    _statuses = {}  # type: Dict[str, Type[StatusBase]]
+    _statuses: Dict[str, Type['StatusBase']] = {}
 
     # Subclasses should override this attribute and make it a string.
     name = NotImplemented
@@ -1587,7 +1587,7 @@ class Resources:
 
     def __init__(self, names: Iterable[str], backend: '_ModelBackend'):
         self._backend = backend
-        self._paths = {name: None for name in names}  # type: Dict[str, Optional[Path]]
+        self._paths: Dict[str, Optional[Path]] = {name: None for name in names}
 
     def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
@@ -1633,8 +1633,8 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __init__(self, storage_names: Iterable[str], backend: '_ModelBackend'):
         self._backend = backend
-        self._storage_map = {storage_name: None for storage_name in storage_names
-                             }  # type: _StorageDictType
+        self._storage_map: _StorageDictType = {storage_name: None
+                                               for storage_name in storage_names}
 
     def __contains__(self, key: str):  # pyright: reportIncompatibleMethodOverride=false
         return key in self._storage_map
@@ -1763,7 +1763,7 @@ class Container:
         if pebble_client is None:
             socket_path = f'/charm/containers/{name}/pebble.socket'
             pebble_client = backend.get_pebble(socket_path)
-        self._pebble = pebble_client  # type: 'Client'
+        self._pebble: 'Client' = pebble_client
 
     @property
     def pebble(self) -> 'Client':
@@ -1837,8 +1837,8 @@ class Container:
             if e.code != 400:
                 raise e
             # support old Pebble instances that don't support the "restart" action
-            stop = tuple(s.name for s in self.get_services(*service_names).values(
-            ) if s.is_running())  # type: Tuple[str, ...]
+            stop: Tuple[str, ...] = tuple(s.name for s in self.get_services(
+                *service_names).values() if s.is_running())
             if stop:
                 self._pebble.stop_services(stop)
             self._pebble.start_services(service_names)
@@ -2057,7 +2057,7 @@ class Container:
             files = [self._build_fileinfo(source_path / f) for f in paths]
             return files
 
-        errors = []  # type: List[Tuple[str, Exception]]
+        errors: List[Tuple[str, Exception]] = []
         for source_path in source_paths:
             try:
                 for info in Container._list_recursive(local_list, source_path):
@@ -2132,7 +2132,7 @@ class Container:
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
-        errors = []  # type: List[Tuple[str, Exception]]
+        errors: List[Tuple[str, Exception]] = []
         for source_path in source_paths:
             try:
                 for info in Container._list_recursive(self.list_files, source_path):
@@ -2483,7 +2483,7 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
             result in duplicate keys. For example: {'a': {'b': 1}, 'a.b': 2}. Also raised if a dict
             is passed with a key that fails to meet the format requirements.
     """
-    output_ = output or {}  # type: Dict[str, str]
+    output_: Dict[str, str] = output or {}
 
     for key, value in input.items():
         # Ensure the key is of a valid format, and raise a ValueError if not
@@ -2531,22 +2531,21 @@ class _ModelBackend:
         unit_name_ = unit_name or os.getenv('JUJU_UNIT_NAME')
         if unit_name_ is None:
             raise ValueError('JUJU_UNIT_NAME not set')
-        self.unit_name = unit_name_  # type: str
+        self.unit_name: str = unit_name_
 
         # we can cast to str because these envvars are guaranteed to be set
-        self.model_name = model_name or typing.cast(str, os.getenv('JUJU_MODEL_NAME'))  # type: str
-        self.model_uuid = model_uuid or typing.cast(str, os.getenv('JUJU_MODEL_UUID'))  # type: str
-        self.app_name = self.unit_name.split('/')[0]  # type: str
+        self.model_name: str = model_name or typing.cast(str, os.getenv('JUJU_MODEL_NAME'))
+        self.model_uuid: str = model_uuid or typing.cast(str, os.getenv('JUJU_MODEL_UUID'))
+        self.app_name: str = self.unit_name.split('/')[0]
 
-        self._is_leader = None  # type: Optional[bool]
+        self._is_leader: Optional[bool] = None
         self._leader_check_time = None
         self._hook_is_running = ''
 
     def _run(self, *args: str, return_output: bool = False,
              use_json: bool = False, input_stream: Optional[str] = None
              ) -> Union[str, 'JsonObject', None]:
-        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True,
-                      encoding='utf-8')  # type: Dict[str, Any]
+        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True, encoding='utf-8')
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
@@ -2850,16 +2849,16 @@ class _ModelBackend:
 
     def add_metrics(self, metrics: Mapping[str, 'Numerical'],
                     labels: Optional[Mapping[str, str]] = None) -> None:
-        cmd = ['add-metric']  # type: List[str]
+        cmd: List[str] = ['add-metric']
         if labels:
-            label_args = []  # type: List[str]
+            label_args: List[str] = []
             for k, v in labels.items():
                 _ModelBackendValidator.validate_metric_label(k)
                 _ModelBackendValidator.validate_label_value(k, v)
                 label_args.append(f'{k}={v}')
             cmd.extend(['--labels', ','.join(label_args)])
 
-        metric_args = []  # type: List[str]
+        metric_args: List[str] = []
         for k, v in metrics.items():
             _ModelBackendValidator.validate_metric_key(k)
             metric_value = _ModelBackendValidator.format_metric_value(v)
@@ -2926,7 +2925,7 @@ class _ModelBackend:
     def secret_info_get(self, *,
                         id: Optional[str] = None,
                         label: Optional[str] = None) -> SecretInfo:
-        args = []  # type: List[str]
+        args: List[str] = []
         if id is not None:
             args.append(id)
         elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
@@ -2963,7 +2962,7 @@ class _ModelBackend:
                    expire: Optional[datetime.datetime] = None,
                    rotate: Optional[SecretRotate] = None,
                    owner: Optional[str] = None) -> str:
-        args = []  # type: List[str]
+        args: List[str] = []
         if label is not None:
             args.extend(['--label', label])
         if description is not None:

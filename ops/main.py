@@ -184,7 +184,7 @@ def _get_event_args(charm: 'CharmBase',
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
-        relation = model.get_relation(relation_name, relation_id)  # type: Optional[Relation]
+        relation: Optional[Relation] = model.get_relation(relation_name, relation_id)
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
     remote_unit_name = os.environ.get('JUJU_REMOTE_UNIT', '')
@@ -195,7 +195,7 @@ def _get_event_args(charm: 'CharmBase',
             raise RuntimeError(f'invalid remote unit name: {remote_unit_name}')
         remote_app_name = remote_unit_name.split('/')[0]
 
-    kwargs = {}  # type: Dict[str, Any]
+    kwargs: Dict[str, Any] = {}
     if remote_app_name:
         kwargs['app'] = model.get_app(remote_app_name)
     if remote_unit_name:

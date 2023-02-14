@@ -659,12 +659,10 @@ class Plan:
         d = typing.cast('_PlanDict', d)
 
         self._raw = raw
-        self._services = {name: Service(name, service)
-                          for name, service in d.get('services', {}).items()
-                          }  # type: Dict[str, Service]
-        self._checks = {name: Check(name, check)
-                        for name, check in d.get('checks', {}).items()
-                        }  # type: Dict[str, Check]
+        self._services: Dict[str, Service] = {name: Service(name, service)
+                                              for name, service in d.get('services', {}).items()}
+        self._checks: Dict[str, Check] = {name: Check(name, check)
+                                          for name, check in d.get('checks', {}).items()}
 
     @property
     def services(self) -> Dict[str, 'Service']:
@@ -754,7 +752,7 @@ class Service:
 
     def __init__(self, name: str, raw: Optional['_ServiceDict'] = None):
         self.name = name
-        dct = raw or {}  # type: _ServiceDict
+        dct: _ServiceDict = raw or {}
         self.summary = dct.get('summary', '')
         self.description = dct.get('description', '')
         self.startup = dct.get('startup', '')
@@ -894,35 +892,35 @@ class Check:
 
     def __init__(self, name: str, raw: Optional['_CheckDict'] = None):
         self.name = name
-        dct = raw or {}  # type: _CheckDict
-        self.override = dct.get('override', '')  # type: str
+        dct: _CheckDict = raw or {}
+        self.override: str = dct.get('override', '')
         try:
-            level = CheckLevel(dct.get('level', ''))  # type: Union[CheckLevel, str]
+            level: Union[CheckLevel, str] = CheckLevel(dct.get('level', ''))
         except ValueError:
             level = dct.get('level', '')
         self.level = level
-        self.period = dct.get('period', '')  # type: Optional[str]
-        self.timeout = dct.get('timeout', '')  # type: Optional[str]
-        self.threshold = dct.get('threshold')  # type: Optional[int]
+        self.period: Optional[str] = dct.get('period', '')
+        self.timeout: Optional[str] = dct.get('timeout', '')
+        self.threshold: Optional[int] = dct.get('threshold')
 
         http = dct.get('http')
         if http is not None:
             http = copy.deepcopy(http)
-        self.http = http  # type: Optional[_HttpDict]
+        self.http: Optional[_HttpDict] = http
 
         tcp = dct.get('tcp')
         if tcp is not None:
             tcp = copy.deepcopy(tcp)
-        self.tcp = tcp  # type: Optional[_TcpDict]
+        self.tcp: Optional[_TcpDict] = tcp
 
         exec_ = dct.get('exec')
         if exec_ is not None:
             exec_ = copy.deepcopy(exec_)
-        self.exec = exec_  # type: Optional[_ExecDict]
+        self.exec: Optional[_ExecDict] = exec_
 
     def to_dict(self) -> '_CheckDict':
         """Convert this check object to its dict representation."""
-        level = self.level.value if isinstance(self.level, CheckLevel) else self.level  # type: str
+        level: str = self.level.value if isinstance(self.level, CheckLevel) else self.level
         fields = [
             ('override', self.override),
             ('level', level),
@@ -1239,10 +1237,10 @@ class ExecProcess:
             t = _start_thread(shutil.copyfileobj, self.stderr, err)
             self._threads.append(t)
 
-        exit_code = self._wait()  # type: int
+        exit_code: int = self._wait()
 
-        out_value = out.getvalue()  # type: '_StrOrBytes'
-        err_value = err.getvalue() if err is not None else None  # type: Optional['_StrOrBytes']
+        out_value: '_StrOrBytes' = out.getvalue()
+        err_value: Optional['_StrOrBytes'] = err.getvalue() if err is not None else None
         if exit_code != 0:
             raise ExecError(self._command, exit_code, out_value, err_value)
 
@@ -1268,7 +1266,7 @@ class ExecProcess:
 def _has_fileno(f: Any) -> bool:
     """Return True if the file-like object has a valid fileno() method."""
     try:
-        f.fileno()  # type: ignore # noqa
+        f.fileno()
         return True
     except Exception:
         # Some types define a fileno method that raises io.UnsupportedOperation,
@@ -1388,7 +1386,7 @@ class _WebsocketReader(io.BufferedIOBase):
 
         if n < 0:
             n = len(self.remaining)
-        result = self.remaining[:n]  # type: '_StrOrBytes'
+        result: '_StrOrBytes' = self.remaining[:n]
         self.remaining = self.remaining[n:]
         return result
 
@@ -1452,7 +1450,7 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        raw_resp = json.loads(response.read())  # type: Dict[str, Any]
+        raw_resp: Dict[str, Any] = json.loads(response.read())
         return raw_resp
 
     @staticmethod
@@ -1488,11 +1486,11 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                body = json.loads(e.read())  # type: Dict[str, Any]
-                message = body['result']['message']  # type: str
+                body: Dict[str, Any] = json.loads(e.read())
+                message: str = body['result']['message']
             except (OSError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
-                body = {}  # type: Dict[str, Any]
+                body: Dict[str, Any] = {}
                 message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message)
         except urllib.error.URLError as e:
@@ -1521,7 +1519,7 @@ class Client:
         self, select: ChangeState = ChangeState.IN_PROGRESS, service: Optional[str] = None,
     ) -> List[Change]:
         """Get list of changes in given state, filter by service name if given."""
-        query = {'select': select.value}  # type: Dict[str, Union[str, int]]
+        query: Dict[str, Union[str, int]] = {'select': select.value}
         if service is not None:
             query['for'] = service
         resp = self._request('GET', '/v1/changes', query)
@@ -1910,7 +1908,7 @@ class Client:
                         user: Optional[str],
                         group_id: Optional[int],
                         group: Optional[str]) -> '_AuthDict':
-        d = {}  # type: _AuthDict
+        d: _AuthDict = {}
         if permissions is not None:
             d['permissions'] = format(permissions, '03o')
         if user_id is not None:
@@ -1928,11 +1926,11 @@ class Client:
         # Python's stdlib mime/multipart handling is screwy and doesn't handle
         # binary properly, so roll our own.
         if isinstance(source, str):
-            source_io = io.StringIO(source)  # type: _AnyStrFileLikeIO
+            source_io: _AnyStrFileLikeIO = io.StringIO(source)
         elif isinstance(source, bytes):
-            source_io = io.BytesIO(source)  # type: _AnyStrFileLikeIO
+            source_io: _AnyStrFileLikeIO = io.BytesIO(source)
         else:
-            source_io = source  # type: _AnyStrFileLikeIO
+            source_io: _AnyStrFileLikeIO = source
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
         content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""  # NOQA: test_quote_backslashes
@@ -1951,7 +1949,7 @@ class Client:
                 b'\r\n',
             ])
 
-            content = source_io.read(self._chunk_size)  # type: '_StrOrBytes'
+            content: '_StrOrBytes' = source_io.read(self._chunk_size)
             while content:
                 if isinstance(content, str):
                     content = content.encode(encoding)
@@ -2035,7 +2033,7 @@ class Client:
                        to `rm -rf <file|dir>`
 
         """
-        info = {'path': path}  # type: Dict[str, Any]
+        info: Dict[str, Any] = {'path': path}
         if recursive:
             info['recursive'] = True
         body = {
@@ -2206,7 +2204,7 @@ class Client:
         change_id = resp['change']
         task_id = resp['result']['task-id']
 
-        stderr_ws = None  # type: Optional['_WebSocket']
+        stderr_ws: Optional['_WebSocket'] = None
         try:
             control_ws = self._connect_websocket(task_id, 'control')
             stdio_ws = self._connect_websocket(task_id, 'stdio')
@@ -2220,9 +2218,9 @@ class Client:
                 raise ChangeError(change.err, change)
             raise ConnectionError(f'unexpected error connecting to websockets: {e}')
 
-        cancel_stdin = None  # type: Optional[Callable[[], None]]
-        cancel_reader = None  # type: Optional[int]
-        threads = []  # type: List[threading.Thread]
+        cancel_stdin: Optional[Callable[[], None]] = None
+        cancel_reader: Optional[int] = None
+        threads: List[threading.Thread] = []
 
         if stdin is not None:
             if _has_fileno(stdin):
@@ -2354,10 +2352,10 @@ class _FilesParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
 
     def __init__(self, boundary: Union[bytes, str]):
-        self._response = None  # type: Optional[_FilesResponse] # externally managed
-        self._part_type = None  # type: Optional[Literal["response", "files"]] # externally managed
-        self._headers = None  # type: Optional['Message'] # externally managed
-        self._files = {}  # type: Dict[str, _Tempfile]
+        self._response: Optional[_FilesResponse] = None  # externally managed
+        self._part_type: Optional[Literal["response", "files"]] = None  # externally managed
+        self._headers: Optional['Message'] = None  # externally managed
+        self._files: Dict[str, _Tempfile] = {}
 
         # Prepare the MIME multipart boundary line patterns.
         if isinstance(boundary, str):
