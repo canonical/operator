@@ -1,11 +1,9 @@
-from typing import Optional, Type
-
 import pytest
-from ops.charm import CharmBase, CharmEvents
-from ops.framework import EventBase, Framework
+from ops.charm import CharmBase
+from ops.framework import Framework
 
 from scenario.sequences import check_builtin_sequences
-from scenario.state import State, _CharmSpec
+from scenario.state import State
 
 CHARM_CALLED = 0
 

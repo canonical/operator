@@ -28,7 +28,7 @@ def test_get_secret_no_secret(mycharm):
             assert charm.model.get_secret(label="foo")
 
     State().trigger(
-        "update-status", mycharm, meta={"name": "local"}, post_event=post_event
+        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
     )
 
 
@@ -37,7 +37,7 @@ def test_get_secret(mycharm):
         assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
 
     State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]).trigger(
-        "update-status", mycharm, meta={"name": "local"}, post_event=post_event
+        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
     )
 
 
@@ -60,7 +60,7 @@ def test_get_secret_peek_update(mycharm):
                 },
             )
         ]
-    ).trigger("update-status", mycharm, meta={"name": "local"}, post_event=post_event)
+    ).trigger("update_status", mycharm, meta={"name": "local"}, post_event=post_event)
 
 
 def test_secret_changed_owner_evt_fails(mycharm):

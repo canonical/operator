@@ -1,5 +1,7 @@
 import dataclasses
+import marshal
 import os
+import re
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -7,6 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union
 
 import yaml
+from ops.framework import _event_regex
+from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
@@ -171,6 +175,49 @@ class Runtime:
             (temppath / "actions.yaml").write_text(yaml.safe_dump(spec.actions or {}))
             yield temppath
 
+    @staticmethod
+    def _get_store(temporary_charm_root: Path):
+        charm_state_path = temporary_charm_root / ".unit-state.db"
+        store = SQLiteStorage(charm_state_path)
+        return store
+
+    def _initialize_storage(self, state: "State", temporary_charm_root: Path):
+        """Before we start processing this event, expose the relevant parts of State through the storage."""
+        store = self._get_store(temporary_charm_root)
+        deferred = state.deferred
+
+        for event in deferred:
+            store.save_notice(event.handle_path, event.owner, event.observer)
+            try:
+                marshal.dumps(event.snapshot_data)
+            except ValueError as e:
+                raise ValueError(
+                    f"unable to save the data for {event}, it must contain only simple types."
+                ) from e
+            store.save_snapshot(event.handle_path, event.snapshot_data)
+
+        store.close()
+
+    def _close_storage(self, state: "State", temporary_charm_root: Path):
+        """Now that we're done processing this event, read the charm state and expose it via State."""
+        from scenario.state import DeferredEvent  # avoid cyclic import
+
+        store = self._get_store(temporary_charm_root)
+
+        deferred = []
+        event_regex = re.compile(_event_regex)
+        for handle_path in store.list_snapshots():
+            if event_regex.match(handle_path):
+                notices = store.notices(handle_path)
+                for handle, owner, observer in notices:
+                    event = DeferredEvent(
+                        handle_path=handle, owner=owner, observer=observer
+                    )
+                    deferred.append(event)
+
+        store.close()
+        return state.replace(deferred=deferred)
+
     def exec(
         self,
         state: "State",
@@ -195,6 +242,9 @@ class Runtime:
         with self.virtual_charm_root() as temporary_charm_root:
             # todo consider forking out a real subprocess and do the mocking by
             #  generating hook tool executables
+
+            logger.info(" - initializing storage")
+            self._initialize_storage(state, temporary_charm_root)
 
             logger.info(" - redirecting root logging")
             self._redirect_root_logger()
@@ -231,7 +281,10 @@ class Runtime:
             logger.info(" - clearing env")
             self._cleanup_env(env)
 
-        logger.info("event fired; done.")
+            logger.info(" - closing storage")
+            output_state = self._close_storage(output_state, temporary_charm_root)
+
+        logger.info("event dispatched. done.")
         return output_state
 
 
