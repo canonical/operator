@@ -1547,6 +1547,7 @@ class _TestingModelBackend:
         self._planned_units: Optional[int] = None
         self._hook_is_running = ''
         self._secrets: List[_Secret] = []
+        self._opened_ports: Set[model.OpenedPort] = set()
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -2058,6 +2059,34 @@ class _TestingModelBackend:
                 self._secrets = [s for s in self._secrets if s.id != id]
         else:
             self._secrets = [s for s in self._secrets if s.id != id]
+
+    def open_port(self, protocol: str, port: Optional[int] = None):
+        self._check_protocol_and_port(protocol, port)
+        protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
+        self._opened_ports.add(model.OpenedPort(protocol_lit, port))
+
+    def close_port(self, protocol: str, port: Optional[int] = None):
+        self._check_protocol_and_port(protocol, port)
+        protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
+        # TODO: is this an error if not opened?
+        self._opened_ports.discard(model.OpenedPort(protocol_lit, port))
+
+    def opened_ports(self) -> List[model.OpenedPort]:
+        return list(self._opened_ports)
+
+    def _check_protocol_and_port(self, protocol: str, port: Optional[int]):
+        if protocol == 'icmp':
+            if port is not None:
+                raise model.ModelError('icmp cannot have port')  # TODO: correct error message
+        elif protocol in ['tcp', 'udp']:
+            if port is None:
+                raise model.ModelError('tcp/udp must have port')  # TODO: correct error message
+            if not (1 <= port <= 65535):
+                # TODO: correct error message
+                raise model.ModelError("port not in range 1 through 65535")
+        else:
+            # TODO: correct error message
+            raise model.ModelError("protocol must be 'tcp', 'udp', or 'icmp'")
 
 
 @_copy_docstrings(pebble.Client)
