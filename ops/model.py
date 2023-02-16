@@ -634,7 +634,7 @@ class Unit:
         return self._backend.opened_ports()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class OpenedPort:
     """Represents a port opened by :meth:`Unit.open_port`."""
 
@@ -3068,18 +3068,13 @@ class _ModelBackend:
             return OpenedPort('icmp', None)
         port_range, slash, protocol = port_str.partition('/')
         if not slash or protocol not in ['tcp', 'udp']:
-            logger.warning('Invalid line from opened-ports: %s', port_str)
+            logger.warning('Unexpected opened-ports protocol: %s', port_str)
             return None
-        start, hyphen, _ = port_range.partition('-')
+        port, hyphen, _ = port_range.partition('-')
         if hyphen:
-            logger.warning('Unexpected port range from opened-ports: %s', port_str)
-        try:
-            port = int(start)
-        except ValueError:
-            logger.warning('Invalid line from opened-ports: %s', port_str)
-            return None
+            logger.warning('Ignoring opened-ports port range: %s', port_str)
         protocol_lit = typing.cast(typing.Literal['tcp', 'udp', 'icmp'], protocol)
-        return OpenedPort(protocol_lit, port)
+        return OpenedPort(protocol_lit, int(port))
 
 
 class _ModelBackendValidator:

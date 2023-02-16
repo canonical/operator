@@ -3165,5 +3165,96 @@ class TestSecretClass(unittest.TestCase):
         ])
 
 
+class TestPorts(unittest.TestCase):
+    def setUp(self):
+        self.model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+        self.unit = self.model.unit
+
+    def test_open_port(self):
+        fake_script(self, 'open-port', 'exit 0')
+
+        self.unit.open_port('tcp', 8080)
+        self.unit.open_port('UDP', 4000)
+        self.unit.open_port('icmp')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['open-port', '8080/tcp'],
+            ['open-port', '4000/udp'],
+            ['open-port', 'icmp'],
+        ])
+
+    def test_open_port_error(self):
+        fake_script(self, 'open-port', "echo 'ERROR bad protocol' >&2; exit 1")
+
+        with self.assertRaises(model.ModelError) as cm:
+            self.unit.open_port('ftp', 8080)
+        self.assertEqual(str(cm.exception), 'ERROR bad protocol\n')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['open-port', '8080/ftp'],
+        ])
+
+    def test_close_port(self):
+        fake_script(self, 'close-port', 'exit 0')
+
+        self.unit.close_port('tcp', 8080)
+        self.unit.close_port('UDP', 4000)
+        self.unit.close_port('icmp')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['close-port', '8080/tcp'],
+            ['close-port', '4000/udp'],
+            ['close-port', 'icmp'],
+        ])
+
+    def test_close_port_error(self):
+        fake_script(self, 'close-port', "echo 'ERROR bad protocol' >&2; exit 1")
+
+        with self.assertRaises(model.ModelError) as cm:
+            self.unit.close_port('ftp', 8080)
+        self.assertEqual(str(cm.exception), 'ERROR bad protocol\n')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['close-port', '8080/ftp'],
+        ])
+
+    def test_opened_ports(self):
+        fake_script(self, 'opened-ports', """echo 8080/tcp; echo icmp""")
+
+        ports = self.unit.opened_ports()
+        self.assertEqual(len(ports), 2)
+        self.assertIsInstance(ports[0], model.OpenedPort)
+        self.assertEqual(ports[0].protocol, 'tcp')
+        self.assertEqual(ports[0].port, 8080)
+        self.assertIsInstance(ports[1], model.OpenedPort)
+        self.assertEqual(ports[1].protocol, 'icmp')
+        self.assertIsNone(ports[1].port)
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['opened-ports', ''],
+        ])
+
+    def test_opened_ports_warnings(self):
+        fake_script(self, 'opened-ports', """echo 8080/tcp; echo 1234/ftp; echo 1000-2000/udp""")
+
+        with self.assertLogs('ops.model', level='WARNING') as cm:
+            ports = self.unit.opened_ports()
+        self.assertEqual(len(cm.output), 2)
+        self.assertRegex(cm.output[0], r'WARNING:ops.model:.*protocol.*')
+        self.assertRegex(cm.output[1], r'WARNING:ops.model:.*range.*')
+
+        self.assertEqual(len(ports), 2)
+        self.assertIsInstance(ports[0], model.OpenedPort)
+        self.assertEqual(ports[0].protocol, 'tcp')
+        self.assertEqual(ports[0].port, 8080)
+        self.assertIsInstance(ports[1], model.OpenedPort)
+        self.assertEqual(ports[1].protocol, 'udp')
+        self.assertEqual(ports[1].port, 1000)
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['opened-ports', ''],
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()

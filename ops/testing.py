@@ -39,6 +39,7 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Literal,
     Mapping,
     Optional,
     Set,
@@ -56,7 +57,7 @@ from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.model import RelationNotFoundError
 
 if TYPE_CHECKING:
-    from typing_extensions import Literal, TypedDict
+    from typing_extensions import TypedDict
 
     from ops.model import UnitOrApplication
 
@@ -2072,7 +2073,9 @@ class _TestingModelBackend:
         self._opened_ports.discard(model.OpenedPort(protocol_lit, port))
 
     def opened_ports(self) -> List[model.OpenedPort]:
-        return list(self._opened_ports)
+        ports = list(self._opened_ports)
+        ports.sort(key=lambda p: (p.protocol, p.port))  # ensure stable order
+        return ports
 
     def _check_protocol_and_port(self, protocol: str, port: Optional[int]):
         if protocol == 'icmp':
