@@ -375,7 +375,8 @@ foo_relation = Relation('foo')
 foo_relation.changed_event.deferred(handler=MyCharm._on_foo_relation_changed)
 ```
 
-Fine-tuning
+### Fine-tuning
+
 The deferred helper Scenario provides will not support out of the box all custom event subclasses, or events emitted by charm libraries or objects other than the main charm class.
 
 For general-purpose usage, you will need to instantiate DeferredEvent directly.
