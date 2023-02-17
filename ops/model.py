@@ -629,7 +629,7 @@ class Unit:
         """Close a port with the given protocol for this unit."""
         self._backend.close_port(protocol.lower(), port)
 
-    def opened_ports(self) -> List['OpenedPort']:
+    def opened_ports(self) -> Set['OpenedPort']:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
 
@@ -3050,16 +3050,16 @@ class _ModelBackend:
         arg = f'{port}/{protocol}' if port is not None else protocol
         self._run('close-port', arg)
 
-    def opened_ports(self) -> List[OpenedPort]:
+    def opened_ports(self) -> Set[OpenedPort]:
         output = typing.cast(str, self._run('opened-ports', return_output=True))
-        ports: List[OpenedPort] = []
+        ports: Set[OpenedPort] = set()
         for line in output.splitlines():
             line = line.strip()
             if not line:
                 continue
             port = self._parse_opened_port(line)
             if port is not None:
-                ports.append(port)
+                ports.add(port)
         return ports
 
     @classmethod

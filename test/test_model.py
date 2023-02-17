@@ -3221,14 +3221,16 @@ class TestPorts(unittest.TestCase):
     def test_opened_ports(self):
         fake_script(self, 'opened-ports', """echo 8080/tcp; echo icmp""")
 
-        ports = self.unit.opened_ports()
+        ports_set = self.unit.opened_ports()
+        self.assertIsInstance(ports_set, set)
+        ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 2)
         self.assertIsInstance(ports[0], model.OpenedPort)
-        self.assertEqual(ports[0].protocol, 'tcp')
-        self.assertEqual(ports[0].port, 8080)
+        self.assertEqual(ports[0].protocol, 'icmp')
+        self.assertIsNone(ports[0].port)
         self.assertIsInstance(ports[1], model.OpenedPort)
-        self.assertEqual(ports[1].protocol, 'icmp')
-        self.assertIsNone(ports[1].port)
+        self.assertEqual(ports[1].protocol, 'tcp')
+        self.assertEqual(ports[1].port, 8080)
 
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['opened-ports', ''],
@@ -3238,11 +3240,13 @@ class TestPorts(unittest.TestCase):
         fake_script(self, 'opened-ports', """echo 8080/tcp; echo 1234/ftp; echo 1000-2000/udp""")
 
         with self.assertLogs('ops.model', level='WARNING') as cm:
-            ports = self.unit.opened_ports()
+            ports_set = self.unit.opened_ports()
         self.assertEqual(len(cm.output), 2)
         self.assertRegex(cm.output[0], r'WARNING:ops.model:.*protocol.*')
         self.assertRegex(cm.output[1], r'WARNING:ops.model:.*range.*')
 
+        self.assertIsInstance(ports_set, set)
+        ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 2)
         self.assertIsInstance(ports[0], model.OpenedPort)
         self.assertEqual(ports[0].protocol, 'tcp')

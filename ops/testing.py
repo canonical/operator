@@ -2072,10 +2072,8 @@ class _TestingModelBackend:
         # TODO: is this an error if not opened?
         self._opened_ports.discard(model.OpenedPort(protocol_lit, port))
 
-    def opened_ports(self) -> List[model.OpenedPort]:
-        ports = list(self._opened_ports)
-        ports.sort(key=lambda p: (p.protocol, p.port))  # ensure stable order
-        return ports
+    def opened_ports(self) -> Set[model.OpenedPort]:
+        return set(self._opened_ports)
 
     def _check_protocol_and_port(self, protocol: str, port: Optional[int]):
         if protocol == 'icmp':

@@ -4584,7 +4584,9 @@ class TestPorts(unittest.TestCase):
         unit.open_port('udp', 4000)
         unit.open_port('icmp')
 
-        ports = unit.opened_ports()
+        ports_set = unit.opened_ports()
+        self.assertIsInstance(ports_set, set)
+        ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 3)
         self.assertIsInstance(ports[0], model.OpenedPort)
         self.assertEqual(ports[0].protocol, 'icmp')
@@ -4600,7 +4602,9 @@ class TestPorts(unittest.TestCase):
         unit.close_port('tcp', 8080)  # closing same port again has no effect
         unit.close_port('udp', 4000)
 
-        ports = unit.opened_ports()
+        ports_set = unit.opened_ports()
+        self.assertIsInstance(ports_set, set)
+        ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 1)
         self.assertIsInstance(ports[0], model.OpenedPort)
         self.assertEqual(ports[0].protocol, 'icmp')
@@ -4608,8 +4612,8 @@ class TestPorts(unittest.TestCase):
 
         unit.close_port('icmp')
 
-        ports = unit.opened_ports()
-        self.assertEqual(ports, [])
+        ports_set = unit.opened_ports()
+        self.assertEqual(ports_set, set())
 
     def test_errors(self):
         harness = Harness(CharmBase, meta='name: webapp')
