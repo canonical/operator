@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+from dataclasses import asdict
 from pathlib import Path
 from subprocess import run
 from textwrap import dedent
@@ -453,7 +454,7 @@ def _snapshot(
             txt = format_test_case(state, charm_type_name=charm_type_name)
         else:
             txt = format_state(state)
-        print(txt)
+        print(asdict(txt))
 
     return state
 
@@ -490,6 +491,5 @@ def snapshot(
 
 
 if __name__ == "__main__":
-    # print(_snapshot("owner/0"))
-    print(get_container(Target('traefik/0'), "", container_name='traefik', container_meta={}))
+    print(_snapshot("controller/0"))
 
