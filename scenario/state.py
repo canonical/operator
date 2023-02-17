@@ -276,8 +276,7 @@ class Container(_DCBase):
             services.update({name: s.to_dict() for name, s in layer.services.items()})
             checks.update({name: s.to_dict() for name, s in layer.checks.items()})
 
-        plandict = {'services': services,
-                    'checks': checks}
+        plandict = {"services": services, "checks": checks}
         planyaml = yaml.safe_dump(plandict)
         return pebble.Plan(planyaml)
 
