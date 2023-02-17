@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import re
-from dataclasses import asdict
 from pathlib import Path
 from subprocess import run
 from textwrap import dedent
@@ -11,6 +10,7 @@ import ops.pebble
 
 import typer
 import yaml
+from ops import pebble
 
 from scenario.state import Address, BindAddress, Model, Network, Relation, State, Status, Container
 
@@ -93,8 +93,9 @@ def _juju_run(cmd, model=None) -> Dict[str, Any]:
 
 def _juju_ssh(target: Target, cmd, model=None) -> str:
     _model = f" -m {model}" if model else ""
+    command = f"""juju ssh{_model} {target.unit_name} {cmd}"""
     raw = run(
-        f"""juju ssh {target.unit_name} {_model} {cmd}""".split(), capture_output=True
+        command.split(), capture_output=True
     ).stdout.decode("utf-8")
     return raw
 
@@ -156,8 +157,8 @@ def get_network(target: Target, model, relation_name: str, is_default=False) -> 
         relation_name,
         bind_addresses=bind_addresses,
         bind_address=bind_address,
-        egress_subnets=jsn["egress-subnets"],
-        ingress_addresses=jsn["ingress-addresses"],
+        egress_subnets=jsn.get("egress-subnets", None),
+        ingress_addresses=jsn.get("ingress-addresses", None),
         is_default=is_default,
     )
 
@@ -175,6 +176,13 @@ def get_metadata(target: Target, model: str):
     return yaml.safe_load(raw_meta)
 
 
+class Plan(ops.pebble.Plan):
+    """pprintable pebble plan"""
+    def __repr__(self):
+        raw_dct = repr(yaml.safe_load(self._raw))
+        return f"pebble.Plan(yaml.safe_dump({raw_dct}))"
+
+
 class RemotePebbleClient:
     """Clever little class that wraps calls to a remote pebble client."""
 
@@ -183,14 +191,14 @@ class RemotePebbleClient:
     #  figure out what it's for.
 
     def __init__(self, container: str, target: Target, model: str = None):
+        self.socket_path = f"/charm/containers/{container}/pebble.socket"
         self.container = container
         self.target = target
         self.model = model
-        self.socket_path = f"/charm/containers/{container}/pebble.socket"
 
-    def _run(self, cmd) -> str:
+    def _run(self, cmd: str) -> str:
         _model = f" -m {self.model}" if self.model else ""
-        command = f'juju ssh --container charm {self.target.unit_name}{_model} {cmd}'
+        command = f'juju ssh{_model} --container {self.container} {self.target.unit_name} /charm/bin/pebble {cmd}'
         proc = run(command.split(), capture_output=True)
         if proc.returncode == 0:
             return proc.stdout.decode('utf-8')
@@ -198,15 +206,6 @@ class RemotePebbleClient:
                            f"process exited with {proc.returncode}; "
                            f"stdout = {proc.stdout}; "
                            f"stderr = {proc.stderr}")
-
-    def wrap_call(self, meth: str):
-        # todo: machine charm compat?
-        cd = f"cd ./agents/unit-{self.target.normalized}/charm/venv"
-        imports = "from ops.pebble import Client"
-        method_call = f"print(Client(socket_path='{self.socket_path}').{meth})"
-        cmd = dedent(f"""{cd}; python3 -c "{imports};{method_call}" """)
-        out = self._run(cmd)
-        return out
 
     def can_connect(self) -> bool:
         try:
@@ -216,11 +215,11 @@ class RemotePebbleClient:
         return bool(version)
 
     def get_system_info(self):
-        return self.wrap_call('get_system_info().version')
+        return self._run('version')
 
     def get_plan(self):
-        dct_plan = self.wrap_call('get_plan().to_dict()')
-        return ops.pebble.Plan(dct_plan)
+        plan_raw = self._run('plan')
+        return Plan(plan_raw)
 
     def pull(self,
              path: str,
@@ -237,6 +236,11 @@ class RemotePebbleClient:
             level: Optional[ops.pebble.CheckLevel] = None,
             names: Optional[Iterable[str]] = None
     ) -> List[ops.pebble.CheckInfo]:
+        _level = f" --level={level}" if level else ""
+        _names = (" " + f" ".join(names)) if names else ""
+        out = self._run(f'checks{_level}{_names}')
+        if out == 'Plan has no health checks.':
+            return []
         raise NotImplementedError()
 
 
@@ -250,7 +254,11 @@ def get_container(target: Target, model, container_name: str, container_meta) ->
     )
 
 
-def get_containers(target: Target, model, metadata) -> List[Container]:
+def get_containers(target: Target, model, metadata: Optional[Dict]) -> List[Container]:
+    if not metadata:
+        logger.warning('no metadata: unable to get containers')
+        return []
+
     containers = []
     for container_name, container_meta in metadata.get('containers', {}).items():
         container = get_container(target, model, container_name, container_meta)
@@ -279,7 +287,7 @@ def _cast(value: str, _type):
         return int(value)
     elif _type == "number":
         return float(value)
-    elif _type == "bool":
+    elif _type == "boolean":
         return value == "true"
     elif _type == "attrs":  # TODO: WOT?
         return value
@@ -312,7 +320,7 @@ def _get_interface_from_metadata(endpoint, metadata):
 
 
 def get_relations(
-        target: Target, model: str, metadata: Dict, include_juju_relation_data=False,
+        target: Target, model: str, metadata: Optional[Dict], include_juju_relation_data=False,
 ) -> List[Relation]:
     _model = f" -m {model}" if model else ""
     try:
@@ -454,7 +462,7 @@ def _snapshot(
             txt = format_test_case(state, charm_type_name=charm_type_name)
         else:
             txt = format_state(state)
-        print(asdict(txt))
+        print(txt)
 
     return state
 
@@ -491,5 +499,4 @@ def snapshot(
 
 
 if __name__ == "__main__":
-    print(_snapshot("controller/0"))
-
+    print(_snapshot("trfk/0", model='foo'))
