@@ -3051,6 +3051,10 @@ class _ModelBackend:
         self._run('close-port', arg)
 
     def opened_ports(self) -> Set[OpenedPort]:
+        # We could use "opened-ports --format=json", but it's not really
+        # structured; it's just an array of strings which are the lines of the
+        # text output, like ["icmp","8081/udp"]. So it's probably just as
+        # likely to change as the text output, and doesn't seem any better.
         output = typing.cast(str, self._run('opened-ports', return_output=True))
         ports: Set[OpenedPort] = set()
         for line in output.splitlines():
