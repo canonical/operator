@@ -5,6 +5,7 @@ import urllib.request
 from io import StringIO
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
+import yaml
 from ops import pebble
 from ops.model import SecretInfo, SecretRotate, _ModelBackend
 from ops.pebble import Client, ExecError
@@ -361,6 +362,19 @@ class _MockPebbleClient(_TestingPebbleClient):
         self.socket_path = socket_path
         self._event = event
         self._charm_spec = charm_spec
+
+    def get_plan(self) -> pebble.Plan:
+        # TODO: verify
+        services = {}
+        checks = {}
+        for _, layer in self._container.layers.items():
+            services.update({name: s.to_dict() for name, s in layer.services.items()})
+            checks.update({name: s.to_dict() for name, s in layer.checks.items()})
+
+        plandict = {'services': services,
+                    'checks': checks}
+        planyaml = yaml.safe_dump(plandict)
+        return pebble.Plan(planyaml)
 
     @property
     def _container(self) -> "ContainerSpec":
