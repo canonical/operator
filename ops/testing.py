@@ -2069,25 +2069,24 @@ class _TestingModelBackend:
     def close_port(self, protocol: str, port: Optional[int] = None):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
-        # TODO: is this an error if not opened?
         self._opened_ports.discard(model.OpenedPort(protocol_lit, port))
 
     def opened_ports(self) -> Set[model.OpenedPort]:
         return set(self._opened_ports)
 
     def _check_protocol_and_port(self, protocol: str, port: Optional[int]):
+        # Simulate the error messages we get from Juju (not that charm tests
+        # should be testing details of error messages).
         if protocol == 'icmp':
             if port is not None:
-                raise model.ModelError('icmp cannot have port')  # TODO: correct error message
+                raise model.ModelError(f'ERROR protocol "{protocol}" doesn\'t support any ports; got "{port}"\n')
         elif protocol in ['tcp', 'udp']:
             if port is None:
-                raise model.ModelError('tcp/udp must have port')  # TODO: correct error message
+                raise model.ModelError(f'ERROR invalid port "{protocol}": strconv.Atoi: parsing "{protocol}": invalid syntax\n')
             if not (1 <= port <= 65535):
-                # TODO: correct error message
-                raise model.ModelError("port not in range 1 through 65535")
+                raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')
         else:
-            # TODO: correct error message
-            raise model.ModelError("protocol must be 'tcp', 'udp', or 'icmp'")
+            raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')
 
 
 @_copy_docstrings(pebble.Client)
