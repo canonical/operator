@@ -268,6 +268,20 @@ class Container(_DCBase):
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
 
     @property
+    def plan(self) -> pebble.Plan:
+        # TODO: verify
+        services = {}
+        checks = {}
+        for _, layer in self.layers.items():
+            services.update({name: s.to_dict() for name, s in layer.services.items()})
+            checks.update({name: s.to_dict() for name, s in layer.checks.items()})
+
+        plandict = {'services': services,
+                    'checks': checks}
+        planyaml = yaml.safe_dump(plandict)
+        return pebble.Plan(planyaml)
+
+    @property
     def filesystem(self) -> _MockFileSystem:
         mounts = {
             name: _MockStorageMount(src=spec.src, location=spec.location)
