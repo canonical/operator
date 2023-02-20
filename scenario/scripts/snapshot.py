@@ -2,15 +2,16 @@ import json
 import logging
 import os
 import re
+from dataclasses import asdict
+from enum import Enum
 from pathlib import Path
 from subprocess import run
 from textwrap import dedent
 from typing import Any, Dict, List, Union, Optional, BinaryIO, TextIO, Iterable
-import ops.pebble
 
+import ops.pebble
 import typer
 import yaml
-from ops import pebble
 
 from scenario.state import Address, BindAddress, Model, Network, Relation, State, Status, Container
 
@@ -176,13 +177,6 @@ def get_metadata(target: Target, model: str):
     return yaml.safe_load(raw_meta)
 
 
-class Plan(ops.pebble.Plan):
-    """pprintable pebble plan"""
-    def __repr__(self):
-        raw_dct = repr(yaml.safe_load(self._raw))
-        return f"pebble.Plan(yaml.safe_dump({raw_dct}))"
-
-
 class RemotePebbleClient:
     """Clever little class that wraps calls to a remote pebble client."""
 
@@ -217,9 +211,9 @@ class RemotePebbleClient:
     def get_system_info(self):
         return self._run('version')
 
-    def get_plan(self):
+    def get_plan(self) -> dict:
         plan_raw = self._run('plan')
-        return Plan(plan_raw)
+        return yaml.safe_load(plan_raw)
 
     def pull(self,
              path: str,
@@ -245,12 +239,12 @@ class RemotePebbleClient:
 
 
 def get_container(target: Target, model, container_name: str, container_meta) -> Container:
-    pebble = RemotePebbleClient(container_name, target, model)
-    layers = pebble.get_plan()
+    remote_client = RemotePebbleClient(container_name, target, model)
+    plan = remote_client.get_plan()
     return Container(
         name=container_name,
-        layers=layers,
-        can_connect=pebble.can_connect()
+        _base_plan=plan,
+        can_connect=remote_client.can_connect()
     )
 
 
@@ -411,12 +405,18 @@ def try_guess_charm_type_name():
     return None
 
 
+class FormatOption(str, Enum):
+    state = "state"
+    json = "json"
+    pytest = "pytest"
+
+
 def _snapshot(
         target: str,
         model: str = None,
         pprint: bool = True,
         include_juju_relation_data=False,
-        full_case=False,
+        format='state',
 ):
     try:
         target = Target(target)
@@ -457,11 +457,19 @@ def _snapshot(
     )
 
     if pprint:
-        if full_case:
+        if format == FormatOption.pytest:
             charm_type_name = try_guess_charm_type_name()
             txt = format_test_case(state, charm_type_name=charm_type_name)
-        else:
+        elif format == FormatOption.state:
             txt = format_state(state)
+        elif format == FormatOption.json:
+            txt = json.dumps(
+                asdict(state),
+                indent=2
+            )
+        else:
+            raise ValueError(f'unknown format {format}')
+
         print(txt)
 
     return state
@@ -470,11 +478,15 @@ def _snapshot(
 def snapshot(
         target: str = typer.Argument(..., help="Target unit."),
         model: str = typer.Option(None, "-m", "--model", help="Which model to look at."),
-        full: bool = typer.Option(
-            False,
+        format: FormatOption = typer.Option(
+            "state",
             "-f",
-            "--full",
-            help="Whether to print a full, nearly-executable Scenario test, or just the State.",
+            "--format",
+            help="How to format the output. "
+                 "``state``: Outputs a black-formatted repr() of the State object (if black is installed!). "
+                 "``json``: Outputs a Jsonified State object. "
+                 "``pytest``: Outputs a full-blown pytest scenario test based on this State. "
+            ,
         ),
         include_juju_relation_data: bool = typer.Option(
             False,
@@ -493,10 +505,10 @@ def snapshot(
     return _snapshot(
         target,
         model,
-        full_case=full,
+        format=format,
         include_juju_relation_data=include_juju_relation_data,
     )
 
 
 if __name__ == "__main__":
-    print(_snapshot("trfk/0", model='foo'))
+    print(_snapshot("trfk/0", model='foo', format=FormatOption.json))
