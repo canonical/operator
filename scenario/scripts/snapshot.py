@@ -7,13 +7,22 @@ from enum import Enum
 from pathlib import Path
 from subprocess import run
 from textwrap import dedent
-from typing import Any, Dict, List, Union, Optional, BinaryIO, TextIO, Iterable
+from typing import Any, BinaryIO, Dict, Iterable, List, Optional, TextIO, Union
 
 import ops.pebble
 import typer
 import yaml
 
-from scenario.state import Address, BindAddress, Model, Network, Relation, State, Status, Container
+from scenario.state import (
+    Address,
+    BindAddress,
+    Container,
+    Model,
+    Network,
+    Relation,
+    State,
+    Status,
+)
 
 logger = logging.getLogger("snapshot")
 
@@ -36,9 +45,9 @@ class InvalidModel(SnapshotError):
 class Target(str):
     def __init__(self, unit_name: str):
         super().__init__()
-        app_name, _, unit_id = unit_name.rpartition('/')
+        app_name, _, unit_id = unit_name.rpartition("/")
         if not app_name or not unit_id:
-            raise InvalidTarget(f'invalid unit name: {unit_name!r}')
+            raise InvalidTarget(f"invalid unit name: {unit_name!r}")
         self.unit_name = unit_name
         self.app_name = app_name
         self.unit_id = int(unit_id)
@@ -95,9 +104,7 @@ def _juju_run(cmd, model=None) -> Dict[str, Any]:
 def _juju_ssh(target: Target, cmd, model=None) -> str:
     _model = f" -m {model}" if model else ""
     command = f"""juju ssh{_model} {target.unit_name} {cmd}"""
-    raw = run(
-        command.split(), capture_output=True
-    ).stdout.decode("utf-8")
+    raw = run(command.split(), capture_output=True).stdout.decode("utf-8")
     return raw
 
 
@@ -173,7 +180,11 @@ def get_networks(target: Target, model, relations: List[str]) -> List[Network]:
 
 
 def get_metadata(target: Target, model: str):
-    raw_meta = _juju_ssh(target, f"cat ./agents/unit-{target.normalized}/charm/metadata.yaml", model=model)
+    raw_meta = _juju_ssh(
+        target,
+        f"cat ./agents/unit-{target.normalized}/charm/metadata.yaml",
+        model=model,
+    )
     return yaml.safe_load(raw_meta)
 
 
@@ -192,14 +203,16 @@ class RemotePebbleClient:
 
     def _run(self, cmd: str) -> str:
         _model = f" -m {self.model}" if self.model else ""
-        command = f'juju ssh{_model} --container {self.container} {self.target.unit_name} /charm/bin/pebble {cmd}'
+        command = f"juju ssh{_model} --container {self.container} {self.target.unit_name} /charm/bin/pebble {cmd}"
         proc = run(command.split(), capture_output=True)
         if proc.returncode == 0:
-            return proc.stdout.decode('utf-8')
-        raise RuntimeError(f"error wrapping pebble call with {command}: "
-                           f"process exited with {proc.returncode}; "
-                           f"stdout = {proc.stdout}; "
-                           f"stderr = {proc.stderr}")
+            return proc.stdout.decode("utf-8")
+        raise RuntimeError(
+            f"error wrapping pebble call with {command}: "
+            f"process exited with {proc.returncode}; "
+            f"stdout = {proc.stdout}; "
+            f"stderr = {proc.stderr}"
+        )
 
     def can_connect(self) -> bool:
         try:
@@ -209,52 +222,52 @@ class RemotePebbleClient:
         return bool(version)
 
     def get_system_info(self):
-        return self._run('version')
+        return self._run("version")
 
     def get_plan(self) -> dict:
-        plan_raw = self._run('plan')
+        plan_raw = self._run("plan")
         return yaml.safe_load(plan_raw)
 
-    def pull(self,
-             path: str,
-             *,
-             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
+    def pull(
+        self, path: str, *, encoding: Optional[str] = "utf-8"
+    ) -> Union[BinaryIO, TextIO]:
         raise NotImplementedError()
 
-    def list_files(self, path: str, *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List[ops.pebble.FileInfo]:
+    def list_files(
+        self, path: str, *, pattern: Optional[str] = None, itself: bool = False
+    ) -> List[ops.pebble.FileInfo]:
         raise NotImplementedError()
 
     def get_checks(
-            self,
-            level: Optional[ops.pebble.CheckLevel] = None,
-            names: Optional[Iterable[str]] = None
+        self,
+        level: Optional[ops.pebble.CheckLevel] = None,
+        names: Optional[Iterable[str]] = None,
     ) -> List[ops.pebble.CheckInfo]:
         _level = f" --level={level}" if level else ""
         _names = (" " + f" ".join(names)) if names else ""
-        out = self._run(f'checks{_level}{_names}')
-        if out == 'Plan has no health checks.':
+        out = self._run(f"checks{_level}{_names}")
+        if out == "Plan has no health checks.":
             return []
         raise NotImplementedError()
 
 
-def get_container(target: Target, model, container_name: str, container_meta) -> Container:
+def get_container(
+    target: Target, model, container_name: str, container_meta
+) -> Container:
     remote_client = RemotePebbleClient(container_name, target, model)
     plan = remote_client.get_plan()
     return Container(
-        name=container_name,
-        _base_plan=plan,
-        can_connect=remote_client.can_connect()
+        name=container_name, _base_plan=plan, can_connect=remote_client.can_connect()
     )
 
 
 def get_containers(target: Target, model, metadata: Optional[Dict]) -> List[Container]:
     if not metadata:
-        logger.warning('no metadata: unable to get containers')
+        logger.warning("no metadata: unable to get containers")
         return []
 
     containers = []
-    for container_name, container_meta in metadata.get('containers', {}).items():
+    for container_name, container_meta in metadata.get("containers", {}).items():
         container = get_container(target, model, container_name, container_meta)
         containers.append(container)
     return containers
@@ -304,17 +317,20 @@ def get_config(target: Target, model: str) -> Dict[str, Union[str, int, float, b
 
 
 def _get_interface_from_metadata(endpoint, metadata):
-    for role in ['provides', 'requires']:
+    for role in ["provides", "requires"]:
         for ep, ep_meta in metadata.get(role, {}).items():
             if ep == endpoint:
-                return ep_meta['interface']
+                return ep_meta["interface"]
 
-    logger.error(f'No interface for endpoint {endpoint} found in charm metadata.')
+    logger.error(f"No interface for endpoint {endpoint} found in charm metadata.")
     return None
 
 
 def get_relations(
-        target: Target, model: str, metadata: Optional[Dict], include_juju_relation_data=False,
+    target: Target,
+    model: str,
+    metadata: Optional[Dict],
+    include_juju_relation_data=False,
 ) -> List[Relation]:
     _model = f" -m {model}" if model else ""
     try:
@@ -358,7 +374,9 @@ def get_relations(
         relations.append(
             Relation(
                 endpoint=raw_relation["endpoint"],
-                interface=_get_interface_from_metadata(raw_relation["endpoint"], metadata),
+                interface=_get_interface_from_metadata(
+                    raw_relation["endpoint"], metadata
+                ),
                 relation_id=relation_id,
                 remote_app_data=raw_relation["application-data"],
                 remote_app_name=some_remote_unit_id.app_name,
@@ -412,25 +430,29 @@ class FormatOption(str, Enum):
 
 
 def _snapshot(
-        target: str,
-        model: str = None,
-        pprint: bool = True,
-        include_juju_relation_data=False,
-        format='state',
+    target: str,
+    model: str = None,
+    pprint: bool = True,
+    include_juju_relation_data=False,
+    format="state",
 ):
     try:
         target = Target(target)
     except InvalidTarget:
-        print(f"invalid target: {target!r} is not a valid unit name. Should be formatted like so:"
-              f"`foo/1`, or `database/0`, or `myapp-foo-bar/42`.")
+        print(
+            f"invalid target: {target!r} is not a valid unit name. Should be formatted like so:"
+            f"`foo/1`, or `database/0`, or `myapp-foo-bar/42`."
+        )
         exit(1)
 
     metadata = get_metadata(target, model)
 
     try:
         relations = get_relations(
-            target, model, metadata=metadata,
-            include_juju_relation_data=include_juju_relation_data
+            target,
+            model,
+            metadata=metadata,
+            include_juju_relation_data=include_juju_relation_data,
         )
     except InvalidTarget:
         _model = f"model {model}" or "the current model"
@@ -463,12 +485,9 @@ def _snapshot(
         elif format == FormatOption.state:
             txt = format_state(state)
         elif format == FormatOption.json:
-            txt = json.dumps(
-                asdict(state),
-                indent=2
-            )
+            txt = json.dumps(asdict(state), indent=2)
         else:
-            raise ValueError(f'unknown format {format}')
+            raise ValueError(f"unknown format {format}")
 
         print(txt)
 
@@ -476,25 +495,24 @@ def _snapshot(
 
 
 def snapshot(
-        target: str = typer.Argument(..., help="Target unit."),
-        model: str = typer.Option(None, "-m", "--model", help="Which model to look at."),
-        format: FormatOption = typer.Option(
-            "state",
-            "-f",
-            "--format",
-            help="How to format the output. "
-                 "``state``: Outputs a black-formatted repr() of the State object (if black is installed!). "
-                 "``json``: Outputs a Jsonified State object. "
-                 "``pytest``: Outputs a full-blown pytest scenario test based on this State. "
-            ,
-        ),
-        include_juju_relation_data: bool = typer.Option(
-            False,
-            "--include",
-            help="Whether to include in the relation data the default juju keys (egress-subnets,"
-                 "ingress-address, private-address).",
-            is_flag=True,
-        ),
+    target: str = typer.Argument(..., help="Target unit."),
+    model: str = typer.Option(None, "-m", "--model", help="Which model to look at."),
+    format: FormatOption = typer.Option(
+        "state",
+        "-f",
+        "--format",
+        help="How to format the output. "
+        "``state``: Outputs a black-formatted repr() of the State object (if black is installed!). "
+        "``json``: Outputs a Jsonified State object. "
+        "``pytest``: Outputs a full-blown pytest scenario test based on this State. ",
+    ),
+    include_juju_relation_data: bool = typer.Option(
+        False,
+        "--include",
+        help="Whether to include in the relation data the default juju keys (egress-subnets,"
+        "ingress-address, private-address).",
+        is_flag=True,
+    ),
 ) -> State:
     """Print the State of a remote target unit.
 
@@ -511,4 +529,4 @@ def snapshot(
 
 
 if __name__ == "__main__":
-    print(_snapshot("trfk/0", model='foo', format=FormatOption.json))
+    print(_snapshot("trfk/0", model="foo", format=FormatOption.json))
