@@ -4,6 +4,8 @@ import datetime
 import inspect
 import re
 import typing
+from itertools import chain
+from operator import attrgetter
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
 from uuid import uuid4
@@ -204,6 +206,7 @@ def _random_model_name():
 class Model(_DCBase):
     name: str = _random_model_name()
     uuid: str = str(uuid4())
+    type: Literal["kubernetes", "lxd"] = "kubernetes"
 
 
 # for now, proc mock allows you to map one command to one mocked output.
@@ -244,7 +247,17 @@ class Mount(_DCBase):
 class Container(_DCBase):
     name: str
     can_connect: bool = False
+
+    # This is the base plan. On top of it, one can add layers.
+    # We need to model pebble in this way because it's impossible to retrieve the layers from pebble
+    # or derive them from the resulting plan (which one CAN get from pebble).
+    # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers' will be unknown.
+    # all that we can know is the resulting plan (the 'computed plan').
+    _base_plan: dict = dataclasses.field(default_factory=dict)
+    # We expect most of the user-facing testing to be covered by this 'layers' attribute,
+    # as all will be known when unit-testing.
     layers: Dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
+
     service_status: Dict[str, pebble.ServiceStatus] = dataclasses.field(
         default_factory=dict
     )
@@ -267,18 +280,53 @@ class Container(_DCBase):
 
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
 
+    def _render_services(self):
+        # copied over from ops.testing._TestingPebbleClient._render_services()
+        services = {}  # type: Dict[str, pebble.Service]
+        for key in sorted(self.layers.keys()):
+            layer = self.layers[key]
+            for name, service in layer.services.items():
+                services[name] = service
+        return services
+
     @property
     def plan(self) -> pebble.Plan:
-        # TODO: verify
-        services = {}
-        checks = {}
-        for _, layer in self.layers.items():
-            services.update({name: s.to_dict() for name, s in layer.services.items()})
-            checks.update({name: s.to_dict() for name, s in layer.checks.items()})
+        """This is the 'computed' pebble plan; i.e. the base plan plus the layers that have been added on top.
 
-        plandict = {"services": services, "checks": checks}
-        planyaml = yaml.safe_dump(plandict)
-        return pebble.Plan(planyaml)
+        You should run your assertions on the plan, not so much on the layers, as those are input data.
+        """
+
+        # copied over from ops.testing._TestingPebbleClient.get_plan().
+        plan = pebble.Plan(yaml.safe_dump(self._base_plan))
+        services = self._render_services()
+        if not services:
+            return plan
+        for name in sorted(services.keys()):
+            plan.services[name] = services[name]
+        return plan
+
+    @property
+    def services(self) -> Dict[str, pebble.ServiceInfo]:
+        services = self._render_services()
+        infos = {}  # type: Dict[str, pebble.ServiceInfo]
+        names = sorted(services.keys())
+        for name in names:
+            try:
+                service = services[name]
+            except KeyError:
+                # in pebble, it just returns "nothing matched" if there are 0 matches,
+                # but it ignores services it doesn't recognize
+                continue
+            status = self.service_status.get(name, pebble.ServiceStatus.INACTIVE)
+            if service.startup == '':
+                startup = pebble.ServiceStartup.DISABLED
+            else:
+                startup = pebble.ServiceStartup(service.startup)
+            info = pebble.ServiceInfo(name,
+                                      startup=startup,
+                                      current=pebble.ServiceStatus(status))
+            infos[name] = info
+        return infos
 
     @property
     def filesystem(self) -> _MockFileSystem:
@@ -304,42 +352,39 @@ class Address(_DCBase):
     hostname: str
     value: str
     cidr: str
+    address: str = ""  # legacy
 
 
 @dataclasses.dataclass
 class BindAddress(_DCBase):
-    mac_address: str
     interface_name: str
-    interfacename: str  # noqa legacy
     addresses: List[Address]
+    mac_address: Optional[str] = None
 
     def hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
-        return {
-            "bind-addresses": self.mac_address,
+        # todo support for legacy (deprecated `interfacename` and `macaddress` fields?
+        dct = {
             "interface-name": self.interface_name,
-            "interfacename": self.interfacename,
             "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
         }
+        if self.mac_address:
+            dct["mac-address"] = self.mac_address
+        return dct
 
 
 @dataclasses.dataclass
 class Network(_DCBase):
     name: str
-    bind_id: int
 
     bind_addresses: List[BindAddress]
-    bind_address: str
-    egress_subnets: List[str]
     ingress_addresses: List[str]
-
-    is_default: bool = False
+    egress_subnets: List[str]
 
     def hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
         return {
             "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
-            "bind-address": self.bind_address,
             "egress-subnets": self.egress_subnets,
             "ingress-addresses": self.ingress_addresses,
         }
@@ -348,24 +393,21 @@ class Network(_DCBase):
     def default(
         cls,
         name,
-        bind_id,
         private_address: str = "1.1.1.1",
-        mac_address: str = "",
         hostname: str = "",
         cidr: str = "",
         interface_name: str = "",
+        mac_address: Optional[str] = None,
         egress_subnets=("1.1.1.2/32",),
         ingress_addresses=("1.1.1.2",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
             name=name,
-            bind_id=bind_id,
             bind_addresses=[
                 BindAddress(
-                    mac_address=mac_address,
                     interface_name=interface_name,
-                    interfacename=interface_name,
+                    mac_address=mac_address,
                     addresses=[
                         Address(hostname=hostname, value=private_address, cidr=cidr)
                     ],
@@ -402,7 +444,7 @@ class StoredState(_DCBase):
 
 @dataclasses.dataclass
 class State(_DCBase):
-    config: Dict[str, Union[str, int, float, bool]] = None
+    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(default_factory=dict)
     relations: List[Relation] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
@@ -414,7 +456,7 @@ class State(_DCBase):
 
     # meta stuff: actually belongs in event data structure.
     juju_version: str = "3.0.0"
-    unit_id: str = "0"
+    unit_id: int = 0
     app_name: str = "local"
 
     # represents the OF's event queue. These events will be emitted before the event being dispatched,
@@ -429,7 +471,7 @@ class State(_DCBase):
 
     @property
     def unit_name(self):
-        return self.app_name + "/" + self.unit_id
+        return f"{self.app_name}/{self.unit_id}"
 
     def with_can_connect(self, container_name: str, can_connect: bool):
         def replacer(container: Container):

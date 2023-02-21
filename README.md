@@ -1,7 +1,7 @@
 Ops-Scenario
 ============
 
-This is a black-box, contract testing framework for Operator Framework charms.
+This is a state transition testing framework for Operator Framework charms.
 
 Where the Harness enables you to procedurally mock pieces of the state the charm needs to function, Scenario tests allow
 you to declaratively define the state all at once, and use it as a sort of context against which you can fire a single

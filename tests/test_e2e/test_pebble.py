@@ -2,6 +2,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
 from ops import pebble
 from ops.charm import CharmBase
 from ops.framework import Framework
@@ -156,8 +157,8 @@ PS = """
 @pytest.mark.parametrize(
     "cmd, out",
     (
-        ("ls", LS),
-        ("ps", PS),
+            ("ls", LS),
+            ("ps", PS),
     ),
 )
 def test_exec(charm_cls, cmd, out):
@@ -198,7 +199,8 @@ def test_pebble_ready(charm_cls):
     )
 
 
-def test_pebble_plan(charm_cls):
+@pytest.mark.parametrize("starting_service_status", pebble.ServiceStatus)
+def test_pebble_plan(charm_cls, starting_service_status):
     def callback(self: CharmBase):
         foo = self.unit.get_container("foo")
 
@@ -207,7 +209,7 @@ def test_pebble_plan(charm_cls):
         }
         fooserv = foo.get_services("fooserv")["fooserv"]
         assert fooserv.startup == ServiceStartup.ENABLED
-        assert fooserv.current == ServiceStatus.INACTIVE
+        assert fooserv.current == ServiceStatus.ACTIVE
 
         foo.add_layer(
             "bar",
@@ -226,8 +228,9 @@ def test_pebble_plan(charm_cls):
             }
         }
 
-        assert foo.get_service("barserv").current == ServiceStatus.INACTIVE
+        assert foo.get_service("barserv").current == starting_service_status
         foo.start("barserv")
+        # whatever the original state, starting a service sets it to active
         assert foo.get_service("barserv").current == ServiceStatus.ACTIVE
 
     container = Container(
@@ -242,11 +245,27 @@ def test_pebble_plan(charm_cls):
                 }
             )
         },
+        service_status={
+            "fooserv": pebble.ServiceStatus.ACTIVE,
+            # todo: should we disallow setting status for services that aren't known YET?
+            "barserv": starting_service_status,
+        }
     )
 
-    State(containers=[container]).trigger(
+    out = State(containers=[container]).trigger(
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event=container.pebble_ready_event,
         post_event=callback,
     )
+
+    serv = lambda name, obj: pebble.Service(name, raw=obj)
+    container = out.containers[0]
+    assert container.plan.services == {
+        'barserv': serv('barserv', {'startup': 'disabled'}),
+        'fooserv': serv('fooserv', {'startup': 'enabled'})}
+    assert container.services['fooserv'].current == pebble.ServiceStatus.ACTIVE
+    assert container.services['fooserv'].startup == pebble.ServiceStartup.ENABLED
+
+    assert container.services['barserv'].current == pebble.ServiceStatus.ACTIVE
+    assert container.services['barserv'].startup == pebble.ServiceStartup.DISABLED
