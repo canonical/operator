@@ -70,7 +70,7 @@ class TestStoredState(BaseTestCase):
         class Sub(SomeObject):
             pass
 
-        class SubSub(SomeObject):
+        class SubSub(Sub):
             pass
 
         self._stored_state_tests(SubSub)
