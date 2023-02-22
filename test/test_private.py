@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import io
 import unittest
 
 import yaml as base_yaml
 
-from ops._private import yaml
+from ops._private import timeconv, yaml
 
 
 class YAMLTest:
@@ -40,9 +41,58 @@ class TestYAML(unittest.TestCase):
         self.assertEqual(s, 'baz: 123\nfoo: bar\n')
 
         f = io.StringIO()
-        s = yaml.safe_dump({'foo': 'bar', 'baz': 123}, stream=f)
+        yaml.safe_dump({'foo': 'bar', 'baz': 123}, stream=f)
         self.assertEqual(f.getvalue(), 'baz: 123\nfoo: bar\n')
 
         # Should error -- it's not safe to dump an instance of a user-defined class
         with self.assertRaises(base_yaml.YAMLError):
             yaml.safe_dump(YAMLTest())
+
+
+class TestStrconv(unittest.TestCase):
+    def test_parse_rfc3339(self):
+        nzdt = datetime.timezone(datetime.timedelta(hours=13))
+        utc = datetime.timezone.utc
+
+        self.assertEqual(timeconv.parse_rfc3339('2020-12-25T13:45:50+13:00'),
+                         datetime.datetime(2020, 12, 25, 13, 45, 50, 0, tzinfo=nzdt))
+
+        self.assertEqual(timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789+13:00'),
+                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=nzdt))
+
+        self.assertEqual(timeconv.parse_rfc3339('2021-02-10T04:36:22Z'),
+                         datetime.datetime(2021, 2, 10, 4, 36, 22, 0, tzinfo=utc))
+
+        self.assertEqual(timeconv.parse_rfc3339('2021-02-10t04:36:22z'),
+                         datetime.datetime(2021, 2, 10, 4, 36, 22, 0, tzinfo=utc))
+
+        self.assertEqual(timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777Z'),
+                         datetime.datetime(2021, 2, 10, 4, 36, 22, 118971, tzinfo=utc))
+
+        self.assertEqual(timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789+00:00'),
+                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=utc))
+
+        tzinfo = datetime.timezone(datetime.timedelta(hours=-11, minutes=-30))
+        self.assertEqual(timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789-11:30'),
+                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=tzinfo))
+
+        tzinfo = datetime.timezone(datetime.timedelta(hours=4))
+        self.assertEqual(timeconv.parse_rfc3339('2000-01-02T03:04:05.006000+04:00'),
+                         datetime.datetime(2000, 1, 2, 3, 4, 5, 6000, tzinfo=tzinfo))
+
+        with self.assertRaises(ValueError):
+            timeconv.parse_rfc3339('')
+
+        with self.assertRaises(ValueError):
+            timeconv.parse_rfc3339('foobar')
+
+        with self.assertRaises(ValueError):
+            timeconv.parse_rfc3339('2021-99-99T04:36:22Z')
+
+        with self.assertRaises(ValueError):
+            timeconv.parse_rfc3339(
+                timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777x'))
+
+        with self.assertRaises(ValueError):
+            timeconv.parse_rfc3339(
+                timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777-99:99'))

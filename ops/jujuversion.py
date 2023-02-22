@@ -38,7 +38,7 @@ class JujuVersion:
     def __init__(self, version: str):
         m = re.match(self.PATTERN, version, re.VERBOSE)
         if not m:
-            raise RuntimeError('"{}" is not a valid Juju version string'.format(version))
+            raise RuntimeError(f'"{version}" is not a valid Juju version string')
 
         d = m.groupdict()
         self.major = int(m.group('major'))
@@ -49,11 +49,11 @@ class JujuVersion:
 
     def __repr__(self):
         if self.tag:
-            s = '{}.{}-{}{}'.format(self.major, self.minor, self.tag, self.patch)
+            s = f'{self.major}.{self.minor}-{self.tag}{self.patch}'
         else:
-            s = '{}.{}.{}'.format(self.major, self.minor, self.patch)
+            s = f'{self.major}.{self.minor}.{self.patch}'
         if self.build > 0:
-            s += '.{}'.format(self.build)
+            s += f'.{self.build}'
         return s
 
     def __eq__(self, other: Union[str, 'JujuVersion']) -> bool:
@@ -62,7 +62,7 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):  # pyright: reportUnnecessaryIsInstance=false
-            raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
+            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
         return (
             self.major == other.major
             and self.minor == other.minor
@@ -76,7 +76,7 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
-            raise RuntimeError('cannot compare Juju version "{}" with "{}"'.format(self, other))
+            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
         if self.major != other.major:
             return self.major < other.major
         elif self.minor != other.minor:
@@ -102,13 +102,23 @@ class JujuVersion:
         return cls(v)
 
     def has_app_data(self) -> bool:
-        """Determine whether this juju version knows about app data."""
+        """Determine whether this Juju version knows about app data."""
         return (self.major, self.minor, self.patch) >= (2, 7, 0)
 
     def is_dispatch_aware(self) -> bool:
-        """Determine whether this juju version knows about dispatch."""
+        """Determine whether this Juju version knows about dispatch."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
     def has_controller_storage(self) -> bool:
-        """Determine whether this juju version supports controller-side storage."""
+        """Determine whether this Juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
+
+    @property
+    def has_secrets(self) -> bool:
+        """Determine whether this Juju version supports the `secrets` feature."""
+        # Juju version 3.0.0 had an initial version of secrets, but:
+        # * In 3.0.2, secret-get "--update" was renamed to "--refresh", and
+        #   secret-get-info was separated into its own hook tool
+        # * In 3.0.3, a bug with observer labels was fixed (juju/juju#14916)
+        # TODO(benhoyt): update to 3.0.3+ once shipped (for juju/juju#14916 fix)
+        return (self.major, self.minor, self.patch) >= (3, 0, 2)

@@ -30,8 +30,7 @@ async def test_smoke(ops_test: OpsTest):
 
     for series in ['focal', 'bionic', 'xenial']:
         app = await ops_test.model.deploy(
-            charm, series=series, application_name="{}-smoke".format(series))
+            charm, series=series, application_name=f"{series}-smoke")
         await ops_test.model.wait_for_idle(timeout=600)
 
-        assert app.status == "active", "Series {} failed with '{}' status".format(
-            series, app.status)
+        assert app.status == "active", f"Series {series} failed with '{app.status}' status"

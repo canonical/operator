@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import collections
 import datetime
 import importlib
 import inspect
@@ -22,7 +24,6 @@ import shutil
 import sys
 import tempfile
 import textwrap
-import typing
 import unittest
 import uuid
 from io import BytesIO, StringIO
@@ -128,38 +129,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_get(rel_id, 'test-app', is_app=True), {})
         self.assertEqual(backend.relation_get(rel_id, 'test-app/0', is_app=False), {})
 
-    def test_can_connect_legacy(self):
-        # This tests the old behavior where we weren't simulating can_connect status of containers
-        # like it runs in juju.
-        tmp = ops.testing.SIMULATE_CAN_CONNECT
-        ops.testing.SIMULATE_CAN_CONNECT = False
-
-        def reset_can_connect():
-            ops.testing.SIMULATE_CAN_CONNECT = tmp
-        self.addCleanup(reset_can_connect)
-
-        harness = Harness(CharmBase, meta='''
-            name: test-app
-            containers:
-              foo:
-                resource: foo-image
-            ''')
-        self.addCleanup(harness.cleanup)
-
-        self.assertRaises(RuntimeError, harness.set_can_connect, 'foo', False)
-
-        harness.begin()
-        c = harness.model.unit.get_container('foo')
-        self.assertTrue(c.can_connect())
-
-    def test_simulate_can_connect(self):
-        tmp = ops.testing.SIMULATE_CAN_CONNECT
-        ops.testing.SIMULATE_CAN_CONNECT = True
-
-        def reset_can_connect():
-            ops.testing.SIMULATE_CAN_CONNECT = tmp
-        self.addCleanup(reset_can_connect)
-
+    def test_can_connect_default(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
             containers:
@@ -172,7 +142,8 @@ class TestHarness(unittest.TestCase):
         c = harness.model.unit.get_container('foo')
 
         self.assertFalse(c.can_connect())
-        self.assertRaises(pebble.ConnectionError, c.get_plan)
+        with self.assertRaises(pebble.ConnectionError):
+            c.get_plan()
 
         harness.set_can_connect('foo', True)
         self.assertTrue(c.can_connect())
@@ -182,7 +153,43 @@ class TestHarness(unittest.TestCase):
 
         harness.container_pebble_ready('foo')
         self.assertTrue(c.can_connect())
-        c.get_plan()
+        c.get_plan()  # shouldn't raise ConnectionError
+
+    def test_can_connect_begin_with_initial_hooks(self):
+        pebble_ready_calls = collections.defaultdict(int)
+
+        class MyCharm(CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+                self.framework.observe(self.on.bar_pebble_ready, self._on_pebble_ready)
+
+            def _on_pebble_ready(self, event: PebbleReadyEvent):
+                assert event.workload.can_connect()
+                pebble_ready_calls[event.workload.name] += 1
+
+        harness = Harness(MyCharm, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+              bar:
+                resource: bar-image
+            ''')
+        self.addCleanup(harness.cleanup)
+
+        harness.begin_with_initial_hooks()
+        self.assertEqual(dict(pebble_ready_calls), {'foo': 1, 'bar': 1})
+        self.assertTrue(harness.model.unit.containers['foo'].can_connect())
+        self.assertTrue(harness.model.unit.containers['bar'].can_connect())
+
+        harness.set_can_connect('foo', False)
+        self.assertFalse(harness.model.unit.containers['foo'].can_connect())
+
+        harness.set_can_connect('foo', True)
+        container = harness.model.unit.containers['foo']
+        self.assertTrue(container.can_connect())
+        container.get_plan()  # shouldn't raise ConnectionError
 
     def test_add_relation_and_unit(self):
         harness = Harness(CharmBase, meta='''
@@ -334,7 +341,7 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         harness.charm.observe_relation_events('foo')
 
-        # relation remote app is None to mirror production juju behavior where juju doesn't
+        # relation remote app is None to mirror production Juju behavior where Juju doesn't
         # communicate the remote app to ops.
         rel_id = harness.add_relation('foo', None)
 
@@ -1478,7 +1485,7 @@ class TestHarness(unittest.TestCase):
         self.assertTrue(added_indices.issubset(set(harness._backend.storage_list("test"))))
 
         for i in ['1', '2', '3']:
-            storage_name = 'test/' + i
+            storage_name = f"test/{i}"
             want = str(pathlib.PurePath('test', i))
             self.assertTrue(harness._backend.storage_get(storage_name, "location").endswith(want))
         self.assertEqual(len(harness.charm.observed_events), 4)
@@ -1539,7 +1546,7 @@ class TestHarness(unittest.TestCase):
 
         stor_id = harness.add_storage("test")[0]
         with self.assertRaises(RuntimeError) as cm:
-            harness.detach_storage("test/{}".format(stor_id))
+            harness.detach_storage(f"test/{stor_id}")
         self.assertEqual(cm.exception.args[0],
                          "cannot detach storage before Harness is initialised")
 
@@ -1799,9 +1806,8 @@ class TestHarness(unittest.TestCase):
 
     def test_event_context_inverse(self):
         class MyCharm(CharmBase):
-            def __init__(self, framework: Framework,
-                         key: typing.Optional = None):
-                super().__init__(framework, key)
+            def __init__(self, framework: Framework):
+                super().__init__(framework)
                 self.framework.observe(self.on.db_relation_joined,
                                        self._join_db)
 
@@ -2032,6 +2038,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
+        harness.set_can_connect('foo', True)
         c = harness.model.unit.containers['foo']
 
         dir_path = '/tmp/foo/dir'
@@ -2622,6 +2629,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
+        harness.set_can_connect('foo', True)
         initial_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(initial_plan.to_yaml(), '{}\n')
         container = harness.model.unit.get_container('foo')
@@ -2662,6 +2670,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
+        harness.set_can_connect('foo', True)
         with self.assertRaises(KeyError):
             harness.get_container_pebble_plan('unknown')
         plan = harness.get_container_pebble_plan('foo')
@@ -2967,7 +2976,7 @@ class TestTestingModelBackend(unittest.TestCase):
         self.assertIsNotNone(backend._resource_dir)
         self.assertTrue(
             str(path).startswith(str(backend._resource_dir.name)),
-            msg='expected {} to be a subdirectory of {}'.format(path, backend._resource_dir.name))
+            msg=f'expected {path} to be a subdirectory of {backend._resource_dir.name}')
 
     def test_resource_get_no_resource(self):
         harness = Harness(CharmBase, meta='''
@@ -3084,11 +3093,15 @@ class _TestingPebbleClientMixin:
     def get_testing_client(self):
         harness = Harness(CharmBase, meta='''
             name: test-app
+            containers:
+              mycontainer: {}
             ''')
         self.addCleanup(harness.cleanup)
         backend = harness._backend
 
-        return backend.get_pebble('/custom/socket/path')
+        client = backend.get_pebble('/charm/containers/mycontainer/pebble.socket')
+        harness.set_can_connect('mycontainer', True)
+        return client
 
 
 # For testing non file ops of the pebble testing client.
@@ -3680,10 +3693,8 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
     def test_start_started_service(self):
-        # If you try to start a service which is started, you get a ChangeError:
-        # $ PYTHONPATH=. python3 ./test/pebble_cli.py start serv
-        # ChangeError: cannot perform the following tasks:
-        # - Start service "serv" (service "serv" was previously started)
+        # Pebble maintains idempotency even if you start a service
+        # which is already started.
         client = self.get_testing_client()
         client.add_layer('foo', '''\
             summary: foo
@@ -3698,26 +3709,23 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
-        with self.assertRaises(pebble.ChangeError):
-            client.start_services(['bar', 'foo'])
-        # bar could have been started, but won't be, because foo did not validate
+        client.start_services(['bar', 'foo'])
+        # foo and bar are both started
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
         bar_info = infos[0]
         self.assertEqual('bar', bar_info.name)
         # Default when not specified is DISABLED
         self.assertEqual(pebble.ServiceStartup.DISABLED, bar_info.startup)
-        self.assertEqual(pebble.ServiceStatus.INACTIVE, bar_info.current)
+        self.assertEqual(pebble.ServiceStatus.ACTIVE, bar_info.current)
         foo_info = infos[1]
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
         self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
 
     def test_stop_stopped_service(self):
-        # If you try to stop a service which is stop, you get a ChangeError:
-        # $ PYTHONPATH=. python3 ./test/pebble_cli.py stop other serv
-        # ChangeError: cannot perform the following tasks:
-        # - Stop service "other" (service "other" is not active)
+        # Pebble maintains idempotency even if you stop a service
+        # which is already stopped.
         client = self.get_testing_client()
         client.add_layer('foo', '''\
             summary: foo
@@ -3732,9 +3740,8 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             ''')
         client.autostart_services()
         # Foo is now started, but Bar is not
-        with self.assertRaises(pebble.ChangeError):
-            client.stop_services(['foo', 'bar'])
-        # foo could have been stopped, but won't be, because bar did not validate
+        client.stop_services(['foo', 'bar'])
+        # foo and bar are both stopped
         infos = client.get_services()
         self.assertEqual(len(infos), 2)
         bar_info = infos[0]
@@ -3745,7 +3752,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         foo_info = infos[1]
         self.assertEqual('foo', foo_info.name)
         self.assertEqual(pebble.ServiceStartup.ENABLED, foo_info.startup)
-        self.assertEqual(pebble.ServiceStatus.ACTIVE, foo_info.current)
+        self.assertEqual(pebble.ServiceStatus.INACTIVE, foo_info.current)
 
     @ unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self):
@@ -3810,15 +3817,15 @@ class _PebbleStorageAPIsTestMixin:
 
     def _test_push_and_pull_data(self, original_data, encoding, stream_class):
         client = self.client
-        client.push(self.prefix + '/test', original_data, encoding=encoding)
-        with client.pull(self.prefix + '/test', encoding=encoding) as infile:
+        client.push(f"{self.prefix}/test", original_data, encoding=encoding)
+        with client.pull(f"{self.prefix}/test", encoding=encoding) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
 
         # We also support file-like objects as input, so let's test that case as well.
         small_file = stream_class(original_data)
-        client.push(self.prefix + '/test', small_file, encoding=encoding)
-        with client.pull(self.prefix + '/test', encoding=encoding) as infile:
+        client.push(f"{self.prefix}/test", small_file, encoding=encoding)
+        with client.pull(f"{self.prefix}/test", encoding=encoding) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
 
@@ -3830,8 +3837,8 @@ class _PebbleStorageAPIsTestMixin:
         original_data = os.urandom(data_size)
 
         client = self.client
-        client.push(self.prefix + '/test', original_data, encoding=None)
-        with client.pull(self.prefix + '/test', encoding=None) as infile:
+        client.push(f"{self.prefix}/test", original_data, encoding=None)
+        with client.pull(f"{self.prefix}/test", encoding=None) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
 
@@ -3840,24 +3847,24 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
 
         with self.assertRaises(pebble.PathError) as cm:
-            client.push(self.prefix + '/nonexistent_dir/test', data, make_dirs=False)
+            client.push(f"{self.prefix}/nonexistent_dir/test", data, make_dirs=False)
         self.assertEqual(cm.exception.kind, 'not-found')
 
-        client.push(self.prefix + '/nonexistent_dir/test', data, make_dirs=True)
+        client.push(f"{self.prefix}/nonexistent_dir/test", data, make_dirs=True)
 
     def test_push_as_child_of_file_raises_error(self):
         data = 'data'
         client = self.client
-        client.push(self.prefix + '/file', data)
+        client.push(f"{self.prefix}/file", data)
         with self.assertRaises(pebble.PathError) as cm:
-            client.push(self.prefix + '/file/file', data)
+            client.push(f"{self.prefix}/file/file", data)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_with_permission_mask(self):
         data = 'data'
         client = self.client
-        client.push(self.prefix + '/file', data, permissions=0o600)
-        client.push(self.prefix + '/file', data, permissions=0o777)
+        client.push(f"{self.prefix}/file", data, permissions=0o600)
+        client.push(f"{self.prefix}/file", data, permissions=0o777)
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
         for bad_permission in (
@@ -3865,7 +3872,7 @@ class _PebbleStorageAPIsTestMixin:
             -1,      # Less than 0o000
         ):
             with self.assertRaises(pebble.PathError) as cm:
-                client.push(self.prefix + '/file', data, permissions=bad_permission)
+                client.push(f"{self.prefix}/file", data, permissions=bad_permission)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_files_and_list(self):
@@ -3874,19 +3881,19 @@ class _PebbleStorageAPIsTestMixin:
 
         # Let's push the first file with a bunch of details.  We'll check on this later.
         client.push(
-            self.prefix + '/file1', data,
+            f"{self.prefix}/file1", data,
             permissions=0o620)
 
         # Do a quick push with defaults for the other files.
-        client.push(self.prefix + '/file2', data)
-        client.push(self.prefix + '/file3', data)
+        client.push(f"{self.prefix}/file2", data)
+        client.push(f"{self.prefix}/file3", data)
 
-        files = client.list_files(self.prefix + '/')
+        files = client.list_files(f"{self.prefix}/")
         self.assertEqual({file.path for file in files},
                          {self.prefix + file for file in ('/file1', '/file2', '/file3')})
 
         # Let's pull the first file again and check its details
-        file = [f for f in files if f.path == self.prefix + '/file1'][0]
+        file = [f for f in files if f.path == f"{self.prefix}/file1"][0]
         self.assertEqual(file.name, 'file1')
         self.assertEqual(file.type, pebble.FileType.FILE)
         self.assertEqual(file.size, 4)
@@ -3897,15 +3904,28 @@ class _PebbleStorageAPIsTestMixin:
     def test_push_and_list_file(self):
         data = 'data'
         client = self.client
-        client.push(self.prefix + '/file', data)
-        files = client.list_files(self.prefix + '/')
-        self.assertEqual({file.path for file in files}, {self.prefix + '/file'})
+        client.push(f"{self.prefix}/file", data)
+        files = client.list_files(f"{self.prefix}/")
+        self.assertEqual({file.path for file in files}, {f"{self.prefix}/file"})
 
     def test_push_file_with_relative_path_fails(self):
         client = self.client
         with self.assertRaises(pebble.PathError) as cm:
             client.push('file', '')
         self.assertEqual(cm.exception.kind, 'generic-file-error')
+
+    def test_pull_not_found(self):
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.pull("/not/found")
+        self.assertEqual(cm.exception.kind, "not-found")
+        self.assertIn("/not/found", cm.exception.message)
+
+    def test_pull_directory(self):
+        self.client.make_dir(f"{self.prefix}/subdir")
+        with self.assertRaises(pebble.PathError) as cm:
+            self.client.pull(f"{self.prefix}/subdir")
+        self.assertEqual(cm.exception.kind, "generic-file-error")
+        self.assertIn(f"{self.prefix}/subdir", cm.exception.message)
 
     def test_list_files_not_found_raises(self):
         client = self.client
@@ -3929,8 +3949,8 @@ class _PebbleStorageAPIsTestMixin:
         self.assertEqual(dir_.type, pebble.FileType.DIRECTORY)
 
         # Test with subdirs
-        client.make_dir(self.prefix + '/subdir')
-        files = client.list_files(self.prefix + '/subdir', itself=True)
+        client.make_dir(f"{self.prefix}/subdir")
+        files = client.list_files(f"{self.prefix}/subdir", itself=True)
         self.assertEqual(len(files), 1)
         dir_ = files[0]
         self.assertEqual(dir_.name, 'subdir')
@@ -3948,32 +3968,32 @@ class _PebbleStorageAPIsTestMixin:
             '/backup_file.gz',
         ):
             client.push(self.prefix + filename, data)
-        files = client.list_files(self.prefix + '/', pattern='file*.gz')
+        files = client.list_files(f"{self.prefix}/", pattern='file*.gz')
         self.assertEqual({file.path for file in files},
                          {self.prefix + file for file in ('/file1.gz', '/file2.tar.gz')})
 
     def test_make_directory(self):
         client = self.client
-        client.make_dir(self.prefix + '/subdir')
+        client.make_dir(f"{self.prefix}/subdir")
         self.assertEqual(
-            client.list_files(self.prefix + '/', pattern='subdir')[0].path,
-            self.prefix + '/subdir')
-        client.make_dir(self.prefix + '/subdir/subdir')
+            client.list_files(f"{self.prefix}/", pattern='subdir')[0].path,
+            f"{self.prefix}/subdir")
+        client.make_dir(f"{self.prefix}/subdir/subdir")
         self.assertEqual(
-            client.list_files(self.prefix + '/subdir', pattern='subdir')[0].path,
-            self.prefix + '/subdir/subdir')
+            client.list_files(f"{self.prefix}/subdir", pattern='subdir')[0].path,
+            f"{self.prefix}/subdir/subdir")
 
     def test_make_directory_recursively(self):
         client = self.client
 
         with self.assertRaises(pebble.PathError) as cm:
-            client.make_dir(self.prefix + '/subdir/subdir', make_parents=False)
+            client.make_dir(f"{self.prefix}/subdir/subdir", make_parents=False)
         self.assertEqual(cm.exception.kind, 'not-found')
 
-        client.make_dir(self.prefix + '/subdir/subdir', make_parents=True)
+        client.make_dir(f"{self.prefix}/subdir/subdir", make_parents=True)
         self.assertEqual(
-            client.list_files(self.prefix + '/subdir', pattern='subdir')[0].path,
-            self.prefix + '/subdir/subdir')
+            client.list_files(f"{self.prefix}/subdir", pattern='subdir')[0].path,
+            f"{self.prefix}/subdir/subdir")
 
     def test_make_directory_with_relative_path_fails(self):
         client = self.client
@@ -3983,27 +4003,27 @@ class _PebbleStorageAPIsTestMixin:
 
     def test_make_subdir_of_file_fails(self):
         client = self.client
-        client.push(self.prefix + '/file', 'data')
+        client.push(f"{self.prefix}/file", 'data')
 
         # Direct child case
         with self.assertRaises(pebble.PathError) as cm:
-            client.make_dir(self.prefix + '/file/subdir')
+            client.make_dir(f"{self.prefix}/file/subdir")
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Recursive creation case, in case its flow is different
         with self.assertRaises(pebble.PathError) as cm:
-            client.make_dir(self.prefix + '/file/subdir/subdir', make_parents=True)
+            client.make_dir(f"{self.prefix}/file/subdir/subdir", make_parents=True)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_make_dir_with_permission_mask(self):
         client = self.client
-        client.make_dir(self.prefix + '/dir1', permissions=0o700)
-        client.make_dir(self.prefix + '/dir2', permissions=0o777)
+        client.make_dir(f"{self.prefix}/dir1", permissions=0o700)
+        client.make_dir(f"{self.prefix}/dir2", permissions=0o777)
 
-        files = client.list_files(self.prefix + '/', pattern='dir*')
-        self.assertEqual([f for f in files if f.path == self.prefix + '/dir1']
+        files = client.list_files(f"{self.prefix}/", pattern='dir*')
+        self.assertEqual([f for f in files if f.path == f"{self.prefix}/dir1"]
                          [0].permissions, 0o700)
-        self.assertEqual([f for f in files if f.path == self.prefix + '/dir2']
+        self.assertEqual([f for f in files if f.path == f"{self.prefix}/dir2"]
                          [0].permissions, 0o777)
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
@@ -4013,37 +4033,37 @@ class _PebbleStorageAPIsTestMixin:
             -1,      # Less than 0o000
         )):
             with self.assertRaises(pebble.PathError) as cm:
-                client.make_dir(self.prefix + '/dir3_{}'.format(i), permissions=bad_permission)
+                client.make_dir(f"{self.prefix}/dir3_{i}", permissions=bad_permission)
             self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_remove_path(self):
         client = self.client
-        client.push(self.prefix + '/file', '')
-        client.make_dir(self.prefix + '/dir/subdir', make_parents=True)
-        client.push(self.prefix + '/dir/subdir/file1', '')
-        client.push(self.prefix + '/dir/subdir/file2', '')
-        client.push(self.prefix + '/dir/subdir/file3', '')
-        client.make_dir(self.prefix + '/empty_dir')
+        client.push(f"{self.prefix}/file", '')
+        client.make_dir(f"{self.prefix}/dir/subdir", make_parents=True)
+        client.push(f"{self.prefix}/dir/subdir/file1", '')
+        client.push(f"{self.prefix}/dir/subdir/file2", '')
+        client.push(f"{self.prefix}/dir/subdir/file3", '')
+        client.make_dir(f"{self.prefix}/empty_dir")
 
-        client.remove_path(self.prefix + '/file')
+        client.remove_path(f"{self.prefix}/file")
 
-        client.remove_path(self.prefix + '/empty_dir')
+        client.remove_path(f"{self.prefix}/empty_dir")
 
         # Remove non-empty directory, recursive=False: error
         with self.assertRaises(pebble.PathError) as cm:
-            client.remove_path(self.prefix + '/dir', recursive=False)
+            client.remove_path(f"{self.prefix}/dir", recursive=False)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
-        client.remove_path(self.prefix + '/dir', recursive=True)
+        client.remove_path(f"{self.prefix}/dir", recursive=True)
 
         # Remove non-existent path, recursive=False: error
         with self.assertRaises(pebble.PathError) as cm:
-            client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=False)
+            client.remove_path(f"{self.prefix}/dir/does/not/exist/asdf", recursive=False)
         self.assertEqual(cm.exception.kind, 'not-found')
 
         # Remove non-existent path, recursive=True: succeeds
-        client.remove_path(self.prefix + '/dir/does/not/exist/asdf', recursive=True)
+        client.remove_path(f"{self.prefix}/dir/does/not/exist/asdf", recursive=True)
 
     # Other notes:
     # * Parent directories created via push(make_dirs=True) default to root:root ownership
@@ -4298,6 +4318,9 @@ class TestPebbleStorageAPIsUsingMocks(
         harness.attach_storage(store_id)
 
         harness.begin()
+        harness.set_can_connect('c1', True)
+        harness.set_can_connect('c2', True)
+        harness.set_can_connect('c3', True)
 
         # push file to c1 storage mount, check that we can see it in charm container storage path.
         c1 = harness.model.unit.get_container('c1')
@@ -4340,8 +4363,8 @@ class TestPebbleStorageAPIsUsingMocks(
         # Note: To simplify implementation, ownership is simply stored as-is with no verification.
         data = 'data'
         client = self.client
-        client.push(self.prefix + '/file', data, user_id=1, user='foo', group_id=3, group='bar')
-        file_ = client.list_files(self.prefix + '/file')[0]
+        client.push(f"{self.prefix}/file", data, user_id=1, user='foo', group_id=3, group='bar')
+        file_ = client.list_files(f"{self.prefix}/file")[0]
         self.assertEqual(file_.user_id, 1)
         self.assertEqual(file_.user, 'foo')
         self.assertEqual(file_.group_id, 3)
@@ -4349,8 +4372,8 @@ class TestPebbleStorageAPIsUsingMocks(
 
     def test_make_dir_with_ownership(self):
         client = self.client
-        client.make_dir(self.prefix + '/dir1', user_id=1, user="foo", group_id=3, group="bar")
-        dir_ = client.list_files(self.prefix + '/dir1', itself=True)[0]
+        client.make_dir(f"{self.prefix}/dir1", user_id=1, user="foo", group_id=3, group="bar")
+        dir_ = client.list_files(f"{self.prefix}/dir1", itself=True)[0]
         self.assertEqual(dir_.user_id, 1)
         self.assertEqual(dir_.user, "foo")
         self.assertEqual(dir_.group_id, 3)
@@ -4377,3 +4400,239 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIs
     @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         pass
+
+
+class TestSecrets(unittest.TestCase):
+    def test_add_model_secret_by_app_name_str(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter2'})
+
+    def test_add_model_secret_by_app_instance(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        app = harness.model.get_app('database')
+        secret_id = harness.add_model_secret(app, {'password': 'hunter3'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter3'})
+
+    def test_add_model_secret_by_unit_instance(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        unit = harness.model.get_unit('database/0')
+        secret_id = harness.add_model_secret(unit, {'password': 'hunter4'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter4'})
+
+    def test_add_model_secret_invalid_content(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        with self.assertRaises(ValueError):
+            harness.add_model_secret('database', {'x': 'y'})  # key too short
+
+    def test_set_secret_content(self):
+        harness = Harness(EventRecorder, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'foo': '1'})
+        harness.grant_secret(secret_id, 'webapp')
+        harness.begin()
+        harness.framework.observe(harness.charm.on.secret_changed, harness.charm.record_event)
+        harness.set_secret_content(secret_id, {'foo': '2'})
+
+        self.assertEqual(len(harness.charm.events), 1)
+        event = harness.charm.events[0]
+        self.assertIsInstance(event, ops.charm.SecretChangedEvent)
+        self.assertEqual(event.secret.get_content(), {'foo': '1'})
+        self.assertEqual(event.secret.get_content(refresh=True), {'foo': '2'})
+        self.assertEqual(event.secret.get_content(), {'foo': '2'})
+
+        self.assertEqual(harness.get_secret_revisions(secret_id), [1, 2])
+
+    def test_set_secret_content_wrong_owner(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        secret = harness.model.app.add_secret({'foo': 'bar'})
+        with self.assertRaises(RuntimeError):
+            harness.set_secret_content(secret.id, {'bar': 'foo'})
+
+    def test_set_secret_content_invalid_secret_id(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        with self.assertRaises(RuntimeError):
+            harness.set_secret_content('asdf', {'foo': 'bar'})
+
+    def test_set_secret_content_invalid_content(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        secret_id = harness.add_model_secret('database', {'foo': 'bar'})
+        with self.assertRaises(ValueError):
+            harness.set_secret_content(secret_id, {'x': 'y'})
+
+    def test_grant_secret_and_revoke_secret(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter2'})
+
+        harness.revoke_secret(secret_id, 'webapp')
+        with self.assertRaises(model.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_grant_secret_wrong_app(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'otherapp')
+        with self.assertRaises(model.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_grant_secret_wrong_unit(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'webapp/1')  # should be webapp/0
+        with self.assertRaises(model.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_grant_secret_no_relation(self):
+        harness = Harness(CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+
+        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        with self.assertRaises(RuntimeError):
+            harness.grant_secret(secret_id, 'webapp')
+
+    def test_get_secret_grants(self):
+        harness = Harness(CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        relation_id = harness.add_relation('db', 'webapp')
+        harness.add_relation_unit(relation_id, 'webapp/0')
+
+        secret = harness.model.app.add_secret({'foo': 'x'})
+        self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
+        secret.grant(harness.model.get_relation('db'))
+        self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp'})
+
+        secret.revoke(harness.model.get_relation('db'))
+        self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
+        secret.grant(harness.model.get_relation('db'), unit=harness.model.get_unit('webapp/0'))
+        self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp/0'})
+
+    def test_trigger_secret_rotation(self):
+        harness = Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        harness.begin()
+        harness.framework.observe(harness.charm.on.secret_rotate, harness.charm.record_event)
+        harness.trigger_secret_rotation(secret.id)
+        harness.trigger_secret_rotation(secret.id, label='override')
+
+        self.assertEqual(len(harness.charm.events), 2)
+        event = harness.charm.events[0]
+        self.assertIsInstance(event, ops.charm.SecretRotateEvent)
+        self.assertEqual(event.secret.label, 'lbl')
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+        event = harness.charm.events[1]
+        self.assertIsInstance(event, ops.charm.SecretRotateEvent)
+        self.assertEqual(event.secret.label, 'override')
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_rotation('nosecret')
+
+    def test_trigger_secret_removal(self):
+        harness = Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        harness.begin()
+        harness.framework.observe(harness.charm.on.secret_remove, harness.charm.record_event)
+        harness.trigger_secret_removal(secret.id, 1)
+        harness.trigger_secret_removal(secret.id, 42, label='override')
+
+        self.assertEqual(len(harness.charm.events), 2)
+        event = harness.charm.events[0]
+        self.assertIsInstance(event, ops.charm.SecretRemoveEvent)
+        self.assertEqual(event.secret.label, 'lbl')
+        self.assertEqual(event.revision, 1)
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+        event = harness.charm.events[1]
+        self.assertIsInstance(event, ops.charm.SecretRemoveEvent)
+        self.assertEqual(event.secret.label, 'override')
+        self.assertEqual(event.revision, 42)
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_removal('nosecret', 1)
+
+    def test_trigger_secret_expiration(self):
+        harness = Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        harness.begin()
+        harness.framework.observe(harness.charm.on.secret_remove, harness.charm.record_event)
+        harness.trigger_secret_removal(secret.id, 1)
+        harness.trigger_secret_removal(secret.id, 42, label='override')
+
+        self.assertEqual(len(harness.charm.events), 2)
+        event = harness.charm.events[0]
+        self.assertIsInstance(event, ops.charm.SecretRemoveEvent)
+        self.assertEqual(event.secret.label, 'lbl')
+        self.assertEqual(event.revision, 1)
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+        event = harness.charm.events[1]
+        self.assertIsInstance(event, ops.charm.SecretRemoveEvent)
+        self.assertEqual(event.secret.label, 'override')
+        self.assertEqual(event.revision, 42)
+        self.assertEqual(event.secret.get_content(), {'foo': 'x'})
+
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_removal('nosecret', 1)
+
+
+class EventRecorder(CharmBase):
+    def __init__(self, framework):
+        super().__init__(framework)
+        self.events = []
+
+    def record_event(self, event):
+        self.events.append(event)

@@ -20,7 +20,6 @@ import io
 import json
 import os
 import signal
-import sys
 import tempfile
 import test.fake_pebble as fake_pebble
 import threading
@@ -33,10 +32,10 @@ import urllib.request
 import uuid
 
 import pytest
+import websocket
 
 import ops.pebble as pebble
 from ops._private import yaml
-from ops._vendor import websocket
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000
@@ -50,50 +49,6 @@ def datetime_utc(y, m, d, hour, min, sec, micro=0):
 def datetime_nzdt(y, m, d, hour, min, sec, micro=0):
     tz = datetime.timezone(datetime.timedelta(hours=13))
     return datetime.datetime(y, m, d, hour, min, sec, micro, tzinfo=tz)
-
-
-class TestHelpers(unittest.TestCase):
-    def test_parse_timestamp(self):
-        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50+13:00'),
-                         datetime_nzdt(2020, 12, 25, 13, 45, 50, 0))
-
-        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789+13:00'),
-                         datetime_nzdt(2020, 12, 25, 13, 45, 50, 123457))
-
-        self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22Z'),
-                         datetime_utc(2021, 2, 10, 4, 36, 22, 0))
-
-        self.assertEqual(pebble._parse_timestamp('2021-02-10t04:36:22z'),
-                         datetime_utc(2021, 2, 10, 4, 36, 22, 0))
-
-        self.assertEqual(pebble._parse_timestamp('2021-02-10T04:36:22.118970777Z'),
-                         datetime_utc(2021, 2, 10, 4, 36, 22, 118971))
-
-        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789+00:00'),
-                         datetime_utc(2020, 12, 25, 13, 45, 50, 123457))
-
-        tzinfo = datetime.timezone(datetime.timedelta(hours=-11, minutes=-30))
-        self.assertEqual(pebble._parse_timestamp('2020-12-25T13:45:50.123456789-11:30'),
-                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=tzinfo))
-
-        tzinfo = datetime.timezone(datetime.timedelta(hours=4))
-        self.assertEqual(pebble._parse_timestamp('2000-01-02T03:04:05.006000+04:00'),
-                         datetime.datetime(2000, 1, 2, 3, 4, 5, 6000, tzinfo=tzinfo))
-
-        with self.assertRaises(ValueError):
-            pebble._parse_timestamp('')
-
-        with self.assertRaises(ValueError):
-            pebble._parse_timestamp('foobar')
-
-        with self.assertRaises(ValueError):
-            pebble._parse_timestamp('2021-99-99T04:36:22Z')
-
-        with self.assertRaises(ValueError):
-            pebble._parse_timestamp(pebble._parse_timestamp('2021-02-10T04:36:22.118970777x'))
-
-        with self.assertRaises(ValueError):
-            pebble._parse_timestamp(pebble._parse_timestamp('2021-02-10T04:36:22.118970777-99:99'))
 
 
 class TestTypes(unittest.TestCase):
@@ -1223,7 +1178,7 @@ class TestMultipartParser(unittest.TestCase):
 
                 def handle_header(data):
                     headers.append(bytes(data))
-                    bodies.append(bytes())
+                    bodies.append(b'')
                     bodies_done.append(False)
 
                 def handle_body(data, done=False):
@@ -1248,12 +1203,12 @@ class TestMultipartParser(unittest.TestCase):
                     if not test.error:
                         self.fail('unexpected error:', err)
                         break
-                    self.assertEqual(test.error, err.message())
+                    self.assertEqual(test.error, str(err))
                 else:
                     if test.error:
-                        self.fail('missing expected error: {!r}'.format(test.error))
+                        self.fail(f'missing expected error: {test.error!r}')
 
-                    msg = 'test case {} ({}), chunk size {}'.format(i + 1, test.name, chunk_size)
+                    msg = f'test case {i + 1} ({test.name}), chunk size {chunk_size}'
                     self.assertEqual(test.want_headers, headers, msg)
                     self.assertEqual(test.want_bodies, bodies, msg)
                     self.assertEqual(test.want_bodies_done, bodies_done, msg)
@@ -2434,7 +2389,7 @@ bad path\r
             ('POST', '/v1/signals', None, {'signal': 'SIGHUP', 'services': ['s1', 's2']}),
         ])
 
-    @unittest.skipUnless(hasattr(signal, 'SIGHUP'), 'signal constants not present on Windows')
+    @unittest.skipUnless(hasattr(signal, 'SIGHUP'), 'signal constants not present')
     def test_send_signal_number(self):
         self.client.responses.append({
             'result': True,
@@ -2546,7 +2501,6 @@ bad path\r
         ])
 
 
-@unittest.skipIf(sys.platform == 'win32', "Unix sockets don't work on Windows")
 class TestSocketClient(unittest.TestCase):
     def test_socket_not_found(self):
         client = pebble.Client(socket_path='does_not_exist')
@@ -2632,7 +2586,7 @@ class TestExec(unittest.TestCase):
         self.addCleanup(time_patcher.stop)
 
     def add_responses(self, change_id, exit_code, change_err=None):
-        task_id = 'T' + change_id  # create a task_id based on change_id
+        task_id = f"T{change_id}"  # create a task_id based on change_id
         self.client.responses.append({
             'change': change_id,
             'result': {'task-id': task_id},
@@ -2663,7 +2617,7 @@ class TestExec(unittest.TestCase):
             'command': command,
             'environment': environment or {},
             'working-dir': working_dir,
-            'timeout': '{:.3f}s'.format(timeout) if timeout is not None else None,
+            'timeout': f'{timeout:.3f}s' if timeout is not None else None,
             'user-id': user_id,
             'user': user,
             'group-id': group_id,
@@ -2781,7 +2735,7 @@ class TestExec(unittest.TestCase):
         process = self.client.exec(['server'])
         process.send_signal('SIGHUP')
         num_sends = 1
-        if hasattr(signal, 'SIGHUP'):  # Skip this part on Windows
+        if hasattr(signal, 'SIGHUP'):
             process.send_signal(1)
             process.send_signal(signal.SIGHUP)
             num_sends += 2
@@ -3045,7 +2999,6 @@ class TestExec(unittest.TestCase):
         ])
         self.assertEqual(io_ws.sends, [])
 
-    @unittest.skipIf(sys.platform == 'win32', "exec() with files doesn't work on Windows")
     def test_wait_file_io(self):
         fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
         out = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
@@ -3302,7 +3255,7 @@ class TestRealPebble(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as cm:
             self._get_health()
         self.assertEqual(cm.exception.code, 502)
-        health = pebble._json_loads(cm.exception.read())
+        health = json.loads(cm.exception.read())
         self.assertEqual(health, {
             'result': {'healthy': False},
             'status': 'Bad Gateway',
@@ -3321,7 +3274,7 @@ class TestRealPebble(unittest.TestCase):
 
     def _get_health(self):
         f = urllib.request.urlopen('http://localhost:4000/v1/health')
-        return pebble._json_loads(f.read())
+        return json.loads(f.read())
 
     def test_exec_wait(self):
         process = self.client.exec(['true'])
@@ -3363,7 +3316,7 @@ class TestRealPebble(unittest.TestCase):
         self.assertEqual(err, b'')
 
     def test_push_pull(self):
-        fname = os.path.join(tempfile.gettempdir(), 'pebbletest-{}'.format(uuid.uuid4()))
+        fname = os.path.join(tempfile.gettempdir(), f'pebbletest-{uuid.uuid4()}')
         content = 'foo\nbar\nbaz-42'
         self.client.push(fname, content)
         with self.client.pull(fname) as f:
@@ -3381,7 +3334,7 @@ class TestRealPebble(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             process = self.client.exec(['pwd'], working_dir=temp_dir)
             out, err = process.wait_output()
-            self.assertEqual(out, temp_dir + '\n')
+            self.assertEqual(out, f"{temp_dir}\n")
             self.assertEqual(err, '')
 
     def test_exec_environment(self):

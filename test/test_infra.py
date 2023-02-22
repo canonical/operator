@@ -31,9 +31,6 @@ def get_python_filepaths(include_tests=True):
         roots.append('test')
     for root in roots:
         for dirpath, dirnames, filenames in os.walk(root):
-            if dirpath == 'ops':
-                # Don't scan ops/_vendor directory
-                dirnames[:] = [x for x in dirnames if x != '_vendor']
             for filename in filenames:
                 if filename.endswith(".py"):
                     python_paths.append(os.path.join(dirpath, filename))
@@ -72,16 +69,12 @@ class InfrastructureTests(unittest.TestCase):
             self.fail("Please add copyright headers to the following files:\n" + "\n".join(issues))
 
     def _run_setup(self, *args):
-        # from 3.6 we could just use encoding="utf8" here, but 3.5
-        # doesn't expose that and instead defaults to the wrong thing
         proc = subprocess.run(
             (sys.executable, 'setup.py') + args,
             stdout=subprocess.PIPE,
-            check=True)
-        out = proc.stdout.strip().decode("utf8")
-        if os.linesep != '\n':
-            out = out.replace(os.linesep, '\n')
-        return out
+            check=True,
+            encoding='utf-8')
+        return proc.stdout.strip()
 
     def test_setup_version(self):
         setup_version = self._run_setup('--version')

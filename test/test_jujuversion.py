@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os
-import unittest
 import unittest.mock  # in this file, importing just 'patch' would be confusing
 
 from ops.jujuversion import JujuVersion
@@ -68,6 +67,11 @@ class TestJujuVersion(unittest.TestCase):
     def test_has_controller_storage(self):
         self.assertTrue(JujuVersion('2.8.0').has_controller_storage())
         self.assertFalse(JujuVersion('2.7.9').has_controller_storage())
+
+    def test_has_secrets(self):
+        self.assertTrue(JujuVersion('3.0.2').has_secrets)
+        self.assertFalse(JujuVersion('3.0.1').has_secrets)
+        self.assertFalse(JujuVersion('2.9.30').has_secrets)
 
     def test_parsing_errors(self):
         invalid_versions = [

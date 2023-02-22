@@ -55,7 +55,7 @@ def fake_script(test_case, name, content):
     # TODO: this hardcodes the path to bash.exe, which works for now but might
     #       need to be set via environ or something like that.
     path.with_suffix(".bat").write_text(
-        '@"C:\\Program Files\\git\\bin\\bash.exe" {} %*\n'.format(path))
+        f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
 
 
 def fake_script_calls(test_case, clear=False):
@@ -120,7 +120,11 @@ class BaseTestCase(unittest.TestCase):
             data_fpath = tmpdir / "framework.data"
             charm_dir = tmpdir
 
-        framework = Framework(SQLiteStorage(data_fpath), charm_dir, meta=None, model=model)
+        framework = Framework(
+            SQLiteStorage(data_fpath),
+            charm_dir,
+            meta=None,
+            model=model)
         self.addCleanup(framework.close)
         return framework
 

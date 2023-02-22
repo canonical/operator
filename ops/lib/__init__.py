@@ -12,12 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Infrastructure for the opslib functionality."""
+"""Infrastructure for the opslib functionality.
+
+DEPRECATED: The ops.lib functionality is deprecated, and is superseded by
+charm libraries (https://juju.is/docs/sdk/library) and regular Python imports.
+We now prefer to do version selection at build (charmcraft pack) time.
+"""
 
 import logging
 import os
 import re
 import sys
+import warnings
 from ast import literal_eval
 from importlib.machinery import ModuleSpec
 from importlib.util import module_from_spec
@@ -41,6 +47,9 @@ _libauthor_re = re.compile(r'''^[A-Za-z0-9_+.-]+@[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.
 def use(name: str, api: int, author: str) -> ModuleType:
     """Use a library from the ops libraries.
 
+    DEPRECATED: This function is deprecated. Prefer charm libraries instead
+    (https://juju.is/docs/sdk/library).
+
     Args:
         name: the name of the library requested.
         api: the API version of the library.
@@ -52,18 +61,20 @@ def use(name: str, api: int, author: str) -> ModuleType:
         TypeError: if the name, api, or author are the wrong type.
         ValueError: if the name, api, or author are invalid.
     """
+    warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
+                  category=DeprecationWarning)
     if not isinstance(name, str):
-        raise TypeError("invalid library name: {!r} (must be a str)".format(name))
+        raise TypeError(f"invalid library name: {name!r} (must be a str)")
     if not isinstance(author, str):
-        raise TypeError("invalid library author: {!r} (must be a str)".format(author))
+        raise TypeError(f"invalid library author: {author!r} (must be a str)")
     if not isinstance(api, int):
-        raise TypeError("invalid library API: {!r} (must be an int)".format(api))
+        raise TypeError(f"invalid library API: {api!r} (must be an int)")
     if api < 0:
-        raise ValueError('invalid library api: {} (must be ≥0)'.format(api))
+        raise ValueError(f'invalid library api: {api} (must be ≥0)')
     if not _libname_re.match(name):
-        raise ValueError("invalid library name: {!r} (chars and digits only)".format(name))
+        raise ValueError(f"invalid library name: {name!r} (chars and digits only)")
     if not _libauthor_re.match(author):
-        raise ValueError("invalid library author email: {!r}".format(author))
+        raise ValueError(f"invalid library author email: {author!r}")
 
     if _libraries is None:
         autoimport()
@@ -75,10 +86,9 @@ def use(name: str, api: int, author: str) -> ModuleType:
 
     others = ', '.join(str(lib.api) for lib in versions)
     if others:
-        msg = 'cannot find "{}" from "{}" with API version {} (have {})'.format(
-            name, author, api, others)
+        msg = f'cannot find "{name}" from "{author}" with API version {api} (have {others})'
     else:
-        msg = 'cannot find library "{}" from "{}"'.format(name, author)
+        msg = f'cannot find library "{name}" from "{author}"'
 
     raise ImportError(msg, name=name)
 
@@ -89,7 +99,12 @@ def autoimport():
     You only need to call this if you've installed a package or
     otherwise changed sys.path in the current run, and need to see the
     changes. Otherwise libraries are found on first call of `use`.
+
+    DEPRECATED: This function is deprecated. Prefer charm libraries instead
+    (https://juju.is/docs/sdk/library).
     """
+    warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
+                  category=DeprecationWarning)
     global _libraries
     _libraries = {}
     for spec in _find_all_specs(sys.path):
@@ -133,7 +148,7 @@ def _find_all_specs(path):
                 logger.debug("  Finder for '%s' has no find_spec", opslib)
                 continue
             for lib_dir in lib_dirs:
-                spec_name = "{}.opslib.{}".format(top_dir, lib_dir)
+                spec_name = f"{top_dir}.opslib.{lib_dir}"
                 spec = finder.find_spec(spec_name)
                 if spec is None:
                     logger.debug("    No spec for %r", spec_name)
@@ -158,7 +173,9 @@ def _join_and(keys: List[str]) -> str:
         return ""
     if len(keys) == 1:
         return keys[0]
-    return ", ".join(keys[:-1]) + ", and " + keys[-1]
+    all_except_last = ', '.join(keys[:-1])
+    last = keys[-1]
+    return f'{all_except_last}, and {last}'
 
 
 class _Missing:
@@ -171,10 +188,8 @@ class _Missing:
         exp = set(_NEEDED_KEYS)
         got = set(self._found)
         if len(got) == 0:
-            return "missing {}".format(_join_and(sorted(exp)))
-        return "got {}, but missing {}".format(
-            _join_and(sorted(got)),
-            _join_and(sorted(exp - got)))
+            return f"missing {_join_and(sorted(exp))}"
+        return f"got {_join_and(sorted(got))}, but missing {_join_and(sorted(exp - got))}"
 
 
 def _parse_lib(spec):
@@ -236,7 +251,7 @@ class _Lib:
         self._module = None
 
     def __repr__(self):
-        return "<_Lib {}>".format(self)
+        return f"<_Lib {self}>"
 
     def __str__(self):
         return "{0.name} by {0.author}, API {0.api}, patch {0.patch}".format(self)

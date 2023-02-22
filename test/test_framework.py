@@ -21,7 +21,6 @@ import re
 import shutil
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 from test.test_helpers import BaseTestCase, fake_script
 from unittest.mock import patch
@@ -167,11 +166,11 @@ class TestFramework(BaseTestCase):
                 self.reprs = []
 
             def on_any(self, event):
-                self.seen.append("on_any:" + event.handle.kind)
+                self.seen.append(f"on_any:{event.handle.kind}")
                 self.reprs.append(repr(event))
 
             def on_foo(self, event):
-                self.seen.append("on_foo:" + event.handle.kind)
+                self.seen.append(f"on_foo:{event.handle.kind}")
                 self.reprs.append(repr(event))
 
         pub = MyNotifier(framework, "1")
@@ -367,7 +366,7 @@ class TestFramework(BaseTestCase):
                 self.seen = []
 
             def _on_foo(self, event):
-                self.seen.append("on_foo:{}={}".format(event.handle.kind, event.my_n))
+                self.seen.append(f"on_foo:{event.handle.kind}={event.my_n}")
                 event.defer()
 
         pub = MyNotifier(framework, "1")
@@ -393,7 +392,7 @@ class TestFramework(BaseTestCase):
         #    we'd get a foo=3).
         #
         self.assertEqual(obs.seen, ["on_foo:foo=2", "on_foo:foo=2"])
-        self.assertLoggedDebug("Re-emitting <MyEvent via MyNotifier[1]/foo[1]>.")
+        self.assertLoggedDebug("Re-emitting deferred event <MyEvent via MyNotifier[1]/foo[1]>.")
 
     def test_weak_observer(self):
         framework = self.create_framework()
@@ -513,11 +512,11 @@ class TestFramework(BaseTestCase):
                 self.seen = []
 
             def _on_foo(self, event):
-                self.seen.append("on_foo:{}".format(event.handle.kind))
+                self.seen.append(f"on_foo:{event.handle.kind}")
                 event.defer()
 
             def _on_bar(self, event):
-                self.seen.append("on_bar:{}".format(event.handle.kind))
+                self.seen.append(f"on_bar:{event.handle.kind}")
 
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
@@ -531,8 +530,8 @@ class TestFramework(BaseTestCase):
         pub.on.foo.emit()
 
         self.assertEqual(obs.seen, ["on_foo:foo"])
-        fqn = pub.on.__class__.__module__ + "." + pub.on.__class__.__qualname__
-        self.assertEqual(repr(pub.on), "<{}: bar, foo>".format(fqn))
+        fqn = f"{pub.on.__class__.__module__}.{pub.on.__class__.__qualname__}"
+        self.assertEqual(repr(pub.on), f"<{fqn}: bar, foo>")
 
     def test_conflicting_event_attributes(self):
         class MyEvent(EventBase):
@@ -547,7 +546,7 @@ class TestFramework(BaseTestCase):
             class OtherEvents(ObjectEvents):
                 foo = event
         self.assertEqual(
-            str(cm.exception),
+            str(cm.exception.__cause__),
             "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
         with self.assertRaises(RuntimeError) as cm:
@@ -555,7 +554,7 @@ class TestFramework(BaseTestCase):
                 on = MyEvents()
                 bar = event
         self.assertEqual(
-            str(cm.exception),
+            str(cm.exception.__cause__),
             "EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
 
     def test_reemit_ignores_unknown_event_type(self):
@@ -622,11 +621,11 @@ class TestFramework(BaseTestCase):
                 self.seen = []
 
             def _on_foo(self, event):
-                self.seen.append("on_foo:{}:{}".format(type(event).__name__, event.handle.kind))
+                self.seen.append(f"on_foo:{type(event).__name__}:{event.handle.kind}")
                 event.defer()
 
             def _on_bar(self, event):
-                self.seen.append("on_bar:{}:{}".format(type(event).__name__, event.handle.kind))
+                self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
                 event.defer()
 
         pub = MyNotifier(framework, "1")
@@ -662,11 +661,11 @@ class TestFramework(BaseTestCase):
                 self.seen = []
 
             def _on_foo(self, event):
-                self.seen.append("on_foo:{}:{}".format(type(event).__name__, event.handle.kind))
+                self.seen.append(f"on_foo:{type(event).__name__}:{event.handle.kind}")
                 event.defer()
 
             def _on_bar(self, event):
-                self.seen.append("on_bar:{}:{}".format(type(event).__name__, event.handle.kind))
+                self.seen.append(f"on_bar:{type(event).__name__}:{event.handle.kind}")
                 event.defer()
 
         pub = MyNotifier(framework, "1")
@@ -1234,11 +1233,11 @@ class TestStoredState(BaseTestCase):
         ), (
             lambda: set(),
             'a',
-            set(['a']),
+            {'a'},
             lambda a, b: a.add(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            lambda: set(['a']),
+            lambda: {'a'},
             'a',
             set(),
             lambda a, b: a.discard(b),
@@ -1256,8 +1255,8 @@ class TestStoredState(BaseTestCase):
             _stored = StoredState()
 
         class WrappedFramework(Framework):
-            def __init__(self, store, charm_dir, meta, model):
-                super().__init__(store, charm_dir, meta, model)
+            def __init__(self, store, charm_dir, meta, model, event_name):
+                super().__init__(store, charm_dir, meta, model, event_name)
                 self.snapshots = []
 
             def save_snapshot(self, value):
@@ -1268,7 +1267,7 @@ class TestStoredState(BaseTestCase):
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
             storage = SQLiteStorage(self.tmpdir / "framework.data")
-            framework = WrappedFramework(storage, self.tmpdir, None, None)
+            framework = WrappedFramework(storage, self.tmpdir, None, None, "foo")
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
@@ -1294,7 +1293,7 @@ class TestStoredState(BaseTestCase):
             framework.close()
 
             storage_copy = SQLiteStorage(self.tmpdir / "framework.data")
-            framework_copy = WrappedFramework(storage_copy, self.tmpdir, None, None)
+            framework_copy = WrappedFramework(storage_copy, self.tmpdir, None, None, "foo")
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
@@ -1545,7 +1544,6 @@ class BreakpointTests(BaseTestCase):
             framework.breakpoint()
             self.assertEqual(fake_stderr.getvalue(), _BREAKPOINT_WELCOME_MESSAGE)
 
-    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
     def test_breakpoint_builtin_sanity(self, fake_stderr):
         # this just checks that calling breakpoint() works as expected
         # nothing really framework-dependent
@@ -1555,12 +1553,11 @@ class BreakpointTests(BaseTestCase):
 
         with patch('pdb.Pdb.set_trace') as mock:
             this_frame = inspect.currentframe()
-            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+            breakpoint()
 
         self.assertEqual(mock.call_count, 1)
         self.assertEqual(mock.call_args, ((this_frame,), {}))
 
-    @unittest.skipIf(sys.version_info < (3, 7), "no sys.breakpointhook for Python < 3.7")
     def test_builtin_breakpoint_hooked(self, fake_stderr):
         # Verify that the proper hook is set.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
@@ -1568,10 +1565,9 @@ class BreakpointTests(BaseTestCase):
         old_breakpointhook = framework.set_breakpointhook()
         self.addCleanup(setattr, sys, 'breakpointhook', old_breakpointhook)
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+            breakpoint()
         self.assertEqual(mock.call_count, 1)
 
-    @unittest.skipIf(sys.version_info < (3, 7), "no breakpoint builtin for Python < 3.7")
     def test_breakpoint_builtin_unset(self, fake_stderr):
         # if no JUJU_DEBUG_AT, no call to pdb is done
         with patch.dict(os.environ):
@@ -1581,7 +1577,7 @@ class BreakpointTests(BaseTestCase):
         self.addCleanup(setattr, sys, 'breakpointhook', old_breakpointhook)
 
         with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()        # noqa: F821 ('undefined name' in <3.7)
+            breakpoint()
 
         self.assertEqual(mock.call_count, 0)
 

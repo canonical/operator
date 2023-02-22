@@ -14,7 +14,6 @@
 
 """Main entry point to the Operator Framework."""
 
-import inspect
 import logging
 import os
 import shutil
@@ -58,7 +57,7 @@ def _get_charm_dir():
     charm_dir = os.environ.get("JUJU_CHARM_DIR")
     if charm_dir is None:
         # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = Path('{}/../../..'.format(__file__)).resolve()
+        charm_dir = Path(f'{__file__}/../../..').resolve()
     else:
         charm_dir = Path(charm_dir).resolve()
     return charm_dir
@@ -74,7 +73,7 @@ def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource[Any]',
         link_to: What the event link should point to
     """
     # type guard
-    assert bound_event.event_kind, "unbound EventSource {}".format(bound_event)
+    assert bound_event.event_kind, f"unbound EventSource {bound_event}"
 
     if issubclass(bound_event.event_type, ops.charm.HookEvent):
         event_dir = charm.framework.charm_dir / 'hooks'
@@ -82,13 +81,13 @@ def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource[Any]',
     elif issubclass(bound_event.event_type, ops.charm.ActionEvent):
         if not bound_event.event_kind.endswith("_action"):
             raise RuntimeError(
-                'action event name {} needs _action suffix'.format(bound_event.event_kind))
+                f'action event name {bound_event.event_kind} needs _action suffix')
         event_dir = charm.framework.charm_dir / 'actions'
         # The event_kind is suffixed with "_action" while the executable is not.
         event_path = event_dir / bound_event.event_kind[:-len('_action')].replace('_', '-')
     else:
         raise RuntimeError(
-            'cannot create a symlink: unsupported event type {}'.format(bound_event.event_type))
+            f'cannot create a symlink: unsupported event type {bound_event.event_type}')
 
     event_dir.mkdir(exist_ok=True)
     if not event_path.exists():
@@ -117,11 +116,6 @@ def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
         charm: An instance of the Charm class.
 
     """
-    # XXX: on windows this function does not accomplish what it wants to:
-    #      it creates symlinks with no extension pointing to a .py
-    #      and juju only knows how to handle .exe, .bat, .cmd, and .ps1
-    #      so it does its job, but does not accomplish anything as the
-    #      hooks aren't 'callable'.
     link_to = os.path.realpath(os.environ.get("JUJU_DISPATCH_PATH", sys.argv[0]))
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
@@ -160,6 +154,14 @@ def _get_event_args(charm: 'CharmBase',
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
         return [container], {}
+    elif issubclass(event_type, ops.charm.SecretEvent):
+        args: List[Any] = [
+            os.environ['JUJU_SECRET_ID'],
+            os.environ.get('JUJU_SECRET_LABEL'),
+        ]
+        if issubclass(event_type, (ops.charm.SecretRemoveEvent, ops.charm.SecretExpiredEvent)):
+            args.append(int(os.environ['JUJU_SECRET_REVISION']))
+        return args, {}
     elif issubclass(event_type, ops.charm.StorageEvent):
         storage_id = os.environ.get("JUJU_STORAGE_ID", "")
         if storage_id:
@@ -170,19 +172,19 @@ def _get_event_args(charm: 'CharmBase',
             storage_name = "-".join(bound_event.event_kind.split("_")[:-2])
 
         storages = model.storages[storage_name]
-        id, storage_location = model._backend._storage_event_details()
+        index, storage_location = model._backend._storage_event_details()
         if len(storages) == 1:
             storage = storages[0]
         else:
             # If there's more than one value, pick the right one. We'll realize the key on lookup
-            storage = next((s for s in storages if s.id == id), None)
+            storage = next((s for s in storages if s.index == index), None)
         storage = cast(Union[ops.storage.JujuStorage, ops.storage.SQLiteStorage], storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
-        relation = model.get_relation(relation_name, relation_id)  # type: Optional[Relation]
+        relation: Optional[Relation] = model.get_relation(relation_name, relation_id)
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
     remote_unit_name = os.environ.get('JUJU_REMOTE_UNIT', '')
@@ -190,10 +192,10 @@ def _get_event_args(charm: 'CharmBase',
 
     if not remote_app_name and remote_unit_name:
         if '/' not in remote_unit_name:
-            raise RuntimeError('invalid remote unit name: {}'.format(remote_unit_name))
+            raise RuntimeError(f'invalid remote unit name: {remote_unit_name}')
         remote_app_name = remote_unit_name.split('/')[0]
 
-    kwargs = {}  # type: Dict[str, Any]
+    kwargs: Dict[str, Any] = {}
     if remote_app_name:
         kwargs['app'] = model.get_app(remote_app_name)
     if remote_unit_name:
@@ -290,7 +292,7 @@ class _Dispatcher:
         """Sets the name attribute to that which can be inferred from the given path."""
         name = path.name.replace('-', '_')
         if path.parent.name == 'actions':
-            name = '{}_action'.format(name)
+            name = f'{name}_action'
         self.event_name = name
 
     def _init_legacy(self):
@@ -337,9 +339,10 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     if db_path.exists():
         return False
 
-    # if you're not in k8s you don't need controller storage
-    if 'kubernetes' not in meta.series:
-        logger.debug("Using local storage: not a kubernetes charm")
+    # only use controller storage for Kubernetes podspec charms
+    is_podspec = 'kubernetes' in meta.series
+    if not is_podspec:
+        logger.debug("Using local storage: not a Kubernetes podspec charm")
         return False
 
     # are we in a new enough Juju?
@@ -395,11 +398,15 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     if use_juju_for_storage is None:
         use_juju_for_storage = _should_use_controller_storage(charm_state_path, meta)
+    elif use_juju_for_storage:
+        warnings.warn("Controller storage is deprecated; it's intended for "
+                      "podspec charms and will be removed in a future release.",
+                      category=DeprecationWarning)
 
     if use_juju_for_storage:
         if dispatcher.is_restricted_context():
             # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
-            #  Though we eventually expect that juju will run collect-metrics in a
+            #  Though we eventually expect that Juju will run collect-metrics in a
             #  non-restricted context. Once we can determine that we are running collect-metrics
             #  in a non-restricted context, we should fire the event as normal.
             logger.debug('"%s" is not supported when using Juju for storage\n'
@@ -410,20 +417,11 @@ def main(charm_class: Type[ops.charm.CharmBase],
         store = ops.storage.JujuStorage()
     else:
         store = ops.storage.SQLiteStorage(charm_state_path)
-    framework = ops.framework.Framework(store, charm_dir, meta, model)
+    framework = ops.framework.Framework(store, charm_dir, meta, model,
+                                        event_name=dispatcher.event_name)
     framework.set_breakpointhook()
     try:
-        sig = inspect.signature(charm_class)
-        try:
-            sig.bind(framework)
-        except TypeError:
-            msg = (
-                "the second argument, 'key', has been deprecated and will be "
-                "removed after the 0.7 release")
-            warnings.warn(msg, DeprecationWarning)
-            charm = charm_class(framework, None)
-        else:
-            charm = charm_class(framework)
+        charm = charm_class(framework)
         dispatcher.ensure_event_links(charm)
 
         # TODO: Remove the collect_metrics check below as soon as the relevant

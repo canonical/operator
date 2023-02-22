@@ -22,7 +22,7 @@ import subprocess
 import typing
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Generator, List, Optional, Tuple, Union
 
 import yaml  # pyright: reportMissingModuleSource=false
 
@@ -42,10 +42,10 @@ if typing.TYPE_CHECKING:
 
 
 def _run(args: List[str], **kw: Any):
-    cmd = shutil.which(args[0])  # type: Optional[str]
+    cmd: Optional[str] = shutil.which(args[0])
     if cmd is None:
         raise FileNotFoundError(args[0])
-    return subprocess.run([cmd, *args[1:]], **kw)
+    return subprocess.run([cmd, *args[1:]], encoding='utf-8', **kw)
 
 
 class SQLiteStorage:
@@ -59,7 +59,7 @@ class SQLiteStorage:
 
         if not os.path.exists(str(filename)):
             # sqlite3.connect creates the file silently if it does not exist
-            logger.debug("Initializing SQLite local storage: {}.".format(filename))
+            logger.debug(f"Initializing SQLite local storage: {filename}.")
 
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
@@ -201,7 +201,7 @@ class JujuStorage:
     NOTICE_KEY = "#notices#"
 
     def __init__(self, backend: Optional['_JujuStorageBackend'] = None):
-        self._backend = backend or _JujuStorageBackend()  # type: _JujuStorageBackend
+        self._backend: _JujuStorageBackend = backend or _JujuStorageBackend()
 
     def close(self):
         """Part of the Storage API, close the storage backend.
@@ -299,11 +299,11 @@ class JujuStorage:
 
 
 # we load yaml.CSafeX if available, falling back to slower yaml.SafeX.
-_BaseDumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)  # type: Type[yaml.SafeDumper]
-_BaseLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)  # type: Type[yaml.SafeLoader]
+_BaseDumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
+_BaseLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 
 
-class _SimpleLoader(_BaseLoader):
+class _SimpleLoader(_BaseLoader):  # type: ignore
     """Handle a couple basic python types.
 
     yaml.SafeLoader can handle all the basic int/float/dict/set/etc that we want. The only one
@@ -321,16 +321,16 @@ _SimpleLoader.add_constructor(  # type: ignore
     _SimpleLoader.construct_python_tuple)  # type: ignore
 
 
-class _SimpleDumper(_BaseDumper):
+class _SimpleDumper(_BaseDumper):  # type: ignore
     """Add types supported by 'marshal'.
 
     YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So
     we want to only support dumping out types that are safe to load.
     """
-    represent_tuple = yaml.Dumper.represent_tuple  # type: _TupleRepresenterType
+    represent_tuple: '_TupleRepresenterType' = yaml.Dumper.represent_tuple
 
 
-_SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)
+_SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)  # type: ignore
 
 
 def juju_backend_available() -> bool:
@@ -358,7 +358,8 @@ class _JujuStorageBackend:
         # have the same default style.
         encoded_value = yaml.dump(value, Dumper=_SimpleDumper, default_flow_style=None)
         content = yaml.dump(
-            {key: encoded_value}, encoding='utf8', default_style='|',
+            {key: encoded_value},
+            default_style='|',
             default_flow_style=False,
             Dumper=_SimpleDumper)
         _run(["state-set", "--file", "-"], input=content, check=True)
@@ -372,7 +373,7 @@ class _JujuStorageBackend:
             CalledProcessError: if 'state-get' returns an error code.
         """
         # We don't capture stderr here so it can end up in debug logs.
-        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True, universal_newlines=True)
+        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
         return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore
@@ -395,4 +396,4 @@ class NoSnapshotError(Exception):
         self.handle_path = handle_path
 
     def __str__(self):
-        return 'no snapshot data found for {} object'.format(self.handle_path)
+        return f'no snapshot data found for {self.handle_path} object'
