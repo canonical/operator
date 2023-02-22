@@ -43,7 +43,7 @@ def test_ip_get(mycharm):
                     relation_id=1,
                 )
             ],
-            networks=[Network.default("metrics-endpoint", bind_id=0)],
+            networks=[Network.default("metrics-endpoint")],
         ),
         "update-status",
         mycharm,
