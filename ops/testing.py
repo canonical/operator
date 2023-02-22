@@ -1141,35 +1141,65 @@ class Harness(Generic[CharmType]):
         """
         self._backend._planned_units = None
 
-    def add_network(
-            self,
-            network_info: '_NetworkDict',
-            endpoint_name: str,
-            relation_id: Optional[int] = None) -> None:
-        """Add simulated network data.
+    def add_network(self, binding_name: str, address: str, *,
+                    relation_id: Optional[int] = None,
+                    cidr: Optional[str] = None,
+                    interface: str = 'eth0',
+                    ingress_addresses: Optional[List[str]] = None,
+                    egress_subnets: Optional[List[str]] = None,
+                    ):
+        """Add simulated network data for the given binding.
 
-        This supports testing charms that rely on the presence of networking info
-        to function. It will make the provided network_info available to the
-        testing backends network_get() method.
+        Calling this multiple times with the same (binding_name, relation_id)
+        combination will replace the associated network data.
+
+        This method only supports the common case of adding a single interface
+        and bind address. If you need support for multiple bind addresses, you
+        can patch ops.testing._TestingModelBackend.network_get and return the
+        full network-get data via the patched method.
 
         Args:
-            network_info: dictionary of network data as would be returned by
-                network_get()
-            endpoint_name: name of the binding to register data for
-            relation_id: optional a relation id
+            binding_name: Name of binding (endpoint) to add network data for.
+            address: Binding's IP address, for example "10.0.0.10".
+            relation_id: Optional relation ID for the binding. If not
+                provided, adds network data for the default binding.
+            cidr: Binding's CIDR. Defaults to "<address>/24".
+            interface: Name of network interface.
+            ingress_addresses: Optional list of ingress addresses. Defaults to
+                [address].
+            egress_subnets: Optional list of egress subnets. Defaults to
+                [cidr]
         """
-        self._backend._network_map[(endpoint_name, relation_id)] = network_info
+        if cidr is None:
+            cidr = f'{address}/24'
+        if ingress_addresses is None:
+            ingress_addresses = [address]
+        if egress_subnets is None:
+            egress_subnets = [cidr]
+        data = {
+            'bind-addresses': [{
+                'interface-name': interface,
+                'addresses': [
+                    {'cidr': cidr, 'value': address},
+                ],
+            }],
+            'egress-subnets': egress_subnets,
+            'ingress-addresses': ingress_addresses,
+        }
+        self._backend._networks[binding_name, relation_id] = data
 
-    def remove_network(self, endpoint_name: str, relation_id: Optional[int] = None):
-        """Remove simulated network data."""
-        try:
-            del self._backend._network_map[(endpoint_name, relation_id)]
-        except KeyError as e:
-            raise RelationNotFoundError() from e
+    def remove_network(self, binding_name: str, relation_id: Optional[int] = None):
+        """Remove simulated network data for the given binding.
 
-    def reset_networks(self):
-        """Clear any simulated network info."""
-        self._backend._network_map = {}
+        Calling this method with a (binding_name, relation_id) combination that
+        hasn't been added does nothing.
+
+        Args:
+            binding_name: Name of binding (endpoint) to remove network data for.
+            relation_id: Optional relation ID for the binding. If not
+                provided, removes network data for the default binding.
+        """
+        self._backend._networks.pop((binding_name, relation_id), None)
 
     def _get_backend_calls(self, reset: bool = True) -> List[Tuple[Any, ...]]:
         """Return the calls that we have made to the TestingModelBackend.
@@ -1577,7 +1607,7 @@ class _TestingModelBackend:
         self._planned_units: Optional[int] = None
         self._hook_is_running = ''
         self._secrets: List[_Secret] = []
-        self._network_map = {}  # type: Dict[Tuple[str, Optional[int]], _NetworkDict]
+        self._networks: Dict[Tuple[str, Optional[int]], _NetworkDict] = {}
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -1823,22 +1853,6 @@ class _TestingModelBackend:
         index = int(index)
         self._storage_list[name].pop(index, None)
 
-    def network_get(self, endpoint_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
-        """Return simulated network data.
-
-        If simulated network data has been set for a given endpoint (and optional relation)
-        it will be available via this method. Otherwise a RelationNotFoundError
-        will be raised
-
-        Args:
-            endpoint_name: binding the network info was registered for
-            relation_id: optional relation identifier
-        """
-        try:
-            return self._network_map[(endpoint_name, relation_id)]
-        except KeyError as e:
-            raise RelationNotFoundError() from e
-
     def action_get(self):  # type:ignore
         raise NotImplementedError(self.action_get)  # type:ignore
 
@@ -1850,6 +1864,29 @@ class _TestingModelBackend:
 
     def action_fail(self, message=''):  # type:ignore
         raise NotImplementedError(self.action_fail)  # type:ignore
+
+    def network_get(self, binding_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
+        if relation_id is None:
+            data = self._networks.get((binding_name, None))
+            if data is not None:
+                # Get the default data if it exists
+                return data
+            # Otherwise get the data with the lowest relation_id as the default
+            # TODO: does this even make sense?
+            datas = sorted((r, data) for (b, r), data in self._networks.items()
+                           if b == binding_name)
+            if datas:
+                return datas[0][1]
+        else:
+            data = self._networks.get((binding_name, relation_id))
+            if data is not None:
+                # Get the data for this specific relation_id if it exists
+                return data
+            data = self._networks.get((binding_name, None))
+            if data is not None:
+                # Otherwise get the default data for this binding
+                return data
+        raise RelationNotFoundError
 
     def add_metrics(self, metrics, labels=None):  # type:ignore
         raise NotImplementedError(self.add_metrics)  # type:ignore
