@@ -28,6 +28,8 @@ classifiers = [
 "Homepage" = "https://github.com/PietroPasotti/ops-scenario"
 "Bug Tracker" = "https://github.com/PietroPasotti/ops-scenario/issues"
 
+[project.scripts]
+scenario = "scenario.scripts.main:main"
 
 [tool.setuptools.package-dir]
 scenario = "scenario"
