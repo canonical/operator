@@ -39,7 +39,7 @@ An initial state goes in, an event occurs (say, `'start'`) and a new state comes
 Scenario tests are about validating the transition, that is, consistency-checking the delta between the two states, and verifying the charm author's expectations.
 
 Comparing scenario tests with `Harness` tests:
-- Harness exposes an imperative API: the user is expected to call methods on the Harness driving it to the desired , then verify the validity of the state.
+- Harness exposes an imperative API: the user is expected to call methods on the Harness driving it to the desired state, then verify its validity by calling charm methods or inspecting the raw data.
 - Harness instantiates the charm once, then allows you to fire multiple events on the charm, which is breeding ground for subtle bugs. Scenario tests are centered around testing single state transitions, that is, one event at a time. This ensures that the execution environment is as clean as possible (for a unit test).
 - Harness maintains a model of the juju Model, which is a maintenance burden and adds complexity. Scenario mocks at the level of hook tools and stores all mocking data in a monolithic data structure (the State), which makes it more lightweight and portable.
 - TODO: Scenario can mock at the level of hook tools. Decoupling charm and context allows us to swap out easily any part of this flow, and even share context data across charms, codebases, teams...
