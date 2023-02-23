@@ -102,6 +102,12 @@ class EventSpec:
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
+    def setUp(self):
+        old_breakpointhook = sys.breakpointhook
+
+        def restore():
+            sys.breakpointhook = old_breakpointhook
+        self.addCleanup(restore)
 
     @patch('sys.stderr', new_callable=io.StringIO)
     def test_breakpoint(self, fake_stderr):
@@ -203,6 +209,13 @@ class CharmInitTestCase(unittest.TestCase):
 @patch('sys.argv', new=("hooks/config-changed",))
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
 class TestDispatch(unittest.TestCase):
+    def setUp(self):
+        old_breakpointhook = sys.breakpointhook
+
+        def restore():
+            sys.breakpointhook = old_breakpointhook
+        self.addCleanup(restore)
+
     def _check(self, *, with_dispatch=False, dispatch_path=''):
         """Helper for below tests."""
         class MyCharm(CharmBase):
