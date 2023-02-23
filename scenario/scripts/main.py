@@ -7,11 +7,10 @@ from scenario.scripts.snapshot import snapshot
 
 
 def _setup_logging(verbosity: int):
-    base_loglevel = int(os.getenv('LOGLEVEL', 30))
+    base_loglevel = int(os.getenv("LOGLEVEL", 30))
     verbosity = min(verbosity, 2)
     loglevel = base_loglevel - (verbosity * 10)
-    logging.basicConfig(level=loglevel,
-                        format='%(message)s')
+    logging.basicConfig(level=loglevel, format="%(message)s")
 
 
 def main():
@@ -30,7 +29,7 @@ def main():
     app.command(name="snapshot", no_args_is_help=True)(snapshot)
 
     @app.callback()
-    def setup_logging(verbose: int = typer.Option(0, '-v', count=True)):
+    def setup_logging(verbose: int = typer.Option(0, "-v", count=True)):
         _setup_logging(verbose)
 
     app()

@@ -239,9 +239,6 @@ class Mount(_DCBase):
     location: Union[str, PurePosixPath]
     src: Union[str, Path]
 
-    def __post_init__(self):
-        self.src = Path(self.src)
-
 
 @dataclasses.dataclass
 class Container(_DCBase):
@@ -318,20 +315,22 @@ class Container(_DCBase):
                 # but it ignores services it doesn't recognize
                 continue
             status = self.service_status.get(name, pebble.ServiceStatus.INACTIVE)
-            if service.startup == '':
+            if service.startup == "":
                 startup = pebble.ServiceStartup.DISABLED
             else:
                 startup = pebble.ServiceStartup(service.startup)
-            info = pebble.ServiceInfo(name,
-                                      startup=startup,
-                                      current=pebble.ServiceStatus(status))
+            info = pebble.ServiceInfo(
+                name, startup=startup, current=pebble.ServiceStatus(status)
+            )
             infos[name] = info
         return infos
 
     @property
     def filesystem(self) -> _MockFileSystem:
         mounts = {
-            name: _MockStorageMount(src=spec.src, location=spec.location)
+            name: _MockStorageMount(
+                src=Path(spec.src), location=PurePosixPath(spec.location)
+            )
             for name, spec in self.mounts.items()
         }
         return _MockFileSystem(mounts=mounts)
@@ -413,7 +412,6 @@ class Network(_DCBase):
                     ],
                 )
             ],
-            bind_address=private_address,
             egress_subnets=list(egress_subnets),
             ingress_addresses=list(ingress_addresses),
         )
@@ -444,7 +442,9 @@ class StoredState(_DCBase):
 
 @dataclasses.dataclass
 class State(_DCBase):
-    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(default_factory=dict)
+    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
+        default_factory=dict
+    )
     relations: List[Relation] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
