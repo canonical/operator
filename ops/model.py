@@ -626,7 +626,20 @@ class Unit:
 
     def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
                    port: Optional[int] = None):
-        """Close a port with the given protocol for this unit."""
+        """Close a port with the given protocol for this unit.
+
+        On Kubernetes sidecar charms, Juju will only close the port once the
+        last unit that opened that port has closed it. However, this is
+        usually not an issue; normally charms should make the same
+        close_port() call from every unit.
+
+        Args:
+            protocol: String representing the protocol; must be one of
+                'tcp', 'udp', or 'icmp' (lowercase is recommended, but
+                uppercase is also supported).
+            port: The port to open. Required for TCP and UDP; not allowed
+                for ICMP.
+        """
         self._backend.close_port(protocol.lower(), port)
 
     def opened_ports(self) -> Set['OpenedPort']:
