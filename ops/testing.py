@@ -1160,6 +1160,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             binding_name: Name of binding (endpoint) to add network data for.
+                Use "" (empty string) to set the default binding.
             address: Binding's IP address, for example "10.0.0.10".
             relation_id: Optional relation ID for the binding. If not
                 provided, adds network data for the default binding.
@@ -1866,26 +1867,17 @@ class _TestingModelBackend:
         raise NotImplementedError(self.action_fail)  # type:ignore
 
     def network_get(self, binding_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
-        if relation_id is None:
+        data = self._networks.get((binding_name, relation_id))
+        if data is not None:
+            return data
+        if relation_id is not None:
             data = self._networks.get((binding_name, None))
             if data is not None:
-                # Get the default data if it exists
                 return data
-            # Otherwise get the data with the lowest relation_id as the default
-            # TODO: does this even make sense?
-            datas = sorted((r, data) for (b, r), data in self._networks.items()
-                           if b == binding_name)
-            if datas:
-                return datas[0][1]
-        else:
-            data = self._networks.get((binding_name, relation_id))
-            if data is not None:
-                # Get the data for this specific relation_id if it exists
-                return data
-            data = self._networks.get((binding_name, None))
-            if data is not None:
-                # Otherwise get the default data for this binding
-                return data
+        # No custom data per relation ID or binding, return the default binding
+        data = self._networks.get(('', None))
+        if data is not None:
+            return data
         raise RelationNotFoundError
 
     def add_metrics(self, metrics, labels=None):  # type:ignore
