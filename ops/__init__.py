@@ -1,4 +1,4 @@
-# Copyright 2020 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,6 +39,122 @@ and day-2 operations specific to that application.
 Full developer documentation is available at https://juju.is/docs/sdk.
 """
 
-# Import here the bare minimum to break the circular import between modules
+# TODO: ensure there is no overlap between names in the various groups
+
+import ops.main as main_module
+
+# TODO: is this still needed?
 from . import charm  # type: ignore # noqa
+from .charm import (
+    ActionEvent,
+    ActionMeta,
+    CharmBase,
+    CharmEvents,
+    CharmMeta,
+    CollectMetricsEvent,
+    ConfigChangedEvent,
+    ContainerMeta,
+    ContainerStorageMeta,
+    HookEvent,
+    InstallEvent,
+    LeaderElectedEvent,
+    LeaderSettingsChangedEvent,
+    PayloadMeta,
+    PebbleReadyEvent,
+    PostSeriesUpgradeEvent,
+    PreSeriesUpgradeEvent,
+    RelationBrokenEvent,
+    RelationChangedEvent,
+    RelationCreatedEvent,
+    RelationDepartedEvent,
+    RelationEvent,
+    RelationJoinedEvent,
+    RelationMeta,
+    RelationRole,
+    RemoveEvent,
+    ResourceMeta,
+    SecretChangedEvent,
+    SecretEvent,
+    SecretExpiredEvent,
+    SecretRemoveEvent,
+    SecretRotateEvent,
+    StartEvent,
+    StopEvent,
+    StorageAttachedEvent,
+    StorageDetachingEvent,
+    StorageEvent,
+    StorageMeta,
+    UpdateStatusEvent,
+    UpgradeCharmEvent,
+    WorkloadEvent,
+)
+from .framework import (
+    BoundEvent,
+    BoundStoredState,
+    CommitEvent,
+    EventBase,
+    EventSource,
+    Framework,
+    FrameworkEvents,
+    Handle,
+    HandleKind,
+    LifecycleEvent,
+    NoTypeError,
+    Object,
+    ObjectEvents,
+    PreCommitEvent,
+    PrefixedEvents,
+    StoredDict,
+    StoredList,
+    StoredSet,
+    StoredState,
+    StoredStateData,
+)
+from .jujuversion import JujuVersion
+from .main import main
+from .model import (
+    ActiveStatus,
+    Application,
+    Binding,
+    BindingMapping,
+    BlockedStatus,
+    CheckInfoMapping,
+    ConfigData,
+    Container,
+    ContainerMapping,
+    ErrorStatus,
+    InvalidStatusError,
+    LazyMapping,
+    MaintenanceStatus,
+    Model,
+    ModelError,
+    MultiPushPullError,
+    Network,
+    NetworkInterface,
+    Pod,
+    Relation,
+    RelationData,
+    RelationDataAccessError,
+    RelationDataContent,
+    RelationDataError,
+    RelationDataTypeError,
+    RelationMapping,
+    RelationNotFoundError,
+    Resources,
+    Secret,
+    SecretInfo,
+    SecretNotFoundError,
+    SecretRotate,
+    ServiceInfoMapping,
+    StatusBase,
+    Storage,
+    StorageMapping,
+    TooManyRelatedAppsError,
+    Unit,
+    UnknownStatus,
+    WaitingStatus,
+)
 from .version import version as __version__  # type: ignore # noqa
+
+# TODO: hmmm, test that this hack works same before and after
+main.main = main

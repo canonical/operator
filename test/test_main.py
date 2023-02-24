@@ -100,7 +100,7 @@ class EventSpec:
         self.secret_revision = secret_revision
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
+@patch('ops.main_module.setup_root_logging', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
 
     @patch('sys.stderr', new_callable=io.StringIO)
@@ -135,8 +135,8 @@ class CharmInitTestCase(unittest.TestCase):
         if extra_environ is not None:
             fake_environ.update(extra_environ)
         with patch.dict(os.environ, fake_environ):
-            with patch('ops.main._emit_charm_event'):
-                with patch('ops.main._get_charm_dir') as mock_charmdir:
+            with patch('ops.main_module._emit_charm_event'):
+                with patch('ops.main_module._get_charm_dir') as mock_charmdir:
                     with tempfile.TemporaryDirectory() as tmpdirname:
                         tmpdirname = Path(tmpdirname)
                         fake_metadata = tmpdirname / 'metadata.yaml'
@@ -201,7 +201,7 @@ class CharmInitTestCase(unittest.TestCase):
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
+@patch('ops.main_module.setup_root_logging', new=lambda *a, **kw: None)
 class TestDispatch(unittest.TestCase):
     def _check(self, *, with_dispatch=False, dispatch_path=''):
         """Helper for below tests."""
@@ -230,8 +230,8 @@ class TestDispatch(unittest.TestCase):
                 dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
-                with patch('ops.main._emit_charm_event') as mock_charm_event:
-                    with patch('ops.main._get_charm_dir') as mock_charmdir:
+                with patch('ops.main_module._emit_charm_event') as mock_charm_event:
+                    with patch('ops.main_module._get_charm_dir') as mock_charmdir:
                         mock_charmdir.return_value = tmpdir
                         main(MyCharm)
 
