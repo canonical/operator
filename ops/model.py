@@ -13,6 +13,8 @@
 # limitations under the License.
 
 """Representations of Juju's model, application, unit, and other entities."""
+
+import dataclasses
 import datetime
 import enum
 import ipaddress
@@ -599,6 +601,61 @@ class Unit:
             rotate=rotate,
             owner='unit')
         return Secret(self._backend, id=id, label=label, content=content)
+
+    def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
+                  port: Optional[int] = None):
+        """Open a port with the given protocol for this unit.
+
+        Calling this registers intent with Juju that the application should be
+        accessed on the given port, but the port isn't actually opened
+        externally until the operator runs "juju expose".
+
+        On Kubernetes sidecar charms, the ports opened are not strictly
+        per-unit: Juju will open the union of ports from all units.
+        However, normally charms should make the same open_port() call from
+        every unit.
+
+        Args:
+            protocol: String representing the protocol; must be one of
+                'tcp', 'udp', or 'icmp' (lowercase is recommended, but
+                uppercase is also supported).
+            port: The port to open. Required for TCP and UDP; not allowed
+                for ICMP.
+        """
+        self._backend.open_port(protocol.lower(), port)
+
+    def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
+                   port: Optional[int] = None):
+        """Close a port with the given protocol for this unit.
+
+        On Kubernetes sidecar charms, Juju will only close the port once the
+        last unit that opened that port has closed it. However, this is
+        usually not an issue; normally charms should make the same
+        close_port() call from every unit.
+
+        Args:
+            protocol: String representing the protocol; must be one of
+                'tcp', 'udp', or 'icmp' (lowercase is recommended, but
+                uppercase is also supported).
+            port: The port to open. Required for TCP and UDP; not allowed
+                for ICMP.
+        """
+        self._backend.close_port(protocol.lower(), port)
+
+    def opened_ports(self) -> Set['OpenedPort']:
+        """Return a list of opened ports for this unit."""
+        return self._backend.opened_ports()
+
+
+@dataclasses.dataclass(frozen=True)
+class OpenedPort:
+    """Represents a port opened by :meth:`Unit.open_port`."""
+
+    """The IP protocol: 'tcp', 'udp', or 'icmp'."""
+    protocol: typing.Literal['tcp', 'udp', 'icmp']
+
+    """The port number. Will be None if protocol is 'icmp'."""
+    port: Optional[int]
 
 
 class LazyMapping(Mapping[str, str], ABC):
@@ -2997,6 +3054,44 @@ class _ModelBackend:
         if revision is not None:
             args.extend(['--revision', str(revision)])
         self._run_for_secret('secret-remove', *args)
+
+    def open_port(self, protocol: str, port: Optional[int] = None):
+        arg = f'{port}/{protocol}' if port is not None else protocol
+        self._run('open-port', arg)
+
+    def close_port(self, protocol: str, port: Optional[int] = None):
+        arg = f'{port}/{protocol}' if port is not None else protocol
+        self._run('close-port', arg)
+
+    def opened_ports(self) -> Set[OpenedPort]:
+        # We could use "opened-ports --format=json", but it's not really
+        # structured; it's just an array of strings which are the lines of the
+        # text output, like ["icmp","8081/udp"]. So it's probably just as
+        # likely to change as the text output, and doesn't seem any better.
+        output = typing.cast(str, self._run('opened-ports', return_output=True))
+        ports: Set[OpenedPort] = set()
+        for line in output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            port = self._parse_opened_port(line)
+            if port is not None:
+                ports.add(port)
+        return ports
+
+    @classmethod
+    def _parse_opened_port(cls, port_str: str) -> Optional[OpenedPort]:
+        if port_str == 'icmp':
+            return OpenedPort('icmp', None)
+        port_range, slash, protocol = port_str.partition('/')
+        if not slash or protocol not in ['tcp', 'udp']:
+            logger.warning('Unexpected opened-ports protocol: %s', port_str)
+            return None
+        port, hyphen, _ = port_range.partition('-')
+        if hyphen:
+            logger.warning('Ignoring opened-ports port range: %s', port_str)
+        protocol_lit = typing.cast(typing.Literal['tcp', 'udp'], protocol)
+        return OpenedPort(protocol_lit, int(port))
 
 
 class _ModelBackendValidator:
