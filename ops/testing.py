@@ -1158,6 +1158,10 @@ class Harness(Generic[CharmType]):
         Note that this method only supports the common case of adding a single
         interface and bind address.
 
+        Example::
+
+            harness.add_network('database', '10.0.0.10')
+
         Args:
             binding_name: Name of binding (endpoint) to add network data for.
                 Use "" (empty string) to set the default binding.
