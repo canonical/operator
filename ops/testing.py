@@ -43,7 +43,6 @@ from typing import (
     Literal,
     Mapping,
     Optional,
-    Sequence,
     Set,
     TextIO,
     Tuple,
@@ -1148,8 +1147,8 @@ class Harness(Generic[CharmType]):
                     relation_id: Optional[int] = None,
                     cidr: Optional[str] = None,
                     interface: str = 'eth0',
-                    ingress_addresses: Optional[Sequence[str]] = None,
-                    egress_subnets: Optional[Sequence[str]] = None,
+                    ingress_addresses: Optional[Iterable[str]] = None,
+                    egress_subnets: Optional[Iterable[str]] = None,
                     ):
         """Add simulated network data for the given binding.
 
