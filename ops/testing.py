@@ -40,6 +40,7 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Literal,
     Mapping,
     Optional,
     Sequence,
@@ -58,7 +59,7 @@ from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.model import RelationNotFoundError
 
 if TYPE_CHECKING:
-    from typing_extensions import Literal, TypedDict
+    from typing_extensions import TypedDict
 
     from ops.model import UnitOrApplication, _NetworkDict
 
@@ -1620,6 +1621,7 @@ class _TestingModelBackend:
         self._planned_units: Optional[int] = None
         self._hook_is_running = ''
         self._secrets: List[_Secret] = []
+        self._opened_ports: Set[model.OpenedPort] = set()
         self._networks: Dict[Tuple[str, Optional[int]], _NetworkDict] = {}
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
@@ -2143,6 +2145,33 @@ class _TestingModelBackend:
                 self._secrets = [s for s in self._secrets if s.id != id]
         else:
             self._secrets = [s for s in self._secrets if s.id != id]
+
+    def open_port(self, protocol: str, port: Optional[int] = None):
+        self._check_protocol_and_port(protocol, port)
+        protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
+        self._opened_ports.add(model.OpenedPort(protocol_lit, port))
+
+    def close_port(self, protocol: str, port: Optional[int] = None):
+        self._check_protocol_and_port(protocol, port)
+        protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
+        self._opened_ports.discard(model.OpenedPort(protocol_lit, port))
+
+    def opened_ports(self) -> Set[model.OpenedPort]:
+        return set(self._opened_ports)
+
+    def _check_protocol_and_port(self, protocol: str, port: Optional[int]):
+        # Simulate the error messages we get from Juju (not that charm tests
+        # should be testing details of error messages).
+        if protocol == 'icmp':
+            if port is not None:
+                raise model.ModelError(f'ERROR protocol "{protocol}" doesn\'t support any ports; got "{port}"\n')  # NOQA: test_quote_backslashes
+        elif protocol in ['tcp', 'udp']:
+            if port is None:
+                raise model.ModelError(f'ERROR invalid port "{protocol}": strconv.Atoi: parsing "{protocol}": invalid syntax\n')  # NOQA: test_quote_backslashes
+            if not (1 <= port <= 65535):
+                raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')  # NOQA: test_quote_backslashes
+        else:
+            raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # NOQA: test_quote_backslashes
 
 
 @_copy_docstrings(pebble.Client)
