@@ -19,6 +19,7 @@ import dataclasses
 import datetime
 import fnmatch
 import inspect
+import ipaddress
 import os
 import pathlib
 import random
@@ -41,6 +42,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Set,
     TextIO,
     Tuple,
@@ -1145,8 +1147,8 @@ class Harness(Generic[CharmType]):
                     relation_id: Optional[int] = None,
                     cidr: Optional[str] = None,
                     interface: str = 'eth0',
-                    ingress_addresses: Optional[List[str]] = None,
-                    egress_subnets: Optional[List[str]] = None,
+                    ingress_addresses: Optional[Sequence[str]] = None,
+                    egress_subnets: Optional[Sequence[str]] = None,
                     ):
         """Add simulated network data for the given binding.
 
@@ -1161,18 +1163,26 @@ class Harness(Generic[CharmType]):
         Args:
             binding_name: Name of binding (endpoint) to add network data for.
                 Use "" (empty string) to set the default binding.
-            address: Binding's IP address, for example "10.0.0.10".
+            address: Binding's IPv4 or IPv6 address, for example "10.0.0.10".
             relation_id: Optional relation ID for the binding. If not
                 provided, adds network data for the default binding.
-            cidr: Binding's CIDR. Defaults to "<address>/24".
+            cidr: Binding's CIDR. Defaults to "<address>/24" if address is an
+                IPv4 address, or "<address>/64" if address is IPv6.
             interface: Name of network interface.
             ingress_addresses: Optional list of ingress addresses. Defaults to
                 [address].
             egress_subnets: Optional list of egress subnets. Defaults to
                 [cidr]
+
+        Raises:
+            ValueError: If address is not an IPv4 or IPv6 address.
         """
+        parsed_address = ipaddress.ip_address(address)  # raises ValueError if not an IP
         if cidr is None:
-            cidr = f'{address}/24'
+            if isinstance(parsed_address, ipaddress.IPv4Address):
+                cidr = f'{address}/24'
+            else:
+                cidr = f'{address}/64'
         if ingress_addresses is None:
             ingress_addresses = [address]
         if egress_subnets is None:
