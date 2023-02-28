@@ -1155,10 +1155,8 @@ class Harness(Generic[CharmType]):
         Calling this multiple times with the same (binding_name, relation_id)
         combination will replace the associated network data.
 
-        This method only supports the common case of adding a single interface
-        and bind address. If you need support for multiple bind addresses, you
-        can patch ops.testing._TestingModelBackend.network_get and return the
-        full network-get data via the patched method.
+        Note that this method only supports the common case of adding a single
+        interface and bind address.
 
         Args:
             binding_name: Name of binding (endpoint) to add network data for.
