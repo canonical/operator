@@ -1,0 +1,35 @@
+name: Charmcraft Pack Test
+
+on: [push, pull_request, workflow_call]
+
+jobs:
+  charmcraft-pack:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Set up Python 3
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+
+    - name: Checkout test charm repository
+      uses: actions/checkout@v2
+      with:
+        repository: jnsgruk/hello-kubecon
+        ref: ${{ github.event.pull_request.head.sha }}  # TODO: remove
+
+    - name: Update 'ops' dependency in test charm to latest
+      run: |
+        sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+        echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+
+    - name: Install charmcraft
+      run: |
+          sudo snap refresh lxd --channel=latest
+          sudo adduser "$USER" lxd
+          sudo lxd init --auto
+          sudo snap install charmcraft --classic
+
+    - name: Pack the charm
+      run: |
+          sudo -g lxd charmcraft pack --verbose

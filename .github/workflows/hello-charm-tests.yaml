@@ -36,9 +36,3 @@ jobs:
         run: |
           export PYTHONPATH="lib:src:$PYTHONPATH"
           python3 -m unittest
-
-      - name: Ensure 'charmcraft pack' works
-        run: |
-          grep --quiet git charmcraft.yaml || echo -e "\nparts:\n  charm:\n    build-packages: [git]" >>charmcraft.yaml
-          sudo snap install charmcraft --classic
-          charmcraft pack --verbose
