@@ -23,7 +23,7 @@ jobs:
         # temporary merge commit), because charmcraft pack does a git checkout which
         # can't see the temporary merge commit.
         sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-        echo -e "\ngit+${{ github.event.pull_request.repo.clone_url }}@${{ github.event.pull_request.head.sha }}#egg=ops" >> requirements.txt
+        echo -e "\ngit+${{ github.event.pull_request.head.repo.clone_url }}@${{ github.event.pull_request.head.sha }}#egg=ops" >> requirements.txt
         cat requirements.txt
 
     - name: Install charmcraft
