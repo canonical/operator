@@ -40,5 +40,5 @@ jobs:
       - name: Ensure 'charmcraft pack' works
         run: |
           grep --quiet git charmcraft.yaml || echo -e "\nparts:\n  charm:\n    build-packages: [git]" >>charmcraft.yaml
-          snap install charmcraft
+          snap install charmcraft --classic
           charmcraft pack --verbose
