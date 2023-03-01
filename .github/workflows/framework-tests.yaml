@@ -105,9 +105,4 @@ jobs:
       # Test that a pip install of the source dist .tar.gz will work
       - name: Test 'pip install'
         run: |
-          ls dist/ops*.gz  # should only be 1
-          echo -------------------------------------
-          cat setup.py
-          echo -------------------------------------
-          tar -tf $(ls dist/ops*.gz | head -n1)
           pip install $(ls dist/ops*.gz | head -n1)
