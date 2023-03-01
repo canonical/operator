@@ -89,4 +89,21 @@ jobs:
         run: tox -e unit -- -k RealPebble
         env:
           RUN_REAL_PEBBLE_TESTS: 1 
-          PEBBLE: /tmp/pebble 
+          PEBBLE: /tmp/pebble
+
+  pip-install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3
+        uses: actions/setup-python@v2
+
+      - name: Build
+        run: python setup.py sdist
+
+      # Test that a pip install of the source dist .tar.gz will work
+      - name: Test 'pip install'
+        run: |
+          ls dist/ops*.gz  # should only be 1
+          pip install $(ls dist/ops*.gz | head -n1)
