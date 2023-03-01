@@ -7,12 +7,10 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-    - uses: actions/checkout@v2
-
-    - name: Set up Python 3
+    - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
-        python-version: "3.10"
+        python-version: "3.8"
 
     - name: Checkout test charm repository
       uses: actions/checkout@v2
@@ -23,6 +21,7 @@ jobs:
       run: |
         sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
         echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+        cat requirements.txt
 
     - name: Install charmcraft
       run: |
