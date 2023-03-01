@@ -96,8 +96,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-        with:  # TODO: remove
-          ref: ${{ github.event.pull_request.head.sha }}
       - name: Set up Python 3
         uses: actions/setup-python@v2
 
