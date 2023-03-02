@@ -104,5 +104,5 @@ jobs:
 
       # Test that a pip install of the source dist .tar.gz will work
       - name: Test 'pip install'
-        run: |
-          pip install $(ls dist/ops*.gz | head -n1)
+        # Shouldn't happen, but pip install will fail if ls returns multiple lines
+        run: pip install $(ls dist/ops*.gz)
