@@ -30,4 +30,4 @@ jobs:
       run: sudo snap install charmcraft --classic
 
     - name: Pack the charm
-      run: sudo -g lxd charmcraft pack --verbose
+      run: sudo charmcraft pack --verbose
