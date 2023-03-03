@@ -3,11 +3,12 @@ import logging
 import marshal
 import os
 import re
+import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union, List
 
 import yaml
 from ops.framework import _event_regex
@@ -53,10 +54,12 @@ class Runtime:
     def __init__(
         self,
         charm_spec: "_CharmSpec",
+        resources: Dict[Path, Path] = None,
         juju_version: str = "3.0.0",
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
+        self._resources = resources
         # TODO consider cleaning up venv on __delete__, but ideally you should be
         #  running this in a clean venv or a container anyway.
 
@@ -161,11 +164,31 @@ class Runtime:
         #  passed via the CharmSpec
         spec = self._charm_spec
         with tempfile.TemporaryDirectory() as tempdir:
-            temppath = Path(tempdir)
-            (temppath / "metadata.yaml").write_text(yaml.safe_dump(spec.meta))
-            (temppath / "config.yaml").write_text(yaml.safe_dump(spec.config or {}))
-            (temppath / "actions.yaml").write_text(yaml.safe_dump(spec.actions or {}))
-            yield temppath
+            virtual_charm_root = Path(tempdir)
+            (virtual_charm_root / "metadata.yaml").write_text(yaml.safe_dump(spec.meta))
+            (virtual_charm_root / "config.yaml").write_text(yaml.safe_dump(spec.config or {}))
+            (virtual_charm_root / "actions.yaml").write_text(yaml.safe_dump(spec.actions or {}))
+
+            for origin, subtree in (self._resources or {}).items():
+                if subtree.name.startswith('/'):
+                    raise ValueError(
+                        'invalid subtree. Should be relative paths starting without a /: they will '
+                        'be interpreted relative to the virtual charm root')
+
+                parts = subtree.parts
+                if parts[0] == '/':
+                    parts = parts[1:]
+
+                new_loc = virtual_charm_root.joinpath(*parts)
+                if not new_loc.parent.exists():
+                    new_loc.parent.mkdir(parents=True)
+
+                if origin.is_dir():
+                    shutil.copytree(origin, new_loc)
+                else:
+                    shutil.copy2(origin, new_loc)
+
+            yield virtual_charm_root
 
     @staticmethod
     def _get_store(temporary_charm_root: Path):
@@ -305,6 +328,7 @@ def trigger(
     meta: Optional[Dict[str, Any]] = None,
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
+    resources: Optional[Dict[Path, Path]] = None,
 ) -> "State":
     from scenario.state import Event, _CharmSpec
 
@@ -321,7 +345,7 @@ def trigger(
             charm_type=charm_type, meta=meta, actions=actions, config=config
         )
 
-    runtime = Runtime(charm_spec=spec, juju_version=state.juju_version)
+    runtime = Runtime(charm_spec=spec, juju_version=state.juju_version, resources=resources)
 
     return runtime.exec(
         state=state,

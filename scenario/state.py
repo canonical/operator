@@ -523,6 +523,7 @@ class State(_DCBase):
         meta: Optional[Dict[str, Any]] = None,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
+        resources: Optional[Dict[Path, Path]] = None,
     ):
         """Fluent API for trigger."""
         return trigger(
@@ -534,6 +535,7 @@ class State(_DCBase):
             meta=meta,
             actions=actions,
             config=config,
+            resources=resources,
         )
 
 
