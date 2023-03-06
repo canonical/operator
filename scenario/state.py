@@ -25,6 +25,8 @@ if typing.TYPE_CHECKING:
         from typing_extensions import Self
     from ops.testing import CharmType
 
+    PathLike = Union[str, Path]
+
 logger = scenario_logger.getChild("structs")
 
 ATTACH_ALL_STORAGES = "ATTACH_ALL_STORAGES"
@@ -318,13 +320,13 @@ class Container(_DCBase):
                 # but it ignores services it doesn't recognize
                 continue
             status = self.service_status.get(name, pebble.ServiceStatus.INACTIVE)
-            if service.startup == '':
+            if service.startup == "":
                 startup = pebble.ServiceStartup.DISABLED
             else:
                 startup = pebble.ServiceStartup(service.startup)
-            info = pebble.ServiceInfo(name,
-                                      startup=startup,
-                                      current=pebble.ServiceStatus(status))
+            info = pebble.ServiceInfo(
+                name, startup=startup, current=pebble.ServiceStatus(status)
+            )
             infos[name] = info
         return infos
 
@@ -413,7 +415,6 @@ class Network(_DCBase):
                     ],
                 )
             ],
-            bind_address=private_address,
             egress_subnets=list(egress_subnets),
             ingress_addresses=list(ingress_addresses),
         )
@@ -444,7 +445,9 @@ class StoredState(_DCBase):
 
 @dataclasses.dataclass
 class State(_DCBase):
-    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(default_factory=dict)
+    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
+        default_factory=dict
+    )
     relations: List[Relation] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
@@ -523,7 +526,7 @@ class State(_DCBase):
         meta: Optional[Dict[str, Any]] = None,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
-        resources: Optional[Dict[Path, Path]] = None,
+        copy_to_charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
     ):
         """Fluent API for trigger."""
         return trigger(
@@ -535,7 +538,7 @@ class State(_DCBase):
             meta=meta,
             actions=actions,
             config=config,
-            resources=resources,
+            copy_to_charm_root=copy_to_charm_root,
         )
 
 
