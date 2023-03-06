@@ -493,7 +493,9 @@ class State(_DCBase):
             status=dataclasses.replace(self.status, unit=(status, message))
         )
 
-    def get_container(self, name) -> Container:
+    def get_container(self, container: Union[str, Container]) -> Container:
+        """Get container from this State, based on an input container or its name."""
+        name = container.name if isinstance(container, Container) else container
         try:
             return next(filter(lambda c: c.name == name, self.containers))
         except StopIteration as e:
