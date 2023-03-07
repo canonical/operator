@@ -318,13 +318,13 @@ class Container(_DCBase):
                 # but it ignores services it doesn't recognize
                 continue
             status = self.service_status.get(name, pebble.ServiceStatus.INACTIVE)
-            if service.startup == '':
+            if service.startup == "":
                 startup = pebble.ServiceStartup.DISABLED
             else:
                 startup = pebble.ServiceStartup(service.startup)
-            info = pebble.ServiceInfo(name,
-                                      startup=startup,
-                                      current=pebble.ServiceStatus(status))
+            info = pebble.ServiceInfo(
+                name, startup=startup, current=pebble.ServiceStatus(status)
+            )
             infos[name] = info
         return infos
 
@@ -391,15 +391,15 @@ class Network(_DCBase):
 
     @classmethod
     def default(
-            cls,
-            name,
-            private_address: str = "1.1.1.1",
-            hostname: str = "",
-            cidr: str = "",
-            interface_name: str = "",
-            mac_address: Optional[str] = None,
-            egress_subnets=("1.1.1.2/32",),
-            ingress_addresses=("1.1.1.2",),
+        cls,
+        name,
+        private_address: str = "1.1.1.1",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        mac_address: Optional[str] = None,
+        egress_subnets=("1.1.1.2/32",),
+        ingress_addresses=("1.1.1.2",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
@@ -421,6 +421,7 @@ class Network(_DCBase):
 @dataclasses.dataclass
 class _EntityStatus(_DCBase):
     """This class represents StatusBase and should not be interacted with directly."""
+
     # Why not use StatusBase directly? Because that's not json-serializable.
 
     name: str
@@ -428,12 +429,16 @@ class _EntityStatus(_DCBase):
 
     def __eq__(self, other):
         if isinstance(other, Tuple):
-            logger.warning('Comparing Status with Tuples is deprecated and will be removed soon.')
+            logger.warning(
+                "Comparing Status with Tuples is deprecated and will be removed soon."
+            )
             return (self.name, self.message) == other
         if isinstance(other, StatusBase):
             return (self.name, self.message) == (other.name, other.message)
-        logger.warning(f'Comparing Status with {other} is not stable and will be forbidden soon.'
-                       f'Please compare with StatusBase directly.')
+        logger.warning(
+            f"Comparing Status with {other} is not stable and will be forbidden soon."
+            f"Please compare with StatusBase directly."
+        )
         return super().__eq__(other)
 
     @classmethod
@@ -461,9 +466,11 @@ class Status(_DCBase):
             elif isinstance(val, StatusBase):
                 setattr(self, name, _EntityStatus._from_statusbase(val))
             elif isinstance(val, tuple):
-                logger.warning('Initializing Status.[app/unit] with Tuple[str, str] is deprecated '
-                               'and will be removed soon. \n'
-                               f'Please pass a StatusBase instance: `StatusBase(*{val})`')
+                logger.warning(
+                    "Initializing Status.[app/unit] with Tuple[str, str] is deprecated "
+                    "and will be removed soon. \n"
+                    f"Please pass a StatusBase instance: `StatusBase(*{val})`"
+                )
                 setattr(self, name, _EntityStatus(*val))
             else:
                 raise TypeError(f"Invalid status.{name}: {val!r}")
@@ -487,7 +494,9 @@ class StoredState(_DCBase):
 
 @dataclasses.dataclass
 class State(_DCBase):
-    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(default_factory=dict)
+    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
+        default_factory=dict
+    )
     relations: List[Relation] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
@@ -693,11 +702,11 @@ class Event(_DCBase):
 
 
 def deferred(
-        event: Union[str, Event],
-        handler: Callable,
-        event_id: int = 1,
-        relation: "Relation" = None,
-        container: "Container" = None,
+    event: Union[str, Event],
+    handler: Callable,
+    event_id: int = 1,
+    relation: "Relation" = None,
+    container: "Container" = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
@@ -742,6 +751,7 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
+
 
 # todo: consider
 #  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:

@@ -157,8 +157,8 @@ PS = """
 @pytest.mark.parametrize(
     "cmd, out",
     (
-            ("ls", LS),
-            ("ps", PS),
+        ("ls", LS),
+        ("ps", PS),
     ),
 )
 def test_exec(charm_cls, cmd, out):
@@ -249,7 +249,7 @@ def test_pebble_plan(charm_cls, starting_service_status):
             "fooserv": pebble.ServiceStatus.ACTIVE,
             # todo: should we disallow setting status for services that aren't known YET?
             "barserv": starting_service_status,
-        }
+        },
     )
 
     out = State(containers=[container]).trigger(
@@ -262,10 +262,11 @@ def test_pebble_plan(charm_cls, starting_service_status):
     serv = lambda name, obj: pebble.Service(name, raw=obj)
     container = out.containers[0]
     assert container.plan.services == {
-        'barserv': serv('barserv', {'startup': 'disabled'}),
-        'fooserv': serv('fooserv', {'startup': 'enabled'})}
-    assert container.services['fooserv'].current == pebble.ServiceStatus.ACTIVE
-    assert container.services['fooserv'].startup == pebble.ServiceStartup.ENABLED
+        "barserv": serv("barserv", {"startup": "disabled"}),
+        "fooserv": serv("fooserv", {"startup": "enabled"}),
+    }
+    assert container.services["fooserv"].current == pebble.ServiceStatus.ACTIVE
+    assert container.services["fooserv"].startup == pebble.ServiceStartup.ENABLED
 
-    assert container.services['barserv'].current == pebble.ServiceStatus.ACTIVE
-    assert container.services['barserv'].startup == pebble.ServiceStartup.DISABLED
+    assert container.services["barserv"].current == pebble.ServiceStatus.ACTIVE
+    assert container.services["barserv"].startup == pebble.ServiceStartup.DISABLED
