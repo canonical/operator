@@ -413,7 +413,6 @@ class Network(_DCBase):
                     ],
                 )
             ],
-            bind_address=private_address,
             egress_subnets=list(egress_subnets),
             ingress_addresses=list(ingress_addresses),
         )
