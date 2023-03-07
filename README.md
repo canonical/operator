@@ -64,7 +64,7 @@ With that, we can write the simplest possible scenario test:
 ```python
 from scenario.state import State
 from ops.charm import CharmBase
-
+from ops.model import UnknownStatus
 
 class MyCharm(CharmBase):
     pass
@@ -74,7 +74,7 @@ def test_scenario_base():
     out = State().trigger(
         'start', 
         MyCharm, meta={"name": "foo"})
-    assert out.status.unit == ('unknown', '')
+    assert out.status.unit == UnknownStatus()
 ```
 
 Now let's start making it more complicated.
@@ -104,7 +104,7 @@ def test_status_leader(leader):
         'start', 
         MyCharm,
         meta={"name": "foo"})
-    assert out.status.unit == ('active', 'I rule' if leader else 'I am ruled')
+    assert out.status.unit == ActiveStatus('I rule' if leader else 'I am ruled')
 ```
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
