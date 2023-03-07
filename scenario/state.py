@@ -444,6 +444,9 @@ class _EntityStatus(_DCBase):
     def __iter__(self):
         return iter([self.name, self.message])
 
+    def __repr__(self):
+        return f"<EntityStatus name={self.name}, message={self.message}>"
+
 
 @dataclasses.dataclass
 class Status(_DCBase):
@@ -464,7 +467,7 @@ class Status(_DCBase):
                                f'Please pass a StatusBase instance: `StatusBase(*{val})`')
                 setattr(self, name, _EntityStatus(*val))
             else:
-                raise TypeError(f"Invalid {self}.{name}: {val!r}")
+                raise TypeError(f"Invalid status.{name}: {val!r}")
 
 
 @dataclasses.dataclass
