@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import yaml
 from ops import pebble
-from ops.model import SecretRotate
+from ops.model import SecretRotate, StatusBase
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockFileSystem, _MockStorageMount
@@ -391,15 +391,15 @@ class Network(_DCBase):
 
     @classmethod
     def default(
-        cls,
-        name,
-        private_address: str = "1.1.1.1",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        mac_address: Optional[str] = None,
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
+            cls,
+            name,
+            private_address: str = "1.1.1.1",
+            hostname: str = "",
+            cidr: str = "",
+            interface_name: str = "",
+            mac_address: Optional[str] = None,
+            egress_subnets=("1.1.1.2/32",),
+            ingress_addresses=("1.1.1.2",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
@@ -420,10 +420,51 @@ class Network(_DCBase):
 
 
 @dataclasses.dataclass
+class _EntityStatus(_DCBase):
+    """This class represents StatusBase and should not be interacted with directly."""
+    # Why not use StatusBase directly? Because that's not json-serializable.
+
+    name: str
+    message: str = ""
+
+    def __eq__(self, other):
+        if isinstance(other, Tuple):
+            logger.warning('Comparing Status with Tuples is deprecated and will be removed soon.')
+            return (self.name, self.message) == other
+        if isinstance(other, StatusBase):
+            return (self.name, self.message) == (other.name, other.message)
+        logger.warning(f'Comparing Status with {other} is not stable and will be forbidden soon.'
+                       f'Please compare with StatusBase directly.')
+        return super().__eq__(other)
+
+    @classmethod
+    def _from_statusbase(cls, obj: StatusBase):
+        return _EntityStatus(obj.name, obj.message)
+
+    def __iter__(self):
+        return iter([self.name, self.message])
+
+
+@dataclasses.dataclass
 class Status(_DCBase):
-    app: Tuple[str, str] = ("unknown", "")
-    unit: Tuple[str, str] = ("unknown", "")
+    app: _EntityStatus = _EntityStatus("unknown")
+    unit: _EntityStatus = _EntityStatus("unknown")
     app_version: str = ""
+
+    def __post_init__(self):
+        for name in ["app", "unit"]:
+            val = getattr(self, name)
+            if isinstance(val, _EntityStatus):
+                pass
+            elif isinstance(val, StatusBase):
+                setattr(self, name, _EntityStatus._from_statusbase(val))
+            elif isinstance(val, tuple):
+                logger.warning('Initializing Status.[app/unit] with Tuple[str, str] is deprecated '
+                               'and will be removed soon. \n'
+                               f'Please pass a StatusBase instance: `StatusBase(*{val})`')
+                setattr(self, name, _EntityStatus(*val))
+            else:
+                raise TypeError(f"Invalid {self}.{name}: {val!r}")
 
 
 @dataclasses.dataclass
@@ -650,11 +691,11 @@ class Event(_DCBase):
 
 
 def deferred(
-    event: Union[str, Event],
-    handler: Callable,
-    event_id: int = 1,
-    relation: "Relation" = None,
-    container: "Container" = None,
+        event: Union[str, Event],
+        handler: Callable,
+        event_id: int = 1,
+        relation: "Relation" = None,
+        container: "Container" = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
@@ -699,7 +740,6 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
-
 
 # todo: consider
 #  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:
