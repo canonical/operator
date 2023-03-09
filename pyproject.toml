@@ -13,7 +13,10 @@ description = "Python library providing a Scenario-based testing API for Operato
 license.text = "Apache-2.0"
 keywords = ["juju", "test"]
 
-dependencies = ["ops>=2.0"]
+dependencies = [
+    "ops>=2.0",
+    "PyYAML==6.0"
+]
 readme = "README.md"
 requires-python = ">=3.8"
 
