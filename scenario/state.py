@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import yaml
 from ops import pebble
-from ops.model import SecretRotate
+from ops.model import SecretRotate, StatusBase
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockFileSystem, _MockStorageMount
@@ -318,13 +318,13 @@ class Container(_DCBase):
                 # but it ignores services it doesn't recognize
                 continue
             status = self.service_status.get(name, pebble.ServiceStatus.INACTIVE)
-            if service.startup == '':
+            if service.startup == "":
                 startup = pebble.ServiceStartup.DISABLED
             else:
                 startup = pebble.ServiceStartup(service.startup)
-            info = pebble.ServiceInfo(name,
-                                      startup=startup,
-                                      current=pebble.ServiceStatus(status))
+            info = pebble.ServiceInfo(
+                name, startup=startup, current=pebble.ServiceStatus(status)
+            )
             infos[name] = info
         return infos
 
@@ -413,17 +413,67 @@ class Network(_DCBase):
                     ],
                 )
             ],
-            bind_address=private_address,
             egress_subnets=list(egress_subnets),
             ingress_addresses=list(ingress_addresses),
         )
 
 
 @dataclasses.dataclass
+class _EntityStatus(_DCBase):
+    """This class represents StatusBase and should not be interacted with directly."""
+
+    # Why not use StatusBase directly? Because that's not json-serializable.
+
+    name: str
+    message: str = ""
+
+    def __eq__(self, other):
+        if isinstance(other, Tuple):
+            logger.warning(
+                "Comparing Status with Tuples is deprecated and will be removed soon."
+            )
+            return (self.name, self.message) == other
+        if isinstance(other, StatusBase):
+            return (self.name, self.message) == (other.name, other.message)
+        logger.warning(
+            f"Comparing Status with {other} is not stable and will be forbidden soon."
+            f"Please compare with StatusBase directly."
+        )
+        return super().__eq__(other)
+
+    @classmethod
+    def _from_statusbase(cls, obj: StatusBase):
+        return _EntityStatus(obj.name, obj.message)
+
+    def __iter__(self):
+        return iter([self.name, self.message])
+
+    def __repr__(self):
+        return f"<EntityStatus name={self.name}, message={self.message}>"
+
+
+@dataclasses.dataclass
 class Status(_DCBase):
-    app: Tuple[str, str] = ("unknown", "")
-    unit: Tuple[str, str] = ("unknown", "")
+    app: _EntityStatus = _EntityStatus("unknown")
+    unit: _EntityStatus = _EntityStatus("unknown")
     app_version: str = ""
+
+    def __post_init__(self):
+        for name in ["app", "unit"]:
+            val = getattr(self, name)
+            if isinstance(val, _EntityStatus):
+                pass
+            elif isinstance(val, StatusBase):
+                setattr(self, name, _EntityStatus._from_statusbase(val))
+            elif isinstance(val, tuple):
+                logger.warning(
+                    "Initializing Status.[app/unit] with Tuple[str, str] is deprecated "
+                    "and will be removed soon. \n"
+                    f"Please pass a StatusBase instance: `StatusBase(*{val})`"
+                )
+                setattr(self, name, _EntityStatus(*val))
+            else:
+                raise TypeError(f"Invalid status.{name}: {val!r}")
 
 
 @dataclasses.dataclass
@@ -444,7 +494,9 @@ class StoredState(_DCBase):
 
 @dataclasses.dataclass
 class State(_DCBase):
-    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(default_factory=dict)
+    config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
+        default_factory=dict
+    )
     relations: List[Relation] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
