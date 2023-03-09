@@ -372,6 +372,12 @@ def trigger(
     :arg copy_to_charm_root: files to copy to the virtual charm root that we create when executing
         the charm. If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
         execution cwd, you need to specify that here.
+        The format is {destination_path: source_path}; so for the aforementioned scenario you
+        would:
+        >>> local_file = tempfile.NamedTemporaryFile(suffix='yaml')
+        >>> local_path = Path(local_path.name)
+        >>> local_path.write_text('foo: bar')
+        >>> scenario.State().trigger(..., copy_to_charm_root = {'./src/foo/bar.yaml': local_path})
     """
     from scenario.state import Event, _CharmSpec
 
