@@ -350,6 +350,29 @@ def trigger(
     config: Optional[Dict[str, Any]] = None,
     copy_to_charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
 ) -> "State":
+    """Trigger a charm execution with an Event and a State.
+
+    Calling this function will call ops' main() and set up the context according to the specified
+    State, then emit the event on the charm.
+
+    :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
+    :arg state: the State instance to use as data source for the hook tool calls that the charm will
+        invoke when handling the Event.
+    :arg charm_type: the CharmBase subclass to call ``ops.main()`` on.
+    :arg pre_event: callback to be invoked right before emitting the event on the newly
+        instantiated charm. Will receive the charm instance as only positional argument.
+    :arg post_event: callback to be invoked right after emitting the event on the charm instance.
+        Will receive the charm instance as only positional argument.
+    :arg meta: charm metadata to use. Needs to be a valid metadata.yaml format (as a python dict).
+        If none is provided, we will search for a ``metadata.yaml`` file in the charm root.
+    :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a python dict).
+        If none is provided, we will search for a ``actions.yaml`` file in the charm root.
+    :arg config: charm config to use. Needs to be a valid config.yaml format (as a python dict).
+        If none is provided, we will search for a ``config.yaml`` file in the charm root.
+    :arg copy_to_charm_root: files to copy to the virtual charm root that we create when executing
+        the charm. If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
+        execution cwd, you need to specify that here.
+    """
     from scenario.state import Event, _CharmSpec
 
     if isinstance(event, str):

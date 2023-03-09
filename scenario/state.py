@@ -16,7 +16,7 @@ from ops.model import SecretRotate
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockFileSystem, _MockStorageMount
-from scenario.runtime import trigger
+from scenario.runtime import trigger as _runtime_trigger
 
 if typing.TYPE_CHECKING:
     try:
@@ -530,8 +530,8 @@ class State(_DCBase):
         config: Optional[Dict[str, Any]] = None,
         copy_to_charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
     ):
-        """Fluent API for trigger."""
-        return trigger(
+        """Fluent API for trigger. See runtime.trigger's docstring."""
+        return _runtime_trigger(
             state=self,
             event=event,
             charm_type=charm_type,
@@ -542,6 +542,8 @@ class State(_DCBase):
             config=config,
             copy_to_charm_root=copy_to_charm_root,
         )
+
+    trigger.__doc__ = _runtime_trigger.__doc__
 
 
 @dataclasses.dataclass
