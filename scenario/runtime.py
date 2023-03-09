@@ -66,12 +66,12 @@ class Runtime:
     def __init__(
         self,
         charm_spec: "_CharmSpec",
-        copy_to_charm_root: Dict["PathLike", "PathLike"] = None,
+        charm_root: Optional["PathLike"] = None,
         juju_version: str = "3.0.0",
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
-        self._copy_to_charm_root = copy_to_charm_root
+        self._charm_root = charm_root
         # TODO consider cleaning up venv on __delete__, but ideally you should be
         #  running this in a clean venv or a container anyway.
 
@@ -175,40 +175,27 @@ class Runtime:
         #  the metadata files ourselves. To be sure, we ALWAYS use a tempdir. Ground truth is what the user
         #  passed via the CharmSpec
         spec = self._charm_spec
-        with tempfile.TemporaryDirectory() as tempdir:
-            virtual_charm_root = Path(tempdir)
-            (virtual_charm_root / "metadata.yaml").write_text(yaml.safe_dump(spec.meta))
-            (virtual_charm_root / "config.yaml").write_text(
-                yaml.safe_dump(spec.config or {})
-            )
-            (virtual_charm_root / "actions.yaml").write_text(
-                yaml.safe_dump(spec.actions or {})
-            )
 
-            for subtree, origin in (self._copy_to_charm_root or {}).items():
-                subtree = Path(subtree)
-                origin = Path(origin)
+        if vroot := self._charm_root:
+            cleanup = False
+            virtual_charm_root = Path(vroot)
+        else:
+            vroot = tempfile.TemporaryDirectory()
+            virtual_charm_root = Path(vroot.name)
+            cleanup = True
 
-                if subtree.name.startswith("/"):
-                    raise ValueError(
-                        "invalid subtree. Should be relative paths starting without a /: they will "
-                        "be interpreted relative to the virtual charm root"
-                    )
+        (virtual_charm_root / "metadata.yaml").write_text(yaml.safe_dump(spec.meta))
+        (virtual_charm_root / "config.yaml").write_text(
+            yaml.safe_dump(spec.config or {})
+        )
+        (virtual_charm_root / "actions.yaml").write_text(
+            yaml.safe_dump(spec.actions or {})
+        )
 
-                parts = subtree.parts
-                if parts[0] == "/":
-                    parts = parts[1:]
+        yield virtual_charm_root
 
-                new_loc = virtual_charm_root.joinpath(*parts)
-                if not new_loc.parent.exists():
-                    new_loc.parent.mkdir(parents=True)
-
-                if origin.is_dir():
-                    shutil.copytree(origin, new_loc)
-                else:
-                    shutil.copy2(origin, new_loc)
-
-            yield virtual_charm_root
+        if cleanup:
+            vroot.cleanup()
 
     @staticmethod
     def _get_store(temporary_charm_root: Path):
@@ -348,7 +335,7 @@ def trigger(
     meta: Optional[Dict[str, Any]] = None,
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
-    copy_to_charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
+    charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
 ) -> "State":
     """Trigger a charm execution with an Event and a State.
 
@@ -369,15 +356,14 @@ def trigger(
         If none is provided, we will search for a ``actions.yaml`` file in the charm root.
     :arg config: charm config to use. Needs to be a valid config.yaml format (as a python dict).
         If none is provided, we will search for a ``config.yaml`` file in the charm root.
-    :arg copy_to_charm_root: files to copy to the virtual charm root that we create when executing
-        the charm. If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
-        execution cwd, you need to specify that here.
-        The format is {destination_path: source_path}; so for the aforementioned scenario you
-        would:
-        >>> local_file = tempfile.NamedTemporaryFile(suffix='yaml')
+    :arg charm_root: virtual charm root the charm will be executed with.
+     If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
+        execution cwd, you need to use this.
+        >>> virtual_root = tempfile.TemporaryDirectory()
         >>> local_path = Path(local_path.name)
-        >>> local_path.write_text('foo: bar')
-        >>> scenario.State().trigger(..., copy_to_charm_root = {'./src/foo/bar.yaml': local_path})
+        >>> (local_path / 'foo').mkdir()
+        >>> (local_path / 'foo' / 'bar.yaml').write_text('foo: bar')
+        >>> scenario.State().trigger(..., charm_root = virtual_root)
     """
     from scenario.state import Event, _CharmSpec
 
@@ -397,7 +383,7 @@ def trigger(
     runtime = Runtime(
         charm_spec=spec,
         juju_version=state.juju_version,
-        copy_to_charm_root=copy_to_charm_root,
+        charm_root=charm_root,
     )
 
     return runtime.exec(

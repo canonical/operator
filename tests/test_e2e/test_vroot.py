@@ -19,25 +19,24 @@ class MyCharm(CharmBase):
         self.unit.status = ActiveStatus(f"{foo.read_text()} {baz.read_text()}")
 
 
-def test_resources():
-    with tempfile.TemporaryDirectory() as td:
-        t = Path(td)
-        foobar = t / "foo.bar"
+def test_vroot():
+    with tempfile.TemporaryDirectory() as myvroot:
+        t = Path(myvroot)
+        src = t / "src"
+        src.mkdir()
+        foobar = src / "foo.bar"
         foobar.write_text("hello")
 
-        baz = t / "baz"
+        baz = src / "baz"
         baz.mkdir(parents=True)
-        quxcos = baz / "qux.cos"
+        quxcos = baz / "qux.kaboodle"
         quxcos.write_text("world")
 
         out = State().trigger(
             "start",
             charm_type=MyCharm,
             meta=MyCharm.META,
-            copy_to_charm_root={
-                "/src/foo.bar": foobar,
-                "/src/baz/qux.kaboodle": quxcos,
-            },
+            charm_root=t,
         )
 
     assert out.status.unit == ("active", "hello world")

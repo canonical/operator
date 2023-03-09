@@ -528,7 +528,7 @@ class State(_DCBase):
         meta: Optional[Dict[str, Any]] = None,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
-        copy_to_charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
+        charm_root: Optional["PathLike"] = None,
     ):
         """Fluent API for trigger. See runtime.trigger's docstring."""
         return _runtime_trigger(
@@ -540,7 +540,7 @@ class State(_DCBase):
             meta=meta,
             actions=actions,
             config=config,
-            copy_to_charm_root=copy_to_charm_root,
+            charm_root=charm_root,
         )
 
     trigger.__doc__ = _runtime_trigger.__doc__
