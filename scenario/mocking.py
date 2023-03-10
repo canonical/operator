@@ -127,11 +127,16 @@ class _MockModelBackend(_ModelBackend):
 
     def config_get(self):
         state_config = self._state.config
-        if not state_config:
-            state_config = {
-                key: value.get("default")
-                for key, value in self._charm_spec.config.items()
-            }
+
+        # add defaults
+        charm_config = self._charm_spec.config
+        if not charm_config:
+            return state_config
+
+        for key, value in charm_config["options"].items():
+            # if it has a default, and it's not overwritten from State, use it:
+            if key not in state_config and (default_value := value.get("default")):
+                state_config[key] = default_value
 
         return state_config  # full config
 
