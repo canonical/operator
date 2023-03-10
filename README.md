@@ -398,20 +398,73 @@ Scenario can simulate StoredState.
 You can define it on the input side as:
 
 ```python
-
+from ops.charm import CharmBase
+from ops.framework import StoredState as Ops_StoredState, Framework
 from scenario import State, StoredState
 
+
+class MyCharmType(CharmBase):
+    my_stored_state = Ops_StoredState()
+
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
+        assert self.my_stored_state.foo == 'bar'  # this will pass!
+
+
 state = State(stored_state=[
-    StoredState(
-        owner="MyCharmType",
-        content={
-            'foo': 'bar',
-            'baz': {42: 42},
-        })
+  StoredState(
+    owner_path="MyCharmType",
+    name="my_stored_state",
+    content={
+      'foo': 'bar',
+      'baz': {42: 42},
+    })
 ])
 ```
 
-And you can run assertions on it on the output side the same as any other bit of state.
+And the charm's runtime will see `self.stored_State.foo` and `.baz` as expected.
+Also, you can run assertions on it on the output side the same as any other bit of state.
+
+
+# The virtual charm root
+Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. 
+The charm will see that tempdir as its 'root'. This allows us to keep things simple when dealing with metadata that can 
+be either inferred from the charm type being passed to `trigger()` or be passed to it as an argument, thereby overriding
+the inferred one. This also allows you to test with charms defined on the fly, as in:
+
+```python
+from ops.charm import CharmBase
+from scenario import State
+
+class MyCharmType(CharmBase):
+    pass
+
+state = State().trigger(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start')
+```
+
+A consequence of this fact is that you have no direct control over the tempdir that we are
+creating to put the metadata you are passing to trigger (because `ops` expects it to be a file...).
+That is, unless you pass your own:
+
+```python
+from ops.charm import CharmBase
+from scenario import State
+import tempfile
+
+
+class MyCharmType(CharmBase):
+  pass
+
+
+td = tempfile.TemporaryDirectory()
+state = State().trigger(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start',
+                        charm_root=td.name)
+```
+
+Do this, and you will be able to set up said directory as you like before the charm is run, as well 
+as verify its contents after the charm has run. Do keep in mind that the metadata files will 
+be overwritten by Scenario, and therefore ignored.
+
 
 # TODOS:
 - State-State consistency checks.

@@ -16,7 +16,7 @@ from ops.model import SecretRotate, StatusBase
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockFileSystem, _MockStorageMount
-from scenario.runtime import trigger
+from scenario.runtime import trigger as _runtime_trigger
 
 if typing.TYPE_CHECKING:
     try:
@@ -24,6 +24,8 @@ if typing.TYPE_CHECKING:
     except ImportError:
         from typing_extensions import Self
     from ops.testing import CharmType
+
+    PathLike = Union[str, Path]
 
 logger = scenario_logger.getChild("structs")
 
@@ -542,7 +544,9 @@ class State(_DCBase):
             status=dataclasses.replace(self.status, unit=(status, message))
         )
 
-    def get_container(self, name) -> Container:
+    def get_container(self, container: Union[str, Container]) -> Container:
+        """Get container from this State, based on an input container or its name."""
+        name = container.name if isinstance(container, Container) else container
         try:
             return next(filter(lambda c: c.name == name, self.containers))
         except StopIteration as e:
@@ -575,9 +579,10 @@ class State(_DCBase):
         meta: Optional[Dict[str, Any]] = None,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
+        charm_root: Optional["PathLike"] = None,
     ):
-        """Fluent API for trigger."""
-        return trigger(
+        """Fluent API for trigger. See runtime.trigger's docstring."""
+        return _runtime_trigger(
             state=self,
             event=event,
             charm_type=charm_type,
@@ -586,7 +591,10 @@ class State(_DCBase):
             meta=meta,
             actions=actions,
             config=config,
+            charm_root=charm_root,
         )
+
+    trigger.__doc__ = _runtime_trigger.__doc__
 
 
 @dataclasses.dataclass
@@ -597,6 +605,10 @@ class _CharmSpec(_DCBase):
     meta: Optional[Dict[str, Any]]
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
+
+    # autoloaded means: trigger() is being invoked on a 'real' charm class, living in some /src/charm.py,
+    # and the metadata files are 'real' metadata files.
+    is_autoloaded: bool = False
 
     @staticmethod
     def autoload(charm_type: Type["CharmType"]):
@@ -617,7 +629,11 @@ class _CharmSpec(_DCBase):
             actions = yaml.safe_load(actions_path.open())
 
         return _CharmSpec(
-            charm_type=charm_type, meta=meta, actions=actions, config=config
+            charm_type=charm_type,
+            meta=meta,
+            actions=actions,
+            config=config,
+            is_autoloaded=True,
         )
 
 
