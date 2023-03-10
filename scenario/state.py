@@ -124,6 +124,11 @@ class Secret(_DCBase):
 _RELATION_IDS_CTR = 0
 
 
+def _normalize_event_name(s: str):
+    """Event names need underscores instead of dashes."""
+    return s.replace('-', '_')
+
+
 @dataclasses.dataclass
 class Relation(_DCBase):
     endpoint: str
@@ -173,27 +178,37 @@ class Relation(_DCBase):
     @property
     def changed_event(self):
         """Sugar to generate a <this relation>-relation-changed event."""
-        return Event(name=self.endpoint + "_relation_changed", relation=self)
+        return Event(
+            name=_normalize_event_name(self.endpoint + "-relation-changed"),
+            relation=self)
 
     @property
     def joined_event(self):
         """Sugar to generate a <this relation>-relation-joined event."""
-        return Event(name=self.endpoint + "_relation_joined", relation=self)
+        return Event(
+            name=_normalize_event_name(self.endpoint + "-relation-joined"),
+            relation=self)
 
     @property
     def created_event(self):
         """Sugar to generate a <this relation>-relation-created event."""
-        return Event(name=self.endpoint + "_relation_created", relation=self)
+        return Event(
+            name=_normalize_event_name(self.endpoint + "-relation-created"),
+            relation=self)
 
     @property
     def departed_event(self):
         """Sugar to generate a <this relation>-relation-departed event."""
-        return Event(name=self.endpoint + "_relation_departed", relation=self)
+        return Event(
+            name=_normalize_event_name(self.endpoint + "-relation-departed"),
+            relation=self)
 
     @property
     def broken_event(self):
         """Sugar to generate a <this relation>-relation-broken event."""
-        return Event(name=self.endpoint + "_relation_broken", relation=self)
+        return Event(
+            name=_normalize_event_name(self.endpoint + "-relation-broken"),
+            relation=self)
 
 
 def _random_model_name():
@@ -346,7 +361,8 @@ class Container(_DCBase):
                 "you **can** fire pebble-ready while the container cannot connect, "
                 "but that's most likely not what you want."
             )
-        return Event(name=self.name + "_pebble_ready", container=self)
+        return Event(name=_normalize_event_name(self.name + "-pebble-ready"),
+                     container=self)
 
 
 @dataclasses.dataclass
@@ -393,15 +409,15 @@ class Network(_DCBase):
 
     @classmethod
     def default(
-        cls,
-        name,
-        private_address: str = "1.1.1.1",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        mac_address: Optional[str] = None,
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
+            cls,
+            name,
+            private_address: str = "1.1.1.1",
+            hostname: str = "",
+            cidr: str = "",
+            interface_name: str = "",
+            mac_address: Optional[str] = None,
+            egress_subnets=("1.1.1.2/32",),
+            ingress_addresses=("1.1.1.2",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
@@ -569,17 +585,17 @@ class State(_DCBase):
         return sort_patch(patch)
 
     def trigger(
-        self,
-        event: Union["Event", str],
-        charm_type: Type["CharmType"],
-        # callbacks
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
-        # if not provided, will be autoloaded from charm_type.
-        meta: Optional[Dict[str, Any]] = None,
-        actions: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None,
-        charm_root: Optional["PathLike"] = None,
+            self,
+            event: Union["Event", str],
+            charm_type: Type["CharmType"],
+            # callbacks
+            pre_event: Optional[Callable[["CharmType"], None]] = None,
+            post_event: Optional[Callable[["CharmType"], None]] = None,
+            # if not provided, will be autoloaded from charm_type.
+            meta: Optional[Dict[str, Any]] = None,
+            actions: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None,
+            charm_root: Optional["PathLike"] = None,
     ):
         """Fluent API for trigger. See runtime.trigger's docstring."""
         return _runtime_trigger(
@@ -718,11 +734,11 @@ class Event(_DCBase):
 
 
 def deferred(
-    event: Union[str, Event],
-    handler: Callable,
-    event_id: int = 1,
-    relation: "Relation" = None,
-    container: "Container" = None,
+        event: Union[str, Event],
+        handler: Callable,
+        event_id: int = 1,
+        relation: "Relation" = None,
+        container: "Container" = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
@@ -767,7 +783,6 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
-
 
 # todo: consider
 #  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:
