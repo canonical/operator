@@ -181,7 +181,7 @@ def get_secrets(
     relations: Tuple[str, ...] = (),
 ) -> List[Secret]:
     """Get Secret list from the charm."""
-    logger.error("Secrets snapshotting not implemented yet. Also, are you *sure*?")
+    logger.warning("Secrets snapshotting not implemented yet. Also, are you *sure*?")
     return []
 
 
@@ -191,7 +191,7 @@ def get_stored_state(
     metadata: Dict,
 ) -> List[StoredState]:
     """Get StoredState list from the charm."""
-    logger.error("StoredState snapshotting not implemented yet.")
+    logger.warning("StoredState snapshotting not implemented yet.")
     return []
 
 
@@ -201,7 +201,7 @@ def get_deferred_events(
     metadata: Dict,
 ) -> List[DeferredEvent]:
     """Get DeferredEvent list from the charm."""
-    logger.error("DeferredEvent snapshotting not implemented yet.")
+    logger.warning("DeferredEvent snapshotting not implemented yet.")
     return []
 
 
