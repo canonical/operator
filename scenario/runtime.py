@@ -178,23 +178,39 @@ class Runtime:
         spec = self._charm_spec
 
         if vroot := self._charm_root:
-            cleanup = False
+            vroot_is_custom = True
             virtual_charm_root = Path(vroot)
         else:
             vroot = tempfile.TemporaryDirectory()
             virtual_charm_root = Path(vroot.name)
-            cleanup = True
+            vroot_is_custom = False
 
         metadata_yaml = virtual_charm_root / "metadata.yaml"
         config_yaml = virtual_charm_root / "config.yaml"
         actions_yaml = virtual_charm_root / "actions.yaml"
 
-        if any((file.exists() for file in (metadata_yaml, config_yaml, actions_yaml))):
+        metadata_files_present = any(
+            (file.exists() for file in (metadata_yaml, config_yaml, actions_yaml))
+        )
+
+        if spec.is_autoloaded and vroot_is_custom:
+            # since the spec is autoloaded, in theory the metadata contents won't differ, so we can
+            # overwrite away even if the custom vroot is the real charm root (the local repo).
+            # Still, log it for clarity.
+            if metadata_files_present:
+                logger.info(
+                    f"metadata files found in custom vroot {vroot}. "
+                    f"The spec was autoloaded so the contents should be identical. "
+                    f"Proceeding..."
+                )
+
+        elif not spec.is_autoloaded and metadata_files_present:
             logger.error(
-                f"Some metadata files found in custom user-provided vroot {vroot}. "
+                f"Some metadata files found in custom user-provided vroot {vroot} "
+                f"while you have passed meta, config or actions to trigger(). "
                 "We don't want to risk overwriting them mindlessly, so we abort. "
                 "You should not include any metadata files in the charm_root. "
-                "Single source of truth are the arguments passed to trigger()."
+                "Single source of truth are the arguments passed to trigger(). "
             )
             raise DirtyVirtualCharmRootError(vroot)
 
@@ -204,7 +220,7 @@ class Runtime:
 
         yield virtual_charm_root
 
-        if cleanup:
+        if not vroot_is_custom:
             vroot.cleanup()
 
     @staticmethod

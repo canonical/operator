@@ -555,6 +555,10 @@ class _CharmSpec(_DCBase):
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
 
+    # autoloaded means: trigger() is being invoked on a 'real' charm class, living in some /src/charm.py,
+    # and the metadata files are 'real' metadata files.
+    is_autoloaded: bool = False
+
     @staticmethod
     def autoload(charm_type: Type["CharmType"]):
         charm_source_path = Path(inspect.getfile(charm_type))
@@ -574,7 +578,11 @@ class _CharmSpec(_DCBase):
             actions = yaml.safe_load(actions_path.open())
 
         return _CharmSpec(
-            charm_type=charm_type, meta=meta, actions=actions, config=config
+            charm_type=charm_type,
+            meta=meta,
+            actions=actions,
+            config=config,
+            is_autoloaded=True,
         )
 
 
