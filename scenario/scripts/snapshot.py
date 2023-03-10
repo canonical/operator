@@ -20,12 +20,15 @@ from scenario.state import (
     Address,
     BindAddress,
     Container,
+    DeferredEvent,
     Model,
     Mount,
     Network,
     Relation,
+    Secret,
     State,
     Status,
+    StoredState,
 )
 
 logger = logging.getLogger("snapshot")
@@ -169,6 +172,37 @@ def get_network(target: JujuUnitName, model: Optional[str], endpoint: str) -> Ne
         egress_subnets=jsn.get("egress-subnets", None),
         ingress_addresses=jsn.get("ingress-addresses", None),
     )
+
+
+def get_secrets(
+    target: JujuUnitName,
+    model: Optional[str],
+    metadata: Dict,
+    relations: Tuple[str, ...] = (),
+) -> List[Secret]:
+    """Get Secret list from the charm."""
+    logger.error("Secrets snapshotting not implemented yet. Also, are you *sure*?")
+    return []
+
+
+def get_stored_state(
+    target: JujuUnitName,
+    model: Optional[str],
+    metadata: Dict,
+) -> List[StoredState]:
+    """Get StoredState list from the charm."""
+    logger.error("StoredState snapshotting not implemented yet.")
+    return []
+
+
+def get_deferred_events(
+    target: JujuUnitName,
+    model: Optional[str],
+    metadata: Dict,
+) -> List[DeferredEvent]:
+    """Get DeferredEvent list from the charm."""
+    logger.error("DeferredEvent snapshotting not implemented yet.")
+    return []
 
 
 def get_networks(
@@ -646,6 +680,9 @@ def _snapshot(
     try:
         status, endpoints = get_status_and_endpoints(target, model)
         state = State(
+            juju_version=get_juju_version(),
+            unit_id=target.unit_id,
+            app_name=target.app_name,
             leader=get_leader(target, model),
             model=get_model(model),
             status=status,
@@ -660,8 +697,6 @@ def _snapshot(
                 ),
                 [],
             ),
-            app_name=target.app_name,
-            unit_id=target.unit_id,
             containers=ifinclude(
                 "k",
                 lambda: get_containers(
@@ -681,6 +716,34 @@ def _snapshot(
                     metadata,
                     include_dead=include_dead_relation_networks,
                     relations=endpoints,
+                ),
+                [],
+            ),
+            secrets=ifinclude(
+                "s",
+                lambda: get_secrets(
+                    target,
+                    model,
+                    metadata,
+                    relations=endpoints,
+                ),
+                [],
+            ),
+            deferred=ifinclude(
+                "d",
+                lambda: get_deferred_events(
+                    target,
+                    model,
+                    metadata,
+                ),
+                [],
+            ),
+            stored_state=ifinclude(
+                "t",
+                lambda: get_stored_state(
+                    target,
+                    model,
+                    metadata,
                 ),
                 [],
             ),
@@ -734,7 +797,7 @@ def snapshot(
         "--include",
         "-i",
         help="What data to include in the state. "
-        "``r``: relation, ``c``: config, ``k``: containers ``n``: networks.",
+        "``r``: relation, ``c``: config, ``k``: containers, ``n``: networks, ``s``: secrets(!).",
     ),
     include_dead_relation_networks: bool = typer.Option(
         False,
