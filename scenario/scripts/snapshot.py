@@ -32,34 +32,38 @@ logger = logging.getLogger("snapshot")
 
 JUJU_RELATION_KEYS = frozenset({"egress-subnets", "ingress-address", "private-address"})
 JUJU_CONFIG_KEYS = frozenset({})
+
+# TODO: allow passing a custom data dir, else put it in a tempfile in /tmp/.
 SNAPSHOT_TEMPDIR_ROOT = (Path(os.getcwd()).parent / "snapshot_storage").absolute()
 
 
 class SnapshotError(RuntimeError):
-    pass
+    """Base class for errors raised by snapshot."""
 
 
-class InvalidTarget(SnapshotError):
-    pass
+class InvalidTargetUnitName(SnapshotError):
+    """Raised if the unit name passed to snapshot is invalid."""
 
 
-class InvalidModel(SnapshotError):
-    pass
+class InvalidTargetModelName(SnapshotError):
+    """Raised if the model name passed to snapshot is invalid."""
 
 
-class Target(str):
+class JujuUnitName(str):
+    """This class represents the name of a juju unit that can be snapshotted."""
+
     def __init__(self, unit_name: str):
         super().__init__()
         app_name, _, unit_id = unit_name.rpartition("/")
         if not app_name or not unit_id:
-            raise InvalidTarget(f"invalid unit name: {unit_name!r}")
+            raise InvalidTargetUnitName(f"invalid unit name: {unit_name!r}")
         self.unit_name = unit_name
         self.app_name = app_name
         self.unit_id = int(unit_id)
         self.normalized = f"{app_name}-{unit_id}"
 
 
-def _try_format(string):
+def _try_format(string: str):
     try:
         import black
 
@@ -73,46 +77,49 @@ def _try_format(string):
         return string
 
 
-def format_state(state):
+def format_state(state: State):
+    """Pretty-print this State as-is."""
     return _try_format(repr(state))
 
 
-def format_test_case(state, charm_type_name=None, event_name=None):
+def format_test_case(state: State, charm_type_name: str = None, event_name: str = None):
+    """Format this State as a pytest test case."""
     ct = charm_type_name or "CHARM_TYPE  # TODO: replace with charm type name"
     en = event_name or "EVENT_NAME,  # TODO: replace with event name"
     return _try_format(
         dedent(
             f"""
-from scenario.state import *
-from charm import {ct}
-
-def test_case():
-    state = {state}
-    out = state.trigger(
-        {en}
-        {ct}
-        )
-
-"""
+            from scenario.state import *
+            from charm import {ct}
+            
+            def test_case():
+                state = {state}
+                out = state.trigger(
+                    {en}
+                    {ct}
+                    )
+            
+            """
         )
     )
 
 
-def _juju_run(cmd, model=None) -> Dict[str, Any]:
+def _juju_run(cmd: str, model=None) -> Dict[str, Any]:
+    """Execute juju {command} in a given model."""
     _model = f" -m {model}" if model else ""
     cmd = f"juju {cmd}{_model} --format json"
     raw = run(shlex.split(cmd), capture_output=True).stdout.decode("utf-8")
     return json.loads(raw)
 
 
-def _juju_ssh(target: Target, cmd, model: Optional[str] = None) -> str:
+def _juju_ssh(target: JujuUnitName, cmd: str, model: Optional[str] = None) -> str:
     _model = f" -m {model}" if model else ""
     command = f"juju ssh{_model} {target.unit_name} {cmd}"
     raw = run(shlex.split(command), capture_output=True).stdout.decode("utf-8")
     return raw
 
 
-def _juju_exec(target: Target, model: Optional[str], cmd: str) -> str:
+def _juju_exec(target: JujuUnitName, model: Optional[str], cmd: str) -> str:
     """Execute a juju command.
 
     Notes:
@@ -126,13 +133,14 @@ def _juju_exec(target: Target, model: Optional[str], cmd: str) -> str:
     ).stdout.decode("utf-8")
 
 
-def get_leader(target: Target, model: Optional[str]):
+def get_leader(target: JujuUnitName, model: Optional[str]):
     # could also get it from _juju_run('status')...
     logger.info("getting leader...")
     return _juju_exec(target, model, "is-leader") == "True"
 
 
-def get_network(target: Target, model: Optional[str], endpoint: str) -> Network:
+def get_network(target: JujuUnitName, model: Optional[str], endpoint: str) -> Network:
+    """Get the Network data structure for this endpoint."""
     raw = _juju_exec(target, model, f"network-get {endpoint}")
     jsn = yaml.safe_load(raw)
 
@@ -164,12 +172,13 @@ def get_network(target: Target, model: Optional[str], endpoint: str) -> Network:
 
 
 def get_networks(
-        target: Target,
-        model: Optional[str],
-        metadata: Dict,
-        include_dead: bool = False,
-        relations: Tuple[str, ...] = (),
+    target: JujuUnitName,
+    model: Optional[str],
+    metadata: Dict,
+    include_dead: bool = False,
+    relations: Tuple[str, ...] = (),
 ) -> List[Network]:
+    """Get all Networks from this unit."""
     logger.info("getting networks...")
     networks = []
     networks.append(get_network(target, model, "juju-info"))
@@ -188,7 +197,8 @@ def get_networks(
     return networks
 
 
-def get_metadata(target: Target, model: Optional[str]):
+def get_metadata(target: JujuUnitName, model: Optional[str]):
+    """Get metadata.yaml from this target."""
     logger.info("fetching metadata...")
 
     raw_meta = _juju_ssh(
@@ -206,7 +216,9 @@ class RemotePebbleClient:
     #  " j ssh --container traefik traefik/0 cat var/lib/pebble/default/.pebble.state | jq"
     #  figure out what it's for.
 
-    def __init__(self, container: str, target: Target, model: Optional[str] = None):
+    def __init__(
+        self, container: str, target: JujuUnitName, model: Optional[str] = None
+    ):
         self.socket_path = f"/charm/containers/{container}/pebble.socket"
         self.container = container
         self.target = target
@@ -240,19 +252,19 @@ class RemotePebbleClient:
         return yaml.safe_load(plan_raw)
 
     def pull(
-            self, path: str, *, encoding: Optional[str] = "utf-8"
+        self, path: str, *, encoding: Optional[str] = "utf-8"
     ) -> Union[BinaryIO, TextIO]:
         raise NotImplementedError()
 
     def list_files(
-            self, path: str, *, pattern: Optional[str] = None, itself: bool = False
+        self, path: str, *, pattern: Optional[str] = None, itself: bool = False
     ) -> List[ops.pebble.FileInfo]:
         raise NotImplementedError()
 
     def get_checks(
-            self,
-            level: Optional[ops.pebble.CheckLevel] = None,
-            names: Optional[Iterable[str]] = None,
+        self,
+        level: Optional[ops.pebble.CheckLevel] = None,
+        names: Optional[Iterable[str]] = None,
     ) -> List[ops.pebble.CheckInfo]:
         _level = f" --level={level}" if level else ""
         _names = (" " + f" ".join(names)) if names else ""
@@ -263,12 +275,13 @@ class RemotePebbleClient:
 
 
 def fetch_file(
-        target: Target,
-        remote_path: str,
-        container_name: str,
-        local_path: Path = None,
-        model: str = None,
+    target: JujuUnitName,
+    remote_path: str,
+    container_name: str,
+    local_path: Path = None,
+    model: Optional[str] = None,
 ) -> Optional[str]:
+    """Download a file from a live unit to a local path."""
     # copied from jhack
     model_arg = f" -m {model}" if model else ""
     cmd = f"juju ssh --container {container_name}{model_arg} {target.unit_name} cat {remote_path}"
@@ -286,13 +299,14 @@ def fetch_file(
 
 
 def get_mounts(
-        target: Target,
-        model,
-        container_name: str,
-        container_meta,
-        fetch_files: Optional[List[Path]] = None,
-        temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
+    target: JujuUnitName,
+    model: Optional[str],
+    container_name: str,
+    container_meta: Dict,
+    fetch_files: Optional[List[Path]] = None,
+    temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
 ) -> Dict[str, Mount]:
+    """Get named Mounts from a container's metadata, and download specified files from the target unit."""
     mount_meta = container_meta.get("mounts")
 
     if fetch_files and not mount_meta:
@@ -349,13 +363,14 @@ def get_mounts(
 
 
 def get_container(
-        target: Target,
-        model,
-        container_name: str,
-        container_meta,
-        fetch_files: Optional[List[Path]] = None,
-        temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
+    target: JujuUnitName,
+    model: Optional[str],
+    container_name: str,
+    container_meta: Dict,
+    fetch_files: Optional[List[Path]] = None,
+    temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
 ) -> Container:
+    """Get container data structure from the target."""
     remote_client = RemotePebbleClient(container_name, target, model)
     plan = remote_client.get_plan()
 
@@ -375,12 +390,13 @@ def get_container(
 
 
 def get_containers(
-        target: Target,
-        model,
-        metadata: Optional[Dict],
-        fetch_files: Dict[str, List[Path]] = None,
-        temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
+    target: JujuUnitName,
+    model: Optional[str],
+    metadata: Optional[Dict],
+    fetch_files: Dict[str, List[Path]] = None,
+    temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
 ) -> List[Container]:
+    """Get all containers from this unit."""
     fetch_files = fetch_files or {}
     logger.info("getting containers...")
 
@@ -403,8 +419,9 @@ def get_containers(
 
 
 def get_status_and_endpoints(
-        target: Target, model: Optional[str]
+    target: JujuUnitName, model: Optional[str]
 ) -> Tuple[Status, Tuple[str, ...]]:
+    """Parse `juju status` to get the Status data structure and some relation information."""
     logger.info("getting status...")
 
     status = _juju_run(f"status --relations {target}", model=model)
@@ -421,39 +438,50 @@ def get_status_and_endpoints(
     return Status(app=app_status, unit=unit_status, app_version=app_version), relations
 
 
-def _cast(value: str, _type):
-    if _type == "string":
-        return value
-    elif _type == "integer":
-        return int(value)
-    elif _type == "number":
-        return float(value)
-    elif _type == "boolean":
-        return value == "true"
-    elif _type == "attrs":  # TODO: WOT?
-        return value
-    else:
-        raise ValueError(_type)
+dispatch = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": lambda x: x == True,
+    "attrs": lambda x: x,
+}
 
 
 def get_config(
-        target: Target, model: Optional[str]
+    target: JujuUnitName, model: Optional[str]
 ) -> Dict[str, Union[str, int, float, bool]]:
+    """Get config dict from target."""
+
     logger.info("getting config...")
     _model = f" -m {model}" if model else ""
     jsn = _juju_run(f"config {target.app_name}", model=model)
 
+    # dispatch table for builtin config options
+    converters = {
+        "string": str,
+        "integer": int,
+        "number": float,
+        "boolean": lambda x: x == "true",
+        "attrs": lambda x: x,
+    }
+
     cfg = {}
     for name, option in jsn.get("settings", ()).items():
-        if not option.get("value"):
+        if value := option.get("value"):
+            try:
+                converter = converters[option["type"]]
+            except KeyError:
+                raise ValueError(f'unrecognized type {option["type"]}')
+            cfg[name] = converter(value)
+
+        else:
             logger.debug(f"skipped {name}: no value.")
-            continue
-        cfg[name] = _cast(option["value"], option["type"])
 
     return cfg
 
 
-def _get_interface_from_metadata(endpoint, metadata):
+def _get_interface_from_metadata(endpoint: str, metadata: Dict) -> Optional[str]:
+    """Get the name of the interface used by endpoint."""
     for role in ["provides", "requires"]:
         for ep, ep_meta in metadata.get(role, {}).items():
             if ep == endpoint:
@@ -464,18 +492,19 @@ def _get_interface_from_metadata(endpoint, metadata):
 
 
 def get_relations(
-        target: Target,
-        model: Optional[str],
-        metadata: Dict,
-        include_juju_relation_data=False,
+    target: JujuUnitName,
+    model: Optional[str],
+    metadata: Dict,
+    include_juju_relation_data=False,
 ) -> List[Relation]:
+    """Get the list of relations active for this target."""
     logger.info("getting relations...")
 
     _model = f" -m {model}" if model else ""
     try:
         jsn = _juju_run(f"show-unit {target}", model=model)
     except json.JSONDecodeError as e:
-        raise InvalidTarget(target) from e
+        raise InvalidTargetUnitName(target) from e
 
     def _clean(relation_data: dict):
         if include_juju_relation_data:
@@ -490,7 +519,9 @@ def get_relations(
         logger.debug(
             f"  getting relation data for endpoint {raw_relation.get('endpoint')!r}"
         )
-        related_units = raw_relation["related-units"]
+        related_units = raw_relation.get("related-units")
+        if not related_units:
+            continue
         #    related-units:
         #      owner/0:
         #        in-scope: true
@@ -512,7 +543,7 @@ def get_relations(
         )
         local_app_data = json.loads(local_app_data_raw)
 
-        some_remote_unit_id = Target(next(iter(related_units)))
+        some_remote_unit_id = JujuUnitName(next(iter(related_units)))
         relations.append(
             Relation(
                 endpoint=raw_relation["endpoint"],
@@ -523,7 +554,7 @@ def get_relations(
                 remote_app_data=raw_relation["application-data"],
                 remote_app_name=some_remote_unit_id.app_name,
                 remote_units_data={
-                    Target(tgt).unit_id: _clean(val["data"])
+                    JujuUnitName(tgt).unit_id: _clean(val["data"])
                     for tgt, val in related_units.items()
                 },
                 local_app_data=local_app_data,
@@ -534,6 +565,7 @@ def get_relations(
 
 
 def get_model(name: str = None) -> Model:
+    """Get the Model data structure."""
     logger.info("getting model...")
 
     jsn = _juju_run("models")
@@ -543,7 +575,7 @@ def get_model(name: str = None) -> Model:
             filter(lambda m: m["short-name"] == model_name, jsn["models"])
         )
     except StopIteration as e:
-        raise InvalidModel(name) from e
+        raise InvalidTargetModelName(name) from e
 
     model_uuid = model_info["model-uuid"]
     model_type = model_info["type"]
@@ -551,7 +583,8 @@ def get_model(name: str = None) -> Model:
     return Model(name=model_name, uuid=model_uuid, type=model_type)
 
 
-def try_guess_charm_type_name():
+def try_guess_charm_type_name() -> Optional[str]:
+    """If we are running this from a charm project root, get the charm type name charm.py is using."""
     try:
         charm_path = Path(os.getcwd()) / "src" / "charm.py"
         if charm_path.exists():
@@ -567,26 +600,31 @@ def try_guess_charm_type_name():
     return None
 
 
-class FormatOption(str, Enum):
-    state = "state"
+class FormatOption(
+    str, Enum
+):  # Enum for typer support, str for native comparison and ==.
+    """Output formatting options for snapshot."""
+
+    state = "state"  # the default: will print the python repr of the State dataclass.
     json = "json"
     pytest = "pytest"
 
 
 def _snapshot(
-        target: str,
-        model: Optional[str] = None,
-        pprint: bool = True,
-        include: str = None,
-        include_juju_relation_data=False,
-        include_dead_relation_networks=False,
-        format: FormatOption = "state",
-        fetch_files: Dict[str, List[Path]] = None,
-        temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
+    target: str,
+    model: Optional[str] = None,
+    pprint: bool = True,
+    include: str = None,
+    include_juju_relation_data=False,
+    include_dead_relation_networks=False,
+    format: FormatOption = "state",
+    fetch_files: Dict[str, List[Path]] = None,
+    temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
 ):
+    """see snapshot's docstring"""
     try:
-        target = Target(target)
-    except InvalidTarget:
+        target = JujuUnitName(target)
+    except InvalidTargetUnitName:
         logger.critical(
             f"invalid target: {target!r} is not a valid unit name. Should be formatted like so:"
             f"`foo/1`, or `database/0`, or `myapp-foo-bar/42`."
@@ -649,11 +687,11 @@ def _snapshot(
         )
 
         # todo: these errors should surface earlier.
-    except InvalidTarget:
+    except InvalidTargetUnitName:
         _model = f"model {model}" or "the current model"
         logger.critical(f"invalid target: {target!r} not found in {_model}")
         exit(1)
-    except InvalidModel:
+    except InvalidTargetModelName:
         logger.critical(f"invalid model: {model!r} not found.")
         exit(1)
 
@@ -676,39 +714,41 @@ def _snapshot(
 
 
 def snapshot(
-        target: str = typer.Argument(..., help="Target unit."),
-        model: Optional[str] = typer.Option(
-            None, "-m", "--model", help="Which model to look at."
-        ),
-        format: FormatOption = typer.Option(
-            "state",
-            "-f",
-            "--format",
-            help="How to format the output. "
-                 "``state``: Outputs a black-formatted repr() of the State object (if black is installed!). "
-                 "``json``: Outputs a Jsonified State object. "
-                 "``pytest``: Outputs a full-blown pytest scenario test based on this State. ",
-        ),
-        include: str = typer.Option(
-            "rckn",
-            "--include",
-            "-i",
-            help="What data to include in the state. "
-                 "``r``: relation, ``c``: config, ``k``: containers ``n``: networks.",
-        ),
-        include_dead_relation_networks: bool = typer.Option(
-            False,
-            "--include-dead-relation-networks",
-            help="Whether to gather networks of inactive relation endpoints.",
-            is_flag=True,
-        ),
-        include_juju_relation_data: bool = typer.Option(
-            False,
-            "--include-juju-relation-data",
-            help="Whether to include in the relation data the default juju keys (egress-subnets,"
-                 "ingress-address, private-address).",
-            is_flag=True,
-        ),
+    target: str = typer.Argument(..., help="Target unit."),
+    model: Optional[str] = typer.Option(
+        None, "-m", "--model", help="Which model to look at."
+    ),
+    format: FormatOption = typer.Option(
+        "state",
+        "-f",
+        "--format",
+        help="How to format the output. "
+        "``state``: Outputs a black-formatted repr() of the State object (if black is installed! "
+        "else it will be ugly but valid python code). "
+        "``json``: Outputs a Jsonified State object. Perfect for storage. "
+        "``pytest``: Outputs a full-blown pytest scenario test based on this State. "
+        "Pipe it to a file and fill in the blanks.",
+    ),
+    include: str = typer.Option(
+        "rckn",
+        "--include",
+        "-i",
+        help="What data to include in the state. "
+        "``r``: relation, ``c``: config, ``k``: containers ``n``: networks.",
+    ),
+    include_dead_relation_networks: bool = typer.Option(
+        False,
+        "--include-dead-relation-networks",
+        help="Whether to gather networks of inactive relation endpoints.",
+        is_flag=True,
+    ),
+    include_juju_relation_data: bool = typer.Option(
+        False,
+        "--include-juju-relation-data",
+        help="Whether to include in the relation data the default juju keys (egress-subnets,"
+        "ingress-address, private-address).",
+        is_flag=True,
+    ),
 ) -> State:
     """Gather and output the State of a remote target unit.
 
@@ -726,20 +766,24 @@ def snapshot(
     )
 
 
+# for the benefit of script usage
+_snapshot.__doc__ = snapshot.__doc__
+
 if __name__ == "__main__":
-    print(
-        _snapshot(
-            "trfk/0",
-            model="foo",
-            format=FormatOption.json,
-            include="k",
-            fetch_files={
-                "traefik": [
-                    Path("/opt/traefik/juju/certificates.yaml"),
-                    Path("/opt/traefik/juju/certificate.cert"),
-                    Path("/opt/traefik/juju/certificate.key"),
-                    Path("/etc/traefik/traefik.yaml"),
-                ]
-            },
-        )
-    )
+    print(_snapshot("prom/0", model="foo", format=FormatOption.pytest))
+
+    # print(
+    #         _snapshot(
+    #             "traefik/0",
+    #             model="cos",
+    #             format=FormatOption.json,
+    #             fetch_files={
+    #                 "traefik": [
+    #                     Path("/opt/traefik/juju/certificates.yaml"),
+    #                     Path("/opt/traefik/juju/certificate.cert"),
+    #                     Path("/opt/traefik/juju/certificate.key"),
+    #                     Path("/etc/traefik/traefik.yaml"),
+    #                 ]
+    #             },
+    #         )
+    #     )
