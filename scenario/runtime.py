@@ -46,15 +46,16 @@ _stored_state_regex = "((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>
 RUNTIME_MODULE = Path(__file__).parent
 
 
-class UncaughtCharmError(RuntimeError):
+class ScenarioRuntimeError(RuntimeError):
+    """Base class for exceptions raised by scenario.runtime."""
+
+
+class UncaughtCharmError(ScenarioRuntimeError):
     """Error raised if the charm raises while handling the event being dispatched."""
 
 
-@dataclasses.dataclass
-class RuntimeRunResult:
-    charm: "CharmBase"
-    scene: "Scene"
-    event: "EventBase"
+class DirtyVirtualCharmRootError(ScenarioRuntimeError):
+    """Error raised when the runtime can't initialize the vroot without overwriting existing metadata files."""
 
 
 class Runtime:
@@ -184,13 +185,22 @@ class Runtime:
             virtual_charm_root = Path(vroot.name)
             cleanup = True
 
-        (virtual_charm_root / "metadata.yaml").write_text(yaml.safe_dump(spec.meta))
-        (virtual_charm_root / "config.yaml").write_text(
-            yaml.safe_dump(spec.config or {})
-        )
-        (virtual_charm_root / "actions.yaml").write_text(
-            yaml.safe_dump(spec.actions or {})
-        )
+        metadata_yaml = virtual_charm_root / "metadata.yaml"
+        config_yaml = virtual_charm_root / "config.yaml"
+        actions_yaml = virtual_charm_root / "actions.yaml"
+
+        if any((file.exists() for file in (metadata_yaml, config_yaml, actions_yaml))):
+            logger.error(
+                f"Some metadata files found in custom user-provided vroot {vroot}. "
+                "We don't want to risk overwriting them mindlessly, so we abort. "
+                "You should not include any metadata files in the charm_root. "
+                "Single source of truth are the arguments passed to trigger()."
+            )
+            raise DirtyVirtualCharmRootError(vroot)
+
+        metadata_yaml.write_text(yaml.safe_dump(spec.meta))
+        config_yaml.write_text(yaml.safe_dump(spec.config or {}))
+        actions_yaml.write_text(yaml.safe_dump(spec.actions or {}))
 
         yield virtual_charm_root
 

@@ -1,11 +1,13 @@
 import tempfile
 from pathlib import Path
 
+import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus
 
 from scenario import State
+from scenario.runtime import DirtyVirtualCharmRootError
 
 
 class MyCharm(CharmBase):
@@ -40,3 +42,19 @@ def test_vroot():
         )
 
     assert out.status.unit == ("active", "hello world")
+
+
+@pytest.mark.parametrize("meta_overwrite", ["metadata", "actions", "config"])
+def test_dirty_vroot_raises(meta_overwrite):
+    with tempfile.TemporaryDirectory() as myvroot:
+        t = Path(myvroot)
+        meta_file = t / f"{meta_overwrite}.yaml"
+        meta_file.touch()
+
+        with pytest.raises(DirtyVirtualCharmRootError):
+            State().trigger(
+                "start",
+                charm_type=MyCharm,
+                meta=MyCharm.META,
+                charm_root=t,
+            )
