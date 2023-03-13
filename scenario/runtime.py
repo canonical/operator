@@ -7,7 +7,17 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union, List
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import yaml
 from ops.framework import _event_regex
@@ -21,7 +31,8 @@ if TYPE_CHECKING:
     from ops.charm import CharmBase
     from ops.testing import CharmType
 
-    from scenario.state import Event, State, _CharmSpec, DeferredEvent, StoredState
+    from scenario.state import DeferredEvent, Event, State, StoredState, _CharmSpec
+
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
 logger = scenario_logger.getChild("runtime")
@@ -37,21 +48,26 @@ class UncaughtCharmError(RuntimeError):
 
 class UnitStateDB:
     """Represents the unit-state.db."""
+
     def __init__(self, db_path: Union[Path, str]):
         self._db_path = db_path
         self._state_file = Path(self._db_path)
 
     @property
     def _has_state(self):
+        """Check that the state file exists."""
         return self._state_file.exists()
 
     def _open_db(self) -> Optional[SQLiteStorage]:
+        """Open the db."""
         if not self._has_state:
             return None
         return SQLiteStorage(self._state_file)
 
     def get_stored_state(self) -> List["StoredState"]:
+        """Load any StoredState data structures from the db."""
         from scenario.state import StoredState  # avoid cyclic import
+
         db = self._open_db()
 
         stored_state = []
@@ -67,7 +83,9 @@ class UnitStateDB:
         return stored_state
 
     def get_deferred_events(self) -> List["DeferredEvent"]:
+        """Load any DeferredEvent data structures from the db."""
         from scenario.state import DeferredEvent  # avoid cyclic import
+
         db = self._open_db()
 
         deferred = []
@@ -85,7 +103,7 @@ class UnitStateDB:
         return deferred
 
     def apply_state(self, state: "State"):
-        """Add deferred and storedstate from this State instance to the storage."""
+        """Add DeferredEvent and StoredState from this State instance to the storage."""
         db = self._open_db()
         for event in state.deferred:
             db.save_notice(event.handle_path, event.owner, event.observer)
