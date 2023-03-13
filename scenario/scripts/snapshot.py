@@ -213,39 +213,22 @@ def get_networks(
     return networks
 
 
-# ripped out of jhack
-def get_substrate(model: str = None) -> Literal["k8s", "machine"]:
-    """Attempts to guess whether we're talking k8s or machine."""
-    cmd = f'juju show-model{f" {model}" if model else ""} --format=json'
-    proc = run(cmd.split(), capture_output=True)
-    raw = proc.stdout.decode("utf-8")
-    model_info = json.loads(raw)
-
-    if not model:
-        model = list(model_info)[0]
-
-    model_type = model_info[model]["model-type"]
-    if model_type == "iaas":
-        return "machine"
-    elif model_type == "caas":
-        return "k8s"
-    else:
-        raise ValueError(f"unrecognized model type: {model_type}")
-
-
-def get_metadata(target: JujuUnitName, model: Optional[str]):
+def get_metadata(target: JujuUnitName, model: Model):
     """Get metadata.yaml from this target."""
     logger.info("fetching metadata...")
 
-    if get_substrate(model) == 'lxd':
+    if model.type == 'lxd':
+        meta_path = f"/var/lib/juju/agents/unit-{target.normalized}/charm/metadata.yaml"
+    elif model.type == 'kubernetes':
         meta_path = f"./agents/unit-{target.normalized}/charm/metadata.yaml"
     else:
+        logger.warning(f"unrecognized model type {model.type}: guessing it's machine-like.")
         meta_path = f"/var/lib/juju/agents/unit-{target.normalized}/charm/metadata.yaml"
 
     raw_meta = _juju_ssh(
         target,
         f"cat {meta_path}",
-        model=model,
+        model=model.name,
     )
     return yaml.safe_load(raw_meta)
 
@@ -712,7 +695,13 @@ def _snapshot(
             return get_value()
         return null_value
 
-    metadata = get_metadata(target, model)
+    try:
+        state_model = get_model(model)
+    except Exception:
+        logger.critical(f"unable to get Model from name {model}.", exc_info=True)
+        exit(1)
+
+    metadata = get_metadata(target, state_model)
     if not metadata:
         logger.critical(f"could not fetch metadata from {target}.")
         exit(1)
@@ -727,7 +716,7 @@ def _snapshot(
             app_name=target.app_name,
 
             leader=get_leader(target, model),
-            model=get_model(model),
+            model=state_model,
             status=get_status(juju_status, target=target),
             config=ifinclude("c", lambda: get_config(target, model), {}),
             relations=ifinclude(
@@ -889,9 +878,10 @@ if __name__ == "__main__":
 
     print(
             _snapshot(
-                "trfk/0",
+                "prom/0",
                 model="foo",
                 format=FormatOption.json,
+                include='td'
                 # fetch_files={
                 #     "traefik": [
                 #         Path("/opt/traefik/juju/certificates.yaml"),
