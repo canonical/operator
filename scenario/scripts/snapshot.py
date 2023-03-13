@@ -16,7 +16,6 @@ from typing import (
     Dict,
     Iterable,
     List,
-    Literal,
     Optional,
     TextIO,
     Tuple,
@@ -33,7 +32,6 @@ from scenario.state import (
     Address,
     BindAddress,
     Container,
-    DeferredEvent,
     Model,
     Mount,
     Network,
@@ -41,7 +39,6 @@ from scenario.state import (
     Secret,
     State,
     Status,
-    StoredState,
 )
 
 logger = logging.getLogger("snapshot")
