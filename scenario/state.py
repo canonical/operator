@@ -126,7 +126,7 @@ _RELATION_IDS_CTR = 0
 
 def _normalize_event_name(s: str):
     """Event names need underscores instead of dashes."""
-    return s.replace('-', '_')
+    return s.replace("-", "_")
 
 
 @dataclasses.dataclass
@@ -180,35 +180,40 @@ class Relation(_DCBase):
         """Sugar to generate a <this relation>-relation-changed event."""
         return Event(
             name=_normalize_event_name(self.endpoint + "-relation-changed"),
-            relation=self)
+            relation=self,
+        )
 
     @property
     def joined_event(self):
         """Sugar to generate a <this relation>-relation-joined event."""
         return Event(
             name=_normalize_event_name(self.endpoint + "-relation-joined"),
-            relation=self)
+            relation=self,
+        )
 
     @property
     def created_event(self):
         """Sugar to generate a <this relation>-relation-created event."""
         return Event(
             name=_normalize_event_name(self.endpoint + "-relation-created"),
-            relation=self)
+            relation=self,
+        )
 
     @property
     def departed_event(self):
         """Sugar to generate a <this relation>-relation-departed event."""
         return Event(
             name=_normalize_event_name(self.endpoint + "-relation-departed"),
-            relation=self)
+            relation=self,
+        )
 
     @property
     def broken_event(self):
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
             name=_normalize_event_name(self.endpoint + "-relation-broken"),
-            relation=self)
+            relation=self,
+        )
 
 
 def _random_model_name():
@@ -361,8 +366,9 @@ class Container(_DCBase):
                 "you **can** fire pebble-ready while the container cannot connect, "
                 "but that's most likely not what you want."
             )
-        return Event(name=_normalize_event_name(self.name + "-pebble-ready"),
-                     container=self)
+        return Event(
+            name=_normalize_event_name(self.name + "-pebble-ready"), container=self
+        )
 
 
 @dataclasses.dataclass
@@ -409,15 +415,15 @@ class Network(_DCBase):
 
     @classmethod
     def default(
-            cls,
-            name,
-            private_address: str = "1.1.1.1",
-            hostname: str = "",
-            cidr: str = "",
-            interface_name: str = "",
-            mac_address: Optional[str] = None,
-            egress_subnets=("1.1.1.2/32",),
-            ingress_addresses=("1.1.1.2",),
+        cls,
+        name,
+        private_address: str = "1.1.1.1",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        mac_address: Optional[str] = None,
+        egress_subnets=("1.1.1.2/32",),
+        ingress_addresses=("1.1.1.2",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
@@ -467,14 +473,22 @@ class _EntityStatus(_DCBase):
         return iter([self.name, self.message])
 
     def __repr__(self):
-        return f"<EntityStatus name={self.name}, message={self.message}>"
+        return f"<EntityStatus name={self.name!r}, message={self.message!r}>"
 
 
 @dataclasses.dataclass
 class Status(_DCBase):
-    app: _EntityStatus = _EntityStatus("unknown")
-    unit: _EntityStatus = _EntityStatus("unknown")
+    """Represents the 'juju statuses' of the application/unit being tested."""
+
+    # the current statuses. Will be cast to _EntitiyStatus in __post_init__
+    app: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
     app_version: str = ""
+
+    # most to least recent statuses; do NOT include the current one.
+    app_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
+    unit_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
+    previous_app_version: Optional[str] = None
 
     def __post_init__(self):
         for name in ["app", "unit"]:
@@ -492,6 +506,24 @@ class Status(_DCBase):
                 setattr(self, name, _EntityStatus(*val))
             else:
                 raise TypeError(f"Invalid status.{name}: {val!r}")
+
+    def _update_app_version(self, new_app_version: str):
+        """Update the current app version and record the previous one."""
+        # We don't keep a full history because we don't expect the app version to change more
+        # than once per hook.
+        self.previous_app_version = self.app_version
+        self.app_version = new_app_version
+
+    def _update_status(
+        self, new_status: str, new_message: str = "", is_app: bool = False
+    ):
+        """Update the current app/unit status and add the previous one to the history."""
+        if is_app:
+            self.app_history.append(self.app)
+            self.app = _EntityStatus(new_status, new_message)
+        else:
+            self.unit_history.append(self.unit)
+            self.unit = _EntityStatus(new_status, new_message)
 
 
 @dataclasses.dataclass
@@ -585,17 +617,17 @@ class State(_DCBase):
         return sort_patch(patch)
 
     def trigger(
-            self,
-            event: Union["Event", str],
-            charm_type: Type["CharmType"],
-            # callbacks
-            pre_event: Optional[Callable[["CharmType"], None]] = None,
-            post_event: Optional[Callable[["CharmType"], None]] = None,
-            # if not provided, will be autoloaded from charm_type.
-            meta: Optional[Dict[str, Any]] = None,
-            actions: Optional[Dict[str, Any]] = None,
-            config: Optional[Dict[str, Any]] = None,
-            charm_root: Optional["PathLike"] = None,
+        self,
+        event: Union["Event", str],
+        charm_type: Type["CharmType"],
+        # callbacks
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+        # if not provided, will be autoloaded from charm_type.
+        meta: Optional[Dict[str, Any]] = None,
+        actions: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None,
+        charm_root: Optional["PathLike"] = None,
     ):
         """Fluent API for trigger. See runtime.trigger's docstring."""
         return _runtime_trigger(
@@ -734,11 +766,11 @@ class Event(_DCBase):
 
 
 def deferred(
-        event: Union[str, Event],
-        handler: Callable,
-        event_id: int = 1,
-        relation: "Relation" = None,
-        container: "Container" = None,
+    event: Union[str, Event],
+    handler: Callable,
+    event_id: int = 1,
+    relation: "Relation" = None,
+    container: "Container" = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
@@ -783,6 +815,7 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
+
 
 # todo: consider
 #  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:

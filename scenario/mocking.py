@@ -148,20 +148,14 @@ class _MockModelBackend(_ModelBackend):
         return network.hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.
-    def application_version_set(self, *args, **kwargs):
-        self._state.status.app_version = args[0]
-        return None
+    def application_version_set(self, version: str):
+        self._state.status._update_app_version(version)  # noqa
 
-    def status_set(self, *args, **kwargs):
-        if kwargs.get("is_app"):
-            self._state.status.app = args
-        else:
-            self._state.status.unit = args
-        return None
+    def status_set(self, status: str, message: str = "", *, is_app: bool = False):
+        self._state.status._update_status(status, message, is_app)  # noqa
 
     def juju_log(self, level: str, message: str):
         self._state.juju_log.append((level, message))
-        return None
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
         relation = self._get_relation_by_id(relation_id)
