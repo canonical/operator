@@ -31,8 +31,7 @@ if TYPE_CHECKING:
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
 logger = scenario_logger.getChild("runtime")
-# _stored_state_regex = "(.*)\/(\D+)\[(.*)\]"
-_stored_state_regex = "((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
+_stored_state_regex = r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
 
 RUNTIME_MODULE = Path(__file__).parent
 
