@@ -1,9 +1,6 @@
-import dataclasses
-import logging
 import marshal
 import os
 import re
-import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -21,14 +18,12 @@ from typing import (
 
 import yaml
 from ops.framework import _event_regex
-from ops.log import JujuLogHandler
 from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
 
 if TYPE_CHECKING:
-    from ops.charm import CharmBase
     from ops.testing import CharmType
 
     from scenario.state import DeferredEvent, Event, State, StoredState, _CharmSpec

@@ -10,17 +10,7 @@ from itertools import chain
 from pathlib import Path
 from subprocess import CalledProcessError, check_output, run
 from textwrap import dedent
-from typing import (
-    Any,
-    BinaryIO,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    TextIO,
-    Tuple,
-    Union,
-)
+from typing import Any, BinaryIO, Dict, Iterable, List, Optional, TextIO, Tuple, Union
 
 import ops.pebble
 import typer

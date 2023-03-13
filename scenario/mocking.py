@@ -1,11 +1,9 @@
 import datetime
 import pathlib
 import random
-import urllib.request
 from io import StringIO
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
-import yaml
 from ops import pebble
 from ops.model import SecretInfo, SecretRotate, _ModelBackend
 from ops.pebble import Client, ExecError
@@ -350,9 +348,6 @@ class _MockPebbleClient(_TestingPebbleClient):
     def __init__(
         self,
         socket_path: str,
-        opener: Optional[urllib.request.OpenerDirector] = None,
-        base_url: str = "http://localhost",
-        timeout: float = 5.0,
         *,
         state: "State",
         event: "Event",
