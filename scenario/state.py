@@ -62,22 +62,22 @@ META_EVENTS = {
 
 def is_relation_event(name: str) -> bool:
     """Whether the event name indicates that this is a relation event."""
-    return any(map(name.endswith, RELATION_EVENTS_SUFFIX))
+    return any(map(name.replace("_", "-").endswith, RELATION_EVENTS_SUFFIX))
 
 
 def is_secret_event(name: str) -> bool:
     """Whether the event name indicates that this is a secret event."""
-    return any(map(name.endswith, SECRET_EVENTS_SUFFIX))
+    return any(map(name.replace("_", "-").endswith, SECRET_EVENTS_SUFFIX))
 
 
 def is_storage_event(name: str) -> bool:
     """Whether the event name indicates that this is a storage event."""
-    return any(map(name.endswith, STORAGE_EVENTS_SUFFIX))
+    return any(map(name.replace("_", "-").endswith, STORAGE_EVENTS_SUFFIX))
 
 
 def is_workload_event(name: str) -> bool:
     """Whether the event name indicates that this is a workload event."""
-    return name.endswith('-pebble-ready')
+    return name.replace("_", "-").endswith("-pebble-ready")
 
 
 @dataclasses.dataclass
@@ -122,7 +122,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-changed for a secret it owns."
             )
-        return Event(name="secret-changed", secret=self)
+        return Event(name="secret_changed", secret=self)
 
     # owner-only events
     @property
@@ -132,7 +132,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-rotate for a secret it does not own."
             )
-        return Event(name="secret-rotate", secret=self)
+        return Event(name="secret_rotate", secret=self)
 
     @property
     def expired_event(self):
@@ -141,7 +141,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-expire for a secret it does not own."
             )
-        return Event(name="secret-expire", secret=self)
+        return Event(name="secret_expire", secret=self)
 
     @property
     def remove_event(self):
@@ -150,15 +150,15 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-removed for a secret it does not own."
             )
-        return Event(name="secret-removed", secret=self)
+        return Event(name="secret_removed", secret=self)
 
 
 _RELATION_IDS_CTR = 0
 
 
-def _normalize_event_name(s: str):
+def normalize_name(s: str):
     """Event names need underscores instead of dashes."""
-    return s.replace('-', '_')
+    return s.replace("-", "_")
 
 
 @dataclasses.dataclass
@@ -211,36 +211,36 @@ class Relation(_DCBase):
     def changed_event(self):
         """Sugar to generate a <this relation>-relation-changed event."""
         return Event(
-            name=_normalize_event_name(self.endpoint + "-relation-changed"),
-            relation=self)
+            name=normalize_name(self.endpoint + "-relation-changed"), relation=self
+        )
 
     @property
     def joined_event(self):
         """Sugar to generate a <this relation>-relation-joined event."""
         return Event(
-            name=_normalize_event_name(self.endpoint + "-relation-joined"),
-            relation=self)
+            name=normalize_name(self.endpoint + "-relation-joined"), relation=self
+        )
 
     @property
     def created_event(self):
         """Sugar to generate a <this relation>-relation-created event."""
         return Event(
-            name=_normalize_event_name(self.endpoint + "-relation-created"),
-            relation=self)
+            name=normalize_name(self.endpoint + "-relation-created"), relation=self
+        )
 
     @property
     def departed_event(self):
         """Sugar to generate a <this relation>-relation-departed event."""
         return Event(
-            name=_normalize_event_name(self.endpoint + "-relation-departed"),
-            relation=self)
+            name=normalize_name(self.endpoint + "-relation-departed"), relation=self
+        )
 
     @property
     def broken_event(self):
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
-            name=_normalize_event_name(self.endpoint + "-relation-broken"),
-            relation=self)
+            name=normalize_name(self.endpoint + "-relation-broken"), relation=self
+        )
 
 
 def _random_model_name():
@@ -393,8 +393,7 @@ class Container(_DCBase):
                 "you **can** fire pebble-ready while the container cannot connect, "
                 "but that's most likely not what you want."
             )
-        return Event(name=_normalize_event_name(self.name + "-pebble-ready"),
-                     container=self)
+        return Event(name=normalize_name(self.name + "-pebble-ready"), container=self)
 
 
 @dataclasses.dataclass
@@ -441,15 +440,15 @@ class Network(_DCBase):
 
     @classmethod
     def default(
-            cls,
-            name,
-            private_address: str = "1.1.1.1",
-            hostname: str = "",
-            cidr: str = "",
-            interface_name: str = "",
-            mac_address: Optional[str] = None,
-            egress_subnets=("1.1.1.2/32",),
-            ingress_addresses=("1.1.1.2",),
+        cls,
+        name,
+        private_address: str = "1.1.1.1",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        mac_address: Optional[str] = None,
+        egress_subnets=("1.1.1.2/32",),
+        ingress_addresses=("1.1.1.2",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
@@ -505,8 +504,10 @@ def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
 
 @dataclasses.dataclass
 class Status(_DCBase):
-    app: _EntityStatus = _EntityStatus("unknown")
-    unit: _EntityStatus = _EntityStatus("unknown")
+
+    # the real type of these is _EntityStatus, but the user needs not know about it.
+    app: Union[StatusBase] = _EntityStatus("unknown")
+    unit: Union[StatusBase] = _EntityStatus("unknown")
     app_version: str = ""
 
     def __post_init__(self):
@@ -588,7 +589,9 @@ class State(_DCBase):
 
     def with_unit_status(self, status: StatusBase) -> "State":
         return self.replace(
-            status=dataclasses.replace(self.status, unit=_status_to_entitystatus(status))
+            status=dataclasses.replace(
+                self.status, unit=_status_to_entitystatus(status)
+            )
         )
 
     def get_container(self, container: Union[str, Container]) -> Container:
@@ -616,18 +619,18 @@ class State(_DCBase):
         return sort_patch(patch)
 
     def trigger(
-            self,
-            event: Union["Event", str],
-            charm_type: Type["CharmType"],
-            # callbacks
-            pre_event: Optional[Callable[["CharmType"], None]] = None,
-            post_event: Optional[Callable[["CharmType"], None]] = None,
-            # if not provided, will be autoloaded from charm_type.
-            meta: Optional[Dict[str, Any]] = None,
-            actions: Optional[Dict[str, Any]] = None,
-            config: Optional[Dict[str, Any]] = None,
-            charm_root: Optional["PathLike"] = None,
-            juju_version: str = "3.0",
+        self,
+        event: Union["Event", str],
+        charm_type: Type["CharmType"],
+        # callbacks
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+        # if not provided, will be autoloaded from charm_type.
+        meta: Optional[Dict[str, Any]] = None,
+        actions: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None,
+        charm_root: Optional["PathLike"] = None,
+        juju_version: str = "3.0",
     ) -> "State":
         """Fluent API for trigger. See runtime.trigger's docstring."""
         return _runtime_trigger(
@@ -640,7 +643,7 @@ class State(_DCBase):
             actions=actions,
             config=config,
             charm_root=charm_root,
-            juju_version=juju_version
+            juju_version=juju_version,
         )
 
     trigger.__doc__ = _runtime_trigger.__doc__
@@ -727,18 +730,7 @@ class Event(_DCBase):
     def __post_init__(self):
         if "-" in self.name:
             logger.warning(f"Only use underscores in event names. {self.name!r}")
-        self.name = self.name.replace("-", "_")
-
-        if not self.relation and is_relation_event(self.name):
-            raise ValueError(
-                "cannot construct a relation event without the relation instance. "
-                "Please pass one."
-            )
-        if not self.container and is_workload_event(self.name):
-            raise ValueError(
-                "cannot construct a workload event without the container instance. "
-                "Please pass one."
-            )
+        self.name = normalize_name(self.name)
 
     def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""
@@ -761,6 +753,10 @@ class Event(_DCBase):
             }
 
         elif is_relation_event(self.name):
+            if not self.relation:
+                raise ValueError(
+                    "this is a relation event; expected relation attribute"
+                )
             # this is a RelationEvent. The snapshot:
             snapshot_data = {
                 "relation_name": self.relation.endpoint,
@@ -778,11 +774,11 @@ class Event(_DCBase):
 
 
 def deferred(
-        event: Union[str, Event],
-        handler: Callable,
-        event_id: int = 1,
-        relation: "Relation" = None,
-        container: "Container" = None,
+    event: Union[str, Event],
+    handler: Callable,
+    event_id: int = 1,
+    relation: "Relation" = None,
+    container: "Container" = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
@@ -813,6 +809,7 @@ def _derive_args(event_name: str):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 
     return tuple(args)
+
 
 # todo: consider
 #  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:

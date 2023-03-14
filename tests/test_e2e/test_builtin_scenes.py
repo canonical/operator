@@ -45,6 +45,9 @@ def test_builtin_scenes(mycharm):
 def test_builtin_scenes_template(mycharm):
     mycharm.require_config = True
     check_builtin_sequences(
-        mycharm, meta={"name": "foo"}, template_state=State(config={"foo": "bar"})
+        mycharm,
+        meta={"name": "foo"},
+        config={"options": {"foo": {"type": "string"}}},
+        template_state=State(config={"foo": "bar"}),
     )
     assert CHARM_CALLED == 12

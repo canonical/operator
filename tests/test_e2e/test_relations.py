@@ -62,6 +62,7 @@ def test_get_relation(mycharm):
                 "zoo": {"interface": "zoo"},
             },
         },
+        config={"options": {"foo": {"type": "string"}}},
     )
 
 

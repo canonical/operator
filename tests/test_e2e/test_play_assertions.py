@@ -44,12 +44,13 @@ def test_charm_heals_on_start(mycharm):
     mycharm._call = call
 
     initial_state = State(
-        config={"foo": "bar"}, leader=True, status=Status(unit=("blocked", "foo"))
+        config={"foo": "bar"}, leader=True, status=Status(unit=BlockedStatus("foo"))
     )
 
     out = initial_state.trigger(
         charm_type=mycharm,
         meta={"name": "foo"},
+        config={"options": {"foo": {"type": "string"}}},
         event="start",
         post_event=post_event,
         pre_event=pre_event,
