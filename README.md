@@ -467,7 +467,5 @@ be overwritten by Scenario, and therefore ignored.
 
 
 # TODOS:
-- State-State consistency checks.
-- State-Metadata consistency checks.
 - When ops supports namespace packages, allow `pip install ops[scenario]` and nest the whole package under `/ops`.
 - Recorder
