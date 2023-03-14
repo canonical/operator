@@ -59,6 +59,14 @@ class InconsistentScenarioError(ScenarioRuntimeError):
 
 
 class ConsistencyChecker:
+    """This class is responsible for validating the combination of a state, an event, a charm spec, and a juju version.
+
+    Upon calling .run(), it performs a series of checks that validate that the state is consistent with itself, with
+    the event being emitted, the charm metadata, etc...
+    For example, if someone tries to emit a foo-pebble-ready but there is no container 'foo' in metadata or in State,
+    this is where we surface the issue.
+    """
+
     def __init__(
         self,
         state: "State",
@@ -72,6 +80,7 @@ class ConsistencyChecker:
         self.juju_version: Tuple[int, ...] = tuple(map(int, juju_version.split(".")))
 
     def run(self):
+        """Run all consistency checks and raise if any of them fails."""
         if os.getenv("SCENARIO_SKIP_CONSISTENCY_CHECKS"):
             logger.info("skipping consistency checks.")
             return
@@ -105,6 +114,7 @@ class ConsistencyChecker:
             raise InconsistentScenarioError(errors)
 
     def _check_event(self) -> Iterable[str]:
+        """Check the internal consistency of the Event data structure."""
         from scenario.state import (  # avoid cycles
             is_relation_event,
             is_workload_event,
@@ -141,6 +151,7 @@ class ConsistencyChecker:
         return errors
 
     def _check_config(self) -> Iterable[str]:
+        """Check the consistency of the state.config with the charm_spec.config (config.yaml)."""
         state_config = self.state.config
         meta_config = (self.charm_spec.config or {}).get("options", {})
         errors = []
@@ -177,6 +188,7 @@ class ConsistencyChecker:
         return errors
 
     def _check_secrets(self) -> Iterable[str]:
+        """Check the consistency of Secret-related stuff."""
         from scenario.state import is_secret_event  # avoid cycles
 
         errors = []
@@ -196,6 +208,7 @@ class ConsistencyChecker:
         return errors
 
     def _check_containers(self) -> Iterable[str]:
+        """Check the consistency of state.containers vs. charm_spec.meta (metadata.yaml/containers)."""
         from scenario.state import is_workload_event  # avoid cycles
 
         meta_containers = list(self.charm_spec.meta.get("containers", {}))
