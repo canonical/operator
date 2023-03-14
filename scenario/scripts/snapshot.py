@@ -469,14 +469,6 @@ def get_endpoints(juju_status: Dict, target: JujuUnitName) -> Tuple[str, ...]:
     return relations
 
 
-dispatch = {
-    "string": str,
-    "integer": int,
-    "number": float,
-    "boolean": lambda x: x == True,
-    "attrs": lambda x: x,
-}
-
 
 def get_config(
     target: JujuUnitName, model: Optional[str]
