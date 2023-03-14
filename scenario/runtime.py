@@ -1,9 +1,6 @@
-import dataclasses
-import logging
 import marshal
 import os
 import re
-import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -13,16 +10,14 @@ from typing import (
     Any,
     Callable,
     Dict,
-    List,
     Optional,
     Type,
     TypeVar,
-    Union,
+    Union, Iterable,
 )
 
 import yaml
 from ops.framework import _event_regex
-from ops.log import JujuLogHandler
 from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
@@ -30,10 +25,9 @@ from scenario.ops_main_mock import NoObserverError
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
-    from ops.framework import EventBase
     from ops.testing import CharmType
 
-    from scenario.state import Event, State, _CharmSpec
+    from scenario.state import Event, State, _CharmSpec, RELATION_EVENTS_SUFFIX, is_relation_event, is_workload_event
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
@@ -58,6 +52,77 @@ class DirtyVirtualCharmRootError(ScenarioRuntimeError):
     """Error raised when the runtime can't initialize the vroot without overwriting existing metadata files."""
 
 
+class InconsistentScenarioError(ScenarioRuntimeError):
+    """Error raised when the combination of state and event is inconsistent."""
+
+
+class ConsistencyChecker:
+    def __init__(self, state: "State", event: "Event", charm_spec: "_CharmSpec", juju_version: str):
+        self.state = state
+        self.event = event
+        self.charm_spec = charm_spec
+        self.juju_version = juju_version
+
+    def run(self):
+        errors = []
+
+        for check in (
+            self._check_containers,
+            self._check_config,
+        ):
+            try:
+                results = check()
+            except:
+                logger.error(f'error encountered processing check {check}', exc_info=True)
+                errors.append('unknown error; see the logs')
+                continue
+
+            errors.extend(results)
+
+        if errors:
+            err_fmt = '\n'.join(errors)
+            logger.error(f"Inconsistent scenario. The following errors were found: {err_fmt}")
+            raise InconsistentScenarioError(errors)
+
+    def _check_config(self) -> Iterable[str]:
+        state_config = self.state.config
+        meta_config = (self.charm_spec.config or {}).get('options', {})
+        errors = []
+
+        for key, value in state_config.items():
+            if key not in meta_config:
+                errors.append(f"config option {key!r} in state.config but not specified in config.yaml.")
+                continue
+
+            expected_type = meta_config[key].get('type', None)
+
+
+        return errors
+
+    def _check_containers(self) -> Iterable[str]:
+        meta_containers = list(self.charm_spec.meta['containers'])
+        state_containers = [c.name for c in self.state.containers]
+        errors = []
+
+        # it's fine if you have containers in meta that are not in state.containers (yet), but it's not fine if:
+        # - you're processing a pebble-ready event and that container is not in state.containers or meta.containers
+        if is_workload_event(self.event.name):
+            evt_container_name = self.event.name[:-len('-pebble-ready')]
+            if evt_container_name not in meta_containers:
+                errors.append(f"the event being processed concerns container {evt_container_name!r}, but a container "
+                              f"with that name is not declared in the charm metadata")
+            if evt_container_name not in state_containers:
+                errors.append(f"the event being processed concerns container {evt_container_name!r}, but a container "
+                              f"with that name is not present in the state. It's odd, but consistent, if it cannot "
+                              f"connect; but it should at least be there.")
+
+        # - a container in state.containers is not in meta.containers
+        if diff := (set(state_containers).difference(set(meta_containers))):
+            errors.append(f"some containers declared in the state are not specified in metadata. That's not possible. "
+                          f"Missing from metadata: {diff}.")
+        return errors
+
+
 class Runtime:
     """Charm runtime wrapper.
 
@@ -65,10 +130,10 @@ class Runtime:
     """
 
     def __init__(
-        self,
-        charm_spec: "_CharmSpec",
-        charm_root: Optional["PathLike"] = None,
-        juju_version: str = "3.0.0",
+            self,
+            charm_spec: "_CharmSpec",
+            charm_root: Optional["PathLike"] = None,
+            juju_version: str = "3.0.0",
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -78,8 +143,8 @@ class Runtime:
 
     @staticmethod
     def from_local_file(
-        local_charm_src: Path,
-        charm_cls_name: str,
+            local_charm_src: Path,
+            charm_cls_name: str,
     ) -> "Runtime":
         sys.path.extend((str(local_charm_src / "src"), str(local_charm_src / "lib")))
 
@@ -285,11 +350,11 @@ class Runtime:
         return state.replace(deferred=deferred, stored_state=stored_state)
 
     def exec(
-        self,
-        state: "State",
-        event: "Event",
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
+            self,
+            state: "State",
+            event: "Event",
+            pre_event: Optional[Callable[["CharmType"], None]] = None,
+            post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
@@ -298,6 +363,8 @@ class Runtime:
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
         """
+        ConsistencyChecker(state, event).run()
+
         charm_type = self._charm_spec.charm_type
         logger.info(f"Preparing to fire {event.name} on {charm_type.__name__}")
 
@@ -352,16 +419,17 @@ class Runtime:
 
 
 def trigger(
-    state: "State",
-    event: Union["Event", str],
-    charm_type: Type["CharmType"],
-    pre_event: Optional[Callable[["CharmType"], None]] = None,
-    post_event: Optional[Callable[["CharmType"], None]] = None,
-    # if not provided, will be autoloaded from charm_type.
-    meta: Optional[Dict[str, Any]] = None,
-    actions: Optional[Dict[str, Any]] = None,
-    config: Optional[Dict[str, Any]] = None,
-    charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
+        state: "State",
+        event: Union["Event", str],
+        charm_type: Type["CharmType"],
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+        # if not provided, will be autoloaded from charm_type.
+        meta: Optional[Dict[str, Any]] = None,
+        actions: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None,
+        charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
+        juju_version: str = "3.0",
 ) -> "State":
     """Trigger a charm execution with an Event and a State.
 
@@ -382,6 +450,7 @@ def trigger(
         If none is provided, we will search for a ``actions.yaml`` file in the charm root.
     :arg config: charm config to use. Needs to be a valid config.yaml format (as a python dict).
         If none is provided, we will search for a ``config.yaml`` file in the charm root.
+    :arg juju_version: Juju agent version to simulate.
     :arg charm_root: virtual charm root the charm will be executed with.
      If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
         execution cwd, you need to use this.
@@ -408,7 +477,7 @@ def trigger(
 
     runtime = Runtime(
         charm_spec=spec,
-        juju_version=state.juju_version,
+        juju_version=juju_version,
         charm_root=charm_root,
     )
 

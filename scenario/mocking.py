@@ -48,7 +48,7 @@ class _MockExecProcess:
 
 class _MockModelBackend(_ModelBackend):
     def __init__(self, state: "State", event: "Event", charm_spec: "_CharmSpec"):
-        super().__init__(state.unit_name, state.model.name, state.model.uuid)
+        super().__init__()
         self._state = state
         self._event = event
         self._charm_spec = charm_spec
@@ -94,11 +94,11 @@ class _MockModelBackend(_ModelBackend):
 
     def relation_get(self, rel_id, obj_name, app):
         relation = self._get_relation_by_id(rel_id)
-        if app and obj_name == self._state.app_name:
+        if app and obj_name == self.app_name:
             return relation.local_app_data
         elif app:
             return relation.remote_app_data
-        elif obj_name == self._state.unit_name:
+        elif obj_name == self.unit_name:
             return relation.local_unit_data
         else:
             unit_id = obj_name.split("/")[-1]
