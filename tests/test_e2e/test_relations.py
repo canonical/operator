@@ -4,7 +4,7 @@ import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 
-from scenario.state import Event, Relation, State, _CharmSpec
+from scenario.state import Relation, State
 
 
 @pytest.fixture(scope="function")

@@ -109,6 +109,60 @@ def test_status_leader(leader):
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
 
+
+## Statuses
+
+One of the simplest types of black-box testing available to charmers is to execute the charm and verify that the charm sets the expected unit/application status.
+We have seen a simple example above including leadership.
+But what if the charm transitions through a sequence of statuses?
+
+```python
+from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, BlockedStatus
+
+# charm code:
+def _on_event(self, _event):
+    self.unit.status = MaintenanceStatus('determining who the ruler is...')
+    try:
+        if self._call_that_takes_a_few_seconds_and_only_passes_on_leadership:
+            self.unit.status = ActiveStatus('I rule')
+        else:
+            self.unit.status = WaitingStatus('checking this is right...')
+            self._check_that_takes_some_more_time()
+            self.unit.status = ActiveStatus('I am ruled')
+    except:
+        self.unit.status = BlockedStatus('something went wrong')
+```
+
+You can verify that the charm has followed the expected path by checking the **unit status history** like so:
+
+```python
+from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, UnknownStatus
+from scenario import State
+
+def test_statuses():
+    out = State(leader=False).trigger(
+        'start', 
+        MyCharm,
+        meta={"name": "foo"})
+    assert out.status.unit_history == [
+      UnknownStatus(),
+      MaintenanceStatus('determining who the ruler is...'),
+      WaitingStatus('checking this is right...'),
+      ActiveStatus('I am ruled')
+    ]
+```
+
+Note that, unless you initialize the State with a preexisting status, the first status in the history will always be `unknown`. That is because, so far as scenario is concerned, each event is "the first event this charm has ever seen".
+
+If you want to simulate a situation in which the charm already has seen some event, and is in a status other than Unknown (the default status every charm is born with), you will have to pass the 'initial status' in State.
+
+```python
+from ops.model import ActiveStatus
+from scenario import State, Status
+State(leader=False, status=Status(unit=ActiveStatus('foo')))
+```
+
+
 ## Relations
 
 You can write scenario tests to verify the shape of relation data:

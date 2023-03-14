@@ -494,7 +494,7 @@ class _EntityStatus(_DCBase):
         return iter([self.name, self.message])
 
     def __repr__(self):
-        return f"<EntityStatus name={self.name}, message={self.message}>"
+        return f"<EntityStatus name={self.name!r}, message={self.message!r}>"
 
 
 def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
@@ -504,11 +504,17 @@ def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
 
 @dataclasses.dataclass
 class Status(_DCBase):
+    """Represents the 'juju statuses' of the application/unit being tested."""
 
-    # the real type of these is _EntityStatus, but the user needs not know about it.
-    app: Union[StatusBase] = _EntityStatus("unknown")
-    unit: Union[StatusBase] = _EntityStatus("unknown")
+    # the current statuses. Will be cast to _EntitiyStatus in __post_init__
+    app: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
     app_version: str = ""
+
+    # most to least recent statuses; do NOT include the current one.
+    app_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
+    unit_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
+    previous_app_version: Optional[str] = None
 
     def __post_init__(self):
         for name in ["app", "unit"]:
@@ -526,6 +532,24 @@ class Status(_DCBase):
                 setattr(self, name, _EntityStatus(*val))
             else:
                 raise TypeError(f"Invalid status.{name}: {val!r}")
+
+    def _update_app_version(self, new_app_version: str):
+        """Update the current app version and record the previous one."""
+        # We don't keep a full history because we don't expect the app version to change more
+        # than once per hook.
+        self.previous_app_version = self.app_version
+        self.app_version = new_app_version
+
+    def _update_status(
+        self, new_status: str, new_message: str = "", is_app: bool = False
+    ):
+        """Update the current app/unit status and add the previous one to the history."""
+        if is_app:
+            self.app_history.append(self.app)
+            self.app = _EntityStatus(new_status, new_message)
+        else:
+            self.unit_history.append(self.unit)
+            self.unit = _EntityStatus(new_status, new_message)
 
 
 @dataclasses.dataclass
