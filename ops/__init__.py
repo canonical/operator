@@ -39,13 +39,24 @@ and day-2 operations specific to that application.
 Full developer documentation is available at https://juju.is/docs/sdk.
 """
 
-# TODO: ensure there is no overlap between names in the various groups
+# The isort command wants to rearrange the nicely-formatted imports below;
+# just skip it for this file.
+# isort:skip_file
 
-import ops.main as main_module
+# Similarly, Pyright complains that all of these things are unused imports,
+# so disable it:
+# pyright: reportUnusedImport=false
 
-# TODO: is this still needed?
-from . import charm  # type: ignore # noqa
-from .charm import (
+# To allow test_main.py to patch things in the main module itself,
+# once "main" becomes a function below.
+import ops.main as _main_module  # noqa: F401
+
+# Import pebble explicitly. It's the one module we don't import names from below.
+from . import pebble  # type: ignore # noqa: F401
+
+# Explicitly import names from sub-modules so users can just "import ops" and
+# then use them as "ops.X".
+from .charm import (  # noqa: F401
     ActionEvent,
     ActionMeta,
     CharmBase,
@@ -88,7 +99,8 @@ from .charm import (
     UpgradeCharmEvent,
     WorkloadEvent,
 )
-from .framework import (
+
+from .framework import (  # noqa: F401
     BoundEvent,
     BoundStoredState,
     CommitEvent,
@@ -110,9 +122,15 @@ from .framework import (
     StoredState,
     StoredStateData,
 )
-from .jujuversion import JujuVersion
+
+from .jujuversion import JujuVersion  # noqa: F401
+
+# Import the main() function, but also set main.main to the function. This
+# allows charms to keep using "from ops.main import main".
 from .main import main
-from .model import (
+main.main = main  # type: ignore
+
+from .model import (  # noqa: F401 E402
     ActiveStatus,
     Application,
     Binding,
@@ -154,7 +172,5 @@ from .model import (
     UnknownStatus,
     WaitingStatus,
 )
-from .version import version as __version__  # type: ignore # noqa
 
-# TODO: hmmm, test that this hack works same before and after
-main.main = main
+from .version import version as __version__  # noqa: F401 E402
