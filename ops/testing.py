@@ -1201,19 +1201,6 @@ class Harness(Generic[CharmType]):
         }
         self._backend._networks[binding_name, relation_id] = data
 
-    def remove_network(self, binding_name: str, relation_id: Optional[int] = None):
-        """Remove simulated network data for the given binding.
-
-        Calling this method with a (binding_name, relation_id) combination that
-        hasn't been added does nothing.
-
-        Args:
-            binding_name: Name of binding (endpoint) to remove network data for.
-            relation_id: Optional relation ID for the binding. If not
-                provided, removes network data for the default binding.
-        """
-        self._backend._networks.pop((binding_name, relation_id), None)
-
     def _get_backend_calls(self, reset: bool = True) -> List[Tuple[Any, ...]]:
         """Return the calls that we have made to the TestingModelBackend.
 
