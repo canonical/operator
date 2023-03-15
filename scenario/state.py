@@ -5,13 +5,13 @@ import inspect
 import re
 import typing
 from itertools import chain
-from operator import attrgetter
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
 from uuid import uuid4
 
 import yaml
 from ops import pebble
+from ops.charm import CharmEvents
 from ops.model import SecretRotate, StatusBase
 
 from scenario.logger import logger as scenario_logger
@@ -27,57 +27,37 @@ if typing.TYPE_CHECKING:
 
     PathLike = Union[str, Path]
 
-logger = scenario_logger.getChild("structs")
+logger = scenario_logger.getChild("state")
 
 ATTACH_ALL_STORAGES = "ATTACH_ALL_STORAGES"
 CREATE_ALL_RELATIONS = "CREATE_ALL_RELATIONS"
 BREAK_ALL_RELATIONS = "BREAK_ALL_RELATIONS"
 DETACH_ALL_STORAGES = "DETACH_ALL_STORAGES"
 RELATION_EVENTS_SUFFIX = {
-    "-relation-changed",
-    "-relation-broken",
-    "-relation-joined",
-    "-relation-departed",
-    "-relation-created",
+    "_relation_changed",
+    "_relation_broken",
+    "_relation_joined",
+    "_relation_departed",
+    "_relation_created",
 }
 STORAGE_EVENTS_SUFFIX = {
-    "-storage-detaching",
-    "-storage-attached",
+    "_storage_detaching",
+    "_storage_attached",
 }
 
 SECRET_EVENTS_SUFFIX = {
-    "-secret-changed",
-    "-secret-removed",
-    "-secret-rotate",
-    "-secret-expired",
+    "_secret_changed",
+    "_secret_removed",
+    "_secret_rotate",
+    "_secret_expired",
 }
 
 META_EVENTS = {
-    "CREATE_ALL_RELATIONS": "-relation-created",
-    "BREAK_ALL_RELATIONS": "-relation-broken",
-    "DETACH_ALL_STORAGES": "-storage-detaching",
-    "ATTACH_ALL_STORAGES": "-storage-attached",
+    "CREATE_ALL_RELATIONS": "_relation_created",
+    "BREAK_ALL_RELATIONS": "_relation_broken",
+    "DETACH_ALL_STORAGES": "_storage_detaching",
+    "ATTACH_ALL_STORAGES": "_storage_attached",
 }
-
-
-def is_relation_event(name: str) -> bool:
-    """Whether the event name indicates that this is a relation event."""
-    return any(map(name.replace("_", "-").endswith, RELATION_EVENTS_SUFFIX))
-
-
-def is_secret_event(name: str) -> bool:
-    """Whether the event name indicates that this is a secret event."""
-    return any(map(name.replace("_", "-").endswith, SECRET_EVENTS_SUFFIX))
-
-
-def is_storage_event(name: str) -> bool:
-    """Whether the event name indicates that this is a storage event."""
-    return any(map(name.replace("_", "-").endswith, STORAGE_EVENTS_SUFFIX))
-
-
-def is_workload_event(name: str) -> bool:
-    """Whether the event name indicates that this is a workload event."""
-    return name.replace("_", "-").endswith("-pebble-ready")
 
 
 @dataclasses.dataclass
@@ -756,6 +736,71 @@ class Event(_DCBase):
             logger.warning(f"Only use underscores in event names. {self.name!r}")
         self.name = normalize_name(self.name)
 
+    @property
+    def _is_relation_event(self) -> bool:
+        """Whether the event name indicates that this is a relation event."""
+        return any(self.name.endswith(suffix) for suffix in RELATION_EVENTS_SUFFIX)
+
+    @property
+    def _is_secret_event(self) -> bool:
+        """Whether the event name indicates that this is a secret event."""
+        return any(self.name.endswith(suffix) for suffix in SECRET_EVENTS_SUFFIX)
+
+    @property
+    def _is_storage_event(self) -> bool:
+        """Whether the event name indicates that this is a storage event."""
+        return any(self.name.endswith(suffix) for suffix in STORAGE_EVENTS_SUFFIX)
+
+    @property
+    def _is_workload_event(self) -> bool:
+        """Whether the event name indicates that this is a workload event."""
+        return self.name.endswith("_pebble_ready")
+
+    # this method is private because _CharmSpec is not quite user-facing; also, the user should know.
+    def _is_builtin_event(self, charm_spec: "_CharmSpec"):
+        """Determine whether the event is a custom-defined one or a builtin one."""
+        evt_name = self.name
+
+        # simple case: this is an event type owned by our charm base.on
+        if hasattr(charm_spec.charm_type.on, evt_name):
+            return hasattr(CharmEvents, evt_name)
+
+        # this could be an event defined on some other Object, e.g. a charm lib.
+        # We don't support (yet) directly emitting those, but they COULD have names that conflict with
+        # events owned by the base charm. E.g. if the charm has a `foo` relation, the charm will get a
+        # charm.on.foo_relation_created. Your charm lib is free to define its own `foo_relation_created`
+        # custom event, because its handle will be `charm.lib.on.foo_relation_created` and therefore be
+        # unique and the Framework is happy. However, our Event data structure ATM has no knowledge
+        # of which Object/Handle it is owned by. So the only thing we can do right now is: check whether
+        # the event name, assuming it is owned by the charm, is that of a builtin event or not.
+        builtins = []
+        for relation_name in chain(
+            charm_spec.meta.get("requires", ()),
+            charm_spec.meta.get("provides", ()),
+            charm_spec.meta.get("peers", ()),
+        ):
+            relation_name = relation_name.replace("-", "_")
+            builtins.append(relation_name + "_relation_created")
+            builtins.append(relation_name + "_relation_joined")
+            builtins.append(relation_name + "_relation_changed")
+            builtins.append(relation_name + "_relation_departed")
+            builtins.append(relation_name + "_relation_broken")
+
+        for storage_name in charm_spec.meta.get("storages", ()):
+            storage_name = storage_name.replace("-", "_")
+            builtins.append(storage_name + "_storage_attached")
+            builtins.append(storage_name + "_storage_detaching")
+
+        for action_name in charm_spec.actions or ():
+            action_name = action_name.replace("-", "_")
+            builtins.append(action_name + "_action")
+
+        for container_name in charm_spec.meta.get("containers", ()):
+            container_name = container_name.replace("-", "_")
+            builtins.append(container_name + "_pebble_ready")
+
+        return evt_name in builtins
+
     def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""
         handler_repr = repr(handler)
@@ -770,13 +815,16 @@ class Event(_DCBase):
 
         snapshot_data = {}
 
-        if is_workload_event(self.name):
+        # fixme: at this stage we can't determine if the event is a builtin one or not; if it is not,
+        #  then the coming checks are meaningless: the custom event could be named like a relation event but
+        #  not *be* one.
+        if self._is_workload_event:
             # this is a WorkloadEvent. The snapshot:
             snapshot_data = {
                 "container_name": self.container.name,
             }
 
-        elif is_relation_event(self.name):
+        elif self._is_relation_event:
             if not self.relation:
                 raise ValueError(
                     "this is a relation event; expected relation attribute"

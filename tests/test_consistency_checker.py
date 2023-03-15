@@ -1,7 +1,8 @@
 import pytest
 from ops.charm import CharmBase
 
-from scenario.runtime import ConsistencyChecker, InconsistentScenarioError
+from scenario.consistency_checker import check_consistency
+from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
     Container,
@@ -17,15 +18,17 @@ class MyCharm(CharmBase):
     pass
 
 
-def assert_inconsistent(state, event, spec, juju_version="3.0"):
-    cc = ConsistencyChecker(state, event, spec, juju_version)
+def assert_inconsistent(
+    state: "State", event: "Event", charm_spec: "_CharmSpec", juju_version="3.0"
+):
     with pytest.raises(InconsistentScenarioError):
-        cc.run()
+        check_consistency(state, event, charm_spec, juju_version)
 
 
-def assert_consistent(state, event, spec, juju_version="3.0"):
-    cc = ConsistencyChecker(state, event, spec, juju_version)
-    cc.run()
+def assert_consistent(
+    state: "State", event: "Event", charm_spec: "_CharmSpec", juju_version="3.0"
+):
+    check_consistency(state, event, charm_spec, juju_version)
 
 
 def test_base():
@@ -90,7 +93,7 @@ def test_evt_bad_relation_name(suffix):
     assert_inconsistent(
         State(),
         Event(f"foo{suffix}", relation=Relation("bar")),
-        _CharmSpec(MyCharm, {}),
+        _CharmSpec(MyCharm, {"requires": {"foo": {"interface": "xxx"}}}),
     )
     assert_consistent(
         State(relations=[Relation("bar")]),
@@ -101,7 +104,7 @@ def test_evt_bad_relation_name(suffix):
 
 @pytest.mark.parametrize("suffix", RELATION_EVENTS_SUFFIX)
 def test_evt_no_relation(suffix):
-    assert_inconsistent(State(), Event("foo-relation-created"), _CharmSpec(MyCharm, {}))
+    assert_inconsistent(State(), Event(f"foo{suffix}"), _CharmSpec(MyCharm, {}))
     assert_consistent(
         State(relations=[Relation("bar")]),
         Event(f"bar{suffix}", relation=Relation("bar")),

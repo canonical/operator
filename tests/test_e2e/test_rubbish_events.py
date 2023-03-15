@@ -5,7 +5,7 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
 
 from scenario.ops_main_mock import NoObserverError
-from scenario.state import Container, State
+from scenario.state import Container, Event, State, _CharmSpec
 
 
 class QuxEvent(EventBase):
@@ -49,8 +49,8 @@ def test_rubbish_event_raises(mycharm, evt_name):
 
         if evt_name.startswith("kazoo"):
             os.environ["SCENARIO_SKIP_CONSISTENCY_CHECKS"] = "true"
-            # will whine about the container not being in state and meta; but if we put the container in meta,
-            # it will actually register an event!
+            # else it will whine about the container not being in state and meta;
+            # but if we put the container in meta, it will actually register an event!
 
         State().trigger(evt_name, mycharm, meta={"name": "foo"})
 
@@ -68,3 +68,22 @@ def test_custom_events_pass(mycharm, evt_name):
 def test_custom_events_sub_raise(mycharm, evt_name):
     with pytest.raises(RuntimeError):
         State().trigger(evt_name, mycharm, meta={"name": "foo"})
+
+
+@pytest.mark.parametrize(
+    "evt_name, expected",
+    (
+        ("qux", False),
+        ("sub", False),
+        ("start", True),
+        ("install", True),
+        ("config-changed", True),
+        ("foo-relation-changed", True),
+        ("bar-relation-changed", False),
+    ),
+)
+def test_is_custom_event(mycharm, evt_name, expected):
+    spec = _CharmSpec(
+        charm_type=mycharm, meta={"name": "mycharm", "requires": {"foo": {}}}
+    )
+    assert Event(evt_name)._is_builtin_event(spec) is expected
