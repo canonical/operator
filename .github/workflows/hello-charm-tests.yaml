@@ -19,7 +19,7 @@ jobs:
           python-version: "3.8"
 
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ${{ matrix.charm-repo }}
 
