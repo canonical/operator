@@ -32,6 +32,7 @@ def test_config_get(mycharm):
         "update-status",
         mycharm,
         meta={"name": "foo"},
+        config={"options": {"foo": {"type": "string"}, "baz": {"type": "integer"}}},
         post_event=check_cfg,
     )
 
@@ -49,7 +50,10 @@ def test_config_get_default_from_meta(mycharm):
         mycharm,
         meta={"name": "foo"},
         config={
-            "options": {"baz": {"type": "integer", "default": 2}},
+            "options": {
+                "foo": {"type": "string"},
+                "baz": {"type": "integer", "default": 2},
+            },
         },
         post_event=check_cfg,
     )

@@ -1,4 +1,4 @@
-Ops-Scenario
+Scenario
 ============
 
 This is a state transition testing framework for Operator Framework charms.
@@ -520,8 +520,25 @@ as verify its contents after the charm has run. Do keep in mind that the metadat
 be overwritten by Scenario, and therefore ignored.
 
 
+# Consistency checks
+
+A Scenario, that is, the combination of an event, a state, and a charm, is consistent if it's plausible in JujuLand.
+For example, Juju can't emit a `foo-relation-changed` event on your charm unless your charm has declared a `foo` relation
+endpoint in its `metadata.yaml`. If that happens, that's a juju bug.
+Scenario however assumes that Juju is bug-free, therefore, so far as we're concerned, that can't happen, and therefore we 
+help you verify that the scenarios you create are consistent and raise an exception if that isn't so.
+
+That happens automatically behind the scenes whenever you trigger an event; `scenario.consistency_checker.check_consistency`
+is called and verifies that the scenario makes sense.
+
+## Caveats:
+- False positives: not all checks are implemented yet; more will come.
+- False negatives: it is possible that a scenario you know to be consistent is seen as inconsistent. That is probably a bug in the consistency checker itself, please report it.
+- Inherent limitations: if you have a custom event whose name conflicts with a builtin one, the consistency constraints of the builtin one will apply. For example: if you decide to name your custom event `bar-pebble-ready`, but you are working on a machine charm or don't have either way a `bar` container in your `metadata.yaml`, Scenario will flag that as inconsistent. 
+
+## Bypassing the checker
+If you have a clear false negative, are explicitly testing 'edge', inconsistent situations, or for whatever reason the checker is in your way, you can set the `SCENARIO_SKIP_CONSISTENCY_CHECKS` envvar and skip it altogether. Hopefully you don't need that.
+
+
 # TODOS:
-- State-State consistency checks.
-- State-Metadata consistency checks.
-- When ops supports namespace packages, allow `pip install ops[scenario]` and nest the whole package under `/ops`.
 - Recorder

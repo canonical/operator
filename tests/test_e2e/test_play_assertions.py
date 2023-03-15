@@ -50,6 +50,7 @@ def test_charm_heals_on_start(mycharm):
     out = initial_state.trigger(
         charm_type=mycharm,
         meta={"name": "foo"},
+        config={"options": {"foo": {"type": "string"}}},
         event="start",
         post_event=post_event,
         pre_event=pre_event,

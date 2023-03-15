@@ -1,28 +1,14 @@
-import dataclasses
-import logging
 import marshal
 import os
 import re
-import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union
 
 import yaml
 from ops.framework import _event_regex
-from ops.log import JujuLogHandler
 from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
@@ -30,7 +16,6 @@ from scenario.ops_main_mock import NoObserverError
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
-    from ops.framework import EventBase
     from ops.testing import CharmType
 
     from scenario.state import Event, State, _CharmSpec
@@ -56,6 +41,10 @@ class UncaughtCharmError(ScenarioRuntimeError):
 
 class DirtyVirtualCharmRootError(ScenarioRuntimeError):
     """Error raised when the runtime can't initialize the vroot without overwriting existing metadata files."""
+
+
+class InconsistentScenarioError(ScenarioRuntimeError):
+    """Error raised when the combination of state and event is inconsistent."""
 
 
 class Runtime:
@@ -298,6 +287,10 @@ class Runtime:
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
         """
+        from scenario.consistency_checker import check_consistency  # avoid cycles
+
+        check_consistency(state, event, self._charm_spec, self._juju_version)
+
         charm_type = self._charm_spec.charm_type
         logger.info(f"Preparing to fire {event.name} on {charm_type.__name__}")
 
@@ -362,6 +355,7 @@ def trigger(
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
     charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
+    juju_version: str = "3.0",
 ) -> "State":
     """Trigger a charm execution with an Event and a State.
 
@@ -382,6 +376,7 @@ def trigger(
         If none is provided, we will search for a ``actions.yaml`` file in the charm root.
     :arg config: charm config to use. Needs to be a valid config.yaml format (as a python dict).
         If none is provided, we will search for a ``config.yaml`` file in the charm root.
+    :arg juju_version: Juju agent version to simulate.
     :arg charm_root: virtual charm root the charm will be executed with.
      If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
         execution cwd, you need to use this.
@@ -408,7 +403,7 @@ def trigger(
 
     runtime = Runtime(
         charm_spec=spec,
-        juju_version=state.juju_version,
+        juju_version=juju_version,
         charm_root=charm_root,
     )
 
