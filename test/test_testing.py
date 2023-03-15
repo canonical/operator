@@ -2701,13 +2701,14 @@ class TestHarness(unittest.TestCase):
 
 
 class TestNetwork(unittest.TestCase):
+    def setUp(self):
+        self.harness = Harness(CharmBase)
+        self.addCleanup(self.harness.cleanup)
+
     def test_add_network_defaults(self):
-        harness = Harness(CharmBase)
-        self.addCleanup(harness.cleanup)
+        self.harness.add_network('db', '10.0.0.10')
 
-        harness.add_network('db', '10.0.0.10')
-
-        binding = harness.model.get_binding('db')
+        binding = self.harness.model.get_binding('db')
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2721,19 +2722,16 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(interface.subnet, ipaddress.IPv4Network('10.0.0.0/24'))
 
     def test_add_network_all_args(self):
-        harness = Harness(CharmBase)
-        self.addCleanup(harness.cleanup)
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.add_network('db', '10.0.0.10',
+                                 relation_id=relation_id,
+                                 cidr='10.0.0.0/8',
+                                 interface='eth1',
+                                 ingress_addresses=['10.0.0.1', '10.0.0.2'],
+                                 egress_subnets=['10.0.0.0/8', '10.0.0.0/16'])
 
-        relation_id = harness.add_relation('db', 'postgresql')
-        harness.add_network('db', '10.0.0.10',
-                            relation_id=relation_id,
-                            cidr='10.0.0.0/8',
-                            interface='eth1',
-                            ingress_addresses=['10.0.0.1', '10.0.0.2'],
-                            egress_subnets=['10.0.0.0/8', '10.0.0.0/16'])
-
-        relation = harness.model.get_relation('db', relation_id)
-        binding = harness.model.get_binding(relation)
+        relation = self.harness.model.get_relation('db', relation_id)
+        binding = self.harness.model.get_binding(relation)
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2750,36 +2748,27 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(interface.subnet, ipaddress.IPv4Network('10.0.0.0/8'))
 
     def test_add_network_endpoint_fallback(self):
-        harness = Harness(CharmBase)
-        self.addCleanup(harness.cleanup)
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.add_network('db', '10.0.0.10')
 
-        relation_id = harness.add_relation('db', 'postgresql')
-        harness.add_network('db', '10.0.0.10')
-
-        relation = harness.model.get_relation('db', relation_id)
-        binding = harness.model.get_binding(relation)
+        relation = self.harness.model.get_relation('db', relation_id)
+        binding = self.harness.model.get_binding(relation)
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
 
     def test_add_network_default_fallback(self):
-        harness = Harness(CharmBase)
-        self.addCleanup(harness.cleanup)
+        self.harness.add_network(None, '10.0.0.10')
 
-        harness.add_network(None, '10.0.0.10')
-
-        binding = harness.model.get_binding('db')
+        binding = self.harness.model.get_binding('db')
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
 
     def test_add_network_ipv6(self):
-        harness = Harness(CharmBase)
-        self.addCleanup(harness.cleanup)
+        self.harness.add_network('db', '2001:0db8::a:0:0:1')
 
-        harness.add_network('db', '2001:0db8::a:0:0:1')
-
-        binding = harness.model.get_binding('db')
+        binding = self.harness.model.get_binding('db')
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv6Address('2001:0db8::a:0:0:1'))
