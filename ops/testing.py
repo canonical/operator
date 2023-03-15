@@ -1158,6 +1158,11 @@ class Harness(Generic[CharmType]):
 
             harness.add_network('db', '10.0.0.10')
 
+        After that call, the following will be true::
+
+            binding = harness.model.get_binding('db')
+            assert binding.network.bind_address == ipaddress.IPv4Address('10.0.0.10'))
+
         Args:
             binding_name: Name of binding (relation endpoint) to add network
                 data for. Use None to set the default binding.
@@ -1177,9 +1182,9 @@ class Harness(Generic[CharmType]):
         parsed_address = ipaddress.ip_address(address)  # raises ValueError if not an IP
         if cidr is None:
             if isinstance(parsed_address, ipaddress.IPv4Address):
-                cidr = str(ipaddress.IPv4Network(address+'/24', strict=False))
+                cidr = str(ipaddress.IPv4Network(address + '/24', strict=False))
             else:
-                cidr = str(ipaddress.IPv6Network(address+'/64', strict=False))
+                cidr = str(ipaddress.IPv6Network(address + '/64', strict=False))
         if ingress_addresses is None:
             ingress_addresses = [address]
         if egress_subnets is None:
@@ -1191,8 +1196,8 @@ class Harness(Generic[CharmType]):
                     {'cidr': cidr, 'value': address},
                 ],
             }],
-            'egress-subnets': egress_subnets,
-            'ingress-addresses': ingress_addresses,
+            'egress-subnets': list(egress_subnets),
+            'ingress-addresses': list(ingress_addresses),
         }
         self._backend._networks[binding_name, relation_id] = data
 

@@ -2741,7 +2741,8 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(network.ingress_addresses,
                          [ipaddress.IPv4Address('10.0.0.1'), ipaddress.IPv4Address('10.0.0.2')])
         self.assertEqual(network.egress_subnets,
-                         [ipaddress.IPv4Network('10.0.0.0/8'), ipaddress.IPv4Network('10.0.0.0/16')])
+                         [ipaddress.IPv4Network('10.0.0.0/8'),
+                          ipaddress.IPv4Network('10.0.0.0/16')])
         self.assertEqual(len(network.interfaces), 1)
         interface = network.interfaces[0]
         self.assertEqual(interface.name, 'eth1')
