@@ -204,7 +204,10 @@ def _random_model_name():
 class Model(_DCBase):
     name: str = _random_model_name()
     uuid: str = str(uuid4())
-    type: Literal["kubernetes", "lxd"] = "kubernetes"  # todo other options?
+
+    # whatever juju models --format=json | jq '.models[<current-model-index>].type' gives back.
+    # TODO: make this exhaustive.
+    type: Literal["kubernetes", "lxd"] = "kubernetes"
 
 
 # for now, proc mock allows you to map one command to one mocked output.

@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
 import json
 import logging
 import os
 import re
 import shlex
+import sys
 import tempfile
 from dataclasses import asdict
 from enum import Enum
@@ -36,8 +40,7 @@ logger = logging.getLogger("snapshot")
 JUJU_RELATION_KEYS = frozenset({"egress-subnets", "ingress-address", "private-address"})
 JUJU_CONFIG_KEYS = frozenset({})
 
-# TODO: allow passing a custom data dir, else put it in a tempfile in /tmp/.
-SNAPSHOT_TEMPDIR_ROOT = (Path(os.getcwd()).parent / "snapshot_storage").absolute()
+SNAPSHOT_OUTPUT_DIR = (Path(os.getcwd()).parent / "snapshot_storage").absolute()
 
 
 class SnapshotError(RuntimeError):
@@ -236,8 +239,8 @@ def get_metadata(target: JujuUnitName, model: Model):
 class RemotePebbleClient:
     """Clever little class that wraps calls to a remote pebble client."""
 
-    # TODO: there is a .pebble.state
-    #  " j ssh --container traefik traefik/0 cat var/lib/pebble/default/.pebble.state | jq"
+    # TODO: there is a .pebble.state in kubernetes containers at
+    #  /var/lib/pebble/default/.pebble.state
     #  figure out what it's for.
 
     def __init__(
@@ -307,6 +310,8 @@ def fetch_file(
 ) -> Optional[str]:
     """Download a file from a live unit to a local path."""
     # copied from jhack
+    # can't recall the path that lead to this solution instead of the more straightforward `juju scp`,
+    # but it was long and painful. Does juju scp even support --container?
     model_arg = f" -m {model}" if model else ""
     cmd = f"juju ssh --container {container_name}{model_arg} {target.unit_name} cat {remote_path}"
     try:
@@ -328,7 +333,7 @@ def get_mounts(
     container_name: str,
     container_meta: Dict,
     fetch_files: Optional[List[Path]] = None,
-    temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
+    temp_dir_base_path: Path = SNAPSHOT_OUTPUT_DIR,
 ) -> Dict[str, Mount]:
     """Get named Mounts from a container's metadata, and download specified files from the target unit."""
     mount_meta = container_meta.get("mounts")
@@ -392,7 +397,7 @@ def get_container(
     container_name: str,
     container_meta: Dict,
     fetch_files: Optional[List[Path]] = None,
-    temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
+    temp_dir_base_path: Path = SNAPSHOT_OUTPUT_DIR,
 ) -> Container:
     """Get container data structure from the target."""
     remote_client = RemotePebbleClient(container_name, target, model)
@@ -418,7 +423,7 @@ def get_containers(
     model: Optional[str],
     metadata: Optional[Dict],
     fetch_files: Dict[str, List[Path]] = None,
-    temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
+    temp_dir_base_path: Path = SNAPSHOT_OUTPUT_DIR,
 ) -> List[Container]:
     """Get all containers from this unit."""
     fetch_files = fetch_files or {}
@@ -467,7 +472,6 @@ def get_endpoints(juju_status: Dict, target: JujuUnitName) -> Tuple[str, ...]:
     app = juju_status["applications"][target.app_name]
     relations = tuple(app["relations"].keys())
     return relations
-
 
 
 def get_config(
@@ -673,7 +677,7 @@ def _snapshot(
     include_dead_relation_networks=False,
     format: FormatOption = "state",
     fetch_files: Dict[str, List[Path]] = None,
-    temp_dir_base_path: Path = SNAPSHOT_TEMPDIR_ROOT,
+    temp_dir_base_path: Path = SNAPSHOT_OUTPUT_DIR,
 ):
     """see snapshot's docstring"""
 
@@ -684,7 +688,7 @@ def _snapshot(
             f"invalid target: {target!r} is not a valid unit name. Should be formatted like so:"
             f"`foo/1`, or `database/0`, or `myapp-foo-bar/42`."
         )
-        exit(1)
+        sys.exit(1)
 
     logger.info(f'beginning snapshot of {target} in model {model or "<current>"}...')
 
@@ -697,12 +701,12 @@ def _snapshot(
         state_model = get_model(model)
     except Exception:
         logger.critical(f"unable to get Model from name {model}.", exc_info=True)
-        exit(1)
+        sys.exit(1)
 
     metadata = get_metadata(target, state_model)
     if not metadata:
         logger.critical(f"could not fetch metadata from {target}.")
-        exit(1)
+        sys.exit(1)
 
     try:
         unit_state_db = RemoteUnitStateDB(model, target)
@@ -774,10 +778,10 @@ def _snapshot(
     except InvalidTargetUnitName:
         _model = f"model {model}" or "the current model"
         logger.critical(f"invalid target: {target!r} not found in {_model}")
-        exit(1)
+        sys.exit(1)
     except InvalidTargetModelName:
         logger.critical(f"invalid model: {model!r} not found.")
-        exit(1)
+        sys.exit(1)
 
     logger.info(f"snapshot done.")
 
@@ -844,7 +848,7 @@ def snapshot(
     ),
     # TODO: generalize "fetch" to allow passing '.' for the 'charm' container or 'the machine'.
     output_dir: Path = typer.Option(
-        SNAPSHOT_TEMPDIR_ROOT,
+        SNAPSHOT_OUTPUT_DIR,
         "--output-dir",
         help="Directory in which to store any files fetched as part of the state. In the case "
         "of k8s charms, this might mean files obtained through Mounts,",
