@@ -2728,7 +2728,7 @@ class TestNetwork(unittest.TestCase):
                                  cidr='10.0.0.0/8',
                                  interface='eth1',
                                  ingress_addresses=['10.0.0.1', '10.0.0.2'],
-                                 egress_subnets=['10.0.0.0/8', '10.0.0.0/16'])
+                                 egress_subnets=['10.0.0.0/8', '10.10.0.0/16'])
 
         relation = self.harness.model.get_relation('db', relation_id)
         binding = self.harness.model.get_binding(relation)
@@ -2740,7 +2740,7 @@ class TestNetwork(unittest.TestCase):
                          [ipaddress.IPv4Address('10.0.0.1'), ipaddress.IPv4Address('10.0.0.2')])
         self.assertEqual(network.egress_subnets,
                          [ipaddress.IPv4Network('10.0.0.0/8'),
-                          ipaddress.IPv4Network('10.0.0.0/16')])
+                          ipaddress.IPv4Network('10.10.0.0/16')])
         self.assertEqual(len(network.interfaces), 1)
         interface = network.interfaces[0]
         self.assertEqual(interface.name, 'eth1')
