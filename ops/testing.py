@@ -1148,8 +1148,7 @@ class Harness(Generic[CharmType]):
                     cidr: Optional[str] = None,
                     interface: str = 'eth0',
                     ingress_addresses: Optional[Iterable[str]] = None,
-                    egress_subnets: Optional[Iterable[str]] = None,
-                    ):
+                    egress_subnets: Optional[Iterable[str]] = None):
         """Add simulated network data for the given binding.
 
         Calling this multiple times with the same (binding_name, relation_id)
@@ -1157,21 +1156,20 @@ class Harness(Generic[CharmType]):
 
         Example::
 
-            harness.add_network('database', '10.0.0.10')
+            harness.add_network('db', '10.0.0.10')
 
         Args:
             binding_name: Name of binding (relation endpoint) to add network
                 data for. Use None to set the default binding.
             address: Binding's IPv4 or IPv6 address.
-            relation_id: Optional relation ID for the binding. If not
-                provided, add network data for the endpoint's default binding.
+            relation_id: Relation ID for the binding. If not provided, add
+                network data for the endpoint's default binding.
             cidr: Binding's CIDR. Defaults to "<address>/24" if address is an
-                IPv4 address, or "<address>/64" if address is IPv6.
+                IPv4 address, or "<address>/64" if address is IPv6 (the host
+                bits are cleared).
             interface: Name of network interface.
-            ingress_addresses: Optional list of ingress addresses. Defaults to
-                [address].
-            egress_subnets: Optional list of egress subnets. Defaults to
-                [cidr].
+            ingress_addresses: List of ingress addresses. Defaults to [address].
+            egress_subnets: List of egress subnets. Defaults to [cidr].
 
         Raises:
             ValueError: If address is not an IPv4 or IPv6 address.
@@ -1179,9 +1177,9 @@ class Harness(Generic[CharmType]):
         parsed_address = ipaddress.ip_address(address)  # raises ValueError if not an IP
         if cidr is None:
             if isinstance(parsed_address, ipaddress.IPv4Address):
-                cidr = f'{address}/24'
+                cidr = str(ipaddress.IPv4Network(address+'/24', strict=False))
             else:
-                cidr = f'{address}/64'
+                cidr = str(ipaddress.IPv6Network(address+'/64', strict=False))
         if ingress_addresses is None:
             ingress_addresses = [address]
         if egress_subnets is None:
