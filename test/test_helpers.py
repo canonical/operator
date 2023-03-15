@@ -19,9 +19,8 @@ import subprocess
 import tempfile
 import unittest
 
-from ops.charm import CharmMeta
-from ops.framework import Framework
-from ops.model import Model, _ModelBackend
+import ops
+from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
 
 
@@ -120,7 +119,7 @@ class BaseTestCase(unittest.TestCase):
             data_fpath = tmpdir / "framework.data"
             charm_dir = tmpdir
 
-        framework = Framework(
+        framework = ops.Framework(
             SQLiteStorage(data_fpath),
             charm_dir,
             meta=None,
@@ -131,6 +130,6 @@ class BaseTestCase(unittest.TestCase):
     def create_model(self):
         """Create a Model object."""
         backend = _ModelBackend(unit_name='myapp/0')
-        meta = CharmMeta()
-        model = Model(meta, backend)
+        meta = ops.CharmMeta()
+        model = ops.Model(meta, backend)
         return model

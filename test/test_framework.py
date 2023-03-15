@@ -27,25 +27,8 @@ from unittest.mock import patch
 
 import logassert
 
-from ops import charm
-from ops.framework import (
-    _BREAKPOINT_WELCOME_MESSAGE,
-    BoundStoredState,
-    CommitEvent,
-    EventBase,
-    EventSource,
-    Framework,
-    Handle,
-    Object,
-    ObjectEvents,
-    PreCommitEvent,
-    StoredDict,
-    StoredList,
-    StoredSet,
-    StoredState,
-    StoredStateData,
-    _event_regex,
-)
+import ops
+from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
 from ops.storage import NoSnapshotError, SQLiteStorage
 
 
@@ -62,24 +45,24 @@ class TestFramework(BaseTestCase):
 
     def test_deprecated_init(self):
         # For 0.7, this still works, but it is deprecated.
-        framework = Framework(':memory:', None, None, None)
+        framework = ops.Framework(':memory:', None, None, None)
         self.assertLoggedWarning(
             "deprecated: Framework now takes a Storage not a path")
         self.assertIsInstance(framework._storage, SQLiteStorage)
 
     def test_handle_path(self):
         cases = [
-            (Handle(None, "root", None), "root"),
-            (Handle(None, "root", "1"), "root[1]"),
-            (Handle(Handle(None, "root", None), "child", None), "root/child"),
-            (Handle(Handle(None, "root", "1"), "child", "2"), "root[1]/child[2]"),
+            (ops.Handle(None, "root", None), "root"),
+            (ops.Handle(None, "root", "1"), "root[1]"),
+            (ops.Handle(ops.Handle(None, "root", None), "child", None), "root/child"),
+            (ops.Handle(ops.Handle(None, "root", "1"), "child", "2"), "root[1]/child[2]"),
         ]
         for handle, path in cases:
             self.assertEqual(str(handle), path)
-            self.assertEqual(Handle.from_path(path), handle)
+            self.assertEqual(ops.Handle.from_path(path), handle)
 
     def test_handle_attrs_readonly(self):
-        handle = Handle(None, 'kind', 'key')
+        handle = ops.Handle(None, 'kind', 'key')
         with self.assertRaises(AttributeError):
             handle.parent = 'foo'
         with self.assertRaises(AttributeError):
@@ -92,10 +75,10 @@ class TestFramework(BaseTestCase):
     def test_restore_unknown(self):
         framework = self.create_framework()
 
-        class Foo(Object):
+        class Foo(ops.Object):
             pass
 
-        handle = Handle(None, "a_foo", "some_key")
+        handle = ops.Handle(None, "a_foo", "some_key")
 
         framework.register_type(Foo, None, handle.kind)
 
@@ -119,7 +102,7 @@ class TestFramework(BaseTestCase):
             def restore(self, snapshot):
                 self.my_n = snapshot["My N!"] + 1
 
-        handle = Handle(None, "a_foo", "some_key")
+        handle = ops.Handle(None, "a_foo", "some_key")
         event = Foo(handle, 1)
 
         framework1 = self.create_framework(tmpdir=self.tmpdir)
@@ -151,15 +134,15 @@ class TestFramework(BaseTestCase):
     def test_simple_event_observer(self):
         framework = self.create_framework()
 
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             pass
 
-        class MyNotifier(Object):
-            foo = EventSource(MyEvent)
-            bar = EventSource(MyEvent)
-            baz = EventSource(MyEvent)
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
+            bar = ops.EventSource(MyEvent)
+            baz = ops.EventSource(MyEvent)
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
@@ -193,16 +176,16 @@ class TestFramework(BaseTestCase):
 
     def test_bad_sig_observer(self):
 
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             pass
 
-        class MyNotifier(Object):
-            foo = EventSource(MyEvent)
-            bar = EventSource(MyEvent)
-            baz = EventSource(MyEvent)
-            qux = EventSource(MyEvent)
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
+            bar = ops.EventSource(MyEvent)
+            baz = ops.EventSource(MyEvent)
+            qux = ops.EventSource(MyEvent)
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def _on_foo(self):
                 assert False, 'should not be reached'
 
@@ -230,9 +213,9 @@ class TestFramework(BaseTestCase):
     def test_on_pre_commit_emitted(self):
         framework = self.create_framework(tmpdir=self.tmpdir)
 
-        class PreCommitObserver(Object):
+        class PreCommitObserver(ops.Object):
 
-            _stored = StoredState()
+            _stored = ops.StoredState()
 
             def __init__(self, parent, key):
                 super().__init__(parent, key)
@@ -259,7 +242,7 @@ class TestFramework(BaseTestCase):
 
         self.assertEqual(obs._stored.myinitdata, 41)
         self.assertEqual(obs._stored.mydata, 42)
-        self.assertTrue(obs.seen, [PreCommitEvent, CommitEvent])
+        self.assertTrue(obs.seen, [ops.PreCommitEvent, ops.CommitEvent])
         framework.close()
 
         other_framework = self.create_framework(tmpdir=self.tmpdir)
@@ -275,17 +258,17 @@ class TestFramework(BaseTestCase):
     def test_defer_and_reemit(self):
         framework = self.create_framework()
 
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             pass
 
-        class MyNotifier1(Object):
-            a = EventSource(MyEvent)
-            b = EventSource(MyEvent)
+        class MyNotifier1(ops.Object):
+            a = ops.EventSource(MyEvent)
+            b = ops.EventSource(MyEvent)
 
-        class MyNotifier2(Object):
-            c = EventSource(MyEvent)
+        class MyNotifier2(ops.Object):
+            c = ops.EventSource(MyEvent)
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
@@ -312,11 +295,11 @@ class TestFramework(BaseTestCase):
         pub2.c.emit()
 
         # Events remain stored because they were deferred.
-        ev_a_handle = Handle(pub1, "a", "1")
+        ev_a_handle = ops.Handle(pub1, "a", "1")
         framework.load_snapshot(ev_a_handle)
-        ev_b_handle = Handle(pub1, "b", "2")
+        ev_b_handle = ops.Handle(pub1, "b", "2")
         framework.load_snapshot(ev_b_handle)
-        ev_c_handle = Handle(pub2, "c", "3")
+        ev_c_handle = ops.Handle(pub2, "c", "3")
         framework.load_snapshot(ev_c_handle)
         # make sure the objects are gone before we reemit them
         gc.collect()
@@ -345,7 +328,7 @@ class TestFramework(BaseTestCase):
     def test_custom_event_data(self):
         framework = self.create_framework()
 
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             def __init__(self, handle, n):
                 super().__init__(handle)
                 self.my_n = n
@@ -357,10 +340,10 @@ class TestFramework(BaseTestCase):
                 super().restore(snapshot)
                 self.my_n = snapshot["My N!"] + 1
 
-        class MyNotifier(Object):
-            foo = EventSource(MyEvent)
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
@@ -399,16 +382,16 @@ class TestFramework(BaseTestCase):
 
         observed_events = []
 
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             pass
 
-        class MyEvents(ObjectEvents):
-            foo = EventSource(MyEvent)
+        class MyEvents(ops.ObjectEvents):
+            foo = ops.EventSource(MyEvent)
 
-        class MyNotifier(Object):
+        class MyNotifier(ops.Object):
             on = MyEvents()
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def _on_foo(self, event):
                 observed_events.append("foo")
 
@@ -428,7 +411,7 @@ class TestFramework(BaseTestCase):
     def test_forget_and_multiple_objects(self):
         framework = self.create_framework()
 
-        class MyObject(Object):
+        class MyObject(ops.Object):
             pass
 
         o1 = MyObject(framework, "path")
@@ -453,7 +436,7 @@ class TestFramework(BaseTestCase):
     def test_forget_and_multiple_objects_with_load_snapshot(self):
         framework = self.create_framework(tmpdir=self.tmpdir)
 
-        class MyObject(Object):
+        class MyObject(ops.Object):
             def __init__(self, parent, name):
                 super().__init__(parent, name)
                 self.value = name
@@ -496,17 +479,17 @@ class TestFramework(BaseTestCase):
     def test_events_base(self):
         framework = self.create_framework()
 
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             pass
 
-        class MyEvents(ObjectEvents):
-            foo = EventSource(MyEvent)
-            bar = EventSource(MyEvent)
+        class MyEvents(ops.ObjectEvents):
+            foo = ops.EventSource(MyEvent)
+            bar = ops.EventSource(MyEvent)
 
-        class MyNotifier(Object):
+        class MyNotifier(ops.Object):
             on = MyEvents()
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
@@ -534,23 +517,23 @@ class TestFramework(BaseTestCase):
         self.assertEqual(repr(pub.on), f"<{fqn}: bar, foo>")
 
     def test_conflicting_event_attributes(self):
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             pass
 
-        event = EventSource(MyEvent)
+        event = ops.EventSource(MyEvent)
 
-        class MyEvents(ObjectEvents):
+        class MyEvents(ops.ObjectEvents):
             foo = event
 
         with self.assertRaises(RuntimeError) as cm:
-            class OtherEvents(ObjectEvents):
+            class OtherEvents(ops.ObjectEvents):
                 foo = event
         self.assertEqual(
             str(cm.exception.__cause__),
             "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
         with self.assertRaises(RuntimeError) as cm:
-            class MyNotifier(Object):
+            class MyNotifier(ops.Object):
                 on = MyEvents()
                 bar = event
         self.assertEqual(
@@ -563,13 +546,13 @@ class TestFramework(BaseTestCase):
 
         framework = self.create_framework()
 
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             pass
 
-        class MyNotifier(Object):
-            foo = EventSource(MyEvent)
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
@@ -602,20 +585,20 @@ class TestFramework(BaseTestCase):
     def test_auto_register_event_types(self):
         framework = self.create_framework()
 
-        class MyFoo(EventBase):
+        class MyFoo(ops.EventBase):
             pass
 
-        class MyBar(EventBase):
+        class MyBar(ops.EventBase):
             pass
 
-        class MyEvents(ObjectEvents):
-            foo = EventSource(MyFoo)
+        class MyEvents(ops.ObjectEvents):
+            foo = ops.EventSource(MyFoo)
 
-        class MyNotifier(Object):
+        class MyNotifier(ops.Object):
             on = MyEvents()
-            bar = EventSource(MyBar)
+            bar = ops.EventSource(MyBar)
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
@@ -645,17 +628,17 @@ class TestFramework(BaseTestCase):
     def test_dynamic_event_types(self):
         framework = self.create_framework()
 
-        class MyEventsA(ObjectEvents):
+        class MyEventsA(ops.ObjectEvents):
             handle_kind = 'on_a'
 
-        class MyEventsB(ObjectEvents):
+        class MyEventsB(ops.ObjectEvents):
             handle_kind = 'on_b'
 
-        class MyNotifier(Object):
+        class MyNotifier(ops.Object):
             on_a = MyEventsA()
             on_b = MyEventsB()
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             def __init__(self, parent, key):
                 super().__init__(parent, key)
                 self.seen = []
@@ -671,16 +654,16 @@ class TestFramework(BaseTestCase):
         pub = MyNotifier(framework, "1")
         obs = MyObserver(framework, "1")
 
-        class MyFoo(EventBase):
+        class MyFoo(ops.EventBase):
             pass
 
-        class MyBar(EventBase):
+        class MyBar(ops.EventBase):
             pass
 
-        class DeadBeefEvent(EventBase):
+        class DeadBeefEvent(ops.EventBase):
             pass
 
-        class NoneEvent(EventBase):
+        class NoneEvent(ops.EventBase):
             pass
 
         pub.on_a.define_event("foo", MyFoo)
@@ -711,7 +694,7 @@ class TestFramework(BaseTestCase):
             pub.on_a.define_event("foo", MyFoo)
 
     def test_event_key_roundtrip(self):
-        class MyEvent(EventBase):
+        class MyEvent(ops.EventBase):
             def __init__(self, handle, value):
                 super().__init__(handle)
                 self.value = value
@@ -722,10 +705,10 @@ class TestFramework(BaseTestCase):
             def restore(self, value):
                 self.value = value
 
-        class MyNotifier(Object):
-            foo = EventSource(MyEvent)
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
 
-        class MyObserver(Object):
+        class MyObserver(ops.Object):
             has_deferred = False
 
             def __init__(self, parent, key):
@@ -768,7 +751,7 @@ class TestFramework(BaseTestCase):
         framework.model = 'test-model'
         framework.meta = 'test-meta'
 
-        my_obj = Object(framework, 'my_obj')
+        my_obj = ops.Object(framework, 'my_obj')
         self.assertEqual(my_obj.model, framework.model)
 
     def test_ban_concurrent_frameworks(self):
@@ -782,11 +765,11 @@ class TestFramework(BaseTestCase):
         # this can not be saved, as it has not simple types!
         to_be_saved = {"bar": TestFramework}
 
-        class FooEvent(EventBase):
+        class FooEvent(ops.EventBase):
             def snapshot(self):
                 return to_be_saved
 
-        handle = Handle(None, "a_foo", "some_key")
+        handle = ops.Handle(None, "a_foo", "some_key")
         event = FooEvent(handle)
 
         framework = self.create_framework()
@@ -799,20 +782,20 @@ class TestFramework(BaseTestCase):
         self.assertEqual(str(cm.exception), expected)
 
     def test_unobserved_events_dont_leave_cruft(self):
-        class FooEvent(EventBase):
+        class FooEvent(ops.EventBase):
             def snapshot(self):
                 return {'content': 1}
 
-        class Events(ObjectEvents):
-            foo = EventSource(FooEvent)
+        class Events(ops.ObjectEvents):
+            foo = ops.EventSource(FooEvent)
 
-        class Emitter(Object):
+        class Emitter(ops.Object):
             on = Events()
 
         framework = self.create_framework()
         e = Emitter(framework, 'key')
         e.on.foo.emit()
-        ev_1_handle = Handle(e.on, "foo", "1")
+        ev_1_handle = ops.Handle(e.on, "foo", "1")
         with self.assertRaises(NoSnapshotError):
             framework.load_snapshot(ev_1_handle)
         # Committing will save the framework's state, but no other snapshots should be saved
@@ -839,14 +822,14 @@ class TestFramework(BaseTestCase):
     def test_remove_unreferenced_events(self):
         framework = self.create_framework()
 
-        class Evt(EventBase):
+        class Evt(ops.EventBase):
             pass
 
-        class Events(ObjectEvents):
-            event = EventSource(Evt)
+        class Events(ops.ObjectEvents):
+            event = ops.EventSource(Evt)
 
-        class ObjectWithStorage(Object):
-            _stored = StoredState()
+        class ObjectWithStorage(ops.Object):
+            _stored = ops.StoredState()
             on = Events()
 
             def __init__(self, framework, key):
@@ -859,7 +842,7 @@ class TestFramework(BaseTestCase):
 
         # This is an event that 'happened in the past' that doesn't have an associated notice.
         o = ObjectWithStorage(framework, 'obj')
-        handle = Handle(o.on, 'event', '100')
+        handle = ops.Handle(o.on, 'event', '100')
         event = Evt(handle)
         framework.save_snapshot(event)
         self.assertEqual(list(framework._storage.list_snapshots()), [handle.path])
@@ -890,26 +873,34 @@ class TestStoredState(BaseTestCase):
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
 
     def test_stored_dict_repr(self):
-        self.assertEqual(repr(StoredDict(None, {})), "ops.framework.StoredDict()")
-        self.assertEqual(repr(StoredDict(None, {"a": 1})), "ops.framework.StoredDict({'a': 1})")
+        self.assertEqual(repr(ops.StoredDict(None, {})), "ops.framework.StoredDict()")
+        self.assertEqual(
+            repr(
+                ops.StoredDict(
+                    None, {
+                        "a": 1})), "ops.framework.StoredDict({'a': 1})")
 
     def test_stored_list_repr(self):
-        self.assertEqual(repr(StoredList(None, [])), "ops.framework.StoredList()")
-        self.assertEqual(repr(StoredList(None, [1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
+        self.assertEqual(repr(ops.StoredList(None, [])), "ops.framework.StoredList()")
+        self.assertEqual(
+            repr(
+                ops.StoredList(
+                    None, [
+                        1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
 
     def test_stored_set_repr(self):
-        self.assertEqual(repr(StoredSet(None, set())), 'ops.framework.StoredSet()')
-        self.assertEqual(repr(StoredSet(None, {1})), 'ops.framework.StoredSet({1})')
+        self.assertEqual(repr(ops.StoredSet(None, set())), 'ops.framework.StoredSet()')
+        self.assertEqual(repr(ops.StoredSet(None, {1})), 'ops.framework.StoredSet({1})')
 
     def test_basic_state_storage(self):
-        class SomeObject(Object):
-            _stored = StoredState()
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
 
         self._stored_state_tests(SomeObject)
 
     def test_straight_subclass(self):
-        class SomeObject(Object):
-            _stored = StoredState()
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
 
         class Sub(SomeObject):
             pass
@@ -917,8 +908,8 @@ class TestStoredState(BaseTestCase):
         self._stored_state_tests(Sub)
 
     def test_straight_sub_subclass(self):
-        class SomeObject(Object):
-            _stored = StoredState()
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
 
         class Sub(SomeObject):
             pass
@@ -929,8 +920,8 @@ class TestStoredState(BaseTestCase):
         self._stored_state_tests(SubSub)
 
     def test_two_subclasses(self):
-        class SomeObject(Object):
-            _stored = StoredState()
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
 
         class SubA(SomeObject):
             pass
@@ -942,11 +933,11 @@ class TestStoredState(BaseTestCase):
         self._stored_state_tests(SubB)
 
     def test_the_crazy_thing(self):
-        class NoState(Object):
+        class NoState(ops.Object):
             pass
 
         class StatedObject(NoState):
-            _stored = StoredState()
+            _stored = ops.StoredState()
 
         class Sibling(NoState):
             pass
@@ -1000,8 +991,8 @@ class TestStoredState(BaseTestCase):
         framework_copy.close()
 
     def test_two_subclasses_no_conflicts(self):
-        class Base(Object):
-            _stored = StoredState()
+        class Base(ops.Object):
+            _stored = ops.StoredState()
 
         class SubA(Base):
             pass
@@ -1031,8 +1022,8 @@ class TestStoredState(BaseTestCase):
         self.assertEqual(z2._stored.foo, {1})
 
     def test_two_names_one_state(self):
-        class Mine(Object):
-            _stored = StoredState()
+        class Mine(ops.Object):
+            _stored = ops.StoredState()
             _stored2 = _stored
 
         framework = self.create_framework()
@@ -1051,11 +1042,11 @@ class TestStoredState(BaseTestCase):
         self.assertNotIn("_stored2", obj.__dict__)
 
     def test_same_name_two_classes(self):
-        class Base(Object):
+        class Base(ops.Object):
             pass
 
         class A(Base):
-            _stored = StoredState()
+            _stored = ops.StoredState()
 
         class B(Base):
             _stored = A._stored
@@ -1079,8 +1070,8 @@ class TestStoredState(BaseTestCase):
     def test_mutable_types_invalid(self):
         framework = self.create_framework()
 
-        class SomeObject(Object):
-            _stored = StoredState()
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
 
         obj = SomeObject(framework, '1')
         try:
@@ -1161,7 +1152,7 @@ class TestStoredState(BaseTestCase):
             lambda a, b: a.append(b),
             lambda res, expected_res: (
                 self.assertEqual(res, expected_res),
-                self.assertIsInstance(res[1], StoredList),
+                self.assertIsInstance(res[1], ops.StoredList),
             )
         ), (
             lambda: ['a', ['c']],
@@ -1176,7 +1167,7 @@ class TestStoredState(BaseTestCase):
             lambda a, b: a.insert(1, b),
             lambda res, expected_res: (
                 self.assertEqual(res, expected_res),
-                self.assertIsInstance(res[1], StoredList)
+                self.assertIsInstance(res[1], ops.StoredList)
             ),
         ), (
             lambda: ['b', 'a', ['c']],
@@ -1186,7 +1177,7 @@ class TestStoredState(BaseTestCase):
             lambda a, b: a.__setitem__(1, b),
             lambda res, expected_res: (
                 self.assertEqual(res, expected_res),
-                self.assertIsInstance(res[1], StoredList)
+                self.assertIsInstance(res[1], ops.StoredList)
             ),
         ), (
             lambda: ['b', ['d'], 'a', ['c']],
@@ -1251,10 +1242,10 @@ class TestStoredState(BaseTestCase):
             lambda res, expected_res: self.assertEqual(res, expected_res)
         )]
 
-        class SomeObject(Object):
-            _stored = StoredState()
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
 
-        class WrappedFramework(Framework):
+        class WrappedFramework(ops.Framework):
             def __init__(self, store, charm_dir, meta, model, event_name):
                 super().__init__(store, charm_dir, meta, model, event_name)
                 self.snapshots = []
@@ -1271,7 +1262,7 @@ class TestStoredState(BaseTestCase):
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
-            self.assertTrue(isinstance(obj._stored, BoundStoredState))
+            self.assertTrue(isinstance(obj._stored, ops.BoundStoredState))
 
             op(obj._stored.a, b)
             validate_op(obj._stored.a, expected_res)
@@ -1280,7 +1271,7 @@ class TestStoredState(BaseTestCase):
             framework.commit()
             # We should see an update for initializing a
             self.assertEqual(framework.snapshots, [
-                (StoredStateData, {'a': get_a()}),
+                (ops.StoredStateData, {'a': get_a()}),
             ])
             del obj
             gc.collect()
@@ -1388,8 +1379,8 @@ class TestStoredState(BaseTestCase):
             False
         )]
 
-        class SomeObject(Object):
-            _stored = StoredState()
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
 
         framework = self.create_framework()
 
@@ -1427,8 +1418,8 @@ class TestStoredState(BaseTestCase):
             set()
         )]
 
-        class SomeObject(Object):
-            _stored = StoredState()
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
 
         framework = self.create_framework()
 
@@ -1459,8 +1450,8 @@ class TestStoredState(BaseTestCase):
     def test_set_default(self):
         framework = self.create_framework()
 
-        class StatefulObject(Object):
-            _stored = StoredState()
+        class StatefulObject(ops.Object):
+            _stored = ops.StoredState()
         parent = StatefulObject(framework, 'key')
         parent._stored.set_default(foo=1)
         self.assertEqual(parent._stored.foo, 1)
@@ -1481,7 +1472,7 @@ class TestStoredState(BaseTestCase):
         #       parent._stored._data.dirty is False?
 
 
-class GenericObserver(Object):
+class GenericObserver(ops.Object):
     """Generic observer for the tests."""
 
     def __init__(self, parent, key):
@@ -1719,7 +1710,7 @@ class DebugHookTests(BaseTestCase):
         framework = self.create_framework()
         framework._juju_debug_at = {'hook'}
 
-        publisher = charm.CharmEvents(framework, "1")
+        publisher = ops.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.install, observer.callback_method)
 
@@ -1733,7 +1724,7 @@ class DebugHookTests(BaseTestCase):
         self.assertEqual(mock.call_count, 1)
         expected_callback, expected_event = mock.call_args[0]
         self.assertEqual(expected_callback, observer.callback_method)
-        self.assertIsInstance(expected_event, EventBase)
+        self.assertIsInstance(expected_event, ops.EventBase)
         self.assertFalse(observer.called)
 
         # Verify proper message was given to the user.
@@ -1744,8 +1735,8 @@ class DebugHookTests(BaseTestCase):
         framework = self.create_framework(model=test_model)
         framework._juju_debug_at = {'all'}
 
-        class CustomEvents(ObjectEvents):
-            foobar_action = EventSource(charm.ActionEvent)
+        class CustomEvents(ops.ObjectEvents):
+            foobar_action = ops.EventSource(ops.ActionEvent)
 
         publisher = CustomEvents(framework, "1")
         observer = GenericObserver(framework, "1")
@@ -1765,8 +1756,8 @@ class DebugHookTests(BaseTestCase):
         framework = self.create_framework(model=test_model)
         framework._juju_debug_at = {'hook'}
 
-        class CustomEvents(ObjectEvents):
-            foobar_action = EventSource(charm.ActionEvent)
+        class CustomEvents(ops.ObjectEvents):
+            foobar_action = ops.EventSource(ops.ActionEvent)
 
         publisher = CustomEvents(framework, "1")
         observer = GenericObserver(framework, "1")
@@ -1782,9 +1773,9 @@ class DebugHookTests(BaseTestCase):
         self.assertFalse(observer.called)
 
     def test_internal_events_not_interrupted(self):
-        class MyNotifier(Object):
+        class MyNotifier(ops.Object):
             """Generic notifier for the tests."""
-            bar = EventSource(EventBase)
+            bar = ops.EventSource(ops.EventBase)
 
         framework = self.create_framework()
         framework._juju_debug_at = {'hook'}
@@ -1803,7 +1794,7 @@ class DebugHookTests(BaseTestCase):
         framework = self.create_framework()
         framework._juju_debug_at = {'foo', 'hook', 'all', 'whatever'}
 
-        publisher = charm.CharmEvents(framework, "1")
+        publisher = ops.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.install, observer.callback_method)
 
@@ -1818,7 +1809,7 @@ class DebugHookTests(BaseTestCase):
         framework = self.create_framework()
         framework._juju_debug_at = {'hook'}
 
-        publisher = charm.CharmEvents(framework, "1")
+        publisher = ops.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
 
         with patch('pdb.runcall') as mock:
@@ -1831,7 +1822,7 @@ class DebugHookTests(BaseTestCase):
         framework = self.create_framework()
         framework._juju_debug_at = {'something-else'}
 
-        publisher = charm.CharmEvents(framework, "1")
+        publisher = ops.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.install, observer.callback_method)
 
@@ -1846,7 +1837,7 @@ class DebugHookTests(BaseTestCase):
         framework = self.create_framework()
         framework._juju_debug_at = set()
 
-        publisher = charm.CharmEvents(framework, "1")
+        publisher = ops.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.install, observer.callback_method)
 
@@ -1860,7 +1851,7 @@ class DebugHookTests(BaseTestCase):
         framework = self.create_framework()
         framework._juju_debug_at = {'hook'}
 
-        publisher = charm.CharmEvents(framework, "1")
+        publisher = ops.CharmEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.install, observer.callback_method)
 
