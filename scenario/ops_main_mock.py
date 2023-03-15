@@ -1,6 +1,6 @@
-### This file contains stuff that ideally should be in ops.
-# see https://github.com/canonical/operator/pull/862
-
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
 import inspect
 import os
 from typing import TYPE_CHECKING, Callable, Optional

@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
 import datetime
 import pathlib
 import random
