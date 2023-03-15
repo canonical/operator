@@ -1143,7 +1143,7 @@ class Harness(Generic[CharmType]):
         """
         self._backend._planned_units = None
 
-    def add_network(self, binding_name: str, address: str, *,
+    def add_network(self, binding_name: Optional[str], address: str, *,
                     relation_id: Optional[int] = None,
                     cidr: Optional[str] = None,
                     interface: str = 'eth0',
@@ -1155,26 +1155,23 @@ class Harness(Generic[CharmType]):
         Calling this multiple times with the same (binding_name, relation_id)
         combination will replace the associated network data.
 
-        Note that this method only supports the common case of adding a single
-        interface and bind address.
-
         Example::
 
             harness.add_network('database', '10.0.0.10')
 
         Args:
-            binding_name: Name of binding (endpoint) to add network data for.
-                Use "" (empty string) to set the default binding.
-            address: Binding's IPv4 or IPv6 address, for example "10.0.0.10".
+            binding_name: Name of binding (relation endpoint) to add network
+                data for. Use None to set the default binding.
+            address: Binding's IPv4 or IPv6 address.
             relation_id: Optional relation ID for the binding. If not
-                provided, adds network data for the default binding.
+                provided, add network data for the endpoint's default binding.
             cidr: Binding's CIDR. Defaults to "<address>/24" if address is an
                 IPv4 address, or "<address>/64" if address is IPv6.
             interface: Name of network interface.
             ingress_addresses: Optional list of ingress addresses. Defaults to
                 [address].
             egress_subnets: Optional list of egress subnets. Defaults to
-                [cidr]
+                [cidr].
 
         Raises:
             ValueError: If address is not an IPv4 or IPv6 address.
@@ -1608,7 +1605,7 @@ class _TestingModelBackend:
         self._hook_is_running = ''
         self._secrets: List[_Secret] = []
         self._opened_ports: Set[model.OpenedPort] = set()
-        self._networks: Dict[Tuple[str, Optional[int]], _NetworkDict] = {}
+        self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -1871,11 +1868,12 @@ class _TestingModelBackend:
         if data is not None:
             return data
         if relation_id is not None:
+            # Fall back to the default binding for this endpoint
             data = self._networks.get((binding_name, None))
             if data is not None:
                 return data
         # No custom data per relation ID or binding, return the default binding
-        data = self._networks.get(('', None))
+        data = self._networks.get((None, None))
         if data is not None:
             return data
         raise RelationNotFoundError
