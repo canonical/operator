@@ -2,6 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
 
+import pytest
 import yaml
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase
@@ -84,3 +85,24 @@ def test_event_emission():
 
         assert my_charm_type._event
         assert isinstance(my_charm_type._event, MyEvt)
+
+
+@pytest.mark.parametrize("app_name", ("foo", "bar-baz", "QuX2"))
+def test_unit_name(app_name):
+    meta = {
+        "name": app_name,
+    }
+
+    my_charm_type = charm_type()
+
+    runtime = Runtime(
+        _CharmSpec(
+            my_charm_type,
+            meta=meta,
+        ),
+    )
+
+    def post_event(charm: CharmBase):
+        assert charm.unit.name == f"{app_name}/0"
+
+    runtime.exec(state=State(), event=Event("start"), post_event=post_event)

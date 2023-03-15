@@ -49,7 +49,7 @@ class _MockExecProcess:
 
 class _MockModelBackend(_ModelBackend):
     def __init__(self, state: "State", event: "Event", charm_spec: "_CharmSpec"):
-        super().__init__(state.unit_name, state.model.name, state.model.uuid)
+        super().__init__()
         self._state = state
         self._event = event
         self._charm_spec = charm_spec
@@ -95,11 +95,11 @@ class _MockModelBackend(_ModelBackend):
 
     def relation_get(self, rel_id, obj_name, app):
         relation = self._get_relation_by_id(rel_id)
-        if app and obj_name == self._state.app_name:
+        if app and obj_name == self.app_name:
             return relation.local_app_data
         elif app:
             return relation.remote_app_data
-        elif obj_name == self._state.unit_name:
+        elif obj_name == self.unit_name:
             return relation.local_unit_data
         else:
             unit_id = obj_name.split("/")[-1]
@@ -128,11 +128,16 @@ class _MockModelBackend(_ModelBackend):
 
     def config_get(self):
         state_config = self._state.config
-        if not state_config:
-            state_config = {
-                key: value.get("default")
-                for key, value in self._charm_spec.config.items()
-            }
+
+        # add defaults
+        charm_config = self._charm_spec.config
+        if not charm_config:
+            return state_config
+
+        for key, value in charm_config["options"].items():
+            # if it has a default, and it's not overwritten from State, use it:
+            if key not in state_config and (default_value := value.get("default")):
+                state_config[key] = default_value
 
         return state_config  # full config
 
@@ -144,20 +149,14 @@ class _MockModelBackend(_ModelBackend):
         return network.hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.
-    def application_version_set(self, *args, **kwargs):
-        self._state.status.app_version = args[0]
-        return None
+    def application_version_set(self, version: str):
+        self._state.status._update_app_version(version)  # noqa
 
-    def status_set(self, *args, **kwargs):
-        if kwargs.get("is_app"):
-            self._state.status.app = args
-        else:
-            self._state.status.unit = args
-        return None
+    def status_set(self, status: str, message: str = "", *, is_app: bool = False):
+        self._state.status._update_status(status, message, is_app)  # noqa
 
     def juju_log(self, level: str, message: str):
         self._state.juju_log.append((level, message))
-        return None
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
         relation = self._get_relation_by_id(relation_id)

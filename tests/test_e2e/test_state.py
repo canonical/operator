@@ -89,23 +89,27 @@ def test_status_setting(state, mycharm):
         mycharm,
         meta={"name": "foo"},
     )
-    assert out.status.unit == ("active", "foo test")
-    assert out.status.app == ("waiting", "foo barz")
+    assert out.status.unit == ActiveStatus("foo test")
+    assert out.status.app == WaitingStatus("foo barz")
     assert out.status.app_version == ""
 
     out.juju_log = []  # ignore logging output in the delta
     out.stored_state = state.stored_state  # ignore stored state in delta.
     assert out.jsonpatch_delta(state) == sort_patch(
         [
+            {"op": "replace", "path": "/status/app/message", "value": "foo barz"},
+            {"op": "replace", "path": "/status/app/name", "value": "waiting"},
             {
-                "op": "replace",
-                "path": "/status/app",
-                "value": ("waiting", "foo barz"),
+                "op": "add",
+                "path": "/status/app_history/0",
+                "value": {"message": "", "name": "unknown"},
             },
+            {"op": "replace", "path": "/status/unit/message", "value": "foo test"},
+            {"op": "replace", "path": "/status/unit/name", "value": "active"},
             {
-                "op": "replace",
-                "path": "/status/unit",
-                "value": ("active", "foo test"),
+                "op": "add",
+                "path": "/status/unit_history/0",
+                "value": {"message": "", "name": "unknown"},
             },
         ]
     )

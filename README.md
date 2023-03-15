@@ -1,4 +1,4 @@
-Ops-Scenario
+Scenario
 ============
 
 This is a state transition testing framework for Operator Framework charms.
@@ -64,7 +64,7 @@ With that, we can write the simplest possible scenario test:
 ```python
 from scenario.state import State
 from ops.charm import CharmBase
-
+from ops.model import UnknownStatus
 
 class MyCharm(CharmBase):
     pass
@@ -74,7 +74,7 @@ def test_scenario_base():
     out = State().trigger(
         'start', 
         MyCharm, meta={"name": "foo"})
-    assert out.status.unit == ('unknown', '')
+    assert out.status.unit == UnknownStatus()
 ```
 
 Now let's start making it more complicated.
@@ -104,10 +104,64 @@ def test_status_leader(leader):
         'start', 
         MyCharm,
         meta={"name": "foo"})
-    assert out.status.unit == ('active', 'I rule' if leader else 'I am ruled')
+    assert out.status.unit == ActiveStatus('I rule' if leader else 'I am ruled')
 ```
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can ask the juju model: am I leader? What are my relations? What is the remote unit I'm talking to? etc...
+
+
+## Statuses
+
+One of the simplest types of black-box testing available to charmers is to execute the charm and verify that the charm sets the expected unit/application status.
+We have seen a simple example above including leadership.
+But what if the charm transitions through a sequence of statuses?
+
+```python
+from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, BlockedStatus
+
+# charm code:
+def _on_event(self, _event):
+    self.unit.status = MaintenanceStatus('determining who the ruler is...')
+    try:
+        if self._call_that_takes_a_few_seconds_and_only_passes_on_leadership:
+            self.unit.status = ActiveStatus('I rule')
+        else:
+            self.unit.status = WaitingStatus('checking this is right...')
+            self._check_that_takes_some_more_time()
+            self.unit.status = ActiveStatus('I am ruled')
+    except:
+        self.unit.status = BlockedStatus('something went wrong')
+```
+
+You can verify that the charm has followed the expected path by checking the **unit status history** like so:
+
+```python
+from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, UnknownStatus
+from scenario import State
+
+def test_statuses():
+    out = State(leader=False).trigger(
+        'start', 
+        MyCharm,
+        meta={"name": "foo"})
+    assert out.status.unit_history == [
+      UnknownStatus(),
+      MaintenanceStatus('determining who the ruler is...'),
+      WaitingStatus('checking this is right...'),
+      ActiveStatus('I am ruled')
+    ]
+```
+
+Note that, unless you initialize the State with a preexisting status, the first status in the history will always be `unknown`. That is because, so far as scenario is concerned, each event is "the first event this charm has ever seen".
+
+If you want to simulate a situation in which the charm already has seen some event, and is in a status other than Unknown (the default status every charm is born with), you will have to pass the 'initial status' in State.
+
+```python
+from ops.model import ActiveStatus
+from scenario import State, Status
+State(leader=False, status=Status(unit=ActiveStatus('foo')))
+```
+
 
 ## Relations
 
@@ -398,23 +452,93 @@ Scenario can simulate StoredState.
 You can define it on the input side as:
 
 ```python
-
+from ops.charm import CharmBase
+from ops.framework import StoredState as Ops_StoredState, Framework
 from scenario import State, StoredState
 
+
+class MyCharmType(CharmBase):
+    my_stored_state = Ops_StoredState()
+
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
+        assert self.my_stored_state.foo == 'bar'  # this will pass!
+
+
 state = State(stored_state=[
-    StoredState(
-        owner="MyCharmType",
-        content={
-            'foo': 'bar',
-            'baz': {42: 42},
-        })
+  StoredState(
+    owner_path="MyCharmType",
+    name="my_stored_state",
+    content={
+      'foo': 'bar',
+      'baz': {42: 42},
+    })
 ])
 ```
 
-And you can run assertions on it on the output side the same as any other bit of state.
+And the charm's runtime will see `self.stored_State.foo` and `.baz` as expected.
+Also, you can run assertions on it on the output side the same as any other bit of state.
+
+
+# The virtual charm root
+Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. 
+The charm will see that tempdir as its 'root'. This allows us to keep things simple when dealing with metadata that can 
+be either inferred from the charm type being passed to `trigger()` or be passed to it as an argument, thereby overriding
+the inferred one. This also allows you to test with charms defined on the fly, as in:
+
+```python
+from ops.charm import CharmBase
+from scenario import State
+
+class MyCharmType(CharmBase):
+    pass
+
+state = State().trigger(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start')
+```
+
+A consequence of this fact is that you have no direct control over the tempdir that we are
+creating to put the metadata you are passing to trigger (because `ops` expects it to be a file...).
+That is, unless you pass your own:
+
+```python
+from ops.charm import CharmBase
+from scenario import State
+import tempfile
+
+
+class MyCharmType(CharmBase):
+  pass
+
+
+td = tempfile.TemporaryDirectory()
+state = State().trigger(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start',
+                        charm_root=td.name)
+```
+
+Do this, and you will be able to set up said directory as you like before the charm is run, as well 
+as verify its contents after the charm has run. Do keep in mind that the metadata files will 
+be overwritten by Scenario, and therefore ignored.
+
+
+# Consistency checks
+
+A Scenario, that is, the combination of an event, a state, and a charm, is consistent if it's plausible in JujuLand.
+For example, Juju can't emit a `foo-relation-changed` event on your charm unless your charm has declared a `foo` relation
+endpoint in its `metadata.yaml`. If that happens, that's a juju bug.
+Scenario however assumes that Juju is bug-free, therefore, so far as we're concerned, that can't happen, and therefore we 
+help you verify that the scenarios you create are consistent and raise an exception if that isn't so.
+
+That happens automatically behind the scenes whenever you trigger an event; `scenario.consistency_checker.check_consistency`
+is called and verifies that the scenario makes sense.
+
+## Caveats:
+- False positives: not all checks are implemented yet; more will come.
+- False negatives: it is possible that a scenario you know to be consistent is seen as inconsistent. That is probably a bug in the consistency checker itself, please report it.
+- Inherent limitations: if you have a custom event whose name conflicts with a builtin one, the consistency constraints of the builtin one will apply. For example: if you decide to name your custom event `bar-pebble-ready`, but you are working on a machine charm or don't have either way a `bar` container in your `metadata.yaml`, Scenario will flag that as inconsistent. 
+
+## Bypassing the checker
+If you have a clear false negative, are explicitly testing 'edge', inconsistent situations, or for whatever reason the checker is in your way, you can set the `SCENARIO_SKIP_CONSISTENCY_CHECKS` envvar and skip it altogether. Hopefully you don't need that.
+
 
 # TODOS:
-- State-State consistency checks.
-- State-Metadata consistency checks.
-- When ops supports namespace packages, allow `pip install ops[scenario]` and nest the whole package under `/ops`.
 - Recorder

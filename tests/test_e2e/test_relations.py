@@ -4,7 +4,7 @@ import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 
-from scenario.state import Event, Relation, State, _CharmSpec
+from scenario.state import Relation, State
 
 
 @pytest.fixture(scope="function")
@@ -62,6 +62,7 @@ def test_get_relation(mycharm):
                 "zoo": {"interface": "zoo"},
             },
         },
+        config={"options": {"foo": {"type": "string"}}},
     )
 
 

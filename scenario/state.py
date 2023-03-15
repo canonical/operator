@@ -7,17 +7,19 @@ import datetime
 import inspect
 import re
 import typing
+from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
 from uuid import uuid4
 
 import yaml
 from ops import pebble
-from ops.model import SecretRotate
+from ops.charm import CharmEvents
+from ops.model import SecretRotate, StatusBase
 
 from scenario.logger import logger as scenario_logger
 from scenario.mocking import _MockFileSystem, _MockStorageMount
-from scenario.runtime import trigger
+from scenario.runtime import trigger as _runtime_trigger
 
 if typing.TYPE_CHECKING:
     try:
@@ -26,24 +28,38 @@ if typing.TYPE_CHECKING:
         from typing_extensions import Self
     from ops.testing import CharmType
 
-logger = scenario_logger.getChild("structs")
+    PathLike = Union[str, Path]
+
+logger = scenario_logger.getChild("state")
 
 ATTACH_ALL_STORAGES = "ATTACH_ALL_STORAGES"
 CREATE_ALL_RELATIONS = "CREATE_ALL_RELATIONS"
 BREAK_ALL_RELATIONS = "BREAK_ALL_RELATIONS"
 DETACH_ALL_STORAGES = "DETACH_ALL_STORAGES"
 RELATION_EVENTS_SUFFIX = {
-    "-relation-changed",
-    "-relation-broken",
-    "-relation-joined",
-    "-relation-departed",
-    "-relation-created",
+    "_relation_changed",
+    "_relation_broken",
+    "_relation_joined",
+    "_relation_departed",
+    "_relation_created",
 }
+STORAGE_EVENTS_SUFFIX = {
+    "_storage_detaching",
+    "_storage_attached",
+}
+
+SECRET_EVENTS_SUFFIX = {
+    "_secret_changed",
+    "_secret_removed",
+    "_secret_rotate",
+    "_secret_expired",
+}
+
 META_EVENTS = {
-    "CREATE_ALL_RELATIONS": "-relation-created",
-    "BREAK_ALL_RELATIONS": "-relation-broken",
-    "DETACH_ALL_STORAGES": "-storage-detaching",
-    "ATTACH_ALL_STORAGES": "-storage-attached",
+    "CREATE_ALL_RELATIONS": "_relation_created",
+    "BREAK_ALL_RELATIONS": "_relation_broken",
+    "DETACH_ALL_STORAGES": "_storage_detaching",
+    "ATTACH_ALL_STORAGES": "_storage_attached",
 }
 
 
@@ -89,7 +105,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-changed for a secret it owns."
             )
-        return Event(name="secret-changed", secret=self)
+        return Event(name="secret_changed", secret=self)
 
     # owner-only events
     @property
@@ -99,7 +115,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-rotate for a secret it does not own."
             )
-        return Event(name="secret-rotate", secret=self)
+        return Event(name="secret_rotate", secret=self)
 
     @property
     def expired_event(self):
@@ -108,7 +124,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-expire for a secret it does not own."
             )
-        return Event(name="secret-expire", secret=self)
+        return Event(name="secret_expire", secret=self)
 
     @property
     def remove_event(self):
@@ -117,10 +133,15 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-removed for a secret it does not own."
             )
-        return Event(name="secret-removed", secret=self)
+        return Event(name="secret_removed", secret=self)
 
 
 _RELATION_IDS_CTR = 0
+
+
+def normalize_name(s: str):
+    """Event names need underscores instead of dashes."""
+    return s.replace("-", "_")
 
 
 @dataclasses.dataclass
@@ -172,27 +193,37 @@ class Relation(_DCBase):
     @property
     def changed_event(self):
         """Sugar to generate a <this relation>-relation-changed event."""
-        return Event(name=self.endpoint + "_relation_changed", relation=self)
+        return Event(
+            name=normalize_name(self.endpoint + "-relation-changed"), relation=self
+        )
 
     @property
     def joined_event(self):
         """Sugar to generate a <this relation>-relation-joined event."""
-        return Event(name=self.endpoint + "_relation_joined", relation=self)
+        return Event(
+            name=normalize_name(self.endpoint + "-relation-joined"), relation=self
+        )
 
     @property
     def created_event(self):
         """Sugar to generate a <this relation>-relation-created event."""
-        return Event(name=self.endpoint + "_relation_created", relation=self)
+        return Event(
+            name=normalize_name(self.endpoint + "-relation-created"), relation=self
+        )
 
     @property
     def departed_event(self):
         """Sugar to generate a <this relation>-relation-departed event."""
-        return Event(name=self.endpoint + "_relation_departed", relation=self)
+        return Event(
+            name=normalize_name(self.endpoint + "-relation-departed"), relation=self
+        )
 
     @property
     def broken_event(self):
         """Sugar to generate a <this relation>-relation-broken event."""
-        return Event(name=self.endpoint + "_relation_broken", relation=self)
+        return Event(
+            name=normalize_name(self.endpoint + "-relation-broken"), relation=self
+        )
 
 
 def _random_model_name():
@@ -347,7 +378,7 @@ class Container(_DCBase):
                 "you **can** fire pebble-ready while the container cannot connect, "
                 "but that's most likely not what you want."
             )
-        return Event(name=self.name + "_pebble_ready", container=self)
+        return Event(name=normalize_name(self.name + "-pebble-ready"), container=self)
 
 
 @dataclasses.dataclass
@@ -422,10 +453,88 @@ class Network(_DCBase):
 
 
 @dataclasses.dataclass
+class _EntityStatus(_DCBase):
+    """This class represents StatusBase and should not be interacted with directly."""
+
+    # Why not use StatusBase directly? Because that's not json-serializable.
+
+    name: str
+    message: str = ""
+
+    def __eq__(self, other):
+        if isinstance(other, Tuple):
+            logger.warning(
+                "Comparing Status with Tuples is deprecated and will be removed soon."
+            )
+            return (self.name, self.message) == other
+        if isinstance(other, StatusBase):
+            return (self.name, self.message) == (other.name, other.message)
+        logger.warning(
+            f"Comparing Status with {other} is not stable and will be forbidden soon."
+            f"Please compare with StatusBase directly."
+        )
+        return super().__eq__(other)
+
+    def __iter__(self):
+        return iter([self.name, self.message])
+
+    def __repr__(self):
+        return f"<EntityStatus name={self.name!r}, message={self.message!r}>"
+
+
+def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
+    """Convert StatusBase to _EntityStatus."""
+    return _EntityStatus(obj.name, obj.message)
+
+
+@dataclasses.dataclass
 class Status(_DCBase):
-    app: Tuple[str, str] = ("unknown", "")
-    unit: Tuple[str, str] = ("unknown", "")
+    """Represents the 'juju statuses' of the application/unit being tested."""
+
+    # the current statuses. Will be cast to _EntitiyStatus in __post_init__
+    app: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
     app_version: str = ""
+
+    # most to least recent statuses; do NOT include the current one.
+    app_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
+    unit_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
+    previous_app_version: Optional[str] = None
+
+    def __post_init__(self):
+        for name in ["app", "unit"]:
+            val = getattr(self, name)
+            if isinstance(val, _EntityStatus):
+                pass
+            elif isinstance(val, StatusBase):
+                setattr(self, name, _status_to_entitystatus(val))
+            elif isinstance(val, tuple):
+                logger.warning(
+                    "Initializing Status.[app/unit] with Tuple[str, str] is deprecated "
+                    "and will be removed soon. \n"
+                    f"Please pass a StatusBase instance: `StatusBase(*{val})`"
+                )
+                setattr(self, name, _EntityStatus(*val))
+            else:
+                raise TypeError(f"Invalid status.{name}: {val!r}")
+
+    def _update_app_version(self, new_app_version: str):
+        """Update the current app version and record the previous one."""
+        # We don't keep a full history because we don't expect the app version to change more
+        # than once per hook.
+        self.previous_app_version = self.app_version
+        self.app_version = new_app_version
+
+    def _update_status(
+        self, new_status: str, new_message: str = "", is_app: bool = False
+    ):
+        """Update the current app/unit status and add the previous one to the history."""
+        if is_app:
+            self.app_history.append(self.app)
+            self.app = _EntityStatus(new_status, new_message)
+        else:
+            self.unit_history.append(self.unit)
+            self.unit = _EntityStatus(new_status, new_message)
 
 
 @dataclasses.dataclass
@@ -446,6 +555,13 @@ class StoredState(_DCBase):
 
 @dataclasses.dataclass
 class State(_DCBase):
+    """Represents the juju-owned portion of a unit's state.
+
+    Roughly speaking, it wraps all hook-tool- and pebble-mediated data a charm can access in its lifecycle.
+    For example, status-get will return data from `State.status`, is-leader will return data from
+    `State.leader`, and so on.
+    """
+
     config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
         default_factory=dict
     )
@@ -458,11 +574,6 @@ class State(_DCBase):
     juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
-    # meta stuff: actually belongs in event data structure.
-    juju_version: str = "3.0.0"
-    unit_id: int = 0
-    app_name: str = "local"
-
     # represents the OF's event queue. These events will be emitted before the event being dispatched,
     # and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
@@ -473,11 +584,7 @@ class State(_DCBase):
     # todo:
     #  actions?
 
-    @property
-    def unit_name(self):
-        return f"{self.app_name}/{self.unit_id}"
-
-    def with_can_connect(self, container_name: str, can_connect: bool):
+    def with_can_connect(self, container_name: str, can_connect: bool) -> "State":
         def replacer(container: Container):
             if container.name == container_name:
                 return container.replace(can_connect=can_connect)
@@ -486,15 +593,19 @@ class State(_DCBase):
         ctrs = tuple(map(replacer, self.containers))
         return self.replace(containers=ctrs)
 
-    def with_leadership(self, leader: bool):
+    def with_leadership(self, leader: bool) -> "State":
         return self.replace(leader=leader)
 
-    def with_unit_status(self, status: str, message: str):
+    def with_unit_status(self, status: StatusBase) -> "State":
         return self.replace(
-            status=dataclasses.replace(self.status, unit=(status, message))
+            status=dataclasses.replace(
+                self.status, unit=_status_to_entitystatus(status)
+            )
         )
 
-    def get_container(self, name) -> Container:
+    def get_container(self, container: Union[str, Container]) -> Container:
+        """Get container from this State, based on an input container or its name."""
+        name = container.name if isinstance(container, Container) else container
         try:
             return next(filter(lambda c: c.name == name, self.containers))
         except StopIteration as e:
@@ -527,9 +638,11 @@ class State(_DCBase):
         meta: Optional[Dict[str, Any]] = None,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
-    ):
-        """Fluent API for trigger."""
-        return trigger(
+        charm_root: Optional["PathLike"] = None,
+        juju_version: str = "3.0",
+    ) -> "State":
+        """Fluent API for trigger. See runtime.trigger's docstring."""
+        return _runtime_trigger(
             state=self,
             event=event,
             charm_type=charm_type,
@@ -538,7 +651,11 @@ class State(_DCBase):
             meta=meta,
             actions=actions,
             config=config,
+            charm_root=charm_root,
+            juju_version=juju_version,
         )
+
+    trigger.__doc__ = _runtime_trigger.__doc__
 
 
 @dataclasses.dataclass
@@ -549,6 +666,10 @@ class _CharmSpec(_DCBase):
     meta: Optional[Dict[str, Any]]
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
+
+    # autoloaded means: trigger() is being invoked on a 'real' charm class, living in some /src/charm.py,
+    # and the metadata files are 'real' metadata files.
+    is_autoloaded: bool = False
 
     @staticmethod
     def autoload(charm_type: Type["CharmType"]):
@@ -569,7 +690,11 @@ class _CharmSpec(_DCBase):
             actions = yaml.safe_load(actions_path.open())
 
         return _CharmSpec(
-            charm_type=charm_type, meta=meta, actions=actions, config=config
+            charm_type=charm_type,
+            meta=meta,
+            actions=actions,
+            config=config,
+            is_autoloaded=True,
         )
 
 
@@ -614,7 +739,72 @@ class Event(_DCBase):
     def __post_init__(self):
         if "-" in self.name:
             logger.warning(f"Only use underscores in event names. {self.name!r}")
-        self.name = self.name.replace("-", "_")
+        self.name = normalize_name(self.name)
+
+    @property
+    def _is_relation_event(self) -> bool:
+        """Whether the event name indicates that this is a relation event."""
+        return any(self.name.endswith(suffix) for suffix in RELATION_EVENTS_SUFFIX)
+
+    @property
+    def _is_secret_event(self) -> bool:
+        """Whether the event name indicates that this is a secret event."""
+        return any(self.name.endswith(suffix) for suffix in SECRET_EVENTS_SUFFIX)
+
+    @property
+    def _is_storage_event(self) -> bool:
+        """Whether the event name indicates that this is a storage event."""
+        return any(self.name.endswith(suffix) for suffix in STORAGE_EVENTS_SUFFIX)
+
+    @property
+    def _is_workload_event(self) -> bool:
+        """Whether the event name indicates that this is a workload event."""
+        return self.name.endswith("_pebble_ready")
+
+    # this method is private because _CharmSpec is not quite user-facing; also, the user should know.
+    def _is_builtin_event(self, charm_spec: "_CharmSpec"):
+        """Determine whether the event is a custom-defined one or a builtin one."""
+        evt_name = self.name
+
+        # simple case: this is an event type owned by our charm base.on
+        if hasattr(charm_spec.charm_type.on, evt_name):
+            return hasattr(CharmEvents, evt_name)
+
+        # this could be an event defined on some other Object, e.g. a charm lib.
+        # We don't support (yet) directly emitting those, but they COULD have names that conflict with
+        # events owned by the base charm. E.g. if the charm has a `foo` relation, the charm will get a
+        # charm.on.foo_relation_created. Your charm lib is free to define its own `foo_relation_created`
+        # custom event, because its handle will be `charm.lib.on.foo_relation_created` and therefore be
+        # unique and the Framework is happy. However, our Event data structure ATM has no knowledge
+        # of which Object/Handle it is owned by. So the only thing we can do right now is: check whether
+        # the event name, assuming it is owned by the charm, is that of a builtin event or not.
+        builtins = []
+        for relation_name in chain(
+            charm_spec.meta.get("requires", ()),
+            charm_spec.meta.get("provides", ()),
+            charm_spec.meta.get("peers", ()),
+        ):
+            relation_name = relation_name.replace("-", "_")
+            builtins.append(relation_name + "_relation_created")
+            builtins.append(relation_name + "_relation_joined")
+            builtins.append(relation_name + "_relation_changed")
+            builtins.append(relation_name + "_relation_departed")
+            builtins.append(relation_name + "_relation_broken")
+
+        for storage_name in charm_spec.meta.get("storages", ()):
+            storage_name = storage_name.replace("-", "_")
+            builtins.append(storage_name + "_storage_attached")
+            builtins.append(storage_name + "_storage_detaching")
+
+        for action_name in charm_spec.actions or ():
+            action_name = action_name.replace("-", "_")
+            builtins.append(action_name + "_action")
+
+        for container_name in charm_spec.meta.get("containers", ()):
+            container_name = container_name.replace("-", "_")
+            builtins.append(container_name + "_pebble_ready")
+
+        return evt_name in builtins
 
     def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""
@@ -630,13 +820,20 @@ class Event(_DCBase):
 
         snapshot_data = {}
 
-        if self.container:
+        # fixme: at this stage we can't determine if the event is a builtin one or not; if it is not,
+        #  then the coming checks are meaningless: the custom event could be named like a relation event but
+        #  not *be* one.
+        if self._is_workload_event:
             # this is a WorkloadEvent. The snapshot:
             snapshot_data = {
                 "container_name": self.container.name,
             }
 
-        elif self.relation:
+        elif self._is_relation_event:
+            if not self.relation:
+                raise ValueError(
+                    "this is a relation event; expected relation attribute"
+                )
             # this is a RelationEvent. The snapshot:
             snapshot_data = {
                 "relation_name": self.relation.endpoint,
@@ -662,20 +859,6 @@ def deferred(
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
-        norm_evt = event.replace("_", "-")
-
-        if not relation:
-            if any(map(norm_evt.endswith, RELATION_EVENTS_SUFFIX)):
-                raise ValueError(
-                    "cannot construct a deferred relation event without the relation instance. "
-                    "Please pass one."
-                )
-        if not container and norm_evt.endswith("_pebble_ready"):
-            raise ValueError(
-                "cannot construct a deferred workload event without the container instance. "
-                "Please pass one."
-            )
-
         event = Event(event, relation=relation, container=container)
     return event.deferred(handler=handler, event_id=event_id)
 
