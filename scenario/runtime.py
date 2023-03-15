@@ -152,13 +152,13 @@ class Runtime:
         if not app_name:
             raise ValueError('invalid metadata: mandatory "name" field is missing.')
 
-        # todo: consider parametrizing unit-id
+        # todo: consider parametrizing unit-id? cfr https://github.com/canonical/ops-scenario/issues/11
         self._unit_name = f"{app_name}/0"
-        # TODO consider cleaning up venv on __delete__, but ideally you should be
-        #  running this in a clean venv or a container anyway.
 
     @staticmethod
     def _cleanup_env(env):
+        # TODO consider cleaning up env on __delete__, but ideally you should be
+        #  running this in a clean venv or a container anyway.
         # cleanup env, in case we'll be firing multiple events, we don't want to accumulate.
         for key in env:
             os.unsetenv(key)
