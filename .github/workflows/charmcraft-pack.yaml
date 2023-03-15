@@ -1,0 +1,33 @@
+name: Charmcraft Pack Test
+
+on: [push, pull_request, workflow_call]
+
+jobs:
+  charmcraft-pack:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout test charm repository
+      uses: actions/checkout@v3
+      with:
+        repository: jnsgruk/hello-kubecon
+
+    - name: Update 'ops' dependency in test charm to latest
+      run: |
+        # We need to reference the PR branch's repo and commit (not the GITHUB_SHA
+        # temporary merge commit), because charmcraft pack does a git checkout which
+        # can't see the temporary merge commit.
+        sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+        echo -e "\ngit+${{ github.event.pull_request.head.repo.clone_url }}@${{ github.event.pull_request.head.sha }}#egg=ops" >> requirements.txt
+        cat requirements.txt
+
+    - name: Set up LXD
+      uses: canonical/setup-lxd@ea57509243d3cf39f8ab926e021bb353947b01b5
+      with:
+        channel: 5.0/stable
+
+    - name: Install charmcraft
+      run: sudo snap install charmcraft --classic
+
+    - name: Pack the charm
+      run: sudo charmcraft pack --verbose

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ast
 import itertools
 import os
 import re
@@ -91,6 +92,26 @@ class InfrastructureTests(unittest.TestCase):
 
     def test_check(self):
         self._run_setup('check', '--strict')
+
+    def test_install_requires(self):
+        """Ensure that requirements.txt stays in sync with install_requires in setup.py."""
+        with open('requirements.txt', encoding='utf-8') as f:
+            requirements = [line.strip() for line in f
+                            if line.strip() and not line.startswith('#')]
+
+        # For some reason "setup.py --requires" doesn't work, so do this the hard way
+        with open('setup.py', encoding='utf-8') as f:
+            lines = []
+            for line in f:
+                if 'install_requires=[' in line:
+                    break
+            for line in f:
+                if line.strip() == '],':
+                    break
+                lines.append(line)
+            install_requires = ast.literal_eval('[' + '\n'.join(lines) + ']')
+
+        self.assertEqual(requirements, install_requires)
 
 
 class ImportersTestCase(unittest.TestCase):

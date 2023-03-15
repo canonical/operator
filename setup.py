@@ -16,7 +16,6 @@
 
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import List
 
 from setuptools import find_packages, setup
 
@@ -26,19 +25,6 @@ def _read_me() -> str:
     with open("README.md", "rt", encoding="utf8") as fh:
         readme = fh.read()
     return readme
-
-
-def _requirements() -> List[str]:
-    """Return the required packages to run the project."""
-    reqs = []
-    with open(Path(__file__).parent / 'requirements.txt', encoding='utf-8') as fh:
-        for line in fh.readlines():
-            # TODO(tinvaan): DRY, consider setuptools offering for requirements parsing
-            # https://setuptools.pypa.io/en/latest/pkg_resources.html#requirements-parsing
-            line = line.strip()
-            if line and not line.startswith("#"):
-                reqs.append(line)
-    return reqs
 
 
 def _get_version() -> str:
@@ -87,7 +73,10 @@ version = {version!r}
             "Operating System :: POSIX :: Linux",
         ],
         python_requires='>=3.8',
-        install_requires=_requirements(),
+        install_requires=[  # must stay in sync with requirements.txt (see test_install_requires)
+            'PyYAML==6.*',
+            'websocket-client==1.*',
+        ],
         package_data={'ops': ['py.typed']},
     )
 
