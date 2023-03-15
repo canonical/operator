@@ -3178,7 +3178,7 @@ class TestPorts(unittest.TestCase):
     def test_open_port_error(self):
         fake_script(self, 'open-port', "echo 'ERROR bad protocol' >&2; exit 1")
 
-        with self.assertRaises(model.ModelError) as cm:
+        with self.assertRaises(ops.ModelError) as cm:
             self.unit.open_port('ftp', 8080)
         self.assertEqual(str(cm.exception), 'ERROR bad protocol\n')
 
@@ -3202,7 +3202,7 @@ class TestPorts(unittest.TestCase):
     def test_close_port_error(self):
         fake_script(self, 'close-port', "echo 'ERROR bad protocol' >&2; exit 1")
 
-        with self.assertRaises(model.ModelError) as cm:
+        with self.assertRaises(ops.ModelError) as cm:
             self.unit.close_port('ftp', 8080)
         self.assertEqual(str(cm.exception), 'ERROR bad protocol\n')
 
@@ -3217,10 +3217,10 @@ class TestPorts(unittest.TestCase):
         self.assertIsInstance(ports_set, set)
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 2)
-        self.assertIsInstance(ports[0], model.OpenedPort)
+        self.assertIsInstance(ports[0], ops.OpenedPort)
         self.assertEqual(ports[0].protocol, 'icmp')
         self.assertIsNone(ports[0].port)
-        self.assertIsInstance(ports[1], model.OpenedPort)
+        self.assertIsInstance(ports[1], ops.OpenedPort)
         self.assertEqual(ports[1].protocol, 'tcp')
         self.assertEqual(ports[1].port, 8080)
 
@@ -3240,10 +3240,10 @@ class TestPorts(unittest.TestCase):
         self.assertIsInstance(ports_set, set)
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 2)
-        self.assertIsInstance(ports[0], model.OpenedPort)
+        self.assertIsInstance(ports[0], ops.OpenedPort)
         self.assertEqual(ports[0].protocol, 'tcp')
         self.assertEqual(ports[0].port, 8080)
-        self.assertIsInstance(ports[1], model.OpenedPort)
+        self.assertIsInstance(ports[1], ops.OpenedPort)
         self.assertEqual(ports[1].protocol, 'udp')
         self.assertEqual(ports[1].port, 1000)
 

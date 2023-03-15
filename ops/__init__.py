@@ -149,6 +149,7 @@ from .model import (  # noqa: F401 E402
     MultiPushPullError,
     Network,
     NetworkInterface,
+    OpenedPort,
     Pod,
     Relation,
     RelationData,
