@@ -173,4 +173,6 @@ from .model import (  # noqa: F401 E402
     WaitingStatus,
 )
 
+from .testing import Harness  # noqa: F401 E402
+
 from .version import version as __version__  # noqa: F401 E402
