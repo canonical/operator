@@ -114,14 +114,14 @@ def _juju_run(cmd: str, model=None) -> Dict[str, Any]:
     """Execute juju {command} in a given model."""
     _model = f" -m {model}" if model else ""
     cmd = f"juju {cmd}{_model} --format json"
-    raw = run(shlex.split(cmd), capture_output=True).stdout.decode("utf-8")
+    raw = run(shlex.split(cmd), capture_output=True, text=True).stdout
     return json.loads(raw)
 
 
 def _juju_ssh(target: JujuUnitName, cmd: str, model: Optional[str] = None) -> str:
     _model = f" -m {model}" if model else ""
     command = f"juju ssh{_model} {target.unit_name} {cmd}"
-    raw = run(shlex.split(command), capture_output=True).stdout.decode("utf-8")
+    raw = run(shlex.split(command), capture_output=True, text=True).stdout
     return raw
 
 
@@ -135,8 +135,8 @@ def _juju_exec(target: JujuUnitName, model: Optional[str], cmd: str) -> str:
     _model = f" -m {model}" if model else ""
     _target = f" -u {target}" if target else ""
     return run(
-        shlex.split(f"juju exec{_model}{_target} -- {cmd}"), capture_output=True
-    ).stdout.decode("utf-8")
+        shlex.split(f"juju exec{_model}{_target} -- {cmd}"), capture_output=True, text=True
+    ).stdout
 
 
 def get_leader(target: JujuUnitName, model: Optional[str]):
@@ -254,9 +254,9 @@ class RemotePebbleClient:
     def _run(self, cmd: str) -> str:
         _model = f" -m {self.model}" if self.model else ""
         command = f"juju ssh{_model} --container {self.container} {self.target.unit_name} /charm/bin/pebble {cmd}"
-        proc = run(shlex.split(command), capture_output=True)
+        proc = run(shlex.split(command), capture_output=True, text=True)
         if proc.returncode == 0:
-            return proc.stdout.decode("utf-8")
+            return proc.stdout
         raise RuntimeError(
             f"error wrapping pebble call with {command}: "
             f"process exited with {proc.returncode}; "
@@ -315,16 +315,16 @@ def fetch_file(
     model_arg = f" -m {model}" if model else ""
     cmd = f"juju ssh --container {container_name}{model_arg} {target.unit_name} cat {remote_path}"
     try:
-        raw = check_output(shlex.split(cmd))
+        raw = check_output(shlex.split(cmd), text=True)
     except CalledProcessError as e:
         raise RuntimeError(
             f"Failed to fetch {remote_path} from {target.unit_name}."
         ) from e
 
     if not local_path:
-        return raw.decode("utf-8")
+        return raw
 
-    local_path.write_bytes(raw)
+    local_path.write_text(raw)
 
 
 def get_mounts(
