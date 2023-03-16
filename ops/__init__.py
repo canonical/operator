@@ -47,10 +47,6 @@ Full developer documentation is available at https://juju.is/docs/sdk.
 # so disable it:
 # pyright: reportUnusedImport=false
 
-# To allow test_main.py to patch things in the main module itself,
-# once "main" becomes a function below.
-import ops.main as _main_module  # noqa: F401
-
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble  # type: ignore # noqa: F401
 
@@ -129,6 +125,10 @@ from .framework import (  # noqa: F401
 )
 
 from .jujuversion import JujuVersion  # noqa: F401
+
+# To allow test_main.py to patch private things in the main module itself,
+# once "main" becomes a function below.
+import ops.main as _main_module  # noqa: F401
 
 # Import the main() function, but also set main.main to the function. This
 # allows charms to keep using "from ops.main import main".
