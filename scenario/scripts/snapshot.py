@@ -675,9 +675,6 @@ class RemoteUnitStateDB(UnitStateDB):
     def _open_db(self) -> SQLiteStorage:
         if not self._has_state:
             self._fetch_state()
-        bout = Path("/home/pietro/good_out")
-        bout.touch()
-        bout.write_bytes(self._state_file.read_bytes())
         return super()._open_db()
 
 
