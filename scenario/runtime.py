@@ -79,7 +79,9 @@ class UnitStateDB:
 
         stored_state = []
         for handle_path in db.list_snapshots():
-            if (match := STORED_STATE_REGEX.match(handle_path)) and not EVENT_REGEX.match(handle_path):
+            if (
+                match := STORED_STATE_REGEX.match(handle_path)
+            ) and not EVENT_REGEX.match(handle_path):
                 stored_state_snapshot = db.load_snapshot(handle_path)
                 kwargs = match.groupdict()
                 sst = StoredState(content=stored_state_snapshot, **kwargs)

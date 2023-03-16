@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import base64
 import datetime
 import json
 import logging
@@ -70,7 +71,9 @@ class JujuUnitName(str):
         self.app_name = app_name
         self.unit_id = int(unit_id)
         self.normalized = f"{app_name}-{unit_id}"
-        self.remote_charm_root = Path(f"/var/lib/juju/agents/unit-{self.normalized}/charm")
+        self.remote_charm_root = Path(
+            f"/var/lib/juju/agents/unit-{self.normalized}/charm"
+        )
 
 
 def _try_format(string: str):
@@ -318,25 +321,27 @@ def fetch_file(
     container_name: str,
     local_path: Union[Path, str] = None,
     model: Optional[str] = None,
-) -> Optional[str]:
+) -> Optional[bytes]:
     """Download a file from a live unit to a local path."""
     # copied from jhack
     # can't recall the path that lead to this solution instead of the more straightforward `juju scp`,
     # but it was long and painful. Does juju scp even support --container?
     model_arg = f" -m {model}" if model else ""
-    cmd = f"juju ssh --container {container_name}{model_arg} {target.unit_name} cat {remote_path}"
+    cmd = f"juju ssh --container {container_name}{model_arg} {target.unit_name} cat {remote_path} | base64"
     try:
-        raw = check_output(shlex.split(cmd))
+        raw = check_output(shlex.split(cmd), text=True)
     except CalledProcessError as e:
         raise RuntimeError(
             f"Failed to fetch {remote_path} from {target.unit_name}. Cmd:={cmd!r}"
         ) from e
 
+    decoded = base64.b64decode(raw)
+
     if not local_path:
-        return raw
+        return decoded
 
     # don't make assumptions about encoding
-    Path(local_path).write_bytes(raw)
+    Path(local_path).write_bytes(decoded)
 
 
 def get_mounts(
@@ -686,6 +691,9 @@ class RemoteUnitStateDB(UnitStateDB):
     def _open_db(self) -> SQLiteStorage:
         if not self._has_state:
             self._fetch_state()
+        bout = Path('/home/pietro/good_out')
+        bout.touch()
+        bout.write_bytes(self._state_file.read_bytes())
         return super()._open_db()
 
 
@@ -701,6 +709,9 @@ def _snapshot(
     temp_dir_base_path: Path = SNAPSHOT_OUTPUT_DIR,
 ):
     """see snapshot's docstring"""
+
+    print(target, model, pprint, include, include_juju_relation_data, include_dead_relation_networks,
+          format, fetch_files, temp_dir_base_path)
 
     try:
         target = JujuUnitName(target)
@@ -915,7 +926,7 @@ if __name__ == "__main__":
         _snapshot(
             "prom/0",
             format=FormatOption.pytest,
-            include="rckndt",
+            include="t",
             # fetch_files={
             #     "traefik": [
             #         Path("/opt/traefik/juju/certificates.yaml"),
