@@ -20,7 +20,9 @@ def _setup_logging(verbosity: int):
 def main():
     app = typer.Typer(
         name="scenario",
-        help="Scenario utilities.",
+        help="Scenario utilities. "
+             "For docs, issues and feature requests, visit "
+             "the github repo --> https://github.com/canonical/ops-scenario",
         no_args_is_help=True,
         rich_markup_mode="markdown",
     )
