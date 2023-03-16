@@ -36,7 +36,16 @@ if TYPE_CHECKING:
     from ops.framework import BoundEvent, EventSource
     from ops.model import Relation
 
-CHARM_STATE_FILE = '.unit-state.db'
+
+try:
+    # If charmhelpers is present in the system, use a different path for
+    # the DB, as it otherwise leads to clashes.
+    # See: https://bugs.launchpad.net/charm-ceph-mon/+bug/2005137
+    import charmhelers.core.unitdata as _unitdata
+    CHARM_STATE_FILE = '.unit-state2.db'
+    del _unitdata
+except BaseException:
+    CHARM_STATE_FILE = '.unit-state.db'
 
 
 logger = logging.getLogger()
