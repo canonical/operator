@@ -95,7 +95,7 @@ def test_add(mycharm):
         charm.unit.add_secret({"foo": "bar"}, label="mylabel")
 
     out = State().trigger(
-        "update-status", mycharm, meta={"name": "local"}, post_event=post_event
+        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
     )
     assert out.secrets
     secret = out.secrets[0]
@@ -127,7 +127,7 @@ def test_meta(mycharm):
                 },
             )
         ]
-    ).trigger("update-status", mycharm, meta={"name": "local"}, post_event=post_event)
+    ).trigger("update_status", mycharm, meta={"name": "local"}, post_event=post_event)
 
 
 def test_meta_nonowner(mycharm):
@@ -148,7 +148,7 @@ def test_meta_nonowner(mycharm):
                 },
             )
         ]
-    ).trigger("update-status", mycharm, meta={"name": "local"}, post_event=post_event)
+    ).trigger("update_status", mycharm, meta={"name": "local"}, post_event=post_event)
 
 
 @pytest.mark.parametrize("app", (True, False))
@@ -176,7 +176,7 @@ def test_grant(mycharm, app):
             )
         ],
     ).trigger(
-        "update-status",
+        "update_status",
         mycharm,
         meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
         post_event=post_event,
@@ -208,7 +208,7 @@ def test_grant_nonowner(mycharm):
             )
         ],
     ).trigger(
-        "update-status",
+        "update_status",
         mycharm,
         meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
         post_event=post_event,

@@ -36,7 +36,10 @@ if TYPE_CHECKING:
     PathLike = Union[str, Path]
 
 logger = scenario_logger.getChild("runtime")
-_stored_state_regex = r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
+STORED_STATE_REGEX = re.compile(
+    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
+)
+EVENT_REGEX = re.compile(_event_regex)
 
 RUNTIME_MODULE = Path(__file__).parent
 
@@ -82,9 +85,8 @@ class UnitStateDB:
         db = self._open_db()
 
         stored_state = []
-        sst_regex = re.compile(_stored_state_regex)
         for handle_path in db.list_snapshots():
-            if match := sst_regex.match(handle_path):
+            if match := STORED_STATE_REGEX.match(handle_path):
                 stored_state_snapshot = db.load_snapshot(handle_path)
                 kwargs = match.groupdict()
                 sst = StoredState(content=stored_state_snapshot, **kwargs)
@@ -100,9 +102,8 @@ class UnitStateDB:
         db = self._open_db()
 
         deferred = []
-        event_regex = re.compile(_event_regex)
         for handle_path in db.list_snapshots():
-            if event_regex.match(handle_path):
+            if EVENT_REGEX.match(handle_path):
                 notices = db.notices(handle_path)
                 for handle, owner, observer in notices:
                     event = DeferredEvent(
@@ -396,13 +397,16 @@ def trigger(
         If none is provided, we will search for a ``config.yaml`` file in the charm root.
     :arg juju_version: Juju agent version to simulate.
     :arg charm_root: virtual charm root the charm will be executed with.
-     If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
-        execution cwd, you need to use this.
+        If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
+        execution cwd, you need to use this. E.g.:
+
         >>> virtual_root = tempfile.TemporaryDirectory()
         >>> local_path = Path(local_path.name)
         >>> (local_path / 'foo').mkdir()
         >>> (local_path / 'foo' / 'bar.yaml').write_text('foo: bar')
-        >>> scenario.State().trigger(..., charm_root = virtual_root)
+        >>> scenario.State().trigger(... charm_root=virtual_root)
+
+
     """
     from scenario.state import Event, _CharmSpec
 

@@ -33,7 +33,7 @@ def assert_consistent(
 
 def test_base():
     state = State()
-    event = Event("update-status")
+    event = Event("update_status")
     spec = _CharmSpec(MyCharm, {})
     assert_consistent(state, event, spec)
 

@@ -478,9 +478,6 @@ class _EntityStatus(_DCBase):
     def __iter__(self):
         return iter([self.name, self.message])
 
-    def __repr__(self):
-        return f"<EntityStatus name={self.name!r}, message={self.message!r}>"
-
 
 def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
     """Convert StatusBase to _EntityStatus."""

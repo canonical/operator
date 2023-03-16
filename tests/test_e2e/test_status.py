@@ -25,7 +25,7 @@ def test_initial_status(mycharm):
         assert charm.unit.status == UnknownStatus()
 
     out = State(leader=True).trigger(
-        "update-status", mycharm, meta={"name": "local"}, post_event=post_event
+        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
     )
 
     assert out.status.unit == UnknownStatus()
@@ -39,7 +39,7 @@ def test_status_history(mycharm):
             obj.status = WaitingStatus("3")
 
     out = State(leader=True).trigger(
-        "update-status", mycharm, meta={"name": "local"}, post_event=post_event
+        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
     )
 
     assert out.status.unit == WaitingStatus("3")
@@ -64,7 +64,7 @@ def test_status_history_preservation(mycharm):
 
     out = State(
         leader=True, status=Status(unit=ActiveStatus("foo"), app=ActiveStatus("bar"))
-    ).trigger("update-status", mycharm, meta={"name": "local"}, post_event=post_event)
+    ).trigger("update_status", mycharm, meta={"name": "local"}, post_event=post_event)
 
     assert out.status.unit == WaitingStatus("3")
     assert out.status.unit_history == [ActiveStatus("foo")]

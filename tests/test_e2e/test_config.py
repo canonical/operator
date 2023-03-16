@@ -29,7 +29,7 @@ def test_config_get(mycharm):
         State(
             config={"foo": "bar", "baz": 1},
         ),
-        "update-status",
+        "update_status",
         mycharm,
         meta={"name": "foo"},
         config={"options": {"foo": {"type": "string"}, "baz": {"type": "integer"}}},
@@ -46,7 +46,7 @@ def test_config_get_default_from_meta(mycharm):
         State(
             config={"foo": "bar"},
         ),
-        "update-status",
+        "update_status",
         mycharm,
         meta={"name": "foo"},
         config={
