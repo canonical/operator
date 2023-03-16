@@ -70,6 +70,7 @@ class JujuUnitName(str):
         self.app_name = app_name
         self.unit_id = int(unit_id)
         self.normalized = f"{app_name}-{unit_id}"
+        self.remote_charm_root = Path(f"/var/lib/juju/agents/unit-{self.normalized}/charm")
 
 
 def _try_format(string: str):
@@ -236,15 +237,7 @@ def get_metadata(target: JujuUnitName, model: Model):
     """Get metadata.yaml from this target."""
     logger.info("fetching metadata...")
 
-    if model.type == "lxd":
-        meta_path = f"/var/lib/juju/agents/unit-{target.normalized}/charm/metadata.yaml"
-    elif model.type == "kubernetes":
-        meta_path = f"./agents/unit-{target.normalized}/charm/metadata.yaml"
-    else:
-        logger.warning(
-            f"unrecognized model type {model.type}: guessing it's machine-like."
-        )
-        meta_path = f"/var/lib/juju/agents/unit-{target.normalized}/charm/metadata.yaml"
+    meta_path = target.remote_charm_root / "metadata.yaml"
 
     raw_meta = _juju_ssh(
         target,
@@ -321,9 +314,9 @@ class RemotePebbleClient:
 
 def fetch_file(
     target: JujuUnitName,
-    remote_path: str,
+    remote_path: Union[Path, str],
     container_name: str,
-    local_path: Path = None,
+    local_path: Union[Path, str] = None,
     model: Optional[str] = None,
 ) -> Optional[str]:
     """Download a file from a live unit to a local path."""
@@ -333,16 +326,17 @@ def fetch_file(
     model_arg = f" -m {model}" if model else ""
     cmd = f"juju ssh --container {container_name}{model_arg} {target.unit_name} cat {remote_path}"
     try:
-        raw = check_output(shlex.split(cmd), text=True)
+        raw = check_output(shlex.split(cmd))
     except CalledProcessError as e:
         raise RuntimeError(
-            f"Failed to fetch {remote_path} from {target.unit_name}."
+            f"Failed to fetch {remote_path} from {target.unit_name}. Cmd:={cmd!r}"
         ) from e
 
     if not local_path:
         return raw
 
-    local_path.write_text(raw)
+    # don't make assumptions about encoding
+    Path(local_path).write_bytes(raw)
 
 
 def get_mounts(
@@ -678,7 +672,7 @@ class RemoteUnitStateDB(UnitStateDB):
     def _fetch_state(self):
         fetch_file(
             self._target,
-            remote_path="./unit-state.db",
+            remote_path=self._target.remote_charm_root / ".unit-state.db",
             container_name="charm",
             local_path=self._state_file,
             model=self._model,
@@ -687,7 +681,7 @@ class RemoteUnitStateDB(UnitStateDB):
     @property
     def _has_state(self):
         """Whether the state file exists."""
-        return self._state_file.exists()
+        return self._state_file.exists() and self._state_file.read_bytes()
 
     def _open_db(self) -> SQLiteStorage:
         if not self._has_state:
