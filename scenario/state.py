@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
 import copy
 import dataclasses
 import datetime
@@ -235,6 +238,9 @@ def _random_model_name():
 class Model(_DCBase):
     name: str = _random_model_name()
     uuid: str = str(uuid4())
+
+    # whatever juju models --format=json | jq '.models[<current-model-index>].type' gives back.
+    # TODO: make this exhaustive.
     type: Literal["kubernetes", "lxd"] = "kubernetes"
 
 
@@ -267,9 +273,6 @@ _ExecMock = Dict[Tuple[str, ...], ExecOutput]
 class Mount(_DCBase):
     location: Union[str, PurePosixPath]
     src: Union[str, Path]
-
-    def __post_init__(self):
-        self.src = Path(self.src)
 
 
 @dataclasses.dataclass
@@ -360,7 +363,9 @@ class Container(_DCBase):
     @property
     def filesystem(self) -> _MockFileSystem:
         mounts = {
-            name: _MockStorageMount(src=spec.src, location=spec.location)
+            name: _MockStorageMount(
+                src=Path(spec.src), location=PurePosixPath(spec.location)
+            )
             for name, spec in self.mounts.items()
         }
         return _MockFileSystem(mounts=mounts)
@@ -472,9 +477,6 @@ class _EntityStatus(_DCBase):
 
     def __iter__(self):
         return iter([self.name, self.message])
-
-    def __repr__(self):
-        return f"<EntityStatus name={self.name!r}, message={self.message!r}>"
 
 
 def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:

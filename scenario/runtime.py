@@ -1,32 +1,45 @@
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
 import marshal
 import os
 import re
-import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import yaml
-from ops.framework import _event_regex
+from ops.framework import _event_regex  # noqa
 from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
 
 if TYPE_CHECKING:
-    from ops.charm import CharmBase
     from ops.testing import CharmType
 
-    from scenario.state import Event, State, _CharmSpec
+    from scenario.state import DeferredEvent, Event, State, StoredState, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
     PathLike = Union[str, Path]
 
 logger = scenario_logger.getChild("runtime")
-# _stored_state_regex = "(.*)\/(\D+)\[(.*)\]"
-_stored_state_regex = "((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
+STORED_STATE_REGEX = re.compile(
+    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
+)
+EVENT_REGEX = re.compile(_event_regex)
 
 RUNTIME_MODULE = Path(__file__).parent
 
@@ -47,6 +60,74 @@ class InconsistentScenarioError(ScenarioRuntimeError):
     """Error raised when the combination of state and event is inconsistent."""
 
 
+class UnitStateDB:
+    """Represents the unit-state.db."""
+
+    def __init__(self, db_path: Union[Path, str]):
+        self._db_path = db_path
+        self._state_file = Path(self._db_path)
+
+    def _open_db(self) -> Optional[SQLiteStorage]:
+        """Open the db."""
+        return SQLiteStorage(self._state_file)
+
+    def get_stored_state(self) -> List["StoredState"]:
+        """Load any StoredState data structures from the db."""
+        from scenario.state import StoredState  # avoid cyclic import
+
+        db = self._open_db()
+
+        stored_state = []
+        for handle_path in db.list_snapshots():
+            if not EVENT_REGEX.match(handle_path) and (
+                match := STORED_STATE_REGEX.match(handle_path)
+            ):
+                stored_state_snapshot = db.load_snapshot(handle_path)
+                kwargs = match.groupdict()
+                sst = StoredState(content=stored_state_snapshot, **kwargs)
+                stored_state.append(sst)
+
+        db.close()
+        return stored_state
+
+    def get_deferred_events(self) -> List["DeferredEvent"]:
+        """Load any DeferredEvent data structures from the db."""
+        from scenario.state import DeferredEvent  # avoid cyclic import
+
+        db = self._open_db()
+
+        deferred = []
+        for handle_path in db.list_snapshots():
+            if EVENT_REGEX.match(handle_path):
+                notices = db.notices(handle_path)
+                for handle, owner, observer in notices:
+                    event = DeferredEvent(
+                        handle_path=handle, owner=owner, observer=observer
+                    )
+                    deferred.append(event)
+
+        db.close()
+        return deferred
+
+    def apply_state(self, state: "State"):
+        """Add DeferredEvent and StoredState from this State instance to the storage."""
+        db = self._open_db()
+        for event in state.deferred:
+            db.save_notice(event.handle_path, event.owner, event.observer)
+            try:
+                marshal.dumps(event.snapshot_data)
+            except ValueError as e:
+                raise ValueError(
+                    f"unable to save the data for {event}, it must contain only simple types."
+                ) from e
+            db.save_snapshot(event.handle_path, event.snapshot_data)
+
+        for stored_state in state.stored_state:
+            db.save_snapshot(stored_state.handle_path, stored_state.content)
+
+        db.close()
+
+
 class Runtime:
     """Charm runtime wrapper.
 
@@ -62,44 +143,21 @@ class Runtime:
         self._charm_spec = charm_spec
         self._juju_version = juju_version
         self._charm_root = charm_root
-        # TODO consider cleaning up venv on __delete__, but ideally you should be
-        #  running this in a clean venv or a container anyway.
 
-    @staticmethod
-    def from_local_file(
-        local_charm_src: Path,
-        charm_cls_name: str,
-    ) -> "Runtime":
-        sys.path.extend((str(local_charm_src / "src"), str(local_charm_src / "lib")))
+        app_name = self._charm_spec.meta.get("name")
+        if not app_name:
+            raise ValueError('invalid metadata: mandatory "name" field is missing.')
 
-        ldict = {}
-
-        try:
-            exec(
-                f"from charm import {charm_cls_name} as my_charm_type", globals(), ldict
-            )
-        except ModuleNotFoundError as e:
-            raise RuntimeError(
-                f"Failed to load charm {charm_cls_name}. "
-                f"Probably some dependency is missing. "
-                f"Try `pip install -r {local_charm_src / 'requirements.txt'}`"
-            ) from e
-
-        my_charm_type: Type["CharmBase"] = ldict["my_charm_type"]
-        return Runtime(_CharmSpec(my_charm_type))  # TODO add meta, options,...
+        # todo: consider parametrizing unit-id? cfr https://github.com/canonical/ops-scenario/issues/11
+        self._unit_name = f"{app_name}/0"
 
     @staticmethod
     def _cleanup_env(env):
+        # TODO consider cleaning up env on __delete__, but ideally you should be
+        #  running this in a clean venv or a container anyway.
         # cleanup env, in case we'll be firing multiple events, we don't want to accumulate.
         for key in env:
             os.unsetenv(key)
-
-    @property
-    def unit_name(self):
-        meta = self._charm_spec.meta
-        if not meta:
-            return "local/0"
-        return meta["name"] + "/0"  # todo allow override
 
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
         if event.name.endswith("_action"):
@@ -110,7 +168,7 @@ class Runtime:
 
         env = {
             "JUJU_VERSION": self._juju_version,
-            "JUJU_UNIT_NAME": self.unit_name,
+            "JUJU_UNIT_NAME": self._unit_name,
             "_": "./dispatch",
             "JUJU_DISPATCH_PATH": f"hooks/{event.name}",
             "JUJU_MODEL_NAME": state.model.name,
@@ -213,64 +271,20 @@ class Runtime:
             vroot.cleanup()
 
     @staticmethod
-    def _get_store(temporary_charm_root: Path):
+    def _get_state_db(temporary_charm_root: Path):
         charm_state_path = temporary_charm_root / ".unit-state.db"
-        store = SQLiteStorage(charm_state_path)
-        return store
+        return UnitStateDB(charm_state_path)
 
     def _initialize_storage(self, state: "State", temporary_charm_root: Path):
         """Before we start processing this event, expose the relevant parts of State through the storage."""
-        store = self._get_store(temporary_charm_root)
-
-        for event in state.deferred:
-            store.save_notice(event.handle_path, event.owner, event.observer)
-            try:
-                marshal.dumps(event.snapshot_data)
-            except ValueError as e:
-                raise ValueError(
-                    f"unable to save the data for {event}, it must contain only simple types."
-                ) from e
-            store.save_snapshot(event.handle_path, event.snapshot_data)
-
-        for stored_state in state.stored_state:
-            store.save_snapshot(stored_state.handle_path, stored_state.content)
-
-        store.close()
+        store = self._get_state_db(temporary_charm_root)
+        store.apply_state(state)
 
     def _close_storage(self, state: "State", temporary_charm_root: Path):
         """Now that we're done processing this event, read the charm state and expose it via State."""
-        from scenario.state import DeferredEvent, StoredState  # avoid cyclic import
-
-        store = self._get_store(temporary_charm_root)
-
-        deferred = []
-        stored_state = []
-        event_regex = re.compile(_event_regex)
-        sst_regex = re.compile(_stored_state_regex)
-        for handle_path in store.list_snapshots():
-            if event_regex.match(handle_path):
-                notices = store.notices(handle_path)
-                for handle, owner, observer in notices:
-                    event = DeferredEvent(
-                        handle_path=handle, owner=owner, observer=observer
-                    )
-                    deferred.append(event)
-
-            else:
-                # it's a StoredState. TODO: No other option, right?
-                stored_state_snapshot = store.load_snapshot(handle_path)
-                match = sst_regex.match(handle_path)
-                if not match:
-                    logger.warning(
-                        f"could not parse handle path {handle_path!r} as stored state"
-                    )
-                    continue
-
-                kwargs = match.groupdict()
-                sst = StoredState(content=stored_state_snapshot, **kwargs)
-                stored_state.append(sst)
-
-        store.close()
+        store = self._get_state_db(temporary_charm_root)
+        deferred = store.get_deferred_events()
+        stored_state = store.get_stored_state()
         return state.replace(deferred=deferred, stored_state=stored_state)
 
     def exec(
@@ -378,13 +392,16 @@ def trigger(
         If none is provided, we will search for a ``config.yaml`` file in the charm root.
     :arg juju_version: Juju agent version to simulate.
     :arg charm_root: virtual charm root the charm will be executed with.
-     If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
-        execution cwd, you need to use this.
+        If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
+        execution cwd, you need to use this. E.g.:
+
         >>> virtual_root = tempfile.TemporaryDirectory()
         >>> local_path = Path(local_path.name)
         >>> (local_path / 'foo').mkdir()
         >>> (local_path / 'foo' / 'bar.yaml').write_text('foo: bar')
-        >>> scenario.State().trigger(..., charm_root = virtual_root)
+        >>> scenario.State().trigger(... charm_root=virtual_root)
+
+
     """
     from scenario.state import Event, _CharmSpec
 

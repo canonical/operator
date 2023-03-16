@@ -45,7 +45,7 @@ def test_ip_get(mycharm):
             ],
             networks=[Network.default("metrics-endpoint")],
         ),
-        "update-status",
+        "update_status",
         mycharm,
         meta={
             "name": "foo",

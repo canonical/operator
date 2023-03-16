@@ -13,7 +13,11 @@ description = "Python library providing a Scenario-based testing API for Operato
 license.text = "Apache-2.0"
 keywords = ["juju", "test"]
 
-dependencies = ["ops>=2.0"]
+dependencies = [
+    "ops>=2.0",
+    "PyYAML==6.0",
+    "typer==0.7.0",
+]
 readme = "README.md"
 requires-python = ">=3.8"
 
@@ -23,11 +27,12 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 
-
 [project.urls]
 "Homepage" = "https://github.com/PietroPasotti/ops-scenario"
 "Bug Tracker" = "https://github.com/PietroPasotti/ops-scenario/issues"
 
+[project.scripts]
+scenario = "scenario.scripts.main:main"
 
 [tool.setuptools.package-dir]
 scenario = "scenario"
