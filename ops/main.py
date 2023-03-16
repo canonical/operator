@@ -41,11 +41,11 @@ try:
     # If charmhelpers is present in the system, use a different path for
     # the DB, as it otherwise leads to clashes.
     # See: https://bugs.launchpad.net/charm-ceph-mon/+bug/2005137
-    import charmhelers.core.unitdata as _unitdata   # type: ignore
+    import charmhelers.core.unitdata as _unitdata  # type: ignore
     CHARM_STATE_FILE = '.unit-state2.db'
     del _unitdata
 except ImportError:
-    CHARM_STATE_FILE = '.unit-state.db'   # type: ignore
+    CHARM_STATE_FILE = '.unit-state.db'  # type: ignore
 
 
 logger = logging.getLogger()
