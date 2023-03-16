@@ -10,7 +10,7 @@ event on the charm and execute its logic.
 This puts scenario tests somewhere in between unit and integration tests.
 
 Scenario tests nudge you into thinking of charms as an input->output function. Input is what we call a `Scene`: the
-union of an `event` (why am I being executed) and a `context` (am I leader? what is my relation data? what is my
+union of an `Event` (why am I being executed) and a `State` (am I leader? what is my relation data? what is my
 config?...).
 The output is another context instance: the context after the charm has had a chance to interact with the mocked juju
 model.
