@@ -67,15 +67,8 @@ class UnitStateDB:
         self._db_path = db_path
         self._state_file = Path(self._db_path)
 
-    @property
-    def _has_state(self):
-        """Check that the state file exists."""
-        return self._state_file.exists()
-
     def _open_db(self) -> Optional[SQLiteStorage]:
         """Open the db."""
-        # if not self._has_state:
-        #     return None
         return SQLiteStorage(self._state_file)
 
     def get_stored_state(self) -> List["StoredState"]:
