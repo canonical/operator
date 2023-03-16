@@ -55,6 +55,10 @@ from . import pebble  # type: ignore # noqa: F401
 # import was here previously
 from . import charm  # type: ignore # noqa: F401
 
+# Import the main module, which we've overriden in main.py to be callable.
+# This allows "import ops; ops.main(Charm)" to work as expected.
+from . import main  # type: ignore # noqa: F401
+
 # Explicitly import names from sub-modules so users can just "import ops" and
 # then use them as "ops.X".
 from .charm import (  # noqa: F401
@@ -125,15 +129,6 @@ from .framework import (  # noqa: F401
 )
 
 from .jujuversion import JujuVersion  # noqa: F401
-
-# To allow test_main.py to patch private things in the main module itself,
-# once "main" becomes a function below.
-import ops.main as _main_module  # noqa: F401
-
-# Import the main() function, but also set main.main to the function. This
-# allows charms to keep using "from ops.main import main".
-from .main import main
-main.main = main  # type: ignore
 
 from .model import (  # noqa: F401 E402
     ActiveStatus,
