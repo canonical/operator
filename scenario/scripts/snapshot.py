@@ -710,18 +710,6 @@ def _snapshot(
 ):
     """see snapshot's docstring"""
 
-    print(
-        target,
-        model,
-        pprint,
-        include,
-        include_juju_relation_data,
-        include_dead_relation_networks,
-        format,
-        fetch_files,
-        temp_dir_base_path,
-    )
-
     try:
         target = JujuUnitName(target)
     except InvalidTargetUnitName:
