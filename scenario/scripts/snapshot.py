@@ -103,12 +103,18 @@ def format_test_case(state: State, charm_type_name: str = None,
             from charm import {ct}
             
             def test_case():
+                # Arrange: prepare the state
                 state = {state}
+                
+                #Act: trigger an event on the state 
                 out = state.trigger(
                     {en}
                     {ct}
                     juju_version="{jv}"
                     )
+                    
+                # Assert: verify that the output state is the way you want it to be
+                # TODO: add assertions
             
             """
         )
@@ -702,14 +708,14 @@ def _snapshot(
 
     logger.info(f'beginning snapshot of {target} in model {model or "<current>"}...')
 
-    def ifinclude(key, get_value, null_value):
+    def if_include(key, get_value, null_value):
         if include is None or key in include:
             return get_value()
         return null_value
 
     try:
         state_model = get_model(model)
-    except Exception:
+    except InvalidTargetModelName:
         logger.critical(f"unable to get Model from name {model}.", exc_info=True)
         sys.exit(1)
 
@@ -729,8 +735,8 @@ def _snapshot(
             leader=get_leader(target, model),
             model=state_model,
             status=get_status(juju_status, target=target),
-            config=ifinclude("c", lambda: get_config(target, model), {}),
-            relations=ifinclude(
+            config=if_include("c", lambda: get_config(target, model), {}),
+            relations=if_include(
                 "r",
                 lambda: get_relations(
                     target,
@@ -740,7 +746,7 @@ def _snapshot(
                 ),
                 [],
             ),
-            containers=ifinclude(
+            containers=if_include(
                 "k",
                 lambda: get_containers(
                     target,
@@ -751,7 +757,7 @@ def _snapshot(
                 ),
                 [],
             ),
-            networks=ifinclude(
+            networks=if_include(
                 "n",
                 lambda: get_networks(
                     target,
@@ -762,7 +768,7 @@ def _snapshot(
                 ),
                 [],
             ),
-            secrets=ifinclude(
+            secrets=if_include(
                 "s",
                 lambda: get_secrets(
                     target,
@@ -772,12 +778,12 @@ def _snapshot(
                 ),
                 [],
             ),
-            deferred=ifinclude(
+            deferred=if_include(
                 "d",
                 unit_state_db.get_deferred_events,
                 [],
             ),
-            stored_state=ifinclude(
+            stored_state=if_include(
                 "t",
                 unit_state_db.get_stored_state,
                 [],
