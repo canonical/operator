@@ -2706,7 +2706,7 @@ class TestNetwork(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
 
     def test_add_network_defaults(self):
-        self.harness.add_network('db', '10.0.0.10')
+        self.harness.add_network('10.0.0.10')
 
         binding = self.harness.model.get_binding('db')
         self.assertEqual(binding.name, 'db')
@@ -2723,7 +2723,8 @@ class TestNetwork(unittest.TestCase):
 
     def test_add_network_all_args(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
-        self.harness.add_network('db', '10.0.0.10',
+        self.harness.add_network('10.0.0.10',
+                                 endpoint='db',
                                  relation_id=relation_id,
                                  cidr='10.0.0.0/8',
                                  interface='eth1',
@@ -2749,7 +2750,7 @@ class TestNetwork(unittest.TestCase):
 
     def test_add_network_endpoint_fallback(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
-        self.harness.add_network('db', '10.0.0.10')
+        self.harness.add_network('10.0.0.10', endpoint='db')
 
         relation = self.harness.model.get_relation('db', relation_id)
         binding = self.harness.model.get_binding(relation)
@@ -2758,7 +2759,7 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
 
     def test_add_network_default_fallback(self):
-        self.harness.add_network(None, '10.0.0.10')
+        self.harness.add_network('10.0.0.10')
 
         binding = self.harness.model.get_binding('db')
         self.assertEqual(binding.name, 'db')
@@ -2766,7 +2767,7 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
 
     def test_add_network_ipv6(self):
-        self.harness.add_network('db', '2001:0db8::a:0:0:1')
+        self.harness.add_network('2001:0db8::a:0:0:1')
 
         binding = self.harness.model.get_binding('db')
         self.assertEqual(binding.name, 'db')
@@ -2780,6 +2781,10 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(interface.name, 'eth0')
         self.assertEqual(interface.address, ipaddress.IPv6Address('2001:0db8::a:0:0:1'))
         self.assertEqual(interface.subnet, ipaddress.IPv6Network('2001:0db8::0:0:0:0/64'))
+
+    def test_network_get_relation_not_found(self):
+        with self.assertRaises(model.RelationNotFoundError):
+            self.harness.model.get_binding('db').network
 
 
 class DBRelationChangedHelper(Object):

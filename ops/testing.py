@@ -1143,30 +1143,36 @@ class Harness(Generic[CharmType]):
         """
         self._backend._planned_units = None
 
-    def add_network(self, binding_name: Optional[str], address: str, *,
+    def add_network(self, address: str, *,
+                    endpoint: Optional[str] = None,
                     relation_id: Optional[int] = None,
                     cidr: Optional[str] = None,
                     interface: str = 'eth0',
                     ingress_addresses: Optional[Iterable[str]] = None,
                     egress_subnets: Optional[Iterable[str]] = None):
-        """Add simulated network data for the given binding.
+        """Add simulated network data for the given relation endpoint (binding).
 
-        Calling this multiple times with the same (binding_name, relation_id)
+        Calling this multiple times with the same (binding, relation_id)
         combination will replace the associated network data.
 
         Example::
 
-            harness.add_network('db', '10.0.0.10')
+            # Set network info for default binding
+            harness.add_network('10.0.0.10')
 
-        After that call, the following will be true::
+            # Or set network info for specific endpoint
+            harness.add_network('10.0.0.10', endpoint='db')
+
+        After either of those calls, the following will be true (in the first
+        case, the simulated network-get will fall back to the default binding)::
 
             binding = harness.model.get_binding('db')
             assert binding.network.bind_address == ipaddress.IPv4Address('10.0.0.10'))
 
         Args:
-            binding_name: Name of binding (relation endpoint) to add network
-                data for. Use None to set the default binding.
             address: Binding's IPv4 or IPv6 address.
+            endpoint: Name of relation endpoint (binding) to add network
+                data for. If not provided, add info for the default binding.
             relation_id: Relation ID for the binding. If not provided, add
                 network data for the endpoint's default binding.
             cidr: Binding's CIDR. Defaults to "<address>/24" if address is an
@@ -1199,7 +1205,7 @@ class Harness(Generic[CharmType]):
             'egress-subnets': list(egress_subnets),
             'ingress-addresses': list(ingress_addresses),
         }
-        self._backend._networks[binding_name, relation_id] = data
+        self._backend._networks[endpoint, relation_id] = data
 
     def _get_backend_calls(self, reset: bool = True) -> List[Tuple[Any, ...]]:
         """Return the calls that we have made to the TestingModelBackend.
@@ -1866,13 +1872,13 @@ class _TestingModelBackend:
     def action_fail(self, message=''):  # type:ignore
         raise NotImplementedError(self.action_fail)  # type:ignore
 
-    def network_get(self, binding_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
-        data = self._networks.get((binding_name, relation_id))
+    def network_get(self, endpoint_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
+        data = self._networks.get((endpoint_name, relation_id))
         if data is not None:
             return data
         if relation_id is not None:
             # Fall back to the default binding for this endpoint
-            data = self._networks.get((binding_name, None))
+            data = self._networks.get((endpoint_name, None))
             if data is not None:
                 return data
         # No custom data per relation ID or binding, return the default binding
