@@ -691,7 +691,7 @@ class RemoteUnitStateDB(UnitStateDB):
     def _open_db(self) -> SQLiteStorage:
         if not self._has_state:
             self._fetch_state()
-        bout = Path('/home/pietro/good_out')
+        bout = Path("/home/pietro/good_out")
         bout.touch()
         bout.write_bytes(self._state_file.read_bytes())
         return super()._open_db()
@@ -710,8 +710,17 @@ def _snapshot(
 ):
     """see snapshot's docstring"""
 
-    print(target, model, pprint, include, include_juju_relation_data, include_dead_relation_networks,
-          format, fetch_files, temp_dir_base_path)
+    print(
+        target,
+        model,
+        pprint,
+        include,
+        include_juju_relation_data,
+        include_dead_relation_networks,
+        format,
+        fetch_files,
+        temp_dir_base_path,
+    )
 
     try:
         target = JujuUnitName(target)
