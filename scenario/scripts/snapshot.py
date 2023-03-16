@@ -347,7 +347,7 @@ def get_mounts(
         return {}
 
     mount_spec = {}
-    for mt in mount_meta:
+    for mt in mount_meta or ():
         if name := mt.get("storage"):
             mount_spec[name] = mt["location"]
         else:
