@@ -54,6 +54,11 @@ import ops.main as _main_module  # noqa: F401
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble  # type: ignore # noqa: F401
 
+# Also import charm explicitly. This is not strictly necessary as the
+# "from .charm" import automatically does that, but be explicit since this
+# import was here previously
+from . import charm  # type: ignore # noqa: F401
+
 # Explicitly import names from sub-modules so users can just "import ops" and
 # then use them as "ops.X".
 from .charm import (  # noqa: F401
