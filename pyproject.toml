@@ -15,7 +15,8 @@ keywords = ["juju", "test"]
 
 dependencies = [
     "ops>=2.0",
-    "PyYAML==6.0"
+    "PyYAML==6.0",
+    "typer==0.7.0",
 ]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -25,7 +26,6 @@ classifiers = [
     "Topic :: Utilities",
     "License :: OSI Approved :: Apache Software License",
 ]
-
 
 [project.urls]
 "Homepage" = "https://github.com/PietroPasotti/ops-scenario"
