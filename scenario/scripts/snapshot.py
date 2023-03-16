@@ -319,29 +319,13 @@ def fetch_file(
     target: JujuUnitName,
     remote_path: Union[Path, str],
     container_name: str,
-    local_path: Union[Path, str] = None,
+    local_path: Union[Path, str],
     model: Optional[str] = None,
-) -> Optional[bytes]:
+) -> None:
     """Download a file from a live unit to a local path."""
-    # copied from jhack
-    # can't recall the path that lead to this solution instead of the more straightforward `juju scp`,
-    # but it was long and painful. Does juju scp even support --container?
     model_arg = f" -m {model}" if model else ""
-    cmd = f"juju ssh --container {container_name}{model_arg} {target.unit_name} cat {remote_path} | base64"
-    try:
-        raw = check_output(shlex.split(cmd), text=True)
-    except CalledProcessError as e:
-        raise RuntimeError(
-            f"Failed to fetch {remote_path} from {target.unit_name}. Cmd:={cmd!r}"
-        ) from e
-
-    decoded = base64.b64decode(raw)
-
-    if not local_path:
-        return decoded
-
-    # don't make assumptions about encoding
-    Path(local_path).write_bytes(decoded)
+    scp_cmd = f"juju scp --container {container_name}{model_arg} {target.unit_name}:{remote_path} {local_path}"
+    run(shlex.split(scp_cmd))
 
 
 def get_mounts(
