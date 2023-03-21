@@ -399,7 +399,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
         raise RuntimeError(msg.format(JujuVersion.from_environ()))
 
     if use_juju_for_storage is None:
-        use_juju_for_storage = _should_use_controller_storage(charm_state_path, meta)
+        use_juju_for_storage = _should_use_controller_storage(new_charm_state_path, meta)
     elif use_juju_for_storage:
         warnings.warn("Controller storage is deprecated; it's intended for "
                       "podspec charms and will be removed in a future release.",
