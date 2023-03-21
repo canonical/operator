@@ -480,6 +480,29 @@ And the charm's runtime will see `self.stored_State.foo` and `.baz` as expected.
 Also, you can run assertions on it on the output side the same as any other bit of state.
 
 
+# Emitted events
+If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it can be hard to examine the resulting control flow.
+In these situations it can be useful to verify that, as a result of a given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The resulting state, black-box as it is, gives little insight into how exactly it was obtained. One important source of information at debug time is the `debug-log`, which `scenario.utils.emitted_events` leverages to allow you to peep into that black box.
+
+Usage: 
+
+```python
+from scenario import State, DeferredEvent
+from scenario.utils import emitted_events
+state_out = State(deferred=[DeferredEvent('foo')]).trigger('start', ...)
+emitted = emitted_events(state_out)
+data = [(e.name, e.source) for e in emitted]
+
+assert data == [
+  ('foo', 'deferral'),  # deferred events get reemitted first
+  ('start', 'juju'),    # then comes the 'main' juju event we're triggering
+  ('bar', 'custom'),  # then come the tail of custom events that the charm (and its libs) emit while handling the 'main' juju event.
+  ('baz', 'custom'),  
+  ('qux', 'custom')  
+]
+```
+
+
 # The virtual charm root
 Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. 
 The charm will see that tempdir as its 'root'. This allows us to keep things simple when dealing with metadata that can 
