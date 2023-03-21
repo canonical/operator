@@ -36,7 +36,8 @@ if TYPE_CHECKING:
     from ops.framework import BoundEvent, EventSource
     from ops.model import Relation
 
-CHARM_STATE_FILE = '.unit-state.db'
+OLD_CHARM_STATE_FILE = '.unit-state.db'
+CHARM_STATE_FILE = '.new-unit-state.db'
 
 
 logger = logging.getLogger()
@@ -389,7 +390,8 @@ def main(charm_class: Type[ops.charm.CharmBase],
     meta = CharmMeta.from_yaml(metadata, actions_metadata)
     model = ops.model.Model(meta, model_backend)
 
-    charm_state_path = charm_dir / CHARM_STATE_FILE
+    charm_state_path = charm_dir / OLD_CHARM_STATE_FILE
+    new_charm_state_path = charm_dir / CHARM_STATE_FILE
 
     if use_juju_for_storage and not ops.storage.juju_backend_available():
         # raise an exception; the charm is broken and needs fixing.
@@ -416,7 +418,10 @@ def main(charm_class: Type[ops.charm.CharmBase],
             return
         store = ops.storage.JujuStorage()
     else:
-        store = ops.storage.SQLiteStorage(charm_state_path)
+        if (os.path.exists(charm_state_path)
+                and not os.path.exists(new_charm_state_path)):
+            shutil.copy(charm_state_path, new_charm_state_path)
+        store = ops.storage.SQLiteStorage(new_charm_state_path)
     framework = ops.framework.Framework(store, charm_dir, meta, model,
                                         event_name=dispatcher.event_name)
     framework.set_breakpointhook()
