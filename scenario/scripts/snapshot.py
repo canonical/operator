@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-import base64
 import datetime
 import json
 import logging
@@ -14,7 +13,7 @@ from dataclasses import asdict
 from enum import Enum
 from itertools import chain
 from pathlib import Path
-from subprocess import CalledProcessError, check_output, run
+from subprocess import run
 from textwrap import dedent
 from typing import Any, BinaryIO, Dict, Iterable, List, Optional, TextIO, Tuple, Union
 
