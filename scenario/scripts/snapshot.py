@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-import base64
 import datetime
 import json
 import logging
@@ -14,7 +13,7 @@ from dataclasses import asdict
 from enum import Enum
 from itertools import chain
 from pathlib import Path
-from subprocess import CalledProcessError, check_output, run
+from subprocess import run
 from textwrap import dedent
 from typing import Any, BinaryIO, Dict, Iterable, List, Optional, TextIO, Tuple, Union
 
@@ -24,6 +23,8 @@ import yaml
 from ops.storage import SQLiteStorage
 
 from scenario.runtime import UnitStateDB
+from scenario.scripts.errors import InvalidTargetUnitName, InvalidTargetModelName
+from scenario.scripts.utils import JujuUnitName
 from scenario.state import (
     Address,
     BindAddress,
@@ -45,35 +46,6 @@ JUJU_CONFIG_KEYS = frozenset({})
 
 SNAPSHOT_OUTPUT_DIR = (Path(os.getcwd()).parent / "snapshot_storage").absolute()
 CHARM_SUBCLASS_REGEX = re.compile(r"class (\D+)\(CharmBase\):")
-
-
-class SnapshotError(RuntimeError):
-    """Base class for errors raised by snapshot."""
-
-
-class InvalidTargetUnitName(SnapshotError):
-    """Raised if the unit name passed to snapshot is invalid."""
-
-
-class InvalidTargetModelName(SnapshotError):
-    """Raised if the model name passed to snapshot is invalid."""
-
-
-class JujuUnitName(str):
-    """This class represents the name of a juju unit that can be snapshotted."""
-
-    def __init__(self, unit_name: str):
-        super().__init__()
-        app_name, _, unit_id = unit_name.rpartition("/")
-        if not app_name or not unit_id:
-            raise InvalidTargetUnitName(f"invalid unit name: {unit_name!r}")
-        self.unit_name = unit_name
-        self.app_name = app_name
-        self.unit_id = int(unit_id)
-        self.normalized = f"{app_name}-{unit_id}"
-        self.remote_charm_root = Path(
-            f"/var/lib/juju/agents/unit-{self.normalized}/charm"
-        )
 
 
 def _try_format(string: str):
@@ -702,10 +674,10 @@ def _snapshot(
 
     logger.info(f'beginning snapshot of {target} in model {model or "<current>"}...')
 
-    def if_include(key, get_value, null_value):
+    def if_include(key, fn, default):
         if include is None or key in include:
-            return get_value()
-        return null_value
+            return fn()
+        return default
 
     try:
         state_model = get_model(model)
@@ -763,7 +735,7 @@ def _snapshot(
                 [],
             ),
             secrets=if_include(
-                "s",
+                "S",
                 lambda: get_secrets(
                     target,
                     model,
@@ -842,7 +814,7 @@ def snapshot(
         "-i",
         help="What data to include in the state. "
         "``r``: relation, ``c``: config, ``k``: containers, "
-        "``n``: networks, ``s``: secrets(!), "
+        "``n``: networks, ``S``: secrets(!), "
         "``d``: deferred events, ``t``: stored state.",
     ),
     include_dead_relation_networks: bool = typer.Option(

@@ -8,6 +8,7 @@ import os
 import typer
 
 from scenario.scripts.snapshot import snapshot
+from scenario.scripts.state_apply import state_apply
 
 
 def _setup_logging(verbosity: int):
@@ -27,12 +28,8 @@ def main():
         rich_markup_mode="markdown",
     )
 
-    # trick to prevent 'snapshot' from being the toplevel command.
-    # We want to do `scenario snapshot`, not just `snapshot`.
-    # TODO remove if/when scenario has more subcommands.
-    app.command(name="_", hidden=True)(lambda: None)
-
     app.command(name="snapshot", no_args_is_help=True)(snapshot)
+    app.command(name="state-apply", no_args_is_help=True)(state_apply)
 
     @app.callback()
     def setup_logging(verbose: int = typer.Option(0, "-v", count=True)):
