@@ -500,6 +500,13 @@ assert data == [
   ('baz', 'custom'),  
   ('qux', 'custom')  
 ]
+
+# or you can count the number of events of a certain type:
+from collections import Counter
+
+counter = Counter(map(lambda t: t.name, emitted))
+assert counter['relation-changed'] == 2
+assert counter.total() == 5
 ```
 
 
