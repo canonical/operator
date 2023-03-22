@@ -28,6 +28,7 @@ from textwrap import dedent
 import pytest
 
 import ops
+import ops.testing
 from ops import pebble
 from ops._private import yaml
 from ops.model import _ModelBackend
@@ -35,7 +36,7 @@ from ops.model import _ModelBackend
 
 class TestModel(unittest.TestCase):
     def setUp(self):
-        self.harness = ops.Harness(ops.CharmBase, meta='''
+        self.harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: myapp
             provides:
               db0:
@@ -1111,7 +1112,7 @@ recursive_push_pull_cases = [
 @pytest.mark.parametrize('case', recursive_push_pull_cases)
 def test_recursive_push_and_pull(case):
     # full "integration" test of push+pull
-    harness = ops.Harness(ops.CharmBase, meta='''
+    harness = ops.testing.Harness(ops.CharmBase, meta='''
         name: test-app
         containers:
           foo:
@@ -1176,7 +1177,7 @@ def test_recursive_push_and_pull(case):
 class TestApplication(unittest.TestCase):
 
     def setUp(self):
-        self.harness = ops.Harness(ops.CharmBase, meta='''
+        self.harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: myapp
             provides:
               db0:
