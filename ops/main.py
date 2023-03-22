@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from ops.model import Relation
 
 OLD_CHARM_STATE_FILE = '.unit-state.db'
-CHARM_STATE_FILE = '.new-unit-state.db'
+CHARM_STATE_FILE = '.ops-unit-state.db'
 
 
 logger = logging.getLogger()
