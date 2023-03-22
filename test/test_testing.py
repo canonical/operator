@@ -2702,7 +2702,14 @@ class TestHarness(unittest.TestCase):
 
 class TestNetwork(unittest.TestCase):
     def setUp(self):
-        self.harness = Harness(CharmBase)
+        self.harness = Harness(CharmBase, meta='''
+            name: test-charm
+            requires:
+               db:
+                 interface: database
+               foo:
+                 interface: xyz
+            ''')
         self.addCleanup(self.harness.cleanup)
 
     def test_add_network_defaults(self):
@@ -2748,6 +2755,27 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(interface.address, ipaddress.IPv4Address('10.0.0.10'))
         self.assertEqual(interface.subnet, ipaddress.IPv4Network('10.0.0.0/8'))
 
+    def test_add_network_specific_endpoint(self):
+        self.harness.add_network('10.0.0.1')
+        self.harness.add_network('10.0.2.1', endpoint='db')
+
+        binding = self.harness.model.get_binding('db')
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.2.1'))
+
+    def test_add_network_specific_relation(self):
+        self.harness.add_network('10.0.0.1')
+        self.harness.add_network('10.0.2.1', endpoint='db')
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.add_network('35.0.0.1', endpoint='db', relation_id=relation_id)
+
+        relation = self.harness.model.get_relation('db', relation_id)
+        binding = self.harness.model.get_binding(relation)
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv4Address('35.0.0.1'))
+
     def test_add_network_endpoint_fallback(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
         self.harness.add_network('10.0.0.10', endpoint='db')
@@ -2785,6 +2813,25 @@ class TestNetwork(unittest.TestCase):
     def test_network_get_relation_not_found(self):
         with self.assertRaises(model.RelationNotFoundError):
             self.harness.model.get_binding('db').network
+
+    def test_add_network_endpoint_not_in_meta(self):
+        with self.assertRaises(model.ModelError):
+            self.harness.add_network('35.0.0.1', endpoint='xyz')
+
+    def test_add_network_relation_id_set_endpoint_not_set(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        with self.assertRaises(TypeError):
+            self.harness.add_network('35.0.0.1', relation_id=relation_id)
+
+    def test_add_network_relation_id_incorrect(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        with self.assertRaises(model.ModelError):
+            self.harness.add_network('35.0.0.1', endpoint='db', relation_id=relation_id + 1)
+
+    def test_add_network_endpoint_and_relation_id_do_not_correspond(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        with self.assertRaises(model.ModelError):
+            self.harness.add_network('35.0.0.1', endpoint='foo', relation_id=relation_id)
 
 
 class DBRelationChangedHelper(Object):

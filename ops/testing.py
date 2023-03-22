@@ -1173,8 +1173,9 @@ class Harness(Generic[CharmType]):
             address: Binding's IPv4 or IPv6 address.
             endpoint: Name of relation endpoint (binding) to add network
                 data for. If not provided, add info for the default binding.
-            relation_id: Relation ID for the binding. If not provided, add
-                network data for the endpoint's default binding.
+            relation_id: Relation ID for the binding. If provided, the
+                endpoint argument must be provided and correspond. If not
+                provided, add network data for the endpoint's default binding.
             cidr: Binding's CIDR. Defaults to "<address>/24" if address is an
                 IPv4 address, or "<address>/64" if address is IPv6 (the host
                 bits are cleared).
@@ -1183,8 +1184,23 @@ class Harness(Generic[CharmType]):
             egress_subnets: List of egress subnets. Defaults to [cidr].
 
         Raises:
+            ModelError: If the endpoint is not a known relation name, or the
+                relation_id is incorrect or doesn't match the endpoint.
             ValueError: If address is not an IPv4 or IPv6 address.
         """
+        if endpoint is not None and endpoint not in self._meta.relations:
+            raise model.ModelError(f'{endpoint} is not a known relation')
+        if relation_id is not None:
+            if endpoint is None:
+                raise TypeError('endpoint must be set if relation_id is provided')
+            relation_name = self._backend._relation_names.get(relation_id)
+            if relation_name is None:
+                raise model.ModelError(
+                    f'relation_id {relation_id} has not been added (using add_relation)')
+            if endpoint != relation_name:
+                raise model.ModelError(
+                    f"endpoint {endpoint!r} does not correspond to relation_id {relation_name!r}")
+
         parsed_address = ipaddress.ip_address(address)  # raises ValueError if not an IP
         if cidr is None:
             if isinstance(parsed_address, ipaddress.IPv4Address):
@@ -1195,6 +1211,7 @@ class Harness(Generic[CharmType]):
             ingress_addresses = [address]
         if egress_subnets is None:
             egress_subnets = [cidr]
+
         data = {
             'bind-addresses': [{
                 'interface-name': interface,
