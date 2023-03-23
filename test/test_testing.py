@@ -17,6 +17,7 @@ import datetime
 import importlib
 import inspect
 import io
+import ipaddress
 import os
 import pathlib
 import platform
@@ -2679,6 +2680,148 @@ class TestHarness(unittest.TestCase):
                  },
             ]
         )
+
+
+class TestNetwork(unittest.TestCase):
+    def setUp(self):
+        self.harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test-charm
+            requires:
+               db:
+                 interface: database
+               foo:
+                 interface: xyz
+            ''')
+        self.addCleanup(self.harness.cleanup)
+
+    def test_add_network_defaults(self):
+        self.harness.add_network('10.0.0.10')
+
+        binding = self.harness.model.get_binding('db')
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
+        self.assertEqual(network.ingress_address, ipaddress.IPv4Address('10.0.0.10'))
+        self.assertEqual(network.ingress_addresses, [ipaddress.IPv4Address('10.0.0.10')])
+        self.assertEqual(network.egress_subnets, [ipaddress.IPv4Network('10.0.0.0/24')])
+        self.assertEqual(len(network.interfaces), 1)
+        interface = network.interfaces[0]
+        self.assertEqual(interface.name, 'eth0')
+        self.assertEqual(interface.address, ipaddress.IPv4Address('10.0.0.10'))
+        self.assertEqual(interface.subnet, ipaddress.IPv4Network('10.0.0.0/24'))
+
+    def test_add_network_all_args(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.add_network('10.0.0.10',
+                                 endpoint='db',
+                                 relation_id=relation_id,
+                                 cidr='10.0.0.0/8',
+                                 interface='eth1',
+                                 ingress_addresses=['10.0.0.1', '10.0.0.2'],
+                                 egress_subnets=['10.0.0.0/8', '10.10.0.0/16'])
+
+        relation = self.harness.model.get_relation('db', relation_id)
+        binding = self.harness.model.get_binding(relation)
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
+        self.assertEqual(network.ingress_address, ipaddress.IPv4Address('10.0.0.1'))
+        self.assertEqual(network.ingress_addresses,
+                         [ipaddress.IPv4Address('10.0.0.1'), ipaddress.IPv4Address('10.0.0.2')])
+        self.assertEqual(network.egress_subnets,
+                         [ipaddress.IPv4Network('10.0.0.0/8'),
+                          ipaddress.IPv4Network('10.10.0.0/16')])
+        self.assertEqual(len(network.interfaces), 1)
+        interface = network.interfaces[0]
+        self.assertEqual(interface.name, 'eth1')
+        self.assertEqual(interface.address, ipaddress.IPv4Address('10.0.0.10'))
+        self.assertEqual(interface.subnet, ipaddress.IPv4Network('10.0.0.0/8'))
+
+    def test_add_network_specific_endpoint(self):
+        self.harness.add_network('10.0.0.1')
+        self.harness.add_network('10.0.2.1', endpoint='db')
+
+        binding = self.harness.model.get_binding('db')
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.2.1'))
+
+        # Ensure binding for the other interface is still on the default value
+        self.assertEqual(self.harness.model.get_binding('foo').network.bind_address,
+                         ipaddress.IPv4Address('10.0.0.1'))
+
+    def test_add_network_specific_relation(self):
+        self.harness.add_network('10.0.0.1')
+        self.harness.add_network('10.0.2.1', endpoint='db')
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.add_network('35.0.0.1', endpoint='db', relation_id=relation_id)
+
+        relation = self.harness.model.get_relation('db', relation_id)
+        binding = self.harness.model.get_binding(relation)
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv4Address('35.0.0.1'))
+
+        # Ensure binding for the other interface is still on the default value
+        self.assertEqual(self.harness.model.get_binding('foo').network.bind_address,
+                         ipaddress.IPv4Address('10.0.0.1'))
+
+    def test_add_network_endpoint_fallback(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        self.harness.add_network('10.0.0.10', endpoint='db')
+
+        relation = self.harness.model.get_relation('db', relation_id)
+        binding = self.harness.model.get_binding(relation)
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
+
+    def test_add_network_default_fallback(self):
+        self.harness.add_network('10.0.0.10')
+
+        binding = self.harness.model.get_binding('db')
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
+
+    def test_add_network_ipv6(self):
+        self.harness.add_network('2001:0db8::a:0:0:1')
+
+        binding = self.harness.model.get_binding('db')
+        self.assertEqual(binding.name, 'db')
+        network = binding.network
+        self.assertEqual(network.bind_address, ipaddress.IPv6Address('2001:0db8::a:0:0:1'))
+        self.assertEqual(network.ingress_address, ipaddress.IPv6Address('2001:0db8::a:0:0:1'))
+        self.assertEqual(network.ingress_addresses, [ipaddress.IPv6Address('2001:0db8::a:0:0:1')])
+        self.assertEqual(network.egress_subnets, [ipaddress.IPv6Network('2001:0db8::0:0:0:0/64')])
+        self.assertEqual(len(network.interfaces), 1)
+        interface = network.interfaces[0]
+        self.assertEqual(interface.name, 'eth0')
+        self.assertEqual(interface.address, ipaddress.IPv6Address('2001:0db8::a:0:0:1'))
+        self.assertEqual(interface.subnet, ipaddress.IPv6Network('2001:0db8::0:0:0:0/64'))
+
+    def test_network_get_relation_not_found(self):
+        with self.assertRaises(ops.RelationNotFoundError):
+            self.harness.model.get_binding('db').network
+
+    def test_add_network_endpoint_not_in_meta(self):
+        with self.assertRaises(ops.ModelError):
+            self.harness.add_network('35.0.0.1', endpoint='xyz')
+
+    def test_add_network_relation_id_set_endpoint_not_set(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        with self.assertRaises(TypeError):
+            self.harness.add_network('35.0.0.1', relation_id=relation_id)
+
+    def test_add_network_relation_id_incorrect(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        with self.assertRaises(ops.ModelError):
+            self.harness.add_network('35.0.0.1', endpoint='db', relation_id=relation_id + 1)
+
+    def test_add_network_endpoint_and_relation_id_do_not_correspond(self):
+        relation_id = self.harness.add_relation('db', 'postgresql')
+        with self.assertRaises(ops.ModelError):
+            self.harness.add_network('35.0.0.1', endpoint='foo', relation_id=relation_id)
 
 
 class DBRelationChangedHelper(ops.Object):
