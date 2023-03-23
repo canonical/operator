@@ -1199,7 +1199,8 @@ class Harness(Generic[CharmType]):
                     f'relation_id {relation_id} has not been added; use add_relation')
             if endpoint != relation_name:
                 raise model.ModelError(
-                    f"endpoint {endpoint!r} does not correspond to relation_id {relation_name!r}")
+                    f"endpoint {endpoint!r} does not correspond to relation_id "
+                    + f"{relation_id} ({relation_name!r})")
 
         parsed_address = ipaddress.ip_address(address)  # raises ValueError if not an IP
         if cidr is None:

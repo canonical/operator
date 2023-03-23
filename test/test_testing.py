@@ -2764,6 +2764,10 @@ class TestNetwork(unittest.TestCase):
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.2.1'))
 
+        # Ensure binding for the other interface is still on the default value
+        self.assertEqual(self.harness.model.get_binding('foo').network.bind_address,
+                         ipaddress.IPv4Address('10.0.0.1'))
+
     def test_add_network_specific_relation(self):
         self.harness.add_network('10.0.0.1')
         self.harness.add_network('10.0.2.1', endpoint='db')
@@ -2775,6 +2779,10 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('35.0.0.1'))
+
+        # Ensure binding for the other interface is still on the default value
+        self.assertEqual(self.harness.model.get_binding('foo').network.bind_address,
+                         ipaddress.IPv4Address('10.0.0.1'))
 
     def test_add_network_endpoint_fallback(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
