@@ -1257,7 +1257,7 @@ class Relation:
         app: An :class:`Application` representing the remote application of this relation.
             For peer relations this will be the local application.
         units: A set of :class:`Unit` for units that have started and joined this relation.
-            For subordinate charms, this set will include one and only unit: the principal unit.
+            For subordinate charms, this set will include only one unit: the principal unit.
         data: A :class:`RelationData` holding the data buckets for each entity
             of a relation. Accessed via eg Relation.data[unit]['foo']
     """
