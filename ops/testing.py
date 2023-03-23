@@ -1189,14 +1189,14 @@ class Harness(Generic[CharmType]):
             ValueError: If address is not an IPv4 or IPv6 address.
         """
         if endpoint is not None and endpoint not in self._meta.relations:
-            raise model.ModelError(f'{endpoint} is not a known relation')
+            raise model.ModelError(f'{endpoint!r} is not a known endpoint')
         if relation_id is not None:
             if endpoint is None:
                 raise TypeError('endpoint must be set if relation_id is provided')
             relation_name = self._backend._relation_names.get(relation_id)
             if relation_name is None:
                 raise model.ModelError(
-                    f'relation_id {relation_id} has not been added (using add_relation)')
+                    f'relation_id {relation_id} has not been added; use add_relation')
             if endpoint != relation_name:
                 raise model.ModelError(
                     f"endpoint {endpoint!r} does not correspond to relation_id {relation_name!r}")
