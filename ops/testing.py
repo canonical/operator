@@ -19,6 +19,7 @@ import dataclasses
 import datetime
 import fnmatch
 import inspect
+import ipaddress
 import os
 import pathlib
 import random
@@ -59,7 +60,7 @@ from ops.model import RelationNotFoundError
 if TYPE_CHECKING:
     from typing_extensions import TypedDict
 
-    from ops.model import UnitOrApplication
+    from ops.model import UnitOrApplication, _NetworkDict
 
     ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
     _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
@@ -1142,6 +1143,88 @@ class Harness(Generic[CharmType]):
         """
         self._backend._planned_units = None
 
+    def add_network(self, address: str, *,
+                    endpoint: Optional[str] = None,
+                    relation_id: Optional[int] = None,
+                    cidr: Optional[str] = None,
+                    interface: str = 'eth0',
+                    ingress_addresses: Optional[Iterable[str]] = None,
+                    egress_subnets: Optional[Iterable[str]] = None):
+        """Add simulated network data for the given relation endpoint (binding).
+
+        Calling this multiple times with the same (binding, relation_id)
+        combination will replace the associated network data.
+
+        Example::
+
+            # Set network info for default binding
+            harness.add_network('10.0.0.10')
+
+            # Or set network info for specific endpoint
+            harness.add_network('10.0.0.10', endpoint='db')
+
+        After either of those calls, the following will be true (in the first
+        case, the simulated network-get will fall back to the default binding)::
+
+            binding = harness.model.get_binding('db')
+            assert binding.network.bind_address == ipaddress.IPv4Address('10.0.0.10'))
+
+        Args:
+            address: Binding's IPv4 or IPv6 address.
+            endpoint: Name of relation endpoint (binding) to add network
+                data for. If not provided, add info for the default binding.
+            relation_id: Relation ID for the binding. If provided, the
+                endpoint argument must be provided and correspond. If not
+                provided, add network data for the endpoint's default binding.
+            cidr: Binding's CIDR. Defaults to "<address>/24" if address is an
+                IPv4 address, or "<address>/64" if address is IPv6 (the host
+                bits are cleared).
+            interface: Name of network interface.
+            ingress_addresses: List of ingress addresses. Defaults to [address].
+            egress_subnets: List of egress subnets. Defaults to [cidr].
+
+        Raises:
+            ModelError: If the endpoint is not a known relation name, or the
+                relation_id is incorrect or doesn't match the endpoint.
+            ValueError: If address is not an IPv4 or IPv6 address.
+        """
+        if endpoint is not None and endpoint not in self._meta.relations:
+            raise model.ModelError(f'{endpoint!r} is not a known endpoint')
+        if relation_id is not None:
+            if endpoint is None:
+                raise TypeError('endpoint must be set if relation_id is provided')
+            relation_name = self._backend._relation_names.get(relation_id)
+            if relation_name is None:
+                raise model.ModelError(
+                    f'relation_id {relation_id} has not been added; use add_relation')
+            if endpoint != relation_name:
+                raise model.ModelError(
+                    f"endpoint {endpoint!r} does not correspond to relation_id "
+                    + f"{relation_id} ({relation_name!r})")
+
+        parsed_address = ipaddress.ip_address(address)  # raises ValueError if not an IP
+        if cidr is None:
+            if isinstance(parsed_address, ipaddress.IPv4Address):
+                cidr = str(ipaddress.IPv4Network(address + '/24', strict=False))
+            else:
+                cidr = str(ipaddress.IPv6Network(address + '/64', strict=False))
+        if ingress_addresses is None:
+            ingress_addresses = [address]
+        if egress_subnets is None:
+            egress_subnets = [cidr]
+
+        data = {
+            'bind-addresses': [{
+                'interface-name': interface,
+                'addresses': [
+                    {'cidr': cidr, 'value': address},
+                ],
+            }],
+            'egress-subnets': list(egress_subnets),
+            'ingress-addresses': list(ingress_addresses),
+        }
+        self._backend._networks[endpoint, relation_id] = data
+
     def _get_backend_calls(self, reset: bool = True) -> List[Tuple[Any, ...]]:
         """Return the calls that we have made to the TestingModelBackend.
 
@@ -1549,6 +1632,7 @@ class _TestingModelBackend:
         self._hook_is_running = ''
         self._secrets: List[_Secret] = []
         self._opened_ports: Set[model.OpenedPort] = set()
+        self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -1806,8 +1890,20 @@ class _TestingModelBackend:
     def action_fail(self, message=''):  # type:ignore
         raise NotImplementedError(self.action_fail)  # type:ignore
 
-    def network_get(self, endpoint_name, relation_id=None):  # type:ignore
-        raise NotImplementedError(self.network_get)  # type:ignore
+    def network_get(self, endpoint_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
+        data = self._networks.get((endpoint_name, relation_id))
+        if data is not None:
+            return data
+        if relation_id is not None:
+            # Fall back to the default binding for this endpoint
+            data = self._networks.get((endpoint_name, None))
+            if data is not None:
+                return data
+        # No custom data per relation ID or binding, return the default binding
+        data = self._networks.get((None, None))
+        if data is not None:
+            return data
+        raise RelationNotFoundError
 
     def add_metrics(self, metrics, labels=None):  # type:ignore
         raise NotImplementedError(self.add_metrics)  # type:ignore
