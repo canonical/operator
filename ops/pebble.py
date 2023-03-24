@@ -744,6 +744,12 @@ class Layer:
     def __repr__(self) -> str:
         return f'Layer({self.to_dict()!r})'
 
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Layer):
+            return self.to_dict() == other.to_dict()
+        else:
+            return NotImplemented
+
     __str__ = to_yaml
 
 

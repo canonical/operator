@@ -634,6 +634,30 @@ summary: Sum Mary
 
         self.assertEqual(s.services, t.services)
 
+    def test_layer_equality(self):
+        s = pebble.Layer({})
+        self._assert_empty(s)
+
+        d = {
+            'summary': 'Sum Mary',
+            'description': 'The quick brown fox!',
+            'services': {
+                'foo': {
+                    'summary': 'Foo',
+                    'command': 'echo foo',
+                },
+                'bar': {
+                    'summary': 'Bar',
+                    'command': 'echo bar',
+                },
+            }
+        }
+        t = pebble.Layer(d)
+        self.assertNotEqual(s, t)
+
+        s = pebble.Layer(d)
+        self.assertEqual(s, t)
+
 
 class TestService(unittest.TestCase):
     def _assert_empty(self, service, name):
