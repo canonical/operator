@@ -39,6 +39,142 @@ and day-2 operations specific to that application.
 Full developer documentation is available at https://juju.is/docs/sdk.
 """
 
-# Import here the bare minimum to break the circular import between modules
-from . import charm  # type: ignore # noqa
-from .version import version as __version__  # type: ignore # noqa
+# The isort command wants to rearrange the nicely-formatted imports below;
+# just skip it for this file.
+# isort:skip_file
+
+# Similarly, Pyright complains that all of these things are unused imports,
+# so disable it:
+# pyright: reportUnusedImport=false
+
+# Import pebble explicitly. It's the one module we don't import names from below.
+from . import pebble  # type: ignore # noqa: F401
+
+# Also import charm explicitly. This is not strictly necessary as the
+# "from .charm" import automatically does that, but be explicit since this
+# import was here previously
+from . import charm  # type: ignore # noqa: F401
+
+# Import the main module, which we've overriden in main.py to be callable.
+# This allows "import ops; ops.main(Charm)" to work as expected.
+from . import main  # type: ignore # noqa: F401
+
+# Explicitly import names from sub-modules so users can just "import ops" and
+# then use them as "ops.X".
+from .charm import (  # noqa: F401
+    ActionEvent,
+    ActionMeta,
+    CharmBase,
+    CharmEvents,
+    CharmMeta,
+    CollectMetricsEvent,
+    ConfigChangedEvent,
+    ContainerMeta,
+    ContainerStorageMeta,
+    HookEvent,
+    InstallEvent,
+    LeaderElectedEvent,
+    LeaderSettingsChangedEvent,
+    PayloadMeta,
+    PebbleReadyEvent,
+    PostSeriesUpgradeEvent,
+    PreSeriesUpgradeEvent,
+    RelationBrokenEvent,
+    RelationChangedEvent,
+    RelationCreatedEvent,
+    RelationDepartedEvent,
+    RelationEvent,
+    RelationJoinedEvent,
+    RelationMeta,
+    RelationRole,
+    RemoveEvent,
+    ResourceMeta,
+    SecretChangedEvent,
+    SecretEvent,
+    SecretExpiredEvent,
+    SecretRemoveEvent,
+    SecretRotateEvent,
+    StartEvent,
+    StopEvent,
+    StorageAttachedEvent,
+    StorageDetachingEvent,
+    StorageEvent,
+    StorageMeta,
+    UpdateStatusEvent,
+    UpgradeCharmEvent,
+    WorkloadEvent,
+)
+
+from .framework import (  # noqa: F401
+    BoundEvent,
+    BoundStoredState,
+    CommitEvent,
+    EventBase,
+    EventSource,
+    Framework,
+    FrameworkEvents,
+    Handle,
+    HandleKind,
+    LifecycleEvent,
+    NoTypeError,
+    Object,
+    ObjectEvents,
+    PreCommitEvent,
+    PrefixedEvents,
+    StoredDict,
+    StoredList,
+    StoredSet,
+    StoredState,
+    StoredStateData,
+)
+
+from .jujuversion import JujuVersion  # noqa: F401
+
+from .model import (  # noqa: F401 E402
+    ActiveStatus,
+    Application,
+    Binding,
+    BindingMapping,
+    BlockedStatus,
+    CheckInfoMapping,
+    ConfigData,
+    Container,
+    ContainerMapping,
+    ErrorStatus,
+    InvalidStatusError,
+    LazyMapping,
+    MaintenanceStatus,
+    Model,
+    ModelError,
+    MultiPushPullError,
+    Network,
+    NetworkInterface,
+    OpenedPort,
+    Pod,
+    Relation,
+    RelationData,
+    RelationDataAccessError,
+    RelationDataContent,
+    RelationDataError,
+    RelationDataTypeError,
+    RelationMapping,
+    RelationNotFoundError,
+    Resources,
+    Secret,
+    SecretInfo,
+    SecretNotFoundError,
+    SecretRotate,
+    ServiceInfoMapping,
+    StatusBase,
+    Storage,
+    StorageMapping,
+    TooManyRelatedAppsError,
+    Unit,
+    UnknownStatus,
+    WaitingStatus,
+)
+
+# NOTE: don't import testing or Harness here, as that's a test-time concern
+# rather than a runtime concern.
+
+from .version import version as __version__  # noqa: F401 E402

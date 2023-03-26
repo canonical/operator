@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Main entry point to the Operator Framework."""
+"""Main entry point to the Operator Framework.
+
+Note that this module is callable, and calls the :func:`ops.main.main` function.
+This is so that :code:`import ops` followed by :code:`ops.main(MyCharm)` works
+as expected.
+"""
 
 import logging
 import os
@@ -438,3 +443,15 @@ def main(charm_class: Type[ops.charm.CharmBase],
         framework.commit()
     finally:
         framework.close()
+
+
+# Make this module callable and call main(), so that "import ops" and then
+# "ops.main(Charm)" works as expected now that everything is imported in
+# ops/__init__.py. Idea from https://stackoverflow.com/a/48100440/68707
+class _CallableModule(sys.modules[__name__].__class__):
+    def __call__(self, charm_class: Type[ops.charm.CharmBase],
+                 use_juju_for_storage: Optional[bool] = None):
+        return main(charm_class, use_juju_for_storage=use_juju_for_storage)
+
+
+sys.modules[__name__].__class__ = _CallableModule

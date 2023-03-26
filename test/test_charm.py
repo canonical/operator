@@ -18,16 +18,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ops.charm import (
-    CharmBase,
-    CharmEvents,
-    CharmMeta,
-    ContainerMeta,
-    ContainerStorageMeta,
-    StartEvent,
-)
-from ops.framework import EventBase, EventSource, Framework
-from ops.model import Model, Storage, _ModelBackend
+import ops
+from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
 
 from .test_helpers import fake_script, fake_script_calls
@@ -48,33 +40,33 @@ class TestCharm(unittest.TestCase):
 
         self.tmpdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
-        self.meta = CharmMeta()
+        self.meta = ops.CharmMeta()
 
-        class CustomEvent(EventBase):
+        class CustomEvent(ops.EventBase):
             pass
 
-        class TestCharmEvents(CharmEvents):
-            custom = EventSource(CustomEvent)
+        class TestCharmEvents(ops.CharmEvents):
+            custom = ops.EventSource(CustomEvent)
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
-        CharmBase.on = TestCharmEvents()
+        ops.CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            CharmBase.on = CharmEvents()
+            ops.CharmBase.on = ops.CharmEvents()
         self.addCleanup(cleanup)
 
     def create_framework(self):
-        model = Model(self.meta, _ModelBackend('local/0'))
+        model = ops.Model(self.meta, _ModelBackend('local/0'))
         # we can pass foo_event as event_name because we're not actually testing dispatch
-        framework = Framework(SQLiteStorage(':memory:'), self.tmpdir, self.meta,
-                              model)
+        framework = ops.Framework(SQLiteStorage(':memory:'), self.tmpdir, self.meta,
+                                  model)
         self.addCleanup(framework.close)
         return framework
 
     def test_basic(self):
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
@@ -116,7 +108,7 @@ class TestCharm(unittest.TestCase):
                 fn(charm, evt)
             return wrapper
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             def __init__(self, *args):
                 super().__init__(*args)
                 framework.observe(self.on.start, self._on_start)
@@ -132,16 +124,16 @@ class TestCharm(unittest.TestCase):
         # check that the event has been seen by the decorator
         self.assertEqual(1, len(events))
         # check that the event has been seen by the observer
-        self.assertIsInstance(charm.seen, StartEvent)
+        self.assertIsInstance(charm.seen, ops.StartEvent)
 
     def test_empty_action(self):
-        meta = CharmMeta.from_yaml('name: my-charm', '')
+        meta = ops.CharmMeta.from_yaml('name: my-charm', '')
         self.assertEqual(meta.actions, {})
 
     def test_helper_properties(self):
         framework = self.create_framework()
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             pass
 
         charm = MyCharm(framework)
@@ -153,7 +145,7 @@ class TestCharm(unittest.TestCase):
 
     def test_relation_events(self):
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             def __init__(self, *args):
                 super().__init__(*args)
                 self.seen = []
@@ -170,7 +162,7 @@ class TestCharm(unittest.TestCase):
                 self.seen.append(type(event).__name__)
 
         # language=YAML
-        self.meta = CharmMeta.from_yaml(metadata='''
+        self.meta = ops.CharmMeta.from_yaml(metadata='''
 name: my-charm
 requires:
  req1:
@@ -216,7 +208,7 @@ peers:
     def test_storage_events(self):
         this = self
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             def __init__(self, *args):
                 super().__init__(*args)
                 self.seen = []
@@ -239,7 +231,7 @@ peers:
                 self.seen.append(type(event).__name__)
 
         # language=YAML
-        self.meta = CharmMeta.from_yaml('''
+        self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
 storage:
   stor-4:
@@ -310,12 +302,12 @@ storage:
 
         charm = MyCharm(self.create_framework())
 
-        charm.on['stor1'].storage_attached.emit(Storage("stor1", 0, charm.model._backend))
-        charm.on['stor2'].storage_detaching.emit(Storage("stor2", 0, charm.model._backend))
-        charm.on['stor3'].storage_attached.emit(Storage("stor3", 0, charm.model._backend))
-        charm.on['stor-4'].storage_attached.emit(Storage("stor-4", 0, charm.model._backend))
+        charm.on['stor1'].storage_attached.emit(ops.Storage("stor1", 0, charm.model._backend))
+        charm.on['stor2'].storage_detaching.emit(ops.Storage("stor2", 0, charm.model._backend))
+        charm.on['stor3'].storage_attached.emit(ops.Storage("stor3", 0, charm.model._backend))
+        charm.on['stor-4'].storage_attached.emit(ops.Storage("stor-4", 0, charm.model._backend))
         charm.on['stor-multiple-dashes'].storage_attached.emit(
-            Storage("stor-multiple-dashes", 0, charm.model._backend))
+            ops.Storage("stor-multiple-dashes", 0, charm.model._backend))
 
         self.assertEqual(charm.seen, [
             'StorageAttachedEvent',
@@ -326,7 +318,7 @@ storage:
 
     def test_workload_events(self):
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             def __init__(self, *args):
                 super().__init__(*args)
                 self.seen = []
@@ -342,7 +334,7 @@ storage:
                 self.count += 1
 
         # language=YAML
-        self.meta = CharmMeta.from_yaml(metadata='''
+        self.meta = ops.CharmMeta.from_yaml(metadata='''
 name: my-charm
 containers:
   container-a:
@@ -368,7 +360,7 @@ containers:
     def test_relations_meta(self):
 
         # language=YAML
-        self.meta = CharmMeta.from_yaml('''
+        self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
 requires:
   database:
@@ -390,7 +382,7 @@ requires:
     def test_relations_meta_limit_type_validation(self):
         with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
             # language=YAML
-            self.meta = CharmMeta.from_yaml('''
+            self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
 requires:
   database:
@@ -402,7 +394,7 @@ requires:
         with self.assertRaisesRegex(TypeError,
                                     "scope should be one of 'global', 'container'; not 'foobar'"):
             # language=YAML
-            self.meta = CharmMeta.from_yaml('''
+            self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
 requires:
   database:
@@ -413,7 +405,7 @@ requires:
     @classmethod
     def _get_action_test_meta(cls):
         # language=YAML
-        return CharmMeta.from_yaml(metadata='''
+        return ops.CharmMeta.from_yaml(metadata='''
 name: my-charm
 ''', actions='''
 foo-bar:
@@ -442,7 +434,7 @@ start:
 
     def test_action_events(self):
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
@@ -482,7 +474,7 @@ start:
 
     def test_invalid_action_results(self):
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
@@ -509,7 +501,7 @@ start:
 
     def _test_action_event_defer_fails(self, cmd_type):
 
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
@@ -532,7 +524,7 @@ start:
         self._test_action_event_defer_fails('action')
 
     def test_containers(self):
-        meta = CharmMeta.from_yaml("""
+        meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
 containers:
   test1:
@@ -540,13 +532,13 @@ containers:
   test2:
     k: v
 """)
-        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
-        self.assertIsInstance(meta.containers['test2'], ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
+        self.assertIsInstance(meta.containers['test2'], ops.ContainerMeta)
         self.assertEqual(meta.containers['test1'].name, 'test1')
         self.assertEqual(meta.containers['test2'].name, 'test2')
 
     def test_containers_storage(self):
-        meta = CharmMeta.from_yaml("""
+        meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
 storage:
   data:
@@ -563,13 +555,13 @@ containers:
       - storage: other
         location: /test/otherdata
 """)
-        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
-        self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
+        self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
         self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storagemount')
         self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/otherdata')
 
     def test_containers_storage_multiple_mounts(self):
-        meta = CharmMeta.from_yaml("""
+        meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
 storage:
   data:
@@ -583,8 +575,8 @@ containers:
       - storage: data
         location: /test/otherdata
 """)
-        self.assertIsInstance(meta.containers['test1'], ContainerMeta)
-        self.assertIsInstance(meta.containers['test1'].mounts["data"], ContainerStorageMeta)
+        self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
         self.assertEqual(
             meta.containers['test1'].mounts["data"].locations[0],
             '/test/storagemount')
@@ -594,7 +586,7 @@ containers:
             meta.containers["test1"].mounts["data"].location
 
     def test_secret_events(self):
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             def __init__(self, *args):
                 super().__init__(*args)
                 self.seen = []
@@ -625,7 +617,7 @@ containers:
                 assert event.revision == 42
                 self.seen.append(type(event).__name__)
 
-        self.meta = CharmMeta.from_yaml(metadata='name: my-charm')
+        self.meta = ops.CharmMeta.from_yaml(metadata='name: my-charm')
         charm = MyCharm(self.create_framework())
 
         charm.on.secret_changed.emit('secret:changed', None)

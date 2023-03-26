@@ -15,7 +15,7 @@
 import os
 import unittest.mock  # in this file, importing just 'patch' would be confusing
 
-from ops.jujuversion import JujuVersion
+import ops
 
 
 class TestJujuVersion(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestJujuVersion(unittest.TestCase):
         ]
 
         for vs, major, minor, tag, patch, build in test_cases:
-            v = JujuVersion(vs)
+            v = ops.JujuVersion(vs)
             self.assertEqual(v.major, major)
             self.assertEqual(v.minor, minor)
             self.assertEqual(v.tag, tag)
@@ -44,34 +44,34 @@ class TestJujuVersion(unittest.TestCase):
     @unittest.mock.patch('os.environ', new={})
     def test_from_environ(self):
         # JUJU_VERSION is not set
-        v = JujuVersion.from_environ()
-        self.assertEqual(v, JujuVersion('0.0.0'))
+        v = ops.JujuVersion.from_environ()
+        self.assertEqual(v, ops.JujuVersion('0.0.0'))
 
         os.environ['JUJU_VERSION'] = 'no'
         with self.assertRaisesRegex(RuntimeError, 'not a valid Juju version'):
-            JujuVersion.from_environ()
+            ops.JujuVersion.from_environ()
 
         os.environ['JUJU_VERSION'] = '2.8.0'
-        v = JujuVersion.from_environ()
-        self.assertEqual(v, JujuVersion('2.8.0'))
+        v = ops.JujuVersion.from_environ()
+        self.assertEqual(v, ops.JujuVersion('2.8.0'))
 
     def test_has_app_data(self):
-        self.assertTrue(JujuVersion('2.8.0').has_app_data())
-        self.assertTrue(JujuVersion('2.7.0').has_app_data())
-        self.assertFalse(JujuVersion('2.6.9').has_app_data())
+        self.assertTrue(ops.JujuVersion('2.8.0').has_app_data())
+        self.assertTrue(ops.JujuVersion('2.7.0').has_app_data())
+        self.assertFalse(ops.JujuVersion('2.6.9').has_app_data())
 
     def test_is_dispatch_aware(self):
-        self.assertTrue(JujuVersion('2.8.0').is_dispatch_aware())
-        self.assertFalse(JujuVersion('2.7.9').is_dispatch_aware())
+        self.assertTrue(ops.JujuVersion('2.8.0').is_dispatch_aware())
+        self.assertFalse(ops.JujuVersion('2.7.9').is_dispatch_aware())
 
     def test_has_controller_storage(self):
-        self.assertTrue(JujuVersion('2.8.0').has_controller_storage())
-        self.assertFalse(JujuVersion('2.7.9').has_controller_storage())
+        self.assertTrue(ops.JujuVersion('2.8.0').has_controller_storage())
+        self.assertFalse(ops.JujuVersion('2.7.9').has_controller_storage())
 
     def test_has_secrets(self):
-        self.assertTrue(JujuVersion('3.0.2').has_secrets)
-        self.assertFalse(JujuVersion('3.0.1').has_secrets)
-        self.assertFalse(JujuVersion('2.9.30').has_secrets)
+        self.assertTrue(ops.JujuVersion('3.0.2').has_secrets)
+        self.assertFalse(ops.JujuVersion('3.0.1').has_secrets)
+        self.assertFalse(ops.JujuVersion('2.9.30').has_secrets)
 
     def test_parsing_errors(self):
         invalid_versions = [
@@ -90,7 +90,7 @@ class TestJujuVersion(unittest.TestCase):
         ]
         for v in invalid_versions:
             with self.assertRaises(RuntimeError):
-                JujuVersion(v)
+                ops.JujuVersion(v)
 
     def test_equality(self):
         test_cases = [
@@ -118,8 +118,8 @@ class TestJujuVersion(unittest.TestCase):
         ]
 
         for a, b, expected in test_cases:
-            self.assertEqual(JujuVersion(a) == JujuVersion(b), expected)
-            self.assertEqual(JujuVersion(a) == b, expected)
+            self.assertEqual(ops.JujuVersion(a) == ops.JujuVersion(b), expected)
+            self.assertEqual(ops.JujuVersion(a) == b, expected)
 
     def test_comparison(self):
         test_cases = [
@@ -149,12 +149,12 @@ class TestJujuVersion(unittest.TestCase):
 
         for a, b, expected_strict, expected_weak in test_cases:
             with self.subTest(a=a, b=b):
-                self.assertEqual(JujuVersion(a) < JujuVersion(b), expected_strict)
-                self.assertEqual(JujuVersion(a) <= JujuVersion(b), expected_weak)
-                self.assertEqual(JujuVersion(b) > JujuVersion(a), expected_strict)
-                self.assertEqual(JujuVersion(b) >= JujuVersion(a), expected_weak)
+                self.assertEqual(ops.JujuVersion(a) < ops.JujuVersion(b), expected_strict)
+                self.assertEqual(ops.JujuVersion(a) <= ops.JujuVersion(b), expected_weak)
+                self.assertEqual(ops.JujuVersion(b) > ops.JujuVersion(a), expected_strict)
+                self.assertEqual(ops.JujuVersion(b) >= ops.JujuVersion(a), expected_weak)
                 # Implicit conversion.
-                self.assertEqual(JujuVersion(a) < b, expected_strict)
-                self.assertEqual(JujuVersion(a) <= b, expected_weak)
-                self.assertEqual(b > JujuVersion(a), expected_strict)
-                self.assertEqual(b >= JujuVersion(a), expected_weak)
+                self.assertEqual(ops.JujuVersion(a) < b, expected_strict)
+                self.assertEqual(ops.JujuVersion(a) <= b, expected_weak)
+                self.assertEqual(b > ops.JujuVersion(a), expected_strict)
+                self.assertEqual(b >= ops.JujuVersion(a), expected_weak)

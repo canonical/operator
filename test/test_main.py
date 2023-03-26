@@ -28,37 +28,9 @@ from unittest.mock import patch
 
 import logassert
 
-from ops.charm import (
-    ActionEvent,
-    CharmBase,
-    CharmEvents,
-    CharmMeta,
-    CollectMetricsEvent,
-    ConfigChangedEvent,
-    HookEvent,
-    InstallEvent,
-    LeaderSettingsChangedEvent,
-    PebbleReadyEvent,
-    RelationBrokenEvent,
-    RelationChangedEvent,
-    RelationDepartedEvent,
-    RelationEvent,
-    RelationJoinedEvent,
-    SecretChangedEvent,
-    SecretEvent,
-    SecretExpiredEvent,
-    SecretRemoveEvent,
-    SecretRotateEvent,
-    StartEvent,
-    StorageAttachedEvent,
-    UpdateStatusEvent,
-    UpgradeCharmEvent,
-    WorkloadEvent,
-)
-from ops.framework import Framework, LifecycleEvent, StoredStateData
-from ops.main import CHARM_STATE_FILE, _should_use_controller_storage, main
+import ops
+from ops.main import CHARM_STATE_FILE, _should_use_controller_storage
 from ops.storage import SQLiteStorage
-from ops.version import version
 
 from .charms.test_main.src.charm import MyCharmEvents
 from .test_helpers import fake_script, fake_script_calls
@@ -69,7 +41,7 @@ TEST_CHARM_DIR = Path(f"{__file__}/../charms/test_main").resolve()
 
 VERSION_LOGLINE = [
     'juju-log', '--log-level', 'DEBUG', '--',
-    f'Operator Framework {version} up and running.',
+    f'Operator Framework {ops.__version__} up and running.',
 ]
 
 logger = logging.getLogger(__name__)
@@ -105,7 +77,7 @@ class CharmInitTestCase(unittest.TestCase):
 
     @patch('sys.stderr', new_callable=io.StringIO)
     def test_breakpoint(self, fake_stderr):
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             pass
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': 'all'})
 
@@ -116,7 +88,7 @@ class CharmInitTestCase(unittest.TestCase):
         self.assertIn('Starting pdb to debug charm operator', fake_stderr.getvalue())
 
     def test_no_debug_breakpoint(self):
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             pass
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': ''})
 
@@ -144,10 +116,10 @@ class CharmInitTestCase(unittest.TestCase):
                             fh.write(b'name: test')
                         mock_charmdir.return_value = tmpdirname
 
-                        main(charm_class, **kwargs)
+                        ops.main(charm_class, **kwargs)
 
     def test_init_signature_passthrough(self):
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
 
             def __init__(self, *args):
                 super().__init__(*args)
@@ -157,7 +129,7 @@ class CharmInitTestCase(unittest.TestCase):
         self.assertEqual(warn_cm, [])
 
     def test_init_signature_old_key_argument(self):
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
 
             def __init__(self, framework, somekey):
                 super().__init__(framework, somekey)
@@ -167,7 +139,7 @@ class CharmInitTestCase(unittest.TestCase):
             self._check(MyCharm)
 
     def test_init_signature_only_framework(self):
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
 
             def __init__(self, framework):
                 super().__init__(framework)
@@ -183,21 +155,21 @@ class CharmInitTestCase(unittest.TestCase):
             with self.assertRaisesRegex(
                     RuntimeError,
                     'charm set use_juju_for_storage=True, but Juju .* does not support it'):
-                self._check(CharmBase, use_juju_for_storage=True)
+                self._check(ops.CharmBase, use_juju_for_storage=True)
 
     def test_storage_with_storage(self):
         # here we patch juju_backend_available, so it gets set up and falls over when used
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
             with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
-                self._check(CharmBase, use_juju_for_storage=True)
+                self._check(ops.CharmBase, use_juju_for_storage=True)
 
     def test_controller_storage_deprecated(self):
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
             with self.assertWarnsRegex(DeprecationWarning, 'Controller storage'):
                 with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
-                    self._check(CharmBase, use_juju_for_storage=True)
+                    self._check(ops.CharmBase, use_juju_for_storage=True)
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
@@ -205,7 +177,7 @@ class CharmInitTestCase(unittest.TestCase):
 class TestDispatch(unittest.TestCase):
     def _check(self, *, with_dispatch=False, dispatch_path=''):
         """Helper for below tests."""
-        class MyCharm(CharmBase):
+        class MyCharm(ops.CharmBase):
             def __init__(self, framework):
                 super().__init__(framework)
 
@@ -233,7 +205,7 @@ class TestDispatch(unittest.TestCase):
                 with patch('ops.main._emit_charm_event') as mock_charm_event:
                     with patch('ops.main._get_charm_dir') as mock_charmdir:
                         mock_charmdir.return_value = tmpdir
-                        main(MyCharm)
+                        ops.main(MyCharm)
 
         self.assertEqual(mock_charm_event.call_count, 1)
         return mock_charm_event.call_args[0][1]
@@ -285,12 +257,12 @@ class _TestMain(abc.ABC):
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
-        class TestCharmEvents(CharmEvents):
+        class TestCharmEvents(ops.CharmEvents):
             pass
-        CharmBase.on = TestCharmEvents()
+        ops.CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            CharmBase.on = CharmEvents()
+            ops.CharmBase.on = ops.CharmEvents()
         self.addCleanup(cleanup)
 
         fake_script(self, 'juju-log', "exit 0")
@@ -337,10 +309,10 @@ class _TestMain(abc.ABC):
                 af = (self.JUJU_CHARM_DIR / 'actions.yaml')
                 if af.exists():
                     with af.open() as a:
-                        meta = CharmMeta.from_yaml(m, a)
+                        meta = ops.CharmMeta.from_yaml(m, a)
                 else:
-                    meta = CharmMeta.from_yaml(m)
-            framework = Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)
+                    meta = ops.CharmMeta.from_yaml(m)
+            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)
 
             class ThisCharmEvents(MyCharmEvents):
                 pass
@@ -355,7 +327,7 @@ class _TestMain(abc.ABC):
             storage.commit()
             framework.close()
         else:
-            stored = StoredStateData(None, None)
+            stored = ops.StoredStateData(None, None)
         return stored
 
     def _simulate_event(self, event_spec):
@@ -372,16 +344,16 @@ class _TestMain(abc.ABC):
         })
         if event_spec.set_in_env is not None:
             env.update(event_spec.set_in_env)
-        if issubclass(event_spec.event_type, SecretEvent):
+        if issubclass(event_spec.event_type, ops.SecretEvent):
             env.update({
                 'JUJU_SECRET_ID': event_spec.secret_id,
                 'JUJU_SECRET_LABEL': event_spec.secret_label or '',
             })
-        if issubclass(event_spec.event_type, (SecretRemoveEvent, SecretExpiredEvent)):
+        if issubclass(event_spec.event_type, (ops.SecretRemoveEvent, ops.SecretExpiredEvent)):
             env.update({
                 'JUJU_SECRET_REVISION': str(event_spec.secret_revision or ''),
             })
-        if issubclass(event_spec.event_type, RelationEvent):
+        if issubclass(event_spec.event_type, ops.RelationEvent):
             rel_name = event_spec.event_name.split('_')[0]
             env.update({
                 'JUJU_RELATION': rel_name,
@@ -406,11 +378,11 @@ class _TestMain(abc.ABC):
                 'JUJU_REMOTE_UNIT': '',
                 'JUJU_REMOTE_APP': '',
             })
-        if issubclass(event_spec.event_type, WorkloadEvent):
+        if issubclass(event_spec.event_type, ops.WorkloadEvent):
             env.update({
                 'JUJU_WORKLOAD_NAME': event_spec.workload_name,
             })
-        if issubclass(event_spec.event_type, ActionEvent):
+        if issubclass(event_spec.event_type, ops.ActionEvent):
             event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
             env.update({
                 event_spec.env_var: event_filename,
@@ -430,14 +402,14 @@ class _TestMain(abc.ABC):
 
     def test_event_reemitted(self):
         # First run "install" to make sure all hooks are set up.
-        state = self._simulate_event(EventSpec(InstallEvent, 'install'))
+        state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
-        state = self._simulate_event(EventSpec(ConfigChangedEvent, 'config-changed'))
+        state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
         self.assertEqual(list(state.observed_event_types), ['ConfigChangedEvent'])
 
         # Re-emit should pick the deferred config-changed.
-        state = self._simulate_event(EventSpec(UpdateStatusEvent, 'update-status'))
+        state = self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status'))
         self.assertEqual(
             list(state.observed_event_types),
             ['ConfigChangedEvent', 'UpdateStatusEvent'])
@@ -446,15 +418,15 @@ class _TestMain(abc.ABC):
         fake_script(self, 'add-metric', 'exit 0')
 
         # First run "install" to make sure all hooks are set up.
-        state = self._simulate_event(EventSpec(InstallEvent, 'install'))
+        state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
-        state = self._simulate_event(EventSpec(ConfigChangedEvent, 'config-changed'))
+        state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
         self.assertEqual(list(state.observed_event_types), ['ConfigChangedEvent'])
 
         # Re-emit should not pick the deferred config-changed because
         # collect-metrics runs in a restricted context.
-        state = self._simulate_event(EventSpec(CollectMetricsEvent, 'collect-metrics'))
+        state = self._simulate_event(EventSpec(ops.CollectMetricsEvent, 'collect-metrics'))
         self.assertEqual(list(state.observed_event_types), ['CollectMetricsEvent'])
 
     def test_multiple_events_handled(self):
@@ -465,19 +437,19 @@ class _TestMain(abc.ABC):
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
         events_under_test = [(
-            EventSpec(InstallEvent, 'install'),
+            EventSpec(ops.InstallEvent, 'install'),
             {},
         ), (
-            EventSpec(StartEvent, 'start'),
+            EventSpec(ops.StartEvent, 'start'),
             {},
         ), (
-            EventSpec(UpdateStatusEvent, 'update_status'),
+            EventSpec(ops.UpdateStatusEvent, 'update_status'),
             {},
         ), (
-            EventSpec(LeaderSettingsChangedEvent, 'leader_settings_changed'),
+            EventSpec(ops.LeaderSettingsChangedEvent, 'leader_settings_changed'),
             {},
         ), (
-            EventSpec(RelationJoinedEvent, 'db_relation_joined',
+            EventSpec(ops.RelationJoinedEvent, 'db_relation_joined',
                       relation_id=1,
                       remote_app='remote',
                       remote_unit='remote/0'),
@@ -486,7 +458,7 @@ class _TestMain(abc.ABC):
              'app_name': 'remote',
              'unit_name': 'remote/0'},
         ), (
-            EventSpec(RelationChangedEvent, 'mon_relation_changed',
+            EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
                       relation_id=2,
                       remote_app='remote',
                       remote_unit='remote/0'),
@@ -495,7 +467,7 @@ class _TestMain(abc.ABC):
              'app_name': 'remote',
              'unit_name': 'remote/0'},
         ), (
-            EventSpec(RelationChangedEvent, 'mon_relation_changed',
+            EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
                       relation_id=2,
                       remote_app='remote',
                       remote_unit=None),
@@ -504,7 +476,7 @@ class _TestMain(abc.ABC):
              'app_name': 'remote',
              'unit_name': None},
         ), (
-            EventSpec(RelationDepartedEvent, 'mon_relation_departed',
+            EventSpec(ops.RelationDepartedEvent, 'mon_relation_departed',
                       relation_id=2,
                       remote_app='remote',
                       remote_unit='remote/0',
@@ -515,13 +487,13 @@ class _TestMain(abc.ABC):
              'unit_name': 'remote/0',
              'departing_unit_name': 'remote/42'},
         ), (
-            EventSpec(RelationBrokenEvent, 'ha_relation_broken',
+            EventSpec(ops.RelationBrokenEvent, 'ha_relation_broken',
                       relation_id=3),
             {'relation_name': 'ha',
              'relation_id': 3},
         ), (
             # Events without a remote app specified (for Juju < 2.7).
-            EventSpec(RelationJoinedEvent, 'db_relation_joined',
+            EventSpec(ops.RelationJoinedEvent, 'db_relation_joined',
                       relation_id=1,
                       remote_unit='remote/0'),
             {'relation_name': 'db',
@@ -529,7 +501,7 @@ class _TestMain(abc.ABC):
              'app_name': 'remote',
              'unit_name': 'remote/0'},
         ), (
-            EventSpec(RelationChangedEvent, 'mon_relation_changed',
+            EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
                       relation_id=2,
                       remote_unit='remote/0'),
             {'relation_name': 'mon',
@@ -537,7 +509,7 @@ class _TestMain(abc.ABC):
              'app_name': 'remote',
              'unit_name': 'remote/0'},
         ), (
-            EventSpec(RelationDepartedEvent, 'mon_relation_departed',
+            EventSpec(ops.RelationDepartedEvent, 'mon_relation_departed',
                       relation_id=2,
                       remote_unit='remote/0',
                       departing_unit_name='remote/42'),
@@ -547,26 +519,26 @@ class _TestMain(abc.ABC):
              'unit_name': 'remote/0',
              'departing_unit_name': 'remote/42'},
         ), (
-            EventSpec(ActionEvent, 'start_action',
+            EventSpec(ops.ActionEvent, 'start_action',
                       env_var='JUJU_ACTION_NAME'),
             {},
         ), (
-            EventSpec(ActionEvent, 'foo_bar_action',
+            EventSpec(ops.ActionEvent, 'foo_bar_action',
                       env_var='JUJU_ACTION_NAME'),
             {},
         ), (
-            EventSpec(PebbleReadyEvent, 'test_pebble_ready',
+            EventSpec(ops.PebbleReadyEvent, 'test_pebble_ready',
                       workload_name='test'),
             {'container_name': 'test'},
         ), (
-            EventSpec(SecretChangedEvent, 'secret_changed',
+            EventSpec(ops.SecretChangedEvent, 'secret_changed',
                       secret_id='secret:12345',
                       secret_label='foo'),
             {'id': 'secret:12345',
              'label': 'foo',
              'revision': 42}
         ), (
-            EventSpec(SecretRotateEvent, 'secret_rotate',
+            EventSpec(ops.SecretRotateEvent, 'secret_rotate',
                       secret_id='secret:12345',
                       secret_label='foo',
                       secret_revision='42'),
@@ -574,7 +546,7 @@ class _TestMain(abc.ABC):
              'label': 'foo',
              'revision': 42}
         ), (
-            EventSpec(SecretRemoveEvent, 'secret_remove',
+            EventSpec(ops.SecretRemoveEvent, 'secret_remove',
                       secret_id='secret:12345',
                       secret_label='foo',
                       secret_revision='42'),
@@ -582,7 +554,7 @@ class _TestMain(abc.ABC):
              'label': 'foo',
              'revision': 42}
         ), (
-            EventSpec(SecretExpiredEvent, 'secret_expired',
+            EventSpec(ops.SecretExpiredEvent, 'secret_expired',
                       secret_id='secret:12345',
                       secret_label='foo',
                       secret_revision='42'),
@@ -594,7 +566,7 @@ class _TestMain(abc.ABC):
         logger.debug('Expected events %s', events_under_test)
 
         # First run "install" to make sure all hooks are set up.
-        self._simulate_event(EventSpec(InstallEvent, 'install'))
+        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
 
         # Simulate hook executions for every event.
         for event_spec, expected_event_data in events_under_test:
@@ -624,25 +596,25 @@ class _TestMain(abc.ABC):
         hook_path.symlink_to('install')
 
         try:
-            self._simulate_event(EventSpec(HookEvent, 'not-implemented-event'))
+            self._simulate_event(EventSpec(ops.HookEvent, 'not-implemented-event'))
         except subprocess.CalledProcessError:
             self.fail('Event simulation for an unsupported event'
                       ' results in a non-zero exit code returned')
 
     def test_no_actions(self):
         (self.JUJU_CHARM_DIR / 'actions.yaml').unlink()
-        self._simulate_event(EventSpec(InstallEvent, 'install'))
+        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
 
     def test_empty_actions(self):
         (self.JUJU_CHARM_DIR / 'actions.yaml').write_text('')
-        self._simulate_event(EventSpec(InstallEvent, 'install'))
+        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
 
     def test_collect_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
-        self._simulate_event(EventSpec(InstallEvent, 'install'))
+        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         # Clear the calls during 'install'
         fake_script_calls(self, clear=True)
-        self._simulate_event(EventSpec(CollectMetricsEvent, 'collect_metrics'))
+        self._simulate_event(EventSpec(ops.CollectMetricsEvent, 'collect_metrics'))
 
         expected = [
             VERSION_LOGLINE,
@@ -654,10 +626,10 @@ class _TestMain(abc.ABC):
         self.assertEqual(calls, expected)
 
     def test_custom_event(self):
-        self._simulate_event(EventSpec(InstallEvent, 'install'))
+        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         # Clear the calls during 'install'
         fake_script_calls(self, clear=True)
-        self._simulate_event(EventSpec(UpdateStatusEvent, 'update-status',
+        self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status',
                                        set_in_env={'EMIT_CUSTOM_EVENT': "1"}))
 
         expected = [
@@ -673,24 +645,24 @@ class _TestMain(abc.ABC):
         fake_script(self, 'action-get', "echo '{}'")
 
         test_cases = [(
-            EventSpec(ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME'),
+            EventSpec(ops.ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME'),
             ['juju-log', '--log-level', 'CRITICAL', '--', 'super critical'],
         ), (
-            EventSpec(ActionEvent, 'log_error_action',
+            EventSpec(ops.ActionEvent, 'log_error_action',
                       env_var='JUJU_ACTION_NAME'),
             ['juju-log', '--log-level', 'ERROR', '--', 'grave error'],
         ), (
-            EventSpec(ActionEvent, 'log_warning_action',
+            EventSpec(ops.ActionEvent, 'log_warning_action',
                       env_var='JUJU_ACTION_NAME'),
             ['juju-log', '--log-level', 'WARNING', '--', 'wise warning'],
         ), (
-            EventSpec(ActionEvent, 'log_info_action',
+            EventSpec(ops.ActionEvent, 'log_info_action',
                       env_var='JUJU_ACTION_NAME'),
             ['juju-log', '--log-level', 'INFO', '--', 'useful info'],
         )]
 
         # Set up action symlinks.
-        self._simulate_event(EventSpec(InstallEvent, 'install'))
+        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
 
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
@@ -698,7 +670,7 @@ class _TestMain(abc.ABC):
 
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
-            self._simulate_event(EventSpec(InstallEvent, 'install',
+            self._simulate_event(EventSpec(ops.InstallEvent, 'install',
                                            set_in_env={'TRY_EXCEPTHOOK': '1'}))
 
         calls = [' '.join(i) for i in fake_script_calls(self)]
@@ -723,7 +695,7 @@ class _TestMain(abc.ABC):
 
         fake_script(self, 'action-get', "echo '{}'")
         state = self._simulate_event(EventSpec(
-            ActionEvent, 'get_model_name_action',
+            ops.ActionEvent, 'get_model_name_action',
             env_var='JUJU_ACTION_NAME',
             model_name='test-model-name'))
         self.assertIsNotNone(state)
@@ -735,7 +707,7 @@ class _TestMain(abc.ABC):
         fake_script(self, 'action-get', "echo '{}'")
         fake_script(self, 'status-get', """echo '{"status": "unknown", "message": ""}'""")
         state = self._simulate_event(EventSpec(
-            ActionEvent, 'get_status_action',
+            ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
         self.assertIsNotNone(state)
         self.assertEqual(state.status_name, 'unknown')
@@ -743,7 +715,7 @@ class _TestMain(abc.ABC):
         fake_script(
             self, 'status-get', """echo '{"status": "blocked", "message": "help meeee"}'""")
         state = self._simulate_event(EventSpec(
-            ActionEvent, 'get_status_action',
+            ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
         self.assertIsNotNone(state)
         self.assertEqual(state.status_name, 'blocked')
@@ -811,13 +783,13 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         """Test auto-creation of symlinks caused by initial events."""
         all_event_hooks = [f"hooks/{name.replace('_', '-')}"
                            for name, event_source in self.charm_module.Charm.on.events().items()
-                           if issubclass(event_source.event_type, LifecycleEvent)]
+                           if issubclass(event_source.event_type, ops.LifecycleEvent)]
 
         initial_events = {
-            EventSpec(InstallEvent, 'install'),
-            EventSpec(StorageAttachedEvent, 'disks-storage-attached'),
-            EventSpec(StartEvent, 'start'),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm'),
+            EventSpec(ops.InstallEvent, 'install'),
+            EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),
+            EventSpec(ops.StartEvent, 'start'),
+            EventSpec(ops.UpgradeCharmEvent, 'upgrade-charm'),
         }
         initial_hooks = {f"hooks/{ev.event_name}" for ev in initial_events}
 
@@ -847,7 +819,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
             _assess_event_links(initial_event)
 
     def test_setup_action_links(self):
-        self._simulate_event(EventSpec(InstallEvent, 'install'))
+        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         # foo-bar is one of the actions defined in actions.yaml
         action_hook = self.JUJU_CHARM_DIR / 'actions' / 'foo-bar'
         self.assertTrue(action_hook.exists())
@@ -886,10 +858,10 @@ class _TestMainWithDispatch(_TestMain):
         all_event_hooks = [f"hooks/{e.replace('_', '-')}"
                            for e in self.charm_module.Charm.on.events().keys()]
         initial_events = {
-            EventSpec(InstallEvent, 'install'),
-            EventSpec(StorageAttachedEvent, 'disks-storage-attached'),
-            EventSpec(StartEvent, 'start'),
-            EventSpec(UpgradeCharmEvent, 'upgrade-charm'),
+            EventSpec(ops.InstallEvent, 'install'),
+            EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),
+            EventSpec(ops.StartEvent, 'start'),
+            EventSpec(ops.UpgradeCharmEvent, 'upgrade-charm'),
         }
 
         def _assess_event_links(event_spec):
@@ -908,7 +880,7 @@ class _TestMainWithDispatch(_TestMain):
         old_path = self.fake_script_path
         self.fake_script_path = self.hooks_dir
         fake_script(self, 'install', 'exit 0')
-        state = self._simulate_event(EventSpec(InstallEvent, 'install'))
+        state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
 
         # the script was called, *and*, the .on. was called
         self.assertEqual(fake_script_calls(self), [['install', '']])
@@ -933,7 +905,7 @@ class _TestMainWithDispatch(_TestMain):
 
     def test_non_executable_hook_and_dispatch(self):
         (self.hooks_dir / "install").write_text("")
-        state = self._simulate_event(EventSpec(InstallEvent, 'install'))
+        state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
 
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
@@ -957,7 +929,7 @@ class _TestMainWithDispatch(_TestMain):
         old_path = self.fake_script_path
         self.fake_script_path = self.hooks_dir
         fake_script(self, 'install', 'exit 42')
-        event = EventSpec(InstallEvent, 'install')
+        event = EventSpec(ops.InstallEvent, 'install')
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(event)
         self.fake_script_path = old_path
@@ -975,7 +947,7 @@ class _TestMainWithDispatch(_TestMain):
         self.assertEqual(calls, expected)
 
     def test_hook_and_dispatch_but_hook_is_dispatch(self):
-        event = EventSpec(InstallEvent, 'install')
+        event = EventSpec(ops.InstallEvent, 'install')
         hook_path = self.hooks_dir / 'install'
         for ((rel, ind), path) in {
                 # relative and indirect
@@ -1007,7 +979,7 @@ class _TestMainWithDispatch(_TestMain):
         path = (self.hooks_dir / self.charm_exec_path).resolve()
         shutil.copy(str(path), str(hook_path))
 
-        event = EventSpec(InstallEvent, 'install')
+        event = EventSpec(ops.InstallEvent, 'install')
         state = self._simulate_event(event)
 
         # the .on. was only called once
@@ -1156,24 +1128,24 @@ class TestStorageHeuristics(unittest.TestCase):
         logassert.setup(self, '')
 
     def test_fallback_to_current_juju_version__too_old(self):
-        meta = CharmMeta.from_yaml("series: [kubernetes]")
+        meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "1.0"}):
             self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
             self.assertLogged('Using local storage: JUJU_VERSION=1.0.0')
 
     def test_fallback_to_current_juju_version__new_enough(self):
-        meta = CharmMeta.from_yaml("series: [kubernetes]")
+        meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
             self.assertTrue(_should_use_controller_storage(Path("/xyzzy"), meta))
             self.assertLogged('Using controller storage: JUJU_VERSION=2.8.0')
 
     def test_not_if_not_in_k8s(self):
-        meta = CharmMeta.from_yaml("series: [ecs]")
+        meta = ops.CharmMeta.from_yaml("series: [ecs]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
             self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
             self.assertLogged('Using local storage: not a Kubernetes podspec charm')
 
     def test_not_if_already_local(self):
-        meta = CharmMeta.from_yaml("series: [kubernetes]")
+        meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}), tempfile.NamedTemporaryFile() as fd:
             self.assertFalse(_should_use_controller_storage(Path(fd.name), meta))

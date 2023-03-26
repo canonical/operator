@@ -34,7 +34,7 @@ import uuid
 import pytest
 import websocket
 
-import ops.pebble as pebble
+from ops import pebble
 from ops._private import yaml
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"

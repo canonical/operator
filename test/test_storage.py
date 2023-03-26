@@ -24,24 +24,24 @@ from textwrap import dedent
 
 import yaml
 
-from ops import framework, storage
+import ops
 
 
 class StoragePermutations(abc.ABC):
 
-    def create_framework(self) -> framework.Framework:
+    def create_framework(self) -> ops.Framework:
         """Create a Framework that we can use to test the backend storage."""
-        return framework.Framework(self.create_storage(), None, None, None)
+        return ops.Framework(self.create_storage(), None, None, None)
 
     @abc.abstractmethod
-    def create_storage(self) -> storage.SQLiteStorage:
+    def create_storage(self) -> ops.storage.SQLiteStorage:
         """Create a Storage backend that we can interact with."""
         return NotImplemented
 
     def test_save_and_load_snapshot(self):
         f = self.create_framework()
 
-        class Sample(framework.Object):
+        class Sample(ops.Object):
 
             def __init__(self, parent, key, content):
                 super().__init__(parent, key)
@@ -74,7 +74,7 @@ class StoragePermutations(abc.ABC):
     def test_emit_event(self):
         f = self.create_framework()
 
-        class Evt(framework.EventBase):
+        class Evt(ops.EventBase):
             def __init__(self, handle, content):
                 super().__init__(handle)
                 self.content = content
@@ -85,10 +85,10 @@ class StoragePermutations(abc.ABC):
             def restore(self, content):
                 self.content = content
 
-        class Events(framework.ObjectEvents):
-            event = framework.EventSource(Evt)
+        class Events(ops.ObjectEvents):
+            event = ops.EventSource(Evt)
 
-        class Sample(framework.Object):
+        class Sample(ops.Object):
 
             on = Events()
 
@@ -121,37 +121,37 @@ class StoragePermutations(abc.ABC):
         store.save_snapshot('foo', {1: 2})
         self.assertEqual({1: 2}, store.load_snapshot('foo'))
         store.drop_snapshot('foo')
-        with self.assertRaises(storage.NoSnapshotError):
+        with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
 
     def test_save_snapshot_empty_string(self):
         store = self.create_storage()
-        with self.assertRaises(storage.NoSnapshotError):
+        with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
         store.save_snapshot('foo', '')
         self.assertEqual('', store.load_snapshot('foo'))
         store.drop_snapshot('foo')
-        with self.assertRaises(storage.NoSnapshotError):
+        with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
 
     def test_save_snapshot_none(self):
         store = self.create_storage()
-        with self.assertRaises(storage.NoSnapshotError):
+        with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
         store.save_snapshot('bar', None)
         self.assertEqual(None, store.load_snapshot('bar'))
         store.drop_snapshot('bar')
-        with self.assertRaises(storage.NoSnapshotError):
+        with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
 
     def test_save_snapshot_zero(self):
         store = self.create_storage()
-        with self.assertRaises(storage.NoSnapshotError):
+        with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
         store.save_snapshot('zero', 0)
         self.assertEqual(0, store.load_snapshot('zero'))
         store.drop_snapshot('zero')
-        with self.assertRaises(storage.NoSnapshotError):
+        with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
 
     def test_save_notice(self):
@@ -203,7 +203,7 @@ class StoragePermutations(abc.ABC):
 class TestSQLiteStorage(StoragePermutations, BaseTestCase):
 
     def create_storage(self):
-        return storage.SQLiteStorage(':memory:')
+        return ops.storage.SQLiteStorage(':memory:')
 
 
 def setup_juju_backend(test_case, state_file):
@@ -281,38 +281,38 @@ class TestJujuStorage(StoragePermutations, BaseTestCase):
         state_file = pathlib.Path(fn)
         self.addCleanup(state_file.unlink)
         setup_juju_backend(self, state_file)
-        return storage.JujuStorage()
+        return ops.storage.JujuStorage()
 
 
 class TestSimpleLoader(BaseTestCase):
 
     def test_is_c_loader(self):
-        loader = storage._SimpleLoader(io.StringIO(''))
+        loader = ops.storage._SimpleLoader(io.StringIO(''))
         if getattr(yaml, 'CSafeLoader', None) is not None:
             self.assertIsInstance(loader, yaml.CSafeLoader)
         else:
             self.assertIsInstance(loader, yaml.SafeLoader)
 
     def test_is_c_dumper(self):
-        dumper = storage._SimpleDumper(io.StringIO(''))
+        dumper = ops.storage._SimpleDumper(io.StringIO(''))
         if getattr(yaml, 'CSafeDumper', None) is not None:
             self.assertIsInstance(dumper, yaml.CSafeDumper)
         else:
             self.assertIsInstance(dumper, yaml.SafeDumper)
 
     def test_handles_tuples(self):
-        raw = yaml.dump((1, 'tuple'), Dumper=storage._SimpleDumper)
-        parsed = yaml.load(raw, Loader=storage._SimpleLoader)
+        raw = yaml.dump((1, 'tuple'), Dumper=ops.storage._SimpleDumper)
+        parsed = yaml.load(raw, Loader=ops.storage._SimpleLoader)
         self.assertEqual(parsed, (1, 'tuple'))
 
     def assertRefused(self, obj):  # noqa: N802
         # We shouldn't allow them to be written
         with self.assertRaises(yaml.representer.RepresenterError):
-            yaml.dump(obj, Dumper=storage._SimpleDumper)
+            yaml.dump(obj, Dumper=ops.storage._SimpleDumper)
         # If they did somehow end up written, we shouldn't be able to load them
         raw = yaml.dump(obj, Dumper=yaml.Dumper)
         with self.assertRaises(yaml.constructor.ConstructorError):
-            yaml.load(raw, Loader=storage._SimpleLoader)
+            yaml.load(raw, Loader=ops.storage._SimpleLoader)
 
     def test_forbids_some_types(self):
         self.assertRefused(1 + 2j)
@@ -330,11 +330,11 @@ class TestSimpleLoader(BaseTestCase):
 class TestJujuStateBackend(BaseTestCase):
 
     def test_is_not_available(self):
-        self.assertFalse(storage.juju_backend_available())
+        self.assertFalse(ops.storage.juju_backend_available())
 
     def test_is_available(self):
         fake_script(self, 'state-get', 'echo ""')
-        self.assertTrue(storage.juju_backend_available())
+        self.assertTrue(ops.storage.juju_backend_available())
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
     def test_set_encodes_args(self):
@@ -343,7 +343,7 @@ class TestJujuStateBackend(BaseTestCase):
             fake_script(self, 'state-set', dedent("""
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()))
-            backend = storage._JujuStorageBackend()
+            backend = ops.storage._JujuStorageBackend()
             backend.set('key', {'foo': 2})
             self.assertEqual(fake_script_calls(self, clear=True), [
                 ['state-set', '--file', '-'],
@@ -361,7 +361,7 @@ class TestJujuStateBackend(BaseTestCase):
         fake_script(self, 'state-get', dedent("""
             echo 'foo: "bar"'
             """))
-        backend = storage._JujuStorageBackend()
+        backend = ops.storage._JujuStorageBackend()
         value = backend.get('key')
         self.assertEqual(value, {'foo': 'bar'})
         self.assertEqual(fake_script_calls(self, clear=True), [
@@ -374,7 +374,7 @@ class TestJujuStateBackend(BaseTestCase):
             fake_script(self, 'state-set', dedent("""
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()))
-            backend = storage._JujuStorageBackend()
+            backend = ops.storage._JujuStorageBackend()
             complex_val = {
                 'foo': 2,
                 3: [1, 2, '3'],
@@ -394,7 +394,7 @@ class TestJujuStateBackend(BaseTestCase):
         outer = yaml.safe_load(content)
         key = 'Class[foo]/_stored'
         self.assertEqual(list(outer.keys()), [key])
-        inner = yaml.load(outer[key], Loader=storage._SimpleLoader)
+        inner = yaml.load(outer[key], Loader=ops.storage._SimpleLoader)
         self.assertEqual(complex_val, inner)
         self.assertEqual(content.decode('utf-8'), dedent("""\
             "Class[foo]/_stored": |
