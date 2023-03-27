@@ -751,7 +751,7 @@ class Layer:
         elif isinstance(other, Layer):
             return self.to_dict() == other.to_dict()
         else:
-            raise TypeError(f"Cannot compare pebble.Layer to {type(other)}")
+            return NotImplemented
 
     __str__ = to_yaml
 
@@ -834,7 +834,7 @@ class Service:
         elif isinstance(other, Service):
             return self.to_dict() == other.to_dict()
         else:
-            raise TypeError(f"Cannot compare pebble.Service to {type(other)}")
+            return NotImplemented
 
 
 class ServiceStartup(enum.Enum):
@@ -951,7 +951,7 @@ class Check:
         elif isinstance(other, Check):
             return self.to_dict() == other.to_dict()
         else:
-            raise TypeError(f"Cannot compare pebble.Check to {type(other)}")
+            return NotImplemented
 
 
 class CheckLevel(enum.Enum):

@@ -662,8 +662,7 @@ summary: Sum Mary
         self.assertNotEqual(s, {})
         self.assertEqual(s, d)
 
-        with self.assertRaises(TypeError):
-            self.assertEqual(s, 5)
+        self.assertNotEqual(s, 5)
 
 
 class TestService(unittest.TestCase):
@@ -795,8 +794,7 @@ class TestService(unittest.TestCase):
         }
         self.assertEqual(one, as_dict)
 
-        with self.assertRaises(TypeError):
-            self.assertEqual(one, 5)
+        self.assertNotEqual(one, 5)
 
 
 class TestCheck(unittest.TestCase):
@@ -880,8 +878,7 @@ class TestCheck(unittest.TestCase):
         d['level'] = 'ready'
         self.assertNotEqual(one, d)
 
-        with self.assertRaises(TypeError):
-            self.assertEqual(one, 5)
+        self.assertNotEqual(one, 5)
 
 
 class TestServiceInfo(unittest.TestCase):
