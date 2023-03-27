@@ -744,11 +744,14 @@ class Layer:
     def __repr__(self) -> str:
         return f'Layer({self.to_dict()!r})'
 
-    def __eq__(self, other: Any) -> bool:
-        if isinstance(other, Layer):
+    def __eq__(self, other: Union['LayerDict', 'Layer']) -> bool:
+        """Reports whether this layer configuration is equal to another."""
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Layer):
             return self.to_dict() == other.to_dict()
         else:
-            return NotImplemented
+            raise TypeError(f"Cannot compare pebble.Layer to {type(other)}")
 
     __str__ = to_yaml
 
@@ -825,15 +828,13 @@ class Service:
         return f'Service({self.to_dict()!r})'
 
     def __eq__(self, other: Union['_ServiceDict', 'Service']) -> bool:
-        """Compare this service description to another."""
+        """Reports whether this service configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, Service):
             return self.to_dict() == other.to_dict()
         else:
-            raise ValueError(
-                f"Cannot compare pebble.Service to {type(other)}"
-            )
+            raise TypeError(f"Cannot compare pebble.Service to {type(other)}")
 
 
 class ServiceStartup(enum.Enum):
@@ -944,13 +945,13 @@ class Check:
         return f'Check({self.to_dict()!r})'
 
     def __eq__(self, other: Union['_CheckDict', 'Check']) -> bool:
-        """Compare this check configuration to another."""
-        if isinstance(other, dict):  # pyright: reportUnnecessaryComparison=false
+        """Reports whether this check configuration is equal to another."""
+        if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, Check):
             return self.to_dict() == other.to_dict()
         else:
-            raise ValueError(f"Cannot compare pebble.Check to {type(other)}")
+            raise TypeError(f"Cannot compare pebble.Check to {type(other)}")
 
 
 class CheckLevel(enum.Enum):

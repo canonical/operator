@@ -654,9 +654,16 @@ summary: Sum Mary
         }
         t = pebble.Layer(d)
         self.assertNotEqual(s, t)
+        self.assertNotEqual(t, {})
+        self.assertEqual(t, d)
 
         s = pebble.Layer(d)
         self.assertEqual(s, t)
+        self.assertNotEqual(s, {})
+        self.assertEqual(s, d)
+
+        with self.assertRaises(TypeError):
+            self.assertEqual(s, 5)
 
 
 class TestService(unittest.TestCase):
@@ -788,7 +795,7 @@ class TestService(unittest.TestCase):
         }
         self.assertEqual(one, as_dict)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             self.assertEqual(one, 5)
 
 
@@ -873,7 +880,7 @@ class TestCheck(unittest.TestCase):
         d['level'] = 'ready'
         self.assertNotEqual(one, d)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             self.assertEqual(one, 5)
 
 
