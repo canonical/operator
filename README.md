@@ -482,32 +482,43 @@ Also, you can run assertions on it on the output side the same as any other bit 
 
 # Emitted events
 If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it can be hard to examine the resulting control flow.
-In these situations it can be useful to verify that, as a result of a given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The resulting state, black-box as it is, gives little insight into how exactly it was obtained. One important source of information at debug time is the `debug-log`, which `scenario.utils.emitted_events` leverages to allow you to peep into that black box.
+In these situations it can be useful to verify that, as a result of a given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The resulting state, black-box as it is, gives little insight into how exactly it was obtained. `scenario.capture_events` allows you to open a peephole and intercept any events emitted by the framework. 
 
 Usage: 
 
 ```python
+from ops.charm import StartEvent, UpdateStatusEvent
 from scenario import State, DeferredEvent
-from scenario.utils import emitted_events
-state_out = State(deferred=[DeferredEvent('foo')]).trigger('start', ...)
-emitted = emitted_events(state_out)
-data = [(e.name, e.source) for e in emitted]
+from scenario import capture_events
+with capture_events() as emitted:
+    state_out = State(deferred=[DeferredEvent('start', ...)]).trigger('update-status', ...)
 
-assert data == [
-  ('foo', 'deferral'),  # deferred events get reemitted first
-  ('start', 'juju'),    # then comes the 'main' juju event we're triggering
-  ('bar', 'custom'),  # then come the tail of custom events that the charm (and its libs) emit while handling the 'main' juju event.
-  ('baz', 'custom'),  
-  ('qux', 'custom')  
-]
-
-# or you can count the number of events of a certain type:
-from collections import Counter
-
-counter = Counter(map(lambda t: t.name, emitted))
-assert counter['relation-changed'] == 2
-assert counter.total() == 5
+# deferred events get reemitted first
+assert isinstance(emitted[0], StartEvent)
+# the main juju event gets emitted next
+assert isinstance(emitted[1], UpdateStatusEvent)
+# possibly followed by a tail of all custom events that the main juju event triggered in turn
+# assert isinstance(emitted[2], MyFooEvent)
+# ... 
 ```
+
+
+You can filter events by type like so:
+
+```python
+from ops.charm import StartEvent, RelationEvent
+from scenario import capture_events
+with capture_events(StartEvent, RelationEvent) as emitted:
+    # capture all `start` and `*-relation-*` events.
+    pass  
+```
+
+Passing no event types, like: `capture_events()`, is equivalent to `capture_events(EventBase)`.
+
+By default, **framework events** (`PreCommit`, `Commit`) are not considered for inclusion in the output list even if they match the instance check. You can toggle that by passing: `capture_events(include_framework=True)`.
+
+By default, **deferred events** are included in the listing if they match the instance check. You can toggle that by passing:
+`capture_events(include_deferred=True)`.
 
 
 # The virtual charm root
