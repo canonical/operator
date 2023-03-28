@@ -46,7 +46,6 @@ def mycharm():
 @pytest.mark.parametrize("evt_name", ("rubbish", "foo", "bar", "kazoo_pebble_ready"))
 def test_rubbish_event_raises(mycharm, evt_name):
     with pytest.raises(NoObserverError):
-
         if evt_name.startswith("kazoo"):
             os.environ["SCENARIO_SKIP_CONSISTENCY_CHECKS"] = "true"
             # else it will whine about the container not being in state and meta;

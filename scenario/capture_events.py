@@ -3,17 +3,24 @@
 # See LICENSE file for licensing details.
 import typing
 from contextlib import contextmanager
-from typing import Type, TypeVar, ContextManager, List
+from typing import ContextManager, List, Type, TypeVar
 
-from ops.framework import EventBase, Framework, PreCommitEvent, CommitEvent, Handle, NoTypeError
+from ops.framework import (
+    CommitEvent,
+    EventBase,
+    Framework,
+    Handle,
+    NoTypeError,
+    PreCommitEvent,
+)
 
 _T = TypeVar("_T", bound=EventBase)
 
 
 @contextmanager
-def capture_events(*types: Type[EventBase],
-                   include_framework=False,
-                   include_deferred=True) -> ContextManager[List[EventBase]]:
+def capture_events(
+    *types: Type[EventBase], include_framework=False, include_deferred=True
+) -> ContextManager[List[EventBase]]:
     """Capture all events of type `*types` (using instance checks).
 
     Example::
@@ -63,7 +70,9 @@ def capture_events(*types: Type[EventBase],
             event.deferred = False
             self._forget(event)  # prevent tracking conflicts
 
-            if not include_framework and isinstance(event, (PreCommitEvent, CommitEvent)):
+            if not include_framework and isinstance(
+                event, (PreCommitEvent, CommitEvent)
+            ):
                 continue
 
             if isinstance(event, allowed_types):
@@ -78,4 +87,3 @@ def capture_events(*types: Type[EventBase],
 
     Framework._emit = _real_emit  # type: ignore # noqa # ugly
     Framework.reemit = _real_reemit  # type: ignore # noqa # ugly
-

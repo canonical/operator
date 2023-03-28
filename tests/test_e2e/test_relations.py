@@ -74,7 +74,11 @@ def test_relation_events(mycharm, evt_name):
 
     mycharm._call = lambda self, evt: None
 
-    State(relations=[relation,],).trigger(
+    State(
+        relations=[
+            relation,
+        ],
+    ).trigger(
         getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
@@ -106,7 +110,11 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
 
     mycharm._call = callback
 
-    State(relations=[relation,],).trigger(
+    State(
+        relations=[
+            relation,
+        ],
+    ).trigger(
         getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
