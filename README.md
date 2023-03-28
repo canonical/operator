@@ -141,18 +141,19 @@ from scenario import State
 
 def test_statuses():
     out = State(leader=False).trigger(
-        'start', 
+        'start',
         MyCharm,
         meta={"name": "foo"})
     assert out.status.unit_history == [
       UnknownStatus(),
       MaintenanceStatus('determining who the ruler is...'),
       WaitingStatus('checking this is right...'),
-      ActiveStatus('I am ruled')
     ]
 ```
 
-Note that, unless you initialize the State with a preexisting status, the first status in the history will always be `unknown`. That is because, so far as scenario is concerned, each event is "the first event this charm has ever seen".
+Note that the current status is not in the **unit status history**.
+
+Also note that, unless you initialize the State with a preexisting status, the first status in the history will always be `unknown`. That is because, so far as scenario is concerned, each event is "the first event this charm has ever seen".
 
 If you want to simulate a situation in which the charm already has seen some event, and is in a status other than Unknown (the default status every charm is born with), you will have to pass the 'initial status' in State.
 
@@ -265,23 +266,28 @@ from scenario.state import State, Container, Mount
 
 
 class MyCharm(CharmBase):
-    def _on_start(self, _):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+
+    def _on_pebble_ready(self, _):
         foo = self.unit.get_container('foo')
         foo.push('/local/share/config.yaml', "TEST", make_dirs=True)
 
 
 def test_pebble_push():
-    local_file = tempfile.TemporaryFile()
-    container = Container(name='foo',
-                          mounts={'local': Mount('/local/share/config.yaml', local_file.name)})
-    out = State(
-        containers=[container]
-    ).trigger(
-        container.pebble_ready_event,
-        MyCharm,
-        meta={"name": "foo", "containers": {"foo": {}}},
-    )
-    assert local_file.open().read() == "TEST"
+    with tempfile.NamedTemporaryFile() as local_file:
+        container = Container(name='foo',
+                              can_connect=True,
+                              mounts={'local': Mount('/local/share/config.yaml', local_file.name)})
+        out = State(
+            containers=[container]
+        ).trigger(
+            container.pebble_ready_event,
+            MyCharm,
+            meta={"name": "foo", "containers": {"foo": {}}},
+        )
+        assert local_file.read().decode() == "TEST"
 ```
 
 `container.pebble_ready_event` is syntactic sugar for: `Event("foo-pebble-ready", container=container)`. The reason we need to associate the container with the event is that the Framework uses an envvar to determine which container the pebble-ready event is about (it does not use the event name). Scenario needs that information, similarly, for injecting that envvar into the charm's runtime.
