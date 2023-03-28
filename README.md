@@ -486,6 +486,47 @@ And the charm's runtime will see `self.stored_State.foo` and `.baz` as expected.
 Also, you can run assertions on it on the output side the same as any other bit of state.
 
 
+# Emitted events
+If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it can be hard to examine the resulting control flow.
+In these situations it can be useful to verify that, as a result of a given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The resulting state, black-box as it is, gives little insight into how exactly it was obtained. `scenario.capture_events` allows you to open a peephole and intercept any events emitted by the framework. 
+
+Usage: 
+
+```python
+from ops.charm import StartEvent, UpdateStatusEvent
+from scenario import State, DeferredEvent
+from scenario import capture_events
+with capture_events() as emitted:
+    state_out = State(deferred=[DeferredEvent('start', ...)]).trigger('update-status', ...)
+
+# deferred events get reemitted first
+assert isinstance(emitted[0], StartEvent)
+# the main juju event gets emitted next
+assert isinstance(emitted[1], UpdateStatusEvent)
+# possibly followed by a tail of all custom events that the main juju event triggered in turn
+# assert isinstance(emitted[2], MyFooEvent)
+# ... 
+```
+
+
+You can filter events by type like so:
+
+```python
+from ops.charm import StartEvent, RelationEvent
+from scenario import capture_events
+with capture_events(StartEvent, RelationEvent) as emitted:
+    # capture all `start` and `*-relation-*` events.
+    pass  
+```
+
+Passing no event types, like: `capture_events()`, is equivalent to `capture_events(EventBase)`.
+
+By default, **framework events** (`PreCommit`, `Commit`) are not considered for inclusion in the output list even if they match the instance check. You can toggle that by passing: `capture_events(include_framework=True)`.
+
+By default, **deferred events** are included in the listing if they match the instance check. You can toggle that by passing:
+`capture_events(include_deferred=True)`.
+
+
 # The virtual charm root
 Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. 
 The charm will see that tempdir as its 'root'. This allows us to keep things simple when dealing with metadata that can 

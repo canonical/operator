@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-import base64
 import datetime
 import json
 import logging
@@ -14,7 +13,7 @@ from dataclasses import asdict
 from enum import Enum
 from itertools import chain
 from pathlib import Path
-from subprocess import CalledProcessError, check_output, run
+from subprocess import run
 from textwrap import dedent
 from typing import Any, BinaryIO, Dict, Iterable, List, Optional, TextIO, Tuple, Union
 
@@ -174,7 +173,6 @@ def get_network(target: JujuUnitName, model: Optional[str], endpoint: str) -> Ne
 
     bind_addresses = []
     for raw_bind in jsn["bind-addresses"]:
-
         addresses = []
         for raw_adds in raw_bind["addresses"]:
             addresses.append(
