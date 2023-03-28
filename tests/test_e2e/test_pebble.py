@@ -104,7 +104,7 @@ def test_fs_pull(charm_cls, make_dirs):
                 container.push("/foo/bar/baz.txt", text, make_dirs=make_dirs)
 
             # check that nothing was changed
-            with pytest.raises(FileNotFoundError):
+            with pytest.raises((FileNotFoundError, pebble.PathError)):
                 container.pull("/foo/bar/baz.txt")
 
     td = tempfile.TemporaryDirectory()
