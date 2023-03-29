@@ -157,7 +157,8 @@ class Runtime:
         #  running this in a clean venv or a container anyway.
         # cleanup env, in case we'll be firing multiple events, we don't want to accumulate.
         for key in env:
-            os.unsetenv(key)
+            # os.unsetenv does not work !?
+            del os.environ[key]
 
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
         if event.name.endswith("_action"):
@@ -183,8 +184,33 @@ class Runtime:
                 {
                     "JUJU_RELATION": relation.endpoint,
                     "JUJU_RELATION_ID": str(relation.relation_id),
+                    "JUJU_REMOTE_APP": relation.remote_app_name,
                 }
             )
+
+            if event._is_relation_event:  # noqa
+                remote_unit_id = event.relation_remote_unit_id
+                if not remote_unit_id:
+                    if len(relation.remote_unit_ids) == 1:
+                        remote_unit_id = relation.remote_unit_ids[0]
+                        logger.info(
+                            "there's only one remote unit, so we set JUJU_REMOTE_UNIT to it, "
+                            "but you probably should be parametrizing the event with `remote_unit` "
+                            "to be explicit."
+                        )
+                    else:
+                        logger.warning(
+                            "unable to determine remote unit ID; which means JUJU_REMOTE_UNIT will "
+                            "be unset and you might get error if charm code attempts to access "
+                            "`event.unit` in event handlers. \n"
+                            "If that is the case, pass `remote_unit` to the Event constructor."
+                        )
+
+                if remote_unit_id:
+                    remote_unit = f"{relation.remote_app_name}/{remote_unit_id}"
+                    env["JUJU_REMOTE_UNIT"] = remote_unit
+                    if event.name.endswith("_relation_departed"):
+                        env["JUJU_DEPARTING_UNIT"] = remote_unit
 
         if container := event.container:
             env.update({"JUJU_WORKLOAD_NAME": container.name})
@@ -348,8 +374,9 @@ class Runtime:
             finally:
                 logger.info(" - Exited ops.main.")
 
-            logger.info(" - clearing env")
+            logger.info(" - Clearing env")
             self._cleanup_env(env)
+            assert not os.getenv("JUJU_DEPARTING_UNIT")
 
             logger.info(" - closing storage")
             output_state = self._close_storage(output_state, temporary_charm_root)

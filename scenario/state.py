@@ -144,6 +144,27 @@ def normalize_name(s: str):
     return s.replace("-", "_")
 
 
+class ParametrizedEvent:
+    def __init__(self, accept_params: Tuple[str], category: str, *args, **kwargs):
+        self._accept_params = accept_params
+        self._category = category
+        self._args = args
+        self._kwargs = kwargs
+
+    def __call__(self, remote_unit: Optional[str] = None) -> "Event":
+        """Construct an Event object using the arguments provided at init and any extra params."""
+        if remote_unit and "remote_unit" not in self._accept_params:
+            raise ValueError(
+                f"cannot pass param `remote_unit` to a "
+                f"{self._category} event constructor."
+            )
+
+        return Event(*self._args, *self._kwargs, relation_remote_unit=remote_unit)
+
+    def deferred(self, handler: Callable, event_id: int = 1) -> "DeferredEvent":
+        return self().deferred(handler=handler, event_id=event_id)
+
+
 @dataclasses.dataclass
 class Relation(_DCBase):
     endpoint: str
@@ -191,35 +212,35 @@ class Relation(_DCBase):
             self.remote_units_data = {0: {}}
 
     @property
-    def changed_event(self):
+    def changed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-changed event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-changed"), relation=self
         )
 
     @property
-    def joined_event(self):
+    def joined_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-joined event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-joined"), relation=self
         )
 
     @property
-    def created_event(self):
+    def created_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-created event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-created"), relation=self
         )
 
     @property
-    def departed_event(self):
+    def departed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-departed event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-departed"), relation=self
         )
 
     @property
-    def broken_event(self):
+    def broken_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-broken"), relation=self
@@ -721,6 +742,8 @@ class Event(_DCBase):
 
     # if this is a relation event, the relation it refers to
     relation: Optional[Relation] = None
+    # and the name of the remote unit this relation event is about
+    relation_remote_unit_id: Optional[int] = None
 
     # if this is a secret event, the secret it refers to
     secret: Optional[Secret] = None
@@ -732,6 +755,14 @@ class Event(_DCBase):
     #  - secret events
     #  - pebble?
     #  - action?
+
+    def __call__(self, remote_unit: Optional[int] = None) -> "Event":
+        if remote_unit and not self._is_relation_event:
+            raise ValueError(
+                "cannot pass param `remote_unit` to a "
+                "non-relation event constructor."
+            )
+        return self.replace(relation_remote_unit_id=remote_unit)
 
     def __post_init__(self):
         if "-" in self.name:
@@ -834,9 +865,9 @@ class Event(_DCBase):
             # this is a RelationEvent. The snapshot:
             snapshot_data = {
                 "relation_name": self.relation.endpoint,
-                "relation_id": self.relation.relation_id
-                # 'app_name': local app name
-                # 'unit_name': local unit name
+                "relation_id": self.relation.relation_id,
+                "app_name": self.relation.remote_app_name,
+                "unit_name": f"{self.relation.remote_app_name}/{self.relation_remote_unit_id}",
             }
 
         return DeferredEvent(

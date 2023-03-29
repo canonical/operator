@@ -1,7 +1,8 @@
+import os
 from typing import Type
 
 import pytest
-from ops.charm import CharmBase, CharmEvents
+from ops.charm import CharmBase, CharmEvents, RelationDepartedEvent
 from ops.framework import EventBase, Framework
 
 from scenario.state import Relation, State
@@ -107,6 +108,79 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
 
     def callback(charm: CharmBase, _):
         assert charm.model.get_relation("foo").app.name == remote_app_name
+
+    mycharm._call = callback
+
+    State(
+        relations=[
+            relation,
+        ],
+    ).trigger(
+        getattr(relation, f"{evt_name}_event"),
+        mycharm,
+        meta={
+            "name": "local",
+            "requires": {
+                "foo": {"interface": "foo"},
+            },
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "evt_name",
+    ("changed", "broken", "departed", "joined", "created"),
+)
+@pytest.mark.parametrize(
+    "remote_app_name",
+    ("remote", "prometheus", "aodeok123"),
+)
+def test_relation_events_attrs(mycharm, evt_name, remote_app_name):
+    relation = Relation(
+        endpoint="foo", interface="foo", remote_app_name=remote_app_name
+    )
+
+    def callback(charm: CharmBase, event):
+        assert event.app
+        assert event.unit
+        if isinstance(event, RelationDepartedEvent):
+            assert event.departing_unit
+
+    mycharm._call = callback
+
+    State(
+        relations=[
+            relation,
+        ],
+    ).trigger(
+        getattr(relation, f"{evt_name}_event")(remote_unit=1),
+        mycharm,
+        meta={
+            "name": "local",
+            "requires": {
+                "foo": {"interface": "foo"},
+            },
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "evt_name",
+    ("changed", "broken", "departed", "joined", "created"),
+)
+@pytest.mark.parametrize(
+    "remote_app_name",
+    ("remote", "prometheus", "aodeok123"),
+)
+def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name):
+    relation = Relation(
+        endpoint="foo", interface="foo", remote_app_name=remote_app_name
+    )
+
+    def callback(charm: CharmBase, event):
+        assert event.app  # that's always present
+        assert not event.unit
+        assert not getattr(event, "departing_unit", False)
 
     mycharm._call = callback
 
