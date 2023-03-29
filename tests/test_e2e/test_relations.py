@@ -176,9 +176,12 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_i
     "remote_app_name",
     ("remote", "prometheus", "aodeok123"),
 )
-def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name):
+def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     relation = Relation(
-        endpoint="foo", interface="foo", remote_app_name=remote_app_name
+        endpoint="foo",
+        interface="foo",
+        remote_app_name=remote_app_name,
+        remote_units_data={0: {}, 1: {}},  # 2 units
     )
 
     def callback(charm: CharmBase, event):
@@ -202,3 +205,5 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name):
             },
         },
     )
+
+    assert "unable to determine remote unit ID" in caplog.text
