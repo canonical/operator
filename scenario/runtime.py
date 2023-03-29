@@ -190,7 +190,7 @@ class Runtime:
 
             if event._is_relation_event:  # noqa
                 remote_unit_id = event.relation_remote_unit_id
-                if not remote_unit_id:
+                if remote_unit_id is None:  # don't check truthiness because it could be int(0)
                     if len(relation.remote_unit_ids) == 1:
                         remote_unit_id = relation.remote_unit_ids[0]
                         logger.info(
@@ -206,7 +206,7 @@ class Runtime:
                             "If that is the case, pass `remote_unit` to the Event constructor."
                         )
 
-                if remote_unit_id:
+                if remote_unit_id is not None:
                     remote_unit = f"{relation.remote_app_name}/{remote_unit_id}"
                     env["JUJU_REMOTE_UNIT"] = remote_unit
                     if event.name.endswith("_relation_departed"):

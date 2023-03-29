@@ -135,7 +135,11 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
     "remote_app_name",
     ("remote", "prometheus", "aodeok123"),
 )
-def test_relation_events_attrs(mycharm, evt_name, remote_app_name):
+@pytest.mark.parametrize(
+    "remote_unit_id",
+    (0, 1),
+)
+def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_id):
     relation = Relation(
         endpoint="foo", interface="foo", remote_app_name=remote_app_name
     )
@@ -153,7 +157,7 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name):
             relation,
         ],
     ).trigger(
-        getattr(relation, f"{evt_name}_event")(remote_unit=1),
+        getattr(relation, f"{evt_name}_event")(remote_unit=remote_unit_id),
         mycharm,
         meta={
             "name": "local",
