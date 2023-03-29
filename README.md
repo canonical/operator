@@ -212,6 +212,40 @@ def test_relation_data():
 # which is very idiomatic and superbly explicit. Noice.
 ```
 
+If you want to trigger relation events, the easiest way to do so is get a hold of the Relation instance and grab the event from one of its aptly-named properties:
+
+```python
+from scenario import Relation
+relation = Relation(endpoint="foo", interface="bar")
+changed_event = relation.changed_event
+joined_event = relation.joined_event
+# ...
+```
+
+This is in fact syntactic sugar for:
+```python
+from scenario import Relation, Event
+relation = Relation(endpoint="foo", interface="bar")
+changed_event = Event('foo-relation-changed', relation=relation)
+```
+
+The reason for this construction is that the event is associated with some relation-specific metadata, that Scenario needs to set up the process that will run `ops.main` with the right environment variables.
+
+### Additional event parameters
+All relation events have some additional metadata that does not belong in the Relation object, such as, for a relation-joined event, the name of the (remote) unit that is joining the relation. That is what determines what `ops.model.Unit` you get when you get `RelationJoinedEvent().unit` in an event handler.
+
+In order to supply this parameter, you will have to **call** the event object and pass as `remote_unit` the id of the remote unit that the event is about.
+
+```python
+from scenario import Relation, Event
+relation = Relation(endpoint="foo", interface="bar")
+remote_unit_2_is_joining_event = relation.joined_event(remote_unit=2)
+
+# which is syntactic sugar for:
+remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation, relation_remote_unit_id=2)
+```
+
+
 ## Containers
 
 When testing a kubernetes charm, you can mock container interactions.
