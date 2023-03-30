@@ -7,6 +7,7 @@ import datetime
 import inspect
 import re
 import typing
+from enum import Enum
 from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
@@ -172,19 +173,18 @@ class ParametrizedEvent:
         return self().deferred(handler=handler, event_id=event_id)
 
 
+class RelationType(str, Enum):
+    subordinate = "subordinate"
+    regular = "regular"
+    peer = "peer"
+
+
 @dataclasses.dataclass
-class Relation(_DCBase):
+class RelationBase(_DCBase):
+    if typing.TYPE_CHECKING:
+        __type__: RelationType
+
     endpoint: str
-    remote_app_name: str = "remote"
-    remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
-
-    # local limit
-    limit: int = 1
-
-    # scale of the remote application; number of units, leader ID?
-    # TODO figure out if this is relevant
-    scale: int = 1
-    leader_id: int = 0
 
     # we can derive this from the charm's metadata
     interface: str = None
@@ -193,11 +193,12 @@ class Relation(_DCBase):
     relation_id: int = -1
 
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
-        default_factory=dict
-    )
+
+    @property
+    def __databags__(self):
+        yield self.local_app_data
+        yield self.local_unit_data
 
     def __post_init__(self):
         global _RELATION_IDS_CTR
@@ -205,35 +206,20 @@ class Relation(_DCBase):
             _RELATION_IDS_CTR += 1
             self.relation_id = _RELATION_IDS_CTR
 
-        if self.remote_unit_ids and self.remote_units_data:
-            if not set(self.remote_unit_ids) == set(self.remote_units_data):
-                raise StateValidationError(
-                    f"{self.remote_unit_ids} should include any and all IDs from {self.remote_units_data}"
-                )
-        elif self.remote_unit_ids:
-            self.remote_units_data = {x: {} for x in self.remote_unit_ids}
-        elif self.remote_units_data:
-            self.remote_unit_ids = [x for x in self.remote_units_data]
-        else:
-            self.remote_unit_ids = [0]
-            self.remote_units_data = {0: {}}
+        for databag in self.__databags__:
+            self._validate_databag(databag)
 
-        for databag in (
-            self.local_unit_data,
-            self.local_app_data,
-            self.remote_app_data,
-            *self.remote_units_data.values(),
-        ):
-            if not isinstance(databag, dict):
+    def _validate_databag(self, databag: dict):
+        if not isinstance(databag, dict):
+            raise StateValidationError(
+                f"all databags should be dicts, not {type(databag)}"
+            )
+        for k, v in databag.items():
+            if not isinstance(v, str):
                 raise StateValidationError(
-                    f"all databags should be dicts, not {type(databag)}"
+                    f"all databags should be Dict[str,str]; "
+                    f"found a value of type {type(v)}"
                 )
-            for k, v in databag.items():
-                if not isinstance(v, str):
-                    raise StateValidationError(
-                        f"all databags should be Dict[str,str]; "
-                        f"found a value of type {type(v)}"
-                    )
 
     @property
     def changed_event(self) -> "Event":
@@ -268,6 +254,121 @@ class Relation(_DCBase):
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-broken"), relation=self
+        )
+
+
+def unify_ids_and_remote_units_data(ids: List[int], data: Dict[int, Any]):
+    """Unify and validate a list of unit IDs and a mapping from said ids to databag contents.
+
+    This allows the user to pass equivalently:
+    ids = []
+    data = {1: {}}
+
+    or
+
+    ids = [1]
+    data = {}
+
+    or
+
+    ids = [1]
+    data = {1: {}}
+
+    but catch the inconsistent:
+
+    ids = [1]
+    data = {2: {}}
+
+    or
+
+    ids = [2]
+    data = {1: {}}
+    """
+    if ids and data:
+        if not set(ids) == set(data):
+            raise StateValidationError(
+                f"{ids} should include any and all IDs from {data}"
+            )
+    elif ids:
+        data = {x: {} for x in ids}
+    elif data:
+        ids = [x for x in data]
+    else:
+        ids = [0]
+        data = {0: {}}
+    return ids, data
+
+
+@dataclasses.dataclass
+class Relation(RelationBase):
+    __type__ = RelationType.regular
+    remote_app_name: str = "remote"
+    remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
+
+    # local limit
+    limit: int = 1
+
+    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
+        default_factory=dict
+    )
+
+    @property
+    def __databags__(self):
+        yield self.local_app_data
+        yield self.local_unit_data
+        yield self.remote_app_data
+        yield from self.remote_units_data.values()
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.remote_unit_ids, self.remote_units_data = unify_ids_and_remote_units_data(
+            self.remote_unit_ids, self.remote_units_data
+        )
+
+
+@dataclasses.dataclass
+class SubordinateRelation(RelationBase):
+    __type__ = RelationType.subordinate
+    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    remote_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+
+    # app name and ID of the primary that *this unit* is attached to.
+    primary_app_name: str = "remote"
+    primary_id: int = 0
+
+    # IDs of the peers. Consistency checks will validate that *this unit*'s ID is not in here.
+    peers_ids: List[int] = dataclasses.field(default_factory=list)
+
+    @property
+    def __databags__(self):
+        yield self.local_app_data
+        yield self.local_unit_data
+        yield self.remote_app_data
+        yield self.remote_unit_data
+
+    @property
+    def primary_name(self) -> str:
+        return f"{self.primary_app_name}/{self.primary_id}"
+
+
+@dataclasses.dataclass
+class PeerRelation(RelationBase):
+    __type__ = RelationType.peer
+    peers_data: Dict[int, Dict[str, str]] = dataclasses.field(default_factory=dict)
+
+    # IDs of the peers. Consistency checks will validate that *this unit*'s ID is not in here.
+    peers_ids: List[int] = dataclasses.field(default_factory=list)
+
+    @property
+    def __databags__(self):
+        yield self.local_app_data
+        yield self.local_unit_data
+        yield from self.peers_data.values()
+
+    def __post_init__(self):
+        self.peers_ids, self.peers_data = unify_ids_and_remote_units_data(
+            self.peers_ids, self.peers_data
         )
 
 

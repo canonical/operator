@@ -6,7 +6,14 @@ from ops.charm import CharmBase, CharmEvents, RelationDepartedEvent
 from ops.framework import EventBase, Framework
 
 from scenario.runtime import InconsistentScenarioError
-from scenario.state import Relation, State, StateValidationError
+from scenario.state import (
+    PeerRelation,
+    Relation,
+    RelationType,
+    State,
+    StateValidationError,
+    SubordinateRelation,
+)
 
 
 @pytest.fixture(scope="function")
@@ -222,3 +229,15 @@ def test_relation_unit_data_bad_types(mycharm, data):
 def test_relation_app_data_bad_types(mycharm, data):
     with pytest.raises(StateValidationError):
         relation = Relation(endpoint="foo", interface="foo", local_app_data={"a": data})
+
+
+@pytest.mark.parametrize(
+    "relation, expected_type",
+    (
+        (Relation("a"), RelationType.regular),
+        (PeerRelation("b"), RelationType.peer),
+        (SubordinateRelation("b"), RelationType.subordinate),
+    ),
+)
+def test_relation_type(relation, expected_type):
+    assert relation.__type__ == expected_type

@@ -16,7 +16,15 @@ from scenario.logger import logger as scenario_logger
 
 if TYPE_CHECKING:
     from scenario.state import Container as ContainerSpec
-    from scenario.state import Event, ExecOutput, State, _CharmSpec
+    from scenario.state import (
+        Event,
+        ExecOutput,
+        PeerRelation,
+        Relation,
+        State,
+        SubordinateRelation,
+        _CharmSpec,
+    )
 
 logger = scenario_logger.getChild("mocking")
 
@@ -62,7 +70,9 @@ class _MockModelBackend(_ModelBackend):
             charm_spec=self._charm_spec,
         )
 
-    def _get_relation_by_id(self, rel_id):
+    def _get_relation_by_id(
+        self, rel_id
+    ) -> Union["Relation", "SubordinateRelation", "PeerRelation"]:
         try:
             return next(
                 filter(lambda r: r.relation_id == rel_id, self._state.relations)
@@ -121,10 +131,22 @@ class _MockModelBackend(_ModelBackend):
 
     def relation_list(self, relation_id: int):
         relation = self._get_relation_by_id(relation_id)
-        return tuple(
-            f"{relation.remote_app_name}/{unit_id}"
-            for unit_id in relation.remote_unit_ids
-        )
+        relation_type = getattr(relation, "__type__", "<no type>")
+        if relation_type == "regular":
+            return tuple(
+                f"{relation.remote_app_name}/{unit_id}"
+                for unit_id in relation.remote_unit_ids
+            )
+        elif relation_type == "peer":
+            return tuple(f"{self.app_name}/{unit_id}" for unit_id in relation.peers_ids)
+
+        elif relation_type == "subordinate":
+            return tuple(f"{relation.primary_name}")
+        else:
+            raise RuntimeError(
+                f"Invalid relation type: {relation_type}; should be one of "
+                f"scenario.state.RelationType"
+            )
 
     def config_get(self):
         state_config = self._state.config

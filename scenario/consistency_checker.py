@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Iterable, NamedTuple, Tuple
 
 from scenario.runtime import InconsistentScenarioError
 from scenario.runtime import logger as scenario_logger
-from scenario.state import _CharmSpec, normalize_name
+from scenario.state import SubordinateRelation, _CharmSpec, normalize_name
 
 if TYPE_CHECKING:
     from scenario.state import Event, State
@@ -51,6 +51,7 @@ def check_consistency(
         check_config_consistency,
         check_event_consistency,
         check_secrets_consistency,
+        check_relation_consistency,
     ):
         results = check(
             state=state, event=event, charm_spec=charm_spec, juju_version=juju_version
@@ -175,6 +176,19 @@ def check_secrets_consistency(
             f"secrets are not supported in the specified juju version {juju_version}. "
             f"Should be at least 3.0."
         )
+
+    return Results(errors, [])
+
+
+def check_relation_consistency(
+    *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
+) -> Results:
+    errors = []
+    for relation in state.relations:
+        if isinstance(relation, SubordinateRelation):
+            # todo: verify that this unit's id is not in:
+            # relation.remote_unit_id
+            pass
 
     return Results(errors, [])
 
