@@ -29,7 +29,14 @@ from scenario.ops_main_mock import NoObserverError
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.state import DeferredEvent, Event, State, StoredState, _CharmSpec
+    from scenario.state import (
+        AnyRelation,
+        DeferredEvent,
+        Event,
+        State,
+        StoredState,
+        _CharmSpec,
+    )
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
@@ -148,6 +155,7 @@ class Runtime:
         if not app_name:
             raise ValueError('invalid metadata: mandatory "name" field is missing.')
 
+        self._app_name = app_name
         # todo: consider parametrizing unit-id? cfr https://github.com/canonical/ops-scenario/issues/11
         self._unit_name = f"{app_name}/0"
 
@@ -179,40 +187,64 @@ class Runtime:
             # todo consider setting pwd, (python)path
         }
 
-        if relation := event.relation:
+        relation: "AnyRelation"
+        from scenario.state import RelationType  # avoid cyclic import # todo refactor
+
+        if event._is_relation_event and (relation := event.relation):  # noqa
+            if relation.__type__ == RelationType.regular:
+                remote_app_name = relation.remote_app_name
+            elif relation.__type__ == RelationType.peer:
+                remote_app_name = self._app_name
+            elif relation.__type__ == RelationType.subordinate:
+                remote_app_name = relation.primary_app_name
+            else:
+                raise TypeError(
+                    f"Invalid relation type for {relation}: {relation.__type__}"
+                )
+
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
                     "JUJU_RELATION_ID": str(relation.relation_id),
-                    "JUJU_REMOTE_APP": relation.remote_app_name,
+                    "JUJU_REMOTE_APP": remote_app_name,
                 }
             )
 
-            if event._is_relation_event:  # noqa
-                remote_unit_id = event.relation_remote_unit_id
-                if (
-                    remote_unit_id is None
-                ):  # don't check truthiness because it could be int(0)
-                    if len(relation.remote_unit_ids) == 1:
-                        remote_unit_id = relation.remote_unit_ids[0]
-                        logger.info(
-                            "there's only one remote unit, so we set JUJU_REMOTE_UNIT to it, "
-                            "but you probably should be parametrizing the event with `remote_unit` "
-                            "to be explicit."
-                        )
-                    else:
-                        logger.warning(
-                            "unable to determine remote unit ID; which means JUJU_REMOTE_UNIT will "
-                            "be unset and you might get error if charm code attempts to access "
-                            "`event.unit` in event handlers. \n"
-                            "If that is the case, pass `remote_unit` to the Event constructor."
-                        )
+            remote_unit_id = event.relation_remote_unit_id
+            if (
+                remote_unit_id is None
+            ):  # don't check truthiness because it could be int(0)
+                if relation.__type__ == RelationType.regular:
+                    remote_unit_ids = relation.remote_unit_ids
+                elif relation.__type__ == RelationType.peer:
+                    remote_unit_ids = relation.peers_ids
+                elif relation.__type__ == RelationType.subordinate:
+                    remote_unit_ids = [relation.primary_id]
+                else:
+                    raise TypeError(
+                        f"Invalid relation type for {relation}: {relation.__type__}"
+                    )
 
-                if remote_unit_id is not None:
-                    remote_unit = f"{relation.remote_app_name}/{remote_unit_id}"
-                    env["JUJU_REMOTE_UNIT"] = remote_unit
-                    if event.name.endswith("_relation_departed"):
-                        env["JUJU_DEPARTING_UNIT"] = remote_unit
+                if len(remote_unit_ids) == 1:
+                    remote_unit_id = remote_unit_ids[0]
+                    logger.info(
+                        "there's only one remote unit, so we set JUJU_REMOTE_UNIT to it, "
+                        "but you probably should be parametrizing the event with `remote_unit` "
+                        "to be explicit."
+                    )
+                else:
+                    logger.warning(
+                        "unable to determine remote unit ID; which means JUJU_REMOTE_UNIT will "
+                        "be unset and you might get error if charm code attempts to access "
+                        "`event.unit` in event handlers. \n"
+                        "If that is the case, pass `remote_unit` to the Event constructor."
+                    )
+
+            if remote_unit_id is not None:
+                remote_unit = f"{remote_app_name}/{remote_unit_id}"
+                env["JUJU_REMOTE_UNIT"] = remote_unit
+                if event.name.endswith("_relation_departed"):
+                    env["JUJU_DEPARTING_UNIT"] = remote_unit
 
         if container := event.container:
             env.update({"JUJU_WORKLOAD_NAME": container.name})

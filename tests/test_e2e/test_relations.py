@@ -241,3 +241,29 @@ def test_relation_app_data_bad_types(mycharm, data):
 )
 def test_relation_type(relation, expected_type):
     assert relation.__type__ == expected_type
+
+
+@pytest.mark.parametrize(
+    "evt_name",
+    ("changed", "broken", "departed", "joined", "created"),
+)
+@pytest.mark.parametrize(
+    "relation",
+    (Relation("a"), PeerRelation("b"), SubordinateRelation("b")),
+)
+def test_relation_event_trigger(relation, evt_name, mycharm):
+    meta = {
+        "name": "mycharm",
+        "requires": {"a": {"interface": "i1"}},
+        "provides": {
+            "c": {
+                "interface": "i3",
+                # this is a subordinate relation.
+                "scope": "container",
+            }
+        },
+        "peers": {"b": {"interface": "i2"}},
+    }
+    state = State(relations=[relation]).trigger(
+        getattr(relation, evt_name + "_event"), mycharm, meta=meta
+    )

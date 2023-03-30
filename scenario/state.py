@@ -30,6 +30,8 @@ if typing.TYPE_CHECKING:
     from ops.testing import CharmType
 
     PathLike = Union[str, Path]
+    AnyRelation = Union["Relation", "PeerRelation", "SubordinateRelation"]
+
 
 logger = scenario_logger.getChild("state")
 
@@ -330,15 +332,14 @@ class Relation(RelationBase):
 @dataclasses.dataclass
 class SubordinateRelation(RelationBase):
     __type__ = RelationType.subordinate
+
+    # todo: consider renaming them to primary_*_data
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
 
     # app name and ID of the primary that *this unit* is attached to.
     primary_app_name: str = "remote"
     primary_id: int = 0
-
-    # IDs of the peers. Consistency checks will validate that *this unit*'s ID is not in here.
-    peers_ids: List[int] = dataclasses.field(default_factory=list)
 
     @property
     def __databags__(self):
@@ -708,7 +709,7 @@ class State(_DCBase):
     config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
         default_factory=dict
     )
-    relations: List[Relation] = dataclasses.field(default_factory=list)
+    relations: List[RelationBase] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
     status: Status = dataclasses.field(default_factory=Status)
