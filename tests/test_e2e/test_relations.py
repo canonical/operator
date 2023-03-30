@@ -5,7 +5,8 @@ import pytest
 from ops.charm import CharmBase, CharmEvents, RelationDepartedEvent
 from ops.framework import EventBase, Framework
 
-from scenario.state import Relation, State
+from scenario.runtime import InconsistentScenarioError
+from scenario.state import Relation, State, StateValidationError
 
 
 @pytest.fixture(scope="function")
@@ -207,3 +208,17 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     )
 
     assert "unable to determine remote unit ID" in caplog.text
+
+
+@pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
+def test_relation_unit_data_bad_types(mycharm, data):
+    with pytest.raises(StateValidationError):
+        relation = Relation(
+            endpoint="foo", interface="foo", remote_units_data={0: {"a": data}}
+        )
+
+
+@pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
+def test_relation_app_data_bad_types(mycharm, data):
+    with pytest.raises(StateValidationError):
+        relation = Relation(endpoint="foo", interface="foo", local_app_data={"a": data})

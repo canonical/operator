@@ -63,6 +63,13 @@ META_EVENTS = {
 }
 
 
+class StateValidationError(RuntimeError):
+    """Raised when individual parts of the State are inconsistent."""
+
+    # as opposed to InconsistentScenario error where the
+    # **combination** of several parts of the State are.
+
+
 @dataclasses.dataclass
 class _DCBase:
     def replace(self, *args, **kwargs):
@@ -200,7 +207,7 @@ class Relation(_DCBase):
 
         if self.remote_unit_ids and self.remote_units_data:
             if not set(self.remote_unit_ids) == set(self.remote_units_data):
-                raise ValueError(
+                raise StateValidationError(
                     f"{self.remote_unit_ids} should include any and all IDs from {self.remote_units_data}"
                 )
         elif self.remote_unit_ids:
@@ -210,6 +217,23 @@ class Relation(_DCBase):
         else:
             self.remote_unit_ids = [0]
             self.remote_units_data = {0: {}}
+
+        for databag in (
+            self.local_unit_data,
+            self.local_app_data,
+            self.remote_app_data,
+            *self.remote_units_data.values(),
+        ):
+            if not isinstance(databag, dict):
+                raise StateValidationError(
+                    f"all databags should be dicts, not {type(databag)}"
+                )
+            for k, v in databag.items():
+                if not isinstance(v, str):
+                    raise StateValidationError(
+                        f"all databags should be Dict[str,str]; "
+                        f"found a value of type {type(v)}"
+                    )
 
     @property
     def changed_event(self) -> "Event":
