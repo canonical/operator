@@ -130,7 +130,7 @@ class _MockModelBackend(_ModelBackend):
             if rel.endpoint == relation_name
         ]
 
-    def relation_list(self, relation_id: int):
+    def relation_list(self, relation_id: int) -> Tuple[str]:
         relation = self._get_relation_by_id(relation_id)
         relation_type = getattr(relation, "__type__", "<no type>")
         if relation_type == "regular":
@@ -142,7 +142,7 @@ class _MockModelBackend(_ModelBackend):
             return tuple(f"{self.app_name}/{unit_id}" for unit_id in relation.peers_ids)
 
         elif relation_type == "subordinate":
-            return tuple(f"{relation.primary_name}")
+            return f"{relation.primary_name}",
         else:
             raise RuntimeError(
                 f"Invalid relation type: {relation_type}; should be one of "
