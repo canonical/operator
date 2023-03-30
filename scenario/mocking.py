@@ -112,9 +112,21 @@ class _MockModelBackend(_ModelBackend):
             return relation.remote_app_data
         elif obj_name == self.unit_name:
             return relation.local_unit_data
+
+        unit_id = int(obj_name.split("/")[-1])
+
+        relation_type = getattr(relation, "__type__", "<no type>")
+        # todo replace with enum value once cyclic import is fixed
+        if relation_type == "regular":
+            return relation.remote_units_data[unit_id]
+        elif relation_type == "peer":
+            return relation.peers_data[unit_id]
+        elif relation_type == "subordinate":
+            return relation.remote_unit_data
         else:
-            unit_id = obj_name.split("/")[-1]
-            return relation.remote_units_data[int(unit_id)]
+            raise TypeError(
+                f"Invalid relation type for {relation}: {relation.__type__}"
+            )
 
     def is_leader(self):
         return self._state.leader
@@ -132,6 +144,7 @@ class _MockModelBackend(_ModelBackend):
 
     def relation_list(self, relation_id: int) -> Tuple[str]:
         relation = self._get_relation_by_id(relation_id)
+        # todo replace with enum value once cyclic import is fixed
         relation_type = getattr(relation, "__type__", "<no type>")
         if relation_type == "regular":
             return tuple(
@@ -142,7 +155,7 @@ class _MockModelBackend(_ModelBackend):
             return tuple(f"{self.app_name}/{unit_id}" for unit_id in relation.peers_ids)
 
         elif relation_type == "subordinate":
-            return f"{relation.primary_name}",
+            return (f"{relation.primary_name}",)
         else:
             raise RuntimeError(
                 f"Invalid relation type: {relation_type}; should be one of "

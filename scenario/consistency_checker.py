@@ -1,4 +1,6 @@
 import os
+from collections import Counter
+from itertools import chain
 from typing import TYPE_CHECKING, Iterable, NamedTuple, Tuple
 
 from scenario.runtime import InconsistentScenarioError
@@ -184,11 +186,35 @@ def check_relation_consistency(
     *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
 ) -> Results:
     errors = []
-    for relation in state.relations:
-        if isinstance(relation, SubordinateRelation):
-            # todo: verify that this unit's id is not in:
-            # relation.remote_unit_id
-            pass
+    # check endpoint unicity
+    seen_endpoints = set()
+    for rel in chain(
+        charm_spec.meta.get("requires", ()),
+        charm_spec.meta.get("provides", ()),
+        charm_spec.meta.get("peers", ()),
+    ):
+        if rel in seen_endpoints:
+            errors.append("duplicate endpoint name in metadata.")
+            break
+        seen_endpoints.add(rel)
+
+    subs = list(filter(lambda x: isinstance(x, SubordinateRelation), state.relations))
+
+    # check subordinate relation consistency
+    seen_sub_primaries = set()
+    sub: SubordinateRelation
+    for sub in subs:
+        sig = (sub.primary_name, sub.endpoint)
+        if sig in seen_sub_primaries:
+            errors.append(
+                "cannot have multiple subordinate relations on the same endpoint with the same primary."
+            )
+            break
+        seen_sub_primaries.add(sig)
+
+    for sub in subs:
+        # todo: verify that *this unit*'s id is not in {relation.remote_unit_id}
+        pass
 
     return Results(errors, [])
 

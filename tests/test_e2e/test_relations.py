@@ -267,3 +267,33 @@ def test_relation_event_trigger(relation, evt_name, mycharm):
     state = State(relations=[relation]).trigger(
         getattr(relation, evt_name + "_event"), mycharm, meta=meta
     )
+
+
+def test_trigger_sub_relation(mycharm):
+    meta = {
+        "name": "mycharm",
+        "provides": {
+            "foo": {
+                "interface": "bar",
+                # this is a subordinate relation.
+                "scope": "container",
+            }
+        },
+    }
+
+    sub1 = SubordinateRelation(
+        "foo", remote_unit_data={"1": "2"}, primary_app_name="primary1"
+    )
+    sub2 = SubordinateRelation(
+        "foo", remote_unit_data={"3": "4"}, primary_app_name="primary2"
+    )
+
+    def post_event(charm: CharmBase):
+        b_relations = charm.model.relations["foo"]
+        assert len(b_relations) == 2
+        for relation in b_relations:
+            assert len(relation.units) == 1
+
+    State(relations=[sub1, sub2]).trigger(
+        "update-status", mycharm, meta=meta, post_event=post_event
+    )
