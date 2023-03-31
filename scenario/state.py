@@ -709,7 +709,7 @@ class State(_DCBase):
     config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
         default_factory=dict
     )
-    relations: List[RelationBase] = dataclasses.field(default_factory=list)
+    relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
     status: Status = dataclasses.field(default_factory=Status)
@@ -755,7 +755,14 @@ class State(_DCBase):
         except StopIteration as e:
             raise ValueError(f"container: {name}") from e
 
-    # FIXME: not a great way to obtain a delta, but is "complete" todo figure out a better way.
+    def get_relations(self, endpoint: str) -> Tuple["AnyRelation"]:
+        """Get relation from this State, based on an input relation or its endpoint name."""
+        try:
+            return tuple(filter(lambda c: c.endpoint == endpoint, self.relations))
+        except StopIteration as e:
+            raise ValueError(f"relation: {endpoint}") from e
+
+    # FIXME: not a great way to obtain a delta, but is "complete". todo figure out a better way.
     def jsonpatch_delta(self, other: "State"):
         try:
             import jsonpatch
