@@ -201,16 +201,17 @@ def check_relation_consistency(
     subs = list(filter(lambda x: isinstance(x, SubordinateRelation), state.relations))
 
     # check subordinate relation consistency
-    seen_sub_primaries = set()
-    sub: SubordinateRelation
-    for sub in subs:
-        sig = (sub.primary_name, sub.endpoint)
-        if sig in seen_sub_primaries:
-            errors.append(
-                "cannot have multiple subordinate relations on the same endpoint with the same primary."
-            )
-            break
-        seen_sub_primaries.add(sig)
+    # todo determine what this rule should be
+    # seen_sub_primaries = {}
+    # sub: SubordinateRelation
+    # for sub in subs:
+    #     if seen_primary := seen_sub_primaries.get(sub.endpoint):
+    #         if sub.primary_name != seen_primary.primary_name:
+    #             errors.append(
+    #                 "cannot have multiple subordinate relations on the same "
+    #                 "endpoint with different primaries."
+    #             )
+    #             break
 
     for sub in subs:
         # todo: verify that *this unit*'s id is not in {relation.remote_unit_id}
