@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Iterable, NamedTuple, Tuple
 
 from scenario.runtime import InconsistentScenarioError
 from scenario.runtime import logger as scenario_logger
-from scenario.state import SubordinateRelation, _CharmSpec, normalize_name, RelationType
+from scenario.state import RelationType, SubordinateRelation, _CharmSpec, normalize_name
 
 if TYPE_CHECKING:
     from scenario.state import Event, State
@@ -21,10 +21,10 @@ class Results(NamedTuple):
 
 
 def check_consistency(
-        state: "State",
-        event: "Event",
-        charm_spec: "_CharmSpec",
-        juju_version: str,
+    state: "State",
+    event: "Event",
+    charm_spec: "_CharmSpec",
+    juju_version: str,
 ):
     """Validate the combination of a state, an event, a charm spec, and a juju version.
 
@@ -49,11 +49,11 @@ def check_consistency(
     warnings = []
 
     for check in (
-            check_containers_consistency,
-            check_config_consistency,
-            check_event_consistency,
-            check_secrets_consistency,
-            check_relation_consistency,
+        check_containers_consistency,
+        check_config_consistency,
+        check_event_consistency,
+        check_secrets_consistency,
+        check_relation_consistency,
     ):
         results = check(
             state=state, event=event, charm_spec=charm_spec, juju_version=juju_version
@@ -75,7 +75,7 @@ def check_consistency(
 
 
 def check_event_consistency(
-        *, event: "Event", charm_spec: "_CharmSpec", **_kwargs
+    *, event: "Event", charm_spec: "_CharmSpec", **_kwargs
 ) -> Results:
     """Check the internal consistency of the Event data structure.
 
@@ -122,7 +122,7 @@ def check_event_consistency(
 
 
 def check_config_consistency(
-        *, state: "State", charm_spec: "_CharmSpec", **_kwargs
+    *, state: "State", charm_spec: "_CharmSpec", **_kwargs
 ) -> Results:
     """Check the consistency of the state.config with the charm_spec.config (config.yaml)."""
     state_config = state.config
@@ -162,7 +162,7 @@ def check_config_consistency(
 
 
 def check_secrets_consistency(
-        *, event: "Event", state: "State", juju_version: Tuple[int, ...], **_kwargs
+    *, event: "Event", state: "State", juju_version: Tuple[int, ...], **_kwargs
 ) -> Results:
     """Check the consistency of Secret-related stuff."""
     errors = []
@@ -183,14 +183,17 @@ def check_secrets_consistency(
 
 
 def check_relation_consistency(
-        *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
+    *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
 ) -> Results:
     errors = []
-    nonpeer_relations_meta = list(chain(charm_spec.meta.get("requires", {}).items(),
-                                        charm_spec.meta.get("provides", {}).items()))
+    nonpeer_relations_meta = list(
+        chain(
+            charm_spec.meta.get("requires", {}).items(),
+            charm_spec.meta.get("provides", {}).items(),
+        )
+    )
     peer_relations_meta = charm_spec.meta.get("peers", {}).items()
-    all_relations_meta = list(chain(nonpeer_relations_meta,
-                                    peer_relations_meta))
+    all_relations_meta = list(chain(nonpeer_relations_meta, peer_relations_meta))
 
     def _get_relations(r):
         try:
@@ -202,22 +205,28 @@ def check_relation_consistency(
     for endpoint, _ in peer_relations_meta:
         for relation in _get_relations(endpoint):
             if relation.__type__ is not RelationType.peer:
-                errors.append(f"endpoint {endpoint} is a peer relation; "
-                              f"expecting relation to be of type PeerRelation, gotten {type(relation)}")
+                errors.append(
+                    f"endpoint {endpoint} is a peer relation; "
+                    f"expecting relation to be of type PeerRelation, gotten {type(relation)}"
+                )
 
     for endpoint, relation_meta in all_relations_meta:
-        expected_sub = relation_meta.get('scope', '') == 'container'
+        expected_sub = relation_meta.get("scope", "") == "container"
         relations = _get_relations(endpoint)
         for relation in relations:
             is_sub = relation.__type__ is RelationType.subordinate
             if is_sub and not expected_sub:
-                errors.append(f"endpoint {endpoint} is not a subordinate relation; "
-                              f"expecting relation to be of type Relation, "
-                              f"gotten {type(relation)}")
+                errors.append(
+                    f"endpoint {endpoint} is not a subordinate relation; "
+                    f"expecting relation to be of type Relation, "
+                    f"gotten {type(relation)}"
+                )
             if expected_sub and not is_sub:
-                errors.append(f"endpoint {endpoint} is a subordinate relation; "
-                              f"expecting relation to be of type SubordinateRelation, "
-                              f"gotten {type(relation)}")
+                errors.append(
+                    f"endpoint {endpoint} is a subordinate relation; "
+                    f"expecting relation to be of type SubordinateRelation, "
+                    f"gotten {type(relation)}"
+                )
 
     # check for duplicate endpoint names
     seen_endpoints = set()
@@ -250,7 +259,7 @@ def check_relation_consistency(
 
 
 def check_containers_consistency(
-        *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
+    *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
 ) -> Results:
     """Check the consistency of `state.containers` vs. `charm_spec.meta` (metadata.yaml/containers)."""
     meta_containers = list(charm_spec.meta.get("containers", {}))
@@ -279,4 +288,10 @@ def check_containers_consistency(
             f"some containers declared in the state are not specified in metadata. That's not possible. "
             f"Missing from metadata: {diff}."
         )
+
+    # guard against duplicate container names
+    names = Counter(state_containers)
+    if dupes := [n for n in names if names[n] > 1]:
+        errors.append(f"Duplicate container name(s): {dupes}.")
+
     return Results(errors, [])

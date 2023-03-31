@@ -211,7 +211,13 @@ def test_relation_data():
 
 # which is very idiomatic and superbly explicit. Noice.
 ```
+## Relation types
 
+When you use `Relation`, you are specifying a 'normal' relation. But that is not the only type of relation. There are also
+peer relations and subordinate relations. While in the background the data model is the same, the data access rules and the consistency constraints on them are very different. For example, it does not make sense for a peer relation to have a different 'remote app' than its 'local app' is, because it's the same application.    
+
+
+## Triggering Relation Events
 If you want to trigger relation events, the easiest way to do so is get a hold of the Relation instance and grab the event from one of its aptly-named properties:
 
 ```python
