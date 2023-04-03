@@ -168,6 +168,7 @@ class Runtime:
             # os.unsetenv does not work !?
             del os.environ[key]
 
+
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
         if event.name.endswith("_action"):
             # todo: do we need some special metadata, or can we assume action names are always dashes?
@@ -229,15 +230,15 @@ class Runtime:
                     remote_unit_id = remote_unit_ids[0]
                     logger.info(
                         "there's only one remote unit, so we set JUJU_REMOTE_UNIT to it, "
-                        "but you probably should be parametrizing the event with `remote_unit` "
+                        "but you probably should be parametrizing the event with `remote_unit_id` "
                         "to be explicit."
                     )
                 else:
+                    remote_unit_id = remote_unit_ids[0]
                     logger.warning(
-                        "unable to determine remote unit ID; which means JUJU_REMOTE_UNIT will "
-                        "be unset and you might get error if charm code attempts to access "
-                        "`event.unit` in event handlers. \n"
-                        "If that is the case, pass `remote_unit` to the Event constructor."
+                        "remote unit ID unset, and multiple remote unit IDs are present; "
+                        "We will pick the first one and hope for the best. You should be passing "
+                        "`remote_unit_id` to the Event constructor."
                     )
 
             if remote_unit_id is not None:
@@ -410,7 +411,6 @@ class Runtime:
 
             logger.info(" - Clearing env")
             self._cleanup_env(env)
-            assert not os.getenv("JUJU_DEPARTING_UNIT")
 
             logger.info(" - closing storage")
             output_state = self._close_storage(output_state, temporary_charm_root)

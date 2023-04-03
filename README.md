@@ -243,12 +243,12 @@ The reason for this construction is that the event is associated with some relat
 ### Additional event parameters
 All relation events have some additional metadata that does not belong in the Relation object, such as, for a relation-joined event, the name of the (remote) unit that is joining the relation. That is what determines what `ops.model.Unit` you get when you get `RelationJoinedEvent().unit` in an event handler.
 
-In order to supply this parameter, you will have to **call** the event object and pass as `remote_unit` the id of the remote unit that the event is about.
+In order to supply this parameter, you will have to **call** the event object and pass as `remote_unit_id` the id of the remote unit that the event is about.
 
 ```python
 from scenario import Relation, Event
 relation = Relation(endpoint="foo", interface="bar")
-remote_unit_2_is_joining_event = relation.joined_event(remote_unit=2)
+remote_unit_2_is_joining_event = relation.joined_event(remote_unit_id=2)
 
 # which is syntactic sugar for:
 remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation, relation_remote_unit_id=2)

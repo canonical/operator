@@ -169,7 +169,7 @@ class ParametrizedEvent:
                 f"{self._category} event constructor."
             )
 
-        return Event(*self._args, *self._kwargs, relation_remote_unit=remote_unit)
+        return Event(*self._args, *self._kwargs, relation_remote_unit_id=remote_unit)
 
     def deferred(self, handler: Callable, event_id: int = 1) -> "DeferredEvent":
         return self().deferred(handler=handler, event_id=event_id)
@@ -889,13 +889,13 @@ class Event(_DCBase):
     #  - pebble?
     #  - action?
 
-    def __call__(self, remote_unit: Optional[int] = None) -> "Event":
-        if remote_unit and not self._is_relation_event:
+    def __call__(self, remote_unit_id: Optional[int] = None) -> "Event":
+        if remote_unit_id and not self._is_relation_event:
             raise ValueError(
-                "cannot pass param `remote_unit` to a "
+                "cannot pass param `remote_unit_id` to a "
                 "non-relation event constructor."
             )
-        return self.replace(relation_remote_unit_id=remote_unit)
+        return self.replace(relation_remote_unit_id=remote_unit_id)
 
     def __post_init__(self):
         if "-" in self.name:

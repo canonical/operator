@@ -165,7 +165,7 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_i
             relation,
         ],
     ).trigger(
-        getattr(relation, f"{evt_name}_event")(remote_unit=remote_unit_id),
+        getattr(relation, f"{evt_name}_event")(remote_unit_id=remote_unit_id),
         mycharm,
         meta={
             "name": "local",
@@ -194,8 +194,8 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
 
     def callback(charm: CharmBase, event):
         assert event.app  # that's always present
-        assert not event.unit
-        assert not getattr(event, "departing_unit", False)
+        assert event.unit
+        assert (evt_name == 'departed') is bool(getattr(event, "departing_unit", False))
 
     mycharm._call = callback
 
@@ -214,7 +214,7 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
         },
     )
 
-    assert "unable to determine remote unit ID" in caplog.text
+    assert "remote unit ID unset, and multiple remote unit IDs are present" in caplog.text
 
 
 @pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
@@ -249,7 +249,7 @@ def test_relation_type(relation, expected_type):
 )
 @pytest.mark.parametrize(
     "relation",
-    (Relation("a"), PeerRelation("b"), SubordinateRelation("b")),
+    (Relation("a"), PeerRelation("b"), SubordinateRelation("c")),
 )
 def test_relation_event_trigger(relation, evt_name, mycharm):
     meta = {
