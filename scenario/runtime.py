@@ -168,7 +168,6 @@ class Runtime:
             # os.unsetenv does not work !?
             del os.environ[key]
 
-
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
         if event.name.endswith("_action"):
             # todo: do we need some special metadata, or can we assume action names are always dashes?

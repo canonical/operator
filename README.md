@@ -213,8 +213,8 @@ def test_relation_data():
 ```
 ## Relation types
 
-When you use `Relation`, you are specifying a 'normal' relation. But that is not the only type of relation. There are also
-peer relations and subordinate relations. While in the background the data model is the same, the data access rules and the consistency constraints on them are very different. For example, it does not make sense for a peer relation to have a different 'remote app' than its 'local app' is, because it's the same application.    
+When you use `Relation`, you are specifying a regular (conventional) relation. But that is not the only type of relation. There are also
+peer relations and subordinate relations. While in the background the data model is the same, the data access rules and the consistency constraints on them are very different. For example, it does not make sense for a peer relation to have a different 'remote app' than its 'local app', because it's the same application.    
 
 
 TODO: describe peer/sub API.
@@ -244,6 +244,9 @@ The reason for this construction is that the event is associated with some relat
 All relation events have some additional metadata that does not belong in the Relation object, such as, for a relation-joined event, the name of the (remote) unit that is joining the relation. That is what determines what `ops.model.Unit` you get when you get `RelationJoinedEvent().unit` in an event handler.
 
 In order to supply this parameter, you will have to **call** the event object and pass as `remote_unit_id` the id of the remote unit that the event is about.
+The reason that this parameter is not supplied to `Relation` but to relation events, is that the relation already ties 'this app' to some 'remote app' (cfr. the `Relation.remote_app_name` attr), but not to a specific unit. What remote unit this event is about is not a `State` concern but an `Event` one.  
+
+The `remote_unit_id` will default to the first ID found in the relation's `remote_unit_ids`, but if the test you are writing is close to that domain, you should probably override it and pass it manually.
 
 ```python
 from scenario import Relation, Event

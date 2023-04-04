@@ -104,7 +104,6 @@ class _MockModelBackend(_ModelBackend):
         return f"secret:{id}"
 
     def relation_get(self, rel_id, obj_name, app):
-        # fixme: this WILL definitely bork with peer and sub relation types.
         relation = self._get_relation_by_id(rel_id)
         if app and obj_name == self.app_name:
             return relation.local_app_data

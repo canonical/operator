@@ -198,7 +198,8 @@ class RelationBase(_DCBase):
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
 
     @property
-    def __databags__(self):
+    def _databags(self):
+        """Yield all databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
 
@@ -206,9 +207,13 @@ class RelationBase(_DCBase):
         global _RELATION_IDS_CTR
         if self.relation_id == -1:
             _RELATION_IDS_CTR += 1
+            logger.info(
+                f"relation ID unset; automatically assigning {_RELATION_IDS_CTR}. "
+                f"If there are problems, pass one manually."
+            )
             self.relation_id = _RELATION_IDS_CTR
 
-        for databag in self.__databags__:
+        for databag in self._databags:
             self._validate_databag(databag)
 
     def _validate_databag(self, databag: dict):
@@ -316,7 +321,8 @@ class Relation(RelationBase):
     )
 
     @property
-    def __databags__(self):
+    def _databags(self):
+        """Yield all databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield self.remote_app_data
@@ -342,7 +348,8 @@ class SubordinateRelation(RelationBase):
     primary_id: int = 0
 
     @property
-    def __databags__(self):
+    def _databags(self):
+        """Yield all databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield self.remote_app_data
@@ -362,7 +369,8 @@ class PeerRelation(RelationBase):
     peers_ids: List[int] = dataclasses.field(default_factory=list)
 
     @property
-    def __databags__(self):
+    def _databags(self):
+        """Yield all databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield from self.peers_data.values()

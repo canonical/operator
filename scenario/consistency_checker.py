@@ -186,11 +186,9 @@ def check_relation_consistency(
     *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
 ) -> Results:
     errors = []
-    nonpeer_relations_meta = list(
-        chain(
-            charm_spec.meta.get("requires", {}).items(),
-            charm_spec.meta.get("provides", {}).items(),
-        )
+    nonpeer_relations_meta = chain(
+        charm_spec.meta.get("requires", {}).items(),
+        charm_spec.meta.get("provides", {}).items(),
     )
     peer_relations_meta = charm_spec.meta.get("peers", {}).items()
     all_relations_meta = list(chain(nonpeer_relations_meta, peer_relations_meta))
@@ -207,7 +205,7 @@ def check_relation_consistency(
             if relation.__type__ is not RelationType.peer:
                 errors.append(
                     f"endpoint {endpoint} is a peer relation; "
-                    f"expecting relation to be of type PeerRelation, gotten {type(relation)}"
+                    f"expecting relation to be of type PeerRelation, got {type(relation)}"
                 )
 
     for endpoint, relation_meta in all_relations_meta:
@@ -219,13 +217,13 @@ def check_relation_consistency(
                 errors.append(
                     f"endpoint {endpoint} is not a subordinate relation; "
                     f"expecting relation to be of type Relation, "
-                    f"gotten {type(relation)}"
+                    f"got {type(relation)}"
                 )
             if expected_sub and not is_sub:
                 errors.append(
-                    f"endpoint {endpoint} is a subordinate relation; "
+                    f"endpoint {endpoint} is not a subordinate relation; "
                     f"expecting relation to be of type SubordinateRelation, "
-                    f"gotten {type(relation)}"
+                    f"got {type(relation)}"
                 )
 
     # check for duplicate endpoint names
@@ -235,25 +233,6 @@ def check_relation_consistency(
             errors.append("duplicate endpoint name in metadata.")
             break
         seen_endpoints.add(endpoint)
-
-    subs = list(filter(lambda x: isinstance(x, SubordinateRelation), state.relations))
-
-    # check subordinate relation consistency
-    # todo determine what this rule should be
-    # seen_sub_primaries = {}
-    # sub: SubordinateRelation
-    # for sub in subs:
-    #     if seen_primary := seen_sub_primaries.get(sub.endpoint):
-    #         if sub.primary_name != seen_primary.primary_name:
-    #             errors.append(
-    #                 "cannot have multiple subordinate relations on the same "
-    #                 "endpoint with different primaries."
-    #             )
-    #             break
-
-    for sub in subs:
-        # todo: verify that *this unit*'s id is not in {relation.remote_unit_id}
-        pass
 
     return Results(errors, [])
 

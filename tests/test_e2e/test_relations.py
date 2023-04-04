@@ -195,7 +195,7 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     def callback(charm: CharmBase, event):
         assert event.app  # that's always present
         assert event.unit
-        assert (evt_name == 'departed') is bool(getattr(event, "departing_unit", False))
+        assert (evt_name == "departed") is bool(getattr(event, "departing_unit", False))
 
     mycharm._call = callback
 
@@ -214,7 +214,9 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
         },
     )
 
-    assert "remote unit ID unset, and multiple remote unit IDs are present" in caplog.text
+    assert (
+        "remote unit ID unset, and multiple remote unit IDs are present" in caplog.text
+    )
 
 
 @pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
