@@ -88,7 +88,8 @@ def test_event_emission():
 
 
 @pytest.mark.parametrize("app_name", ("foo", "bar-baz", "QuX2"))
-def test_unit_name(app_name):
+@pytest.mark.parametrize("unit_id", (1, 2, 42))
+def test_unit_name(app_name, unit_id):
     meta = {
         "name": app_name,
     }
@@ -100,9 +101,10 @@ def test_unit_name(app_name):
             my_charm_type,
             meta=meta,
         ),
+        unit_id=unit_id,
     )
 
     def post_event(charm: CharmBase):
-        assert charm.unit.name == f"{app_name}/0"
+        assert charm.unit.name == f"{app_name}/{unit_id}"
 
     runtime.exec(state=State(), event=Event("start"), post_event=post_event)

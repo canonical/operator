@@ -7,9 +7,11 @@ from scenario.state import (
     RELATION_EVENTS_SUFFIX,
     Container,
     Event,
+    PeerRelation,
     Relation,
     Secret,
     State,
+    SubordinateRelation,
     _CharmSpec,
 )
 
@@ -153,4 +155,50 @@ def test_secrets_jujuv_bad(good_v):
         Event("bar"),
         _CharmSpec(MyCharm, {}),
         good_v,
+    )
+
+
+def test_peer_relation_consistency():
+    assert_inconsistent(
+        State(relations=[Relation("foo")]),
+        Event("bar"),
+        _CharmSpec(MyCharm, {"peers": {"foo": {"interface": "bar"}}}),
+    )
+    assert_consistent(
+        State(relations=[PeerRelation("foo")]),
+        Event("bar"),
+        _CharmSpec(MyCharm, {"peers": {"foo": {"interface": "bar"}}}),
+    )
+
+
+def test_sub_relation_consistency():
+    assert_inconsistent(
+        State(relations=[Relation("foo")]),
+        Event("bar"),
+        _CharmSpec(
+            MyCharm, {"requires": {"foo": {"interface": "bar", "scope": "container"}}}
+        ),
+    )
+    assert_consistent(
+        State(relations=[SubordinateRelation("foo")]),
+        Event("bar"),
+        _CharmSpec(
+            MyCharm, {"requires": {"foo": {"interface": "bar", "scope": "container"}}}
+        ),
+    )
+
+
+def test_relation_sub_inconsistent():
+    assert_inconsistent(
+        State(relations=[SubordinateRelation("foo")]),
+        Event("bar"),
+        _CharmSpec(MyCharm, {"requires": {"foo": {"interface": "bar"}}}),
+    )
+
+
+def test_dupe_containers_inconsistent():
+    assert_inconsistent(
+        State(containers=[Container("foo"), Container("foo")]),
+        Event("bar"),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
     )

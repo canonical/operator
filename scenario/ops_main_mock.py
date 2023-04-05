@@ -14,7 +14,6 @@ from ops.log import setup_root_logging
 from ops.main import CHARM_STATE_FILE, _Dispatcher, _emit_charm_event, _get_charm_dir
 
 from scenario.logger import logger as scenario_logger
-from scenario.mocking import _MockModelBackend
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
@@ -38,6 +37,9 @@ def main(
     """Set up the charm and dispatch the observed event."""
     charm_class = charm_spec.charm_type
     charm_dir = _get_charm_dir()
+
+    from scenario.mocking import _MockModelBackend
+
     model_backend = _MockModelBackend(  # pyright: reportPrivateUsage=false
         state=state, event=event, charm_spec=charm_spec
     )

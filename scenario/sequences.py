@@ -96,6 +96,7 @@ def check_builtin_sequences(
     template_state: State = None,
     pre_event: Optional[Callable[["CharmType"], None]] = None,
     post_event: Optional[Callable[["CharmType"], None]] = None,
+    unit_id: int = 0,
 ):
     """Test that all the builtin startup and teardown events can fire without errors.
 
@@ -124,4 +125,5 @@ def check_builtin_sequences(
             config=config,
             pre_event=pre_event,
             post_event=post_event,
+            unit_id=unit_id,
         )

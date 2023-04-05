@@ -25,11 +25,19 @@ from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
+from scenario.state import DeferredEvent, PeerRelation, StoredState
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.state import DeferredEvent, Event, State, StoredState, _CharmSpec
+    from scenario.state import (
+        AnyRelation,
+        DeferredEvent,
+        Event,
+        State,
+        StoredState,
+        _CharmSpec,
+    )
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
@@ -73,7 +81,6 @@ class UnitStateDB:
 
     def get_stored_state(self) -> List["StoredState"]:
         """Load any StoredState data structures from the db."""
-        from scenario.state import StoredState  # avoid cyclic import
 
         db = self._open_db()
 
@@ -92,7 +99,6 @@ class UnitStateDB:
 
     def get_deferred_events(self) -> List["DeferredEvent"]:
         """Load any DeferredEvent data structures from the db."""
-        from scenario.state import DeferredEvent  # avoid cyclic import
 
         db = self._open_db()
 
@@ -139,6 +145,7 @@ class Runtime:
         charm_spec: "_CharmSpec",
         charm_root: Optional["PathLike"] = None,
         juju_version: str = "3.0.0",
+        unit_id: int = 0,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -148,8 +155,9 @@ class Runtime:
         if not app_name:
             raise ValueError('invalid metadata: mandatory "name" field is missing.')
 
-        # todo: consider parametrizing unit-id? cfr https://github.com/canonical/ops-scenario/issues/11
-        self._unit_name = f"{app_name}/0"
+        self._app_name = app_name
+        self._unit_id = unit_id
+        self._unit_name = f"{app_name}/{unit_id}"
 
     @staticmethod
     def _cleanup_env(env):
@@ -157,7 +165,8 @@ class Runtime:
         #  running this in a clean venv or a container anyway.
         # cleanup env, in case we'll be firing multiple events, we don't want to accumulate.
         for key in env:
-            os.unsetenv(key)
+            # os.unsetenv does not work !?
+            del os.environ[key]
 
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
         if event.name.endswith("_action"):
@@ -178,13 +187,47 @@ class Runtime:
             # todo consider setting pwd, (python)path
         }
 
-        if relation := event.relation:
+        relation: "AnyRelation"
+
+        if event._is_relation_event and (relation := event.relation):  # noqa
+            if isinstance(relation, PeerRelation):
+                remote_app_name = self._app_name
+            else:
+                remote_app_name = relation._remote_app_name  # noqa
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
                     "JUJU_RELATION_ID": str(relation.relation_id),
+                    "JUJU_REMOTE_APP": remote_app_name,
                 }
             )
+
+            remote_unit_id = event.relation_remote_unit_id
+            if (
+                remote_unit_id is None
+            ):  # don't check truthiness because it could be int(0)
+                remote_unit_ids = relation._remote_unit_ids  # noqa
+
+                if len(remote_unit_ids) == 1:
+                    remote_unit_id = remote_unit_ids[0]
+                    logger.info(
+                        "there's only one remote unit, so we set JUJU_REMOTE_UNIT to it, "
+                        "but you probably should be parametrizing the event with `remote_unit_id` "
+                        "to be explicit."
+                    )
+                else:
+                    remote_unit_id = remote_unit_ids[0]
+                    logger.warning(
+                        "remote unit ID unset, and multiple remote unit IDs are present; "
+                        "We will pick the first one and hope for the best. You should be passing "
+                        "`remote_unit_id` to the Event constructor."
+                    )
+
+            if remote_unit_id is not None:
+                remote_unit = f"{remote_app_name}/{remote_unit_id}"
+                env["JUJU_REMOTE_UNIT"] = remote_unit
+                if event.name.endswith("_relation_departed"):
+                    env["JUJU_DEPARTING_UNIT"] = remote_unit
 
         if container := event.container:
             env.update({"JUJU_WORKLOAD_NAME": container.name})
@@ -348,7 +391,7 @@ class Runtime:
             finally:
                 logger.info(" - Exited ops.main.")
 
-            logger.info(" - clearing env")
+            logger.info(" - Clearing env")
             self._cleanup_env(env)
 
             logger.info(" - closing storage")
@@ -370,6 +413,7 @@ def trigger(
     config: Optional[Dict[str, Any]] = None,
     charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
     juju_version: str = "3.0",
+    unit_id: int = 0,
 ) -> "State":
     """Trigger a charm execution with an Event and a State.
 
@@ -391,6 +435,7 @@ def trigger(
     :arg config: charm config to use. Needs to be a valid config.yaml format (as a python dict).
         If none is provided, we will search for a ``config.yaml`` file in the charm root.
     :arg juju_version: Juju agent version to simulate.
+    :arg unit_id: The ID of the Juju unit that is charm execution is running on.
     :arg charm_root: virtual charm root the charm will be executed with.
         If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
         execution cwd, you need to use this. E.g.:
@@ -422,6 +467,7 @@ def trigger(
         charm_spec=spec,
         juju_version=juju_version,
         charm_root=charm_root,
+        unit_id=unit_id,
     )
 
     return runtime.exec(
