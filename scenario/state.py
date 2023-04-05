@@ -846,6 +846,7 @@ class State(_DCBase):
         config: Optional[Dict[str, Any]] = None,
         charm_root: Optional["PathLike"] = None,
         juju_version: str = "3.0",
+        unit_id: int = 0,
     ) -> "State":
         """Fluent API for trigger. See runtime.trigger's docstring."""
         from scenario.runtime import trigger as _runtime_trigger
@@ -861,6 +862,7 @@ class State(_DCBase):
             config=config,
             charm_root=charm_root,
             juju_version=juju_version,
+            unit_id=unit_id,
         )
 
 

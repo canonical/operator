@@ -145,6 +145,7 @@ class Runtime:
         charm_spec: "_CharmSpec",
         charm_root: Optional["PathLike"] = None,
         juju_version: str = "3.0.0",
+        unit_id: int = 0,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -155,8 +156,8 @@ class Runtime:
             raise ValueError('invalid metadata: mandatory "name" field is missing.')
 
         self._app_name = app_name
-        # todo: consider parametrizing unit-id? cfr https://github.com/canonical/ops-scenario/issues/11
-        self._unit_name = f"{app_name}/0"
+        self._unit_id = unit_id
+        self._unit_name = f"{app_name}/{unit_id}"
 
     @staticmethod
     def _cleanup_env(env):
@@ -412,6 +413,7 @@ def trigger(
     config: Optional[Dict[str, Any]] = None,
     charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
     juju_version: str = "3.0",
+    unit_id: int = 0,
 ) -> "State":
     """Trigger a charm execution with an Event and a State.
 
@@ -433,6 +435,7 @@ def trigger(
     :arg config: charm config to use. Needs to be a valid config.yaml format (as a python dict).
         If none is provided, we will search for a ``config.yaml`` file in the charm root.
     :arg juju_version: Juju agent version to simulate.
+    :arg unit_id: The ID of the Juju unit that is charm execution is running on.
     :arg charm_root: virtual charm root the charm will be executed with.
         If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
         execution cwd, you need to use this. E.g.:
@@ -464,6 +467,7 @@ def trigger(
         charm_spec=spec,
         juju_version=juju_version,
         charm_root=charm_root,
+        unit_id=unit_id,
     )
 
     return runtime.exec(
