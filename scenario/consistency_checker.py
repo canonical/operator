@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Iterable, NamedTuple, Tuple
 
 from scenario.runtime import InconsistentScenarioError
 from scenario.runtime import logger as scenario_logger
-from scenario.state import RelationType, SubordinateRelation, _CharmSpec, normalize_name
+from scenario.state import PeerRelation, SubordinateRelation, _CharmSpec, normalize_name
 
 if TYPE_CHECKING:
     from scenario.state import Event, State
@@ -202,7 +202,7 @@ def check_relation_consistency(
     # check relation types
     for endpoint, _ in peer_relations_meta:
         for relation in _get_relations(endpoint):
-            if relation.__type__ is not RelationType.peer:
+            if not isinstance(relation, PeerRelation):
                 errors.append(
                     f"endpoint {endpoint} is a peer relation; "
                     f"expecting relation to be of type PeerRelation, got {type(relation)}"
@@ -212,7 +212,7 @@ def check_relation_consistency(
         expected_sub = relation_meta.get("scope", "") == "container"
         relations = _get_relations(endpoint)
         for relation in relations:
-            is_sub = relation.__type__ is RelationType.subordinate
+            is_sub = isinstance(relation, SubordinateRelation)
             if is_sub and not expected_sub:
                 errors.append(
                     f"endpoint {endpoint} is not a subordinate relation; "

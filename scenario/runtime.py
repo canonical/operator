@@ -25,6 +25,7 @@ from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
+from scenario.state import DeferredEvent, PeerRelation, StoredState
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
@@ -80,7 +81,6 @@ class UnitStateDB:
 
     def get_stored_state(self) -> List["StoredState"]:
         """Load any StoredState data structures from the db."""
-        from scenario.state import StoredState  # avoid cyclic import
 
         db = self._open_db()
 
@@ -99,7 +99,6 @@ class UnitStateDB:
 
     def get_deferred_events(self) -> List["DeferredEvent"]:
         """Load any DeferredEvent data structures from the db."""
-        from scenario.state import DeferredEvent  # avoid cyclic import
 
         db = self._open_db()
 
@@ -188,20 +187,12 @@ class Runtime:
         }
 
         relation: "AnyRelation"
-        from scenario.state import RelationType  # avoid cyclic import # todo refactor
 
         if event._is_relation_event and (relation := event.relation):  # noqa
-            if relation.__type__ == RelationType.regular:
-                remote_app_name = relation.remote_app_name
-            elif relation.__type__ == RelationType.peer:
+            if isinstance(relation, PeerRelation):
                 remote_app_name = self._app_name
-            elif relation.__type__ == RelationType.subordinate:
-                remote_app_name = relation.primary_app_name
             else:
-                raise TypeError(
-                    f"Invalid relation type for {relation}: {relation.__type__}"
-                )
-
+                remote_app_name = relation._remote_app_name  # noqa
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
@@ -214,16 +205,7 @@ class Runtime:
             if (
                 remote_unit_id is None
             ):  # don't check truthiness because it could be int(0)
-                if relation.__type__ == RelationType.regular:
-                    remote_unit_ids = relation.remote_unit_ids
-                elif relation.__type__ == RelationType.peer:
-                    remote_unit_ids = relation.peers_ids
-                elif relation.__type__ == RelationType.subordinate:
-                    remote_unit_ids = [relation.primary_id]
-                else:
-                    raise TypeError(
-                        f"Invalid relation type for {relation}: {relation.__type__}"
-                    )
+                remote_unit_ids = relation._remote_unit_ids  # noqa
 
                 if len(remote_unit_ids) == 1:
                     remote_unit_id = remote_unit_ids[0]

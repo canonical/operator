@@ -1,15 +1,13 @@
-import os
 from typing import Type
 
 import pytest
 from ops.charm import CharmBase, CharmEvents, RelationDepartedEvent
 from ops.framework import EventBase, Framework
 
-from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     PeerRelation,
     Relation,
-    RelationType,
+    RelationBase,
     State,
     StateValidationError,
     SubordinateRelation,
@@ -234,18 +232,6 @@ def test_relation_app_data_bad_types(mycharm, data):
 
 
 @pytest.mark.parametrize(
-    "relation, expected_type",
-    (
-        (Relation("a"), RelationType.regular),
-        (PeerRelation("b"), RelationType.peer),
-        (SubordinateRelation("b"), RelationType.subordinate),
-    ),
-)
-def test_relation_type(relation, expected_type):
-    assert relation.__type__ == expected_type
-
-
-@pytest.mark.parametrize(
     "evt_name",
     ("changed", "broken", "departed", "joined", "created"),
 )
@@ -299,3 +285,8 @@ def test_trigger_sub_relation(mycharm):
     State(relations=[sub1, sub2]).trigger(
         "update-status", mycharm, meta=meta, post_event=post_event
     )
+
+
+def test_cannot_instantiate_relationbase():
+    with pytest.raises(RuntimeError):
+        RelationBase("")

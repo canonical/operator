@@ -7,7 +7,6 @@ import datetime
 import inspect
 import re
 import typing
-from enum import Enum
 from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
@@ -18,9 +17,8 @@ from ops import pebble
 from ops.charm import CharmEvents
 from ops.model import SecretRotate, StatusBase
 
+from scenario.fs_mocks import _MockFileSystem, _MockStorageMount
 from scenario.logger import logger as scenario_logger
-from scenario.mocking import _MockFileSystem, _MockStorageMount
-from scenario.runtime import trigger as _runtime_trigger
 
 if typing.TYPE_CHECKING:
     try:
@@ -31,7 +29,6 @@ if typing.TYPE_CHECKING:
 
     PathLike = Union[str, Path]
     AnyRelation = Union["Relation", "PeerRelation", "SubordinateRelation"]
-
 
 logger = scenario_logger.getChild("state")
 
@@ -175,17 +172,8 @@ class ParametrizedEvent:
         return self().deferred(handler=handler, event_id=event_id)
 
 
-class RelationType(str, Enum):
-    subordinate = "subordinate"
-    regular = "regular"
-    peer = "peer"
-
-
 @dataclasses.dataclass
 class RelationBase(_DCBase):
-    if typing.TYPE_CHECKING:
-        __type__: RelationType
-
     endpoint: str
 
     # we can derive this from the charm's metadata
@@ -203,7 +191,27 @@ class RelationBase(_DCBase):
         yield self.local_app_data
         yield self.local_unit_data
 
+    @property
+    def _remote_app_name(self) -> str:
+        """Who is on the other end of this relation?"""
+        raise NotImplementedError()
+
+    @property
+    def _remote_unit_ids(self) -> Tuple[int]:
+        """Ids of the units on the other end of this relation."""
+        raise NotImplementedError()
+
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+        """Return the databag for some remote unit ID."""
+        raise NotImplementedError()
+
     def __post_init__(self):
+        if type(self) is RelationBase:
+            raise RuntimeError(
+                "RelationBase cannot be instantiated directly; "
+                "please use Relation, PeerRelation, or SubordinateRelation"
+            )
+
         global _RELATION_IDS_CTR
         if self.relation_id == -1:
             _RELATION_IDS_CTR += 1
@@ -308,7 +316,6 @@ def unify_ids_and_remote_units_data(ids: List[int], data: Dict[int, Any]):
 
 @dataclasses.dataclass
 class Relation(RelationBase):
-    __type__ = RelationType.regular
     remote_app_name: str = "remote"
     remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
 
@@ -319,6 +326,20 @@ class Relation(RelationBase):
     remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
         default_factory=dict
     )
+
+    @property
+    def _remote_app_name(self) -> str:
+        """Who is on the other end of this relation?"""
+        return self.remote_app_name
+
+    @property
+    def _remote_unit_ids(self) -> Tuple[int]:
+        """Ids of the units on the other end of this relation."""
+        return tuple(self.remote_unit_ids)
+
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+        """Return the databag for some remote unit ID."""
+        return self.remote_units_data[unit_id]
 
     @property
     def _databags(self):
@@ -337,8 +358,6 @@ class Relation(RelationBase):
 
 @dataclasses.dataclass
 class SubordinateRelation(RelationBase):
-    __type__ = RelationType.subordinate
-
     # todo: consider renaming them to primary_*_data
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
@@ -346,6 +365,20 @@ class SubordinateRelation(RelationBase):
     # app name and ID of the primary that *this unit* is attached to.
     primary_app_name: str = "remote"
     primary_id: int = 0
+
+    @property
+    def _remote_app_name(self) -> str:
+        """Who is on the other end of this relation?"""
+        return self.primary_app_name
+
+    @property
+    def _remote_unit_ids(self) -> Tuple[int]:
+        """Ids of the units on the other end of this relation."""
+        return (self.primary_id,)
+
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+        """Return the databag for some remote unit ID."""
+        return self.remote_unit_data
 
     @property
     def _databags(self):
@@ -362,7 +395,6 @@ class SubordinateRelation(RelationBase):
 
 @dataclasses.dataclass
 class PeerRelation(RelationBase):
-    __type__ = RelationType.peer
     peers_data: Dict[int, Dict[str, str]] = dataclasses.field(default_factory=dict)
 
     # IDs of the peers. Consistency checks will validate that *this unit*'s ID is not in here.
@@ -374,6 +406,21 @@ class PeerRelation(RelationBase):
         yield self.local_app_data
         yield self.local_unit_data
         yield from self.peers_data.values()
+
+    @property
+    def _remote_app_name(self) -> str:
+        """Who is on the other end of this relation?"""
+        # surprise! It's myself.
+        raise ValueError("peer relations don't quite have a remote end.")
+
+    @property
+    def _remote_unit_ids(self) -> Tuple[int]:
+        """Ids of the units on the other end of this relation."""
+        return tuple(self.peers_ids)
+
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+        """Return the databag for some remote unit ID."""
+        return self.peers_data[unit_id]
 
     def __post_init__(self):
         self.peers_ids, self.peers_data = unify_ids_and_remote_units_data(
@@ -516,7 +563,7 @@ class Container(_DCBase):
         return infos
 
     @property
-    def filesystem(self) -> _MockFileSystem:
+    def filesystem(self) -> "_MockFileSystem":
         mounts = {
             name: _MockStorageMount(
                 src=Path(spec.src), location=PurePosixPath(spec.location)
@@ -801,6 +848,8 @@ class State(_DCBase):
         juju_version: str = "3.0",
     ) -> "State":
         """Fluent API for trigger. See runtime.trigger's docstring."""
+        from scenario.runtime import trigger as _runtime_trigger
+
         return _runtime_trigger(
             state=self,
             event=event,
@@ -813,8 +862,6 @@ class State(_DCBase):
             charm_root=charm_root,
             juju_version=juju_version,
         )
-
-    trigger.__doc__ = _runtime_trigger.__doc__
 
 
 @dataclasses.dataclass
@@ -882,7 +929,7 @@ class Event(_DCBase):
     kwargs: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
     # if this is a relation event, the relation it refers to
-    relation: Optional[Relation] = None
+    relation: Optional["AnyRelation"] = None
     # and the name of the remote unit this relation event is about
     relation_remote_unit_id: Optional[int] = None
 
