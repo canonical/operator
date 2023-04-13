@@ -3833,27 +3833,27 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         # Foo is now started, but Bar is not
 
         # Send a valid signal to a running service
-        client.send_signal("SIGINT", "foo")
+        client.send_signal("SIGINT", ("foo",))
 
         # Send a valid signal but omit service name
         with self.assertRaises(TypeError):
-            client.send_signal("SIGINT")
+            client.send_signal("SIGINT", tuple())
 
         # Send an invalid signal to a running service
         with self.assertRaises(pebble.APIError):
-            client.send_signal("sigint", "foo")
+            client.send_signal("sigint", ("foo",))
 
         # Send a valid signal to a stopped service
         with self.assertRaises(pebble.APIError):
-            client.send_signal("SIGINT", "bar")
+            client.send_signal("SIGINT", ("bar",))
 
         # Send a valid signal to a non-existing service
         with self.assertRaises(pebble.APIError):
-            client.send_signal("SIGINT", "baz")
+            client.send_signal("SIGINT", ("baz",))
 
         # Send a valid signal to a multiple services, one of which is not running
         with self.assertRaises(pebble.APIError):
-            client.send_signal("SIGINT", "foo", "bar")
+            client.send_signal("SIGINT", ("foo", "bar",))
 
 
 # For testing file-ops of the pebble client.  This is refactored into a

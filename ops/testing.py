@@ -2564,7 +2564,8 @@ class _TestingPebbleClient:
             signal.Signals[sig]
         except KeyError:
             # conform with the real pebble api
-            message = f'cannot send signal to "{service_names[0]}": invalid signal name "{sig}"'
+            first_service = next(iter(service_names))
+            message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
             body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
                     'result': {'message': message}}
             raise pebble.APIError(
