@@ -218,7 +218,7 @@ def state_apply(
     )
 
 
-# for the benefit of script usage
+# for the benefit of scripted usage
 _state_apply.__doc__ = state_apply.__doc__
 
 if __name__ == "__main__":

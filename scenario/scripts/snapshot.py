@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+
 import datetime
 import json
-import logging
 import os
 import re
 import shlex
@@ -24,6 +24,7 @@ from ops.storage import SQLiteStorage
 
 from scenario.runtime import UnitStateDB
 from scenario.scripts.errors import InvalidTargetUnitName, InvalidTargetModelName
+from scenario.scripts.logger import logger as root_scripts_logger
 from scenario.scripts.utils import JujuUnitName
 from scenario.state import (
     Address,
@@ -39,7 +40,7 @@ from scenario.state import (
     _EntityStatus,
 )
 
-logger = logging.getLogger("snapshot")
+logger = root_scripts_logger.getChild(__file__)
 
 JUJU_RELATION_KEYS = frozenset({"egress-subnets", "ingress-address", "private-address"})
 JUJU_CONFIG_KEYS = frozenset({})
@@ -803,7 +804,8 @@ def snapshot(
         "--format",
         help="How to format the output. "
         "``state``: Outputs a black-formatted repr() of the State object (if black is installed! "
-        "else it will be ugly but valid python code). "
+        "else it will be ugly but valid python code). All you need to do then is import the necessary "
+        "objects from scenario.state, and you should have a valid State object."
         "``json``: Outputs a Jsonified State object. Perfect for storage. "
         "``pytest``: Outputs a full-blown pytest scenario test based on this State. "
         "Pipe it to a file and fill in the blanks.",
