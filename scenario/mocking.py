@@ -2,7 +2,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import datetime
-import pathlib
 import random
 from io import StringIO
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
@@ -10,13 +9,22 @@ from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 from ops import pebble
 from ops.model import SecretInfo, SecretRotate, _ModelBackend
 from ops.pebble import Client, ExecError
-from ops.testing import _TestingFilesystem, _TestingPebbleClient, _TestingStorageMount
+from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
+from scenario.state import PeerRelation
 
 if TYPE_CHECKING:
     from scenario.state import Container as ContainerSpec
-    from scenario.state import Event, ExecOutput, State, _CharmSpec
+    from scenario.state import (
+        Event,
+        ExecOutput,
+        PeerRelation,
+        Relation,
+        State,
+        SubordinateRelation,
+        _CharmSpec,
+    )
 
 logger = scenario_logger.getChild("mocking")
 
@@ -62,7 +70,9 @@ class _MockModelBackend(_ModelBackend):
             charm_spec=self._charm_spec,
         )
 
-    def _get_relation_by_id(self, rel_id):
+    def _get_relation_by_id(
+        self, rel_id
+    ) -> Union["Relation", "SubordinateRelation", "PeerRelation"]:
         try:
             return next(
                 filter(lambda r: r.relation_id == rel_id, self._state.relations)
@@ -101,9 +111,9 @@ class _MockModelBackend(_ModelBackend):
             return relation.remote_app_data
         elif obj_name == self.unit_name:
             return relation.local_unit_data
-        else:
-            unit_id = obj_name.split("/")[-1]
-            return relation.remote_units_data[int(unit_id)]
+
+        unit_id = int(obj_name.split("/")[-1])
+        return relation._get_databag_for_remote(unit_id)  # noqa
 
     def is_leader(self):
         return self._state.leader
@@ -119,11 +129,14 @@ class _MockModelBackend(_ModelBackend):
             if rel.endpoint == relation_name
         ]
 
-    def relation_list(self, relation_id: int):
+    def relation_list(self, relation_id: int) -> Tuple[str]:
         relation = self._get_relation_by_id(relation_id)
+
+        if isinstance(relation, PeerRelation):
+            return tuple(f"{self.app_name}/{unit_id}" for unit_id in relation.peers_ids)
         return tuple(
-            f"{relation.remote_app_name}/{unit_id}"
-            for unit_id in relation.remote_unit_ids
+            f"{relation._remote_app_name}/{unit_id}"  # noqa
+            for unit_id in relation._remote_unit_ids  # noqa
         )
 
     def config_get(self):
@@ -315,35 +328,6 @@ class _MockModelBackend(_ModelBackend):
 
     def planned_units(self, *args, **kwargs):
         raise NotImplementedError("planned_units")
-
-
-class _MockStorageMount(_TestingStorageMount):
-    def __init__(self, location: pathlib.PurePosixPath, src: pathlib.Path):
-        """Creates a new simulated storage mount.
-
-        Args:
-            location: The path within simulated filesystem at which this storage will be mounted.
-            src: The temporary on-disk location where the simulated storage will live.
-        """
-        self._src = src
-        self._location = location
-        if (
-            not src.exists()
-        ):  # we need to add this guard because the directory might exist already.
-            src.mkdir(exist_ok=True, parents=True)
-
-
-# todo consider duplicating the filesystem on State.copy() to be able to diff and have true state snapshots
-class _MockFileSystem(_TestingFilesystem):
-    def __init__(self, mounts: Dict[str, _MockStorageMount]):
-        super().__init__()
-        self._mounts = mounts
-
-    def add_mount(self, *args, **kwargs):
-        raise NotImplementedError("Cannot mutate mounts; declare them all in State.")
-
-    def remove_mount(self, *args, **kwargs):
-        raise NotImplementedError("Cannot mutate mounts; declare them all in State.")
 
 
 class _MockPebbleClient(_TestingPebbleClient):

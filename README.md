@@ -136,6 +136,7 @@ def _on_event(self, _event):
 You can verify that the charm has followed the expected path by checking the **unit status history** like so:
 
 ```python
+from charm import MyCharm
 from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, UnknownStatus
 from scenario import State
 
@@ -148,6 +149,7 @@ def test_statuses():
       UnknownStatus(),
       MaintenanceStatus('determining who the ruler is...'),
       WaitingStatus('checking this is right...'),
+      ActiveStatus("I am ruled"),
     ]
 ```
 
@@ -155,7 +157,7 @@ Note that the current status is not in the **unit status history**.
 
 Also note that, unless you initialize the State with a preexisting status, the first status in the history will always be `unknown`. That is because, so far as scenario is concerned, each event is "the first event this charm has ever seen".
 
-If you want to simulate a situation in which the charm already has seen some event, and is in a status other than Unknown (the default status every charm is born with), you will have to pass the 'initial status' in State.
+If you want to simulate a situation in which the charm already has seen some event, and is in a status other than Unknown (the default status every charm is born with), you will have to pass the 'initial status' to State.
 
 ```python
 from ops.model import ActiveStatus
@@ -211,6 +213,102 @@ def test_relation_data():
 
 # which is very idiomatic and superbly explicit. Noice.
 ```
+
+The only mandatory argument to `Relation` (and other relation types, see below) is `endpoint`. The `interface` will be derived from the charm's `metadata.yaml`. When fully defaulted, a relation is 'empty'. There are no remote units, the remote application is called `'remote'` and only has a single unit `remote/0`, and nobody has written any data to the databags yet.
+
+That is typically the state of a relation when the first unit joins it.
+
+When you use `Relation`, you are specifying a regular (conventional) relation. But that is not the only type of relation. There are also
+peer relations and subordinate relations. While in the background the data model is the same, the data access rules and the consistency constraints on them are very different. For example, it does not make sense for a peer relation to have a different 'remote app' than its 'local app', because it's the same application.    
+
+### PeerRelation
+To declare a peer relation, you should use `scenario.state.PeerRelation`.
+The core difference with regular relations is that peer relations do not have a "remote app" (it's this app, in fact).
+So unlike `Relation`, a `PeerRelation` does not have `remote_app_name` or `remote_app_data` arguments. Also, it talks in terms of `peers`:
+- `Relation.remote_unit_ids` maps to `PeerRelation.peers_ids` 
+- `Relation.remote_units_data` maps to `PeerRelation.peers_data` 
+
+```python
+from scenario.state import PeerRelation
+
+relation = PeerRelation(
+    endpoint="peers",
+    peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
+)
+```
+
+be mindful when using `PeerRelation` not to include **"this unit"**'s ID in `peers_data` or `peers_ids`, as that would be flagged by the Consistency Checker:
+```python
+from scenario import State, PeerRelation
+
+State(relations=[
+    PeerRelation(
+        endpoint="peers",
+        peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
+    )]).trigger("start", ..., unit_id=1)  # invalid: this unit's id cannot be the ID of a peer.
+
+
+```
+
+### SubordinateRelation
+To declare a subordinate relation, you should use `scenario.state.SubordinateRelation`.
+The core difference with regular relations is that subordinate relations always have exactly one remote unit (there is always exactly one primary unit that this unit can see). 
+So unlike `Relation`, a `SubordinateRelation` does not have a `remote_units_data` argument. Instead, it has a `remote_unit_data` taking a single `Dict[str:str]`, and takes the primary unit ID as a separate argument.
+Also, it talks in terms of `primary`:
+- `Relation.remote_unit_ids` becomes `SubordinateRelation.primary_id` (a single ID instead of a list of IDs) 
+- `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` (a single databag instead of a mapping from unit IDs to databags) 
+- `Relation.remote_app_name` maps to `SubordinateRelation.primary_app_name`
+
+```python
+from scenario.state import SubordinateRelation
+
+relation = SubordinateRelation(
+    endpoint="peers",
+    remote_unit_data={"foo": "bar"},
+    primary_app_name="zookeeper",
+    primary_id=42
+)
+relation.primary_name  # "zookeeper/42"
+```
+
+
+## Triggering Relation Events
+If you want to trigger relation events, the easiest way to do so is get a hold of the Relation instance and grab the event from one of its aptly-named properties:
+
+```python
+from scenario import Relation
+relation = Relation(endpoint="foo", interface="bar")
+changed_event = relation.changed_event
+joined_event = relation.joined_event
+# ...
+```
+
+This is in fact syntactic sugar for:
+```python
+from scenario import Relation, Event
+relation = Relation(endpoint="foo", interface="bar")
+changed_event = Event('foo-relation-changed', relation=relation)
+```
+
+The reason for this construction is that the event is associated with some relation-specific metadata, that Scenario needs to set up the process that will run `ops.main` with the right environment variables.
+
+### Additional event parameters
+All relation events have some additional metadata that does not belong in the Relation object, such as, for a relation-joined event, the name of the (remote) unit that is joining the relation. That is what determines what `ops.model.Unit` you get when you get `RelationJoinedEvent().unit` in an event handler.
+
+In order to supply this parameter, you will have to **call** the event object and pass as `remote_unit_id` the id of the remote unit that the event is about.
+The reason that this parameter is not supplied to `Relation` but to relation events, is that the relation already ties 'this app' to some 'remote app' (cfr. the `Relation.remote_app_name` attr), but not to a specific unit. What remote unit this event is about is not a `State` concern but an `Event` one.  
+
+The `remote_unit_id` will default to the first ID found in the relation's `remote_unit_ids`, but if the test you are writing is close to that domain, you should probably override it and pass it manually.
+
+```python
+from scenario import Relation, Event
+relation = Relation(endpoint="foo", interface="bar")
+remote_unit_2_is_joining_event = relation.joined_event(remote_unit_id=2)
+
+# which is syntactic sugar for:
+remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation, relation_remote_unit_id=2)
+```
+
 
 ## Containers
 

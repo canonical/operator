@@ -1,9 +1,11 @@
 import os
+from collections import Counter
+from itertools import chain
 from typing import TYPE_CHECKING, Iterable, NamedTuple, Tuple
 
 from scenario.runtime import InconsistentScenarioError
 from scenario.runtime import logger as scenario_logger
-from scenario.state import _CharmSpec, normalize_name
+from scenario.state import PeerRelation, SubordinateRelation, _CharmSpec, normalize_name
 
 if TYPE_CHECKING:
     from scenario.state import Event, State
@@ -51,6 +53,7 @@ def check_consistency(
         check_config_consistency,
         check_event_consistency,
         check_secrets_consistency,
+        check_relation_consistency,
     ):
         results = check(
             state=state, event=event, charm_spec=charm_spec, juju_version=juju_version
@@ -179,6 +182,61 @@ def check_secrets_consistency(
     return Results(errors, [])
 
 
+def check_relation_consistency(
+    *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
+) -> Results:
+    errors = []
+    nonpeer_relations_meta = chain(
+        charm_spec.meta.get("requires", {}).items(),
+        charm_spec.meta.get("provides", {}).items(),
+    )
+    peer_relations_meta = charm_spec.meta.get("peers", {}).items()
+    all_relations_meta = list(chain(nonpeer_relations_meta, peer_relations_meta))
+
+    def _get_relations(r):
+        try:
+            return state.get_relations(r)
+        except ValueError:
+            return ()
+
+    # check relation types
+    for endpoint, _ in peer_relations_meta:
+        for relation in _get_relations(endpoint):
+            if not isinstance(relation, PeerRelation):
+                errors.append(
+                    f"endpoint {endpoint} is a peer relation; "
+                    f"expecting relation to be of type PeerRelation, got {type(relation)}"
+                )
+
+    for endpoint, relation_meta in all_relations_meta:
+        expected_sub = relation_meta.get("scope", "") == "container"
+        relations = _get_relations(endpoint)
+        for relation in relations:
+            is_sub = isinstance(relation, SubordinateRelation)
+            if is_sub and not expected_sub:
+                errors.append(
+                    f"endpoint {endpoint} is not a subordinate relation; "
+                    f"expecting relation to be of type Relation, "
+                    f"got {type(relation)}"
+                )
+            if expected_sub and not is_sub:
+                errors.append(
+                    f"endpoint {endpoint} is not a subordinate relation; "
+                    f"expecting relation to be of type SubordinateRelation, "
+                    f"got {type(relation)}"
+                )
+
+    # check for duplicate endpoint names
+    seen_endpoints = set()
+    for endpoint, relation_meta in all_relations_meta:
+        if endpoint in seen_endpoints:
+            errors.append("duplicate endpoint name in metadata.")
+            break
+        seen_endpoints.add(endpoint)
+
+    return Results(errors, [])
+
+
 def check_containers_consistency(
     *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
 ) -> Results:
@@ -209,4 +267,10 @@ def check_containers_consistency(
             f"some containers declared in the state are not specified in metadata. That's not possible. "
             f"Missing from metadata: {diff}."
         )
+
+    # guard against duplicate container names
+    names = Counter(state_containers)
+    if dupes := [n for n in names if names[n] > 1]:
+        errors.append(f"Duplicate container name(s): {dupes}.")
+
     return Results(errors, [])
