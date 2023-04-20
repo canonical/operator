@@ -147,7 +147,6 @@ def get_network(target: JujuUnitName, model: Optional[str], endpoint: str) -> Ne
 
     bind_addresses = []
     for raw_bind in jsn["bind-addresses"]:
-
         addresses = []
         for raw_adds in raw_bind["addresses"]:
             addresses.append(

@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=62"]
+requires = [
+    "setuptools >= 35.0.2",
+    "setuptools_scm >= 2.0.0, <3"
+]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -46,4 +49,4 @@ include = '\.pyi?$'
 profile = "black"
 
 [bdist_wheel]
-universal=1
+universal = 1

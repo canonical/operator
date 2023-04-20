@@ -17,9 +17,8 @@ from ops import pebble
 from ops.charm import CharmEvents
 from ops.model import SecretRotate, StatusBase
 
+from scenario.fs_mocks import _MockFileSystem, _MockStorageMount
 from scenario.logger import logger as scenario_logger
-from scenario.mocking import _MockFileSystem, _MockStorageMount
-from scenario.runtime import trigger as _runtime_trigger
 
 if typing.TYPE_CHECKING:
     try:
@@ -29,6 +28,7 @@ if typing.TYPE_CHECKING:
     from ops.testing import CharmType
 
     PathLike = Union[str, Path]
+    AnyRelation = Union["Relation", "PeerRelation", "SubordinateRelation"]
 
 logger = scenario_logger.getChild("state")
 
@@ -61,6 +61,13 @@ META_EVENTS = {
     "DETACH_ALL_STORAGES": "_storage_detaching",
     "ATTACH_ALL_STORAGES": "_storage_attached",
 }
+
+
+class StateValidationError(RuntimeError):
+    """Raised when individual parts of the State are inconsistent."""
+
+    # as opposed to InconsistentScenario error where the
+    # **combination** of several parts of the State are.
 
 
 @dataclasses.dataclass
@@ -144,19 +151,30 @@ def normalize_name(s: str):
     return s.replace("-", "_")
 
 
+class ParametrizedEvent:
+    def __init__(self, accept_params: Tuple[str], category: str, *args, **kwargs):
+        self._accept_params = accept_params
+        self._category = category
+        self._args = args
+        self._kwargs = kwargs
+
+    def __call__(self, remote_unit: Optional[str] = None) -> "Event":
+        """Construct an Event object using the arguments provided at init and any extra params."""
+        if remote_unit and "remote_unit" not in self._accept_params:
+            raise ValueError(
+                f"cannot pass param `remote_unit` to a "
+                f"{self._category} event constructor."
+            )
+
+        return Event(*self._args, *self._kwargs, relation_remote_unit_id=remote_unit)
+
+    def deferred(self, handler: Callable, event_id: int = 1) -> "DeferredEvent":
+        return self().deferred(handler=handler, event_id=event_id)
+
+
 @dataclasses.dataclass
-class Relation(_DCBase):
+class RelationBase(_DCBase):
     endpoint: str
-    remote_app_name: str = "remote"
-    remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
-
-    # local limit
-    limit: int = 1
-
-    # scale of the remote application; number of units, leader ID?
-    # TODO figure out if this is relevant
-    scale: int = 1
-    leader_id: int = 0
 
     # we can derive this from the charm's metadata
     interface: str = None
@@ -165,64 +183,248 @@ class Relation(_DCBase):
     relation_id: int = -1
 
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
-        default_factory=dict
-    )
+
+    @property
+    def _databags(self):
+        """Yield all databags in this relation."""
+        yield self.local_app_data
+        yield self.local_unit_data
+
+    @property
+    def _remote_app_name(self) -> str:
+        """Who is on the other end of this relation?"""
+        raise NotImplementedError()
+
+    @property
+    def _remote_unit_ids(self) -> Tuple[int]:
+        """Ids of the units on the other end of this relation."""
+        raise NotImplementedError()
+
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+        """Return the databag for some remote unit ID."""
+        raise NotImplementedError()
 
     def __post_init__(self):
+        if type(self) is RelationBase:
+            raise RuntimeError(
+                "RelationBase cannot be instantiated directly; "
+                "please use Relation, PeerRelation, or SubordinateRelation"
+            )
+
         global _RELATION_IDS_CTR
         if self.relation_id == -1:
             _RELATION_IDS_CTR += 1
+            logger.info(
+                f"relation ID unset; automatically assigning {_RELATION_IDS_CTR}. "
+                f"If there are problems, pass one manually."
+            )
             self.relation_id = _RELATION_IDS_CTR
 
-        if self.remote_unit_ids and self.remote_units_data:
-            if not set(self.remote_unit_ids) == set(self.remote_units_data):
-                raise ValueError(
-                    f"{self.remote_unit_ids} should include any and all IDs from {self.remote_units_data}"
+        for databag in self._databags:
+            self._validate_databag(databag)
+
+    def _validate_databag(self, databag: dict):
+        if not isinstance(databag, dict):
+            raise StateValidationError(
+                f"all databags should be dicts, not {type(databag)}"
+            )
+        for k, v in databag.items():
+            if not isinstance(v, str):
+                raise StateValidationError(
+                    f"all databags should be Dict[str,str]; "
+                    f"found a value of type {type(v)}"
                 )
-        elif self.remote_unit_ids:
-            self.remote_units_data = {x: {} for x in self.remote_unit_ids}
-        elif self.remote_units_data:
-            self.remote_unit_ids = [x for x in self.remote_units_data]
-        else:
-            self.remote_unit_ids = [0]
-            self.remote_units_data = {0: {}}
 
     @property
-    def changed_event(self):
+    def changed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-changed event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-changed"), relation=self
         )
 
     @property
-    def joined_event(self):
+    def joined_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-joined event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-joined"), relation=self
         )
 
     @property
-    def created_event(self):
+    def created_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-created event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-created"), relation=self
         )
 
     @property
-    def departed_event(self):
+    def departed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-departed event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-departed"), relation=self
         )
 
     @property
-    def broken_event(self):
+    def broken_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
             name=normalize_name(self.endpoint + "-relation-broken"), relation=self
+        )
+
+
+def unify_ids_and_remote_units_data(ids: List[int], data: Dict[int, Any]):
+    """Unify and validate a list of unit IDs and a mapping from said ids to databag contents.
+
+    This allows the user to pass equivalently:
+    ids = []
+    data = {1: {}}
+
+    or
+
+    ids = [1]
+    data = {}
+
+    or
+
+    ids = [1]
+    data = {1: {}}
+
+    but catch the inconsistent:
+
+    ids = [1]
+    data = {2: {}}
+
+    or
+
+    ids = [2]
+    data = {1: {}}
+    """
+    if ids and data:
+        if not set(ids) == set(data):
+            raise StateValidationError(
+                f"{ids} should include any and all IDs from {data}"
+            )
+    elif ids:
+        data = {x: {} for x in ids}
+    elif data:
+        ids = [x for x in data]
+    else:
+        ids = [0]
+        data = {0: {}}
+    return ids, data
+
+
+@dataclasses.dataclass
+class Relation(RelationBase):
+    remote_app_name: str = "remote"
+    remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
+
+    # local limit
+    limit: int = 1
+
+    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
+        default_factory=dict
+    )
+
+    @property
+    def _remote_app_name(self) -> str:
+        """Who is on the other end of this relation?"""
+        return self.remote_app_name
+
+    @property
+    def _remote_unit_ids(self) -> Tuple[int]:
+        """Ids of the units on the other end of this relation."""
+        return tuple(self.remote_unit_ids)
+
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+        """Return the databag for some remote unit ID."""
+        return self.remote_units_data[unit_id]
+
+    @property
+    def _databags(self):
+        """Yield all databags in this relation."""
+        yield self.local_app_data
+        yield self.local_unit_data
+        yield self.remote_app_data
+        yield from self.remote_units_data.values()
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.remote_unit_ids, self.remote_units_data = unify_ids_and_remote_units_data(
+            self.remote_unit_ids, self.remote_units_data
+        )
+
+
+@dataclasses.dataclass
+class SubordinateRelation(RelationBase):
+    # todo: consider renaming them to primary_*_data
+    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    remote_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+
+    # app name and ID of the primary that *this unit* is attached to.
+    primary_app_name: str = "remote"
+    primary_id: int = 0
+
+    @property
+    def _remote_app_name(self) -> str:
+        """Who is on the other end of this relation?"""
+        return self.primary_app_name
+
+    @property
+    def _remote_unit_ids(self) -> Tuple[int]:
+        """Ids of the units on the other end of this relation."""
+        return (self.primary_id,)
+
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+        """Return the databag for some remote unit ID."""
+        return self.remote_unit_data
+
+    @property
+    def _databags(self):
+        """Yield all databags in this relation."""
+        yield self.local_app_data
+        yield self.local_unit_data
+        yield self.remote_app_data
+        yield self.remote_unit_data
+
+    @property
+    def primary_name(self) -> str:
+        return f"{self.primary_app_name}/{self.primary_id}"
+
+
+@dataclasses.dataclass
+class PeerRelation(RelationBase):
+    peers_data: Dict[int, Dict[str, str]] = dataclasses.field(default_factory=dict)
+
+    # IDs of the peers. Consistency checks will validate that *this unit*'s ID is not in here.
+    peers_ids: List[int] = dataclasses.field(default_factory=list)
+
+    @property
+    def _databags(self):
+        """Yield all databags in this relation."""
+        yield self.local_app_data
+        yield self.local_unit_data
+        yield from self.peers_data.values()
+
+    @property
+    def _remote_app_name(self) -> str:
+        """Who is on the other end of this relation?"""
+        # surprise! It's myself.
+        raise ValueError("peer relations don't quite have a remote end.")
+
+    @property
+    def _remote_unit_ids(self) -> Tuple[int]:
+        """Ids of the units on the other end of this relation."""
+        return tuple(self.peers_ids)
+
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+        """Return the databag for some remote unit ID."""
+        return self.peers_data[unit_id]
+
+    def __post_init__(self):
+        self.peers_ids, self.peers_data = unify_ids_and_remote_units_data(
+            self.peers_ids, self.peers_data
         )
 
 
@@ -361,7 +563,7 @@ class Container(_DCBase):
         return infos
 
     @property
-    def filesystem(self) -> _MockFileSystem:
+    def filesystem(self) -> "_MockFileSystem":
         mounts = {
             name: _MockStorageMount(
                 src=Path(spec.src), location=PurePosixPath(spec.location)
@@ -562,7 +764,7 @@ class State(_DCBase):
     config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
         default_factory=dict
     )
-    relations: List[Relation] = dataclasses.field(default_factory=list)
+    relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
     status: Status = dataclasses.field(default_factory=Status)
@@ -608,7 +810,14 @@ class State(_DCBase):
         except StopIteration as e:
             raise ValueError(f"container: {name}") from e
 
-    # FIXME: not a great way to obtain a delta, but is "complete" todo figure out a better way.
+    def get_relations(self, endpoint: str) -> Tuple["AnyRelation"]:
+        """Get relation from this State, based on an input relation or its endpoint name."""
+        try:
+            return tuple(filter(lambda c: c.endpoint == endpoint, self.relations))
+        except StopIteration as e:
+            raise ValueError(f"relation: {endpoint}") from e
+
+    # FIXME: not a great way to obtain a delta, but is "complete". todo figure out a better way.
     def jsonpatch_delta(self, other: "State"):
         try:
             import jsonpatch
@@ -637,8 +846,11 @@ class State(_DCBase):
         config: Optional[Dict[str, Any]] = None,
         charm_root: Optional["PathLike"] = None,
         juju_version: str = "3.0",
+        unit_id: int = 0,
     ) -> "State":
         """Fluent API for trigger. See runtime.trigger's docstring."""
+        from scenario.runtime import trigger as _runtime_trigger
+
         return _runtime_trigger(
             state=self,
             event=event,
@@ -650,9 +862,8 @@ class State(_DCBase):
             config=config,
             charm_root=charm_root,
             juju_version=juju_version,
+            unit_id=unit_id,
         )
-
-    trigger.__doc__ = _runtime_trigger.__doc__
 
 
 @dataclasses.dataclass
@@ -720,7 +931,9 @@ class Event(_DCBase):
     kwargs: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
     # if this is a relation event, the relation it refers to
-    relation: Optional[Relation] = None
+    relation: Optional["AnyRelation"] = None
+    # and the name of the remote unit this relation event is about
+    relation_remote_unit_id: Optional[int] = None
 
     # if this is a secret event, the secret it refers to
     secret: Optional[Secret] = None
@@ -732,6 +945,14 @@ class Event(_DCBase):
     #  - secret events
     #  - pebble?
     #  - action?
+
+    def __call__(self, remote_unit_id: Optional[int] = None) -> "Event":
+        if remote_unit_id and not self._is_relation_event:
+            raise ValueError(
+                "cannot pass param `remote_unit_id` to a "
+                "non-relation event constructor."
+            )
+        return self.replace(relation_remote_unit_id=remote_unit_id)
 
     def __post_init__(self):
         if "-" in self.name:
@@ -834,9 +1055,9 @@ class Event(_DCBase):
             # this is a RelationEvent. The snapshot:
             snapshot_data = {
                 "relation_name": self.relation.endpoint,
-                "relation_id": self.relation.relation_id
-                # 'app_name': local app name
-                # 'unit_name': local unit name
+                "relation_id": self.relation.relation_id,
+                "app_name": self.relation.remote_app_name,
+                "unit_name": f"{self.relation.remote_app_name}/{self.relation_remote_unit_id}",
             }
 
         return DeferredEvent(
