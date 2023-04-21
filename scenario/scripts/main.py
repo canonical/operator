@@ -6,7 +6,6 @@ import typer
 
 from scenario.scripts.snapshot import snapshot
 from scenario.scripts import logger
-from scenario.scripts.state_apply import state_apply
 
 
 def main():
@@ -20,7 +19,7 @@ def main():
     )
 
     app.command(name="snapshot", no_args_is_help=True)(snapshot)
-    app.command(name="state-apply", no_args_is_help=True)(state_apply)
+    app.command(name="_", hidden=True)(lambda: None)
 
     @app.callback()
     def setup_logging(verbose: int = typer.Option(0, "-v", count=True)):
