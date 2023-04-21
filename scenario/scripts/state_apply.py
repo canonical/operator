@@ -16,11 +16,12 @@ from scenario.scripts.errors import InvalidTargetUnitName, StateApplyError
 from scenario.scripts.utils import JujuUnitName
 from scenario.state import (
     Container,
+    DeferredEvent,
     Relation,
     Secret,
     State,
     Status,
-    DeferredEvent, StoredState,
+    StoredState,
 )
 
 SNAPSHOT_DATA_DIR = (Path(os.getcwd()).parent / "snapshot_storage").absolute()
@@ -29,18 +30,18 @@ logger = logging.getLogger("snapshot")
 
 
 def set_status(status: Status) -> List[str]:
-    logger.info('preparing status...')
+    logger.info("preparing status...")
     cmds = []
 
-    cmds.append(f'status-set {status.unit.name} {status.unit.message}')
-    cmds.append(f'status-set --application {status.app.name} {status.app.message}')
-    cmds.append(f'application-version-set {status.app_version}')
+    cmds.append(f"status-set {status.unit.name} {status.unit.message}")
+    cmds.append(f"status-set --application {status.app.name} {status.app.message}")
+    cmds.append(f"application-version-set {status.app_version}")
 
     return cmds
 
 
 def set_relations(relations: Iterable[Relation]) -> List[str]:
-    logger.info('preparing relations...')
+    logger.info("preparing relations...")
     logger.warning("set_relations not implemented yet")
     return []
 
@@ -75,11 +76,7 @@ def set_stored_state(stored_state: Iterable[StoredState]) -> List[str]:
     return []
 
 
-def exec_in_unit(
-        target: JujuUnitName,
-        model: str,
-        cmds: List[str]
-):
+def exec_in_unit(target: JujuUnitName, model: str, cmds: List[str]):
     logger.info("Running juju exec...")
 
     _model = f" -m {model}" if model else ""
@@ -87,36 +84,38 @@ def exec_in_unit(
     try:
         run(f'juju exec -u {target}{_model} -- "{cmd_fmt}"')
     except CalledProcessError as e:
-        raise StateApplyError(f"Failed to apply state: process exited with {e.returncode}; "
-                              f"stdout = {e.stdout}; "
-                              f"stderr = {e.stderr}.")
+        raise StateApplyError(
+            f"Failed to apply state: process exited with {e.returncode}; "
+            f"stdout = {e.stdout}; "
+            f"stderr = {e.stderr}."
+        )
 
 
-def run_commands(
-        cmds: List[str]
-):
+def run_commands(cmds: List[str]):
     logger.info("Applying remaining state...")
     for cmd in cmds:
         try:
             run(cmd)
         except CalledProcessError as e:
             # todo: should we log and continue instead?
-            raise StateApplyError(f"Failed to apply state: process exited with {e.returncode}; "
-                                  f"stdout = {e.stdout}; "
-                                  f"stderr = {e.stderr}.")
+            raise StateApplyError(
+                f"Failed to apply state: process exited with {e.returncode}; "
+                f"stdout = {e.stdout}; "
+                f"stderr = {e.stderr}."
+            )
 
 
 def _state_apply(
-        target: str,
-        state: State,
-        model: Optional[str] = None,
-        include: str = None,
-        include_juju_relation_data=False,
-        push_files: Dict[str, List[Path]] = None,
-        snapshot_data_dir: Path = SNAPSHOT_DATA_DIR,
+    target: str,
+    state: State,
+    model: Optional[str] = None,
+    include: str = None,
+    include_juju_relation_data=False,
+    push_files: Dict[str, List[Path]] = None,
+    snapshot_data_dir: Path = SNAPSHOT_DATA_DIR,
 ):
     """see state_apply's docstring"""
-    logger.info('Starting state-apply...')
+    logger.info("Starting state-apply...")
 
     try:
         target = JujuUnitName(target)
@@ -154,49 +153,49 @@ def _state_apply(
     # non-juju-exec commands are ran one by one, individually
     run_commands(cmds)
 
-    logger.info('Done!')
+    logger.info("Done!")
 
 
 def state_apply(
-        target: str = typer.Argument(..., help="Target unit."),
-        state: Path = typer.Argument(
-            ...,
-            help="Source State to apply. Json file containing a State data structure; "
-                 "the same you would obtain by running snapshot."
-        ),
-        model: Optional[str] = typer.Option(
-            None, "-m", "--model", help="Which model to look at."
-        ),
-        include: str = typer.Option(
-            "scrkSdt",
-            "--include",
-            "-i",
-            help="What parts of the state to apply. Defaults to: all of them. "
-                 "``r``: relation, ``c``: config, ``k``: containers, "
-                 "``s``: status, ``S``: secrets(!), "
-                 "``d``: deferred events, ``t``: stored state.",
-        ),
-        include_juju_relation_data: bool = typer.Option(
-            False,
-            "--include-juju-relation-data",
-            help="Whether to include in the relation data the default juju keys (egress-subnets,"
-                 "ingress-address, private-address).",
-            is_flag=True,
-        ),
-        push_files: Path = typer.Option(
-            None,
-            "--push-files",
-            help="Path to a local file containing a json spec of files to be fetched from the unit. "
-                 "For k8s units, it's supposed to be a {container_name: List[Path]} mapping listing "
-                 "the files that need to be pushed to the each container.",
-        ),
-        # TODO: generalize "push_files" to allow passing '.' for the 'charm' container or 'the machine'.
-        data_dir: Path = typer.Option(
-            SNAPSHOT_DATA_DIR,
-            "--data-dir",
-            help="Directory in which to any files associated with the state are stored. In the case "
-                 "of k8s charms, this might mean files obtained through Mounts,",
-        ),
+    target: str = typer.Argument(..., help="Target unit."),
+    state: Path = typer.Argument(
+        ...,
+        help="Source State to apply. Json file containing a State data structure; "
+        "the same you would obtain by running snapshot.",
+    ),
+    model: Optional[str] = typer.Option(
+        None, "-m", "--model", help="Which model to look at."
+    ),
+    include: str = typer.Option(
+        "scrkSdt",
+        "--include",
+        "-i",
+        help="What parts of the state to apply. Defaults to: all of them. "
+        "``r``: relation, ``c``: config, ``k``: containers, "
+        "``s``: status, ``S``: secrets(!), "
+        "``d``: deferred events, ``t``: stored state.",
+    ),
+    include_juju_relation_data: bool = typer.Option(
+        False,
+        "--include-juju-relation-data",
+        help="Whether to include in the relation data the default juju keys (egress-subnets,"
+        "ingress-address, private-address).",
+        is_flag=True,
+    ),
+    push_files: Path = typer.Option(
+        None,
+        "--push-files",
+        help="Path to a local file containing a json spec of files to be fetched from the unit. "
+        "For k8s units, it's supposed to be a {container_name: List[Path]} mapping listing "
+        "the files that need to be pushed to the each container.",
+    ),
+    # TODO: generalize "push_files" to allow passing '.' for the 'charm' container or 'the machine'.
+    data_dir: Path = typer.Option(
+        SNAPSHOT_DATA_DIR,
+        "--data-dir",
+        help="Directory in which to any files associated with the state are stored. In the case "
+        "of k8s charms, this might mean files obtained through Mounts,",
+    ),
 ):
     """Gather and output the State of a remote target unit.
 
@@ -224,7 +223,4 @@ _state_apply.__doc__ = state_apply.__doc__
 if __name__ == "__main__":
     from scenario import State
 
-    _state_apply(
-        "zookeeper/0", model="foo",
-        state=State()
-    )
+    _state_apply("zookeeper/0", model="foo", state=State())
