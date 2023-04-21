@@ -4,8 +4,8 @@
 
 import typer
 
-from scenario.scripts.snapshot import snapshot
 from scenario.scripts import logger
+from scenario.scripts.snapshot import snapshot
 
 
 def main():
