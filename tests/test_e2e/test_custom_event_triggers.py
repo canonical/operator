@@ -18,17 +18,24 @@ def test_custom_event_emitted():
     class MyCharm(CharmBase):
         META = {"name": "mycharm"}
         on = MyCharmEvents()
-        _foo_called = False
+        _foo_called = 0
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.framework.observe(self.on.foo, self._on_foo)
+            self.framework.observe(self.on.start, self._on_start)
 
         def _on_foo(self, e):
-            MyCharm._foo_called = True
+            MyCharm._foo_called += 1
+
+        def _on_start(self, e):
+            self.on.foo.emit()
 
     State().trigger("foo", MyCharm, meta=MyCharm.META)
-    assert MyCharm._foo_called
+    assert MyCharm._foo_called == 1
+
+    State().trigger("start", MyCharm, meta=MyCharm.META)
+    assert MyCharm._foo_called == 2
 
 
 def test_funky_named_event_emitted():

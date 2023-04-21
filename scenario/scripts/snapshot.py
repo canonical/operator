@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+
 import datetime
 import json
-import logging
 import os
 import re
 import shlex
@@ -14,7 +14,6 @@ from enum import Enum
 from itertools import chain
 from pathlib import Path
 from subprocess import run
-from textwrap import dedent
 from typing import Any, BinaryIO, Dict, Iterable, List, Optional, TextIO, Tuple, Union
 
 import ops.pebble
@@ -23,6 +22,9 @@ import yaml
 from ops.storage import SQLiteStorage
 
 from scenario.runtime import UnitStateDB
+from scenario.scripts.errors import InvalidTargetModelName, InvalidTargetUnitName
+from scenario.scripts.logger import logger as root_scripts_logger
+from scenario.scripts.utils import JujuUnitName
 from scenario.state import (
     Address,
     BindAddress,
@@ -37,42 +39,13 @@ from scenario.state import (
     _EntityStatus,
 )
 
-logger = logging.getLogger("snapshot")
+logger = root_scripts_logger.getChild(__file__)
 
 JUJU_RELATION_KEYS = frozenset({"egress-subnets", "ingress-address", "private-address"})
 JUJU_CONFIG_KEYS = frozenset({})
 
 SNAPSHOT_OUTPUT_DIR = (Path(os.getcwd()).parent / "snapshot_storage").absolute()
 CHARM_SUBCLASS_REGEX = re.compile(r"class (\D+)\(CharmBase\):")
-
-
-class SnapshotError(RuntimeError):
-    """Base class for errors raised by snapshot."""
-
-
-class InvalidTargetUnitName(SnapshotError):
-    """Raised if the unit name passed to snapshot is invalid."""
-
-
-class InvalidTargetModelName(SnapshotError):
-    """Raised if the model name passed to snapshot is invalid."""
-
-
-class JujuUnitName(str):
-    """This class represents the name of a juju unit that can be snapshotted."""
-
-    def __init__(self, unit_name: str):
-        super().__init__()
-        app_name, _, unit_id = unit_name.rpartition("/")
-        if not app_name or not unit_id:
-            raise InvalidTargetUnitName(f"invalid unit name: {unit_name!r}")
-        self.unit_name = unit_name
-        self.app_name = app_name
-        self.unit_id = int(unit_id)
-        self.normalized = f"{app_name}-{unit_id}"
-        self.remote_charm_root = Path(
-            f"/var/lib/juju/agents/unit-{self.normalized}/charm"
-        )
 
 
 def _try_format(string: str):
@@ -90,8 +63,28 @@ def _try_format(string: str):
 
 
 def format_state(state: State):
-    """Pretty-print this State as-is."""
+    """Stringify this State as nicely as possible."""
     return _try_format(repr(state))
+
+
+PYTEST_TEST_TEMPLATE = """
+from scenario.state import *
+from charm import {ct}
+
+def test_case():
+    # Arrange: prepare the state
+    state = {state}
+    
+    #Act: trigger an event on the state 
+    out = state.trigger(
+        {en}
+        {ct}
+        juju_version="{jv}"
+        )
+        
+    # Assert: verify that the output state is the way you want it to be
+    # TODO: add assertions
+"""
 
 
 def format_test_case(
@@ -104,28 +97,9 @@ def format_test_case(
     ct = charm_type_name or "CHARM_TYPE,  # TODO: replace with charm type name"
     en = event_name or "EVENT_NAME,  # TODO: replace with event name"
     jv = juju_version or "3.0,  # TODO: check juju version is correct"
+    state_fmt = repr(state)
     return _try_format(
-        dedent(
-            f"""
-            from scenario.state import *
-            from charm import {ct}
-            
-            def test_case():
-                # Arrange: prepare the state
-                state = {state}
-                
-                #Act: trigger an event on the state 
-                out = state.trigger(
-                    {en}
-                    {ct}
-                    juju_version="{jv}"
-                    )
-                    
-                # Assert: verify that the output state is the way you want it to be
-                # TODO: add assertions
-            
-            """
-        )
+        PYTEST_TEST_TEMPLATE.format(state=state_fmt, ct=ct, en=en, jv=jv)
     )
 
 
@@ -217,8 +191,7 @@ def get_networks(
 ) -> List[Network]:
     """Get all Networks from this unit."""
     logger.info("getting networks...")
-    networks = []
-    networks.append(get_network(target, model, "juju-info"))
+    networks = [get_network(target, model, "juju-info")]
 
     endpoints = relations  # only alive relations
     if include_dead:
@@ -250,10 +223,6 @@ def get_metadata(target: JujuUnitName, model: Model):
 
 class RemotePebbleClient:
     """Clever little class that wraps calls to a remote pebble client."""
-
-    # TODO: there is a .pebble.state in kubernetes containers at
-    #  /var/lib/pebble/default/.pebble.state
-    #  figure out what it's for.
 
     def __init__(
         self, container: str, target: JujuUnitName, model: Optional[str] = None
@@ -473,7 +442,10 @@ def get_status(juju_status: Dict, target: JujuUnitName) -> Status:
 def get_endpoints(juju_status: Dict, target: JujuUnitName) -> Tuple[str, ...]:
     """Parse `juju status` to get the relation names owned by the target."""
     app = juju_status["applications"][target.app_name]
-    relations = tuple(app["relations"].keys())
+    relations_raw = app.get("relations", None)
+    if not relations_raw:
+        return ()
+    relations = tuple(relations_raw.keys())
     return relations
 
 
@@ -575,6 +547,11 @@ def get_relations(
         local_app_data = json.loads(local_app_data_raw)
 
         some_remote_unit_id = JujuUnitName(next(iter(related_units)))
+
+        # fixme: at the moment the juju CLI offers no way to see what type of relation this is;
+        #  if it's a peer relation or a subordinate, we should use the corresponding
+        #  scenario.state types instead of a regular Relation.
+
         relations.append(
             Relation(
                 endpoint=raw_relation["endpoint"],
@@ -646,6 +623,20 @@ def get_juju_version(juju_status: Dict) -> str:
     return juju_status["model"]["version"]
 
 
+def get_charm_version(target: JujuUnitName, juju_status: Dict) -> str:
+    """Get charm version info from juju status output."""
+    app_info = juju_status["applications"][target.app_name]
+    channel = app_info["charm-channel"]
+    charm_name = app_info["charm-name"]
+    app_version = app_info["version"]
+    charm_rev = app_info["charm-rev"]
+    charm_origin = app_info["charm-origin"]
+    return (
+        f"charm {charm_name!r} ({channel}/{charm_rev}); "
+        f"origin := {charm_origin}; app version := {app_version}."
+    )
+
+
 class RemoteUnitStateDB(UnitStateDB):
     """Represents a remote unit's state db."""
 
@@ -700,10 +691,10 @@ def _snapshot(
 
     logger.info(f'beginning snapshot of {target} in model {model or "<current>"}...')
 
-    def if_include(key, get_value, null_value):
+    def if_include(key, fn, default):
         if include is None or key in include:
-            return get_value()
-        return null_value
+            return fn()
+        return default
 
     try:
         state_model = get_model(model)
@@ -761,7 +752,7 @@ def _snapshot(
                 [],
             ),
             secrets=if_include(
-                "s",
+                "S",
                 lambda: get_secrets(
                     target,
                     model,
@@ -794,6 +785,7 @@ def _snapshot(
     logger.info(f"snapshot done.")
 
     if pprint:
+        charm_version = get_charm_version(target, juju_status)
         juju_version = get_juju_version(juju_status)
         if format == FormatOption.pytest:
             charm_type_name = try_guess_charm_type_name()
@@ -807,11 +799,14 @@ def _snapshot(
         else:
             raise ValueError(f"unknown format {format}")
 
-        timestamp = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+        controller_timestamp = juju_status["controller"]["timestamp"]
+        local_timestamp = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
         print(
             f"# Generated by scenario.snapshot. \n"
-            f"# Snapshot of {state_model.name}:{target.unit_name} at {timestamp}. \n"
+            f"# Snapshot of {state_model.name}:{target.unit_name} at {local_timestamp}. \n"
+            f"# Controller timestamp := {controller_timestamp}. \n"
             f"# Juju version := {juju_version} \n"
+            f"# Charm fingerprint := {charm_version} \n"
         )
         print(txt)
 
@@ -829,7 +824,8 @@ def snapshot(
         "--format",
         help="How to format the output. "
         "``state``: Outputs a black-formatted repr() of the State object (if black is installed! "
-        "else it will be ugly but valid python code). "
+        "else it will be ugly but valid python code). All you need to do then is import the necessary "
+        "objects from scenario.state, and you should have a valid State object."
         "``json``: Outputs a Jsonified State object. Perfect for storage. "
         "``pytest``: Outputs a full-blown pytest scenario test based on this State. "
         "Pipe it to a file and fill in the blanks.",
@@ -840,7 +836,7 @@ def snapshot(
         "-i",
         help="What data to include in the state. "
         "``r``: relation, ``c``: config, ``k``: containers, "
-        "``n``: networks, ``s``: secrets(!), "
+        "``n``: networks, ``S``: secrets(!), "
         "``d``: deferred events, ``t``: stored state.",
     ),
     include_dead_relation_networks: bool = typer.Option(
@@ -900,9 +896,9 @@ if __name__ == "__main__":
 
     print(
         _snapshot(
-            "prom/0",
-            format=FormatOption.pytest,
-            include="t",
+            "traefik/0",
+            format=FormatOption.state,
+            include="r",
             # fetch_files={
             #     "traefik": [
             #         Path("/opt/traefik/juju/certificates.yaml"),

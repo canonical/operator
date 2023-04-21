@@ -660,7 +660,7 @@ class _EntityStatus(_DCBase):
 
     # Why not use StatusBase directly? Because that's not json-serializable.
 
-    name: str
+    name: Literal["waiting", "blocked", "active", "unknown", "error", "maintenance"]
     message: str = ""
 
     def __eq__(self, other):
@@ -679,6 +679,10 @@ class _EntityStatus(_DCBase):
 
     def __iter__(self):
         return iter([self.name, self.message])
+
+    def __repr__(self):
+        status_type_name = self.name.title() + "Status"
+        return f"{status_type_name}('{self.message}')"
 
 
 def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
@@ -1086,8 +1090,6 @@ class Inject(_DCBase):
     """Base class for injectors: special placeholders used to tell harness_ctx
     to inject instances that can't be retrieved in advance in event args or kwargs.
     """
-
-    pass
 
 
 @dataclasses.dataclass
