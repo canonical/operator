@@ -223,6 +223,7 @@ def get_metadata(target: JujuUnitName, model: Model):
 
 class RemotePebbleClient:
     """Clever little class that wraps calls to a remote pebble client."""
+
     def __init__(
         self, container: str, target: JujuUnitName, model: Optional[str] = None
     ):
