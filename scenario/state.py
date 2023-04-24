@@ -695,8 +695,12 @@ class Status(_DCBase):
     """Represents the 'juju statuses' of the application/unit being tested."""
 
     # the current statuses. Will be cast to _EntitiyStatus in __post_init__
-    app: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
-    unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    app: Union[StatusBase, _EntityStatus] = dataclasses.field(
+        default_factory=lambda: _EntityStatus("unknown")
+    )
+    unit: Union[StatusBase, _EntityStatus] = dataclasses.field(
+        default_factory=lambda: _EntityStatus("unknown")
+    )
     app_version: str = ""
 
     # most to least recent statuses; do NOT include the current one.
