@@ -2537,7 +2537,7 @@ class _TestingPebbleClient:
     def exec(self, command, **kwargs):  # type:ignore
         raise NotImplementedError(self.exec)  # type:ignore
 
-    def send_signal(self, sig: Union[int, str], *service_names: str):
+    def send_signal(self, sig: Union[int, str], service_names: Iterable[str]):
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')
         self._check_connection()
@@ -2564,7 +2564,8 @@ class _TestingPebbleClient:
             signal.Signals[sig]
         except KeyError:
             # conform with the real pebble api
-            message = f'cannot send signal to "{service_names[0]}": invalid signal name "{sig}"'
+            first_service = next(iter(service_names))
+            message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
             body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
                     'result': {'message': message}}
             raise pebble.APIError(
