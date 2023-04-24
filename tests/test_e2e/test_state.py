@@ -60,9 +60,8 @@ def state():
 
 def test_bare_event(state, mycharm):
     out = state.trigger("start", mycharm, meta={"name": "foo"})
-    out.juju_log = []  # ignore logging output in the delta
-    out.stored_state = state.stored_state  # ignore stored state in delta.
-    assert state.jsonpatch_delta(out) == []
+    out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
+    assert state.jsonpatch_delta(out_purged) == []
 
 
 def test_leader_get(state, mycharm):
@@ -88,14 +87,15 @@ def test_status_setting(state, mycharm):
         "start",
         mycharm,
         meta={"name": "foo"},
+        config={"options": {"foo": {"type": "string"}}},
     )
     assert out.status.unit == ActiveStatus("foo test")
     assert out.status.app == WaitingStatus("foo barz")
     assert out.status.app_version == ""
 
-    out.juju_log = []  # ignore logging output in the delta
-    out.stored_state = state.stored_state  # ignore stored state in delta.
-    assert out.jsonpatch_delta(state) == sort_patch(
+    # ignore logging output and stored state in the delta
+    out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
+    assert out_purged.jsonpatch_delta(state) == sort_patch(
         [
             {"op": "replace", "path": "/status/app/message", "value": "foo barz"},
             {"op": "replace", "path": "/status/app/name", "value": "waiting"},
@@ -123,7 +123,7 @@ def test_container(connect, mycharm):
         assert container.name == "foo"
         assert container.can_connect() is connect
 
-    State(containers=(Container(name="foo", can_connect=connect),)).trigger(
+    State(containers=[Container(name="foo", can_connect=connect)]).trigger(
         "start",
         mycharm,
         meta={
