@@ -220,7 +220,7 @@ class _MockModelBackend(_ModelBackend):
         if peek or refresh:
             revision = max(secret.contents.keys())
             if refresh:
-                secret.revision = revision
+                secret._set_revision(revision)
 
         return secret.contents[revision]
 
@@ -298,6 +298,10 @@ class _MockModelBackend(_ModelBackend):
         else:
             secret.contents.clear()
 
+    def relation_remote_app_name(self, relation_id: int):
+        relation = self._get_relation_by_id(relation_id)
+        return relation.remote_app_name
+
     # TODO:
     def action_set(self, *args, **kwargs):
         raise NotImplementedError("action_set")
@@ -313,9 +317,6 @@ class _MockModelBackend(_ModelBackend):
 
     def action_get(self):
         raise NotImplementedError("action_get")
-
-    def relation_remote_app_name(self, *args, **kwargs):
-        raise NotImplementedError("relation_remote_app_name")
 
     def resource_get(self, *args, **kwargs):
         raise NotImplementedError("resource_get")
