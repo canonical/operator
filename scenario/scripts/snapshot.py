@@ -68,7 +68,7 @@ def format_state(state: State):
 
 
 PYTEST_TEST_TEMPLATE = """
-from scenario.state import *
+from scenario import *
 from charm import {ct}
 
 def test_case():
