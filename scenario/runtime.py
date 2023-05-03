@@ -386,7 +386,7 @@ class Runtime:
                 raise  # propagate along
             except Exception as e:
                 raise UncaughtCharmError(
-                    f"Uncaught error in operator/charm code: {e}."
+                    f"Uncaught exception ({type(e)}) in operator/charm code: {e!r}"
                 ) from e
             finally:
                 logger.info(" - Exited ops.main.")
