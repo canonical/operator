@@ -91,7 +91,7 @@ def test_status_setting(state, mycharm):
     )
     assert out.status.unit == ActiveStatus("foo test")
     assert out.status.app == WaitingStatus("foo barz")
-    assert out.status.app_version == ""
+    assert out.status.workload_version == ""
 
     # ignore logging output and stored state in the delta
     out_purged = out.replace(juju_log=[], stored_state=state.stored_state)

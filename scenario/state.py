@@ -720,12 +720,12 @@ class Status(_DCBase):
     # the current statuses. Will be cast to _EntitiyStatus in __post_init__
     app: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
     unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
-    app_version: str = ""
+    workload_version: str = ""
 
     # most to least recent statuses; do NOT include the current one.
     app_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
     unit_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
-    previous_app_version: Optional[str] = None
+    previous_workload_version: Optional[str] = None
 
     def __post_init__(self):
         for name in ["app", "unit"]:
@@ -744,14 +744,14 @@ class Status(_DCBase):
             else:
                 raise TypeError(f"Invalid status.{name}: {val!r}")
 
-    def _update_app_version(self, new_app_version: str):
+    def _update_workload_version(self, new_workload_version: str):
         """Update the current app version and record the previous one."""
         # We don't keep a full history because we don't expect the app version to change more
         # than once per hook.
 
         # bypass frozen dataclass
-        object.__setattr__(self, "previous_app_version", self.app_version)
-        object.__setattr__(self, "app_version", new_app_version)
+        object.__setattr__(self, "previous_workload_version", self.workload_version)
+        object.__setattr__(self, "workload_version", new_workload_version)
 
     def _update_status(
         self, new_status: str, new_message: str = "", is_app: bool = False
