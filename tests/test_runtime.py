@@ -101,10 +101,11 @@ def test_unit_name(app_name, unit_id):
             my_charm_type,
             meta=meta,
         ),
-        unit_id=unit_id,
     )
 
     def post_event(charm: CharmBase):
         assert charm.unit.name == f"{app_name}/{unit_id}"
 
-    runtime.exec(state=State(), event=Event("start"), post_event=post_event)
+    runtime.exec(
+        state=State(unit_id=unit_id), event=Event("start"), post_event=post_event
+    )

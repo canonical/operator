@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+
 import typing
 from contextlib import contextmanager
 from typing import ContextManager, List, Type, TypeVar
 
+import pytest
 from ops.framework import (
     CommitEvent,
     EventBase,
@@ -23,6 +25,8 @@ def capture_events(
 ) -> ContextManager[List[EventBase]]:
     """Capture all events of type `*types` (using instance checks).
 
+    Arguments exposed so that you can define your own fixtures if you want to.
+
     Example::
     >>> from ops.charm import StartEvent
     >>> from scenario import Event, State
@@ -30,7 +34,7 @@ def capture_events(
     >>>
     >>> def test_my_event():
     >>>     with capture_events(StartEvent, MyCustomEvent) as captured:
-    >>>         State().trigger("start", MyCharm, meta=MyCharm.META)
+    >>>         trigger(State(), ("start", MyCharm, meta=MyCharm.META)
     >>>
     >>>     assert len(captured) == 2
     >>>     e1, e2 = captured
@@ -87,3 +91,9 @@ def capture_events(
 
     Framework._emit = _real_emit  # type: ignore # noqa # ugly
     Framework.reemit = _real_reemit  # type: ignore # noqa # ugly
+
+
+@pytest.fixture(scope="function")
+def emitted_events():
+    with capture_events() as captured:
+        yield captured

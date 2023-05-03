@@ -4,6 +4,7 @@ import pytest
 from ops.charm import CharmBase, CharmEvents, RelationDepartedEvent
 from ops.framework import EventBase, Framework
 
+from scenario import trigger
 from scenario.state import (
     PeerRelation,
     Relation,
@@ -48,14 +49,15 @@ def test_get_relation(mycharm):
         assert charm.model.get_relation("qux")
         assert charm.model.get_relation("zoo") is None
 
-    State(
-        config={"foo": "bar"},
-        leader=True,
-        relations=[
-            Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
-            Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
-        ],
-    ).trigger(
+    trigger(
+        State(
+            config={"foo": "bar"},
+            leader=True,
+            relations=[
+                Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
+                Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
+            ],
+        ),
         "start",
         mycharm,
         meta={
@@ -81,11 +83,12 @@ def test_relation_events(mycharm, evt_name):
 
     mycharm._call = lambda self, evt: None
 
-    State(
-        relations=[
-            relation,
-        ],
-    ).trigger(
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
         getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
@@ -117,11 +120,12 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
 
     mycharm._call = callback
 
-    State(
-        relations=[
-            relation,
-        ],
-    ).trigger(
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
         getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
@@ -158,11 +162,12 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_i
 
     mycharm._call = callback
 
-    State(
-        relations=[
-            relation,
-        ],
-    ).trigger(
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
         getattr(relation, f"{evt_name}_event")(remote_unit_id=remote_unit_id),
         mycharm,
         meta={
@@ -197,11 +202,12 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
 
     mycharm._call = callback
 
-    State(
-        relations=[
-            relation,
-        ],
-    ).trigger(
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
         getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
@@ -252,8 +258,11 @@ def test_relation_event_trigger(relation, evt_name, mycharm):
         },
         "peers": {"b": {"interface": "i2"}},
     }
-    state = State(relations=[relation]).trigger(
-        getattr(relation, evt_name + "_event"), mycharm, meta=meta
+    state = trigger(
+        State(relations=[relation]),
+        getattr(relation, evt_name + "_event"),
+        mycharm,
+        meta=meta,
     )
 
 
@@ -282,8 +291,12 @@ def test_trigger_sub_relation(mycharm):
         for relation in b_relations:
             assert len(relation.units) == 1
 
-    State(relations=[sub1, sub2]).trigger(
-        "update-status", mycharm, meta=meta, post_event=post_event
+    trigger(
+        State(relations=[sub1, sub2]),
+        "update-status",
+        mycharm,
+        meta=meta,
+        post_event=post_event,
     )
 
 

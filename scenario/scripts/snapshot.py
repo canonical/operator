@@ -76,7 +76,7 @@ def test_case():
     state = {state}
     
     #Act: trigger an event on the state 
-    out = state.trigger(
+    out = trigger(state, 
         {en}
         {ct}
         juju_version="{jv}"

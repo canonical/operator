@@ -71,7 +71,7 @@ class MyCharm(CharmBase):
 
 
 def test_scenario_base():
-    out = State().trigger(
+    out = trigger(State(), (
         'start', 
         MyCharm, meta={"name": "foo"})
     assert out.status.unit == UnknownStatus()
@@ -100,7 +100,7 @@ class MyCharm(CharmBase):
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    out = State(leader=leader).trigger(
+    out = State(leader=leader), 
         'start', 
         MyCharm,
         meta={"name": "foo"})
@@ -141,7 +141,7 @@ from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, UnknownSta
 from scenario import State
 
 def test_statuses():
-    out = State(leader=False).trigger(
+    out = State(leader=False), 
         'start',
         MyCharm,
         meta={"name": "foo"})
@@ -197,7 +197,7 @@ def test_relation_data():
             remote_app_data={"cde": "baz!"},
         ),
     ]
-    ).trigger("start", MyCharm, meta={"name": "foo"})
+    ), "start", MyCharm, meta={"name": "foo"})
 
     assert out.relations[0].local_unit_data == {"abc": "baz!"}
     # you can do this to check that there are no other differences:
@@ -245,7 +245,7 @@ State(relations=[
     PeerRelation(
         endpoint="peers",
         peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
-    )]).trigger("start", ..., unit_id=1)  # invalid: this unit's id cannot be the ID of a peer.
+    )]), "start", ..., unit_id=1)  # invalid: this unit's id cannot be the ID of a peer.
 
 
 ```
@@ -380,7 +380,7 @@ def test_pebble_push():
                               mounts={'local': Mount('/local/share/config.yaml', local_file.name)})
         out = State(
             containers=[container]
-        ).trigger(
+        ), 
             container.pebble_ready_event,
             MyCharm,
             meta={"name": "foo", "containers": {"foo": {}}},
@@ -425,7 +425,7 @@ def test_pebble_exec():
     )
     out = State(
         containers=[container]
-    ).trigger(
+    ), 
         container.pebble_ready_event,
         MyCharm,
         meta={"name": "foo", "containers": {"foo": {}}},
@@ -456,7 +456,7 @@ def test_start_on_deferred_update_status(MyCharm):
             deferred('update_status', 
                      handler=MyCharm._on_update_status)
         ]
-    ).trigger('start', MyCharm)
+    ), 'start', MyCharm)
     assert len(out.deferred) == 1
     assert out.deferred[0].name == 'start'
 ```
@@ -491,7 +491,7 @@ class MyCharm(...):
 
         
 def test_defer(MyCharm):
-    out = State().trigger('start', MyCharm)
+    out = trigger(State(), ('start', MyCharm)
     assert len(out.deferred) == 1
     assert out.deferred[0].name == 'start'
 ```
@@ -595,7 +595,7 @@ from ops.charm import StartEvent, UpdateStatusEvent
 from scenario import State, DeferredEvent
 from scenario import capture_events
 with capture_events() as emitted:
-    state_out = State(deferred=[DeferredEvent('start', ...)]).trigger('update-status', ...)
+    state_out = State(deferred=[DeferredEvent('start', ...)]), 'update-status', ...)
 
 # deferred events get reemitted first
 assert isinstance(emitted[0], StartEvent)
@@ -638,7 +638,7 @@ from scenario import State
 class MyCharmType(CharmBase):
     pass
 
-state = State().trigger(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start')
+state = trigger(State(), (charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start')
 ```
 
 A consequence of this fact is that you have no direct control over the tempdir that we are
@@ -656,7 +656,7 @@ class MyCharmType(CharmBase):
 
 
 td = tempfile.TemporaryDirectory()
-state = State().trigger(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start',
+state = trigger(State(), (charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start',
                         charm_root=td.name)
 ```
 
@@ -694,7 +694,7 @@ Snapshot's purpose is to gather the State data structure from a real, live charm
 - your charm is bork or in some inconsistent state, and you want to write a test to check the charm will handle it correctly the next time around (aka regression testing)
 - you are new to Scenario and want to quickly get started with a real-life example.
 
-Suppose you have a Juju model with a `prometheus-k8s` unit deployed as `prometheus-k8s/0`. If you type `scenario snapshot prometheus-k8s/0`, you will get a printout of the State object. Copy-paste that in some file, import all you need from `scenario`, and you have a working `State` that you can `.trigger()` events from.
+Suppose you have a Juju model with a `prometheus-k8s` unit deployed as `prometheus-k8s/0`. If you type `scenario snapshot prometheus-k8s/0`, you will get a printout of the State object. Copy-paste that in some file, import all you need from `scenario`, and you have a working `State` that you can `, )` events from.
 
 You can also pass a `--format json | pytest | state (default=state)` flag to obtain
 - jsonified `State` data structure, for portability

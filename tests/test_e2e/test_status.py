@@ -3,6 +3,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus, UnknownStatus, WaitingStatus
 
+from scenario import trigger
 from scenario.state import State, Status
 
 
@@ -24,8 +25,12 @@ def test_initial_status(mycharm):
     def post_event(charm: CharmBase):
         assert charm.unit.status == UnknownStatus()
 
-    out = State(leader=True).trigger(
-        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
+    out = trigger(
+        State(leader=True),
+        "update_status",
+        mycharm,
+        meta={"name": "local"},
+        post_event=post_event,
     )
 
     assert out.status.unit == UnknownStatus()
@@ -38,8 +43,12 @@ def test_status_history(mycharm):
             obj.status = BlockedStatus("2")
             obj.status = WaitingStatus("3")
 
-    out = State(leader=True).trigger(
-        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
+    out = trigger(
+        State(leader=True),
+        "update_status",
+        mycharm,
+        meta={"name": "local"},
+        post_event=post_event,
     )
 
     assert out.status.unit == WaitingStatus("3")
@@ -62,9 +71,16 @@ def test_status_history_preservation(mycharm):
         for obj in [charm.unit, charm.app]:
             obj.status = WaitingStatus("3")
 
-    out = State(
-        leader=True, status=Status(unit=ActiveStatus("foo"), app=ActiveStatus("bar"))
-    ).trigger("update_status", mycharm, meta={"name": "local"}, post_event=post_event)
+    out = trigger(
+        State(
+            leader=True,
+            status=Status(unit=ActiveStatus("foo"), app=ActiveStatus("bar")),
+        ),
+        "update_status",
+        mycharm,
+        meta={"name": "local"},
+        post_event=post_event,
+    )
 
     assert out.status.unit == WaitingStatus("3")
     assert out.status.unit_history == [ActiveStatus("foo")]
