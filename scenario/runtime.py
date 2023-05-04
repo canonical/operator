@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 
 logger = scenario_logger.getChild("runtime")
 STORED_STATE_REGEX = re.compile(
-    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
+    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]",
 )
 EVENT_REGEX = re.compile(_event_regex)
 
@@ -108,7 +108,9 @@ class UnitStateDB:
                 notices = db.notices(handle_path)
                 for handle, owner, observer in notices:
                     event = DeferredEvent(
-                        handle_path=handle, owner=owner, observer=observer
+                        handle_path=handle,
+                        owner=owner,
+                        observer=observer,
                     )
                     deferred.append(event)
 
@@ -124,7 +126,7 @@ class UnitStateDB:
                 marshal.dumps(event.snapshot_data)
             except ValueError as e:
                 raise ValueError(
-                    f"unable to save the data for {event}, it must contain only simple types."
+                    f"unable to save the data for {event}, it must contain only simple types.",
                 ) from e
             db.save_snapshot(event.handle_path, event.snapshot_data)
 
@@ -183,7 +185,7 @@ class Runtime:
             "JUJU_MODEL_NAME": state.model.name,
             "JUJU_ACTION_NAME": action_name,
             "JUJU_MODEL_UUID": state.model.uuid,
-            "JUJU_CHARM_DIR": str(charm_root.absolute())
+            "JUJU_CHARM_DIR": str(charm_root.absolute()),
             # todo consider setting pwd, (python)path
         }
 
@@ -199,7 +201,7 @@ class Runtime:
                     "JUJU_RELATION": relation.endpoint,
                     "JUJU_RELATION_ID": str(relation.relation_id),
                     "JUJU_REMOTE_APP": remote_app_name,
-                }
+                },
             )
 
             remote_unit_id = event.relation_remote_unit_id
@@ -213,14 +215,14 @@ class Runtime:
                     logger.info(
                         "there's only one remote unit, so we set JUJU_REMOTE_UNIT to it, "
                         "but you probably should be parametrizing the event with `remote_unit_id` "
-                        "to be explicit."
+                        "to be explicit.",
                     )
                 else:
                     remote_unit_id = remote_unit_ids[0]
                     logger.warning(
                         "remote unit ID unset, and multiple remote unit IDs are present; "
                         "We will pick the first one and hope for the best. You should be passing "
-                        "`remote_unit_id` to the Event constructor."
+                        "`remote_unit_id` to the Event constructor.",
                     )
 
             if remote_unit_id is not None:
@@ -237,7 +239,7 @@ class Runtime:
                 {
                     "JUJU_SECRET_ID": secret.id,
                     "JUJU_SECRET_LABEL": secret.label or "",
-                }
+                },
             )
 
         return env
@@ -280,7 +282,7 @@ class Runtime:
         actions_yaml = virtual_charm_root / "actions.yaml"
 
         metadata_files_present = any(
-            (file.exists() for file in (metadata_yaml, config_yaml, actions_yaml))
+            file.exists() for file in (metadata_yaml, config_yaml, actions_yaml)
         )
 
         if spec.is_autoloaded and vroot_is_custom:
@@ -291,7 +293,7 @@ class Runtime:
                 logger.info(
                     f"metadata files found in custom vroot {vroot}. "
                     f"The spec was autoloaded so the contents should be identical. "
-                    f"Proceeding..."
+                    f"Proceeding...",
                 )
 
         elif not spec.is_autoloaded and metadata_files_present:
@@ -300,7 +302,7 @@ class Runtime:
                 f"while you have passed meta, config or actions to trigger(). "
                 "We don't want to risk overwriting them mindlessly, so we abort. "
                 "You should not include any metadata files in the charm_root. "
-                "Single source of truth are the arguments passed to trigger(). "
+                "Single source of truth are the arguments passed to trigger(). ",
             )
             raise DirtyVirtualCharmRootError(vroot)
 
@@ -364,7 +366,9 @@ class Runtime:
 
             logger.info(" - preparing env")
             env = self._get_event_env(
-                state=state, event=event, charm_root=temporary_charm_root
+                state=state,
+                event=event,
+                charm_root=temporary_charm_root,
             )
             os.environ.update(env)
 
@@ -379,14 +383,14 @@ class Runtime:
                     state=output_state,
                     event=event,
                     charm_spec=self._charm_spec.replace(
-                        charm_type=self._wrap(charm_type)
+                        charm_type=self._wrap(charm_type),
                     ),
                 )
             except NoObserverError:
                 raise  # propagate along
             except Exception as e:
                 raise UncaughtCharmError(
-                    f"Uncaught exception ({type(e)}) in operator/charm code: {e!r}"
+                    f"Uncaught exception ({type(e)}) in operator/charm code: {e!r}",
                 ) from e
             finally:
                 logger.info(" - Exited ops.main.")
@@ -460,7 +464,10 @@ def trigger(
         if not meta:
             meta = {"name": str(charm_type.__name__)}
         spec = _CharmSpec(
-            charm_type=charm_type, meta=meta, actions=actions, config=config
+            charm_type=charm_type,
+            meta=meta,
+            actions=actions,
+            config=config,
         )
 
     runtime = Runtime(

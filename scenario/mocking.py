@@ -71,11 +71,12 @@ class _MockModelBackend(_ModelBackend):
         )
 
     def _get_relation_by_id(
-        self, rel_id
+        self,
+        rel_id,
     ) -> Union["Relation", "SubordinateRelation", "PeerRelation"]:
         try:
             return next(
-                filter(lambda r: r.relation_id == rel_id, self._state.relations)
+                filter(lambda r: r.relation_id == rel_id, self._state.relations),
             )
         except StopIteration as e:
             raise RuntimeError(f"Not found: relation with id={rel_id}.") from e
@@ -225,7 +226,10 @@ class _MockModelBackend(_ModelBackend):
         return secret.contents[revision]
 
     def secret_info_get(
-        self, *, id: Optional[str] = None, label: Optional[str] = None
+        self,
+        *,
+        id: Optional[str] = None,
+        label: Optional[str] = None,
     ) -> SecretInfo:
         secret = self._get_secret(id, label)
         if not secret.owner:
@@ -353,13 +357,13 @@ class _MockPebbleClient(_TestingPebbleClient):
         container_name = self.socket_path.split("/")[-2]
         try:
             return next(
-                filter(lambda x: x.name == container_name, self._state.containers)
+                filter(lambda x: x.name == container_name, self._state.containers),
             )
         except StopIteration:
             raise RuntimeError(
                 f"container with name={container_name!r} not found. "
                 f"Did you forget a Container, or is the socket path "
-                f"{self.socket_path!r} wrong?"
+                f"{self.socket_path!r} wrong?",
             )
 
     @property

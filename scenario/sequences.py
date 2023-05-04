@@ -59,7 +59,7 @@ def generate_startup_sequence(state_template: State):
                 Event(
                     "leader_elected"
                     if state_template.leader
-                    else "leader_settings_changed"
+                    else "leader_settings_changed",
                 ),
                 state_template.copy(),
             ),
@@ -115,7 +115,7 @@ def check_builtin_sequences(
         (
             template.replace(leader=True),
             template.replace(leader=False),
-        )
+        ),
     ):
         state.trigger(
             event=event,

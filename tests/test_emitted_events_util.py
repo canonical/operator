@@ -68,7 +68,9 @@ def test_capture_deferred_evt():
     # todo: this test should pass with ops < 2.1 as well
     with capture_events() as emitted:
         State(deferred=[Event("foo").deferred(handler=MyCharm._on_foo)]).trigger(
-            "start", MyCharm, meta=MyCharm.META
+            "start",
+            MyCharm,
+            meta=MyCharm.META,
         )
 
     assert len(emitted) == 3
@@ -81,7 +83,9 @@ def test_capture_no_deferred_evt():
     # todo: this test should pass with ops < 2.1 as well
     with capture_events(include_deferred=False) as emitted:
         State(deferred=[Event("foo").deferred(handler=MyCharm._on_foo)]).trigger(
-            "start", MyCharm, meta=MyCharm.META
+            "start",
+            MyCharm,
+            meta=MyCharm.META,
         )
 
     assert len(emitted) == 2

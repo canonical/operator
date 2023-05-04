@@ -19,7 +19,9 @@ _T = TypeVar("_T", bound=EventBase)
 
 @contextmanager
 def capture_events(
-    *types: Type[EventBase], include_framework=False, include_deferred=True
+    *types: Type[EventBase],
+    include_framework=False,
+    include_deferred=True,
 ) -> ContextManager[List[EventBase]]:
     """Capture all events of type `*types` (using instance checks).
 
@@ -71,7 +73,8 @@ def capture_events(
             self._forget(event)  # prevent tracking conflicts
 
             if not include_framework and isinstance(
-                event, (PreCommitEvent, CommitEvent)
+                event,
+                (PreCommitEvent, CommitEvent),
             ):
                 continue
 

@@ -74,14 +74,14 @@ from charm import {ct}
 def test_case():
     # Arrange: prepare the state
     state = {state}
-    
-    #Act: trigger an event on the state 
+
+    #Act: trigger an event on the state
     out = state.trigger(
         {en}
         {ct}
         juju_version="{jv}"
         )
-        
+
     # Assert: verify that the output state is the way you want it to be
     # TODO: add assertions
 """
@@ -99,7 +99,7 @@ def format_test_case(
     jv = juju_version or "3.0,  # TODO: check juju version is correct"
     state_fmt = repr(state)
     return _try_format(
-        PYTEST_TEST_TEMPLATE.format(state=state_fmt, ct=ct, en=en, jv=jv)
+        PYTEST_TEST_TEMPLATE.format(state=state_fmt, ct=ct, en=en, jv=jv),
     )
 
 
@@ -155,13 +155,14 @@ def get_network(target: JujuUnitName, model: Optional[str], endpoint: str) -> Ne
                     value=raw_adds["value"],
                     cidr=raw_adds["cidr"],
                     address=raw_adds.get("address", ""),
-                )
+                ),
             )
 
         bind_addresses.append(
             BindAddress(
-                interface_name=raw_bind.get("interface-name", ""), addresses=addresses
-            )
+                interface_name=raw_bind.get("interface-name", ""),
+                addresses=addresses,
+            ),
         )
     return Network(
         name=endpoint,
@@ -225,7 +226,10 @@ class RemotePebbleClient:
     """Clever little class that wraps calls to a remote pebble client."""
 
     def __init__(
-        self, container: str, target: JujuUnitName, model: Optional[str] = None
+        self,
+        container: str,
+        target: JujuUnitName,
+        model: Optional[str] = None,
     ):
         self.socket_path = f"/charm/containers/{container}/pebble.socket"
         self.container = container
@@ -242,7 +246,7 @@ class RemotePebbleClient:
             f"error wrapping pebble call with {command}: "
             f"process exited with {proc.returncode}; "
             f"stdout = {proc.stdout}; "
-            f"stderr = {proc.stderr}"
+            f"stderr = {proc.stderr}",
         )
 
     def can_connect(self) -> bool:
@@ -260,12 +264,19 @@ class RemotePebbleClient:
         return yaml.safe_load(plan_raw)
 
     def pull(
-        self, path: str, *, encoding: Optional[str] = "utf-8"
+        self,
+        path: str,
+        *,
+        encoding: Optional[str] = "utf-8",
     ) -> Union[BinaryIO, TextIO]:
         raise NotImplementedError()
 
     def list_files(
-        self, path: str, *, pattern: Optional[str] = None, itself: bool = False
+        self,
+        path: str,
+        *,
+        pattern: Optional[str] = None,
+        itself: bool = False,
     ) -> List[ops.pebble.FileInfo]:
         raise NotImplementedError()
 
@@ -309,7 +320,7 @@ def get_mounts(
     if fetch_files and not mount_meta:
         logger.error(
             f"No mounts defined for container {container_name} in metadata.yaml. "
-            f"Cannot fetch files {fetch_files} for this container."
+            f"Cannot fetch files {fetch_files} for this container.",
         )
         return {}
 
@@ -329,7 +340,7 @@ def get_mounts(
 
         if not found:
             logger.error(
-                f"could not find mount corresponding to requested remote_path {remote_path}: skipping..."
+                f"could not find mount corresponding to requested remote_path {remote_path}: skipping...",
             )
             continue
 
@@ -450,7 +461,8 @@ def get_endpoints(juju_status: Dict, target: JujuUnitName) -> Tuple[str, ...]:
 
 
 def get_config(
-    target: JujuUnitName, model: Optional[str]
+    target: JujuUnitName,
+    model: Optional[str],
 ) -> Dict[str, Union[str, int, float, bool]]:
     """Get config dict from target."""
 
@@ -520,7 +532,7 @@ def get_relations(
     relations = []
     for raw_relation in jsn[target].get("relation-info", ()):
         logger.debug(
-            f"  getting relation data for endpoint {raw_relation.get('endpoint')!r}"
+            f"  getting relation data for endpoint {raw_relation.get('endpoint')!r}",
         )
         related_units = raw_relation.get("related-units")
         if not related_units:
@@ -536,7 +548,9 @@ def get_relations(
         relation_id = raw_relation["relation-id"]
 
         local_unit_data_raw = _juju_exec(
-            target, model, f"relation-get -r {relation_id} - {target} --format json"
+            target,
+            model,
+            f"relation-get -r {relation_id} - {target} --format json",
         )
         local_unit_data = json.loads(local_unit_data_raw)
         local_app_data_raw = _juju_exec(
@@ -556,7 +570,8 @@ def get_relations(
             Relation(
                 endpoint=raw_relation["endpoint"],
                 interface=_get_interface_from_metadata(
-                    raw_relation["endpoint"], metadata
+                    raw_relation["endpoint"],
+                    metadata,
                 ),
                 relation_id=relation_id,
                 remote_app_data=raw_relation["application-data"],
@@ -567,7 +582,7 @@ def get_relations(
                 },
                 local_app_data=local_app_data,
                 local_unit_data=_clean(local_unit_data),
-            )
+            ),
         )
     return relations
 
@@ -580,7 +595,7 @@ def get_model(name: str = None) -> Model:
     model_name = name or jsn["current-model"]
     try:
         model_info = next(
-            filter(lambda m: m["short-name"] == model_name, jsn["models"])
+            filter(lambda m: m["short-name"] == model_name, jsn["models"]),
         )
     except StopIteration as e:
         raise InvalidTargetModelName(name) from e
@@ -609,7 +624,8 @@ def try_guess_charm_type_name() -> Optional[str]:
 
 
 class FormatOption(
-    str, Enum
+    str,
+    Enum,
 ):  # Enum for typer support, str for native comparison and ==.
     """Output formatting options for snapshot."""
 
@@ -685,7 +701,7 @@ def _snapshot(
     except InvalidTargetUnitName:
         logger.critical(
             f"invalid target: {target!r} is not a valid unit name. Should be formatted like so:"
-            f"`foo/1`, or `database/0`, or `myapp-foo-bar/42`."
+            f"`foo/1`, or `database/0`, or `myapp-foo-bar/42`.",
         )
         sys.exit(1)
 
@@ -790,7 +806,9 @@ def _snapshot(
         if format == FormatOption.pytest:
             charm_type_name = try_guess_charm_type_name()
             txt = format_test_case(
-                state, charm_type_name=charm_type_name, juju_version=juju_version
+                state,
+                charm_type_name=charm_type_name,
+                juju_version=juju_version,
             )
         elif format == FormatOption.state:
             txt = format_state(state)
@@ -806,7 +824,7 @@ def _snapshot(
             f"# Snapshot of {state_model.name}:{target.unit_name} at {local_timestamp}. \n"
             f"# Controller timestamp := {controller_timestamp}. \n"
             f"# Juju version := {juju_version} \n"
-            f"# Charm fingerprint := {charm_version} \n"
+            f"# Charm fingerprint := {charm_version} \n",
         )
         print(txt)
 
@@ -816,7 +834,10 @@ def _snapshot(
 def snapshot(
     target: str = typer.Argument(..., help="Target unit."),
     model: Optional[str] = typer.Option(
-        None, "-m", "--model", help="Which model to look at."
+        None,
+        "-m",
+        "--model",
+        help="Which model to look at.",
     ),
     format: FormatOption = typer.Option(
         "state",
@@ -907,5 +928,5 @@ if __name__ == "__main__":
             #         Path("/etc/traefik/traefik.yaml"),
             #     ]
             # },
-        )
+        ),
     )

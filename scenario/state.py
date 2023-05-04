@@ -110,7 +110,7 @@ class Secret(_DCBase):
         """Sugar to generate a secret-changed event."""
         if self.owner:
             raise ValueError(
-                "This unit will never receive secret-changed for a secret it owns."
+                "This unit will never receive secret-changed for a secret it owns.",
             )
         return Event(name="secret_changed", secret=self)
 
@@ -120,7 +120,7 @@ class Secret(_DCBase):
         """Sugar to generate a secret-rotate event."""
         if not self.owner:
             raise ValueError(
-                "This unit will never receive secret-rotate for a secret it does not own."
+                "This unit will never receive secret-rotate for a secret it does not own.",
             )
         return Event(name="secret_rotate", secret=self)
 
@@ -129,7 +129,7 @@ class Secret(_DCBase):
         """Sugar to generate a secret-expired event."""
         if not self.owner:
             raise ValueError(
-                "This unit will never receive secret-expire for a secret it does not own."
+                "This unit will never receive secret-expire for a secret it does not own.",
             )
         return Event(name="secret_expire", secret=self)
 
@@ -138,7 +138,7 @@ class Secret(_DCBase):
         """Sugar to generate a secret-remove event."""
         if not self.owner:
             raise ValueError(
-                "This unit will never receive secret-removed for a secret it does not own."
+                "This unit will never receive secret-removed for a secret it does not own.",
             )
         return Event(name="secret_removed", secret=self)
 
@@ -168,7 +168,7 @@ class ParametrizedEvent:
         if remote_unit and "remote_unit" not in self._accept_params:
             raise ValueError(
                 f"cannot pass param `remote_unit` to a "
-                f"{self._category} event constructor."
+                f"{self._category} event constructor.",
             )
 
         return Event(*self._args, *self._kwargs, relation_remote_unit_id=remote_unit)
@@ -182,7 +182,7 @@ def _generate_new_relation_id():
     _RELATION_IDS_CTR += 1
     logger.info(
         f"relation ID unset; automatically assigning {_RELATION_IDS_CTR}. "
-        f"If there are problems, pass one manually."
+        f"If there are problems, pass one manually.",
     )
     return _RELATION_IDS_CTR
 
@@ -224,7 +224,7 @@ class RelationBase(_DCBase):
         if type(self) is RelationBase:
             raise RuntimeError(
                 "RelationBase cannot be instantiated directly; "
-                "please use Relation, PeerRelation, or SubordinateRelation"
+                "please use Relation, PeerRelation, or SubordinateRelation",
             )
 
         for databag in self._databags:
@@ -233,48 +233,53 @@ class RelationBase(_DCBase):
     def _validate_databag(self, databag: dict):
         if not isinstance(databag, dict):
             raise StateValidationError(
-                f"all databags should be dicts, not {type(databag)}"
+                f"all databags should be dicts, not {type(databag)}",
             )
         for k, v in databag.items():
             if not isinstance(v, str):
                 raise StateValidationError(
                     f"all databags should be Dict[str,str]; "
-                    f"found a value of type {type(v)}"
+                    f"found a value of type {type(v)}",
                 )
 
     @property
     def changed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-changed event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-changed"), relation=self
+            name=normalize_name(self.endpoint + "-relation-changed"),
+            relation=self,
         )
 
     @property
     def joined_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-joined event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-joined"), relation=self
+            name=normalize_name(self.endpoint + "-relation-joined"),
+            relation=self,
         )
 
     @property
     def created_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-created event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-created"), relation=self
+            name=normalize_name(self.endpoint + "-relation-created"),
+            relation=self,
         )
 
     @property
     def departed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-departed event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-departed"), relation=self
+            name=normalize_name(self.endpoint + "-relation-departed"),
+            relation=self,
         )
 
     @property
     def broken_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-broken"), relation=self
+            name=normalize_name(self.endpoint + "-relation-broken"),
+            relation=self,
         )
 
 
@@ -308,7 +313,7 @@ def unify_ids_and_remote_units_data(ids: List[int], data: Dict[int, Any]):
     if ids and data:
         if not set(ids) == set(data):
             raise StateValidationError(
-                f"{ids} should include any and all IDs from {data}"
+                f"{ids} should include any and all IDs from {data}",
             )
     elif ids:
         data = {x: {} for x in ids}
@@ -332,14 +337,15 @@ class Relation(RelationBase):
 
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
-        default_factory=dict
+        default_factory=dict,
     )
 
     def __post_init__(self):
         super().__post_init__()
 
         remote_unit_ids, remote_units_data = unify_ids_and_remote_units_data(
-            self.remote_unit_ids, self.remote_units_data
+            self.remote_unit_ids,
+            self.remote_units_data,
         )
         # bypass frozen dataclass
         object.__setattr__(self, "remote_unit_ids", remote_unit_ids)
@@ -436,7 +442,8 @@ class PeerRelation(RelationBase):
 
     def __post_init__(self):
         peers_ids, peers_data = unify_ids_and_remote_units_data(
-            self.peers_ids, self.peers_data
+            self.peers_ids,
+            self.peers_data,
         )
         # bypass frozen dataclass guards
         object.__setattr__(self, "peers_ids", peers_ids)
@@ -473,7 +480,7 @@ def _generate_new_change_id():
     _CHANGE_IDS += 1
     logger.info(
         f"change ID unset; automatically assigning {_CHANGE_IDS}. "
-        f"If there are problems, pass one manually."
+        f"If there are problems, pass one manually.",
     )
     return _CHANGE_IDS
 
@@ -516,7 +523,7 @@ class Container(_DCBase):
     layers: Dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
 
     service_status: Dict[str, pebble.ServiceStatus] = dataclasses.field(
-        default_factory=dict
+        default_factory=dict,
     )
 
     # this is how you specify the contents of the filesystem: suppose you want to express that your
@@ -580,7 +587,9 @@ class Container(_DCBase):
             else:
                 startup = pebble.ServiceStartup(service.startup)
             info = pebble.ServiceInfo(
-                name, startup=startup, current=pebble.ServiceStatus(status)
+                name,
+                startup=startup,
+                current=pebble.ServiceStatus(status),
             )
             infos[name] = info
         return infos
@@ -589,7 +598,8 @@ class Container(_DCBase):
     def filesystem(self) -> "_MockFileSystem":
         mounts = {
             name: _MockStorageMount(
-                src=Path(spec.src), location=PurePosixPath(spec.location)
+                src=Path(spec.src),
+                location=PurePosixPath(spec.location),
             )
             for name, spec in self.mounts.items()
         }
@@ -601,7 +611,7 @@ class Container(_DCBase):
         if not self.can_connect:
             logger.warning(
                 "you **can** fire pebble-ready while the container cannot connect, "
-                "but that's most likely not what you want."
+                "but that's most likely not what you want.",
             )
         return Event(name=normalize_name(self.name + "-pebble-ready"), container=self)
 
@@ -668,9 +678,9 @@ class Network(_DCBase):
                     interface_name=interface_name,
                     mac_address=mac_address,
                     addresses=[
-                        Address(hostname=hostname, value=private_address, cidr=cidr)
+                        Address(hostname=hostname, value=private_address, cidr=cidr),
                     ],
-                )
+                ),
             ],
             egress_subnets=list(egress_subnets),
             ingress_addresses=list(ingress_addresses),
@@ -689,14 +699,14 @@ class _EntityStatus(_DCBase):
     def __eq__(self, other):
         if isinstance(other, Tuple):
             logger.warning(
-                "Comparing Status with Tuples is deprecated and will be removed soon."
+                "Comparing Status with Tuples is deprecated and will be removed soon.",
             )
             return (self.name, self.message) == other
         if isinstance(other, StatusBase):
             return (self.name, self.message) == (other.name, other.message)
         logger.warning(
             f"Comparing Status with {other} is not stable and will be forbidden soon."
-            f"Please compare with StatusBase directly."
+            f"Please compare with StatusBase directly.",
         )
         return super().__eq__(other)
 
@@ -738,7 +748,7 @@ class Status(_DCBase):
                 logger.warning(
                     "Initializing Status.[app/unit] with Tuple[str, str] is deprecated "
                     "and will be removed soon. \n"
-                    f"Please pass a StatusBase instance: `StatusBase(*{val})`"
+                    f"Please pass a StatusBase instance: `StatusBase(*{val})`",
                 )
                 object.__setattr__(self, name, _EntityStatus(*val))
             else:
@@ -754,7 +764,10 @@ class Status(_DCBase):
         object.__setattr__(self, "app_version", new_app_version)
 
     def _update_status(
-        self, new_status: str, new_message: str = "", is_app: bool = False
+        self,
+        new_status: str,
+        new_message: str = "",
+        is_app: bool = False,
     ):
         """Update the current app/unit status and add the previous one to the history."""
         if is_app:
@@ -793,7 +806,7 @@ class State(_DCBase):
     """
 
     config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
-        default_factory=dict
+        default_factory=dict,
     )
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
@@ -829,8 +842,9 @@ class State(_DCBase):
     def with_unit_status(self, status: StatusBase) -> "State":
         return self.replace(
             status=dataclasses.replace(
-                self.status, unit=_status_to_entitystatus(status)
-            )
+                self.status,
+                unit=_status_to_entitystatus(status),
+            ),
         )
 
     def get_container(self, container: Union[str, Container]) -> Container:
@@ -856,11 +870,12 @@ class State(_DCBase):
             logger.error(
                 "cannot import jsonpatch: using the .delta() "
                 "extension requires jsonpatch to be installed."
-                "Fetch it with pip install jsonpatch."
+                "Fetch it with pip install jsonpatch.",
             )
             return NotImplemented
         patch = jsonpatch.make_patch(
-            dataclasses.asdict(other), dataclasses.asdict(self)
+            dataclasses.asdict(other),
+            dataclasses.asdict(self),
         ).patch
         return sort_patch(patch)
 
@@ -981,7 +996,7 @@ class Event(_DCBase):
         if remote_unit_id and not self._is_relation_event:
             raise ValueError(
                 "cannot pass param `remote_unit_id` to a "
-                "non-relation event constructor."
+                "non-relation event constructor.",
             )
         return self.replace(relation_remote_unit_id=remote_unit_id)
 
@@ -1064,7 +1079,7 @@ class Event(_DCBase):
         match = handler_re.match(handler_repr)
         if not match:
             raise ValueError(
-                f"cannot construct DeferredEvent from {handler}; please create one manually."
+                f"cannot construct DeferredEvent from {handler}; please create one manually.",
             )
         owner_name, handler_name = match.groups()[0].split(".")[-2:]
         handle_path = f"{owner_name}/on/{self.name}[{event_id}]"
@@ -1083,7 +1098,7 @@ class Event(_DCBase):
         elif self._is_relation_event:
             if not self.relation:
                 raise ValueError(
-                    "this is a relation event; expected relation attribute"
+                    "this is a relation event; expected relation attribute",
                 )
             # this is a RelationEvent. The snapshot:
             snapshot_data = {

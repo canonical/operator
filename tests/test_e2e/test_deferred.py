@@ -51,7 +51,7 @@ def test_deferred_evt_emitted(mycharm):
     mycharm.defer_next = 2
 
     out = State(
-        deferred=[deferred(event="update_status", handler=mycharm._on_event)]
+        deferred=[deferred(event="update_status", handler=mycharm._on_event)],
     ).trigger("start", mycharm, meta=mycharm.META)
 
     # we deferred the first 2 events we saw: update-status, start.
@@ -75,7 +75,9 @@ def test_deferred_relation_evt(mycharm):
     rel = Relation(endpoint="foo", remote_app_name="remote")
     evt1 = rel.changed_event.deferred(handler=mycharm._on_event)
     evt2 = deferred(
-        event="foo_relation_changed", handler=mycharm._on_event, relation=rel
+        event="foo_relation_changed",
+        handler=mycharm._on_event,
+        relation=rel,
     )
 
     assert asdict(evt2) == asdict(evt1)
@@ -98,8 +100,10 @@ def test_deferred_relation_event(mycharm):
         relations=[rel],
         deferred=[
             deferred(
-                event="foo_relation_changed", handler=mycharm._on_event, relation=rel
-            )
+                event="foo_relation_changed",
+                handler=mycharm._on_event,
+                relation=rel,
+            ),
         ],
     ).trigger("start", mycharm, meta=mycharm.META)
 

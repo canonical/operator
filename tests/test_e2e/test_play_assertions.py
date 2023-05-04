@@ -44,7 +44,9 @@ def test_charm_heals_on_start(mycharm):
     mycharm._call = call
 
     initial_state = State(
-        config={"foo": "bar"}, leader=True, status=Status(unit=BlockedStatus("foo"))
+        config={"foo": "bar"},
+        leader=True,
+        status=Status(unit=BlockedStatus("foo")),
     )
 
     out = initial_state.trigger(
@@ -109,8 +111,8 @@ def test_relation_data_access(mycharm):
                 remote_app_name="karlos",
                 remote_app_data={"yaba": "doodle"},
                 remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
-            )
-        ]
+            ),
+        ],
     ).trigger(
         charm_type=mycharm,
         meta={

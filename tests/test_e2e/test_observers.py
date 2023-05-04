@@ -40,7 +40,7 @@ def test_action_event(charm_evts):
     charm, evts = charm_evts
 
     scenario = Scenario(
-        _CharmSpec(charm, meta={"name": "foo"}, actions={"show_proxied_endpoints": {}})
+        _CharmSpec(charm, meta={"name": "foo"}, actions={"show_proxied_endpoints": {}}),
     )
     scene = Scene(Event("show_proxied_endpoints_action"), state=State())
     scenario.play(scene)

@@ -56,7 +56,10 @@ def check_consistency(
         check_relation_consistency,
     ):
         results = check(
-            state=state, event=event, charm_spec=charm_spec, juju_version=juju_version
+            state=state,
+            event=event,
+            charm_spec=charm_spec,
+            juju_version=juju_version,
         )
         errors.extend(results.errors)
         warnings.extend(results.warnings)
@@ -64,18 +67,21 @@ def check_consistency(
     if errors:
         err_fmt = "\n".join(errors)
         raise InconsistentScenarioError(
-            f"Inconsistent scenario. The following errors were found: {err_fmt}"
+            f"Inconsistent scenario. The following errors were found: {err_fmt}",
         )
     if warnings:
         err_fmt = "\n".join(warnings)
         logger.warning(
             f"This scenario is probably inconsistent. Double check, and ignore this warning if you're sure. "
-            f"The following warnings were found: {err_fmt}"
+            f"The following warnings were found: {err_fmt}",
         )
 
 
 def check_event_consistency(
-    *, event: "Event", charm_spec: "_CharmSpec", **_kwargs
+    *,
+    event: "Event",
+    charm_spec: "_CharmSpec",
+    **_kwargs,
 ) -> Results:
     """Check the internal consistency of the Event data structure.
 
@@ -90,39 +96,42 @@ def check_event_consistency(
         warnings.append(
             "this is a custom event; if its name makes it look like a builtin one "
             "(e.g. a relation event, or a workload event), you might get some false-negative "
-            "consistency checks."
+            "consistency checks.",
         )
 
     if event._is_relation_event:  # noqa
         if not event.relation:
             errors.append(
                 "cannot construct a relation event without the relation instance. "
-                "Please pass one."
+                "Please pass one.",
             )
         else:
             if not event.name.startswith(normalize_name(event.relation.endpoint)):
                 errors.append(
                     f"relation event should start with relation endpoint name. {event.name} does "
-                    f"not start with {event.relation.endpoint}."
+                    f"not start with {event.relation.endpoint}.",
                 )
 
     if event._is_workload_event:  # noqa
         if not event.container:
             errors.append(
                 "cannot construct a workload event without the container instance. "
-                "Please pass one."
+                "Please pass one.",
             )
         else:
             if not event.name.startswith(normalize_name(event.container.name)):
                 errors.append(
                     f"workload event should start with container name. {event.name} does "
-                    f"not start with {event.container.name}."
+                    f"not start with {event.container.name}.",
                 )
     return Results(errors, warnings)
 
 
 def check_config_consistency(
-    *, state: "State", charm_spec: "_CharmSpec", **_kwargs
+    *,
+    state: "State",
+    charm_spec: "_CharmSpec",
+    **_kwargs,
 ) -> Results:
     """Check the consistency of the state.config with the charm_spec.config (config.yaml)."""
     state_config = state.config
@@ -132,7 +141,7 @@ def check_config_consistency(
     for key, value in state_config.items():
         if key not in meta_config:
             errors.append(
-                f"config option {key!r} in state.config but not specified in config.yaml."
+                f"config option {key!r} in state.config but not specified in config.yaml.",
             )
             continue
 
@@ -155,14 +164,18 @@ def check_config_consistency(
         if not isinstance(value, expected_type):
             errors.append(
                 f"config invalid; option {key!r} should be of type {expected_type} "
-                f"but is of type {type(value)}."
+                f"but is of type {type(value)}.",
             )
 
     return Results(errors, [])
 
 
 def check_secrets_consistency(
-    *, event: "Event", state: "State", juju_version: Tuple[int, ...], **_kwargs
+    *,
+    event: "Event",
+    state: "State",
+    juju_version: Tuple[int, ...],
+    **_kwargs,
 ) -> Results:
     """Check the consistency of Secret-related stuff."""
     errors = []
@@ -171,19 +184,23 @@ def check_secrets_consistency(
 
     if not state.secrets:
         errors.append(
-            "the event being processed is a secret event; but the state has no secrets."
+            "the event being processed is a secret event; but the state has no secrets.",
         )
     elif juju_version < (3,):
         errors.append(
             f"secrets are not supported in the specified juju version {juju_version}. "
-            f"Should be at least 3.0."
+            f"Should be at least 3.0.",
         )
 
     return Results(errors, [])
 
 
 def check_relation_consistency(
-    *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
+    *,
+    state: "State",
+    event: "Event",
+    charm_spec: "_CharmSpec",
+    **_kwargs,
 ) -> Results:
     errors = []
     nonpeer_relations_meta = chain(
@@ -205,7 +222,7 @@ def check_relation_consistency(
             if not isinstance(relation, PeerRelation):
                 errors.append(
                     f"endpoint {endpoint} is a peer relation; "
-                    f"expecting relation to be of type PeerRelation, got {type(relation)}"
+                    f"expecting relation to be of type PeerRelation, got {type(relation)}",
                 )
 
     for endpoint, relation_meta in all_relations_meta:
@@ -217,13 +234,13 @@ def check_relation_consistency(
                 errors.append(
                     f"endpoint {endpoint} is not a subordinate relation; "
                     f"expecting relation to be of type Relation, "
-                    f"got {type(relation)}"
+                    f"got {type(relation)}",
                 )
             if expected_sub and not is_sub:
                 errors.append(
                     f"endpoint {endpoint} is not a subordinate relation; "
                     f"expecting relation to be of type SubordinateRelation, "
-                    f"got {type(relation)}"
+                    f"got {type(relation)}",
                 )
 
     # check for duplicate endpoint names
@@ -238,7 +255,11 @@ def check_relation_consistency(
 
 
 def check_containers_consistency(
-    *, state: "State", event: "Event", charm_spec: "_CharmSpec", **_kwargs
+    *,
+    state: "State",
+    event: "Event",
+    charm_spec: "_CharmSpec",
+    **_kwargs,
 ) -> Results:
     """Check the consistency of `state.containers` vs. `charm_spec.meta` (metadata.yaml/containers)."""
     meta_containers = list(charm_spec.meta.get("containers", {}))
@@ -252,20 +273,20 @@ def check_containers_consistency(
         if evt_container_name not in meta_containers:
             errors.append(
                 f"the event being processed concerns container {evt_container_name!r}, but a container "
-                f"with that name is not declared in the charm metadata"
+                f"with that name is not declared in the charm metadata",
             )
         if evt_container_name not in state_containers:
             errors.append(
                 f"the event being processed concerns container {evt_container_name!r}, but a container "
                 f"with that name is not present in the state. It's odd, but consistent, if it cannot "
-                f"connect; but it should at least be there."
+                f"connect; but it should at least be there.",
             )
 
     # - a container in state.containers is not in meta.containers
     if diff := (set(state_containers).difference(set(meta_containers))):
         errors.append(
             f"some containers declared in the state are not specified in metadata. That's not possible. "
-            f"Missing from metadata: {diff}."
+            f"Missing from metadata: {diff}.",
         )
 
     # guard against duplicate container names
