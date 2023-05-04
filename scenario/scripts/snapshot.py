@@ -648,10 +648,10 @@ def get_charm_version(target: JujuUnitName, juju_status: Dict) -> str:
     """Get charm version info from juju status output."""
     app_info = juju_status["applications"][target.app_name]
     channel = app_info.get("charm-channel", "<local charm>")
-    charm_name = app_info["charm-name"]
-    app_version = app_info["version"]
-    charm_rev = app_info["charm-rev"]
-    charm_origin = app_info["charm-origin"]
+    charm_name = app_info.get("charm-name", "n/a")
+    app_version = app_info.get("version", "n/a")
+    charm_rev = app_info.get("charm-rev", "n/a")
+    charm_origin = app_info.get("charm-origin", "n/a")
     return (
         f"charm {charm_name!r} ({channel}/{charm_rev}); "
         f"origin := {charm_origin}; app version := {app_version}."
