@@ -45,6 +45,11 @@ scenario = "scenario"
 include = '\.pyi?$'
 
 
+[tool.flake8]
+dictionaries = ["en_US","python","technical","django"]
+max-line-length = 100
+ignore = ["SC100", "SC200", "B008"]
+
 [tool.isort]
 profile = "black"
 

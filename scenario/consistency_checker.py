@@ -28,15 +28,17 @@ def check_consistency(
 ):
     """Validate the combination of a state, an event, a charm spec, and a juju version.
 
-    When invoked, it performs a series of checks that validate that the state is consistent with itself, with
-    the event being emitted, the charm metadata, etc...
+    When invoked, it performs a series of checks that validate that the state is consistent with
+    itself, with the event being emitted, the charm metadata, etc...
 
-    This function performs some basic validation of the combination of inputs that goes into a scenario test and
-    determines if the scenario is a realistic/plausible/consistent one.
+    This function performs some basic validation of the combination of inputs that goes into a
+    scenario test and determines if the scenario is a realistic/plausible/consistent one.
 
-    A scenario is inconsistent if it can practically never occur because it contradicts the juju model.
-    For example: juju guarantees that upon calling config-get, a charm will only ever get the keys it declared
-    in its config.yaml. So a State declaring some config keys that are not in the charm's config.yaml is nonsense,
+    A scenario is inconsistent if it can practically never occur because it contradicts
+    the juju model.
+    For example: juju guarantees that upon calling config-get, a charm will only ever get the keys
+    it declared in its config.yaml.
+    So a State declaring some config keys that are not in the charm's config.yaml is nonsense,
     and the combination of the two is inconsistent.
     """
     juju_version: Tuple[int, ...] = tuple(map(int, juju_version.split(".")))
@@ -72,7 +74,8 @@ def check_consistency(
     if warnings:
         err_fmt = "\n".join(warnings)
         logger.warning(
-            f"This scenario is probably inconsistent. Double check, and ignore this warning if you're sure. "
+            f"This scenario is probably inconsistent. Double check, and ignore this "
+            f"warning if you're sure. "
             f"The following warnings were found: {err_fmt}",
         )
 
@@ -81,25 +84,25 @@ def check_event_consistency(
     *,
     event: "Event",
     charm_spec: "_CharmSpec",
-    **_kwargs,
+    **_kwargs,  # noqa: U101
 ) -> Results:
     """Check the internal consistency of the Event data structure.
 
-    For example, it checks that a relation event has a relation instance, and that the relation endpoint
-    name matches the event prefix.
+    For example, it checks that a relation event has a relation instance, and that
+    the relation endpoint name matches the event prefix.
     """
     errors = []
     warnings = []
 
     # custom event: can't make assumptions about its name and its semantics
-    if not event._is_builtin_event(charm_spec):  # noqa
+    if not event._is_builtin_event(charm_spec):
         warnings.append(
             "this is a custom event; if its name makes it look like a builtin one "
             "(e.g. a relation event, or a workload event), you might get some false-negative "
             "consistency checks.",
         )
 
-    if event._is_relation_event:  # noqa
+    if event._is_relation_event:
         if not event.relation:
             errors.append(
                 "cannot construct a relation event without the relation instance. "
@@ -112,7 +115,7 @@ def check_event_consistency(
                     f"not start with {event.relation.endpoint}.",
                 )
 
-    if event._is_workload_event:  # noqa
+    if event._is_workload_event:
         if not event.container:
             errors.append(
                 "cannot construct a workload event without the container instance. "
@@ -131,7 +134,7 @@ def check_config_consistency(
     *,
     state: "State",
     charm_spec: "_CharmSpec",
-    **_kwargs,
+    **_kwargs,  # noqa: U101
 ) -> Results:
     """Check the consistency of the state.config with the charm_spec.config (config.yaml)."""
     state_config = state.config
@@ -175,11 +178,11 @@ def check_secrets_consistency(
     event: "Event",
     state: "State",
     juju_version: Tuple[int, ...],
-    **_kwargs,
+    **_kwargs,  # noqa: U101
 ) -> Results:
     """Check the consistency of Secret-related stuff."""
     errors = []
-    if not event._is_secret_event:  # noqa
+    if not event._is_secret_event:
         return Results(errors, [])
 
     if not state.secrets:
@@ -198,9 +201,9 @@ def check_secrets_consistency(
 def check_relation_consistency(
     *,
     state: "State",
-    event: "Event",
+    event: "Event",  # noqa: U100
     charm_spec: "_CharmSpec",
-    **_kwargs,
+    **_kwargs,  # noqa: U101
 ) -> Results:
     errors = []
     nonpeer_relations_meta = chain(
@@ -245,7 +248,7 @@ def check_relation_consistency(
 
     # check for duplicate endpoint names
     seen_endpoints = set()
-    for endpoint, relation_meta in all_relations_meta:
+    for endpoint, _ in all_relations_meta:
         if endpoint in seen_endpoints:
             errors.append("duplicate endpoint name in metadata.")
             break
@@ -259,33 +262,36 @@ def check_containers_consistency(
     state: "State",
     event: "Event",
     charm_spec: "_CharmSpec",
-    **_kwargs,
+    **_kwargs,  # noqa: U101
 ) -> Results:
-    """Check the consistency of `state.containers` vs. `charm_spec.meta` (metadata.yaml/containers)."""
+    """Check the consistency of `state.containers` vs. `charm_spec.meta`."""
     meta_containers = list(charm_spec.meta.get("containers", {}))
     state_containers = [c.name for c in state.containers]
     errors = []
 
-    # it's fine if you have containers in meta that are not in state.containers (yet), but it's not fine if:
-    # - you're processing a pebble-ready event and that container is not in state.containers or meta.containers
-    if event._is_workload_event:  # noqa
+    # it's fine if you have containers in meta that are not in state.containers (yet), but it's
+    # not fine if:
+    # - you're processing a pebble-ready event and that container is not in state.containers or
+    #   meta.containers
+    if event._is_workload_event:
         evt_container_name = event.name[: -len("-pebble-ready")]
         if evt_container_name not in meta_containers:
             errors.append(
-                f"the event being processed concerns container {evt_container_name!r}, but a container "
-                f"with that name is not declared in the charm metadata",
+                f"the event being processed concerns container {evt_container_name!r}, but a "
+                f"container with that name is not declared in the charm metadata",
             )
         if evt_container_name not in state_containers:
             errors.append(
-                f"the event being processed concerns container {evt_container_name!r}, but a container "
-                f"with that name is not present in the state. It's odd, but consistent, if it cannot "
-                f"connect; but it should at least be there.",
+                f"the event being processed concerns container {evt_container_name!r}, but a "
+                f"container with that name is not present in the state. It's odd, but consistent, "
+                f"if it cannot connect; but it should at least be there.",
             )
 
     # - a container in state.containers is not in meta.containers
     if diff := (set(state_containers).difference(set(meta_containers))):
         errors.append(
-            f"some containers declared in the state are not specified in metadata. That's not possible. "
+            f"some containers declared in the state are not specified in metadata. "
+            f"That's not possible. "
             f"Missing from metadata: {diff}.",
         )
 

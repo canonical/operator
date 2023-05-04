@@ -143,10 +143,10 @@ def get_leader(target: JujuUnitName, model: Optional[str]):
 def get_network(target: JujuUnitName, model: Optional[str], endpoint: str) -> Network:
     """Get the Network data structure for this endpoint."""
     raw = _juju_exec(target, model, f"network-get {endpoint}")
-    jsn = yaml.safe_load(raw)
+    json_data = yaml.safe_load(raw)
 
     bind_addresses = []
-    for raw_bind in jsn["bind-addresses"]:
+    for raw_bind in json_data["bind-addresses"]:
         addresses = []
         for raw_adds in raw_bind["addresses"]:
             addresses.append(
@@ -167,16 +167,16 @@ def get_network(target: JujuUnitName, model: Optional[str], endpoint: str) -> Ne
     return Network(
         name=endpoint,
         bind_addresses=bind_addresses,
-        egress_subnets=jsn.get("egress-subnets", None),
-        ingress_addresses=jsn.get("ingress-addresses", None),
+        egress_subnets=json_data.get("egress-subnets", None),
+        ingress_addresses=json_data.get("ingress-addresses", None),
     )
 
 
 def get_secrets(
-    target: JujuUnitName,
-    model: Optional[str],
-    metadata: Dict,
-    relations: Tuple[str, ...] = (),
+    target: JujuUnitName,  # noqa: U100
+    model: Optional[str],  # noqa: U100
+    metadata: Dict,  # noqa: U100
+    relations: Tuple[str, ...] = (),  # noqa: U100
 ) -> List[Secret]:
     """Get Secret list from the charm."""
     logger.warning("Secrets snapshotting not implemented yet. Also, are you *sure*?")
@@ -238,7 +238,10 @@ class RemotePebbleClient:
 
     def _run(self, cmd: str) -> str:
         _model = f" -m {self.model}" if self.model else ""
-        command = f"juju ssh{_model} --container {self.container} {self.target.unit_name} /charm/bin/pebble {cmd}"
+        command = (
+            f"juju ssh{_model} --container {self.container} {self.target.unit_name} "
+            f"/charm/bin/pebble {cmd}"
+        )
         proc = run(shlex.split(command), capture_output=True, text=True)
         if proc.returncode == 0:
             return proc.stdout
@@ -265,18 +268,18 @@ class RemotePebbleClient:
 
     def pull(
         self,
-        path: str,
+        path: str,  # noqa: U100
         *,
-        encoding: Optional[str] = "utf-8",
+        encoding: Optional[str] = "utf-8",  # noqa: U100
     ) -> Union[BinaryIO, TextIO]:
         raise NotImplementedError()
 
     def list_files(
         self,
-        path: str,
+        path: str,  # noqa: U100
         *,
-        pattern: Optional[str] = None,
-        itself: bool = False,
+        pattern: Optional[str] = None,  # noqa: U100
+        itself: bool = False,  # noqa: U100
     ) -> List[ops.pebble.FileInfo]:
         raise NotImplementedError()
 
@@ -286,7 +289,7 @@ class RemotePebbleClient:
         names: Optional[Iterable[str]] = None,
     ) -> List[ops.pebble.CheckInfo]:
         _level = f" --level={level}" if level else ""
-        _names = (" " + f" ".join(names)) if names else ""
+        _names = (" " + " ".join(names)) if names else ""
         out = self._run(f"checks{_level}{_names}")
         if out == "Plan has no health checks.":
             return []
@@ -302,7 +305,10 @@ def fetch_file(
 ) -> None:
     """Download a file from a live unit to a local path."""
     model_arg = f" -m {model}" if model else ""
-    scp_cmd = f"juju scp --container {container_name}{model_arg} {target.unit_name}:{remote_path} {local_path}"
+    scp_cmd = (
+        f"juju scp --container {container_name}{model_arg} "
+        f"{target.unit_name}:{remote_path} {local_path}"
+    )
     run(shlex.split(scp_cmd))
 
 
@@ -314,7 +320,7 @@ def get_mounts(
     fetch_files: Optional[List[Path]] = None,
     temp_dir_base_path: Path = SNAPSHOT_OUTPUT_DIR,
 ) -> Dict[str, Mount]:
-    """Get named Mounts from a container's metadata, and download specified files from the target unit."""
+    """Get named Mounts from a container's metadata, and download specified files from the unit."""
     mount_meta = container_meta.get("mounts")
 
     if fetch_files and not mount_meta:
@@ -340,7 +346,8 @@ def get_mounts(
 
         if not found:
             logger.error(
-                f"could not find mount corresponding to requested remote_path {remote_path}: skipping...",
+                "could not find mount corresponding to requested remote_path "
+                f"{remote_path}: skipping...",
             )
             continue
 
@@ -429,7 +436,7 @@ def get_containers(
 def get_juju_status(model: Optional[str]) -> Dict:
     """Return juju status as json."""
     logger.info("getting status...")
-    return _juju_run(f"status --relations", model=model)
+    return _juju_run("status --relations", model=model)
 
 
 def get_status(juju_status: Dict, target: JujuUnitName) -> Status:
@@ -467,8 +474,7 @@ def get_config(
     """Get config dict from target."""
 
     logger.info("getting config...")
-    _model = f" -m {model}" if model else ""
-    jsn = _juju_run(f"config {target.app_name}", model=model)
+    json_data = _juju_run(f"config {target.app_name}", model=model)
 
     # dispatch table for builtin config options
     converters = {
@@ -481,7 +487,7 @@ def get_config(
     }
 
     cfg = {}
-    for name, option in jsn.get("settings", ()).items():
+    for name, option in json_data.get("settings", ()).items():
         if value := option.get("value"):
             try:
                 converter = converters[option["type"]]
@@ -515,9 +521,8 @@ def get_relations(
     """Get the list of relations active for this target."""
     logger.info("getting relations...")
 
-    _model = f" -m {model}" if model else ""
     try:
-        jsn = _juju_run(f"show-unit {target}", model=model)
+        json_data = _juju_run(f"show-unit {target}", model=model)
     except json.JSONDecodeError as e:
         raise InvalidTargetUnitName(target) from e
 
@@ -530,7 +535,7 @@ def get_relations(
         return relation_data
 
     relations = []
-    for raw_relation in jsn[target].get("relation-info", ()):
+    for raw_relation in json_data[target].get("relation-info", ()):
         logger.debug(
             f"  getting relation data for endpoint {raw_relation.get('endpoint')!r}",
         )
@@ -591,11 +596,11 @@ def get_model(name: str = None) -> Model:
     """Get the Model data structure."""
     logger.info("getting model...")
 
-    jsn = _juju_run("models")
-    model_name = name or jsn["current-model"]
+    json_data = _juju_run("models")
+    model_name = name or json_data["current-model"]
     try:
         model_info = next(
-            filter(lambda m: m["short-name"] == model_name, jsn["models"]),
+            filter(lambda m: m["short-name"] == model_name, json_data["models"]),
         )
     except StopIteration as e:
         raise InvalidTargetModelName(name) from e
@@ -607,7 +612,7 @@ def get_model(name: str = None) -> Model:
 
 
 def try_guess_charm_type_name() -> Optional[str]:
-    """If we are running this from a charm project root, get the charm type name charm.py is using."""
+    """If we are running this from a charm project root, get the charm type name from charm.py."""
     try:
         charm_path = Path(os.getcwd()) / "src" / "charm.py"
         if charm_path.exists():
@@ -798,7 +803,7 @@ def _snapshot(
         logger.critical(f"invalid model: {model!r} not found.")
         sys.exit(1)
 
-    logger.info(f"snapshot done.")
+    logger.info("snapshot done.")
 
     if pprint:
         charm_version = get_charm_version(target, juju_status)
@@ -845,8 +850,8 @@ def snapshot(
         "--format",
         help="How to format the output. "
         "``state``: Outputs a black-formatted repr() of the State object (if black is installed! "
-        "else it will be ugly but valid python code). All you need to do then is import the necessary "
-        "objects from scenario.state, and you should have a valid State object."
+        "else it will be ugly but valid python code). All you need to do then is import the "
+        "necessary objects from scenario.state, and you should have a valid State object. "
         "``json``: Outputs a Jsonified State object. Perfect for storage. "
         "``pytest``: Outputs a full-blown pytest scenario test based on this State. "
         "Pipe it to a file and fill in the blanks.",

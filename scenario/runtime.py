@@ -20,7 +20,7 @@ from typing import (
 )
 
 import yaml
-from ops.framework import _event_regex  # noqa
+from ops.framework import _event_regex
 from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
@@ -30,14 +30,7 @@ from scenario.state import DeferredEvent, PeerRelation, StoredState
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.state import (
-        AnyRelation,
-        DeferredEvent,
-        Event,
-        State,
-        StoredState,
-        _CharmSpec,
-    )
+    from scenario.state import AnyRelation, Event, State, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
@@ -61,7 +54,7 @@ class UncaughtCharmError(ScenarioRuntimeError):
 
 
 class DirtyVirtualCharmRootError(ScenarioRuntimeError):
-    """Error raised when the runtime can't initialize the vroot without overwriting existing metadata files."""
+    """Error raised when the runtime can't initialize the vroot without overwriting metadata."""
 
 
 class InconsistentScenarioError(ScenarioRuntimeError):
@@ -172,7 +165,8 @@ class Runtime:
 
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
         if event.name.endswith("_action"):
-            # todo: do we need some special metadata, or can we assume action names are always dashes?
+            # todo: do we need some special metadata, or can we assume action names
+            #  are always dashes?
             action_name = event.name[: -len("_action")].replace("_", "-")
         else:
             action_name = ""
@@ -191,11 +185,11 @@ class Runtime:
 
         relation: "AnyRelation"
 
-        if event._is_relation_event and (relation := event.relation):  # noqa
+        if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):
                 remote_app_name = self._app_name
             else:
-                remote_app_name = relation._remote_app_name  # noqa
+                remote_app_name = relation._remote_app_name
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
@@ -208,7 +202,7 @@ class Runtime:
             if (
                 remote_unit_id is None
             ):  # don't check truthiness because it could be int(0)
-                remote_unit_ids = relation._remote_unit_ids  # noqa
+                remote_unit_ids = relation._remote_unit_ids  # pyright: ignore
 
                 if len(remote_unit_ids) == 1:
                     remote_unit_id = remote_unit_ids[0]
@@ -262,11 +256,11 @@ class Runtime:
 
     @contextmanager
     def virtual_charm_root(self):
-        # If we are using runtime on a real charm, we can make some assumptions about the directory structure
-        #  we are going to find.
-        #  If we're, say, dynamically defining charm types and doing tests on them, we'll have to generate
-        #  the metadata files ourselves. To be sure, we ALWAYS use a tempdir. Ground truth is what the user
-        #  passed via the CharmSpec
+        # If we are using runtime on a real charm, we can make some assumptions about the
+        # directory structure we are going to find.
+        # If we're, say, dynamically defining charm types and doing tests on them, we'll have to
+        # generate the metadata files ourselves. To be sure, we ALWAYS use a tempdir. Ground truth
+        # is what the user passed via the CharmSpec
         spec = self._charm_spec
 
         if vroot := self._charm_root:
@@ -321,12 +315,12 @@ class Runtime:
         return UnitStateDB(charm_state_path)
 
     def _initialize_storage(self, state: "State", temporary_charm_root: Path):
-        """Before we start processing this event, expose the relevant parts of State through the storage."""
+        """Before we start processing this event, store the relevant parts of State."""
         store = self._get_state_db(temporary_charm_root)
         store.apply_state(state)
 
     def _close_storage(self, state: "State", temporary_charm_root: Path):
-        """Now that we're done processing this event, read the charm state and expose it via State."""
+        """Now that we're done processing this event, read the charm state and expose it."""
         store = self._get_state_db(temporary_charm_root)
         deferred = store.get_deferred_events()
         stored_state = store.get_stored_state()
@@ -341,7 +335,8 @@ class Runtime:
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
-        Returns the 'output state', that is, the state as mutated by the charm during the event handling.
+        Returns the 'output state', that is, the state as mutated by the charm during the
+        event handling.
 
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
@@ -373,7 +368,8 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(" - Entering ops.main (mocked).")
-            # we don't import from ops.main because we need some extras, such as the pre/post_event hooks
+            # we don't import from ops.main because we need some extras, such as the
+            # pre/post_event hooks
             from scenario.ops_main_mock import main as mocked_main
 
             try:

@@ -147,6 +147,29 @@ class Secret(_DCBase):
         # bypass frozen dataclass
         object.__setattr__(self, "revision", revision)
 
+    def _update_metadata(
+        self,
+        content: Optional[Dict[str, str]] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[SecretRotate] = None,
+    ):
+        """Update the metadata."""
+        revision = max(self.contents.keys())
+        # bypass frozen dataclass
+        object.__setattr__(self, "contents"[revision + 1], content)
+        if label:
+            object.__setattr__(self, "label", label)
+        if description:
+            object.__setattr__(self, "description", description)
+        if expire:
+            if isinstance(expire, datetime.timedelta):
+                expire = datetime.datetime.now() + expire
+            object.__setattr__(self, "expire", expire)
+        if rotate:
+            object.__setattr__(self, "rotate", rotate)
+
 
 _RELATION_IDS_CTR = 0
 
@@ -216,7 +239,7 @@ class RelationBase(_DCBase):
         """Ids of the units on the other end of this relation."""
         raise NotImplementedError()
 
-    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:  # noqa: U100
         """Return the databag for some remote unit ID."""
         raise NotImplementedError()
 
@@ -235,7 +258,7 @@ class RelationBase(_DCBase):
             raise StateValidationError(
                 f"all databags should be dicts, not {type(databag)}",
             )
-        for k, v in databag.items():
+        for v in databag.values():
             if not isinstance(v, str):
                 raise StateValidationError(
                     f"all databags should be Dict[str,str]; "
@@ -318,7 +341,7 @@ def unify_ids_and_remote_units_data(ids: List[int], data: Dict[int, Any]):
     elif ids:
         data = {x: {} for x in ids}
     elif data:
-        ids = [x for x in data]
+        ids = list(data)
     else:
         ids = [0]
         data = {0: {}}
@@ -394,7 +417,7 @@ class SubordinateRelation(RelationBase):
         """Ids of the units on the other end of this relation."""
         return (self.primary_id,)
 
-    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:  # noqa: U100
         """Return the databag for some remote unit ID."""
         return self.remote_unit_data
 
@@ -513,10 +536,10 @@ class Container(_DCBase):
     can_connect: bool = False
 
     # This is the base plan. On top of it, one can add layers.
-    # We need to model pebble in this way because it's impossible to retrieve the layers from pebble
-    # or derive them from the resulting plan (which one CAN get from pebble).
-    # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers' will be unknown.
-    # all that we can know is the resulting plan (the 'computed plan').
+    # We need to model pebble in this way because it's impossible to retrieve the layers from
+    # pebble or derive them from the resulting plan (which one CAN get from pebble).
+    # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers'
+    # will be unknown. all that we can know is the resulting plan (the 'computed plan').
     _base_plan: dict = dataclasses.field(default_factory=dict)
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as all will be known when unit-testing.
@@ -555,9 +578,11 @@ class Container(_DCBase):
 
     @property
     def plan(self) -> pebble.Plan:
-        """This is the 'computed' pebble plan; i.e. the base plan plus the layers that have been added on top.
+        """The 'computed' pebble plan.
 
-        You should run your assertions on the plan, not so much on the layers, as those are input data.
+        i.e. the base plan plus the layers that have been added on top.
+        You should run your assertions on this plan, not so much on the layers, as those are
+        input data.
         """
 
         # copied over from ops.testing._TestingPebbleClient.get_plan().
@@ -571,6 +596,7 @@ class Container(_DCBase):
 
     @property
     def services(self) -> Dict[str, pebble.ServiceInfo]:
+        """The pebble services as rendered in the plan."""
         services = self._render_services()
         infos = {}  # type: Dict[str, pebble.ServiceInfo]
         names = sorted(services.keys())
@@ -596,6 +622,7 @@ class Container(_DCBase):
 
     @property
     def filesystem(self) -> "_MockFileSystem":
+        """Simulated pebble filesystem."""
         mounts = {
             name: _MockStorageMount(
                 src=Path(spec.src),
@@ -800,9 +827,9 @@ class StoredState(_DCBase):
 class State(_DCBase):
     """Represents the juju-owned portion of a unit's state.
 
-    Roughly speaking, it wraps all hook-tool- and pebble-mediated data a charm can access in its lifecycle.
-    For example, status-get will return data from `State.status`, is-leader will return data from
-    `State.leader`, and so on.
+    Roughly speaking, it wraps all hook-tool- and pebble-mediated data a charm can access in its
+    lifecycle. For example, status-get will return data from `State.status`, is-leader will
+    return data from `State.leader`, and so on.
     """
 
     config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
@@ -817,8 +844,8 @@ class State(_DCBase):
     juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
-    # represents the OF's event queue. These events will be emitted before the event being dispatched,
-    # and represent the events that had been deferred during the previous run.
+    # represents the OF's event queue. These events will be emitted before the event
+    # being dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
@@ -921,8 +948,8 @@ class _CharmSpec(_DCBase):
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
 
-    # autoloaded means: trigger() is being invoked on a 'real' charm class, living in some /src/charm.py,
-    # and the metadata files are 'real' metadata files.
+    # autoloaded means: trigger() is being invoked on a 'real' charm class, living in some
+    # /src/charm.py, and the metadata files are 'real' metadata files.
     is_autoloaded: bool = False
 
     @staticmethod
@@ -1027,23 +1054,25 @@ class Event(_DCBase):
         """Whether the event name indicates that this is a workload event."""
         return self.name.endswith("_pebble_ready")
 
-    # this method is private because _CharmSpec is not quite user-facing; also, the user should know.
+    # this method is private because _CharmSpec is not quite user-facing; also,
+    # the user should know.
     def _is_builtin_event(self, charm_spec: "_CharmSpec"):
         """Determine whether the event is a custom-defined one or a builtin one."""
-        evt_name = self.name
+        event_name = self.name
 
         # simple case: this is an event type owned by our charm base.on
-        if hasattr(charm_spec.charm_type.on, evt_name):
-            return hasattr(CharmEvents, evt_name)
+        if hasattr(charm_spec.charm_type.on, event_name):
+            return hasattr(CharmEvents, event_name)
 
         # this could be an event defined on some other Object, e.g. a charm lib.
-        # We don't support (yet) directly emitting those, but they COULD have names that conflict with
-        # events owned by the base charm. E.g. if the charm has a `foo` relation, the charm will get a
-        # charm.on.foo_relation_created. Your charm lib is free to define its own `foo_relation_created`
-        # custom event, because its handle will be `charm.lib.on.foo_relation_created` and therefore be
-        # unique and the Framework is happy. However, our Event data structure ATM has no knowledge
-        # of which Object/Handle it is owned by. So the only thing we can do right now is: check whether
-        # the event name, assuming it is owned by the charm, is that of a builtin event or not.
+        # We don't support (yet) directly emitting those, but they COULD have names that conflict
+        # with events owned by the base charm. E.g. if the charm has a `foo` relation, the charm
+        # will get a  charm.on.foo_relation_created. Your charm lib is free to define its own
+        # `foo_relation_created`  custom event, because its handle will be
+        # `charm.lib.on.foo_relation_created` and therefore be  unique and the Framework is happy.
+        # However, our Event data structure ATM has no knowledge of which Object/Handle it is
+        # owned by. So the only thing we can do right now is: check whether the event name,
+        # assuming it is owned by the charm, is that of a builtin event or not.
         builtins = []
         for relation_name in chain(
             charm_spec.meta.get("requires", ()),
@@ -1070,7 +1099,7 @@ class Event(_DCBase):
             container_name = container_name.replace("-", "_")
             builtins.append(container_name + "_pebble_ready")
 
-        return evt_name in builtins
+        return event_name in builtins
 
     def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""
@@ -1086,9 +1115,9 @@ class Event(_DCBase):
 
         snapshot_data = {}
 
-        # fixme: at this stage we can't determine if the event is a builtin one or not; if it is not,
-        #  then the coming checks are meaningless: the custom event could be named like a relation event but
-        #  not *be* one.
+        # fixme: at this stage we can't determine if the event is a builtin one or not; if it is
+        #  not, then the coming checks are meaningless: the custom event could be named like a
+        #  relation event but not *be* one.
         if self._is_workload_event:
             # this is a WorkloadEvent. The snapshot:
             snapshot_data = {
@@ -1145,7 +1174,7 @@ class InjectRelation(Inject):
 def _derive_args(event_name: str):
     args = []
     for term in RELATION_EVENTS_SUFFIX:
-        # fixme: we can't disambiguate between relation IDs.
+        # fixme: we can't disambiguate between relation id-s.
         if event_name.endswith(term):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 

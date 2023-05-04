@@ -4,7 +4,8 @@ from typing import Dict
 from ops.testing import _TestingFilesystem, _TestingStorageMount  # noqa
 
 
-# todo consider duplicating the filesystem on State.copy() to be able to diff and have true state snapshots
+# todo consider duplicating the filesystem on State.copy() to be able to diff
+#  and have true state snapshots
 class _MockStorageMount(_TestingStorageMount):
     def __init__(self, location: pathlib.PurePosixPath, src: pathlib.Path):
         """Creates a new simulated storage mount.
@@ -28,8 +29,8 @@ class _MockFileSystem(_TestingFilesystem):
         super().__init__()
         self._mounts = mounts
 
-    def add_mount(self, *args, **kwargs):
+    def add_mount(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("Cannot mutate mounts; declare them all in State.")
 
-    def remove_mount(self, *args, **kwargs):
+    def remove_mount(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("Cannot mutate mounts; declare them all in State.")

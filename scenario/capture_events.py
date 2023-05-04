@@ -62,7 +62,7 @@ def capture_events(
             return _real_reemit(self)
 
         # load all notices from storage as events.
-        for event_path, observer_path, method_name in self._storage.notices():
+        for event_path, _, _ in self._storage.notices():
             event_handle = Handle.from_path(event_path)
             try:
                 event = self.load_snapshot(event_handle)
@@ -83,10 +83,10 @@ def capture_events(
 
         return _real_reemit(self)
 
-    Framework._emit = _wrapped_emit  # type: ignore # noqa # ugly
-    Framework.reemit = _wrapped_reemit  # type: ignore # noqa # ugly
+    Framework._emit = _wrapped_emit  # type: ignore
+    Framework.reemit = _wrapped_reemit  # type: ignore
 
     yield captured
 
-    Framework._emit = _real_emit  # type: ignore # noqa # ugly
-    Framework.reemit = _real_reemit  # type: ignore # noqa # ugly
+    Framework._emit = _real_emit  # type: ignore
+    Framework.reemit = _real_reemit  # type: ignore
