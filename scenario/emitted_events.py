@@ -21,7 +21,9 @@ _T = TypeVar("_T", bound=EventBase)
 
 @contextmanager
 def capture_events(
-    *types: Type[EventBase], include_framework=False, include_deferred=True
+    *types: Type[EventBase],
+    include_framework=False,
+    include_deferred=True,
 ) -> ContextManager[List[EventBase]]:
     """Capture all events of type `*types` (using instance checks).
 
@@ -64,7 +66,7 @@ def capture_events(
             return _real_reemit(self)
 
         # load all notices from storage as events.
-        for event_path, observer_path, method_name in self._storage.notices():
+        for event_path, _, _ in self._storage.notices():
             event_handle = Handle.from_path(event_path)
             try:
                 event = self.load_snapshot(event_handle)
@@ -75,7 +77,8 @@ def capture_events(
             self._forget(event)  # prevent tracking conflicts
 
             if not include_framework and isinstance(
-                event, (PreCommitEvent, CommitEvent)
+                event,
+                (PreCommitEvent, CommitEvent),
             ):
                 continue
 
@@ -84,16 +87,16 @@ def capture_events(
 
         return _real_reemit(self)
 
-    Framework._emit = _wrapped_emit  # type: ignore # noqa # ugly
-    Framework.reemit = _wrapped_reemit  # type: ignore # noqa # ugly
+    Framework._emit = _wrapped_emit  # type: ignore
+    Framework.reemit = _wrapped_reemit  # type: ignore
 
     yield captured
 
-    Framework._emit = _real_emit  # type: ignore # noqa # ugly
-    Framework.reemit = _real_reemit  # type: ignore # noqa # ugly
+    Framework._emit = _real_emit  # type: ignore
+    Framework.reemit = _real_reemit  # type: ignore
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def emitted_events():
     with capture_events() as captured:
         yield captured

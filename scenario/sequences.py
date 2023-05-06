@@ -38,7 +38,8 @@ def decompose_meta_event(meta_event: Event, state: State):
             event = Event(
                 relation.endpoint + META_EVENTS[meta_event.name],
                 args=(
-                    # right now, the Relation object hasn't been created by ops yet, so we can't pass it down.
+                    # right now, the Relation object hasn't been created by ops yet, so we
+                    # can't pass it down.
                     # this will be replaced by a Relation instance before the event is fired.
                     InjectRelation(relation.endpoint, relation.relation_id),
                 ),
@@ -60,7 +61,7 @@ def generate_startup_sequence(state_template: State):
                 Event(
                     "leader_elected"
                     if state_template.leader
-                    else "leader_settings_changed"
+                    else "leader_settings_changed",
                 ),
                 state_template.copy(),
             ),
@@ -115,7 +116,7 @@ def check_builtin_sequences(
         (
             template.replace(leader=True),
             template.replace(leader=False),
-        )
+        ),
     ):
         trigger(
             state,

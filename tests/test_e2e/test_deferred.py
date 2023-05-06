@@ -79,7 +79,9 @@ def test_deferred_relation_evt(mycharm):
     rel = Relation(endpoint="foo", remote_app_name="remote")
     evt1 = rel.changed_event.deferred(handler=mycharm._on_event)
     evt2 = deferred(
-        event="foo_relation_changed", handler=mycharm._on_event, relation=rel
+        event="foo_relation_changed",
+        handler=mycharm._on_event,
+        relation=rel,
     )
 
     assert asdict(evt2) == asdict(evt1)

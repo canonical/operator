@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 from scenario.context import Context
 from scenario.emitted_events import capture_events, emitted_events
-from scenario.runtime import trigger
+from scenario.runtime import trigger  # noqa: F401
 from scenario.state import (
     Address,
     BindAddress,

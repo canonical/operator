@@ -9,7 +9,6 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 from scenario import trigger
 from scenario.state import Container, Relation, State, sort_patch
 
-
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
     "relation_joined",
