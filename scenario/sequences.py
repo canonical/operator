@@ -5,6 +5,7 @@ import typing
 from itertools import chain
 from typing import Any, Callable, Dict, Iterable, Optional, TextIO, Type, Union
 
+from scenario import trigger
 from scenario.logger import logger as scenario_logger
 from scenario.state import (
     ATTACH_ALL_STORAGES,
@@ -97,7 +98,6 @@ def check_builtin_sequences(
     template_state: State = None,
     pre_event: Optional[Callable[["CharmType"], None]] = None,
     post_event: Optional[Callable[["CharmType"], None]] = None,
-    unit_id: int = 0,
 ):
     """Test that all the builtin startup and teardown events can fire without errors.
 
@@ -118,7 +118,8 @@ def check_builtin_sequences(
             template.replace(leader=False),
         ),
     ):
-        state.trigger(
+        trigger(
+            state,
             event=event,
             charm_type=charm_type,
             meta=meta,
@@ -126,5 +127,4 @@ def check_builtin_sequences(
             config=config,
             pre_event=pre_event,
             post_event=post_event,
-            unit_id=unit_id,
         )

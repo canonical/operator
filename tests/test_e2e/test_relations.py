@@ -4,6 +4,7 @@ import pytest
 from ops.charm import CharmBase, CharmEvents, RelationDepartedEvent
 from ops.framework import EventBase, Framework
 
+from scenario import trigger
 from scenario.state import (
     PeerRelation,
     Relation,
@@ -48,14 +49,15 @@ def test_get_relation(mycharm):
         assert charm.model.get_relation("qux")
         assert charm.model.get_relation("zoo") is None
 
-    State(
-        config={"foo": "bar"},
-        leader=True,
-        relations=[
-            Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
-            Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
-        ],
-    ).trigger(
+    trigger(
+        State(
+            config={"foo": "bar"},
+            leader=True,
+            relations=[
+                Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
+                Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
+            ],
+        ),
         "start",
         mycharm,
         meta={
@@ -74,20 +76,20 @@ def test_get_relation(mycharm):
 
 
 @pytest.mark.parametrize(
-    "event_name",
-    ("changed", "broken", "departed", "joined", "created"),
+    "evt_name", ("changed", "broken", "departed", "joined", "created")
 )
-def test_relation_events(mycharm, event_name):
+def test_relation_events(mycharm, evt_name):
     relation = Relation(endpoint="foo", interface="foo", remote_app_name="remote")
 
     mycharm._call = lambda self, evt: None
 
-    State(
-        relations=[
-            relation,
-        ],
-    ).trigger(
-        getattr(relation, f"{event_name}_event"),
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
+        getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
             "name": "local",
@@ -101,18 +103,16 @@ def test_relation_events(mycharm, event_name):
 
 
 @pytest.mark.parametrize(
-    "event_name",
+    "evt_name",
     ("changed", "broken", "departed", "joined", "created"),
 )
 @pytest.mark.parametrize(
     "remote_app_name",
     ("remote", "prometheus", "aodeok123"),
 )
-def test_relation_events(mycharm, event_name, remote_app_name):
+def test_relation_events(mycharm, evt_name, remote_app_name):
     relation = Relation(
-        endpoint="foo",
-        interface="foo",
-        remote_app_name=remote_app_name,
+        endpoint="foo", interface="foo", remote_app_name=remote_app_name
     )
 
     def callback(charm: CharmBase, _):
@@ -120,12 +120,13 @@ def test_relation_events(mycharm, event_name, remote_app_name):
 
     mycharm._call = callback
 
-    State(
-        relations=[
-            relation,
-        ],
-    ).trigger(
-        getattr(relation, f"{event_name}_event"),
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
+        getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
             "name": "local",
@@ -137,7 +138,7 @@ def test_relation_events(mycharm, event_name, remote_app_name):
 
 
 @pytest.mark.parametrize(
-    "event_name",
+    "evt_name",
     ("changed", "broken", "departed", "joined", "created"),
 )
 @pytest.mark.parametrize(
@@ -148,11 +149,9 @@ def test_relation_events(mycharm, event_name, remote_app_name):
     "remote_unit_id",
     (0, 1),
 )
-def test_relation_events_attrs(mycharm, event_name, remote_app_name, remote_unit_id):
+def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_id):
     relation = Relation(
-        endpoint="foo",
-        interface="foo",
-        remote_app_name=remote_app_name,
+        endpoint="foo", interface="foo", remote_app_name=remote_app_name
     )
 
     def callback(charm: CharmBase, event):
@@ -163,12 +162,13 @@ def test_relation_events_attrs(mycharm, event_name, remote_app_name, remote_unit
 
     mycharm._call = callback
 
-    State(
-        relations=[
-            relation,
-        ],
-    ).trigger(
-        getattr(relation, f"{event_name}_event")(remote_unit_id=remote_unit_id),
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
+        getattr(relation, f"{evt_name}_event")(remote_unit_id=remote_unit_id),
         mycharm,
         meta={
             "name": "local",
@@ -180,14 +180,14 @@ def test_relation_events_attrs(mycharm, event_name, remote_app_name, remote_unit
 
 
 @pytest.mark.parametrize(
-    "event_name",
+    "evt_name",
     ("changed", "broken", "departed", "joined", "created"),
 )
 @pytest.mark.parametrize(
     "remote_app_name",
     ("remote", "prometheus", "aodeok123"),
 )
-def test_relation_events_no_attrs(mycharm, event_name, remote_app_name, caplog):
+def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     relation = Relation(
         endpoint="foo",
         interface="foo",
@@ -198,18 +198,17 @@ def test_relation_events_no_attrs(mycharm, event_name, remote_app_name, caplog):
     def callback(charm: CharmBase, event):
         assert event.app  # that's always present
         assert event.unit
-        assert (event_name == "departed") is bool(
-            getattr(event, "departing_unit", False)
-        )
+        assert (evt_name == "departed") is bool(getattr(event, "departing_unit", False))
 
     mycharm._call = callback
 
-    State(
-        relations=[
-            relation,
-        ],
-    ).trigger(
-        getattr(relation, f"{event_name}_event"),
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
+        getattr(relation, f"{evt_name}_event"),
         mycharm,
         meta={
             "name": "local",
@@ -228,9 +227,7 @@ def test_relation_events_no_attrs(mycharm, event_name, remote_app_name, caplog):
 def test_relation_unit_data_bad_types(mycharm, data):
     with pytest.raises(StateValidationError):
         relation = Relation(
-            endpoint="foo",
-            interface="foo",
-            remote_units_data={0: {"a": data}},
+            endpoint="foo", interface="foo", remote_units_data={0: {"a": data}}
         )
 
 
@@ -241,14 +238,14 @@ def test_relation_app_data_bad_types(mycharm, data):
 
 
 @pytest.mark.parametrize(
-    "event_name",
+    "evt_name",
     ("changed", "broken", "departed", "joined", "created"),
 )
 @pytest.mark.parametrize(
     "relation",
     (Relation("a"), PeerRelation("b"), SubordinateRelation("c")),
 )
-def test_relation_event_trigger(relation, event_name, mycharm):
+def test_relation_event_trigger(relation, evt_name, mycharm):
     meta = {
         "name": "mycharm",
         "requires": {"a": {"interface": "i1"}},
@@ -257,12 +254,13 @@ def test_relation_event_trigger(relation, event_name, mycharm):
                 "interface": "i3",
                 # this is a subordinate relation.
                 "scope": "container",
-            },
+            }
         },
         "peers": {"b": {"interface": "i2"}},
     }
-    state = State(relations=[relation]).trigger(
-        getattr(relation, event_name + "_event"),
+    state = trigger(
+        State(relations=[relation]),
+        getattr(relation, evt_name + "_event"),
         mycharm,
         meta=meta,
     )
@@ -276,19 +274,15 @@ def test_trigger_sub_relation(mycharm):
                 "interface": "bar",
                 # this is a subordinate relation.
                 "scope": "container",
-            },
+            }
         },
     }
 
     sub1 = SubordinateRelation(
-        "foo",
-        remote_unit_data={"1": "2"},
-        primary_app_name="primary1",
+        "foo", remote_unit_data={"1": "2"}, primary_app_name="primary1"
     )
     sub2 = SubordinateRelation(
-        "foo",
-        remote_unit_data={"3": "4"},
-        primary_app_name="primary2",
+        "foo", remote_unit_data={"3": "4"}, primary_app_name="primary2"
     )
 
     def post_event(charm: CharmBase):
@@ -297,7 +291,8 @@ def test_trigger_sub_relation(mycharm):
         for relation in b_relations:
             assert len(relation.units) == 1
 
-    State(relations=[sub1, sub2]).trigger(
+    trigger(
+        State(relations=[sub1, sub2]),
         "update-status",
         mycharm,
         meta=meta,

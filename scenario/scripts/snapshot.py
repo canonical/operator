@@ -68,7 +68,7 @@ def format_state(state: State):
 
 
 PYTEST_TEST_TEMPLATE = """
-from scenario.state import *
+from scenario import *
 from charm import {ct}
 
 def test_case():
@@ -76,10 +76,13 @@ def test_case():
     state = {state}
 
     #Act: trigger an event on the state
-    out = state.trigger(
+    ctx = Context(
+        {ct},
+        juju_version="{jv}")
+
+    out = ctx.run(
         {en}
-        {ct}
-        juju_version="{jv}"
+        state,
         )
 
     # Assert: verify that the output state is the way you want it to be

@@ -28,7 +28,11 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Topic :: Utilities",
     "License :: OSI Approved :: Apache Software License",
+    "Testing :: Pytest"
 ]
+
+[project.entry-points.pytest11]
+emitted_events = "scenario"
 
 [project.urls]
 "Homepage" = "https://github.com/PietroPasotti/ops-scenario"

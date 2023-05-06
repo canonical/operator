@@ -2,7 +2,7 @@ import pytest
 from ops.charm import CharmBase, CharmEvents, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
-from scenario import Event, State, capture_events
+from scenario import Event, State, capture_events, trigger
 
 
 class Foo(EventBase):
@@ -31,7 +31,7 @@ class MyCharm(CharmBase):
 
 def test_capture_custom_evt():
     with capture_events(Foo) as emitted:
-        State().trigger("foo", MyCharm, meta=MyCharm.META)
+        trigger(State(), "foo", MyCharm, meta=MyCharm.META)
 
     assert len(emitted) == 1
     assert isinstance(emitted[0], Foo)
@@ -39,7 +39,7 @@ def test_capture_custom_evt():
 
 def test_capture_custom_evt_nonspecific_capture():
     with capture_events() as emitted:
-        State().trigger("foo", MyCharm, meta=MyCharm.META)
+        trigger(State(), "foo", MyCharm, meta=MyCharm.META)
 
     assert len(emitted) == 1
     assert isinstance(emitted[0], Foo)
@@ -47,7 +47,7 @@ def test_capture_custom_evt_nonspecific_capture():
 
 def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
     with capture_events(include_framework=True) as emitted:
-        State().trigger("foo", MyCharm, meta=MyCharm.META)
+        trigger(State(), "foo", MyCharm, meta=MyCharm.META)
 
     assert len(emitted) == 3
     assert isinstance(emitted[0], Foo)
@@ -57,7 +57,7 @@ def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
 
 def test_capture_juju_evt():
     with capture_events() as emitted:
-        State().trigger("start", MyCharm, meta=MyCharm.META)
+        trigger(State(), "start", MyCharm, meta=MyCharm.META)
 
     assert len(emitted) == 2
     assert isinstance(emitted[0], StartEvent)
@@ -67,7 +67,8 @@ def test_capture_juju_evt():
 def test_capture_deferred_evt():
     # todo: this test should pass with ops < 2.1 as well
     with capture_events() as emitted:
-        State(deferred=[Event("foo").deferred(handler=MyCharm._on_foo)]).trigger(
+        trigger(
+            State(deferred=[Event("foo").deferred(handler=MyCharm._on_foo)]),
             "start",
             MyCharm,
             meta=MyCharm.META,
@@ -82,7 +83,8 @@ def test_capture_deferred_evt():
 def test_capture_no_deferred_evt():
     # todo: this test should pass with ops < 2.1 as well
     with capture_events(include_deferred=False) as emitted:
-        State(deferred=[Event("foo").deferred(handler=MyCharm._on_foo)]).trigger(
+        trigger(
+            State(deferred=[Event("foo").deferred(handler=MyCharm._on_foo)]),
             "start",
             MyCharm,
             meta=MyCharm.META,

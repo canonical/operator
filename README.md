@@ -73,7 +73,7 @@ available. The charm has no config, no relations, no networks, and no leadership
 With that, we can write the simplest possible scenario test:
 
 ```python
-from scenario.state import State
+from scenario import State, Context
 from ops.charm import CharmBase
 from ops.model import UnknownStatus
 
@@ -82,9 +82,9 @@ class MyCharm(CharmBase):
 
 
 def test_scenario_base():
-    out = State().trigger(
-        'start',
-        MyCharm, meta={"name": "foo"})
+    ctx = Context(MyCharm, 
+          meta={"name": "foo"})
+    out = ctx.run('start', State())
     assert out.status.unit == UnknownStatus()
 ```
 
@@ -92,7 +92,7 @@ Now let's start making it more complicated. Our charm sets a special state if it
 
 ```python
 import pytest
-from scenario.state import State
+from scenario import State, Context
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
@@ -110,10 +110,10 @@ class MyCharm(CharmBase):
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    out = State(leader=leader).trigger(
-        'start',
-        MyCharm,
-        meta={"name": "foo"})
+    ctx = Context(MyCharm, 
+          meta={"name": "foo"})
+    out = ctx.run('start', 
+                  State(leader=leader)
     assert out.status.unit == ActiveStatus('I rule' if leader else 'I am ruled')
 ```
 
@@ -148,13 +148,13 @@ You can verify that the charm has followed the expected path by checking the **u
 ```python
 from charm import MyCharm
 from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, UnknownStatus
-from scenario import State
+from scenario import State, Context
 
 def test_statuses():
-    out = State(leader=False).trigger(
-        'start',
-        MyCharm,
-        meta={"name": "foo"})
+    ctx = Context(MyCharm, 
+          meta={"name": "foo"})
+    out = ctx.run('start', 
+                  State(leader=False)) 
     assert out.status.unit_history == [
       UnknownStatus(),
       MaintenanceStatus('determining who the ruler is...'),
@@ -185,7 +185,7 @@ You can write scenario tests to verify the shape of relation data:
 ```python
 from ops.charm import CharmBase
 
-from scenario.state import Relation, State
+from scenario import Relation, State, Context
 
 
 # This charm copies over remote app data to local unit data
@@ -200,7 +200,7 @@ class MyCharm(CharmBase):
 
 
 def test_relation_data():
-    out = State(relations=[
+    state_in = State(relations=[
         Relation(
             endpoint="foo",
             interface="bar",
@@ -208,12 +208,15 @@ def test_relation_data():
             local_unit_data={"abc": "foo"},
             remote_app_data={"cde": "baz!"},
         ),
-    ]
-    ).trigger("start", MyCharm, meta={"name": "foo"})
+    ])
+    ctx = Context(MyCharm, 
+          meta={"name": "foo"})
+    
+    state_out = ctx.run('start', state_in) 
 
-    assert out.relations[0].local_unit_data == {"abc": "baz!"}
+    assert state_out.relations[0].local_unit_data == {"abc": "baz!"}
     # you can do this to check that there are no other differences:
-    assert out.relations == [
+    assert state_out.relations == [
         Relation(
             endpoint="foo",
             interface="bar",
@@ -260,13 +263,16 @@ be mindful when using `PeerRelation` not to include **"this unit"**'s ID in `pee
 be flagged by the Consistency Checker:
 
 ```python
-from scenario import State, PeerRelation
+from scenario import State, PeerRelation, Context
 
-State(relations=[
+state_in = State(relations=[
     PeerRelation(
         endpoint="peers",
         peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
-    )]).trigger("start", ..., unit_id=1)  # invalid: this unit's id cannot be the ID of a peer.
+    )],
+    unit_id=1)
+
+Context(...).run("start", state_in)  # invalid: this unit's id cannot be the ID of a peer.
 
 
 ```
@@ -396,7 +402,7 @@ strings and passing them to the charm via the container.
 ```python
 import tempfile
 from ops.charm import CharmBase
-from scenario.state import State, Container, Mount
+from scenario import State, Container, Mount, Context
 
 
 class MyCharm(CharmBase):
@@ -414,12 +420,14 @@ def test_pebble_push():
         container = Container(name='foo',
                               can_connect=True,
                               mounts={'local': Mount('/local/share/config.yaml', local_file.name)})
-        out = State(
+        state_in = State(
             containers=[container]
-        ).trigger(
-            container.pebble_ready_event,
+        )
+        Context(
             MyCharm,
-            meta={"name": "foo", "containers": {"foo": {}}},
+            meta={"name": "foo", "containers": {"foo": {}}}).run(
+            "start",
+            state_in,
         )
         assert local_file.read().decode() == "TEST"
 ```
@@ -436,7 +444,7 @@ result of that would be: its return code, what will be written to stdout/stderr.
 ```python
 from ops.charm import CharmBase
 
-from scenario.state import State, Container, ExecOutput
+from scenario import State, Container, ExecOutput, Context
 
 LS_LL = """
 .rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml
@@ -463,12 +471,15 @@ def test_pebble_exec():
                            stdout=LS_LL)
         }
     )
-    out = State(
+    state_in = State(
         containers=[container]
-    ).trigger(
-        container.pebble_ready_event,
+    )
+    state_out = Context(
         MyCharm,
         meta={"name": "foo", "containers": {"foo": {}}},
+    ).run(
+        container.pebble_ready_event,
+        state_in,
     )
 ```
 
@@ -480,27 +491,30 @@ event in its queue (they would be there because they had been deferred in the pr
 valid.
 
 ```python
-from scenario import State, deferred
+from scenario import State, deferred, Context
 
 
 class MyCharm(...):
     ...
+
     def _on_update_status(self, e):
         e.defer()
+
     def _on_start(self, e):
         e.defer()
 
 
 def test_start_on_deferred_update_status(MyCharm):
     """Test charm execution if a 'start' is dispatched when in the previous run an update-status had been deferred."""
-    out = State(
-      deferred=[
+    state_in = State(
+        deferred=[
             deferred('update_status',
                      handler=MyCharm._on_update_status)
         ]
-    ).trigger('start', MyCharm)
-    assert len(out.deferred) == 1
-    assert out.deferred[0].name == 'start'
+    )
+    state_out = Context(MyCharm).run('start', state_in)
+    assert len(state_out.deferred) == 1
+    assert state_out.deferred[0].name == 'start'
 ```
 
 You can also generate the 'deferred' data structure (called a DeferredEvent) from the corresponding Event (and the
@@ -527,7 +541,7 @@ On the output side, you can verify that an event that you expect to have been de
 been deferred.
 
 ```python
-from scenario import State
+from scenario import State, Context
 
 
 class MyCharm(...):
@@ -537,7 +551,7 @@ class MyCharm(...):
 
 
 def test_defer(MyCharm):
-    out = State().trigger('start', MyCharm)
+    out = Context(MyCharm).run('start', State())
     assert len(out.deferred) == 1
     assert out.deferred[0].name == 'start'
 ```
@@ -637,17 +651,38 @@ the output side the same as any other bit of state.
 If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it
 can be hard to examine the resulting control flow. In these situations it can be useful to verify that, as a result of a
 given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The
-resulting state, black-box as it is, gives little insight into how exactly it was obtained. `scenario.capture_events`
-allows you to open a peephole and intercept any events emitted by the framework.
+resulting state, black-box as it is, gives little insight into how exactly it was obtained. 
+
+`scenario`, among many other great things, is also a pytest plugin. It exposes a fixture called `emitted_events` that you can use like so:
+
+```python
+from scenario import Context
+from ops.charm import StartEvent
+
+def test_foo(emitted_events):
+
+  Context(...).run('start', ...)
+
+  assert len(emitted_events) == 1
+  assert isinstance(emitted_events[0], StartEvent)
+```
+
+
+## Customizing: capture_events
+If you need more control over what events are captured (or you're not into pytest), you can use directly the context manager that powers the `emitted_events` fixture: `scenario.capture_events`.
+This context manager allows you to intercept any events emitted by the framework.
 
 Usage:
 
 ```python
 from ops.charm import StartEvent, UpdateStatusEvent
-from scenario import State, DeferredEvent
-from scenario import capture_events
+from scenario import State, Context, DeferredEvent, capture_events
 with capture_events() as emitted:
-    state_out = State(deferred=[DeferredEvent('start', ...)]).trigger('update-status', ...)
+    ctx = Context(...)
+    state_out = ctx.run(
+      "update-status",
+      State(deferred=[DeferredEvent("start", ...)])
+    )
 
 # deferred events get reemitted first
 assert isinstance(emitted[0], StartEvent)
@@ -680,17 +715,18 @@ passing: `capture_events(include_deferred=True)`.
 
 Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. The
 charm will see that tempdir as its 'root'. This allows us to keep things simple when dealing with metadata that can be
-either inferred from the charm type being passed to `trigger()` or be passed to it as an argument, thereby overriding
+either inferred from the charm type being passed to `Context` or be passed to it as an argument, thereby overriding
 the inferred one. This also allows you to test with charms defined on the fly, as in:
 
 ```python
 from ops.charm import CharmBase
-from scenario import State
+from scenario import State, Context
 
 class MyCharmType(CharmBase):
     pass
-
-state = State().trigger(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start')
+ctx = Context(charm_type=MyCharmType, 
+              meta={'name': 'my-charm-name'})
+ctx.run('start', State())
 ```
 
 A consequence of this fact is that you have no direct control over the tempdir that we are creating to put the metadata
@@ -698,17 +734,20 @@ you are passing to trigger (because `ops` expects it to be a file...). That is, 
 
 ```python
 from ops.charm import CharmBase
-from scenario import State
+from scenario import State, Context
 import tempfile
 
 
 class MyCharmType(CharmBase):
-  pass
+    pass
 
 
 td = tempfile.TemporaryDirectory()
-state = State().trigger(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, event='start',
-                        charm_root=td.name)
+state = Context(
+    charm_type=MyCharmType,
+    meta={'name': 'my-charm-name'},
+    charm_root=td.name
+).run('start', State())
 ```
 
 Do this, and you will be able to set up said directory as you like before the charm is run, as well as verify its
@@ -757,7 +796,7 @@ client has access to. This is handy in case:
 
 Suppose you have a Juju model with a `prometheus-k8s` unit deployed as `prometheus-k8s/0`. If you type
 `scenario snapshot prometheus-k8s/0`, you will get a printout of the State object. Copy-paste that in some file, import
-all you need from `scenario`, and you have a working `State` that you can `.trigger()` events from.
+all you need from `scenario`, and you have a working `State` that you can `Context.run` events with.
 
 You can also pass a `--format json | pytest | state (default=state)` flag to obtain
 

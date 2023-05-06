@@ -844,8 +844,9 @@ class State(_DCBase):
     juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
-    # represents the OF's event queue. These events will be emitted before the event
-    # being dispatched, and represent the events that had been deferred during the previous run.
+    unit_id: int = 0
+    # represents the OF's event queue. These events will be emitted before the event being
+    # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
@@ -905,38 +906,6 @@ class State(_DCBase):
             dataclasses.asdict(self),
         ).patch
         return sort_patch(patch)
-
-    def trigger(
-        self,
-        event: Union["Event", str],
-        charm_type: Type["CharmType"],
-        # callbacks
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
-        # if not provided, will be autoloaded from charm_type.
-        meta: Optional[Dict[str, Any]] = None,
-        actions: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None,
-        charm_root: Optional["PathLike"] = None,
-        juju_version: str = "3.0",
-        unit_id: int = 0,
-    ) -> "State":
-        """Fluent API for trigger. See runtime.trigger's docstring."""
-        from scenario.runtime import trigger as _runtime_trigger
-
-        return _runtime_trigger(
-            state=self,
-            event=event,
-            charm_type=charm_type,
-            pre_event=pre_event,
-            post_event=post_event,
-            meta=meta,
-            actions=actions,
-            config=config,
-            charm_root=charm_root,
-            juju_version=juju_version,
-            unit_id=unit_id,
-        )
 
 
 @dataclasses.dataclass(frozen=True)
