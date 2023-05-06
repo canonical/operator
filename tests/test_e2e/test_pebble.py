@@ -77,9 +77,11 @@ def test_fs_push(charm_cls):
     State(
         containers=[
             Container(
-                name="foo", can_connect=True, mounts={"bar": Mount("/bar/baz.txt", pth)}
-            )
-        ]
+                name="foo",
+                can_connect=True,
+                mounts={"bar": Mount("/bar/baz.txt", pth)},
+            ),
+        ],
     ).trigger(
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
@@ -111,9 +113,11 @@ def test_fs_pull(charm_cls, make_dirs):
     state = State(
         containers=[
             Container(
-                name="foo", can_connect=True, mounts={"foo": Mount("/foo", td.name)}
-            )
-        ]
+                name="foo",
+                can_connect=True,
+                mounts={"foo": Mount("/foo", td.name)},
+            ),
+        ],
     )
 
     out = state.trigger(
@@ -133,23 +137,23 @@ def test_fs_pull(charm_cls, make_dirs):
 
 
 LS = """
-.rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml    
-.rw-rw-r--  497 ubuntu ubuntu 18 jan 12:05 -- config.yaml        
-.rw-rw-r--  900 ubuntu ubuntu 18 jan 12:05 -- CONTRIBUTING.md    
-drwxrwxr-x    - ubuntu ubuntu 18 jan 12:06 -- lib                
-.rw-rw-r--  11k ubuntu ubuntu 18 jan 12:05 -- LICENSE            
-.rw-rw-r-- 1,6k ubuntu ubuntu 18 jan 12:05 -- metadata.yaml      
-.rw-rw-r--  845 ubuntu ubuntu 18 jan 12:05 -- pyproject.toml     
-.rw-rw-r--  831 ubuntu ubuntu 18 jan 12:05 -- README.md          
-.rw-rw-r--   13 ubuntu ubuntu 18 jan 12:05 -- requirements.txt   
-drwxrwxr-x    - ubuntu ubuntu 18 jan 12:05 -- src                
-drwxrwxr-x    - ubuntu ubuntu 18 jan 12:05 -- tests              
-.rw-rw-r-- 1,9k ubuntu ubuntu 18 jan 12:05 -- tox.ini            
+.rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml
+.rw-rw-r--  497 ubuntu ubuntu 18 jan 12:05 -- config.yaml
+.rw-rw-r--  900 ubuntu ubuntu 18 jan 12:05 -- CONTRIBUTING.md
+drwxrwxr-x    - ubuntu ubuntu 18 jan 12:06 -- lib
+.rw-rw-r--  11k ubuntu ubuntu 18 jan 12:05 -- LICENSE
+.rw-rw-r-- 1,6k ubuntu ubuntu 18 jan 12:05 -- metadata.yaml
+.rw-rw-r--  845 ubuntu ubuntu 18 jan 12:05 -- pyproject.toml
+.rw-rw-r--  831 ubuntu ubuntu 18 jan 12:05 -- README.md
+.rw-rw-r--   13 ubuntu ubuntu 18 jan 12:05 -- requirements.txt
+drwxrwxr-x    - ubuntu ubuntu 18 jan 12:05 -- src
+drwxrwxr-x    - ubuntu ubuntu 18 jan 12:05 -- tests
+.rw-rw-r-- 1,9k ubuntu ubuntu 18 jan 12:05 -- tox.ini
 """
 PS = """
-    PID TTY          TIME CMD    
- 298238 pts/3    00:00:04 zsh    
-1992454 pts/3    00:00:00 ps     
+    PID TTY          TIME CMD
+ 298238 pts/3    00:00:04 zsh
+1992454 pts/3    00:00:00 ps
 """
 
 
@@ -173,8 +177,8 @@ def test_exec(charm_cls, cmd, out):
                 name="foo",
                 can_connect=True,
                 exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
-            )
-        ]
+            ),
+        ],
     ).trigger(
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
@@ -204,7 +208,7 @@ def test_pebble_plan(charm_cls, starting_service_status):
         foo = self.unit.get_container("foo")
 
         assert foo.get_plan().to_dict() == {
-            "services": {"fooserv": {"startup": "enabled"}}
+            "services": {"fooserv": {"startup": "enabled"}},
         }
         fooserv = foo.get_services("fooserv")["fooserv"]
         assert fooserv.startup == ServiceStartup.ENABLED
@@ -224,7 +228,7 @@ def test_pebble_plan(charm_cls, starting_service_status):
             "services": {
                 "barserv": {"startup": "disabled"},
                 "fooserv": {"startup": "enabled"},
-            }
+            },
         }
 
         assert foo.get_service("barserv").current == starting_service_status
@@ -241,8 +245,8 @@ def test_pebble_plan(charm_cls, starting_service_status):
                     "summary": "bla",
                     "description": "deadbeef",
                     "services": {"fooserv": {"startup": "enabled"}},
-                }
-            )
+                },
+            ),
         },
         service_status={
             "fooserv": pebble.ServiceStatus.ACTIVE,

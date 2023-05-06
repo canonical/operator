@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from scenario.state import (
         Event,
         ExecOutput,
-        PeerRelation,
         Relation,
         State,
         SubordinateRelation,
@@ -51,8 +50,8 @@ class _MockExecProcess:
             raise ExecError(list(self._command), exit_code, None, None)
         return out.stdout, out.stderr
 
-    def send_signal(self, sig: Union[int, str]):
-        pass
+    def send_signal(self, sig: Union[int, str]):  # noqa: U100
+        raise NotImplementedError()
 
 
 class _MockModelBackend(_ModelBackend):
@@ -71,11 +70,12 @@ class _MockModelBackend(_ModelBackend):
         )
 
     def _get_relation_by_id(
-        self, rel_id
+        self,
+        rel_id,
     ) -> Union["Relation", "SubordinateRelation", "PeerRelation"]:
         try:
             return next(
-                filter(lambda r: r.relation_id == rel_id, self._state.relations)
+                filter(lambda r: r.relation_id == rel_id, self._state.relations),
             )
         except StopIteration as e:
             raise RuntimeError(f"Not found: relation with id={rel_id}.") from e
@@ -96,7 +96,7 @@ class _MockModelBackend(_ModelBackend):
             except StopIteration:
                 raise RuntimeError(f"not found: secret with label={label}.")
         else:
-            raise RuntimeError(f"need id or label.")
+            raise RuntimeError("need id or label.")
 
     @staticmethod
     def _generate_secret_id():
@@ -135,8 +135,8 @@ class _MockModelBackend(_ModelBackend):
         if isinstance(relation, PeerRelation):
             return tuple(f"{self.app_name}/{unit_id}" for unit_id in relation.peers_ids)
         return tuple(
-            f"{relation._remote_app_name}/{unit_id}"  # noqa
-            for unit_id in relation._remote_unit_ids  # noqa
+            f"{relation._remote_app_name}/{unit_id}"
+            for unit_id in relation._remote_unit_ids
         )
 
     def config_get(self):
@@ -163,10 +163,10 @@ class _MockModelBackend(_ModelBackend):
 
     # setter methods: these can mutate the state.
     def application_version_set(self, version: str):
-        self._state.status._update_workload_version(version)  # noqa
+        self._state.status._update_workload_version(version)
 
     def status_set(self, status: str, message: str = "", *, is_app: bool = False):
-        self._state.status._update_status(status, message, is_app)  # noqa
+        self._state.status._update_status(status, message, is_app)
 
     def juju_log(self, level: str, message: str):
         self._state.juju_log.append((level, message))
@@ -225,7 +225,10 @@ class _MockModelBackend(_ModelBackend):
         return secret.contents[revision]
 
     def secret_info_get(
-        self, *, id: Optional[str] = None, label: Optional[str] = None
+        self,
+        *,
+        id: Optional[str] = None,
+        label: Optional[str] = None,
     ) -> SecretInfo:
         secret = self._get_secret(id, label)
         if not secret.owner:
@@ -254,19 +257,13 @@ class _MockModelBackend(_ModelBackend):
         if not secret.owner:
             raise RuntimeError(f"not the owner of {secret}")
 
-        revision = max(secret.contents.keys())
-        secret.contents[revision + 1] = content
-        if label:
-            secret.label = label
-        if description:
-            secret.description = description
-        if expire:
-            if isinstance(expire, datetime.timedelta):
-                expire = datetime.datetime.now() + expire
-            secret.expire = expire
-        if rotate:
-            secret.rotate = rotate
-        raise NotImplementedError("secret_set")
+        secret._update_metadata(
+            content=content,
+            label=label,
+            description=description,
+            expire=expire,
+            rotate=rotate,
+        )
 
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
@@ -303,31 +300,31 @@ class _MockModelBackend(_ModelBackend):
         return relation.remote_app_name
 
     # TODO:
-    def action_set(self, *args, **kwargs):
+    def action_set(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("action_set")
 
-    def action_fail(self, *args, **kwargs):
+    def action_fail(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("action_fail")
 
-    def action_log(self, *args, **kwargs):
+    def action_log(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("action_log")
 
-    def storage_add(self, *args, **kwargs):
+    def storage_add(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("storage_add")
 
     def action_get(self):
         raise NotImplementedError("action_get")
 
-    def resource_get(self, *args, **kwargs):
+    def resource_get(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("resource_get")
 
-    def storage_list(self, *args, **kwargs):
+    def storage_list(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("storage_list")
 
-    def storage_get(self, *args, **kwargs):
+    def storage_get(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("storage_get")
 
-    def planned_units(self, *args, **kwargs):
+    def planned_units(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("planned_units")
 
 
@@ -353,13 +350,13 @@ class _MockPebbleClient(_TestingPebbleClient):
         container_name = self.socket_path.split("/")[-2]
         try:
             return next(
-                filter(lambda x: x.name == container_name, self._state.containers)
+                filter(lambda x: x.name == container_name, self._state.containers),
             )
         except StopIteration:
             raise RuntimeError(
                 f"container with name={container_name!r} not found. "
                 f"Did you forget a Container, or is the socket path "
-                f"{self.socket_path!r} wrong?"
+                f"{self.socket_path!r} wrong?",
             )
 
     @property
@@ -374,7 +371,7 @@ class _MockPebbleClient(_TestingPebbleClient):
     def _service_status(self) -> Dict[str, pebble.ServiceStatus]:
         return self._container.service_status
 
-    def exec(self, *args, **kwargs):
+    def exec(self, *args, **kwargs):  # noqa: U100
         cmd = tuple(args[0])
         out = self._container.exec_mock.get(cmd)
         if not out:

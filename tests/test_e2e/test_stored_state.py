@@ -38,7 +38,7 @@ def test_stored_state_initialized(mycharm):
     out = State(
         stored_state=[
             StoredState("MyCharm", name="_stored", content={"foo": "FOOX"}),
-        ]
+        ],
     ).trigger("start", mycharm, meta=mycharm.META)
     # todo: ordering is messy?
     assert out.stored_state[1].content == {"foo": "FOOX", "baz": {12: 142}}

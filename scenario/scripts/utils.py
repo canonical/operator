@@ -19,5 +19,5 @@ class JujuUnitName(str):
         self.unit_id = int(unit_id)
         self.normalized = f"{app_name}-{unit_id}"
         self.remote_charm_root = Path(
-            f"/var/lib/juju/agents/unit-{self.normalized}/charm"
+            f"/var/lib/juju/agents/unit-{self.normalized}/charm",
         )

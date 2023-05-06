@@ -44,7 +44,7 @@ def test_event_hooks():
             _CharmSpec(
                 charm_type(),
                 meta=meta,
-            )
+            ),
         )
 
         pre_event = MagicMock(return_value=None)

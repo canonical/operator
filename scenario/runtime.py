@@ -20,7 +20,7 @@ from typing import (
 )
 
 import yaml
-from ops.framework import _event_regex  # noqa
+from ops.framework import _event_regex
 from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
@@ -30,14 +30,7 @@ from scenario.state import DeferredEvent, PeerRelation, StoredState
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.state import (
-        AnyRelation,
-        DeferredEvent,
-        Event,
-        State,
-        StoredState,
-        _CharmSpec,
-    )
+    from scenario.state import AnyRelation, Event, State, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 
@@ -45,7 +38,7 @@ if TYPE_CHECKING:
 
 logger = scenario_logger.getChild("runtime")
 STORED_STATE_REGEX = re.compile(
-    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]"
+    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]",
 )
 EVENT_REGEX = re.compile(_event_regex)
 
@@ -61,7 +54,7 @@ class UncaughtCharmError(ScenarioRuntimeError):
 
 
 class DirtyVirtualCharmRootError(ScenarioRuntimeError):
-    """Error raised when the runtime can't initialize the vroot without overwriting existing metadata files."""
+    """Error raised when the runtime can't initialize the vroot without overwriting metadata."""
 
 
 class InconsistentScenarioError(ScenarioRuntimeError):
@@ -108,7 +101,9 @@ class UnitStateDB:
                 notices = db.notices(handle_path)
                 for handle, owner, observer in notices:
                     event = DeferredEvent(
-                        handle_path=handle, owner=owner, observer=observer
+                        handle_path=handle,
+                        owner=owner,
+                        observer=observer,
                     )
                     deferred.append(event)
 
@@ -124,7 +119,7 @@ class UnitStateDB:
                 marshal.dumps(event.snapshot_data)
             except ValueError as e:
                 raise ValueError(
-                    f"unable to save the data for {event}, it must contain only simple types."
+                    f"unable to save the data for {event}, it must contain only simple types.",
                 ) from e
             db.save_snapshot(event.handle_path, event.snapshot_data)
 
@@ -170,7 +165,8 @@ class Runtime:
 
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
         if event.name.endswith("_action"):
-            # todo: do we need some special metadata, or can we assume action names are always dashes?
+            # todo: do we need some special metadata, or can we assume action names
+            #  are always dashes?
             action_name = event.name[: -len("_action")].replace("_", "-")
         else:
             action_name = ""
@@ -183,44 +179,44 @@ class Runtime:
             "JUJU_MODEL_NAME": state.model.name,
             "JUJU_ACTION_NAME": action_name,
             "JUJU_MODEL_UUID": state.model.uuid,
-            "JUJU_CHARM_DIR": str(charm_root.absolute())
+            "JUJU_CHARM_DIR": str(charm_root.absolute()),
             # todo consider setting pwd, (python)path
         }
 
         relation: "AnyRelation"
 
-        if event._is_relation_event and (relation := event.relation):  # noqa
+        if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):
                 remote_app_name = self._app_name
             else:
-                remote_app_name = relation._remote_app_name  # noqa
+                remote_app_name = relation._remote_app_name
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
                     "JUJU_RELATION_ID": str(relation.relation_id),
                     "JUJU_REMOTE_APP": remote_app_name,
-                }
+                },
             )
 
             remote_unit_id = event.relation_remote_unit_id
             if (
                 remote_unit_id is None
             ):  # don't check truthiness because it could be int(0)
-                remote_unit_ids = relation._remote_unit_ids  # noqa
+                remote_unit_ids = relation._remote_unit_ids  # pyright: ignore
 
                 if len(remote_unit_ids) == 1:
                     remote_unit_id = remote_unit_ids[0]
                     logger.info(
                         "there's only one remote unit, so we set JUJU_REMOTE_UNIT to it, "
                         "but you probably should be parametrizing the event with `remote_unit_id` "
-                        "to be explicit."
+                        "to be explicit.",
                     )
                 else:
                     remote_unit_id = remote_unit_ids[0]
                     logger.warning(
                         "remote unit ID unset, and multiple remote unit IDs are present; "
                         "We will pick the first one and hope for the best. You should be passing "
-                        "`remote_unit_id` to the Event constructor."
+                        "`remote_unit_id` to the Event constructor.",
                     )
 
             if remote_unit_id is not None:
@@ -237,7 +233,7 @@ class Runtime:
                 {
                     "JUJU_SECRET_ID": secret.id,
                     "JUJU_SECRET_LABEL": secret.label or "",
-                }
+                },
             )
 
         return env
@@ -260,11 +256,11 @@ class Runtime:
 
     @contextmanager
     def virtual_charm_root(self):
-        # If we are using runtime on a real charm, we can make some assumptions about the directory structure
-        #  we are going to find.
-        #  If we're, say, dynamically defining charm types and doing tests on them, we'll have to generate
-        #  the metadata files ourselves. To be sure, we ALWAYS use a tempdir. Ground truth is what the user
-        #  passed via the CharmSpec
+        # If we are using runtime on a real charm, we can make some assumptions about the
+        # directory structure we are going to find.
+        # If we're, say, dynamically defining charm types and doing tests on them, we'll have to
+        # generate the metadata files ourselves. To be sure, we ALWAYS use a tempdir. Ground truth
+        # is what the user passed via the CharmSpec
         spec = self._charm_spec
 
         if vroot := self._charm_root:
@@ -280,7 +276,7 @@ class Runtime:
         actions_yaml = virtual_charm_root / "actions.yaml"
 
         metadata_files_present = any(
-            (file.exists() for file in (metadata_yaml, config_yaml, actions_yaml))
+            file.exists() for file in (metadata_yaml, config_yaml, actions_yaml)
         )
 
         if spec.is_autoloaded and vroot_is_custom:
@@ -291,7 +287,7 @@ class Runtime:
                 logger.info(
                     f"metadata files found in custom vroot {vroot}. "
                     f"The spec was autoloaded so the contents should be identical. "
-                    f"Proceeding..."
+                    f"Proceeding...",
                 )
 
         elif not spec.is_autoloaded and metadata_files_present:
@@ -300,7 +296,7 @@ class Runtime:
                 f"while you have passed meta, config or actions to trigger(). "
                 "We don't want to risk overwriting them mindlessly, so we abort. "
                 "You should not include any metadata files in the charm_root. "
-                "Single source of truth are the arguments passed to trigger(). "
+                "Single source of truth are the arguments passed to trigger(). ",
             )
             raise DirtyVirtualCharmRootError(vroot)
 
@@ -319,12 +315,12 @@ class Runtime:
         return UnitStateDB(charm_state_path)
 
     def _initialize_storage(self, state: "State", temporary_charm_root: Path):
-        """Before we start processing this event, expose the relevant parts of State through the storage."""
+        """Before we start processing this event, store the relevant parts of State."""
         store = self._get_state_db(temporary_charm_root)
         store.apply_state(state)
 
     def _close_storage(self, state: "State", temporary_charm_root: Path):
-        """Now that we're done processing this event, read the charm state and expose it via State."""
+        """Now that we're done processing this event, read the charm state and expose it."""
         store = self._get_state_db(temporary_charm_root)
         deferred = store.get_deferred_events()
         stored_state = store.get_stored_state()
@@ -339,7 +335,8 @@ class Runtime:
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
-        Returns the 'output state', that is, the state as mutated by the charm during the event handling.
+        Returns the 'output state', that is, the state as mutated by the charm during the
+        event handling.
 
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
@@ -364,12 +361,15 @@ class Runtime:
 
             logger.info(" - preparing env")
             env = self._get_event_env(
-                state=state, event=event, charm_root=temporary_charm_root
+                state=state,
+                event=event,
+                charm_root=temporary_charm_root,
             )
             os.environ.update(env)
 
             logger.info(" - Entering ops.main (mocked).")
-            # we don't import from ops.main because we need some extras, such as the pre/post_event hooks
+            # we don't import from ops.main because we need some extras, such as the
+            # pre/post_event hooks
             from scenario.ops_main_mock import main as mocked_main
 
             try:
@@ -379,14 +379,14 @@ class Runtime:
                     state=output_state,
                     event=event,
                     charm_spec=self._charm_spec.replace(
-                        charm_type=self._wrap(charm_type)
+                        charm_type=self._wrap(charm_type),
                     ),
                 )
             except NoObserverError:
                 raise  # propagate along
             except Exception as e:
                 raise UncaughtCharmError(
-                    f"Uncaught exception ({type(e)}) in operator/charm code: {e!r}"
+                    f"Uncaught exception ({type(e)}) in operator/charm code: {e!r}",
                 ) from e
             finally:
                 logger.info(" - Exited ops.main.")
@@ -460,7 +460,10 @@ def trigger(
         if not meta:
             meta = {"name": str(charm_type.__name__)}
         spec = _CharmSpec(
-            charm_type=charm_type, meta=meta, actions=actions, config=config
+            charm_type=charm_type,
+            meta=meta,
+            actions=actions,
+            config=config,
         )
 
     runtime = Runtime(

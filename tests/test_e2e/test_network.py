@@ -41,7 +41,7 @@ def test_ip_get(mycharm):
                     remote_app_name="remote",
                     endpoint="metrics-endpoint",
                     relation_id=1,
-                )
+                ),
             ],
             networks=[Network.default("metrics-endpoint")],
         ),

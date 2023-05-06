@@ -8,11 +8,6 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import Container, Relation, State, sort_patch
 
-# from tests.setup_tests import setup_tests
-#
-# setup_tests()  # noqa & keep this on top
-
-
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
     "relation_joined",
@@ -111,7 +106,7 @@ def test_status_setting(state, mycharm):
                 "path": "/status/unit_history/0",
                 "value": {"message": "", "name": "unknown"},
             },
-        ]
+        ],
     )
 
 
@@ -162,8 +157,8 @@ def test_relation_get(mycharm):
                 remote_app_data={"a": "b"},
                 local_unit_data={"c": "d"},
                 remote_units_data={0: {}, 1: {"e": "f"}, 2: {}},
-            )
-        ]
+            ),
+        ],
     )
     state.trigger(
         "start",
@@ -233,7 +228,7 @@ def test_relation_set(mycharm):
         relation.replace(
             local_app_data={"a": "b"},
             local_unit_data={"c": "d"},
-        )
+        ),
     )
 
     assert out.relations[0].local_app_data == {"a": "b"}
