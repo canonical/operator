@@ -163,7 +163,7 @@ class _MockModelBackend(_ModelBackend):
 
     # setter methods: these can mutate the state.
     def application_version_set(self, version: str):
-        self._state.status._update_app_version(version)
+        self._state.status._update_workload_version(version)
 
     def status_set(self, status: str, message: str = "", *, is_app: bool = False):
         self._state.status._update_status(status, message, is_app)
