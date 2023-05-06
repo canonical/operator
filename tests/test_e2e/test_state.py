@@ -9,10 +9,6 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 from scenario import trigger
 from scenario.state import Container, Relation, State, sort_patch
 
-# from tests.setup_tests import setup_tests
-#
-# setup_tests()  # noqa & keep this on top
-
 
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
