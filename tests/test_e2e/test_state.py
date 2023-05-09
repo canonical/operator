@@ -6,6 +6,7 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
+from scenario import trigger
 from scenario.state import Container, Relation, State, sort_patch
 
 CUSTOM_EVT_SUFFIXES = {
@@ -54,7 +55,7 @@ def state():
 
 
 def test_bare_event(state, mycharm):
-    out = state.trigger("start", mycharm, meta={"name": "foo"})
+    out = trigger(state, "start", mycharm, meta={"name": "foo"})
     out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
     assert state.jsonpatch_delta(out_purged) == []
 
@@ -63,7 +64,8 @@ def test_leader_get(state, mycharm):
     def pre_event(charm):
         assert charm.unit.is_leader()
 
-    state.trigger(
+    trigger(
+        state,
         "start",
         mycharm,
         meta={"name": "foo"},
@@ -78,7 +80,8 @@ def test_status_setting(state, mycharm):
         charm.app.status = WaitingStatus("foo barz")
 
     mycharm._call = call
-    out = state.trigger(
+    out = trigger(
+        state,
         "start",
         mycharm,
         meta={"name": "foo"},
@@ -86,7 +89,7 @@ def test_status_setting(state, mycharm):
     )
     assert out.status.unit == ActiveStatus("foo test")
     assert out.status.app == WaitingStatus("foo barz")
-    assert out.status.app_version == ""
+    assert out.status.workload_version == ""
 
     # ignore logging output and stored state in the delta
     out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
@@ -106,7 +109,7 @@ def test_status_setting(state, mycharm):
                 "path": "/status/unit_history/0",
                 "value": {"message": "", "name": "unknown"},
             },
-        ],
+        ]
     )
 
 
@@ -118,7 +121,8 @@ def test_container(connect, mycharm):
         assert container.name == "foo"
         assert container.can_connect() is connect
 
-    State(containers=[Container(name="foo", can_connect=connect)]).trigger(
+    trigger(
+        State(containers=[Container(name="foo", can_connect=connect)]),
         "start",
         mycharm,
         meta={
@@ -157,10 +161,11 @@ def test_relation_get(mycharm):
                 remote_app_data={"a": "b"},
                 local_unit_data={"c": "d"},
                 remote_units_data={0: {}, 1: {"e": "f"}, 2: {}},
-            ),
-        ],
+            )
+        ]
     )
-    state.trigger(
+    trigger(
+        state,
         "start",
         mycharm,
         meta={
@@ -213,7 +218,8 @@ def test_relation_set(mycharm):
     )
 
     assert not mycharm.called
-    out = state.trigger(
+    out = trigger(
+        state,
         event="start",
         charm_type=mycharm,
         meta={
@@ -228,7 +234,7 @@ def test_relation_set(mycharm):
         relation.replace(
             local_app_data={"a": "b"},
             local_unit_data={"c": "d"},
-        ),
+        )
     )
 
     assert out.relations[0].local_app_data == {"a": "b"}

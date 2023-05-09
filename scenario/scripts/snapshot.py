@@ -68,7 +68,7 @@ def format_state(state: State):
 
 
 PYTEST_TEST_TEMPLATE = """
-from scenario.state import *
+from scenario import *
 from charm import {ct}
 
 def test_case():
@@ -76,10 +76,13 @@ def test_case():
     state = {state}
 
     #Act: trigger an event on the state
-    out = state.trigger(
+    ctx = Context(
+        {ct},
+        juju_version="{jv}")
+
+    out = ctx.run(
         {en}
-        {ct}
-        juju_version="{jv}"
+        state,
         )
 
     # Assert: verify that the output state is the way you want it to be
@@ -449,11 +452,11 @@ def get_status(juju_status: Dict, target: JujuUnitName) -> Status:
     unit_status_raw = app["units"][target]["workload-status"]
     unit_status = unit_status_raw["current"], unit_status_raw.get("message", "")
 
-    app_version = app.get("version", "")
+    workload_version = app.get("version", "")
     return Status(
         app=_EntityStatus(*app_status),
         unit=_EntityStatus(*unit_status),
-        app_version=app_version,
+        workload_version=workload_version,
     )
 
 
@@ -649,12 +652,12 @@ def get_charm_version(target: JujuUnitName, juju_status: Dict) -> str:
     app_info = juju_status["applications"][target.app_name]
     channel = app_info.get("charm-channel", "<local charm>")
     charm_name = app_info.get("charm-name", "n/a")
-    app_version = app_info.get("version", "n/a")
+    workload_version = app_info.get("version", "n/a")
     charm_rev = app_info.get("charm-rev", "n/a")
     charm_origin = app_info.get("charm-origin", "n/a")
     return (
         f"charm {charm_name!r} ({channel}/{charm_rev}); "
-        f"origin := {charm_origin}; app version := {app_version}."
+        f"origin := {charm_origin}; app version := {workload_version}."
     )
 
 

@@ -757,12 +757,12 @@ class Status(_DCBase):
     # the current statuses. Will be cast to _EntitiyStatus in __post_init__
     app: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
     unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
-    app_version: str = ""
+    workload_version: str = ""
 
     # most to least recent statuses; do NOT include the current one.
     app_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
     unit_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
-    previous_app_version: Optional[str] = None
+    previous_workload_version: Optional[str] = None
 
     def __post_init__(self):
         for name in ["app", "unit"]:
@@ -781,14 +781,14 @@ class Status(_DCBase):
             else:
                 raise TypeError(f"Invalid status.{name}: {val!r}")
 
-    def _update_app_version(self, new_app_version: str):
+    def _update_workload_version(self, new_workload_version: str):
         """Update the current app version and record the previous one."""
         # We don't keep a full history because we don't expect the app version to change more
         # than once per hook.
 
         # bypass frozen dataclass
-        object.__setattr__(self, "previous_app_version", self.app_version)
-        object.__setattr__(self, "app_version", new_app_version)
+        object.__setattr__(self, "previous_workload_version", self.workload_version)
+        object.__setattr__(self, "workload_version", new_workload_version)
 
     def _update_status(
         self,
@@ -844,8 +844,9 @@ class State(_DCBase):
     juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
-    # represents the OF's event queue. These events will be emitted before the event
-    # being dispatched, and represent the events that had been deferred during the previous run.
+    unit_id: int = 0
+    # represents the OF's event queue. These events will be emitted before the event being
+    # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
@@ -905,38 +906,6 @@ class State(_DCBase):
             dataclasses.asdict(self),
         ).patch
         return sort_patch(patch)
-
-    def trigger(
-        self,
-        event: Union["Event", str],
-        charm_type: Type["CharmType"],
-        # callbacks
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
-        # if not provided, will be autoloaded from charm_type.
-        meta: Optional[Dict[str, Any]] = None,
-        actions: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None,
-        charm_root: Optional["PathLike"] = None,
-        juju_version: str = "3.0",
-        unit_id: int = 0,
-    ) -> "State":
-        """Fluent API for trigger. See runtime.trigger's docstring."""
-        from scenario.runtime import trigger as _runtime_trigger
-
-        return _runtime_trigger(
-            state=self,
-            event=event,
-            charm_type=charm_type,
-            pre_event=pre_event,
-            post_event=post_event,
-            meta=meta,
-            actions=actions,
-            config=config,
-            charm_root=charm_root,
-            juju_version=juju_version,
-            unit_id=unit_id,
-        )
 
 
 @dataclasses.dataclass(frozen=True)

@@ -10,6 +10,7 @@ from ops.charm import (
 )
 from ops.framework import Framework
 
+from scenario import trigger
 from scenario.state import Container, DeferredEvent, Relation, State, deferred
 
 CHARM_CALLED = 0
@@ -42,7 +43,7 @@ def mycharm():
 
 def test_defer(mycharm):
     mycharm.defer_next = True
-    out = State().trigger("start", mycharm, meta=mycharm.META)
+    out = trigger(State(), "start", mycharm, meta=mycharm.META)
     assert len(out.deferred) == 1
     assert out.deferred[0].name == "start"
 
@@ -50,9 +51,12 @@ def test_defer(mycharm):
 def test_deferred_evt_emitted(mycharm):
     mycharm.defer_next = 2
 
-    out = State(
-        deferred=[deferred(event="update_status", handler=mycharm._on_event)],
-    ).trigger("start", mycharm, meta=mycharm.META)
+    out = trigger(
+        State(deferred=[deferred(event="update_status", handler=mycharm._on_event)]),
+        "start",
+        mycharm,
+        meta=mycharm.META,
+    )
 
     # we deferred the first 2 events we saw: update-status, start.
     assert len(out.deferred) == 2
@@ -96,16 +100,21 @@ def test_deferred_relation_event(mycharm):
 
     rel = Relation(endpoint="foo", remote_app_name="remote")
 
-    out = State(
-        relations=[rel],
-        deferred=[
-            deferred(
-                event="foo_relation_changed",
-                handler=mycharm._on_event,
-                relation=rel,
-            ),
-        ],
-    ).trigger("start", mycharm, meta=mycharm.META)
+    out = trigger(
+        State(
+            relations=[rel],
+            deferred=[
+                deferred(
+                    event="foo_relation_changed",
+                    handler=mycharm._on_event,
+                    relation=rel,
+                )
+            ],
+        ),
+        "start",
+        mycharm,
+        meta=mycharm.META,
+    )
 
     # we deferred the first 2 events we saw: relation-changed, start.
     assert len(out.deferred) == 2
@@ -122,10 +131,15 @@ def test_deferred_relation_event(mycharm):
 def test_deferred_relation_event_from_relation(mycharm):
     mycharm.defer_next = 2
     rel = Relation(endpoint="foo", remote_app_name="remote")
-    out = State(
-        relations=[rel],
-        deferred=[rel.changed_event.deferred(handler=mycharm._on_event)],
-    ).trigger("start", mycharm, meta=mycharm.META)
+    out = trigger(
+        State(
+            relations=[rel],
+            deferred=[rel.changed_event.deferred(handler=mycharm._on_event)],
+        ),
+        "start",
+        mycharm,
+        meta=mycharm.META,
+    )
 
     # we deferred the first 2 events we saw: foo_relation_changed, start.
     assert len(out.deferred) == 2
@@ -144,10 +158,15 @@ def test_deferred_workload_event(mycharm):
 
     ctr = Container("foo")
 
-    out = State(
-        containers=[ctr],
-        deferred=[ctr.pebble_ready_event.deferred(handler=mycharm._on_event)],
-    ).trigger("start", mycharm, meta=mycharm.META)
+    out = trigger(
+        State(
+            containers=[ctr],
+            deferred=[ctr.pebble_ready_event.deferred(handler=mycharm._on_event)],
+        ),
+        "start",
+        mycharm,
+        meta=mycharm.META,
+    )
 
     # we deferred the first 2 events we saw: foo_pebble_ready, start.
     assert len(out.deferred) == 2
