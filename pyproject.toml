@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "3.0"
+version = "3.0a1"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -39,8 +39,8 @@ classifiers = [
 emitted_events = "scenario"
 
 [project.urls]
-"Homepage" = "https://github.com/PietroPasotti/ops-scenario"
-"Bug Tracker" = "https://github.com/PietroPasotti/ops-scenario/issues"
+"Homepage" = "https://github.com/canonical/ops-scenario"
+"Bug Tracker" = "https://github.com/canonical/ops-scenario/issues"
 
 [project.scripts]
 scenario = "scenario.scripts.main:main"
