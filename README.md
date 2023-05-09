@@ -1,17 +1,22 @@
 # Scenario
 
-This is a state transition testing framework for Operator Framework charms.
+[![CharmHub Badge](https://charmhub.io/traefik-k8s/badge.svg)](https://charmhub.io/traefik-k8s)
+[![Release Edge](https://github.com/canonical/traefik-k8s-operator/actions/workflows/release-edge.yaml/badge.svg)](https://github.com/canonical/traefik-k8s-operator/actions/workflows/release-edge.yaml)
+[![Release Libraries](https://github.com/canonical/traefik-k8s-operator/actions/workflows/release-libs.yaml/badge.svg)](https://github.com/canonical/traefik-k8s-operator/actions/workflows/release-libs.yaml)
+[![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
+) [![foo](https://img.shields.io/badge/everything-charming-blueviolet)](https://github.com/PietroPasotti/jhack) 
+[![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://discourse.charmhub.io/t/rethinking-charm-testing-with-ops-scenario/8649)
 
-Where the Harness enables you to procedurally mock pieces of the state the charm needs to function, Scenario tests allow
-you to declaratively define the state all at once, and use it as a sort of context against which you can fire a single
-event on the charm and execute its logic.
+Scenario is a state-transition, functional testing framework for Operator Framework charms.
 
-This puts scenario tests somewhere in between unit and integration tests.
+Where the Harness enables you to procedurally mock pieces of the state the charm needs to function, Scenario tests allow you to declaratively define the state all at once, and use it as a sort of context against which you can fire a single event on the charm and execute its logic.
 
-Scenario tests nudge you into thinking of charms as an input->output function. Input is what we call a `Scene`: the
+This puts scenario tests somewhere in between unit and integration tests: some say 'functional', some say 'contract'.
+
+Scenario tests nudge you into thinking of a charm as an input->output function. Input is what we call a `Scene`: the
 union of an `Event` (why am I being executed) and a `State` (am I leader? what is my relation data? what is my
 config?...). The output is another context instance: the context after the charm has had a chance to interact with the
-mocked juju model.
+mocked juju model and affect the state back.
 
 ![state transition model depiction](resources/state-transition-model.png)
 
@@ -58,14 +63,15 @@ Comparing scenario tests with `Harness` tests:
 
 A scenario test consists of three broad steps:
 
-- Arrange:
+- **Arrange**:
   - declare the input state
   - select an event to fire
-- Act:
+- **Act**:
   - run the state (i.e. obtain the output state)
-- Assert:
+  - optionally, use pre-event and post-event hooks to get a hold of the charm instance and run assertions on internal APIs
+- **Assert**:
   - verify that the output state is how you expect it to be
-  - verify that the delta with the input state is what you expect it to be
+  - optionally, verify that the delta with the input state is what you expect it to be
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, and no leadership.
