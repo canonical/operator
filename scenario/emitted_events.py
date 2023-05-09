@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+
 import typing
 from contextlib import contextmanager
 from typing import ContextManager, List, Type, TypeVar
 
+import pytest
 from ops.framework import (
     CommitEvent,
     EventBase,
@@ -19,9 +21,13 @@ _T = TypeVar("_T", bound=EventBase)
 
 @contextmanager
 def capture_events(
-    *types: Type[EventBase], include_framework=False, include_deferred=True
+    *types: Type[EventBase],
+    include_framework=False,
+    include_deferred=True,
 ) -> ContextManager[List[EventBase]]:
     """Capture all events of type `*types` (using instance checks).
+
+    Arguments exposed so that you can define your own fixtures if you want to.
 
     Example::
     >>> from ops.charm import StartEvent
@@ -30,7 +36,7 @@ def capture_events(
     >>>
     >>> def test_my_event():
     >>>     with capture_events(StartEvent, MyCustomEvent) as captured:
-    >>>         State().trigger("start", MyCharm, meta=MyCharm.META)
+    >>>         trigger(State(), ("start", MyCharm, meta=MyCharm.META)
     >>>
     >>>     assert len(captured) == 2
     >>>     e1, e2 = captured
@@ -60,7 +66,7 @@ def capture_events(
             return _real_reemit(self)
 
         # load all notices from storage as events.
-        for event_path, observer_path, method_name in self._storage.notices():
+        for event_path, _, _ in self._storage.notices():
             event_handle = Handle.from_path(event_path)
             try:
                 event = self.load_snapshot(event_handle)
@@ -71,7 +77,8 @@ def capture_events(
             self._forget(event)  # prevent tracking conflicts
 
             if not include_framework and isinstance(
-                event, (PreCommitEvent, CommitEvent)
+                event,
+                (PreCommitEvent, CommitEvent),
             ):
                 continue
 
@@ -80,10 +87,16 @@ def capture_events(
 
         return _real_reemit(self)
 
-    Framework._emit = _wrapped_emit  # type: ignore # noqa # ugly
-    Framework.reemit = _wrapped_reemit  # type: ignore # noqa # ugly
+    Framework._emit = _wrapped_emit  # type: ignore
+    Framework.reemit = _wrapped_reemit  # type: ignore
 
     yield captured
 
-    Framework._emit = _real_emit  # type: ignore # noqa # ugly
-    Framework.reemit = _real_reemit  # type: ignore # noqa # ugly
+    Framework._emit = _real_emit  # type: ignore
+    Framework.reemit = _real_reemit  # type: ignore
+
+
+@pytest.fixture()
+def emitted_events():
+    with capture_events() as captured:
+        yield captured
