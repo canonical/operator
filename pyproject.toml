@@ -26,9 +26,16 @@ requires-python = ">=3.8"
 
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Topic :: Utilities",
     "License :: OSI Approved :: Apache Software License",
+    'Framework :: Pytest',
+    'Intended Audience :: Developers',
+    'Topic :: Software Development :: Quality Assurance',
+    'Topic :: Software Development :: Testing',
+    'Topic :: Utilities',
 ]
+
+[project.entry-points.pytest11]
+emitted_events = "scenario"
 
 [project.urls]
 "Homepage" = "https://github.com/PietroPasotti/ops-scenario"
