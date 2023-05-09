@@ -21,14 +21,20 @@ class MyCharm(CharmBase):
 
 
 def assert_inconsistent(
-    state: "State", event: "Event", charm_spec: "_CharmSpec", juju_version="3.0"
+    state: "State",
+    event: "Event",
+    charm_spec: "_CharmSpec",
+    juju_version="3.0",
 ):
     with pytest.raises(InconsistentScenarioError):
         check_consistency(state, event, charm_spec, juju_version)
 
 
 def assert_consistent(
-    state: "State", event: "Event", charm_spec: "_CharmSpec", juju_version="3.0"
+    state: "State",
+    event: "Event",
+    charm_spec: "_CharmSpec",
+    juju_version="3.0",
 ):
     check_consistency(state, event, charm_spec, juju_version)
 
@@ -68,7 +74,9 @@ def test_container_meta_mismatch():
 
 def test_container_in_state_but_no_container_in_meta():
     assert_inconsistent(
-        State(containers=[Container("bar")]), Event("foo"), _CharmSpec(MyCharm, {})
+        State(containers=[Container("bar")]),
+        Event("foo"),
+        _CharmSpec(MyCharm, {}),
     )
     assert_consistent(
         State(containers=[Container("bar")]),
@@ -116,7 +124,9 @@ def test_evt_no_relation(suffix):
 
 def test_config_key_missing_from_meta():
     assert_inconsistent(
-        State(config={"foo": True}), Event("bar"), _CharmSpec(MyCharm, {})
+        State(config={"foo": True}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}),
     )
     assert_consistent(
         State(config={"foo": True}),
@@ -176,14 +186,16 @@ def test_sub_relation_consistency():
         State(relations=[Relation("foo")]),
         Event("bar"),
         _CharmSpec(
-            MyCharm, {"requires": {"foo": {"interface": "bar", "scope": "container"}}}
+            MyCharm,
+            {"requires": {"foo": {"interface": "bar", "scope": "container"}}},
         ),
     )
     assert_consistent(
         State(relations=[SubordinateRelation("foo")]),
         Event("bar"),
         _CharmSpec(
-            MyCharm, {"requires": {"foo": {"interface": "bar", "scope": "container"}}}
+            MyCharm,
+            {"requires": {"foo": {"interface": "bar", "scope": "container"}}},
         ),
     )
 

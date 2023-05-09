@@ -3,6 +3,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import SecretRotate
 
+from scenario import trigger
 from scenario.state import Relation, Secret, State
 
 
@@ -27,8 +28,8 @@ def test_get_secret_no_secret(mycharm):
         with pytest.raises(RuntimeError):
             assert charm.model.get_secret(label="foo")
 
-    State().trigger(
-        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
+    trigger(
+        State(), "update_status", mycharm, meta={"name": "local"}, post_event=post_event
     )
 
 
@@ -36,8 +37,12 @@ def test_get_secret(mycharm):
     def post_event(charm: CharmBase):
         assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
 
-    State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]).trigger(
-        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
+    trigger(
+        State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]),
+        "update_status",
+        mycharm,
+        meta={"name": "local"},
+        post_event=post_event,
     )
 
 
@@ -50,17 +55,23 @@ def test_get_secret_peek_update(mycharm):
         assert charm.model.get_secret(id="foo").get_content(refresh=True)["a"] == "c"
         assert charm.model.get_secret(id="foo").get_content()["a"] == "c"
 
-    State(
-        secrets=[
-            Secret(
-                id="foo",
-                contents={
-                    0: {"a": "b"},
-                    1: {"a": "c"},
-                },
-            )
-        ]
-    ).trigger("update_status", mycharm, meta={"name": "local"}, post_event=post_event)
+    trigger(
+        State(
+            secrets=[
+                Secret(
+                    id="foo",
+                    contents={
+                        0: {"a": "b"},
+                        1: {"a": "c"},
+                    },
+                )
+            ]
+        ),
+        "update_status",
+        mycharm,
+        meta={"name": "local"},
+        post_event=post_event,
+    )
 
 
 def test_secret_changed_owner_evt_fails(mycharm):
@@ -94,8 +105,8 @@ def test_add(mycharm):
     def post_event(charm: CharmBase):
         charm.unit.add_secret({"foo": "bar"}, label="mylabel")
 
-    out = State().trigger(
-        "update_status", mycharm, meta={"name": "local"}, post_event=post_event
+    out = trigger(
+        State(), "update_status", mycharm, meta={"name": "local"}, post_event=post_event
     )
     assert out.secrets
     secret = out.secrets[0]
@@ -114,20 +125,26 @@ def test_meta(mycharm):
         assert info.label == "mylabel"
         assert info.rotation == SecretRotate.HOURLY
 
-    State(
-        secrets=[
-            Secret(
-                owner="unit",
-                id="foo",
-                label="mylabel",
-                description="foobarbaz",
-                rotate=SecretRotate.HOURLY,
-                contents={
-                    0: {"a": "b"},
-                },
-            )
-        ]
-    ).trigger("update_status", mycharm, meta={"name": "local"}, post_event=post_event)
+    trigger(
+        State(
+            secrets=[
+                Secret(
+                    owner="unit",
+                    id="foo",
+                    label="mylabel",
+                    description="foobarbaz",
+                    rotate=SecretRotate.HOURLY,
+                    contents={
+                        0: {"a": "b"},
+                    },
+                )
+            ]
+        ),
+        "update_status",
+        mycharm,
+        meta={"name": "local"},
+        post_event=post_event,
+    )
 
 
 def test_meta_nonowner(mycharm):
@@ -136,19 +153,25 @@ def test_meta_nonowner(mycharm):
         with pytest.raises(RuntimeError):
             info = secret.get_info()
 
-    State(
-        secrets=[
-            Secret(
-                id="foo",
-                label="mylabel",
-                description="foobarbaz",
-                rotate=SecretRotate.HOURLY,
-                contents={
-                    0: {"a": "b"},
-                },
-            )
-        ]
-    ).trigger("update_status", mycharm, meta={"name": "local"}, post_event=post_event)
+    trigger(
+        State(
+            secrets=[
+                Secret(
+                    id="foo",
+                    label="mylabel",
+                    description="foobarbaz",
+                    rotate=SecretRotate.HOURLY,
+                    contents={
+                        0: {"a": "b"},
+                    },
+                )
+            ]
+        ),
+        "update_status",
+        mycharm,
+        meta={"name": "local"},
+        post_event=post_event,
+    )
 
 
 @pytest.mark.parametrize("app", (True, False))
@@ -161,21 +184,22 @@ def test_grant(mycharm, app):
         else:
             secret.grant(relation=foo, unit=foo.units.pop())
 
-    out = State(
-        relations=[Relation("foo", "remote")],
-        secrets=[
-            Secret(
-                owner="unit",
-                id="foo",
-                label="mylabel",
-                description="foobarbaz",
-                rotate=SecretRotate.HOURLY,
-                contents={
-                    0: {"a": "b"},
-                },
-            )
-        ],
-    ).trigger(
+    out = trigger(
+        State(
+            relations=[Relation("foo", "remote")],
+            secrets=[
+                Secret(
+                    owner="unit",
+                    id="foo",
+                    label="mylabel",
+                    description="foobarbaz",
+                    rotate=SecretRotate.HOURLY,
+                    contents={
+                        0: {"a": "b"},
+                    },
+                )
+            ],
+        ),
         "update_status",
         mycharm,
         meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
@@ -194,20 +218,21 @@ def test_grant_nonowner(mycharm):
             foo = charm.model.get_relation("foo")
             secret.grant(relation=foo)
 
-    out = State(
-        relations=[Relation("foo", "remote")],
-        secrets=[
-            Secret(
-                id="foo",
-                label="mylabel",
-                description="foobarbaz",
-                rotate=SecretRotate.HOURLY,
-                contents={
-                    0: {"a": "b"},
-                },
-            )
-        ],
-    ).trigger(
+    out = trigger(
+        State(
+            relations=[Relation("foo", "remote")],
+            secrets=[
+                Secret(
+                    id="foo",
+                    label="mylabel",
+                    description="foobarbaz",
+                    rotate=SecretRotate.HOURLY,
+                    contents={
+                        0: {"a": "b"},
+                    },
+                )
+            ],
+        ),
         "update_status",
         mycharm,
         meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},

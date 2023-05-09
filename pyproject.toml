@@ -8,7 +8,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "2.2"
+version = "3.0"
+
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
 ]
@@ -51,6 +52,11 @@ scenario = "scenario"
 [tool.black]
 include = '\.pyi?$'
 
+
+[tool.flake8]
+dictionaries = ["en_US","python","technical","django"]
+max-line-length = 100
+ignore = ["SC100", "SC200", "B008"]
 
 [tool.isort]
 profile = "black"

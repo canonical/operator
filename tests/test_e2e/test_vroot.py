@@ -7,7 +7,7 @@ from ops.framework import Framework
 from ops.model import ActiveStatus
 
 from scenario import State
-from scenario.runtime import DirtyVirtualCharmRootError
+from scenario.runtime import DirtyVirtualCharmRootError, trigger
 
 
 class MyCharm(CharmBase):
@@ -34,7 +34,8 @@ def test_vroot():
         quxcos = baz / "qux.kaboodle"
         quxcos.write_text("world")
 
-        out = State().trigger(
+        out = trigger(
+            State(),
             "start",
             charm_type=MyCharm,
             meta=MyCharm.META,
@@ -52,7 +53,8 @@ def test_dirty_vroot_raises(meta_overwrite):
         meta_file.touch()
 
         with pytest.raises(DirtyVirtualCharmRootError):
-            State().trigger(
+            trigger(
+                State(),
                 "start",
                 charm_type=MyCharm,
                 meta=MyCharm.META,

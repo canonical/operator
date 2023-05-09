@@ -41,12 +41,15 @@ def main(
     from scenario.mocking import _MockModelBackend
 
     model_backend = _MockModelBackend(  # pyright: reportPrivateUsage=false
-        state=state, event=event, charm_spec=charm_spec
+        state=state,
+        event=event,
+        charm_spec=charm_spec,
     )
     debug = "JUJU_DEBUG" in os.environ
     setup_root_logging(model_backend, debug=debug)
     logger.debug(
-        "Operator Framework %s up and running.", ops.__version__
+        "Operator Framework %s up and running.",
+        ops.__version__,
     )  # type:ignore
 
     dispatcher = _Dispatcher(charm_dir)
@@ -86,7 +89,7 @@ def main(
         if not getattr(charm.on, dispatcher.event_name, None):
             raise NoObserverError(
                 f"Charm has no registered observers for {dispatcher.event_name!r}. "
-                f"This is probably not what you were looking for."
+                f"This is probably not what you were looking for.",
             )
 
         _emit_charm_event(charm, dispatcher.event_name)

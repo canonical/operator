@@ -8,6 +8,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.pebble import ServiceStartup, ServiceStatus
 
+from scenario import trigger
 from scenario.state import Container, ExecOutput, Mount, State
 
 
@@ -29,7 +30,8 @@ def test_no_containers(charm_cls):
     def callback(self: CharmBase):
         assert not self.unit.containers
 
-    State().trigger(
+    trigger(
+        State(),
         charm_type=charm_cls,
         meta={"name": "foo"},
         event="start",
@@ -42,7 +44,8 @@ def test_containers_from_meta(charm_cls):
         assert self.unit.containers
         assert self.unit.get_container("foo")
 
-    State().trigger(
+    trigger(
+        State(),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
@@ -55,7 +58,8 @@ def test_connectivity(charm_cls, can_connect):
     def callback(self: CharmBase):
         assert can_connect == self.unit.get_container("foo").can_connect()
 
-    State(containers=[Container(name="foo", can_connect=can_connect)]).trigger(
+    trigger(
+        State(containers=[Container(name="foo", can_connect=can_connect)]),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
@@ -74,13 +78,16 @@ def test_fs_push(charm_cls):
         baz = container.pull("/bar/baz.txt")
         assert baz.read() == text
 
-    State(
-        containers=[
-            Container(
-                name="foo", can_connect=True, mounts={"bar": Mount("/bar/baz.txt", pth)}
-            )
-        ]
-    ).trigger(
+    trigger(
+        State(
+            containers=[
+                Container(
+                    name="foo",
+                    can_connect=True,
+                    mounts={"bar": Mount("/bar/baz.txt", pth)},
+                )
+            ]
+        ),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
@@ -116,7 +123,8 @@ def test_fs_pull(charm_cls, make_dirs):
         ]
     )
 
-    out = state.trigger(
+    out = trigger(
+        state,
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
@@ -167,15 +175,16 @@ def test_exec(charm_cls, cmd, out):
         proc.wait()
         assert proc.stdout.read() == "hello pebble"
 
-    State(
-        containers=[
-            Container(
-                name="foo",
-                can_connect=True,
-                exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
-            )
-        ]
-    ).trigger(
+    trigger(
+        State(
+            containers=[
+                Container(
+                    name="foo",
+                    can_connect=True,
+                    exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
+                )
+            ]
+        ),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
@@ -190,7 +199,8 @@ def test_pebble_ready(charm_cls):
 
     container = Container(name="foo", can_connect=True)
 
-    State(containers=[container]).trigger(
+    trigger(
+        State(containers=[container]),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event=container.pebble_ready_event,
@@ -251,7 +261,8 @@ def test_pebble_plan(charm_cls, starting_service_status):
         },
     )
 
-    out = State(containers=[container]).trigger(
+    out = trigger(
+        State(containers=[container]),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event=container.pebble_ready_event,
