@@ -265,8 +265,10 @@ def check_containers_consistency(
     **_kwargs,  # noqa: U101
 ) -> Results:
     """Check the consistency of `state.containers` vs. `charm_spec.meta`."""
-    meta_containers = list(charm_spec.meta.get("containers", {}))
-    state_containers = [c.name for c in state.containers]
+
+    # event names will be normalized; need to compare against normalized container names.
+    meta_containers = list(map(normalize_name, charm_spec.meta.get("containers", {})))
+    state_containers = [normalize_name(c.name) for c in state.containers]
     errors = []
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's

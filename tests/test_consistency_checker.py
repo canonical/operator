@@ -214,3 +214,12 @@ def test_dupe_containers_inconsistent():
         Event("bar"),
         _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
     )
+
+
+def test_container_pebble_evt_consistent():
+    container = Container("foo-bar-baz")
+    assert_consistent(
+        State(containers=[container]),
+        container.pebble_ready_event,
+        _CharmSpec(MyCharm, {"containers": {"foo-bar-baz": {}}}),
+    )

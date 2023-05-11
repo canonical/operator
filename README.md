@@ -3,12 +3,14 @@
 [![Build](https://github.com/canonical/ops-scenario/actions/workflows/build_wheels.yaml/badge.svg)](https://github.com/canonical/ops-scenario/actions/workflows/build_wheels.yaml)
 [![QC](https://github.com/canonical/ops-scenario/actions/workflows/quality_checks.yaml/badge.svg?event=pull_request)](https://github.com/canonical/ops-scenario/actions/workflows/quality_checks.yaml?event=pull_request)
 [![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
-[![foo](https://img.shields.io/badge/everything-charming-blueviolet)](https://github.com/PietroPasotti/jhack) 
+[![foo](https://img.shields.io/badge/everything-charming-blueviolet)](https://github.com/PietroPasotti/jhack)
 [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://discourse.charmhub.io/t/rethinking-charm-testing-with-ops-scenario/8649)
 
 Scenario is a state-transition, functional testing framework for Operator Framework charms.
 
-Where the Harness enables you to procedurally mock pieces of the state the charm needs to function, Scenario tests allow you to declaratively define the state all at once, and use it as a sort of context against which you can fire a single event on the charm and execute its logic.
+Where the Harness enables you to procedurally mock pieces of the state the charm needs to function, Scenario tests allow
+you to declaratively define the state all at once, and use it as a sort of context against which you can fire a single
+event on the charm and execute its logic.
 
 This puts scenario tests somewhere in between unit and integration tests: some say 'functional', some say 'contract'.
 
@@ -31,10 +33,10 @@ I like metaphors, so here we go:
 - There is a theatre stage.
 - You pick an actor (a Charm) to put on the stage. Not just any actor: an improv one.
 - You arrange the stage with content that the actor will have to interact with. This consists of selecting:
-  - An initial situation (State) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what
-    other actors are there around it, what is written in those pebble-shaped books on the table?
-  - Something that has just happened (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the
-    stage (relation-departed), or the content of one of the books changes).
+    - An initial situation (State) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what
+      other actors are there around it, what is written in those pebble-shaped books on the table?
+    - Something that has just happened (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the
+      stage (relation-departed), or the content of one of the books changes).
 - How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a
   container), or write something down into one of the books.
 
@@ -63,14 +65,15 @@ Comparing scenario tests with `Harness` tests:
 A scenario test consists of three broad steps:
 
 - **Arrange**:
-  - declare the input state
-  - select an event to fire
+    - declare the input state
+    - select an event to fire
 - **Act**:
-  - run the state (i.e. obtain the output state)
-  - optionally, use pre-event and post-event hooks to get a hold of the charm instance and run assertions on internal APIs
+    - run the state (i.e. obtain the output state)
+    - optionally, use pre-event and post-event hooks to get a hold of the charm instance and run assertions on internal
+      APIs
 - **Assert**:
-  - verify that the output state is how you expect it to be
-  - optionally, verify that the delta with the input state is what you expect it to be
+    - verify that the output state is how you expect it to be
+    - optionally, verify that the delta with the input state is what you expect it to be
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, and no leadership.
@@ -82,13 +85,14 @@ from scenario import State, Context
 from ops.charm import CharmBase
 from ops.model import UnknownStatus
 
+
 class MyCharm(CharmBase):
     pass
 
 
 def test_scenario_base():
-    ctx = Context(MyCharm, 
-          meta={"name": "foo"})
+    ctx = Context(MyCharm,
+                  meta={"name": "foo"})
     out = ctx.run('start', State())
     assert out.status.unit == UnknownStatus()
 ```
@@ -115,9 +119,9 @@ class MyCharm(CharmBase):
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    ctx = Context(MyCharm, 
-          meta={"name": "foo"})
-    out = ctx.run('start', 
+    ctx = Context(MyCharm,
+                  meta={"name": "foo"})
+    out = ctx.run('start',
                   State(leader=leader)
     assert out.status.unit == ActiveStatus('I rule' if leader else 'I am ruled')
 ```
@@ -133,6 +137,7 @@ charm transitions through a sequence of statuses?
 
 ```python
 from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, BlockedStatus
+
 
 # charm code:
 def _on_event(self, _event):
@@ -155,16 +160,17 @@ from charm import MyCharm
 from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, UnknownStatus
 from scenario import State, Context
 
+
 def test_statuses():
-    ctx = Context(MyCharm, 
-          meta={"name": "foo"})
-    out = ctx.run('start', 
-                  State(leader=False)) 
+    ctx = Context(MyCharm,
+                  meta={"name": "foo"})
+    out = ctx.run('start',
+                  State(leader=False))
     assert out.status.unit_history == [
-      UnknownStatus(),
-      MaintenanceStatus('determining who the ruler is...'),
-      WaitingStatus('checking this is right...'),
-      ActiveStatus("I am ruled"),
+        UnknownStatus(),
+        MaintenanceStatus('determining who the ruler is...'),
+        WaitingStatus('checking this is right...'),
+        ActiveStatus("I am ruled"),
     ]
 ```
 
@@ -180,6 +186,7 @@ Unknown (the default status every charm is born with), you will have to pass the
 ```python
 from ops.model import ActiveStatus
 from scenario import State, Status
+
 State(leader=False, status=Status(unit=ActiveStatus('foo')))
 ```
 
@@ -214,10 +221,10 @@ def test_relation_data():
             remote_app_data={"cde": "baz!"},
         ),
     ])
-    ctx = Context(MyCharm, 
-          meta={"name": "foo"})
-    
-    state_out = ctx.run('start', state_in) 
+    ctx = Context(MyCharm,
+                  meta={"name": "foo"})
+
+    state_out = ctx.run('start', state_in)
 
     assert state_out.relations[0].local_unit_data == {"abc": "baz!"}
     # you can do this to check that there are no other differences:
@@ -314,6 +321,7 @@ event from one of its aptly-named properties:
 
 ```python
 from scenario import Relation
+
 relation = Relation(endpoint="foo", interface="bar")
 changed_event = relation.changed_event
 joined_event = relation.joined_event
@@ -324,6 +332,7 @@ This is in fact syntactic sugar for:
 
 ```python
 from scenario import Relation, Event
+
 relation = Relation(endpoint="foo", interface="bar")
 changed_event = Event('foo-relation-changed', relation=relation)
 ```
@@ -347,6 +356,7 @@ writing is close to that domain, you should probably override it and pass it man
 
 ```python
 from scenario import Relation, Event
+
 relation = Relation(endpoint="foo", interface="bar")
 remote_unit_2_is_joining_event = relation.joined_event(remote_unit_id=2)
 
@@ -366,6 +376,7 @@ An example of a scene including some containers:
 
 ```python
 from scenario.state import Container, State
+
 state = State(containers=[
     Container(name="foo", can_connect=True),
     Container(name="bar", can_connect=False)
@@ -528,8 +539,10 @@ handler):
 ```python
 from scenario import Event, Relation
 
+
 class MyCharm(...):
     ...
+
 
 deferred_start = Event('start').deferred(MyCharm._on_start)
 deferred_install = Event('install').deferred(MyCharm._on_start)
@@ -551,6 +564,7 @@ from scenario import State, Context
 
 class MyCharm(...):
     ...
+
     def _on_start(self, e):
         e.defer()
 
@@ -573,6 +587,7 @@ from scenario import State, Relation, deferred
 
 class MyCharm(...):
     ...
+
     def _on_foo_relation_changed(self, e):
         e.defer()
 
@@ -580,8 +595,8 @@ class MyCharm(...):
 def test_start_on_deferred_update_status(MyCharm):
     foo_relation = Relation('foo')
     State(
-      relations=[foo_relation],
-      deferred=[
+        relations=[foo_relation],
+        deferred=[
             deferred('foo_relation_changed',
                      handler=MyCharm._on_foo_relation_changed,
                      relation=foo_relation)
@@ -595,8 +610,10 @@ but you can also use a shortcut from the relation event itself, as mentioned abo
 
 from scenario import Relation
 
+
 class MyCharm(...):
     ...
+
 
 foo_relation = Relation('foo')
 foo_relation.changed_event.deferred(handler=MyCharm._on_foo_relation_changed)
@@ -613,9 +630,9 @@ For general-purpose usage, you will need to instantiate DeferredEvent directly.
 from scenario import DeferredEvent
 
 my_deferred_event = DeferredEvent(
-   handle_path='MyCharm/MyCharmLib/on/database_ready[1]',
-   owner='MyCharmLib',  # the object observing the event. Could also be MyCharm.
-   observer='_on_database_ready'
+    handle_path='MyCharm/MyCharmLib/on/database_ready[1]',
+    owner='MyCharmLib',  # the object observing the event. Could also be MyCharm.
+    observer='_on_database_ready'
 )
 ```
 
@@ -638,13 +655,13 @@ class MyCharmType(CharmBase):
 
 
 state = State(stored_state=[
-  StoredState(
-    owner_path="MyCharmType",
-    name="my_stored_state",
-    content={
-      'foo': 'bar',
-      'baz': {42: 42},
-    })
+    StoredState(
+        owner_path="MyCharmType",
+        name="my_stored_state",
+        content={
+            'foo': 'bar',
+            'baz': {42: 42},
+        })
 ])
 ```
 
@@ -656,25 +673,27 @@ the output side the same as any other bit of state.
 If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it
 can be hard to examine the resulting control flow. In these situations it can be useful to verify that, as a result of a
 given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The
-resulting state, black-box as it is, gives little insight into how exactly it was obtained. 
+resulting state, black-box as it is, gives little insight into how exactly it was obtained.
 
-`scenario`, among many other great things, is also a pytest plugin. It exposes a fixture called `emitted_events` that you can use like so:
+`scenario`, among many other great things, is also a pytest plugin. It exposes a fixture called `emitted_events` that
+you can use like so:
 
 ```python
 from scenario import Context
 from ops.charm import StartEvent
 
+
 def test_foo(emitted_events):
+    Context(...).run('start', ...)
 
-  Context(...).run('start', ...)
-
-  assert len(emitted_events) == 1
-  assert isinstance(emitted_events[0], StartEvent)
+    assert len(emitted_events) == 1
+    assert isinstance(emitted_events[0], StartEvent)
 ```
 
-
 ## Customizing: capture_events
-If you need more control over what events are captured (or you're not into pytest), you can use directly the context manager that powers the `emitted_events` fixture: `scenario.capture_events`.
+
+If you need more control over what events are captured (or you're not into pytest), you can use directly the context
+manager that powers the `emitted_events` fixture: `scenario.capture_events`.
 This context manager allows you to intercept any events emitted by the framework.
 
 Usage:
@@ -682,11 +701,12 @@ Usage:
 ```python
 from ops.charm import StartEvent, UpdateStatusEvent
 from scenario import State, Context, DeferredEvent, capture_events
+
 with capture_events() as emitted:
     ctx = Context(...)
     state_out = ctx.run(
-      "update-status",
-      State(deferred=[DeferredEvent("start", ...)])
+        "update-status",
+        State(deferred=[DeferredEvent("start", ...)])
     )
 
 # deferred events get reemitted first
@@ -703,6 +723,7 @@ You can filter events by type like so:
 ```python
 from ops.charm import StartEvent, RelationEvent
 from scenario import capture_events
+
 with capture_events(StartEvent, RelationEvent) as emitted:
     # capture all `start` and `*-relation-*` events.
     pass
@@ -727,9 +748,12 @@ the inferred one. This also allows you to test with charms defined on the fly, a
 from ops.charm import CharmBase
 from scenario import State, Context
 
+
 class MyCharmType(CharmBase):
     pass
-ctx = Context(charm_type=MyCharmType, 
+
+
+ctx = Context(charm_type=MyCharmType,
               meta={'name': 'my-charm-name'})
 ctx.run('start', State())
 ```
@@ -804,6 +828,7 @@ Suppose you have a Juju model with a `prometheus-k8s` unit deployed as `promethe
 all you need from `scenario`, and you have a working `State` that you can `Context.run` events with.
 
 You can also pass a `--format` flag to obtain instead:
+
 - a jsonified `State` data structure, for portability
 - a full-fledged pytest test case (with imports and all), where you only have to fill in the charm type and the event
   that you wish to trigger.
