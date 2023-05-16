@@ -186,7 +186,7 @@ class Runtime:
             if isinstance(relation, PeerRelation):
                 remote_app_name = self._app_name
             else:
-                remote_app_name = relation._remote_app_name
+                remote_app_name = relation.remote_app_name
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,

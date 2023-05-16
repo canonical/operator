@@ -6,7 +6,6 @@ import typing
 from contextlib import contextmanager
 from typing import ContextManager, List, Type, TypeVar
 
-import pytest
 from ops.framework import (
     CommitEvent,
     EventBase,
@@ -94,9 +93,3 @@ def capture_events(
 
     Framework._emit = _real_emit  # type: ignore
     Framework.reemit = _real_reemit  # type: ignore
-
-
-@pytest.fixture()
-def emitted_events():
-    with capture_events() as captured:
-        yield captured

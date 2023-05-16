@@ -279,10 +279,10 @@ def test_trigger_sub_relation(mycharm):
     }
 
     sub1 = SubordinateRelation(
-        "foo", remote_unit_data={"1": "2"}, primary_app_name="primary1"
+        "foo", remote_unit_data={"1": "2"}, remote_app_name="primary1"
     )
     sub2 = SubordinateRelation(
-        "foo", remote_unit_data={"3": "4"}, primary_app_name="primary2"
+        "foo", remote_unit_data={"3": "4"}, remote_app_name="primary2"
     )
 
     def post_event(charm: CharmBase):

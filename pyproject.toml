@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "3.0.1"
+version = "3.0.2"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -36,7 +36,7 @@ classifiers = [
 ]
 
 [project.entry-points.pytest11]
-emitted_events = "scenario"
+emitted_events = "scenario.pytest_plugin"
 
 [project.urls]
 "Homepage" = "https://github.com/canonical/ops-scenario"
