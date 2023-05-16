@@ -36,7 +36,7 @@ classifiers = [
 ]
 
 [project.entry-points.pytest11]
-emitted_events = "scenario"
+emitted_events = "scenario.pytest_plugin"
 
 [project.urls]
 "Homepage" = "https://github.com/canonical/ops-scenario"

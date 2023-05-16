@@ -98,7 +98,7 @@ def check_builtin_sequences(
     template_state: State = None,
     pre_event: Optional[Callable[["CharmType"], None]] = None,
     post_event: Optional[Callable[["CharmType"], None]] = None,
-):
+) -> object:
     """Test that all the builtin startup and teardown events can fire without errors.
 
     This will play both scenarios with and without leadership, and raise any exceptions.

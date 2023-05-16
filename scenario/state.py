@@ -230,11 +230,6 @@ class RelationBase(_DCBase):
         yield self.local_unit_data
 
     @property
-    def _remote_app_name(self) -> str:
-        """Who is on the other end of this relation?"""
-        raise NotImplementedError()
-
-    @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
         raise NotImplementedError()
@@ -399,26 +394,25 @@ class Relation(RelationBase):
 
 @dataclasses.dataclass(frozen=True)
 class SubordinateRelation(RelationBase):
-    # todo: consider renaming them to primary_*_data
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
 
-    # app name and ID of the primary that *this unit* is attached to.
-    primary_app_name: str = "remote"
-    primary_id: int = 0
-
-    @property
-    def _remote_app_name(self) -> str:
-        """Who is on the other end of this relation?"""
-        return self.primary_app_name
+    # app name and ID of the remote unit that *this unit* is attached to.
+    remote_app_name: str = "remote"
+    remote_unit_id: int = 0
 
     @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
-        return (self.primary_id,)
+        return (self.remote_unit_id,)
 
-    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:  # noqa: U100
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
         """Return the databag for some remote unit ID."""
+        if unit_id is not self.remote_unit_id:
+            raise ValueError(
+                f"invalid unit id ({unit_id}): subordinate relation only has one "
+                f"remote and that has id {self.remote_unit_id}",
+            )
         return self.remote_unit_data
 
     @property
@@ -430,8 +424,8 @@ class SubordinateRelation(RelationBase):
         yield self.remote_unit_data
 
     @property
-    def primary_name(self) -> str:
-        return f"{self.primary_app_name}/{self.primary_id}"
+    def remote_unit_name(self) -> str:
+        return f"{self.remote_app_name}/{self.remote_unit_id}"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -447,12 +441,6 @@ class PeerRelation(RelationBase):
         yield self.local_app_data
         yield self.local_unit_data
         yield from self.peers_data.values()
-
-    @property
-    def _remote_app_name(self) -> str:
-        """Who is on the other end of this relation?"""
-        # surprise! It's myself.
-        raise ValueError("peer relations don't quite have a remote end.")
 
     @property
     def _remote_unit_ids(self) -> Tuple[int]:

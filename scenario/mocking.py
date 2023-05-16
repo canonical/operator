@@ -135,7 +135,7 @@ class _MockModelBackend(_ModelBackend):
         if isinstance(relation, PeerRelation):
             return tuple(f"{self.app_name}/{unit_id}" for unit_id in relation.peers_ids)
         return tuple(
-            f"{relation._remote_app_name}/{unit_id}"
+            f"{relation.remote_app_name}/{unit_id}"
             for unit_id in relation._remote_unit_ids
         )
 

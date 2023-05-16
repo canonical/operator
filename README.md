@@ -306,12 +306,12 @@ argument. Also, it talks in terms of `primary`:
 from scenario.state import SubordinateRelation
 
 relation = SubordinateRelation(
-    endpoint="peers",
-    remote_unit_data={"foo": "bar"},
-    primary_app_name="zookeeper",
-    primary_id=42
+  endpoint="peers",
+  remote_unit_data={"foo": "bar"},
+  remote_app_name="zookeeper",
+  remote_unit_id=42
 )
-relation.primary_name  # "zookeeper/42"
+relation.remote_unit_name  # "zookeeper/42"
 ```
 
 ## Triggering Relation Events
