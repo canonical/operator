@@ -499,6 +499,61 @@ def test_pebble_exec():
     )
 ```
 
+# Secrets
+
+Scenario has secrets. Here's how you use them.
+
+```python
+from scenario import State, Secret
+
+state = State(
+    secrets=[
+        Secret(
+            id='foo',
+            contents={0: {'key': 'public'}}
+        )
+    ]
+)
+```
+
+The only mandatory arguments to Secret are its secret ID (which should be unique) and its 'contents': that is, a mapping from revision numbers (integers) to a str:str dict representing the payload of the revision. 
+
+By default, the secret is not owned by **this charm** nor is it granted to it. 
+Therefore, if charm code attempted to get that secret revision, it would get a permission error: we didn't grant it to this charm, nor we specified that the secret is owned by it.
+
+To specify a secret owned by this unit (or app):
+```python
+from scenario import State, Secret
+
+state = State(
+    secrets=[
+        Secret(
+            id='foo',
+            contents={0: {'key': 'public'}},
+            owner='unit',  # or 'app'
+            remote_grants = {0: {"remote"}}  # the secret owner has granted access to the "remote" app over some relation with ID 0
+        )
+    ]
+)
+```
+
+To specify a secret owned by some other application and give this unit (or app) access to it:
+```python
+from scenario import State, Secret
+
+state = State(
+    secrets=[
+        Secret(
+            id='foo',
+            contents={0: {'key': 'public'}},
+            # owner=None, which is the default
+            granted="unit",  # or "app",
+            revision=0,  # the revision that this unit (or app) is currently tracking
+        )
+    ]
+)
+```
+
 # Deferred events
 
 Scenario allows you to accurately simulate the Operator Framework's event queue. The event queue is responsible for
