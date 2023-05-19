@@ -4333,6 +4333,51 @@ class TestTestingFilesystem(GenericTestingFilesystemTests, unittest.TestCase):
             self.assertEqual(f.read(), 'quux')
 
 
+class TestTestingContainerFilesystemFacade(unittest.TestCase):
+    def setUp(self) -> None:
+        self.harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.container = self.harness.model.unit.get_container("foo")
+        self.container_fs = self.harness.get_container_filesystem("foo")
+
+    def tearDown(self) -> None:
+        self.harness.cleanup()
+
+    def test_push_pull(self):
+        path = "/test"
+        content = "bar"
+        self.container_fs.push(path, source="bar")
+        self.assertEqual(self.container_fs.pull(path).read(), content)
+
+    def test_create_dir(self):
+        path = "/tmp/foo"
+        self.container_fs.make_dir(path=path, make_parents=True)
+        self.assertTrue(self.container_fs.isdir("/tmp"))
+        self.assertTrue(self.container_fs.isdir(path))
+        self.assertFalse(self.container_fs.isdir("/bar"))
+
+    def test_connectivity_unchanged(self):
+        self.assertFalse(self.harness._backend._can_connect(self.container._pebble))
+        self.container_fs.list_files("/")
+        self.assertFalse(self.harness._backend._can_connect(self.container._pebble))
+        self.harness.set_can_connect(self.container, True)
+        self.container_fs.list_files("/")
+        self.assertTrue(self.harness._backend._can_connect(self.container._pebble))
+
+    def test_list_dir(self):
+        self.container_fs.make_dir("/foo")
+        self.container_fs.make_dir("/bar")
+        self.assertSetEqual(set(f.name for f in self.container_fs.list_files("/")), {"foo", "bar"})
+
+    def test_proxy_non_exist_attr(self):
+        with self.assertRaises(AttributeError):
+            self.container_fs.exist()
+
+
 class TestTestingStorageMount(GenericTestingFilesystemTests, unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

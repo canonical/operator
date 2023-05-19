@@ -18,6 +18,7 @@
 import dataclasses
 import datetime
 import fnmatch
+import functools
 import inspect
 import ipaddress
 import os
@@ -43,6 +44,7 @@ from typing import (
     Literal,
     Mapping,
     Optional,
+    Protocol,
     Set,
     TextIO,
     Tuple,
@@ -55,12 +57,13 @@ from typing import (
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import RelationNotFoundError
+from ops.model import RelationNotFoundError, StrOrPath
 
 if TYPE_CHECKING:
     from typing_extensions import TypedDict
 
     from ops.model import UnitOrApplication, _NetworkDict
+    from ops.pebble import FileInfo
 
     ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
     _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
@@ -220,6 +223,21 @@ class Harness(Generic[CharmType]):
         if isinstance(container, str):
             container = self.model.unit.get_container(container)
         self._backend._set_can_connect(container._pebble, val)
+
+    def get_container_filesystem(
+        self, container: Union[str, model.Container]
+    ) -> "_TestingContainerFilesystemFacade":
+        """Provides an interface for conducting filesystem operations on a specified container.
+
+        This method is designed to return a facade object which provides an interface
+        for filesystem-related operations (such as push, pull, list_files, push_path, etc.)
+        on the specified container. The operations available through this interface are always
+        permitted and unaffected by the `set_can_connect` method.
+        """
+        container = (
+            self.model.unit.get_container(container) if isinstance(container, str) else container
+        )
+        return _TestingContainerFilesystemProxy(harness=self, container=container)
 
     @property
     def charm(self) -> CharmType:
@@ -2584,6 +2602,82 @@ class NonAbsolutePathError(Exception):
     This error is raised when an absolute path is required but the code instead encountered a
     relative path.
     """
+
+
+@_copy_docstrings(model.Container)
+class _TestingContainerFilesystemFacade(Protocol):
+    """A Protocol class that represents a filesystem-related subset of operations of container."""
+
+    def pull(self, path: StrOrPath, *,
+             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
+        ...
+
+    def push(self,
+             path: StrOrPath,
+             source: Union[bytes, str, BinaryIO, TextIO],
+             *,
+             encoding: str = 'utf-8',
+             make_dirs: bool = False,
+             permissions: Optional[int] = None,
+             user_id: Optional[int] = None,
+             user: Optional[str] = None,
+             group_id: Optional[int] = None,
+             group: Optional[str] = None):
+        ...
+
+    def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
+                   itself: bool = False) -> List['FileInfo']:
+        ...
+
+    def push_path(self,
+                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
+                  dest_dir: StrOrPath):
+        ...
+
+    def pull_path(self,
+                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
+                  dest_dir: StrOrPath):
+        ...
+
+    def exists(self, path: str) -> bool:
+        ...
+
+    def isdir(self, path: str) -> bool:
+        ...
+
+    def make_dir(
+            self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
+            user_id: Optional[int] = None, user: Optional[str] = None,
+            group_id: Optional[int] = None, group: Optional[str] = None):
+        ...
+
+    def remove_path(self, path: str, *, recursive: bool = False):
+        ...
+
+
+class _TestingContainerFilesystemProxy:
+    """A proxy providing unrestricted filesystem access for a specified container."""
+
+    def __init__(self, container: model.Container, harness: Harness[Any]):
+        self.__container = container
+        self.__harness = harness
+
+    def __getattr__(self, item: str):
+        if item not in _TestingContainerFilesystemFacade.__dict__ or item.startswith("_"):
+            raise AttributeError(f'object has no attribute {item!r}')
+        harness = self.__harness
+        container = self.__container
+        func = getattr(self.__container, item)
+
+        @functools.wraps(func)
+        def proxy_function(*args: Any, **kwargs: Any) -> Any:
+            can_connect = harness._backend._can_connect(container._pebble)
+            harness.set_can_connect(container, True)
+            result = func(*args, **kwargs)
+            harness.set_can_connect(container, can_connect)
+            return result
+
+        return proxy_function
 
 
 class _TestingStorageMount:
