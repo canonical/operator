@@ -28,6 +28,7 @@ import signal
 import tempfile
 import uuid
 import warnings
+from abc import abstractmethod
 from contextlib import contextmanager
 from io import BytesIO, StringIO
 from textwrap import dedent
@@ -236,7 +237,9 @@ class Harness(Generic[CharmType]):
         """
         if isinstance(container, str):
             container = self.model.unit.get_container(container)
-        return _TestingContainerFilesystemProxy(container=container, backend=self._backend)
+        return _TestingContainerFilesystemProxy(
+            container=container, backend=self._backend
+        )  # type: ignore
 
     @property
     def charm(self) -> CharmType:
@@ -2604,8 +2607,12 @@ class NonAbsolutePathError(Exception):
 
 
 class ContainerFilesystem(Protocol):
-    """A Protocol class that represents a filesystem-related subset of operations of container."""
+    """The subset of container operations that are filesystem-related.
 
+    Don't instantiate this directly; use :meth:`Harness.get_container_filesystem`.
+    """
+
+    @abstractmethod
     def pull(self, path: StrOrPath, *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
@@ -2613,6 +2620,7 @@ class ContainerFilesystem(Protocol):
         See :meth:`model.Container.pull` for details.
         """
 
+    @abstractmethod
     def push(self,
              path: StrOrPath,
              source: Union[bytes, str, BinaryIO, TextIO],
@@ -2629,6 +2637,7 @@ class ContainerFilesystem(Protocol):
         See :meth:`model.Container.push` for details.
         """
 
+    @abstractmethod
     def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['FileInfo']:
         """Return list of directory entries from given path on remote system.
@@ -2636,6 +2645,7 @@ class ContainerFilesystem(Protocol):
         See :meth:`model.Container.list_files` for details.
         """
 
+    @abstractmethod
     def push_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
                   dest_dir: StrOrPath):
@@ -2644,6 +2654,7 @@ class ContainerFilesystem(Protocol):
         See :meth:`model.Container.push_path` for details.
         """
 
+    @abstractmethod
     def pull_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
                   dest_dir: StrOrPath):
@@ -2652,18 +2663,21 @@ class ContainerFilesystem(Protocol):
         See :meth:`model.Container.pull_path` for details.
         """
 
+    @abstractmethod
     def exists(self, path: str) -> bool:
         """Return true if the path exists on the container filesystem.
 
         See :meth:`model.Container.exists` for details.
         """
 
+    @abstractmethod
     def isdir(self, path: str) -> bool:
         """Return true if a directory exists at the given path on the container filesystem.
 
         See :meth:`model.Container.isdir` for details.
         """
 
+    @abstractmethod
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
             user_id: Optional[int] = None, user: Optional[str] = None,
@@ -2673,6 +2687,7 @@ class ContainerFilesystem(Protocol):
         See :meth:`model.Container.make_dir` for details.
         """
 
+    @abstractmethod
     def remove_path(self, path: str, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 

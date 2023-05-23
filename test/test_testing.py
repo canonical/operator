@@ -36,7 +36,7 @@ import yaml
 import ops
 import ops.testing
 from ops import pebble
-from ops.model import _ModelBackend, Container
+from ops.model import Container, _ModelBackend
 from ops.testing import (
     ContainerFilesystem,
     NonAbsolutePathError,
