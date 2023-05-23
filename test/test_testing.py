@@ -36,8 +36,9 @@ import yaml
 import ops
 import ops.testing
 from ops import pebble
-from ops.model import _ModelBackend
+from ops.model import _ModelBackend, Container
 from ops.testing import (
+    ContainerFilesystem,
     NonAbsolutePathError,
     _Directory,
     _TestingFilesystem,
@@ -4372,6 +4373,15 @@ class TestTestingContainerFilesystemFacade(unittest.TestCase):
         self.container_fs.make_dir("/foo")
         self.container_fs.make_dir("/bar")
         self.assertSetEqual(set(f.name for f in self.container_fs.list_files("/")), {"foo", "bar"})
+
+    def test_protocol_attributes(self):
+        for attr in ContainerFilesystem.__dict__.keys():
+            if attr.startswith("_"):
+                continue
+            self.assertEqual(
+                inspect.signature(getattr(ContainerFilesystem, attr)),
+                inspect.signature(getattr(Container, attr))
+            )
 
     def test_proxy_non_exist_attr(self):
         with self.assertRaises(AttributeError):

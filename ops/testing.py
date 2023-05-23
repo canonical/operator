@@ -226,18 +226,17 @@ class Harness(Generic[CharmType]):
 
     def get_container_filesystem(
         self, container: Union[str, model.Container]
-    ) -> "_TestingContainerFilesystemFacade":
-        """Provides an interface for conducting filesystem operations on a specified container.
+    ) -> "ContainerFilesystem":
+        """Return an interface for conducting filesystem operations on the specified container.
 
-        This method is designed to return a facade object which provides an interface
-        for filesystem-related operations (such as push, pull, list_files, push_path, etc.)
-        on the specified container. The operations available through this interface are always
-        permitted and unaffected by the `set_can_connect` method.
+        This method returns an object which provides an interface for filesystem-related
+        operations (push, pull, and so on) on the specified container. The operations available
+        through this interface are always permitted and unaffected by the
+        :meth:`.set_can_connect` method.
         """
-        container = (
-            self.model.unit.get_container(container) if isinstance(container, str) else container
-        )
-        return _TestingContainerFilesystemProxy(harness=self, container=container)
+        if isinstance(container, str):
+            container = self.model.unit.get_container(container)
+        return _TestingContainerFilesystemProxy(container=container, backend=self._backend)
 
     @property
     def charm(self) -> CharmType:
@@ -2604,13 +2603,15 @@ class NonAbsolutePathError(Exception):
     """
 
 
-@_copy_docstrings(model.Container)
-class _TestingContainerFilesystemFacade(Protocol):
+class ContainerFilesystem(Protocol):
     """A Protocol class that represents a filesystem-related subset of operations of container."""
 
     def pull(self, path: StrOrPath, *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
-        ...
+        """Read a file's content from the remote system.
+
+        See :meth:`model.Container.pull` for details.
+        """
 
     def push(self,
              path: StrOrPath,
@@ -2623,58 +2624,80 @@ class _TestingContainerFilesystemFacade(Protocol):
              user: Optional[str] = None,
              group_id: Optional[int] = None,
              group: Optional[str] = None):
-        ...
+        """Write content to a given file path on the remote system.
+
+        See :meth:`model.Container.push` for details.
+        """
 
     def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['FileInfo']:
-        ...
+        """Return list of directory entries from given path on remote system.
+
+        See :meth:`model.Container.list_files` for details.
+        """
 
     def push_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
                   dest_dir: StrOrPath):
-        ...
+        """Recursively push a local path or files to the remote system.
+
+        See :meth:`model.Container.push_path` for details.
+        """
 
     def pull_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
                   dest_dir: StrOrPath):
-        ...
+        """Recursively pull a remote path or files to the local system.
+
+        See :meth:`model.Container.pull_path` for details.
+        """
 
     def exists(self, path: str) -> bool:
-        ...
+        """Return true if the path exists on the container filesystem.
+
+        See :meth:`model.Container.exists` for details.
+        """
 
     def isdir(self, path: str) -> bool:
-        ...
+        """Return true if a directory exists at the given path on the container filesystem.
+
+        See :meth:`model.Container.isdir` for details.
+        """
 
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
             user_id: Optional[int] = None, user: Optional[str] = None,
             group_id: Optional[int] = None, group: Optional[str] = None):
-        ...
+        """Create a directory on the remote system with the given attributes.
+
+        See :meth:`model.Container.make_dir` for details.
+        """
 
     def remove_path(self, path: str, *, recursive: bool = False):
-        ...
+        """Remove a file or directory on the remote system.
+
+        See :meth:`model.Container.remove_path` for details.
+        """
 
 
 class _TestingContainerFilesystemProxy:
     """A proxy providing unrestricted filesystem access for a specified container."""
 
-    def __init__(self, container: model.Container, harness: Harness[Any]):
-        self.__container = container
-        self.__harness = harness
+    def __init__(self, container: model.Container, backend: _TestingPebbleClient):
+        self._container = container
+        self._backend = backend
 
-    def __getattr__(self, item: str):
-        if item not in _TestingContainerFilesystemFacade.__dict__ or item.startswith("_"):
-            raise AttributeError(f'object has no attribute {item!r}')
-        harness = self.__harness
-        container = self.__container
-        func = getattr(self.__container, item)
+    def __getattr__(self, name: str):
+        if name not in ContainerFilesystem.__dict__ or name.startswith("_"):
+            raise AttributeError(f'object has no attribute {name!r}')
+        func = getattr(self._container, name)
 
         @functools.wraps(func)
         def proxy_function(*args: Any, **kwargs: Any) -> Any:
-            can_connect = harness._backend._can_connect(container._pebble)
-            harness.set_can_connect(container, True)
+            can_connect = self._backend._can_connect(self._container._pebble)
+            self._backend._set_can_connect(self._container._pebble, True)
             result = func(*args, **kwargs)
-            harness.set_can_connect(container, can_connect)
+            self._backend._set_can_connect(self._container._pebble, can_connect)
             return result
 
         return proxy_function
