@@ -2938,7 +2938,7 @@ class _ModelBackend:
         # concept is being deprecated, however, in favor of approaches such as the one that we use
         # here.
         app_state = self._run('goal-state', return_output=True, use_json=True)
-        app_state = typing.cast(Dict[str, List[str]], app_state)
+        app_state = typing.cast(Dict[str, Dict[str, str]], app_state)
 
         # Planned units can be zero. We don't need to do error checking here.
         # But we need to filter out dying units as they may be reported before being deleted
