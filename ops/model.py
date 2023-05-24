@@ -2934,8 +2934,6 @@ class _ModelBackend:
         Includes the current unit in the count.
 
         """
-        # TODO: here, query the "life" of the application, if it's "dying", return -1
-
         # The goal-state tool will return the information that we need. Goal state as a general
         # concept is being deprecated, however, in favor of approaches such as the one that we use
         # here.
@@ -2949,6 +2947,10 @@ class _ModelBackend:
             for unit_name, unit_info in app_state.get('units', {})
             if unit_info['status'] != 'dying'
         ]
+
+        # TODO: here, if len(units) == 0, query the "life" of the application
+        #  if it's "dying", return -1, otherwise 0 (all units removed but app not removed)
+
         return len(units)
 
     def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
