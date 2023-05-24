@@ -2947,10 +2947,6 @@ class _ModelBackend:
             for unit_name, unit_info in app_state.get('units', {}).items()
             if unit_info['status'] != 'dying'
         ]
-
-        # TODO: here, if len(units) == 0, query the "life" of the application
-        #  if it's "dying", return -1, otherwise 0 (all units removed but app not removed)
-
         return len(units)
 
     def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
