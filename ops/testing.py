@@ -237,9 +237,8 @@ class Harness(Generic[CharmType]):
         """
         if isinstance(container, str):
             container = self.model.unit.get_container(container)
-        return _TestingContainerFilesystemProxy(
-            container=container, backend=self._backend
-        )  # type: ignore
+        proxy = _ContainerFilesystemProxy(container=container, backend=self._backend)
+        return cast(ContainerFilesystem, proxy)
 
     @property
     def charm(self) -> CharmType:
@@ -2617,8 +2616,9 @@ class ContainerFilesystem(Protocol):
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
-        See :meth:`model.Container.pull` for details.
+        See :meth:`ops.model.Container.pull` for details.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def push(self,
@@ -2631,71 +2631,79 @@ class ContainerFilesystem(Protocol):
              user_id: Optional[int] = None,
              user: Optional[str] = None,
              group_id: Optional[int] = None,
-             group: Optional[str] = None):
+             group: Optional[str] = None) -> None:
         """Write content to a given file path on the remote system.
 
-        See :meth:`model.Container.push` for details.
+        See :meth:`ops.model.Container.push` for details.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['FileInfo']:
         """Return list of directory entries from given path on remote system.
 
-        See :meth:`model.Container.list_files` for details.
+        See :meth:`ops.model.Container.list_files` for details.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def push_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  dest_dir: StrOrPath) -> None:
         """Recursively push a local path or files to the remote system.
 
-        See :meth:`model.Container.push_path` for details.
+        See :meth:`ops.model.Container.push_path` for details.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def pull_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  dest_dir: StrOrPath) -> None:
         """Recursively pull a remote path or files to the local system.
 
-        See :meth:`model.Container.pull_path` for details.
+        See :meth:`ops.model.Container.pull_path` for details.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def exists(self, path: str) -> bool:
         """Return true if the path exists on the container filesystem.
 
-        See :meth:`model.Container.exists` for details.
+        See :meth:`ops.model.Container.exists` for details.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def isdir(self, path: str) -> bool:
         """Return true if a directory exists at the given path on the container filesystem.
 
-        See :meth:`model.Container.isdir` for details.
+        See :meth:`ops.model.Container.isdir` for details.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
             user_id: Optional[int] = None, user: Optional[str] = None,
-            group_id: Optional[int] = None, group: Optional[str] = None):
+            group_id: Optional[int] = None, group: Optional[str] = None) -> None:
         """Create a directory on the remote system with the given attributes.
 
-        See :meth:`model.Container.make_dir` for details.
+        See :meth:`ops.model.Container.make_dir` for details.
         """
+        raise NotImplementedError
 
     @abstractmethod
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: str, *, recursive: bool = False) -> None:
         """Remove a file or directory on the remote system.
 
-        See :meth:`model.Container.remove_path` for details.
+        See :meth:`ops.model.Container.remove_path` for details.
         """
+        raise NotImplementedError
 
 
-class _TestingContainerFilesystemProxy:
+class _ContainerFilesystemProxy:
     """A proxy providing unrestricted filesystem access for a specified container."""
 
     def __init__(self, container: model.Container, backend: _TestingPebbleClient):
@@ -2711,9 +2719,10 @@ class _TestingContainerFilesystemProxy:
         def proxy_function(*args: Any, **kwargs: Any) -> Any:
             can_connect = self._backend._can_connect(self._container._pebble)
             self._backend._set_can_connect(self._container._pebble, True)
-            result = func(*args, **kwargs)
-            self._backend._set_can_connect(self._container._pebble, can_connect)
-            return result
+            try:
+                return func(*args, **kwargs)
+            finally:
+                self._backend._set_can_connect(self._container._pebble, can_connect)
 
         return proxy_function
 

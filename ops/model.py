@@ -2012,7 +2012,7 @@ class Container:
              user_id: Optional[int] = None,
              user: Optional[str] = None,
              group_id: Optional[int] = None,
-             group: Optional[str] = None):
+             group: Optional[str] = None) -> None:
         """Write content to a given file path on the remote system.
 
         Args:
@@ -2058,7 +2058,7 @@ class Container:
 
     def push_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  dest_dir: StrOrPath) -> None:
         """Recursively push a local path or files to the remote system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2137,7 +2137,7 @@ class Container:
 
     def pull_path(self,
                   source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  dest_dir: StrOrPath) -> None:
         """Recursively pull a remote path or files to the local system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2302,7 +2302,7 @@ class Container:
     def make_dir(
             self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
             user_id: Optional[int] = None, user: Optional[str] = None,
-            group_id: Optional[int] = None, group: Optional[str] = None):
+            group_id: Optional[int] = None, group: Optional[str] = None) -> None:
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -2322,7 +2322,7 @@ class Container:
                               user_id=user_id, user=user,
                               group_id=group_id, group=group)
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: str, *, recursive: bool = False) -> None:
         """Remove a file or directory on the remote system.
 
         Args:

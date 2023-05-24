@@ -4375,17 +4375,22 @@ class TestTestingContainerFilesystemFacade(unittest.TestCase):
         self.assertSetEqual(set(f.name for f in self.container_fs.list_files("/")), {"foo", "bar"})
 
     def test_protocol_attributes(self):
-        for attr in ContainerFilesystem.__dict__.keys():
+        for attr, func in ContainerFilesystem.__dict__.items():
             if attr.startswith("_"):
                 continue
             self.assertEqual(
-                inspect.signature(getattr(ContainerFilesystem, attr)),
+                inspect.signature(func),
                 inspect.signature(getattr(Container, attr))
             )
 
     def test_proxy_non_exist_attr(self):
         with self.assertRaises(AttributeError):
             self.container_fs.exist()
+
+    def test_exception_safe(self):
+        with self.assertRaises(TypeError):
+            self.container_fs.exists(foo="bar")
+        self.assertFalse(self.harness._backend._can_connect(self.container._pebble))
 
 
 class TestTestingStorageMount(GenericTestingFilesystemTests, unittest.TestCase):
