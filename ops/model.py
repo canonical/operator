@@ -2944,7 +2944,7 @@ class _ModelBackend:
         # But we need to filter out dying units as they may be reported before being deleted
         units = [
             unit_name
-            for unit_name, unit_info in app_state.get('units', {})
+            for unit_name, unit_info in app_state.get('units', {}).items()
             if unit_info['status'] != 'dying'
         ]
 
