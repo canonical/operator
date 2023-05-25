@@ -2942,12 +2942,9 @@ class _ModelBackend:
 
         # Planned units can be zero. We don't need to do error checking here.
         # But we need to filter out dying units as they may be reported before being deleted
-        units = [
-            unit_name
-            for unit_name, unit_info in app_state.get('units', {}).items()
-            if unit_info['status'] != 'dying'
-        ]
-        return len(units)
+        units = app_state.get('units', {})
+        num_alive = sum(1 for unit in units.values() if unit['status'] != 'dying')
+        return num_alive
 
     def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
                              key: str, value: str):
