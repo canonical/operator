@@ -2716,7 +2716,7 @@ class _ContainerFilesystemProxy:
         func = getattr(self._container, name)
 
         @functools.wraps(func)
-        def proxy_function(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             can_connect = self._backend._can_connect(self._container._pebble)
             self._backend._set_can_connect(self._container._pebble, True)
             try:
@@ -2724,7 +2724,7 @@ class _ContainerFilesystemProxy:
             finally:
                 self._backend._set_can_connect(self._container._pebble, can_connect)
 
-        return proxy_function
+        return wrapper
 
 
 class _TestingStorageMount:
