@@ -2931,7 +2931,8 @@ class _ModelBackend:
     def planned_units(self) -> int:
         """Count of "planned" units that will run this application.
 
-        Includes the current unit in the count, but does not include dying units.
+        This will include the current unit, any units that are alive, units that are in the process
+        of being started, but will not include units that are being shut down.
 
         """
         # The goal-state tool will return the information that we need. Goal state as a general
