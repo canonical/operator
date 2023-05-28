@@ -2712,6 +2712,35 @@ exit 2
             ['relation-list', '-r', '6', '--app', '--format=json'],
         ])
 
+    def test_planned_units(self):
+        # no units
+        fake_script(self, 'goal-state', """
+echo '{"units":{}, "relations":{}}'
+""")
+        self.assertEqual(self.backend.planned_units(), 0)
+
+        # only active units
+        fake_script(self, 'goal-state', """
+echo '{
+    "units":{
+        "app/0": {"status":"active","since":"2023-05-23 17:05:05Z"},
+        "app/1": {"status":"active","since":"2023-05-23 17:57:05Z"}
+    },
+    "relations": {}
+}'""")
+        self.assertEqual(self.backend.planned_units(), 2)
+
+        # active and dying units
+        fake_script(self, 'goal-state', """
+echo '{
+    "units":{
+        "app/0": {"status":"active","since":"2023-05-23 17:05:05Z"},
+        "app/1": {"status":"dying","since":"2023-05-23 17:57:05Z"}
+    },
+    "relations": {}
+}'""")
+        self.assertEqual(self.backend.planned_units(), 1)
+
 
 class TestLazyMapping(unittest.TestCase):
 
