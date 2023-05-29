@@ -2712,7 +2712,7 @@ class _ContainerFilesystemProxy:
 
     def __getattr__(self, name: str):
         if name not in ContainerFilesystem.__dict__ or name.startswith("_"):
-            raise AttributeError(f'object has no attribute {name!r}')
+            raise AttributeError(f'{self.__class__.__name__!r} object has no attribute {name!r}')
         func = getattr(self._container, name)
 
         @functools.wraps(func)
