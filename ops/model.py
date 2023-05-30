@@ -2931,16 +2931,21 @@ class _ModelBackend:
     def planned_units(self) -> int:
         """Count of "planned" units that will run this application.
 
-        Includes the current unit in the count.
+        This will include the current unit, any units that are alive, units that are in the process
+        of being started, but will not include units that are being shut down.
 
         """
         # The goal-state tool will return the information that we need. Goal state as a general
         # concept is being deprecated, however, in favor of approaches such as the one that we use
         # here.
         app_state = self._run('goal-state', return_output=True, use_json=True)
-        app_state = typing.cast(Dict[str, List[str]], app_state)
+        app_state = typing.cast(Dict[str, Dict[str, Any]], app_state)
+
         # Planned units can be zero. We don't need to do error checking here.
-        return len(app_state.get('units', []))
+        # But we need to filter out dying units as they may be reported before being deleted
+        units = app_state.get('units', {})
+        num_alive = sum(1 for unit in units.values() if unit['status'] != 'dying')
+        return num_alive
 
     def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
                              key: str, value: str):
