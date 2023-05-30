@@ -39,13 +39,128 @@ and day-2 operations specific to that application.
 Full developer documentation is available at https://juju.is/docs/sdk.
 """
 
+# The "from .X import Y" imports below don't explicitly tell Pyright (or MyPy)
+# that those symbols are part of the public API, so we have to add __all__.
+__all__ = [
+    '__version__',
+    'main',
+    'pebble',
+
+    # From charm.py
+    'ActionEvent',
+    'ActionMeta',
+    'CharmBase',
+    'CharmEvents',
+    'CharmMeta',
+    'CollectMetricsEvent',
+    'ConfigChangedEvent',
+    'ContainerMeta',
+    'ContainerStorageMeta',
+    'HookEvent',
+    'InstallEvent',
+    'LeaderElectedEvent',
+    'LeaderSettingsChangedEvent',
+    'PayloadMeta',
+    'PebbleReadyEvent',
+    'PostSeriesUpgradeEvent',
+    'PreSeriesUpgradeEvent',
+    'RelationBrokenEvent',
+    'RelationChangedEvent',
+    'RelationCreatedEvent',
+    'RelationDepartedEvent',
+    'RelationEvent',
+    'RelationJoinedEvent',
+    'RelationMeta',
+    'RelationRole',
+    'RemoveEvent',
+    'ResourceMeta',
+    'SecretChangedEvent',
+    'SecretEvent',
+    'SecretExpiredEvent',
+    'SecretRemoveEvent',
+    'SecretRotateEvent',
+    'StartEvent',
+    'StopEvent',
+    'StorageAttachedEvent',
+    'StorageDetachingEvent',
+    'StorageEvent',
+    'StorageMeta',
+    'UpdateStatusEvent',
+    'UpgradeCharmEvent',
+    'WorkloadEvent',
+
+    # From framework.py
+    'BoundEvent',
+    'BoundStoredState',
+    'CommitEvent',
+    'EventBase',
+    'EventSource',
+    'Framework',
+    'FrameworkEvents',
+    'Handle',
+    'HandleKind',
+    'LifecycleEvent',
+    'NoTypeError',
+    'Object',
+    'ObjectEvents',
+    'PreCommitEvent',
+    'PrefixedEvents',
+    'StoredDict',
+    'StoredList',
+    'StoredSet',
+    'StoredState',
+    'StoredStateData',
+
+    # From jujuversion.py
+    'JujuVersion',
+
+    # From model.py
+    'ActiveStatus',
+    'Application',
+    'Binding',
+    'BindingMapping',
+    'BlockedStatus',
+    'CheckInfoMapping',
+    'ConfigData',
+    'Container',
+    'ContainerMapping',
+    'ErrorStatus',
+    'InvalidStatusError',
+    'LazyMapping',
+    'MaintenanceStatus',
+    'Model',
+    'ModelError',
+    'MultiPushPullError',
+    'Network',
+    'NetworkInterface',
+    'OpenedPort',
+    'Pod',
+    'Relation',
+    'RelationData',
+    'RelationDataAccessError',
+    'RelationDataContent',
+    'RelationDataError',
+    'RelationDataTypeError',
+    'RelationMapping',
+    'RelationNotFoundError',
+    'Resources',
+    'Secret',
+    'SecretInfo',
+    'SecretNotFoundError',
+    'SecretRotate',
+    'ServiceInfoMapping',
+    'StatusBase',
+    'Storage',
+    'StorageMapping',
+    'TooManyRelatedAppsError',
+    'Unit',
+    'UnknownStatus',
+    'WaitingStatus',
+]
+
 # The isort command wants to rearrange the nicely-formatted imports below;
 # just skip it for this file.
 # isort:skip_file
-
-# Similarly, Pyright complains that all of these things are unused imports,
-# so disable it:
-# pyright: reportUnusedImport=false
 
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble  # type: ignore # noqa: F401
