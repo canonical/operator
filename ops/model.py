@@ -75,10 +75,9 @@ if typing.TYPE_CHECKING:
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
-    Numerical = Union[int, float]
 
     # all types that can be (de) serialized to json(/yaml) fom Python builtins
-    JsonObject = Union[None, Numerical, bool, str,
+    JsonObject = Union[None, int, float, bool, str,
                        Dict[str, 'JsonObject'],
                        List['JsonObject'],
                        Tuple['JsonObject', ...]]
@@ -1740,7 +1739,6 @@ class Storage:
 
     Attributes:
         name: Simple string name of the storage
-        index: The index number for storage
     """
 
     def __init__(self, storage_name: str, storage_index: int, backend: '_ModelBackend'):
@@ -1784,16 +1782,18 @@ class Storage:
 
 
 class MultiPushPullError(Exception):
-    """Aggregates multiple push/pull related exceptions into one."""
+    """Aggregates multiple push/pull related exceptions into one.
+
+    This class should not be instantiated directly.
+
+    Attributes:
+        message: error message
+        errors: list of errors with each represented by a tuple (<source_path>,<exception>)
+            where source_path is the path being pushed/pulled from.
+    """
 
     def __init__(self, message: str, errors: List[Tuple[str, Exception]]):
-        """Create an aggregation of several push/pull errors.
-
-        Args:
-            message: error message
-            errors: list of errors with each represented by a tuple (<source_path>,<exception>)
-                where source_path is the path being pushed/pulled from.
-        """
+        """Create an aggregation of several push/pull errors."""
         self.errors = errors
         self.message = message
 
@@ -2905,7 +2905,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def add_metrics(self, metrics: Mapping[str, 'Numerical'],
+    def add_metrics(self, metrics: Mapping[str, Union[int, float]],
                     labels: Optional[Mapping[str, str]] = None) -> None:
         cmd: List[str] = ['add-metric']
         if labels:
@@ -3119,7 +3119,7 @@ class _ModelBackendValidator:
                     label_name, cls.METRIC_KEY_REGEX.pattern))
 
     @classmethod
-    def format_metric_value(cls, value: 'Numerical'):
+    def format_metric_value(cls, value: Union[int, float]):
         if not isinstance(value, (int, float)):  # pyright: reportUnnecessaryIsInstance=false
             raise ModelError('invalid metric value {!r} provided:'
                              ' must be a positive finite float'.format(value))

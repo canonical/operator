@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
     from ops.framework import Handle, JsonObject, _SerializedData
-    from ops.model import Container, Numerical, Relation, Storage
+    from ops.model import Container, Relation, Storage
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
@@ -189,30 +189,35 @@ class ActionEvent(EventBase):
     def set_results(self, results: '_SerializedData'):
         """Report the result of the action.
 
-        Args:
-            results: The result of the action as a Dict
-            Juju eventually only accepts a str:str mapping, so we will attempt
-            to flatten any more complex data structure like so:
+        Juju eventually only accepts a str:str mapping, so we will attempt
+        to flatten any more complex data structure like so::
+
             >>> {'a': 'b'} # becomes: 'a'='b'
             >>> {'a': {'b': 'c'}} # becomes: 'a.b'='c'
             >>> {'a': {'b': 'c', 'd': 'e'}} # becomes: 'a.b'='c', 'a.d' = 'e'
             >>> {'a.b': 'c', 'a.d': 'e'} # equivalent to previous
-            Note that duplicate keys are not allowed, so
-            >>> {'a': {'b': 'c'}, 'a.b': 'c'} # invalid!
 
-            Note that the resulting keys must start and end with lowercase
-            alphanumeric, and can only contain lowercase alphanumeric, hyphens
-            and periods.
+        Note that duplicate keys are not allowed, so this is invalid::
 
-            If any exceptions occur whilst the action is being handled, juju will
-            gather any stdout/stderr data (and the return code) and inject them into the
-            results object. Thus, the results object might contain the following keys,
-            additionally to those specified by the charm code:
-             - Stdout
-             - Stderr
-             - Stdout-encoding
-             - Stderr-encoding
-             - ReturnCode
+            >>> {'a': {'b': 'c'}, 'a.b': 'c'}
+
+        Note that the resulting keys must start and end with lowercase
+        alphanumeric, and can only contain lowercase alphanumeric, hyphens
+        and periods.
+
+        If any exceptions occur whilst the action is being handled, juju will
+        gather any stdout/stderr data (and the return code) and inject them into the
+        results object. Thus, the results object might contain the following keys,
+        additionally to those specified by the charm code:
+
+         - Stdout
+         - Stderr
+         - Stdout-encoding
+         - Stderr-encoding
+         - ReturnCode
+
+        Args:
+            results: The result of the action as a Dict
         """
         self.framework.model._backend.action_set(results)   # pyright: reportPrivateUsage=false
 
@@ -392,7 +397,7 @@ class CollectMetricsEvent(HookEvent):
     how they can interact with Juju.
     """
 
-    def add_metrics(self, metrics: Mapping[str, 'Numerical'],
+    def add_metrics(self, metrics: Mapping[str, Union[int, float]],
                     labels: Optional[Mapping[str, str]] = None):
         """Record metrics that have been gathered by the charm for this unit.
 
@@ -545,11 +550,6 @@ class RelationDepartedEvent(RelationEvent):
 
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
-
-    Attributes:
-        departing_unit: The :class:`~ops.model.Unit` that is departing.  This
-            can facilitate determining e.g. whether *you* are the departing
-            unit.
     """
 
     def __init__(self, handle: 'Handle', relation: 'Relation',
@@ -572,7 +572,11 @@ class RelationDepartedEvent(RelationEvent):
 
     @property
     def departing_unit(self) -> Optional[model.Unit]:
-        """The `ops.model.Unit` that is departing, if any."""
+        """The :class:`ops.Unit` that is departing, if any.
+
+        You can use this to determine (for example) whether *you* are the
+        departing unit.
+        """
         # doing this on init would fail because `framework` gets patched in
         # post-init
         if not self._departing_unit_name:
@@ -955,7 +959,7 @@ class CharmBase(Object):
             main(MyCharm)
 
     As shown in the example above, a charm class is instantiated by
-    :func:`~ops.main.main` rather than charm authors directly instantiating a
+    :code:`ops.main` rather than charm authors directly instantiating a
     charm.
 
     Args:
@@ -1279,7 +1283,6 @@ class ContainerMeta:
 
     Attributes:
         name: Name of container (key in the YAML)
-        mounts: :class:`ContainerStorageMeta` mounts available to the container
     """
 
     def __init__(self, name: str, raw: '_ContainerMetaDict'):
@@ -1337,7 +1340,6 @@ class ContainerStorageMeta:
         storage: a name for the mountpoint, which should exist the keys for :class:`StorageMeta`
                  for the charm
         location: the location `storage` is mounted at
-        locations: a list of mountpoints for the key
 
     If multiple locations are specified for the same storage, such as Kubernetes subPath mounts,
     `location` will not be an accessible attribute, as it would not be possible to determine
@@ -1358,6 +1360,7 @@ class ContainerStorageMeta:
         return self._locations
 
     def __getattr__(self, name: str):
+        # TODO(benhoyt): this should just be a property "location"
         if name == "location":
             if len(self._locations) == 1:
                 return self._locations[0]
