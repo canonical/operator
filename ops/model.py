@@ -75,9 +75,10 @@ if typing.TYPE_CHECKING:
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
+    Numerical = Union[int, float]
 
     # all types that can be (de) serialized to json(/yaml) fom Python builtins
-    JsonObject = Union[None, int, float, bool, str,
+    JsonObject = Union[None, Numerical, bool, str,
                        Dict[str, 'JsonObject'],
                        List['JsonObject'],
                        Tuple['JsonObject', ...]]
@@ -2905,7 +2906,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def add_metrics(self, metrics: Mapping[str, Union[int, float]],
+    def add_metrics(self, metrics: Mapping[str, 'Numerical'],
                     labels: Optional[Mapping[str, str]] = None) -> None:
         cmd: List[str] = ['add-metric']
         if labels:
@@ -3119,7 +3120,7 @@ class _ModelBackendValidator:
                     label_name, cls.METRIC_KEY_REGEX.pattern))
 
     @classmethod
-    def format_metric_value(cls, value: Union[int, float]):
+    def format_metric_value(cls, value: 'Numerical'):
         if not isinstance(value, (int, float)):  # pyright: reportUnnecessaryIsInstance=false
             raise ModelError('invalid metric value {!r} provided:'
                              ' must be a positive finite float'.format(value))

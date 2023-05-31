@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
     from ops.framework import Handle, JsonObject, _SerializedData
-    from ops.model import Container, Relation, Storage
+    from ops.model import Container, Numerical, Relation, Storage
 
     # CharmMeta also needs these.
     _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
@@ -397,7 +397,7 @@ class CollectMetricsEvent(HookEvent):
     how they can interact with Juju.
     """
 
-    def add_metrics(self, metrics: Mapping[str, Union[int, float]],
+    def add_metrics(self, metrics: Mapping[str, 'Numerical'],
                     labels: Optional[Mapping[str, str]] = None):
         """Record metrics that have been gathered by the charm for this unit.
 
