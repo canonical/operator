@@ -71,7 +71,7 @@ html_theme = 'sphinx_rtd_theme'  # 'alabaster'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = []
 
 
 # -- Options for sphinx.ext.todo ---------------------------------------------
@@ -98,7 +98,7 @@ autodoc_typehints = 'description'
 #     'both' - Both the class’ and the __init__ method’s docstring are
 #              concatenated and inserted.
 #     'init' - Only the __init__ method’s docstring is inserted.
-autoclass_content = 'both'
+autoclass_content = 'class'
 
 # This value selects if automatically documented members are sorted
 # alphabetical (value 'alphabetical'), by member type (value
