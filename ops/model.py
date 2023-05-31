@@ -1535,7 +1535,7 @@ class StatusBase:
         self.message = message
 
     def __new__(cls, *args: Any, **kwargs: Dict[Any, Any]):
-        """Forbid the usage of StatusBase directly."""
+        # Forbid the usage of StatusBase directly.
         if cls is StatusBase:
             raise TypeError("cannot instantiate a base class")
         return super().__new__(cls)

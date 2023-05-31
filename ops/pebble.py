@@ -1403,7 +1403,11 @@ class _WebsocketReader(io.BufferedIOBase):
 
 
 class Client:
-    """Pebble API client."""
+    """Pebble API client.
+
+    Defaults to using a Unix socket at socket_path (which must be specified
+    unless a custom opener is provided).
+    """
 
     _chunk_size = 8192
 
@@ -1411,11 +1415,6 @@ class Client:
                  opener: Optional[urllib.request.OpenerDirector] = None,
                  base_url: str = 'http://localhost',
                  timeout: float = 5.0):
-        """Initialize a client instance.
-
-        Defaults to using a Unix socket at socket_path (which must be specified
-        unless a custom opener is provided).
-        """
         if not isinstance(socket_path, str):
             raise TypeError(f'`socket_path` should be a string, not: {type(socket_path)}')
         if opener is None:
