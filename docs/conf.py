@@ -104,7 +104,7 @@ autoclass_content = 'class'
 # alphabetical (value 'alphabetical'), by member type (value
 # 'groupwise') or by source order (value 'bysource'). The default is
 # alphabetical.
-autodoc_member_order = 'bysource'
+autodoc_member_order = 'alphabetical'
 
 autodoc_default_options = {
     'members': None,            # None here means "yes"
