@@ -29,6 +29,12 @@ SNAPSHOT_DATA_DIR = (Path(os.getcwd()).parent / "snapshot_storage").absolute()
 logger = logging.getLogger("snapshot")
 
 
+def set_relations(relations: Iterable[Relation]) -> List[str]:  # noqa: U100
+    logger.info("preparing relations...")
+    logger.warning("set_relations not implemented yet")
+    return []
+
+
 def set_status(status: Status) -> List[str]:
     logger.info("preparing status...")
     cmds = []
@@ -40,37 +46,33 @@ def set_status(status: Status) -> List[str]:
     return cmds
 
 
-def set_relations(relations: Iterable[Relation]) -> List[str]:
-    logger.info("preparing relations...")
-    logger.warning("set_relations not implemented yet")
-    return []
-
-
-def set_config(config: Dict[str, str]) -> List[str]:
+def set_config(config: Dict[str, str]) -> List[str]:  # noqa: U100
     logger.info("preparing config...")
     logger.warning("set_config not implemented yet")
     return []
 
 
-def set_containers(containers: Iterable[Container]) -> List[str]:
+def set_containers(containers: Iterable[Container]) -> List[str]:  # noqa: U100
     logger.info("preparing containers...")
     logger.warning("set_containers not implemented yet")
     return []
 
 
-def set_secrets(secrets: Iterable[Secret]) -> List[str]:
+def set_secrets(secrets: Iterable[Secret]) -> List[str]:  # noqa: U100
     logger.info("preparing secrets...")
     logger.warning("set_secrets not implemented yet")
     return []
 
 
-def set_deferred_events(deferred_events: Iterable[DeferredEvent]) -> List[str]:
+def set_deferred_events(
+    deferred_events: Iterable[DeferredEvent],  # noqa: U100
+) -> List[str]:
     logger.info("preparing deferred_events...")
     logger.warning("set_deferred_events not implemented yet")
     return []
 
 
-def set_stored_state(stored_state: Iterable[StoredState]) -> List[str]:
+def set_stored_state(stored_state: Iterable[StoredState]) -> List[str]:  # noqa: U100
     logger.info("preparing stored_state...")
     logger.warning("set_stored_state not implemented yet")
     return []
@@ -87,7 +89,7 @@ def exec_in_unit(target: JujuUnitName, model: str, cmds: List[str]):
         raise StateApplyError(
             f"Failed to apply state: process exited with {e.returncode}; "
             f"stdout = {e.stdout}; "
-            f"stderr = {e.stderr}."
+            f"stderr = {e.stderr}.",
         )
 
 
@@ -101,7 +103,7 @@ def run_commands(cmds: List[str]):
             raise StateApplyError(
                 f"Failed to apply state: process exited with {e.returncode}; "
                 f"stdout = {e.stdout}; "
-                f"stderr = {e.stderr}."
+                f"stderr = {e.stderr}.",
             )
 
 
@@ -110,9 +112,9 @@ def _state_apply(
     state: State,
     model: Optional[str] = None,
     include: str = None,
-    include_juju_relation_data=False,
-    push_files: Dict[str, List[Path]] = None,
-    snapshot_data_dir: Path = SNAPSHOT_DATA_DIR,
+    include_juju_relation_data=False,  # noqa: U100
+    push_files: Dict[str, List[Path]] = None,  # noqa: U100
+    snapshot_data_dir: Path = SNAPSHOT_DATA_DIR,  # noqa: U100
 ):
     """see state_apply's docstring"""
     logger.info("Starting state-apply...")
@@ -122,7 +124,7 @@ def _state_apply(
     except InvalidTargetUnitName:
         logger.critical(
             f"invalid target: {target!r} is not a valid unit name. Should be formatted like so:"
-            f"`foo/1`, or `database/0`, or `myapp-foo-bar/42`."
+            f"`foo/1`, or `database/0`, or `myapp-foo-bar/42`.",
         )
         sys.exit(1)
 
@@ -164,7 +166,10 @@ def state_apply(
         "the same you would obtain by running snapshot.",
     ),
     model: Optional[str] = typer.Option(
-        None, "-m", "--model", help="Which model to look at."
+        None,
+        "-m",
+        "--model",
+        help="Which model to look at.",
     ),
     include: str = typer.Option(
         "scrkSdt",
