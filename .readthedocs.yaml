@@ -1,6 +1,13 @@
-version: 2                      # required
-formats: []                     # i.e. no extra formats (for now)
+version: 2
+
 python:
-  version: "3.8"
   install:
     - requirements: docs/requirements.txt
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+
+sphinx:
+   configuration: docs/conf.py

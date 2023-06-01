@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # -- Project information -----------------------------------------------------
 
 project = 'The Operator Framework'
-copyright = '2019-2020, Canonical Ltd.'
+copyright = '2019-2023, Canonical Ltd.'
 author = 'Canonical Ltd'
 
 
@@ -88,7 +88,7 @@ todo_include_todos = False
 #     'signature' – Show typehints as its signature (default)
 #     'description' – Show typehints as content of function or method
 #     'none' – Do not show typehints
-autodoc_typehints = 'description'
+autodoc_typehints = 'signature'
 
 # This value selects what content will be inserted into the main body of an
 # autoclass directive. The possible values are:
