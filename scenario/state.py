@@ -70,7 +70,7 @@ class StateValidationError(RuntimeError):
     # **combination** of several parts of the State are.
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class _DCBase:
     def replace(self, *args, **kwargs):
         return dataclasses.replace(self, *args, **kwargs)
@@ -79,7 +79,7 @@ class _DCBase:
         return copy.deepcopy(self)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Secret(_DCBase):
     id: str
 
@@ -110,7 +110,7 @@ class Secret(_DCBase):
         """Sugar to generate a secret-changed event."""
         if self.owner:
             raise ValueError(
-                "This unit will never receive secret-changed for a secret it owns."
+                "This unit will never receive secret-changed for a secret it owns.",
             )
         return Event(name="secret_changed", secret=self)
 
@@ -120,7 +120,7 @@ class Secret(_DCBase):
         """Sugar to generate a secret-rotate event."""
         if not self.owner:
             raise ValueError(
-                "This unit will never receive secret-rotate for a secret it does not own."
+                "This unit will never receive secret-rotate for a secret it does not own.",
             )
         return Event(name="secret_rotate", secret=self)
 
@@ -129,7 +129,7 @@ class Secret(_DCBase):
         """Sugar to generate a secret-expired event."""
         if not self.owner:
             raise ValueError(
-                "This unit will never receive secret-expire for a secret it does not own."
+                "This unit will never receive secret-expire for a secret it does not own.",
             )
         return Event(name="secret_expire", secret=self)
 
@@ -138,9 +138,37 @@ class Secret(_DCBase):
         """Sugar to generate a secret-remove event."""
         if not self.owner:
             raise ValueError(
-                "This unit will never receive secret-removed for a secret it does not own."
+                "This unit will never receive secret-removed for a secret it does not own.",
             )
         return Event(name="secret_removed", secret=self)
+
+    def _set_revision(self, revision: int):
+        """Set a new tracked revision."""
+        # bypass frozen dataclass
+        object.__setattr__(self, "revision", revision)
+
+    def _update_metadata(
+        self,
+        content: Optional[Dict[str, str]] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[SecretRotate] = None,
+    ):
+        """Update the metadata."""
+        revision = max(self.contents.keys())
+        # bypass frozen dataclass
+        object.__setattr__(self, "contents"[revision + 1], content)
+        if label:
+            object.__setattr__(self, "label", label)
+        if description:
+            object.__setattr__(self, "description", description)
+        if expire:
+            if isinstance(expire, datetime.timedelta):
+                expire = datetime.datetime.now() + expire
+            object.__setattr__(self, "expire", expire)
+        if rotate:
+            object.__setattr__(self, "rotate", rotate)
 
 
 _RELATION_IDS_CTR = 0
@@ -163,7 +191,7 @@ class ParametrizedEvent:
         if remote_unit and "remote_unit" not in self._accept_params:
             raise ValueError(
                 f"cannot pass param `remote_unit` to a "
-                f"{self._category} event constructor."
+                f"{self._category} event constructor.",
             )
 
         return Event(*self._args, *self._kwargs, relation_remote_unit_id=remote_unit)
@@ -172,7 +200,17 @@ class ParametrizedEvent:
         return self().deferred(handler=handler, event_id=event_id)
 
 
-@dataclasses.dataclass
+def _generate_new_relation_id():
+    global _RELATION_IDS_CTR
+    _RELATION_IDS_CTR += 1
+    logger.info(
+        f"relation ID unset; automatically assigning {_RELATION_IDS_CTR}. "
+        f"If there are problems, pass one manually.",
+    )
+    return _RELATION_IDS_CTR
+
+
+@dataclasses.dataclass(frozen=True)
 class RelationBase(_DCBase):
     endpoint: str
 
@@ -180,7 +218,7 @@ class RelationBase(_DCBase):
     interface: str = None
 
     # Every new Relation instance gets a new one, if there's trouble, override.
-    relation_id: int = -1
+    relation_id: int = dataclasses.field(default_factory=_generate_new_relation_id)
 
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
@@ -192,16 +230,11 @@ class RelationBase(_DCBase):
         yield self.local_unit_data
 
     @property
-    def _remote_app_name(self) -> str:
-        """Who is on the other end of this relation?"""
-        raise NotImplementedError()
-
-    @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
         raise NotImplementedError()
 
-    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:  # noqa: U100
         """Return the databag for some remote unit ID."""
         raise NotImplementedError()
 
@@ -209,17 +242,8 @@ class RelationBase(_DCBase):
         if type(self) is RelationBase:
             raise RuntimeError(
                 "RelationBase cannot be instantiated directly; "
-                "please use Relation, PeerRelation, or SubordinateRelation"
+                "please use Relation, PeerRelation, or SubordinateRelation",
             )
-
-        global _RELATION_IDS_CTR
-        if self.relation_id == -1:
-            _RELATION_IDS_CTR += 1
-            logger.info(
-                f"relation ID unset; automatically assigning {_RELATION_IDS_CTR}. "
-                f"If there are problems, pass one manually."
-            )
-            self.relation_id = _RELATION_IDS_CTR
 
         for databag in self._databags:
             self._validate_databag(databag)
@@ -227,48 +251,53 @@ class RelationBase(_DCBase):
     def _validate_databag(self, databag: dict):
         if not isinstance(databag, dict):
             raise StateValidationError(
-                f"all databags should be dicts, not {type(databag)}"
+                f"all databags should be dicts, not {type(databag)}",
             )
-        for k, v in databag.items():
+        for v in databag.values():
             if not isinstance(v, str):
                 raise StateValidationError(
                     f"all databags should be Dict[str,str]; "
-                    f"found a value of type {type(v)}"
+                    f"found a value of type {type(v)}",
                 )
 
     @property
     def changed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-changed event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-changed"), relation=self
+            name=normalize_name(self.endpoint + "-relation-changed"),
+            relation=self,
         )
 
     @property
     def joined_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-joined event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-joined"), relation=self
+            name=normalize_name(self.endpoint + "-relation-joined"),
+            relation=self,
         )
 
     @property
     def created_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-created event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-created"), relation=self
+            name=normalize_name(self.endpoint + "-relation-created"),
+            relation=self,
         )
 
     @property
     def departed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-departed event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-departed"), relation=self
+            name=normalize_name(self.endpoint + "-relation-departed"),
+            relation=self,
         )
 
     @property
     def broken_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-broken"), relation=self
+            name=normalize_name(self.endpoint + "-relation-broken"),
+            relation=self,
         )
 
 
@@ -302,21 +331,23 @@ def unify_ids_and_remote_units_data(ids: List[int], data: Dict[int, Any]):
     if ids and data:
         if not set(ids) == set(data):
             raise StateValidationError(
-                f"{ids} should include any and all IDs from {data}"
+                f"{ids} should include any and all IDs from {data}",
             )
     elif ids:
         data = {x: {} for x in ids}
     elif data:
-        ids = [x for x in data]
+        ids = list(data)
     else:
         ids = [0]
         data = {0: {}}
     return ids, data
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Relation(RelationBase):
     remote_app_name: str = "remote"
+
+    # fixme: simplify API by deriving remote_unit_ids from remote_units_data.
     remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
 
     # local limit
@@ -324,8 +355,19 @@ class Relation(RelationBase):
 
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
-        default_factory=dict
+        default_factory=dict,
     )
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        remote_unit_ids, remote_units_data = unify_ids_and_remote_units_data(
+            self.remote_unit_ids,
+            self.remote_units_data,
+        )
+        # bypass frozen dataclass
+        object.__setattr__(self, "remote_unit_ids", remote_unit_ids)
+        object.__setattr__(self, "remote_units_data", remote_units_data)
 
     @property
     def _remote_app_name(self) -> str:
@@ -349,35 +391,28 @@ class Relation(RelationBase):
         yield self.remote_app_data
         yield from self.remote_units_data.values()
 
-    def __post_init__(self):
-        super().__post_init__()
-        self.remote_unit_ids, self.remote_units_data = unify_ids_and_remote_units_data(
-            self.remote_unit_ids, self.remote_units_data
-        )
 
-
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class SubordinateRelation(RelationBase):
-    # todo: consider renaming them to primary_*_data
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
 
-    # app name and ID of the primary that *this unit* is attached to.
-    primary_app_name: str = "remote"
-    primary_id: int = 0
-
-    @property
-    def _remote_app_name(self) -> str:
-        """Who is on the other end of this relation?"""
-        return self.primary_app_name
+    # app name and ID of the remote unit that *this unit* is attached to.
+    remote_app_name: str = "remote"
+    remote_unit_id: int = 0
 
     @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
-        return (self.primary_id,)
+        return (self.remote_unit_id,)
 
     def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
         """Return the databag for some remote unit ID."""
+        if unit_id is not self.remote_unit_id:
+            raise ValueError(
+                f"invalid unit id ({unit_id}): subordinate relation only has one "
+                f"remote and that has id {self.remote_unit_id}",
+            )
         return self.remote_unit_data
 
     @property
@@ -389,11 +424,11 @@ class SubordinateRelation(RelationBase):
         yield self.remote_unit_data
 
     @property
-    def primary_name(self) -> str:
-        return f"{self.primary_app_name}/{self.primary_id}"
+    def remote_unit_name(self) -> str:
+        return f"{self.remote_app_name}/{self.remote_unit_id}"
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class PeerRelation(RelationBase):
     peers_data: Dict[int, Dict[str, str]] = dataclasses.field(default_factory=dict)
 
@@ -408,12 +443,6 @@ class PeerRelation(RelationBase):
         yield from self.peers_data.values()
 
     @property
-    def _remote_app_name(self) -> str:
-        """Who is on the other end of this relation?"""
-        # surprise! It's myself.
-        raise ValueError("peer relations don't quite have a remote end.")
-
-    @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
         return tuple(self.peers_ids)
@@ -423,9 +452,13 @@ class PeerRelation(RelationBase):
         return self.peers_data[unit_id]
 
     def __post_init__(self):
-        self.peers_ids, self.peers_data = unify_ids_and_remote_units_data(
-            self.peers_ids, self.peers_data
+        peers_ids, peers_data = unify_ids_and_remote_units_data(
+            self.peers_ids,
+            self.peers_data,
         )
+        # bypass frozen dataclass guards
+        object.__setattr__(self, "peers_ids", peers_ids)
+        object.__setattr__(self, "peers_data", peers_data)
 
 
 def _random_model_name():
@@ -436,7 +469,7 @@ def _random_model_name():
     return "".join(random.choice(space) for _ in range(20))
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Model(_DCBase):
     name: str = _random_model_name()
     uuid: str = str(uuid4())
@@ -453,47 +486,55 @@ class Model(_DCBase):
 _CHANGE_IDS = 0
 
 
-@dataclasses.dataclass
+def _generate_new_change_id():
+    global _CHANGE_IDS
+    _CHANGE_IDS += 1
+    logger.info(
+        f"change ID unset; automatically assigning {_CHANGE_IDS}. "
+        f"If there are problems, pass one manually.",
+    )
+    return _CHANGE_IDS
+
+
+@dataclasses.dataclass(frozen=True)
 class ExecOutput:
     return_code: int = 0
     stdout: str = ""
     stderr: str = ""
 
     # change ID: used internally to keep track of mocked processes
-    _change_id: int = -1
+    _change_id: int = dataclasses.field(default_factory=_generate_new_change_id)
 
     def _run(self) -> int:
-        global _CHANGE_IDS
-        _CHANGE_IDS = self._change_id = _CHANGE_IDS + 1
-        return _CHANGE_IDS
+        return self._change_id
 
 
 _ExecMock = Dict[Tuple[str, ...], ExecOutput]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Mount(_DCBase):
     location: Union[str, PurePosixPath]
     src: Union[str, Path]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Container(_DCBase):
     name: str
     can_connect: bool = False
 
     # This is the base plan. On top of it, one can add layers.
-    # We need to model pebble in this way because it's impossible to retrieve the layers from pebble
-    # or derive them from the resulting plan (which one CAN get from pebble).
-    # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers' will be unknown.
-    # all that we can know is the resulting plan (the 'computed plan').
+    # We need to model pebble in this way because it's impossible to retrieve the layers from
+    # pebble or derive them from the resulting plan (which one CAN get from pebble).
+    # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers'
+    # will be unknown. all that we can know is the resulting plan (the 'computed plan').
     _base_plan: dict = dataclasses.field(default_factory=dict)
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as all will be known when unit-testing.
     layers: Dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
 
     service_status: Dict[str, pebble.ServiceStatus] = dataclasses.field(
-        default_factory=dict
+        default_factory=dict,
     )
 
     # this is how you specify the contents of the filesystem: suppose you want to express that your
@@ -525,9 +566,11 @@ class Container(_DCBase):
 
     @property
     def plan(self) -> pebble.Plan:
-        """This is the 'computed' pebble plan; i.e. the base plan plus the layers that have been added on top.
+        """The 'computed' pebble plan.
 
-        You should run your assertions on the plan, not so much on the layers, as those are input data.
+        i.e. the base plan plus the layers that have been added on top.
+        You should run your assertions on this plan, not so much on the layers, as those are
+        input data.
         """
 
         # copied over from ops.testing._TestingPebbleClient.get_plan().
@@ -541,6 +584,7 @@ class Container(_DCBase):
 
     @property
     def services(self) -> Dict[str, pebble.ServiceInfo]:
+        """The pebble services as rendered in the plan."""
         services = self._render_services()
         infos = {}  # type: Dict[str, pebble.ServiceInfo]
         names = sorted(services.keys())
@@ -557,16 +601,20 @@ class Container(_DCBase):
             else:
                 startup = pebble.ServiceStartup(service.startup)
             info = pebble.ServiceInfo(
-                name, startup=startup, current=pebble.ServiceStatus(status)
+                name,
+                startup=startup,
+                current=pebble.ServiceStatus(status),
             )
             infos[name] = info
         return infos
 
     @property
     def filesystem(self) -> "_MockFileSystem":
+        """Simulated pebble filesystem."""
         mounts = {
             name: _MockStorageMount(
-                src=Path(spec.src), location=PurePosixPath(spec.location)
+                src=Path(spec.src),
+                location=PurePosixPath(spec.location),
             )
             for name, spec in self.mounts.items()
         }
@@ -578,12 +626,12 @@ class Container(_DCBase):
         if not self.can_connect:
             logger.warning(
                 "you **can** fire pebble-ready while the container cannot connect, "
-                "but that's most likely not what you want."
+                "but that's most likely not what you want.",
             )
         return Event(name=normalize_name(self.name + "-pebble-ready"), container=self)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Address(_DCBase):
     hostname: str
     value: str
@@ -591,7 +639,7 @@ class Address(_DCBase):
     address: str = ""  # legacy
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class BindAddress(_DCBase):
     interface_name: str
     addresses: List[Address]
@@ -609,7 +657,7 @@ class BindAddress(_DCBase):
         return dct
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Network(_DCBase):
     name: str
 
@@ -645,16 +693,16 @@ class Network(_DCBase):
                     interface_name=interface_name,
                     mac_address=mac_address,
                     addresses=[
-                        Address(hostname=hostname, value=private_address, cidr=cidr)
+                        Address(hostname=hostname, value=private_address, cidr=cidr),
                     ],
-                )
+                ),
             ],
             egress_subnets=list(egress_subnets),
             ingress_addresses=list(ingress_addresses),
         )
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class _EntityStatus(_DCBase):
     """This class represents StatusBase and should not be interacted with directly."""
 
@@ -666,14 +714,14 @@ class _EntityStatus(_DCBase):
     def __eq__(self, other):
         if isinstance(other, Tuple):
             logger.warning(
-                "Comparing Status with Tuples is deprecated and will be removed soon."
+                "Comparing Status with Tuples is deprecated and will be removed soon.",
             )
             return (self.name, self.message) == other
         if isinstance(other, StatusBase):
             return (self.name, self.message) == (other.name, other.message)
         logger.warning(
             f"Comparing Status with {other} is not stable and will be forbidden soon."
-            f"Please compare with StatusBase directly."
+            f"Please compare with StatusBase directly.",
         )
         return super().__eq__(other)
 
@@ -690,19 +738,19 @@ def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
     return _EntityStatus(obj.name, obj.message)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Status(_DCBase):
     """Represents the 'juju statuses' of the application/unit being tested."""
 
     # the current statuses. Will be cast to _EntitiyStatus in __post_init__
     app: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
     unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
-    app_version: str = ""
+    workload_version: str = ""
 
     # most to least recent statuses; do NOT include the current one.
     app_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
     unit_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
-    previous_app_version: Optional[str] = None
+    previous_workload_version: Optional[str] = None
 
     def __post_init__(self):
         for name in ["app", "unit"]:
@@ -710,37 +758,44 @@ class Status(_DCBase):
             if isinstance(val, _EntityStatus):
                 pass
             elif isinstance(val, StatusBase):
-                setattr(self, name, _status_to_entitystatus(val))
+                object.__setattr__(self, name, _status_to_entitystatus(val))
             elif isinstance(val, tuple):
                 logger.warning(
                     "Initializing Status.[app/unit] with Tuple[str, str] is deprecated "
                     "and will be removed soon. \n"
-                    f"Please pass a StatusBase instance: `StatusBase(*{val})`"
+                    f"Please pass a StatusBase instance: `StatusBase(*{val})`",
                 )
-                setattr(self, name, _EntityStatus(*val))
+                object.__setattr__(self, name, _EntityStatus(*val))
             else:
                 raise TypeError(f"Invalid status.{name}: {val!r}")
 
-    def _update_app_version(self, new_app_version: str):
+    def _update_workload_version(self, new_workload_version: str):
         """Update the current app version and record the previous one."""
         # We don't keep a full history because we don't expect the app version to change more
         # than once per hook.
-        self.previous_app_version = self.app_version
-        self.app_version = new_app_version
+
+        # bypass frozen dataclass
+        object.__setattr__(self, "previous_workload_version", self.workload_version)
+        object.__setattr__(self, "workload_version", new_workload_version)
 
     def _update_status(
-        self, new_status: str, new_message: str = "", is_app: bool = False
+        self,
+        new_status: str,
+        new_message: str = "",
+        is_app: bool = False,
     ):
         """Update the current app/unit status and add the previous one to the history."""
         if is_app:
             self.app_history.append(self.app)
-            self.app = _EntityStatus(new_status, new_message)
+            # bypass frozen dataclass
+            object.__setattr__(self, "app", _EntityStatus(new_status, new_message))
         else:
             self.unit_history.append(self.unit)
-            self.unit = _EntityStatus(new_status, new_message)
+            # bypass frozen dataclass
+            object.__setattr__(self, "unit", _EntityStatus(new_status, new_message))
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class StoredState(_DCBase):
     # /-separated Object names. E.g. MyCharm/MyCharmLib.
     # if None, this StoredState instance is owned by the Framework.
@@ -756,17 +811,17 @@ class StoredState(_DCBase):
         return f"{self.owner_path or ''}/{self.data_type_name}[{self.name}]"
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class State(_DCBase):
     """Represents the juju-owned portion of a unit's state.
 
-    Roughly speaking, it wraps all hook-tool- and pebble-mediated data a charm can access in its lifecycle.
-    For example, status-get will return data from `State.status`, is-leader will return data from
-    `State.leader`, and so on.
+    Roughly speaking, it wraps all hook-tool- and pebble-mediated data a charm can access in its
+    lifecycle. For example, status-get will return data from `State.status`, is-leader will
+    return data from `State.leader`, and so on.
     """
 
     config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
-        default_factory=dict
+        default_factory=dict,
     )
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
@@ -777,8 +832,9 @@ class State(_DCBase):
     juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
-    # represents the OF's event queue. These events will be emitted before the event being dispatched,
-    # and represent the events that had been deferred during the previous run.
+    unit_id: int = 0
+    # represents the OF's event queue. These events will be emitted before the event being
+    # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
@@ -802,8 +858,9 @@ class State(_DCBase):
     def with_unit_status(self, status: StatusBase) -> "State":
         return self.replace(
             status=dataclasses.replace(
-                self.status, unit=_status_to_entitystatus(status)
-            )
+                self.status,
+                unit=_status_to_entitystatus(status),
+            ),
         )
 
     def get_container(self, container: Union[str, Container]) -> Container:
@@ -829,48 +886,17 @@ class State(_DCBase):
             logger.error(
                 "cannot import jsonpatch: using the .delta() "
                 "extension requires jsonpatch to be installed."
-                "Fetch it with pip install jsonpatch."
+                "Fetch it with pip install jsonpatch.",
             )
             return NotImplemented
         patch = jsonpatch.make_patch(
-            dataclasses.asdict(other), dataclasses.asdict(self)
+            dataclasses.asdict(other),
+            dataclasses.asdict(self),
         ).patch
         return sort_patch(patch)
 
-    def trigger(
-        self,
-        event: Union["Event", str],
-        charm_type: Type["CharmType"],
-        # callbacks
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
-        # if not provided, will be autoloaded from charm_type.
-        meta: Optional[Dict[str, Any]] = None,
-        actions: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None,
-        charm_root: Optional["PathLike"] = None,
-        juju_version: str = "3.0",
-        unit_id: int = 0,
-    ) -> "State":
-        """Fluent API for trigger. See runtime.trigger's docstring."""
-        from scenario.runtime import trigger as _runtime_trigger
 
-        return _runtime_trigger(
-            state=self,
-            event=event,
-            charm_type=charm_type,
-            pre_event=pre_event,
-            post_event=post_event,
-            meta=meta,
-            actions=actions,
-            config=config,
-            charm_root=charm_root,
-            juju_version=juju_version,
-            unit_id=unit_id,
-        )
-
-
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class _CharmSpec(_DCBase):
     """Charm spec."""
 
@@ -879,8 +905,8 @@ class _CharmSpec(_DCBase):
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
 
-    # autoloaded means: trigger() is being invoked on a 'real' charm class, living in some /src/charm.py,
-    # and the metadata files are 'real' metadata files.
+    # autoloaded means: trigger() is being invoked on a 'real' charm class, living in some
+    # /src/charm.py, and the metadata files are 'real' metadata files.
     is_autoloaded: bool = False
 
     @staticmethod
@@ -914,7 +940,7 @@ def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
     return sorted(patch, key=key)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class DeferredEvent(_DCBase):
     handle_path: str
     owner: str
@@ -928,7 +954,7 @@ class DeferredEvent(_DCBase):
         return self.handle_path.split("/")[-1].split("[")[0]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Event(_DCBase):
     name: str
     args: Tuple[Any] = ()
@@ -954,14 +980,16 @@ class Event(_DCBase):
         if remote_unit_id and not self._is_relation_event:
             raise ValueError(
                 "cannot pass param `remote_unit_id` to a "
-                "non-relation event constructor."
+                "non-relation event constructor.",
             )
         return self.replace(relation_remote_unit_id=remote_unit_id)
 
     def __post_init__(self):
         if "-" in self.name:
             logger.warning(f"Only use underscores in event names. {self.name!r}")
-        self.name = normalize_name(self.name)
+
+        # bypass frozen dataclass
+        object.__setattr__(self, "name", normalize_name(self.name))
 
     @property
     def _is_relation_event(self) -> bool:
@@ -983,23 +1011,25 @@ class Event(_DCBase):
         """Whether the event name indicates that this is a workload event."""
         return self.name.endswith("_pebble_ready")
 
-    # this method is private because _CharmSpec is not quite user-facing; also, the user should know.
+    # this method is private because _CharmSpec is not quite user-facing; also,
+    # the user should know.
     def _is_builtin_event(self, charm_spec: "_CharmSpec"):
         """Determine whether the event is a custom-defined one or a builtin one."""
-        evt_name = self.name
+        event_name = self.name
 
         # simple case: this is an event type owned by our charm base.on
-        if hasattr(charm_spec.charm_type.on, evt_name):
-            return hasattr(CharmEvents, evt_name)
+        if hasattr(charm_spec.charm_type.on, event_name):
+            return hasattr(CharmEvents, event_name)
 
         # this could be an event defined on some other Object, e.g. a charm lib.
-        # We don't support (yet) directly emitting those, but they COULD have names that conflict with
-        # events owned by the base charm. E.g. if the charm has a `foo` relation, the charm will get a
-        # charm.on.foo_relation_created. Your charm lib is free to define its own `foo_relation_created`
-        # custom event, because its handle will be `charm.lib.on.foo_relation_created` and therefore be
-        # unique and the Framework is happy. However, our Event data structure ATM has no knowledge
-        # of which Object/Handle it is owned by. So the only thing we can do right now is: check whether
-        # the event name, assuming it is owned by the charm, is that of a builtin event or not.
+        # We don't support (yet) directly emitting those, but they COULD have names that conflict
+        # with events owned by the base charm. E.g. if the charm has a `foo` relation, the charm
+        # will get a  charm.on.foo_relation_created. Your charm lib is free to define its own
+        # `foo_relation_created`  custom event, because its handle will be
+        # `charm.lib.on.foo_relation_created` and therefore be  unique and the Framework is happy.
+        # However, our Event data structure ATM has no knowledge of which Object/Handle it is
+        # owned by. So the only thing we can do right now is: check whether the event name,
+        # assuming it is owned by the charm, is that of a builtin event or not.
         builtins = []
         for relation_name in chain(
             charm_spec.meta.get("requires", ()),
@@ -1026,7 +1056,7 @@ class Event(_DCBase):
             container_name = container_name.replace("-", "_")
             builtins.append(container_name + "_pebble_ready")
 
-        return evt_name in builtins
+        return event_name in builtins
 
     def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""
@@ -1035,16 +1065,16 @@ class Event(_DCBase):
         match = handler_re.match(handler_repr)
         if not match:
             raise ValueError(
-                f"cannot construct DeferredEvent from {handler}; please create one manually."
+                f"cannot construct DeferredEvent from {handler}; please create one manually.",
             )
         owner_name, handler_name = match.groups()[0].split(".")[-2:]
         handle_path = f"{owner_name}/on/{self.name}[{event_id}]"
 
         snapshot_data = {}
 
-        # fixme: at this stage we can't determine if the event is a builtin one or not; if it is not,
-        #  then the coming checks are meaningless: the custom event could be named like a relation event but
-        #  not *be* one.
+        # fixme: at this stage we can't determine if the event is a builtin one or not; if it is
+        #  not, then the coming checks are meaningless: the custom event could be named like a
+        #  relation event but not *be* one.
         if self._is_workload_event:
             # this is a WorkloadEvent. The snapshot:
             snapshot_data = {
@@ -1054,7 +1084,7 @@ class Event(_DCBase):
         elif self._is_relation_event:
             if not self.relation:
                 raise ValueError(
-                    "this is a relation event; expected relation attribute"
+                    "this is a relation event; expected relation attribute",
                 )
             # this is a RelationEvent. The snapshot:
             snapshot_data = {
@@ -1085,14 +1115,14 @@ def deferred(
     return event.deferred(handler=handler, event_id=event_id)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Inject(_DCBase):
     """Base class for injectors: special placeholders used to tell harness_ctx
     to inject instances that can't be retrieved in advance in event args or kwargs.
     """
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class InjectRelation(Inject):
     relation_name: str
     relation_id: Optional[int] = None
@@ -1101,7 +1131,7 @@ class InjectRelation(Inject):
 def _derive_args(event_name: str):
     args = []
     for term in RELATION_EVENTS_SUFFIX:
-        # fixme: we can't disambiguate between relation IDs.
+        # fixme: we can't disambiguate between relation id-s.
         if event_name.endswith(term):
             args.append(InjectRelation(relation_name=event_name[: -len(term)]))
 

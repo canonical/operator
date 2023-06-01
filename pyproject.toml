@@ -8,7 +8,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "2.1.4"
+version = "3.1"
+
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
 ]
@@ -26,13 +27,20 @@ requires-python = ">=3.8"
 
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Topic :: Utilities",
     "License :: OSI Approved :: Apache Software License",
+    'Framework :: Pytest',
+    'Intended Audience :: Developers',
+    'Topic :: Software Development :: Quality Assurance',
+    'Topic :: Software Development :: Testing',
+    'Topic :: Utilities',
 ]
 
+[project.entry-points.pytest11]
+emitted_events = "scenario.pytest_plugin"
+
 [project.urls]
-"Homepage" = "https://github.com/PietroPasotti/ops-scenario"
-"Bug Tracker" = "https://github.com/PietroPasotti/ops-scenario/issues"
+"Homepage" = "https://github.com/canonical/ops-scenario"
+"Bug Tracker" = "https://github.com/canonical/ops-scenario/issues"
 
 [project.scripts]
 scenario = "scenario.scripts.main:main"
@@ -44,6 +52,11 @@ scenario = "scenario"
 [tool.black]
 include = '\.pyi?$'
 
+
+[tool.flake8]
+dictionaries = ["en_US","python","technical","django"]
+max-line-length = 100
+ignore = ["SC100", "SC200", "B008"]
 
 [tool.isort]
 profile = "black"

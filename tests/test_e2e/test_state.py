@@ -6,12 +6,8 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
+from scenario import trigger
 from scenario.state import Container, Relation, State, sort_patch
-
-# from tests.setup_tests import setup_tests
-#
-# setup_tests()  # noqa & keep this on top
-
 
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
@@ -59,17 +55,17 @@ def state():
 
 
 def test_bare_event(state, mycharm):
-    out = state.trigger("start", mycharm, meta={"name": "foo"})
-    out.juju_log = []  # ignore logging output in the delta
-    out.stored_state = state.stored_state  # ignore stored state in delta.
-    assert state.jsonpatch_delta(out) == []
+    out = trigger(state, "start", mycharm, meta={"name": "foo"})
+    out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
+    assert state.jsonpatch_delta(out_purged) == []
 
 
 def test_leader_get(state, mycharm):
     def pre_event(charm):
         assert charm.unit.is_leader()
 
-    state.trigger(
+    trigger(
+        state,
         "start",
         mycharm,
         meta={"name": "foo"},
@@ -84,18 +80,20 @@ def test_status_setting(state, mycharm):
         charm.app.status = WaitingStatus("foo barz")
 
     mycharm._call = call
-    out = state.trigger(
+    out = trigger(
+        state,
         "start",
         mycharm,
         meta={"name": "foo"},
+        config={"options": {"foo": {"type": "string"}}},
     )
     assert out.status.unit == ActiveStatus("foo test")
     assert out.status.app == WaitingStatus("foo barz")
-    assert out.status.app_version == ""
+    assert out.status.workload_version == ""
 
-    out.juju_log = []  # ignore logging output in the delta
-    out.stored_state = state.stored_state  # ignore stored state in delta.
-    assert out.jsonpatch_delta(state) == sort_patch(
+    # ignore logging output and stored state in the delta
+    out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
+    assert out_purged.jsonpatch_delta(state) == sort_patch(
         [
             {"op": "replace", "path": "/status/app/message", "value": "foo barz"},
             {"op": "replace", "path": "/status/app/name", "value": "waiting"},
@@ -123,7 +121,8 @@ def test_container(connect, mycharm):
         assert container.name == "foo"
         assert container.can_connect() is connect
 
-    State(containers=(Container(name="foo", can_connect=connect),)).trigger(
+    trigger(
+        State(containers=[Container(name="foo", can_connect=connect)]),
         "start",
         mycharm,
         meta={
@@ -165,7 +164,8 @@ def test_relation_get(mycharm):
             )
         ]
     )
-    state.trigger(
+    trigger(
+        state,
         "start",
         mycharm,
         meta={
@@ -218,7 +218,8 @@ def test_relation_set(mycharm):
     )
 
     assert not mycharm.called
-    out = state.trigger(
+    out = trigger(
+        state,
         event="start",
         charm_type=mycharm,
         meta={

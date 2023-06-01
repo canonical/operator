@@ -3,6 +3,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.framework import StoredState as ops_storedstate
 
+from scenario import trigger
 from scenario.state import State, StoredState
 
 
@@ -30,16 +31,21 @@ def mycharm():
 
 
 def test_stored_state_default(mycharm):
-    out = State().trigger("start", mycharm, meta=mycharm.META)
+    out = trigger(State(), "start", mycharm, meta=mycharm.META)
     assert out.stored_state[0].content == {"foo": "bar", "baz": {12: 142}}
 
 
 def test_stored_state_initialized(mycharm):
-    out = State(
-        stored_state=[
-            StoredState("MyCharm", name="_stored", content={"foo": "FOOX"}),
-        ]
-    ).trigger("start", mycharm, meta=mycharm.META)
+    out = trigger(
+        State(
+            stored_state=[
+                StoredState("MyCharm", name="_stored", content={"foo": "FOOX"}),
+            ]
+        ),
+        "start",
+        mycharm,
+        meta=mycharm.META,
+    )
     # todo: ordering is messy?
     assert out.stored_state[1].content == {"foo": "FOOX", "baz": {12: 142}}
     assert out.stored_state[0].content == {"foo": "bar", "baz": {12: 142}}

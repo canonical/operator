@@ -3,6 +3,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
+from scenario import trigger
 from scenario.state import Event, Relation, State, Status, _CharmSpec
 
 
@@ -47,7 +48,8 @@ def test_charm_heals_on_start(mycharm):
         config={"foo": "bar"}, leader=True, status=Status(unit=BlockedStatus("foo"))
     )
 
-    out = initial_state.trigger(
+    out = trigger(
+        initial_state,
         charm_type=mycharm,
         meta={"name": "foo"},
         config={"options": {"foo": {"type": "string"}}},
@@ -58,9 +60,8 @@ def test_charm_heals_on_start(mycharm):
 
     assert out.status.unit == ActiveStatus("yabadoodle")
 
-    out.juju_log = []  # exclude juju log from delta
-    out.stored_state = initial_state.stored_state  # ignore stored state in delta.
-    assert out.jsonpatch_delta(initial_state) == [
+    out_purged = out.replace(juju_log=[], stored_state=initial_state.stored_state)
+    assert out_purged.jsonpatch_delta(initial_state) == [
         {
             "op": "replace",
             "path": "/status/unit/message",
@@ -101,7 +102,7 @@ def test_relation_data_access(mycharm):
 
         assert remote_app_data == {"yaba": "doodle"}
 
-    State(
+    state_in = State(
         relations=[
             Relation(
                 endpoint="relation_test",
@@ -112,7 +113,9 @@ def test_relation_data_access(mycharm):
                 remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
             )
         ]
-    ).trigger(
+    )
+    trigger(
+        state_in,
         charm_type=mycharm,
         meta={
             "name": "foo",
