@@ -1740,7 +1740,6 @@ class Storage:
 
     Attributes:
         name: Simple string name of the storage
-        index: The index number for storage
     """
 
     def __init__(self, storage_name: str, storage_index: int, backend: '_ModelBackend'):
@@ -1784,16 +1783,18 @@ class Storage:
 
 
 class MultiPushPullError(Exception):
-    """Aggregates multiple push/pull related exceptions into one."""
+    """Aggregates multiple push/pull related exceptions into one.
+
+    This class should not be instantiated directly.
+
+    Attributes:
+        message: error message
+        errors: list of errors with each represented by a tuple (<source_path>,<exception>)
+            where source_path is the path being pushed/pulled from.
+    """
 
     def __init__(self, message: str, errors: List[Tuple[str, Exception]]):
-        """Create an aggregation of several push/pull errors.
-
-        Args:
-            message: error message
-            errors: list of errors with each represented by a tuple (<source_path>,<exception>)
-                where source_path is the path being pushed/pulled from.
-        """
+        """Create an aggregation of several push/pull errors."""
         self.errors = errors
         self.message = message
 
