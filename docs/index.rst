@@ -1,6 +1,6 @@
 
-Welcome to The Operator Framework's documentation!
-==================================================
+The Charmed Operator Framework's documentation
+==============================================
 
 .. toctree::
    :maxdepth: 2

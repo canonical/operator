@@ -1,3 +1,7 @@
 -r ../requirements.txt
-sphinx==6.2.1  # Latest sphinx_rtd_theme doesn't yet support sphinx 7.x
-sphinx_rtd_theme==1.2.1
+sphinx==6.2.1
+sphinx-design
+furo
+sphinx-tabs
+lxd-sphinx-extensions
+sphinx-copybutton
