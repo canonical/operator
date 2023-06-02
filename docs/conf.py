@@ -9,7 +9,6 @@
 
 # -- Path setup --------------------------------------------------------------
 
-import datetime
 import pathlib
 import sys
 
@@ -18,9 +17,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # -- Project information -----------------------------------------------------
 
-project = 'Charmed Operator Framework'
-author = 'Canonical Group Ltd'
-copyright = f'2019-{datetime.date.today().year}, {author}'
+project = 'The Operator Framework'
+copyright = '2019-2023, Canonical Ltd.'
+author = 'Canonical Ltd'
 
 html_favicon = "_static/favicon.png"
 
