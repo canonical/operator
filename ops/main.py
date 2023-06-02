@@ -68,7 +68,7 @@ def _get_charm_dir():
     return charm_dir
 
 
-def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource[Any]',
+def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource',
                        link_to: Union[str, Path]):
     """Create a symlink for a particular event.
 
@@ -150,7 +150,7 @@ def _emit_charm_event(charm: 'CharmBase', event_name: str):
 
 
 def _get_event_args(charm: 'CharmBase',
-                    bound_event: 'BoundEvent[Any]') -> Tuple[List[Any], Dict[str, Any]]:
+                    bound_event: 'BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
     event_type = bound_event.event_type
     model = charm.framework.model
 

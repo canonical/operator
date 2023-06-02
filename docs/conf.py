@@ -11,6 +11,20 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
+# Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
+# "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
+import re
+import sphinx.ext.autodoc
+sphinx.ext.autodoc.py_ext_sig_re = re.compile(
+    r'''^ ([\w.]+::)?            # explicit module name
+          ([\w.]+\.)?            # module and/or class name(s)
+          ([^.()]+)  \s*         # thing name
+          (?: \((.*)\)           # optional: arguments
+           (?:\s* -> \s* (.*))?  #           return annotation
+          )? $                   # and nothing more
+          ''', re.VERBOSE)
+
+
 # -- Project information -----------------------------------------------------
 
 project = 'The Operator Framework'
@@ -29,12 +43,33 @@ nitpicky = True
 # domain name if present. Example entries would be ('py:func', 'int') or
 # ('envvar', 'LD_LIBRARY_PATH').
 nitpick_ignore = [
-    ('py:class', 'TextIO'),  # typing.TextIO confuses the nitpicker
-    ('py:class', 'method'),  # types.Method confuses the nitpicker
-    ('py:class', '_ModelBackend'),  # private
-    ('py:class', '_ModelCache'), # private
-    ('py:class', 'ipaddress.ip_address'), # fake (AFAIK there is no ABC)
-    ('py:class', 'ipaddress.ip_network'), # ditto
+    ('py:class', 'ops.model._ModelBackend'),
+    ('py:class', 'ops.model._ModelCache'),
+    ('py:class', '_AddressDict'),
+    ('py:class', '_NetworkDict'),
+    ('py:class', '_RelationMetaDict'),
+    ('py:class', '_ResourceMetaDict'),
+    ('py:class', '_StorageMetaDict'),
+    ('py:class', '_ChangeData'),
+    ('py:class', '_ChangeDict'),
+    ('py:class', '_InfoDict'),
+    ('py:class', '_IOSource'),
+    ('py:class', '_TextOrBinaryIO'),
+    ('py:class', '_Readable'),
+    ('py:class', '_Writeable'),
+    ('py:class', '_WebSocket'),
+    ('py:class', '_FileInfoDict'),
+    ('py:class', '_PlanDict'),
+    ('py:class', '_ServiceInfoDict'),
+    ('py:class', '_SystemInfoDict'),
+    ('py:class', '_TaskData'),
+    ('py:class', '_TaskDict'),
+    ('py:class', '_ProgressDict'),
+    ('py:class', '_WarningDict'),
+    ('py:class', 'ops.storage.SQLiteStorage'),
+    ('py:class', 'ops.storage.JujuStorage'),
+    ('py:class', 'ops.testing.CharmType'),
+    ('py:obj', 'ops.testing.CharmType'),
 ]
 
 # Add any Sphinx extension module names here, as strings. They can be
