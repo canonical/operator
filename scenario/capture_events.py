@@ -53,6 +53,8 @@ def capture_events(
             return _real_emit(self, evt)
 
         if isinstance(evt, allowed_types):
+            # dump/undump the event to ensure any custom attributes are (re)set by restore()
+            evt.restore(evt.snapshot())
             captured.append(evt)
 
         return _real_emit(self, evt)

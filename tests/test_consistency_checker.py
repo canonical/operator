@@ -5,6 +5,7 @@ from scenario.consistency_checker import check_consistency
 from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
+    Action,
     Container,
     Event,
     PeerRelation,
@@ -222,4 +223,39 @@ def test_container_pebble_evt_consistent():
         State(containers=[container]),
         container.pebble_ready_event,
         _CharmSpec(MyCharm, {"containers": {"foo-bar-baz": {}}}),
+    )
+
+
+def test_action_name():
+    action = Action("foo", params={"bar": "baz"})
+
+    assert_consistent(
+        State(),
+        action.event,
+        _CharmSpec(
+            MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": "string"}}}}
+        ),
+    )
+    assert_inconsistent(
+        State(),
+        Event("box_action", action=action),
+        _CharmSpec(MyCharm, meta={}, actions={"foo": {}}),
+    )
+
+
+def test_action_params_type():
+    action = Action("foo", params={"bar": "baz"})
+    assert_consistent(
+        State(),
+        action.event,
+        _CharmSpec(
+            MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": "string"}}}}
+        ),
+    )
+    assert_inconsistent(
+        State(),
+        action.event,
+        _CharmSpec(
+            MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": "boolean"}}}}
+        ),
     )

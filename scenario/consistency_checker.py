@@ -1,6 +1,8 @@
 import os
 from collections import Counter
+from collections.abc import Sequence
 from itertools import chain
+from numbers import Number
 from typing import TYPE_CHECKING, Iterable, NamedTuple, Tuple
 
 from scenario.runtime import InconsistentScenarioError
@@ -127,6 +129,64 @@ def check_event_consistency(
                     f"workload event should start with container name. {event.name} does "
                     f"not start with {event.container.name}.",
                 )
+
+    if event._is_action_event:
+        action = event.action
+        if not action:
+            errors.append(
+                "cannot construct a workload event without the container instance. "
+                "Please pass one.",
+            )
+        else:
+            if not event.name.startswith(normalize_name(action.name)):
+                errors.append(
+                    f"action event should start with action name. {event.name} does "
+                    f"not start with {action.name}.",
+                )
+        if action.name not in charm_spec.actions:
+            errors.append(
+                f"action event {event.name} refers to action {action.name} "
+                f"which is not declared in the charm metadata (actions.yaml).",
+            )
+        to_python_type = {
+            "string": str,
+            "boolean": bool,
+            "number": Number,
+            "array": Sequence,
+            "object": dict,
+        }
+        expected_param_type = {}
+        for par_name, par_spec in (
+            charm_spec.actions[action.name].get("params", {}).items()
+        ):
+            if value := par_spec.get("type"):
+                try:
+                    expected_param_type[par_name] = to_python_type[value]
+                except KeyError:
+                    warnings.append(
+                        f"unknown data type declared for parameter {par_name}: type={value}. "
+                        f"Cannot consistency-check.",
+                    )
+            else:
+                errors.append(
+                    f"action parameter {par_name} has no type. "
+                    f"Charmcraft will be unhappy about this. ",
+                )
+
+        for provided_param_name, provided_param_value in action.params.items():
+            if expected_type := expected_param_type.get(provided_param_name):
+                if not isinstance(provided_param_value, expected_type):
+                    errors.append(
+                        f"param {provided_param_name} is of type {type(provided_param_value)}: "
+                        f"expecting {expected_type}",
+                    )
+
+            else:
+                errors.append(
+                    f"param {provided_param_name} is not a valid parameter for {action.name}: "
+                    "missing from action specification",
+                )
+
     return Results(errors, warnings)
 
 

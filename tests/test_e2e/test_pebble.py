@@ -280,3 +280,60 @@ def test_pebble_plan(charm_cls, starting_service_status):
 
     assert container.services["barserv"].current == pebble.ServiceStatus.ACTIVE
     assert container.services["barserv"].startup == pebble.ServiceStartup.DISABLED
+
+
+@pytest.mark.parametrize("starting_service_status", pebble.ServiceStatus)
+def test_pebble_restart_replan(charm_cls, starting_service_status):
+    def callback(self: CharmBase):
+        foo = self.unit.get_container("foo")
+        foo.restart("fooserv")
+        foo.add_layer(
+            "bar",
+            {
+                "services": {"barserv": {"env": {"qux": "liz"}}},
+            },
+            combine=True,
+        )
+
+        # we've touched barserv: that should be started as well
+        foo.replan()
+
+        for service_name in ("fooserv", "barserv"):
+            serv = foo.get_services(service_name)[service_name]
+            assert serv.startup == ServiceStartup.ENABLED
+            assert serv.current == ServiceStatus.ACTIVE
+
+    container = Container(
+        name="foo",
+        can_connect=True,
+        layers={
+            "foo": pebble.Layer(
+                {
+                    "summary": "bla",
+                    "description": "deadbeefy",
+                    "services": {
+                        "fooserv": {"startup": "enabled"},
+                        "barserv": {"startup": "enabled"},
+                    },
+                }
+            )
+        },
+        service_status={
+            "fooserv": pebble.ServiceStatus.ACTIVE,
+            "barserv": pebble.ServiceStatus.ACTIVE,
+        },
+    )
+
+    out = trigger(
+        State(containers=[container]),
+        charm_type=charm_cls,
+        meta={"name": "foo", "containers": {"foo": {}}},
+        event=container.pebble_ready_event,
+        post_event=callback,
+    )
+
+    serv = lambda name, obj: pebble.Service(name, raw=obj)
+    container = out.containers[0]
+
+    assert not container.services["fooserv"].restarted
+    assert container.services["barserv"].restarted
