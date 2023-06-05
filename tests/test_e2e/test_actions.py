@@ -75,7 +75,7 @@ def test_action_event_results_valid(mycharm, res_value):
         actions={"foo": {}},
     )
 
-    assert action.results == res_value
+    assert action.output.results == res_value
 
 
 @pytest.mark.parametrize("res_value", ({"a": {"b": {"c"}}}, {"d": "e"}))
@@ -97,6 +97,6 @@ def test_action_event_outputs(mycharm, res_value):
         actions={"foo": {}},
     )
 
-    assert action.failed
-    assert action.failure_message == "failed becozz"
-    assert action.logs == ["log1", "log2"]
+    assert action.output.failed
+    assert action.output.failure_message == "failed becozz"
+    assert action.output.logs == ["log1", "log2"]

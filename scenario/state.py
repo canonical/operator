@@ -19,6 +19,7 @@ from ops.model import SecretRotate, StatusBase
 
 from scenario.fs_mocks import _MockFileSystem, _MockStorageMount
 from scenario.logger import logger as scenario_logger
+from scenario.outputs import ACTION_OUTPUT, ActionOutput
 
 if typing.TYPE_CHECKING:
     try:
@@ -844,9 +845,6 @@ class State(_DCBase):
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
     stored_state: List["StoredState"] = dataclasses.field(default_factory=dict)
 
-    # todo:
-    #  actions?
-
     def with_can_connect(self, container_name: str, can_connect: bool) -> "State":
         def replacer(container: Container):
             if container.name == container_name:
@@ -1113,46 +1111,15 @@ class Action(_DCBase):
 
     params: Dict[str, "AnyJson"] = dataclasses.field(default_factory=dict)
 
-    _results: Dict[str, Any] = None
-    _logs: List[str] = dataclasses.field(default_factory=list)
-    _failure_message: str = ""
-
-    @property
-    def results(self) -> Dict[str, Any]:
-        """Read-only: action results as set by the charm."""
-        return self._results
-
-    @property
-    def logs(self) -> List[str]:
-        """Read-only: action logs as set by the charm."""
-        return self._logs
-
-    @property
-    def failed(self) -> bool:
-        """Read-only: action failure as set by the charm."""
-        return bool(self._failure_message)
-
-    @property
-    def failure_message(self) -> str:
-        """Read-only: action failure as set by the charm."""
-        return self._failure_message
-
     @property
     def event(self) -> Event:
         """Helper to generate an action event from this action."""
         return Event(self.name + ACTION_EVENT_SUFFIX, action=self)
 
-    def _set_results(self, results: Dict[str, Any]):
-        # bypass frozen dataclass
-        object.__setattr__(self, "_results", results)
-
-    def _set_failed(self, message: str):
-        # bypass frozen dataclass
-        object.__setattr__(self, "_failure_message", message)
-
-    def _log_message(self, message: str):
-        # bypass frozen dataclass
-        object.__setattr__(self, "_logs", self._logs + [message])
+    @property
+    def output(self) -> ActionOutput:
+        """Helper to access the outputs of this action."""
+        return ACTION_OUTPUT.get()
 
 
 def deferred(

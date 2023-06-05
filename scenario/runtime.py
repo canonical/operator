@@ -25,6 +25,7 @@ from ops.storage import SQLiteStorage
 
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
+from scenario.outputs import ACTION_OUTPUT, ActionOutput
 from scenario.state import DeferredEvent, PeerRelation, StoredState
 
 if TYPE_CHECKING:
@@ -356,6 +357,16 @@ class Runtime:
             logger.info(" - initializing storage")
             self._initialize_storage(state, temporary_charm_root)
 
+            action_token = None
+            if not ActionOutput.is_set():
+                logger.warning(
+                    "ActionOutput is not initialized; "
+                    "Runtime.exec called outside of a pytest scope. "
+                    "We'll set up one for you, but it will likely be unretrievable. "
+                    "Please manage scenario.outputs.ACTION_OUTPUT yourself.",
+                )
+                action_token = ACTION_OUTPUT.set(ActionOutput())
+
             logger.info(" - preparing env")
             env = self._get_event_env(
                 state=state,
@@ -390,6 +401,10 @@ class Runtime:
 
             logger.info(" - Clearing env")
             self._cleanup_env(env)
+
+            if action_token:
+                logger.info(" - Discarding action output context")
+                ACTION_OUTPUT.reset(action_token)
 
             logger.info(" - closing storage")
             output_state = self._close_storage(output_state, temporary_charm_root)

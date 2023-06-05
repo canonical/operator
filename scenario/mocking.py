@@ -17,10 +17,10 @@ from ops.pebble import Client, ExecError
 from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
+from scenario.outputs import ACTION_OUTPUT
 from scenario.state import PeerRelation
 
 if TYPE_CHECKING:
-    from scenario.state import Action
     from scenario.state import Container as ContainerSpec
     from scenario.state import (
         Event,
@@ -67,6 +67,11 @@ class _MockModelBackend(_ModelBackend):
         self._event = event
         self._charm_spec = charm_spec
 
+    @property
+    def _action_output(self):
+        """This should only be accessed if we are in an action event context."""
+        return ACTION_OUTPUT.get()
+
     def get_pebble(self, socket_path: str) -> "Client":
         return _MockPebbleClient(
             socket_path=socket_path,
@@ -85,14 +90,6 @@ class _MockModelBackend(_ModelBackend):
             )
         except StopIteration as e:
             raise RuntimeError(f"Not found: relation with id={rel_id}.") from e
-
-    def _get_action(
-        self,
-    ) -> "Action":
-        action = self._event.action
-        if not action:
-            raise RuntimeError("not in the context of an action event")
-        return action
 
     def _get_secret(self, id=None, label=None):
         # cleanup id:
@@ -314,20 +311,34 @@ class _MockModelBackend(_ModelBackend):
         return relation.remote_app_name
 
     def action_set(self, results: Dict[str, Any]):
-        action = self._get_action()
+        if not self._event.action:
+            raise RuntimeError(
+                "not in the context of an action event: cannot action-set",
+            )
         # let ops validate the results dict
         _format_action_result_dict(results)
         # but then we will store it in its unformatted, original form
-        action._set_results(results)
+        self._action_output.results = results
 
     def action_fail(self, message: str = ""):
-        self._get_action()._set_failed(message)
+        if not self._event.action:
+            raise RuntimeError(
+                "not in the context of an action event: cannot action-fail",
+            )
+        self._action_output.failure_message = message
 
     def action_log(self, message: str):
-        self._get_action()._log_message(message)
+        if not self._event.action:
+            raise RuntimeError(
+                "not in the context of an action event: cannot action-log",
+            )
+
+        self._action_output.logs.append(message)
 
     def action_get(self):
-        return self._get_action().params
+        if action := self._event.action:
+            return action.params
+        raise RuntimeError("not in the context of an action event: cannot action-get")
 
     # TODO:
     def storage_add(self, *args, **kwargs):  # noqa: U100

@@ -306,10 +306,10 @@ argument. Also, it talks in terms of `primary`:
 from scenario.state import SubordinateRelation
 
 relation = SubordinateRelation(
-  endpoint="peers",
-  remote_unit_data={"foo": "bar"},
-  remote_app_name="zookeeper",
-  remote_unit_id=42
+    endpoint="peers",
+    remote_unit_data={"foo": "bar"},
+    remote_app_name="zookeeper",
+    remote_unit_id=42
 )
 relation.remote_unit_name  # "zookeeper/42"
 ```
@@ -516,9 +516,9 @@ state = State(
 )
 ```
 
-The only mandatory arguments to Secret are its secret ID (which should be unique) and its 'contents': that is, a mapping from revision numbers (integers) to a str:str dict representing the payload of the revision. 
+The only mandatory arguments to Secret are its secret ID (which should be unique) and its 'contents': that is, a mapping from revision numbers (integers) to a str:str dict representing the payload of the revision.
 
-By default, the secret is not owned by **this charm** nor is it granted to it. 
+By default, the secret is not owned by **this charm** nor is it granted to it.
 Therefore, if charm code attempted to get that secret revision, it would get a permission error: we didn't grant it to this charm, nor we specified that the secret is owned by it.
 
 To specify a secret owned by this unit (or app):
@@ -553,6 +553,49 @@ state = State(
     ]
 )
 ```
+
+# Actions
+
+How to test actions with scenario:
+
+```python
+from scenario import Action, Context, State
+from charm import MyCharm
+
+def test_backup_action():
+    # define an action
+    action = Action('do_backup')
+    ctx = Context(MyCharm)
+
+    # obtain an Event from the action and fire it in the context on a state of your choosing.
+    
+    # If you didn't declare do_backup in the charm's `actions.yaml`, the `ConsistencyChecker` will slap you on both wrists 
+    # and refuse to proceed.
+    ctx.run(action.event, State())
+    
+    # you can assert action results, logs, failure using the action.output interface
+    assert action.output.results == {'foo': 'bar'}
+    assert action.output.logs == {'foo': 'bar'}
+    assert action.output.failed
+    assert action.output.failure_message == 'boo-hoo'
+```
+
+It doesn't quite make sense to have this action output data in the `State`, hence the choice to make it an external object attached to a global context var: `scenario.outputs.ACTION_OUTPUT`. 
+If you are using pytest, the `action_output` fixture will set up and tear down that contextvar for you. So you can also write assertions like so:
+
+
+```python
+def test_backup_action(action_output):
+    # ... run test as above
+    assert action_output.results == {'foo': 'bar'}
+    assert action_output.logs == {'foo': 'bar'}
+    assert action_output.failed
+    assert action_output.failure_message == 'boo-hoo'
+```
+
+If you are not using pytest, you'll need to `scenario.outputs.ACTION_OUTPUT.set(ActionOutput())` before you can run your test.
+And don't forget to clean up after yourself!
+
 
 # Deferred events
 
