@@ -71,7 +71,7 @@ def test_deferred_evt_emitted(mycharm):
 
 
 def test_deferred_relation_event_without_relation_raises(mycharm):
-    with pytest.raises(ValueError):
+    with pytest.raises(AttributeError):
         deferred(event="foo_relation_changed", handler=mycharm._on_event)
 
 
