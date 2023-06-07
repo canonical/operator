@@ -9,10 +9,26 @@
 
 # -- Path setup --------------------------------------------------------------
 
+import furo
+import furo.navigation
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
+
+# Furo patch to get local TOC to show in sidebar (as sphinx-rtd-theme did)
+# See https://github.com/pradyunsg/furo/blob/490527b2aef00b1198770c3389a1979911ee1fcb/src/furo/__init__.py#L115-L128
+
+_old_compute_navigation_tree = furo._compute_navigation_tree
+
+def _compute_navigation_tree(context):
+    tree_html = _old_compute_navigation_tree(context)
+    if not tree_html and context.get("toc"):
+        tree_html = furo.navigation.get_navigation_tree(context["toc"])
+    return tree_html
+
+furo._compute_navigation_tree = _compute_navigation_tree
 
 
 # -- Project information -----------------------------------------------------
