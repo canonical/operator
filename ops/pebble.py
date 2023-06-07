@@ -108,9 +108,9 @@ LayerDict = typing.TypedDict('LayerDict',
                              total=False)
 
 PlanDict = typing.TypedDict('PlanDict',
-                      {'services': Dict[str, ServiceDict],
-                       'checks': Dict[str, CheckDict]},
-                      total=False)
+                            {'services': Dict[str, ServiceDict],
+                             'checks': Dict[str, CheckDict]},
+                            total=False)
 
 if TYPE_CHECKING:
     from email.message import Message
@@ -149,11 +149,11 @@ if TYPE_CHECKING:
 
     _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
     _CheckInfoDict = TypedDict('_CheckInfoDict',
-                          {"name": str,
-                           "level": Optional[Union['CheckLevel', str]],
-                           "status": Union['CheckStatus', str],
-                           "failures": int,
-                           "threshold": int})
+                               {"name": str,
+                                "level": Optional[Union['CheckLevel', str]],
+                                "status": Union['CheckStatus', str],
+                                "failures": int,
+                                "threshold": int})
     _FileInfoDict = TypedDict('_FileInfoDict',
                               {"path": str,
                                "name": str,
