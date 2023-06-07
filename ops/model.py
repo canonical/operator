@@ -57,7 +57,6 @@ from ops._private import timeconv, yaml
 from ops.jujuversion import JujuVersion
 
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
-# public since it is used in ops.testing
 K8sSpec = Mapping[str, Any]
 
 if typing.TYPE_CHECKING:

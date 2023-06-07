@@ -1142,7 +1142,7 @@ class StorageMeta:
         storage_name: Name of storage
         type: Storage type
         description: A text description of the storage
-        read_only: Whether the storage is read only
+        read_only: True if the storage is read-only
         minimum_size: Minimum size of storage
         location: Mount point of storage
         multiple_range: Range of numeric qualifiers when multiple storage units are used
