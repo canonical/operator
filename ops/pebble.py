@@ -107,6 +107,11 @@ LayerDict = typing.TypedDict('LayerDict',
                               'checks': Dict[str, CheckDict]},
                              total=False)
 
+PlanDict = typing.TypedDict('PlanDict',
+                      {'services': Dict[str, ServiceDict],
+                       'checks': Dict[str, CheckDict]},
+                      total=False)
+
 if TYPE_CHECKING:
     from email.message import Message
 
@@ -143,7 +148,7 @@ if TYPE_CHECKING:
     _IOSource = Union[str, bytes, _AnyStrFileLikeIO]
 
     _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
-    _InfoDict = TypedDict('_InfoDict',
+    _CheckInfoDict = TypedDict('_CheckInfoDict',
                           {"name": str,
                            "level": Optional[Union['CheckLevel', str]],
                            "status": Union['CheckStatus', str],
@@ -180,7 +185,6 @@ if TYPE_CHECKING:
                               {'label': str,
                                'done': int,
                                'total': int})
-    _TaskData = Dict[str, Any]
     _TaskDict = TypedDict('_TaskDict',
                           {'id': 'TaskID',
                            'kind': str,
@@ -190,8 +194,7 @@ if TYPE_CHECKING:
                            'progress': _ProgressDict,
                            'spawn-time': str,
                            'ready-time': str,
-                           'data': Optional[_TaskData]})
-    _ChangeData = TypedDict('_ChangeData', {})
+                           'data': Optional[Dict[str, Any]]})
     _ChangeDict = TypedDict('_ChangeDict',
                             {'id': str,
                              'kind': str,
@@ -202,12 +205,8 @@ if TYPE_CHECKING:
                              'tasks': Optional[List[_TaskDict]],
                              'err': Optional[str],
                              'ready-time': Optional[str],
-                             'data': Optional[_ChangeData]})
+                             'data': Optional[Dict[str, Any]]})
 
-    _PlanDict = TypedDict('_PlanDict',
-                          {'services': Dict[str, ServiceDict],
-                           'checks': Dict[str, CheckDict]},
-                          total=False)
     _Error = TypedDict('_Error',
                        {'kind': str,
                         'message': str})
@@ -541,7 +540,7 @@ class Task:
         progress: TaskProgress,
         spawn_time: datetime.datetime,
         ready_time: Optional[datetime.datetime],
-        data: Optional['_TaskData'] = None,
+        data: Optional[Dict[str, Any]] = None,
     ):
         self.id = id
         self.kind = kind
@@ -604,7 +603,7 @@ class Change:
         err: Optional[str],
         spawn_time: datetime.datetime,
         ready_time: Optional[datetime.datetime],
-        data: Optional['_ChangeData'] = None,
+        data: Optional[Dict[str, Any]] = None,
     ):
         self.id = id
         self.kind = kind
@@ -658,7 +657,7 @@ class Plan:
 
     def __init__(self, raw: str):
         d = yaml.safe_load(raw) or {}  # type: ignore
-        d = typing.cast('_PlanDict', d)
+        d = typing.cast('PlanDict', d)
 
         self._raw = raw
         self._services: Dict[str, Service] = {name: Service(name, service)
@@ -682,14 +681,14 @@ class Plan:
         """
         return self._checks
 
-    def to_dict(self) -> '_PlanDict':
+    def to_dict(self) -> 'PlanDict':
         """Convert this plan to its dict representation."""
         fields = [
             ('services', {name: service.to_dict() for name, service in self._services.items()}),
             ('checks', {name: check.to_dict() for name, check in self._checks.items()}),
         ]
         dct = {name: value for name, value in fields if value}
-        return typing.cast('_PlanDict', dct)
+        return typing.cast('PlanDict', dct)
 
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
@@ -1079,7 +1078,7 @@ class CheckInfo:
         self.threshold = threshold
 
     @classmethod
-    def from_dict(cls, d: '_InfoDict') -> 'CheckInfo':
+    def from_dict(cls, d: '_CheckInfoDict') -> 'CheckInfo':
         """Create new :class:`CheckInfo` object from dict parsed from JSON."""
         try:
             level = CheckLevel(d.get('level', ''))
