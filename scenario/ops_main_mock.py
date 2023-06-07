@@ -18,6 +18,7 @@ from scenario.logger import logger as scenario_logger
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
+    from scenario.context import Context
     from scenario.state import Event, State, _CharmSpec
 
 logger = scenario_logger.getChild("ops_main_mock")
@@ -32,6 +33,7 @@ def main(
     post_event: Optional[Callable[["CharmType"], None]] = None,
     state: "State" = None,
     event: "Event" = None,
+    context: "Context" = None,
     charm_spec: "_CharmSpec" = None,
 ):
     """Set up the charm and dispatch the observed event."""
@@ -43,6 +45,7 @@ def main(
     model_backend = _MockModelBackend(  # pyright: reportPrivateUsage=false
         state=state,
         event=event,
+        context=context,
         charm_spec=charm_spec,
     )
     debug = "JUJU_DEBUG" in os.environ

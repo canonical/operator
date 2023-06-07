@@ -3,8 +3,9 @@ import logging
 import pytest
 from ops.charm import CharmBase
 
-from scenario import trigger
+from scenario import Context
 from scenario.state import State
+from tests.helpers import trigger
 
 logger = logging.getLogger("testing logger")
 
@@ -27,7 +28,8 @@ def mycharm():
 
 
 def test_juju_log(mycharm):
-    out = trigger(State(), "start", mycharm, meta=mycharm.META)
-    assert out.juju_log[16] == ("DEBUG", "Emitting Juju event start.")
+    ctx = Context(mycharm, meta=mycharm.META)
+    ctx.run("start", State())
+    assert ctx.juju_log[16] == ("DEBUG", "Emitting Juju event start.")
     # prints are not juju-logged.
-    assert out.juju_log[17] == ("WARNING", "bar!")
+    assert ctx.juju_log[17] == ("WARNING", "bar!")

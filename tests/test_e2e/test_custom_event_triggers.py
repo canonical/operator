@@ -5,7 +5,8 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource
 
 from scenario import State
-from scenario.runtime import InconsistentScenarioError, trigger
+from scenario.runtime import InconsistentScenarioError
+from tests.helpers import trigger
 
 
 def test_custom_event_emitted():

@@ -17,10 +17,10 @@ from ops.pebble import Client, ExecError
 from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
-from scenario.outputs import ACTION_OUTPUT
-from scenario.state import PeerRelation
+from scenario.state import JujuLogLine, PeerRelation
 
 if TYPE_CHECKING:
+    from scenario.context import Context
     from scenario.state import Container as ContainerSpec
     from scenario.state import (
         Event,
@@ -61,16 +61,18 @@ class _MockExecProcess:
 
 
 class _MockModelBackend(_ModelBackend):
-    def __init__(self, state: "State", event: "Event", charm_spec: "_CharmSpec"):
+    def __init__(
+        self,
+        state: "State",
+        event: "Event",
+        charm_spec: "_CharmSpec",
+        context: "Context",
+    ):
         super().__init__()
         self._state = state
         self._event = event
+        self._context = context
         self._charm_spec = charm_spec
-
-    @property
-    def _action_output(self):
-        """This should only be accessed if we are in an action event context."""
-        return ACTION_OUTPUT.get()
 
     def get_pebble(self, socket_path: str) -> "Client":
         return _MockPebbleClient(
@@ -174,13 +176,18 @@ class _MockModelBackend(_ModelBackend):
 
     # setter methods: these can mutate the state.
     def application_version_set(self, version: str):
+        if workload_version := self._state.status.workload_version:
+            # do not record if empty = unset
+            self._context.workload_version_history.append(workload_version)
+
         self._state.status._update_workload_version(version)
 
     def status_set(self, status: str, message: str = "", *, is_app: bool = False):
+        self._context._record_status(self._state.status, is_app)
         self._state.status._update_status(status, message, is_app)
 
     def juju_log(self, level: str, message: str):
-        self._state.juju_log.append((level, message))
+        self._context.juju_log.append(JujuLogLine(level, message))
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
         relation = self._get_relation_by_id(relation_id)
@@ -318,27 +325,29 @@ class _MockModelBackend(_ModelBackend):
         # let ops validate the results dict
         _format_action_result_dict(results)
         # but then we will store it in its unformatted, original form
-        self._action_output.results = results
+        self._context._action_results = results
 
     def action_fail(self, message: str = ""):
         if not self._event.action:
             raise RuntimeError(
                 "not in the context of an action event: cannot action-fail",
             )
-        self._action_output.failure_message = message
+        self._context._action_failure = message
 
     def action_log(self, message: str):
         if not self._event.action:
             raise RuntimeError(
                 "not in the context of an action event: cannot action-log",
             )
-
-        self._action_output.logs.append(message)
+        self._context._action_logs.append(message)
 
     def action_get(self):
-        if action := self._event.action:
-            return action.params
-        raise RuntimeError("not in the context of an action event: cannot action-get")
+        action = self._event.action
+        if not action:
+            raise RuntimeError(
+                "not in the context of an action event: cannot action-get",
+            )
+        return action.params
 
     # TODO:
     def storage_add(self, *args, **kwargs):  # noqa: U100

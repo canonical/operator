@@ -5,7 +5,6 @@ import typing
 from itertools import chain
 from typing import Any, Callable, Dict, Iterable, Optional, TextIO, Type, Union
 
-from scenario import trigger
 from scenario.logger import logger as scenario_logger
 from scenario.state import (
     ATTACH_ALL_STORAGES,
@@ -17,6 +16,7 @@ from scenario.state import (
     InjectRelation,
     State,
 )
+from tests.helpers import trigger
 
 if typing.TYPE_CHECKING:
     from ops.testing import CharmType

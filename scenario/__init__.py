@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-from scenario.capture_events import capture_events
-from scenario.context import Context
-from scenario.pytest_plugin import action_output, emitted_events  # noqa: F401
-from scenario.runtime import trigger  # noqa: F401
+from scenario.context import ActionOutput, Context
 from scenario.state import (
     Action,
     Address,
@@ -27,12 +24,14 @@ from scenario.state import (
     Status,
     StoredState,
     SubordinateRelation,
+    deferred,
 )
 
 __all__ = [
     Action,
-    capture_events,
+    ActionOutput,
     Context,
+    deferred,
     StateValidationError,
     Secret,
     ParametrizedEvent,

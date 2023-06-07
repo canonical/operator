@@ -7,7 +7,8 @@ from ops.framework import Framework
 from ops.model import ActiveStatus
 
 from scenario import State
-from scenario.runtime import DirtyVirtualCharmRootError, trigger
+from scenario.runtime import DirtyVirtualCharmRootError
+from tests.helpers import trigger
 
 
 class MyCharm(CharmBase):

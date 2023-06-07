@@ -10,8 +10,8 @@ from ops.charm import (
 )
 from ops.framework import Framework
 
-from scenario import trigger
 from scenario.state import Container, DeferredEvent, Relation, State, deferred
+from tests.helpers import trigger
 
 CHARM_CALLED = 0
 

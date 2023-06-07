@@ -7,6 +7,7 @@ import datetime
 import inspect
 import re
 import typing
+from collections import namedtuple
 from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
@@ -19,7 +20,8 @@ from ops.model import SecretRotate, StatusBase
 
 from scenario.fs_mocks import _MockFileSystem, _MockStorageMount
 from scenario.logger import logger as scenario_logger
-from scenario.outputs import ACTION_OUTPUT, ActionOutput
+
+JujuLogLine = namedtuple("JujuLogLine", ("level", "message"))
 
 if typing.TYPE_CHECKING:
     try:
@@ -752,11 +754,6 @@ class Status(_DCBase):
     unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
     workload_version: str = ""
 
-    # most to least recent statuses; do NOT include the current one.
-    app_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
-    unit_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
-    previous_workload_version: Optional[str] = None
-
     def __post_init__(self):
         for name in ["app", "unit"]:
             val = getattr(self, name)
@@ -780,7 +777,6 @@ class Status(_DCBase):
         # than once per hook.
 
         # bypass frozen dataclass
-        object.__setattr__(self, "previous_workload_version", self.workload_version)
         object.__setattr__(self, "workload_version", new_workload_version)
 
     def _update_status(
@@ -790,14 +786,9 @@ class Status(_DCBase):
         is_app: bool = False,
     ):
         """Update the current app/unit status and add the previous one to the history."""
-        if is_app:
-            self.app_history.append(self.app)
-            # bypass frozen dataclass
-            object.__setattr__(self, "app", _EntityStatus(new_status, new_message))
-        else:
-            self.unit_history.append(self.unit)
-            # bypass frozen dataclass
-            object.__setattr__(self, "unit", _EntityStatus(new_status, new_message))
+        name = "app" if is_app else "unit"
+        # bypass frozen dataclass
+        object.__setattr__(self, name, _EntityStatus(new_status, new_message))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -834,7 +825,6 @@ class State(_DCBase):
     status: Status = dataclasses.field(default_factory=Status)
     leader: bool = False
     model: Model = Model()
-    juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
     unit_id: int = 0
@@ -1115,11 +1105,6 @@ class Action(_DCBase):
     def event(self) -> Event:
         """Helper to generate an action event from this action."""
         return Event(self.name + ACTION_EVENT_SUFFIX, action=self)
-
-    @property
-    def output(self) -> ActionOutput:
-        """Helper to access the outputs of this action."""
-        return ACTION_OUTPUT.get()
 
 
 def deferred(

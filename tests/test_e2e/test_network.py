@@ -2,8 +2,8 @@ import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 
-from scenario import trigger
 from scenario.state import Event, Network, Relation, State, _CharmSpec
+from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")
