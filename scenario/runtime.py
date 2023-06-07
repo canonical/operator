@@ -254,7 +254,7 @@ class Runtime:
         return WrappedCharm
 
     @contextmanager
-    def virtual_charm_root(self):
+    def _virtual_charm_root(self):
         # If we are using runtime on a real charm, we can make some assumptions about the
         # directory structure we are going to find.
         # If we're, say, dynamically defining charm types and doing tests on them, we'll have to
@@ -356,7 +356,7 @@ class Runtime:
 
         logger.info(" - generating virtual charm root")
         with (
-            self.virtual_charm_root() as temporary_charm_root,
+            self._virtual_charm_root() as temporary_charm_root,
             # todo allow customizing capture_events
             capture_events() as captured,
         ):
