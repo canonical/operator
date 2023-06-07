@@ -13,3 +13,4 @@ coverage[toml]==7.0.5
 typing_extensions==4.2.0
 
 -r requirements.txt
+
