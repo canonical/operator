@@ -692,7 +692,7 @@ def test_backup_action():
 
     # you can assert action results, logs, failure using the ActionOutput interface
     assert out.results == {'foo': 'bar'}
-    assert out.logs == {'foo': 'bar'}
+    assert out.logs == ['baz', 'qux']
     assert out.failure == 'boo-hoo'
 ```
 
