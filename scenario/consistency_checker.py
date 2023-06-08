@@ -3,11 +3,17 @@ from collections import Counter
 from collections.abc import Sequence
 from itertools import chain
 from numbers import Number
-from typing import TYPE_CHECKING, Iterable, NamedTuple, Tuple
+from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple
 
 from scenario.runtime import InconsistentScenarioError
 from scenario.runtime import logger as scenario_logger
-from scenario.state import PeerRelation, SubordinateRelation, _CharmSpec, normalize_name
+from scenario.state import (
+    Action,
+    PeerRelation,
+    SubordinateRelation,
+    _CharmSpec,
+    normalize_name,
+)
 
 if TYPE_CHECKING:
     from scenario.state import Event, State
@@ -97,6 +103,7 @@ def check_event_consistency(
     warnings = []
 
     # custom event: can't make assumptions about its name and its semantics
+    # todo: should we then just skip the other checks?
     if not event._is_builtin_event(charm_spec):
         warnings.append(
             "this is a custom event; if its name makes it look like a builtin one "
@@ -105,89 +112,124 @@ def check_event_consistency(
         )
 
     if event._is_relation_event:
-        if not event.relation:
-            errors.append(
-                "cannot construct a relation event without the relation instance. "
-                "Please pass one.",
-            )
-        else:
-            if not event.name.startswith(normalize_name(event.relation.endpoint)):
-                errors.append(
-                    f"relation event should start with relation endpoint name. {event.name} does "
-                    f"not start with {event.relation.endpoint}.",
-                )
+        _check_relation_event(charm_spec, event, errors, warnings)
 
     if event._is_workload_event:
-        if not event.container:
-            errors.append(
-                "cannot construct a workload event without the container instance. "
-                "Please pass one.",
-            )
-        else:
-            if not event.name.startswith(normalize_name(event.container.name)):
-                errors.append(
-                    f"workload event should start with container name. {event.name} does "
-                    f"not start with {event.container.name}.",
-                )
+        _check_workload_event(charm_spec, event, errors, warnings)
 
     if event._is_action_event:
-        action = event.action
-        if not action:
-            errors.append(
-                "cannot construct a workload event without the container instance. "
-                "Please pass one.",
-            )
-        else:
-            if not event.name.startswith(normalize_name(action.name)):
-                errors.append(
-                    f"action event should start with action name. {event.name} does "
-                    f"not start with {action.name}.",
-                )
-        if action.name not in charm_spec.actions:
-            errors.append(
-                f"action event {event.name} refers to action {action.name} "
-                f"which is not declared in the charm metadata (actions.yaml).",
-            )
-        to_python_type = {
-            "string": str,
-            "boolean": bool,
-            "number": Number,
-            "array": Sequence,
-            "object": dict,
-        }
-        expected_param_type = {}
-        for par_name, par_spec in (
-            charm_spec.actions[action.name].get("params", {}).items()
-        ):
-            if value := par_spec.get("type"):
-                try:
-                    expected_param_type[par_name] = to_python_type[value]
-                except KeyError:
-                    warnings.append(
-                        f"unknown data type declared for parameter {par_name}: type={value}. "
-                        f"Cannot consistency-check.",
-                    )
-            else:
-                errors.append(
-                    f"action parameter {par_name} has no type. "
-                    f"Charmcraft will be unhappy about this. ",
-                )
-
-        for provided_param_name, provided_param_value in action.params.items():
-            if expected_type := expected_param_type.get(provided_param_name):
-                if not isinstance(provided_param_value, expected_type):
-                    errors.append(
-                        f"param {provided_param_name} is of type {type(provided_param_value)}: "
-                        f"expecting {expected_type}",
-                    )
-
-            else:
-                errors.append(
-                    f"param {provided_param_name} is not a valid parameter for {action.name}: "
-                    "missing from action specification",
-                )
+        _check_action_event(charm_spec, event, errors, warnings)
 
     return Results(errors, warnings)
+
+
+def _check_relation_event(
+    charm_spec: _CharmSpec,  # noqa: U100
+    event: "Event",
+    errors: List[str],
+    warnings: List[str],  # noqa: U100
+):
+    if not event.relation:
+        errors.append(
+            "cannot construct a relation event without the relation instance. "
+            "Please pass one.",
+        )
+    else:
+        if not event.name.startswith(normalize_name(event.relation.endpoint)):
+            errors.append(
+                f"relation event should start with relation endpoint name. {event.name} does "
+                f"not start with {event.relation.endpoint}.",
+            )
+
+
+def _check_workload_event(
+    charm_spec: _CharmSpec,  # noqa: U100
+    event: "Event",
+    errors: List[str],
+    warnings: List[str],  # noqa: U100
+):
+    if not event.container:
+        errors.append(
+            "cannot construct a workload event without the container instance. "
+            "Please pass one.",
+        )
+    elif not event.name.startswith(normalize_name(event.container.name)):
+        errors.append(
+            f"workload event should start with container name. {event.name} does "
+            f"not start with {event.container.name}.",
+        )
+
+
+def _check_action_event(
+    charm_spec: _CharmSpec,
+    event: "Event",
+    errors: List[str],
+    warnings: List[str],
+):
+    action = event.action
+    if not action:
+        errors.append(
+            "cannot construct a workload event without the container instance. "
+            "Please pass one.",
+        )
+    elif not event.name.startswith(normalize_name(action.name)):
+        errors.append(
+            f"action event should start with action name. {event.name} does "
+            f"not start with {action.name}.",
+        )
+    if action.name not in charm_spec.actions:
+        errors.append(
+            f"action event {event.name} refers to action {action.name} "
+            f"which is not declared in the charm metadata (actions.yaml).",
+        )
+
+    _check_action_param_types(charm_spec, action, errors, warnings)
+
+
+def _check_action_param_types(
+    charm_spec: _CharmSpec,
+    action: Action,
+    errors: List[str],
+    warnings: List[str],
+):
+    to_python_type = {
+        "string": str,
+        "boolean": bool,
+        "number": Number,
+        "array": Sequence,
+        "object": dict,
+    }
+    expected_param_type = {}
+    for par_name, par_spec in charm_spec.actions[action.name].get("params", {}).items():
+        value = par_spec.get("type")
+        if not value:
+            errors.append(
+                f"action parameter {par_name} has no type. "
+                f"Charmcraft will be unhappy about this. ",
+            )
+            continue
+
+        try:
+            expected_param_type[par_name] = to_python_type[value]
+        except KeyError:
+            warnings.append(
+                f"unknown data type declared for parameter {par_name}: type={value}. "
+                f"Cannot consistency-check.",
+            )
+
+    for provided_param_name, provided_param_value in action.params.items():
+        expected_type = expected_param_type.get(provided_param_name)
+        if not expected_type:
+            errors.append(
+                f"param {provided_param_name} is not a valid parameter for {action.name}: "
+                "missing from action specification",
+            )
+            continue
+        if not isinstance(provided_param_value, expected_type):
+            errors.append(
+                f"param {provided_param_name} is of type {type(provided_param_value)}: "
+                f"expecting {expected_type}",
+            )
 
 
 def check_config_consistency(
