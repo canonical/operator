@@ -1305,10 +1305,10 @@ def _reader_to_websocket(reader: '_WebsocketReader',
 
 
 def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
-                         encoding: str):
+                         encoding: Optional[str]):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
-        chunk: _StrOrBytes = ws.recv()
+        chunk: _StrOrBytes = typing.cast('_StrOrBytes', ws.recv())
 
         if isinstance(chunk, str):
             try:
@@ -1371,7 +1371,7 @@ class _WebsocketReader(io.BufferedIOBase):
             return b''
 
         while not self.remaining:
-            chunk: _StrOrBytes = self.ws.recv()
+            chunk = typing.cast('_StrOrBytes', self.ws.recv())
 
             if isinstance(chunk, str):
                 try:
@@ -2318,7 +2318,7 @@ class Client:
             raise TypeError('services must be of type Iterable[str], '
                             'not {}'.format(type(services).__name__))
         for s in services:
-            if not isinstance(s, str):  # pyright: reportUnnecessaryIsInstance=false
+            if not isinstance(s, str):
                 raise TypeError(f'service names must be str, not {type(s).__name__}')
 
         if isinstance(sig, int):

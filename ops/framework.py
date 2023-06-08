@@ -182,8 +182,8 @@ class Handle:
                     good = True
             if not good:
                 raise RuntimeError(f"attempted to restore invalid handle path {path}")
-            handle = Handle(handle, kind, key)  # pyright: reportUnboundVariable=false
-        return handle
+            handle = Handle(handle, kind, key)  # type: ignore
+        return typing.cast(Handle, handle)
 
 
 class EventBase:
@@ -196,7 +196,7 @@ class EventBase:
     # after being loaded from snapshot, or by `BoundEvent.emit()` if this
     # event is being fired for the first time.
     # TODO this is hard to debug, this should be refactored
-    framework: 'Framework' = None
+    framework: 'Framework' = None  # type: ignore
 
     def __init__(self, handle: Handle):
         self.handle = handle
@@ -321,7 +321,7 @@ class EventSource(Generic[_EventType]):
         framework = getattr(emitter, 'framework', None)
         if framework is not None:
             framework.register_type(self.event_type, emitter, self.event_kind)
-        return BoundEvent(emitter, self.event_type, self.event_kind)
+        return BoundEvent(emitter, self.event_type, typing.cast(str, self.event_kind))
 
 
 class BoundEvent(Generic[_EventType]):
@@ -387,7 +387,7 @@ class Object:
     been created.
 
     """
-    handle_kind: str = HandleKind()
+    handle_kind: str = HandleKind()  # type: ignore
 
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
@@ -396,8 +396,8 @@ class Object:
         def on(self) -> 'ObjectEvents': ...  # noqa
 
     def __init__(self, parent: Union['Framework', 'Object'], key: Optional[str]):
-        self.framework: Framework = None
-        self.handle: Handle = None
+        self.framework: Framework = None  # type: ignore
+        self.handle: Handle = None  # type: ignore
 
         kind = self.handle_kind
         if isinstance(parent, Framework):
@@ -405,11 +405,11 @@ class Object:
             # Avoid Framework instances having a circular reference to themselves.
             if self.framework is self:
                 self.framework = weakref.proxy(self.framework)
-            self.handle = Handle(None, kind, key)
+            self.handle = Handle(None, kind, typing.cast(str, key))
         else:
             self.framework = parent.framework
-            self.handle = Handle(parent, kind, key)
-        self.framework._track(self)
+            self.handle = Handle(parent, kind, typing.cast(str, key))
+        self.framework._track(self)  # type: ignore
 
         # TODO Detect conflicting handles here.
 
@@ -556,17 +556,17 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 class Framework(Object):
     """Main interface from the Charm to the Operator Framework internals."""
 
-    on = FrameworkEvents()
+    on = FrameworkEvents()  # type: ignore
 
     # Override properties from Object so that we can set them in __init__.
-    model: 'Model' = None
-    meta: 'CharmMeta' = None
-    charm_dir: 'Path' = None
+    model: 'Model' = None  # type: ignore
+    meta: 'CharmMeta' = None  # type: ignore
+    charm_dir: 'Path' = None  # type: ignore
 
     # to help the type checker and IDEs:
 
     if TYPE_CHECKING:
-        _stored: 'StoredStateData' = None
+        _stored: 'StoredStateData' = None  # type: ignore
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
@@ -593,9 +593,9 @@ class Framework(Object):
         # [(observer_path, method_name, parent_path, event_key)]
         self._observers: _ObserverPath = []
         # {observer_path: observing Object}
-        self._observer: _PathToObjectMapping = weakref.WeakValueDictionary()
+        self._observer: _PathToObjectMapping = weakref.WeakValueDictionary()  # type: ignore
         # {object_path: object}
-        self._objects: _PathToSerializableMapping = weakref.WeakValueDictionary()
+        self._objects: _PathToSerializableMapping = weakref.WeakValueDictionary()  # type: ignore
         # {(parent_path, kind): cls}
         # (parent_path, kind) is the address of _this_ object: the parent path
         # plus a 'kind' string that is the name of this object.
@@ -606,7 +606,8 @@ class Framework(Object):
             logger.warning(
                 "deprecated: Framework now takes a Storage not a path")
             storage = SQLiteStorage(storage)
-        self._storage: 'SQLiteStorage' = storage
+        # TODO(benhoyt): should probably have a Storage protocol
+        self._storage: 'SQLiteStorage' = storage  # type: ignore
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
@@ -678,7 +679,7 @@ class Framework(Object):
         self._storage.commit()
 
     def register_type(self, cls: 'Type[_Serializable]', parent: Optional['_ParentHandle'],
-                      kind: str = None):
+                      kind: Optional[str] = None):
         """Register a type to a handle."""
         parent_path: Optional[str] = None
         if isinstance(parent, Object):
@@ -686,8 +687,8 @@ class Framework(Object):
         elif isinstance(parent, Handle):
             parent_path = parent.path
 
-        kind: str = kind or cls.handle_kind
-        self._type_registry[(parent_path, kind)] = cls
+        kind_: str = kind or cls.handle_kind
+        self._type_registry[(parent_path, kind_)] = cls
         self._type_known.add(cls)
 
     def save_snapshot(self, value: Union["StoredStateData", "EventBase"]):
@@ -715,12 +716,13 @@ class Framework(Object):
         parent_path = None
         if handle.parent:
             parent_path = handle.parent.path
-        cls: Type[_Serializable] = self._type_registry.get((parent_path, handle.kind))
-        if not cls:
+        cls_or_none = self._type_registry.get((parent_path, handle.kind))
+        if not cls_or_none:
             raise NoTypeError(handle.path)
+        cls: Type[_Serializable] = cls_or_none
         data = self._storage.load_snapshot(handle.path)
         obj = cls.__new__(cls)
-        obj.framework = self
+        obj.framework = self  # type: ignore
         obj.handle = handle
         obj.restore(data)
         self._track(obj)
@@ -764,7 +766,7 @@ class Framework(Object):
         event_kind = bound_event.event_kind
         emitter = bound_event.emitter
 
-        self.register_type(event_type, emitter, event_kind)
+        self.register_type(event_type, emitter, event_kind)  # type: ignore
 
         if hasattr(emitter, "handle"):
             emitter_path = emitter.handle.path
@@ -869,7 +871,7 @@ class Framework(Object):
 
         self._event_name = old_event_name
 
-    def _reemit(self, single_event_path: str = None):
+    def _reemit(self, single_event_path: Optional[str] = None):
         last_event_path = None
         deferred = True
         for event_path, observer_path, method_name in self._storage.notices(single_event_path):
@@ -924,7 +926,7 @@ class Framework(Object):
                 self._storage.drop_notice(event_path, observer_path, method_name)
             # We intentionally consider this event to be dead and reload it from
             # scratch in the next path.
-            self.framework._forget(event)
+            self.framework._forget(event)  # type: ignore
 
         if not deferred and last_event_path is not None:
             self._storage.drop_snapshot(last_event_path)
@@ -949,7 +951,7 @@ class Framework(Object):
         """
         # If given, validate the name comply with all the rules
         if name is not None:
-            if not isinstance(name, str):  # pyright: reportUnnecessaryIsInstance=false
+            if not isinstance(name, str):
                 raise TypeError('breakpoint names must be strings')
             if name in ('hook', 'all'):
                 raise ValueError('breakpoint names "all" and "hook" are reserved')
@@ -1030,12 +1032,10 @@ class BoundStoredState:
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
-        def _data(self) -> StoredStateData:
-            pass
+        def _data(self) -> StoredStateData: ...  # noqa, type: ignore
 
         @property
-        def _attr_name(self) -> str:
-            pass  # pyright: reportGeneralTypeIssues=false
+        def _attr_name(self) -> str: ...  # noqa, type: ignore
 
     def __init__(self, parent: Object, attr_name: str):
         parent.framework.register_type(StoredStateData, parent)
@@ -1054,7 +1054,7 @@ class BoundStoredState:
 
     if TYPE_CHECKING:
         @typing.overload
-        def __getattr__(self, key: Literal['on']) -> ObjectEvents:
+        def __getattr__(self, key: Literal['on']) -> ObjectEvents:  # type: ignore
             pass
 
     def __getattr__(self, key: str) -> Union['_StorableType', 'StoredObject', ObjectEvents]:
@@ -1130,7 +1130,7 @@ class StoredState:
             pass
 
     def __get__(self,
-                parent: '_ObjectType',
+                parent: Optional['_ObjectType'],
                 parent_type: 'Type[_ObjectType]') -> Union['StoredState',
                                                            BoundStoredState]:
         if self.parent_type is not None and self.parent_type not in parent_type.mro():
@@ -1195,13 +1195,13 @@ def _unwrap_stored(parent_data: StoredStateData,
                    value: Union['_StoredObject', '_StorableType']
                    ) -> '_StorableType':
     if isinstance(value, (StoredDict, StoredList, StoredSet)):
-        return value._under  # pyright: reportPrivateUsage=false
+        return value._under
     return typing.cast('_StorableType', value)
 
 
 def _wrapped_repr(obj: '_StoredObject') -> str:
     t = type(obj)
-    if obj._under:  # pyright: reportPrivateUsage=false
+    if obj._under:
         return f"{t.__module__}.{t.__name__}({obj._under!r})"  # type: ignore
     else:
         return f"{t.__module__}.{t.__name__}()"

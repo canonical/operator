@@ -219,7 +219,7 @@ class ActionEvent(EventBase):
         Args:
             results: The result of the action as a Dict
         """
-        self.framework.model._backend.action_set(results)   # pyright: reportPrivateUsage=false
+        self.framework.model._backend.action_set(results)
 
     def log(self, message: str):
         """Send a message that a user will see while the action is running.
@@ -227,7 +227,7 @@ class ActionEvent(EventBase):
         Args:
             message: The message for the user.
         """
-        self.framework.model._backend.action_log(message)  # pyright: reportPrivateUsage=false
+        self.framework.model._backend.action_log(message)
 
     def fail(self, message: str = ''):
         """Report that this action has failed.
@@ -235,7 +235,7 @@ class ActionEvent(EventBase):
         Args:
             message: Optional message to record why it has failed.
         """
-        self.framework.model._backend.action_fail(message)  # pyright: reportPrivateUsage=false
+        self.framework.model._backend.action_fail(message)
 
 
 class InstallEvent(HookEvent):
@@ -1141,7 +1141,7 @@ class CharmMeta:
         meta = cast('_CharmMetaDict', yaml.safe_load(metadata))
         raw_actions = {}
         if actions is not None:
-            raw_actions = cast(Dict[str, '_ActionMetaDict'], yaml.safe_load(actions))
+            raw_actions = cast(Optional[Dict[str, Any]], yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
         return cls(meta, raw_actions)
