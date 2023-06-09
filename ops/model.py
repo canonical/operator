@@ -2317,7 +2317,9 @@ class Container:
         """
         self._pebble.remove_path(path, recursive=recursive)
 
-    def exec(
+    # Exec I/O is str if encoding is provided (the default)
+    @typing.overload
+    def exec(  # noqa
         self,
         command: List[str],
         *,
@@ -2333,7 +2335,47 @@ class Container:
         stderr: Optional[Union[TextIO, BinaryIO]] = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False
-    ) -> 'pebble.ExecProcess':
+    ) -> pebble.ExecProcess[str]:
+        ...
+
+    # Exec I/O is bytes if encoding is explicitly set to None
+    @typing.overload
+    def exec(  # noqa
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        encoding: None = None,
+        combine_stderr: bool = False
+    ) -> pebble.ExecProcess[bytes]:
+        ...
+
+    def exec(
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        encoding: Optional[str] = 'utf-8',
+        combine_stderr: bool = False
+    ) -> pebble.ExecProcess[Any]:
         """Execute the given command on the remote system.
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
@@ -2351,7 +2393,7 @@ class Container:
             stdin=stdin,
             stdout=stdout,
             stderr=stderr,
-            encoding=encoding,
+            encoding=encoding,  # type: ignore
             combine_stderr=combine_stderr,
         )
 
