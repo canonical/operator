@@ -30,7 +30,7 @@ import time
 import typing
 import weakref
 from abc import ABC, abstractmethod
-from pathlib import Path
+from pathlib import Path, PurePath
 from subprocess import PIPE, CalledProcessError, run
 from typing import (
     Any,
@@ -126,6 +126,7 @@ if typing.TYPE_CHECKING:
 
 
 StrOrPath = typing.Union[str, Path]
+StrOrPurePath = typing.Union[str, PurePath]
 
 logger = logging.getLogger(__name__)
 
@@ -1983,7 +1984,7 @@ class Container:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
-    def pull(self, path: StrOrPath, *,
+    def pull(self, path: StrOrPurePath, *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
@@ -2004,7 +2005,7 @@ class Container:
         return self._pebble.pull(str(path), encoding=encoding)
 
     def push(self,
-             path: StrOrPath,
+             path: StrOrPurePath,
              source: Union[bytes, str, BinaryIO, TextIO],
              *,
              encoding: str = 'utf-8',
@@ -2039,7 +2040,7 @@ class Container:
                           user_id=user_id, user=user,
                           group_id=group_id, group=group)
 
-    def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
+    def list_files(self, path: StrOrPurePath, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['FileInfo']:
         """Return list of directory entries from given path on remote system.
 
@@ -2280,20 +2281,20 @@ class Container:
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
-    def exists(self, path: str) -> bool:
+    def exists(self, path: StrOrPurePath) -> bool:
         """Return true if the path exists on the container filesystem."""
         try:
-            self._pebble.list_files(path, itself=True)
+            self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
             raise err
         return True
 
-    def isdir(self, path: str) -> bool:
+    def isdir(self, path: StrOrPurePath) -> bool:
         """Return true if a directory exists at the given path on the container filesystem."""
         try:
-            files = self._pebble.list_files(path, itself=True)
+            files = self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
@@ -2301,9 +2302,15 @@ class Container:
         return files[0].type == pebble.FileType.DIRECTORY
 
     def make_dir(
-            self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
-            user_id: Optional[int] = None, user: Optional[str] = None,
-            group_id: Optional[int] = None, group: Optional[str] = None):
+            self,
+            path: StrOrPurePath,
+            *,
+            make_parents: bool = False,
+            permissions: Optional[int] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None):
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -2318,19 +2325,19 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        self._pebble.make_dir(path, make_parents=make_parents,
+        self._pebble.make_dir(str(path), make_parents=make_parents,
                               permissions=permissions,
                               user_id=user_id, user=user,
                               group_id=group_id, group=group)
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: StrOrPurePath, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         Args:
             path: Path of the file or directory to delete from the remote system.
             recursive: If True, recursively delete path and everything under it.
         """
-        self._pebble.remove_path(path, recursive=recursive)
+        self._pebble.remove_path(str(path), recursive=recursive)
 
     def exec(
         self,
