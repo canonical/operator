@@ -1806,13 +1806,13 @@ class Container:
     """
 
     def __init__(self, name: str, backend: '_ModelBackend',
-                 pebble_client: Optional['pebble.Client'] = None):
+                 pebble_client: Optional[pebble.Client] = None):
         self.name = name
 
         if pebble_client is None:
             socket_path = f'/charm/containers/{name}/pebble.socket'
             pebble_client = backend.get_pebble(socket_path)
-        self._pebble: 'pebble.Client' = pebble_client
+        self._pebble: pebble.Client = pebble_client
 
     def can_connect(self) -> bool:
         """Report whether the Pebble API is reachable in the container.
@@ -1910,7 +1910,7 @@ class Container:
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
-    def get_plan(self) -> 'pebble.Plan':
+    def get_plan(self) -> pebble.Plan:
         """Get the combined Pebble configuration.
 
         This will immediately reflect changes from any previous
@@ -1929,7 +1929,7 @@ class Container:
         services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
-    def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
+    def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
         Raises :class:`ModelError` if service_name is not found.
@@ -1944,7 +1944,7 @@ class Container:
     def get_checks(
             self,
             *check_names: str,
-            level: Optional['pebble.CheckLevel'] = None) -> 'CheckInfoMapping':
+            level: Optional[pebble.CheckLevel] = None) -> 'CheckInfoMapping':
         """Fetch and return a mapping of check information indexed by check name.
 
         Args:
@@ -1956,7 +1956,7 @@ class Container:
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
-    def get_check(self, check_name: str) -> 'pebble.CheckInfo':
+    def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
         Raises :class:`ModelError` if check_name is not found.
@@ -2025,7 +2025,7 @@ class Container:
                           group_id=group_id, group=group)
 
     def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List['pebble.FileInfo']:
+                   itself: bool = False) -> List[pebble.FileInfo]:
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -2191,7 +2191,7 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: StrOrPath) -> 'pebble.FileInfo':
+    def _build_fileinfo(path: StrOrPath) -> pebble.FileInfo:
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
@@ -2220,8 +2220,8 @@ class Container:
 
     @staticmethod
     def _list_recursive(list_func: Callable[[Path],
-                        Iterable['pebble.FileInfo']],
-                        path: Path) -> Generator['pebble.FileInfo', None, None]:
+                        Iterable[pebble.FileInfo]],
+                        path: Path) -> Generator[pebble.FileInfo, None, None]:
         """Recursively lists all files under path using the given list_func.
 
         Args:
@@ -2416,7 +2416,7 @@ class Container:
 
     # Define this last to avoid clashes with the imported "pebble" module
     @property
-    def pebble(self) -> 'pebble.Client':
+    def pebble(self) -> pebble.Client:
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
@@ -2444,14 +2444,14 @@ class ContainerMapping(Mapping[str, Container]):
         return repr(self._containers)
 
 
-class ServiceInfoMapping(Mapping[str, 'pebble.ServiceInfo']):
+class ServiceInfoMapping(Mapping[str, pebble.ServiceInfo]):
     """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, services: Iterable['pebble.ServiceInfo']):
+    def __init__(self, services: Iterable[pebble.ServiceInfo]):
         self._services = {s.name: s for s in services}
 
     def __getitem__(self, key: str):
@@ -2467,14 +2467,14 @@ class ServiceInfoMapping(Mapping[str, 'pebble.ServiceInfo']):
         return repr(self._services)
 
 
-class CheckInfoMapping(Mapping[str, 'pebble.CheckInfo']):
+class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
     """Map of check names to :class:`ops.pebble.CheckInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, checks: Iterable['pebble.CheckInfo']):
+    def __init__(self, checks: Iterable[pebble.CheckInfo]):
         self._checks = {c.name: c for c in checks}
 
     def __getitem__(self, key: str):
@@ -2960,7 +2960,7 @@ class _ModelBackend:
         cmd.extend(metric_args)
         self._run(*cmd)
 
-    def get_pebble(self, socket_path: str) -> 'pebble.Client':
+    def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
 
