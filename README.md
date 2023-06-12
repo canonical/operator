@@ -1,14 +1,19 @@
 # The Operator Framework
 
+<!-- The text below is also at the top of ops/__init__.py. Keep in sync! -->
+
 The Operator Framework is a Python library (available as [ops](https://pypi.org/project/ops/))
 for developing and testing [Juju](https://juju.is/) charms in a consistent way, using standard Python constructs
 to allow for clean, maintainable, and reusable code.
 
+A charm is an operator -- business logic encapsulated in a reusable software
+package that automates every aspect of an application's life.
+
 Charms written with the Operator Framework support Kubernetes using Juju's
 "sidecar charm" pattern, as well as charms that deploy to Linux-based
-virtual machines.
+machines and containers.
 
-Charms should do one thing and do it well. Each charm drives a single Juju
+Charms should do one thing and do it well. Each charm drives a single
 application and can be integrated with other charms to deliver a complex
 system. A charm handles creating the application in addition to scaling,
 configuration, optimisation, networking, service mesh, observability, and other
@@ -18,7 +23,7 @@ The Operator Framework is part of the Charm SDK (the other part being
 Charmcraft). Full developer documentation for the Charm SDK is available at
 https://juju.is/docs/sdk.
 
-To learn more about the Juju engine, visit https://juju.is/docs/olm.
+To learn more about Juju, visit https://juju.is/docs/olm.
 
 
 ## Pure Python
