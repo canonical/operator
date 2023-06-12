@@ -12,31 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The Charmed Operator Framework.
+"""The Charmed Operator Framework: a Python library for writing Juju charms.
 
-The Charmed Operator Framework allows the development of operators in a simple
-and straightforward way, using standard Python structures to allow for clean,
-maintainable, and reusable code.
+The Charmed Operator Framework is a Python library (available as `ops`_) for
+developing and testing Juju charms in a consistent way, using standard Python
+constructs to allow for clean, maintainable, and reusable code.
 
-A Kubernetes operator is a container that drives lifecycle management,
-configuration, integration and daily actions for an application. Operators
-simplify software management and operations. They capture reusable app domain
-knowledge from experts in a software component that can be shared.
+Charms written with the Charmed Operator Framework support Kubernetes using
+Juju's "sidecar charm" pattern, but they also fully support charms that deploy
+to traditional Linux virtual machines.
 
-The Charmed Operator Framework extends the "operator pattern" to enable Charmed
-Operators, packaged as and often referred to as "charms". Charms are not just
-for Kubernetes but also operators for traditional Linux application management.
-Operators use an Operator Lifecycle Manager (OLM), like Juju, to coordinate
-their work in a cluster. The system uses Golang for concurrent event processing
-under the hood, but enables the operators to be written in Python.
-
-Operators should do one thing and do it well. Each operator drives a single
-application or service and can be composed with other operators to deliver a
-complex application or service. An operator handles instantiation, scaling,
+Charms should do one thing and do it well. Each charm drives a single Juju
+application and can be integrated with other charms to deliver a complex
+system. A charm handles creating the application in addition to scaling,
 configuration, optimisation, networking, service mesh, observability,
-and day-2 operations specific to that application.
+and other day-2 operations specific to the application.
 
-Full developer documentation is available at https://juju.is/docs/sdk.
+The Charmed Operator Framework is part of the Charm SDK (the other part being
+Charmcraft). Full developer documentation for the Charm SDK is available at
+https://juju.is/docs/sdk.
+
+To learn more about the Juju engine, visit https://juju.is/docs/olm.
+
+.. _ops: https://pypi.org/project/ops/
 """
 
 # The "from .X import Y" imports below don't explicitly tell Pyright (or MyPy)

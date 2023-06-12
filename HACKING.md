@@ -105,6 +105,14 @@ Currently we don't publish separate versions of documentation for separate relea
 
 next to the relevant content (e.g. headings, etc.).
 
+
+## Dependencies
+
+The Python dependencies of `ops` are kept as minimal as possible, to avoid
+bloat and to minimise conflict with the charm's dependencies. The dependencies
+are listed in [requirements.txt](requirements.txt).
+
+
 # Publishing a Release
 
 To make a release of the Operator Framework, do the following:
