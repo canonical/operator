@@ -1174,6 +1174,98 @@ def test_recursive_push_and_pull(case):
         assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
 
 
+def change_to_relative_path(case: PushPullCase):
+    if isinstance(case.path, list):
+        path = [p[1:] for p in case.path]
+    else:
+        path = case.path[1:]
+    if path == "":
+        path = "."
+
+    files = [file[1:] for file in case.files]
+    return PushPullCase(
+            name=case.name,
+            path=path,
+            dst=case.dst,
+            files=files,
+            want=case.want,
+            errors=case.errors,
+        )
+
+test_casees = map(change_to_relative_path, recursive_push_pull_cases)
+
+
+@pytest.mark.parametrize('case', test_casees)
+def test_recursive_push_and_pull_relative_paths(case):
+    harness = ops.testing.Harness(ops.CharmBase, meta='''
+        name: test-app
+        containers:
+          foo:
+            resource: foo-image
+        ''')
+    harness.begin()
+    harness.set_can_connect('foo', True)
+    c = harness.model.unit.containers['foo']
+
+    original_working_dir = os.getcwd()
+    # create push test case filesystem structure
+    push_src = tempfile.TemporaryDirectory()
+    os.chdir(push_src.name)
+    for file in case.files:
+        fpath = file
+        if not os.path.dirname(fpath):
+            continue
+        os.makedirs(os.path.dirname(fpath), exist_ok=True)
+        with open(fpath, 'w') as f:
+            f.write('hello')
+
+    # test push
+    if isinstance(case.path, list):
+        # swap slash for dummy dir on root dir so Path.parent doesn't return tmpdir path component
+        # otherwise remove leading slash so we can do the path join properly.
+        push_path = [os.path.join(push_src.name, p if len(p) > 1 else 'foo')
+                     for p in case.path]
+    else:
+        # swap slash for dummy dir on root dir so Path.parent doesn't return tmpdir path component
+        # otherwise remove leading slash so we can do the path join properly.
+        push_path = os.path.join(push_src.name, case.path if len(case.path) > 1 else 'foo')
+
+    errors = []
+    try:
+        c.push_path(push_path, case.dst)
+    except ops.MultiPushPullError as err:
+        if not case.errors:
+            raise
+        errors = {src[len(push_src.name):] for src, _ in err.errors}
+
+    assert case.errors == errors, \
+        f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
+    for fpath in case.want:
+        assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
+
+    # create pull test case filesystem structure
+    pull_dst = tempfile.TemporaryDirectory()
+    for fpath in case.files:
+        c.push("/" + fpath, 'hello', make_dirs=True)
+
+    # test pull
+    errors = []
+    pull_path = "/" + case.path if isinstance(case.path, str) else ("/" + p for p in case.path)
+    try:
+        c.pull_path(pull_path, os.path.join(pull_dst.name, case.dst[1:]))
+    except ops.MultiPushPullError as err:
+        if not case.errors:
+            raise
+        errors = {src for src, _ in err.errors}
+
+    assert case.errors == errors, \
+        f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
+    for fpath in case.want:
+        assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
+
+    os.chdir(original_working_dir)
+
+
 class TestApplication(unittest.TestCase):
 
     def setUp(self):

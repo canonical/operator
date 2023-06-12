@@ -133,3 +133,20 @@ class BaseTestCase(unittest.TestCase):
         meta = ops.CharmMeta()
         model = ops.Model(meta, backend)
         return model
+
+def make_relative_path(relative_to_path, target_path) -> str:
+    """Make target_path relative to the relative_to_path.
+
+    This is a helper function to test pathing created in temporary directories.
+    If two paths are from the root directory and a path operation is applied,
+    the latter path will overwrite the former, hence this helper function is
+    required for testing purposes.
+
+    Args:
+        relative_to_path: The relative path root.
+        target_path: Target path to make relative to.
+    """
+    if target_path.startswith("/"):
+        return os.path.join(relative_to_path, target_path[1:])
+    else:
+        return os.path.join(relative_to_path, target_path)
