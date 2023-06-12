@@ -125,8 +125,6 @@ if typing.TYPE_CHECKING:
     })
 
 
-StrOrPath = typing.Union[str, Path]
-
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
@@ -2058,8 +2056,8 @@ class Container:
                                        pattern=pattern, itself=itself)
 
     def push_path(self,
-                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  source_path: Union[str, Path, Iterable[Union[str, Path]]],
+                  dest_dir: Union[str, PurePath]):
         """Recursively push a local path or files to the remote system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2105,9 +2103,9 @@ class Container:
                 placed.  This must be an absolute path.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+            source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
-            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+            source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -2137,8 +2135,8 @@ class Container:
             raise MultiPushPullError('failed to push one or more files', errors)
 
     def pull_path(self,
-                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  source_path: Union[str, PurePath, Iterable[Union[str, PurePath]]],
+                  dest_dir: Union[str, Path]):
         """Recursively pull a remote path or files to the local system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2185,9 +2183,9 @@ class Container:
                 placed.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+            source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
-            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+            source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -2206,7 +2204,7 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: StrOrPath) -> 'FileInfo':
+    def _build_fileinfo(path: Union[str, Path]) -> 'FileInfo':
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
@@ -2234,8 +2232,7 @@ class Container:
             group=grp.getgrgid(info.st_gid).gr_name)
 
     @staticmethod
-    def _list_recursive(list_func: Callable[[Path],
-                        Iterable['FileInfo']],
+    def _list_recursive(list_func: Callable[[Path], Iterable['FileInfo']],
                         path: Path) -> Generator['FileInfo', None, None]:
         """Recursively lists all files under path using the given list_func.
 
@@ -2259,7 +2256,10 @@ class Container:
                     'skipped unsupported file in Container.[push/pull]_path: %s', info.path)
 
     @staticmethod
-    def _build_destpath(file_path: StrOrPath, source_path: StrOrPath, dest_dir: StrOrPath) -> Path:
+    def _build_destpath(
+            file_path: Union[str, Path],
+            source_path: Union[str, Path],
+            dest_dir: Union[str, Path]) -> Path:
         """Converts a source file and destination dir into a full destination filepath.
 
         file_path:
