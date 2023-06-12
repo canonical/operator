@@ -126,7 +126,6 @@ if typing.TYPE_CHECKING:
 
 
 StrOrPath = typing.Union[str, Path]
-StrOrPurePath = typing.Union[str, PurePath]
 
 logger = logging.getLogger(__name__)
 
@@ -1984,7 +1983,7 @@ class Container:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
-    def pull(self, path: StrOrPurePath, *,
+    def pull(self, path: Union[str, PurePath], *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
@@ -2005,7 +2004,7 @@ class Container:
         return self._pebble.pull(str(path), encoding=encoding)
 
     def push(self,
-             path: StrOrPurePath,
+             path: Union[str, PurePath],
              source: Union[bytes, str, BinaryIO, TextIO],
              *,
              encoding: str = 'utf-8',
@@ -2040,7 +2039,7 @@ class Container:
                           user_id=user_id, user=user,
                           group_id=group_id, group=group)
 
-    def list_files(self, path: StrOrPurePath, *, pattern: Optional[str] = None,
+    def list_files(self, path: Union[str, PurePath], *, pattern: Optional[str] = None,
                    itself: bool = False) -> List['FileInfo']:
         """Return list of directory entries from given path on remote system.
 
@@ -2281,7 +2280,7 @@ class Container:
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
-    def exists(self, path: StrOrPurePath) -> bool:
+    def exists(self, path: Union[str, PurePath]) -> bool:
         """Return true if the path exists on the container filesystem."""
         try:
             self._pebble.list_files(str(path), itself=True)
@@ -2291,7 +2290,7 @@ class Container:
             raise err
         return True
 
-    def isdir(self, path: StrOrPurePath) -> bool:
+    def isdir(self, path: Union[str, PurePath]) -> bool:
         """Return true if a directory exists at the given path on the container filesystem."""
         try:
             files = self._pebble.list_files(str(path), itself=True)
@@ -2303,7 +2302,7 @@ class Container:
 
     def make_dir(
             self,
-            path: StrOrPurePath,
+            path: Union[str, PurePath],
             *,
             make_parents: bool = False,
             permissions: Optional[int] = None,
@@ -2330,7 +2329,7 @@ class Container:
                               user_id=user_id, user=user,
                               group_id=group_id, group=group)
 
-    def remove_path(self, path: StrOrPurePath, *, recursive: bool = False):
+    def remove_path(self, path: Union[str, PurePath], *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         Args:
