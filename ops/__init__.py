@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The Charmed Operator Framework: a Python library for writing Juju charms.
+"""The Operator Framework: a Python library for writing Juju charms.
 
-The Charmed Operator Framework is a Python library (available as `ops`_) for
+The Operator Framework is a Python library (available as `ops`_) for
 developing and testing Juju charms in a consistent way, using standard Python
 constructs to allow for clean, maintainable, and reusable code.
 
-Charms written with the Charmed Operator Framework support Kubernetes using
-Juju's "sidecar charm" pattern, as well as charms that deploy to Linux-based
+Charms written with the Operator Framework support Kubernetes using Juju's
+"sidecar charm" pattern, as well as charms that deploy to Linux-based
 virtual machines.
 
 Charms should do one thing and do it well. Each charm drives a single Juju
@@ -28,7 +28,7 @@ system. A charm handles creating the application in addition to scaling,
 configuration, optimisation, networking, service mesh, observability,
 and other day-2 operations specific to the application.
 
-The Charmed Operator Framework is part of the Charm SDK (the other part being
+The Operator Framework is part of the Charm SDK (the other part being
 Charmcraft). Full developer documentation for the Charm SDK is available at
 https://juju.is/docs/sdk.
 
