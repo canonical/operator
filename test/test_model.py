@@ -1192,10 +1192,10 @@ def change_to_relative_path(case: PushPullCase):
             errors=case.errors,
         )
 
-test_casees = map(change_to_relative_path, recursive_push_pull_cases)
+relative_recursive_push_pull_cases = map(change_to_relative_path, recursive_push_pull_cases)
 
 
-@pytest.mark.parametrize('case', test_casees)
+@pytest.mark.parametrize('case', relative_recursive_push_pull_cases)
 def test_recursive_push_and_pull_relative_paths(case):
     harness = ops.testing.Harness(ops.CharmBase, meta='''
         name: test-app
