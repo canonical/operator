@@ -303,7 +303,7 @@ class Harness(Generic[CharmType]):
             harness.begin_with_initial_hooks()
             # This will cause
             # install, db-relation-created('postgresql'), leader-elected, config-changed, start
-            # db-relation-joined('postrgesql/0'), db-relation-changed('postgresql/0')
+            # db-relation-joined('postgresql/0'), db-relation-changed('postgresql/0')
             # To be fired.
         """
         self.begin()
