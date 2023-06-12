@@ -2113,7 +2113,7 @@ class Container:
 
         def local_list(source_path: Path) -> List[pebble.FileInfo]:
             paths = source_path.iterdir() if source_path.is_dir() else [source_path]
-            files = [self._build_fileinfo(source_path / f) for f in paths]
+            files = [self._build_fileinfo(f) for f in paths]
             return files
 
         errors: List[Tuple[str, Exception]] = []
