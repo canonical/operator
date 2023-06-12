@@ -5,8 +5,8 @@ for developing and testing [Juju](https://juju.is/) charms in a consistent way, 
 to allow for clean, maintainable, and reusable code.
 
 Charms written with the Charmed Operator Framework support Kubernetes using
-Juju's "sidecar charm" pattern, but they also fully support charms that deploy
-to traditional Linux virtual machines.
+Juju's "sidecar charm" pattern, as well as charms that deploy to Linux-based
+virtual machines.
 
 Charms should do one thing and do it well. Each charm drives a single Juju
 application and can be integrated with other charms to deliver a complex
@@ -23,19 +23,19 @@ To learn more about the Juju engine, visit https://juju.is/docs/olm.
 
 ## Pure Python
 
-The framework provides a standardized Python object model that represents the
+The framework provides a standardised Python object model that represents the
 application graph, as well as an event-handling mechanism for distributed
 system coordination and communication.
 
-The latest version of `ops` currently required Python 3.8 or above.
+The latest version of `ops` requires Python 3.8 or above.
 
 Juju itself is written in Go for efficient concurrency even in large
 deployments. Charms can be written in any language, however, we recommend using
-Python with this framework to make development easier and more standardised
-(all new charms at Canonical are written using it).
+Python with this framework to make development easier and more standardised.
+All new charms at Canonical are written using it.
 
 
-# Getting started
+## Getting started
 
 A package of operator code is called a charmed operator or simply "charm".
 You'll use [charmcraft](https://juju.is/docs/sdk/install-charmcraft) to
@@ -44,7 +44,7 @@ of our [charming tutorials](https://juju.is/docs/sdk/tutorials) to get started
 writing your first charm.
 
 
-# Testing your charms
+## Testing your charms
 
 The framework provides a testing harness, so you can ensure that your charm
 does the right thing in different scenarios, without having to create
@@ -69,7 +69,7 @@ self.assertEqual(harness.charm. ...)
 If you need help, have ideas, or would just like to chat with us, reach out on
 the Charmhub [Mattermost].
 
-We also pay attention to the Charmhub [Discourse]
+We also pay attention to the Charmhub [Discourse].
 
 And of course you can deep dive into the [API reference].
 

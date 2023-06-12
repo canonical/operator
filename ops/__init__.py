@@ -19,8 +19,8 @@ developing and testing Juju charms in a consistent way, using standard Python
 constructs to allow for clean, maintainable, and reusable code.
 
 Charms written with the Charmed Operator Framework support Kubernetes using
-Juju's "sidecar charm" pattern, but they also fully support charms that deploy
-to traditional Linux virtual machines.
+Juju's "sidecar charm" pattern, as well as charms that deploy to Linux-based
+virtual machines.
 
 Charms should do one thing and do it well. Each charm drives a single Juju
 application and can be integrated with other charms to deliver a complex
