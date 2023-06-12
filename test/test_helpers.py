@@ -134,6 +134,7 @@ class BaseTestCase(unittest.TestCase):
         model = ops.Model(meta, backend)
         return model
 
+
 def make_relative_path(relative_to_path, target_path) -> str:
     """Make target_path relative to the relative_to_path.
 

@@ -1183,14 +1183,16 @@ def change_to_relative_path(case: PushPullCase):
         path = "."
 
     files = [file[1:] for file in case.files]
+
     return PushPullCase(
-            name=case.name,
-            path=path,
-            dst=case.dst,
-            files=files,
-            want=case.want,
-            errors=case.errors,
-        )
+        name=case.name,
+        path=path,
+        dst=case.dst,
+        files=files,
+        want=case.want,
+        errors=case.errors,
+    )
+
 
 relative_recursive_push_pull_cases = map(change_to_relative_path, recursive_push_pull_cases)
 
