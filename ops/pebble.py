@@ -42,6 +42,7 @@ import urllib.parse
 import urllib.request
 import warnings
 from typing import (
+    IO,
     TYPE_CHECKING,
     Any,
     AnyStr,
@@ -1129,9 +1130,9 @@ class ExecProcess(Generic[AnyStr]):
 
     def __init__(
         self,
-        stdin: Optional[typing.IO[AnyStr]],
-        stdout: Optional[typing.IO[AnyStr]],
-        stderr: Optional[typing.IO[AnyStr]],
+        stdin: Optional[IO[AnyStr]],
+        stdout: Optional[IO[AnyStr]],
+        stderr: Optional[IO[AnyStr]],
         client: 'Client',
         timeout: Optional[float],
         control_ws: '_WebSocket',
@@ -2057,9 +2058,9 @@ class Client:
         user: Optional[str] = None,
         group_id: Optional[int] = None,
         group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
-        stdout: Optional[Union[TextIO, BinaryIO]] = None,
-        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        stdin: Optional[Union[str, TextIO]] = None,
+        stdout: Optional[TextIO] = None,
+        stderr: Optional[TextIO] = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False
     ) -> ExecProcess[str]:
@@ -2078,9 +2079,9 @@ class Client:
         user: Optional[str] = None,
         group_id: Optional[int] = None,
         group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
-        stdout: Optional[Union[TextIO, BinaryIO]] = None,
-        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        stdin: Optional[Union[bytes, BinaryIO]] = None,
+        stdout: Optional[BinaryIO] = None,
+        stderr: Optional[BinaryIO] = None,
         encoding: None = None,
         combine_stderr: bool = False
     ) -> ExecProcess[bytes]:

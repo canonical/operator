@@ -2333,9 +2333,9 @@ class Container:
         user: Optional[str] = None,
         group_id: Optional[int] = None,
         group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
-        stdout: Optional[Union[TextIO, BinaryIO]] = None,
-        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        stdin: Optional[Union[str, TextIO]] = None,
+        stdout: Optional[TextIO] = None,
+        stderr: Optional[TextIO] = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False
     ) -> pebble.ExecProcess[str]:
@@ -2354,9 +2354,9 @@ class Container:
         user: Optional[str] = None,
         group_id: Optional[int] = None,
         group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
-        stdout: Optional[Union[TextIO, BinaryIO]] = None,
-        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        stdin: Optional[Union[bytes, BinaryIO]] = None,
+        stdout: Optional[BinaryIO] = None,
+        stderr: Optional[BinaryIO] = None,
         encoding: None = None,
         combine_stderr: bool = False
     ) -> pebble.ExecProcess[bytes]:
@@ -2393,9 +2393,9 @@ class Container:
             user=user,
             group_id=group_id,
             group=group,
-            stdin=stdin,
-            stdout=stdout,
-            stderr=stderr,
+            stdin=stdin,  # type: ignore
+            stdout=stdout,  # type: ignore
+            stderr=stderr,  # type: ignore
             encoding=encoding,  # type: ignore
             combine_stderr=combine_stderr,
         )
