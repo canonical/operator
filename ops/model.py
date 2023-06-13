@@ -25,13 +25,13 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import tempfile
 import time
 import typing
 import weakref
 from abc import ABC, abstractmethod
 from pathlib import Path, PurePath
-from subprocess import PIPE, CalledProcessError, run
 from typing import (
     Any,
     BinaryIO,
@@ -58,16 +58,6 @@ from ops._private import timeconv, yaml
 from ops.jujuversion import JujuVersion
 
 if typing.TYPE_CHECKING:
-    from pebble import (  # pyright: reportMissingTypeStubs=false
-        CheckInfo,
-        CheckLevel,
-        Client,
-        ExecProcess,
-        FileInfo,
-        LayerDict,
-        Plan,
-        ServiceInfo,
-    )
     from typing_extensions import TypedDict
 
     from ops.framework import _SerializedData
@@ -90,7 +80,7 @@ if typing.TYPE_CHECKING:
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
     # the data structure we can use to initialize pebble layers with.
-    _Layer = Union[str, LayerDict, pebble.Layer]
+    _Layer = Union[str, pebble.LayerDict, pebble.Layer]
 
     # mapping from relation name to a list of relation objects
     _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -755,7 +745,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                                 self._our_unit, self._backend, self._cache)
         relations = self[relation_name]
         num_related = len(relations)
-        self._backend._validate_relation_access(  # pyright: reportPrivateUsage=false
+        self._backend._validate_relation_access(
             relation_name, relations)
         if num_related == 0:
             return None
@@ -1368,7 +1358,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # this flag controls whether the access we have to RelationDataContent
         # is 'strict' aka the same as a deployed charm would have, or whether it is
         # unrestricted, allowing test code to read/write databags at will.
-        return bool(self._backend._hook_is_running)  # pyright: reportPrivateUsage=false
+        return bool(self._backend._hook_is_running)
 
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
@@ -1692,7 +1682,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         self._storage_map: _StorageDictType = {storage_name: None
                                                for storage_name in storage_names}
 
-    def __contains__(self, key: str):  # pyright: reportIncompatibleMethodOverride=false
+    def __contains__(self, key: str):  # pyright: ignore[reportIncompatibleMethodOverride]
         return key in self._storage_map
 
     def __len__(self):
@@ -1814,18 +1804,13 @@ class Container:
     """
 
     def __init__(self, name: str, backend: '_ModelBackend',
-                 pebble_client: Optional['Client'] = None):
+                 pebble_client: Optional[pebble.Client] = None):
         self.name = name
 
         if pebble_client is None:
             socket_path = f'/charm/containers/{name}/pebble.socket'
             pebble_client = backend.get_pebble(socket_path)
-        self._pebble: 'Client' = pebble_client
-
-    @property
-    def pebble(self) -> 'Client':
-        """The low-level :class:`ops.pebble.Client` instance for this container."""
-        return self._pebble
+        self._pebble: pebble.Client = pebble_client
 
     def can_connect(self) -> bool:
         """Report whether the Pebble API is reachable in the container.
@@ -1923,7 +1908,7 @@ class Container:
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
-    def get_plan(self) -> 'Plan':
+    def get_plan(self) -> pebble.Plan:
         """Get the combined Pebble configuration.
 
         This will immediately reflect changes from any previous
@@ -1942,7 +1927,7 @@ class Container:
         services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
-    def get_service(self, service_name: str) -> 'ServiceInfo':
+    def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
         Raises :class:`ModelError` if service_name is not found.
@@ -1957,7 +1942,7 @@ class Container:
     def get_checks(
             self,
             *check_names: str,
-            level: Optional['CheckLevel'] = None) -> 'CheckInfoMapping':
+            level: Optional[pebble.CheckLevel] = None) -> 'CheckInfoMapping':
         """Fetch and return a mapping of check information indexed by check name.
 
         Args:
@@ -1969,7 +1954,7 @@ class Container:
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
-    def get_check(self, check_name: str) -> 'CheckInfo':
+    def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
         Raises :class:`ModelError` if check_name is not found.
@@ -2038,7 +2023,7 @@ class Container:
                           group_id=group_id, group=group)
 
     def list_files(self, path: Union[str, PurePath], *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List['FileInfo']:
+                   itself: bool = False) -> List[pebble.FileInfo]:
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -2204,7 +2189,7 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: Union[str, Path]) -> 'FileInfo':
+    def _build_fileinfo(path: Union[str, Path]) -> pebble.FileInfo:
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
@@ -2232,8 +2217,8 @@ class Container:
             group=grp.getgrgid(info.st_gid).gr_name)
 
     @staticmethod
-    def _list_recursive(list_func: Callable[[Path], Iterable['FileInfo']],
-                        path: Path) -> Generator['FileInfo', None, None]:
+    def _list_recursive(list_func: Callable[[Path], Iterable[pebble.FileInfo]],
+                        path: Path) -> Generator[pebble.FileInfo, None, None]:
         """Recursively lists all files under path using the given list_func.
 
         Args:
@@ -2338,7 +2323,9 @@ class Container:
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 
-    def exec(
+    # Exec I/O is str if encoding is provided (the default)
+    @typing.overload
+    def exec(  # noqa
         self,
         command: List[str],
         *,
@@ -2354,7 +2341,47 @@ class Container:
         stderr: Optional[Union[TextIO, BinaryIO]] = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False
-    ) -> 'ExecProcess':
+    ) -> pebble.ExecProcess[str]:
+        ...
+
+    # Exec I/O is bytes if encoding is explicitly set to None
+    @typing.overload
+    def exec(  # noqa
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        encoding: None = None,
+        combine_stderr: bool = False
+    ) -> pebble.ExecProcess[bytes]:
+        ...
+
+    def exec(
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        encoding: Optional[str] = 'utf-8',
+        combine_stderr: bool = False
+    ) -> pebble.ExecProcess[Any]:
         """Execute the given command on the remote system.
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
@@ -2372,7 +2399,7 @@ class Container:
             stdin=stdin,
             stdout=stdout,
             stderr=stderr,
-            encoding=encoding,
+            encoding=encoding,  # type: ignore
             combine_stderr=combine_stderr,
         )
 
@@ -2392,6 +2419,12 @@ class Container:
             raise TypeError('send_signal expected at least 1 service name, got 0')
 
         self._pebble.send_signal(sig, service_names)
+
+    # Define this last to avoid clashes with the imported "pebble" module
+    @property
+    def pebble(self) -> pebble.Client:
+        """The low-level :class:`ops.pebble.Client` instance for this container."""
+        return self._pebble
 
 
 class ContainerMapping(Mapping[str, Container]):
@@ -2417,14 +2450,14 @@ class ContainerMapping(Mapping[str, Container]):
         return repr(self._containers)
 
 
-class ServiceInfoMapping(Mapping[str, 'ServiceInfo']):
+class ServiceInfoMapping(Mapping[str, pebble.ServiceInfo]):
     """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, services: Iterable['ServiceInfo']):
+    def __init__(self, services: Iterable[pebble.ServiceInfo]):
         self._services = {s.name: s for s in services}
 
     def __getitem__(self, key: str):
@@ -2440,14 +2473,14 @@ class ServiceInfoMapping(Mapping[str, 'ServiceInfo']):
         return repr(self._services)
 
 
-class CheckInfoMapping(Mapping[str, 'CheckInfo']):
+class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
     """Map of check names to :class:`ops.pebble.CheckInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, checks: Iterable['CheckInfo']):
+    def __init__(self, checks: Iterable[pebble.CheckInfo]):
         self._checks = {c.name: c for c in checks}
 
     def __getitem__(self, key: str):
@@ -2609,8 +2642,8 @@ class _ModelBackend:
 
     def _run(self, *args: str, return_output: bool = False,
              use_json: bool = False, input_stream: Optional[str] = None
-             ) -> Union[str, 'JsonObject', None]:
-        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True, encoding='utf-8')
+             ) -> Union[str, 'JsonObject']:
+        kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
@@ -2619,19 +2652,21 @@ class _ModelBackend:
         args = (which_cmd,) + args[1:]
         if use_json:
             args += ('--format=json',)
+        # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
+        #                been fighting with Pyright for half an hour now...
         try:
-            result = run(args, **kwargs)
-        except CalledProcessError as e:
+            result = subprocess.run(args, **kwargs)  # type: ignore
+        except subprocess.CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
-            if result.stdout is None:
+            if result.stdout is None:  # type: ignore
                 return ''
             else:
-                text = typing.cast(str, result.stdout)
+                text: str = result.stdout  # type: ignore
                 if use_json:
-                    return json.loads(text)
+                    return json.loads(text)  # type: ignore
                 else:
-                    return text
+                    return text  # type: ignore
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:
@@ -2931,7 +2966,7 @@ class _ModelBackend:
         cmd.extend(metric_args)
         self._run(*cmd)
 
-    def get_pebble(self, socket_path: str) -> 'Client':
+    def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
 
@@ -3127,7 +3162,7 @@ class _ModelBackendValidator:
 
     @classmethod
     def format_metric_value(cls, value: 'Numerical'):
-        if not isinstance(value, (int, float)):  # pyright: reportUnnecessaryIsInstance=false
+        if not isinstance(value, (int, float)):
             raise ModelError('invalid metric value {!r} provided:'
                              ' must be a positive finite float'.format(value))
 

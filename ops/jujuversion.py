@@ -61,7 +61,7 @@ class JujuVersion:
             return True
         if isinstance(other, str):
             other = type(self)(other)
-        elif not isinstance(other, JujuVersion):  # pyright: reportUnnecessaryIsInstance=false
+        elif not isinstance(other, JujuVersion):
             raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
         return (
             self.major == other.major

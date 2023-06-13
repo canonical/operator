@@ -35,4 +35,7 @@ typeCheckingMode = "strict"
 reportIncompatibleMethodOverride = false
 reportImportCycles = false
 reportMissingModuleSource = false
+reportPrivateUsage = false
+reportUnnecessaryIsInstance = false
+reportUnnecessaryComparison = false
 stubPath = ""
