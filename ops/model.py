@@ -25,13 +25,13 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import tempfile
 import time
 import typing
 import weakref
 from abc import ABC, abstractmethod
-from pathlib import Path
-from subprocess import PIPE, CalledProcessError, run
+from pathlib import Path, PurePath
 from typing import (
     Any,
     BinaryIO,
@@ -94,8 +94,6 @@ if typing.TYPE_CHECKING:
         'egress-subnets': List[str]
     })
 
-
-StrOrPath = typing.Union[str, Path]
 
 logger = logging.getLogger(__name__)
 
@@ -724,7 +722,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                                 self._our_unit, self._backend, self._cache)
         relations = self[relation_name]
         num_related = len(relations)
-        self._backend._validate_relation_access(  # pyright: reportPrivateUsage=false
+        self._backend._validate_relation_access(
             relation_name, relations)
         if num_related == 0:
             return None
@@ -1356,7 +1354,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # this flag controls whether the access we have to RelationDataContent
         # is 'strict' aka the same as a deployed charm would have, or whether it is
         # unrestricted, allowing test code to read/write databags at will.
-        return bool(self._backend._hook_is_running)  # pyright: reportPrivateUsage=false
+        return bool(self._backend._hook_is_running)
 
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
@@ -1680,7 +1678,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         self._storage_map: _StorageDictType = {storage_name: None
                                                for storage_name in storage_names}
 
-    def __contains__(self, key: str):  # pyright: reportIncompatibleMethodOverride=false
+    def __contains__(self, key: str):  # pyright: ignore[reportIncompatibleMethodOverride]
         return key in self._storage_map
 
     def __len__(self):
@@ -1802,13 +1800,13 @@ class Container:
     """
 
     def __init__(self, name: str, backend: '_ModelBackend',
-                 pebble_client: Optional['pebble.Client'] = None):
+                 pebble_client: Optional[pebble.Client] = None):
         self.name = name
 
         if pebble_client is None:
             socket_path = f'/charm/containers/{name}/pebble.socket'
             pebble_client = backend.get_pebble(socket_path)
-        self._pebble: 'pebble.Client' = pebble_client
+        self._pebble: pebble.Client = pebble_client
 
     def can_connect(self) -> bool:
         """Report whether the Pebble API is reachable in the container.
@@ -1907,7 +1905,7 @@ class Container:
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
-    def get_plan(self) -> 'pebble.Plan':
+    def get_plan(self) -> pebble.Plan:
         """Get the combined Pebble configuration.
 
         This will immediately reflect changes from any previous
@@ -1926,7 +1924,7 @@ class Container:
         services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
-    def get_service(self, service_name: str) -> 'pebble.ServiceInfo':
+    def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
         Raises :class:`ModelError` if service_name is not found.
@@ -1941,7 +1939,7 @@ class Container:
     def get_checks(
             self,
             *check_names: str,
-            level: Optional['pebble.CheckLevel'] = None) -> 'CheckInfoMapping':
+            level: Optional[pebble.CheckLevel] = None) -> 'CheckInfoMapping':
         """Fetch and return a mapping of check information indexed by check name.
 
         Args:
@@ -1953,7 +1951,7 @@ class Container:
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
-    def get_check(self, check_name: str) -> 'pebble.CheckInfo':
+    def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
         Raises :class:`ModelError` if check_name is not found.
@@ -1965,7 +1963,7 @@ class Container:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
-    def pull(self, path: StrOrPath, *,
+    def pull(self, path: Union[str, PurePath], *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
@@ -1986,7 +1984,7 @@ class Container:
         return self._pebble.pull(str(path), encoding=encoding)
 
     def push(self,
-             path: StrOrPath,
+             path: Union[str, PurePath],
              source: Union[bytes, str, BinaryIO, TextIO],
              *,
              encoding: str = 'utf-8',
@@ -2021,8 +2019,8 @@ class Container:
                           user_id=user_id, user=user,
                           group_id=group_id, group=group)
 
-    def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List['pebble.FileInfo']:
+    def list_files(self, path: Union[str, PurePath], *, pattern: Optional[str] = None,
+                   itself: bool = False) -> List[pebble.FileInfo]:
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -2040,8 +2038,8 @@ class Container:
                                        pattern=pattern, itself=itself)
 
     def push_path(self,
-                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  source_path: Union[str, Path, Iterable[Union[str, Path]]],
+                  dest_dir: Union[str, PurePath]):
         """Recursively push a local path or files to the remote system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2087,9 +2085,9 @@ class Container:
                 placed.  This must be an absolute path.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+            source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
-            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+            source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -2119,8 +2117,8 @@ class Container:
             raise MultiPushPullError('failed to push one or more files', errors)
 
     def pull_path(self,
-                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  source_path: Union[str, PurePath, Iterable[Union[str, PurePath]]],
+                  dest_dir: Union[str, Path]):
         """Recursively pull a remote path or files to the local system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2167,9 +2165,9 @@ class Container:
                 placed.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+            source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
-            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+            source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -2188,8 +2186,8 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: StrOrPath) -> 'pebble.FileInfo':
-        """Construct a :class:`pebble.FileInfo` object by stat'ing a local path."""
+    def _build_fileinfo(path: Union[str, Path]) -> pebble.FileInfo:
+        """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
             ftype = pebble.FileType.SYMLINK
@@ -2216,9 +2214,8 @@ class Container:
             group=grp.getgrgid(info.st_gid).gr_name)
 
     @staticmethod
-    def _list_recursive(list_func: Callable[[Path],
-                        Iterable['pebble.FileInfo']],
-                        path: Path) -> Generator['pebble.FileInfo', None, None]:
+    def _list_recursive(list_func: Callable[[Path], Iterable[pebble.FileInfo]],
+                        path: Path) -> Generator[pebble.FileInfo, None, None]:
         """Recursively lists all files under path using the given list_func.
 
         Args:
@@ -2241,7 +2238,10 @@ class Container:
                     'skipped unsupported file in Container.[push/pull]_path: %s', info.path)
 
     @staticmethod
-    def _build_destpath(file_path: StrOrPath, source_path: StrOrPath, dest_dir: StrOrPath) -> Path:
+    def _build_destpath(
+            file_path: Union[str, Path],
+            source_path: Union[str, Path],
+            dest_dir: Union[str, Path]) -> Path:
         """Converts a source file and destination dir into a full destination filepath.
 
         file_path:
@@ -2262,20 +2262,20 @@ class Container:
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
-    def exists(self, path: str) -> bool:
+    def exists(self, path: Union[str, PurePath]) -> bool:
         """Return true if the path exists on the container filesystem."""
         try:
-            self._pebble.list_files(path, itself=True)
+            self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
             raise err
         return True
 
-    def isdir(self, path: str) -> bool:
+    def isdir(self, path: Union[str, PurePath]) -> bool:
         """Return true if a directory exists at the given path on the container filesystem."""
         try:
-            files = self._pebble.list_files(path, itself=True)
+            files = self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
@@ -2283,9 +2283,15 @@ class Container:
         return files[0].type == pebble.FileType.DIRECTORY
 
     def make_dir(
-            self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
-            user_id: Optional[int] = None, user: Optional[str] = None,
-            group_id: Optional[int] = None, group: Optional[str] = None):
+            self,
+            path: Union[str, PurePath],
+            *,
+            make_parents: bool = False,
+            permissions: Optional[int] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None):
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -2300,21 +2306,23 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        self._pebble.make_dir(path, make_parents=make_parents,
+        self._pebble.make_dir(str(path), make_parents=make_parents,
                               permissions=permissions,
                               user_id=user_id, user=user,
                               group_id=group_id, group=group)
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: Union[str, PurePath], *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         Args:
             path: Path of the file or directory to delete from the remote system.
             recursive: If True, recursively delete path and everything under it.
         """
-        self._pebble.remove_path(path, recursive=recursive)
+        self._pebble.remove_path(str(path), recursive=recursive)
 
-    def exec(
+    # Exec I/O is str if encoding is provided (the default)
+    @typing.overload
+    def exec(  # noqa
         self,
         command: List[str],
         *,
@@ -2330,7 +2338,47 @@ class Container:
         stderr: Optional[Union[TextIO, BinaryIO]] = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False
-    ) -> 'pebble.ExecProcess':
+    ) -> pebble.ExecProcess[str]:
+        ...
+
+    # Exec I/O is bytes if encoding is explicitly set to None
+    @typing.overload
+    def exec(  # noqa
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        encoding: None = None,
+        combine_stderr: bool = False
+    ) -> pebble.ExecProcess[bytes]:
+        ...
+
+    def exec(
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        encoding: Optional[str] = 'utf-8',
+        combine_stderr: bool = False
+    ) -> pebble.ExecProcess[Any]:
         """Execute the given command on the remote system.
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
@@ -2348,7 +2396,7 @@ class Container:
             stdin=stdin,
             stdout=stdout,
             stderr=stderr,
-            encoding=encoding,
+            encoding=encoding,  # type: ignore
             combine_stderr=combine_stderr,
         )
 
@@ -2371,7 +2419,7 @@ class Container:
 
     # Define this last to avoid clashes with the imported "pebble" module
     @property
-    def pebble(self) -> 'pebble.Client':
+    def pebble(self) -> pebble.Client:
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
@@ -2399,14 +2447,14 @@ class ContainerMapping(Mapping[str, Container]):
         return repr(self._containers)
 
 
-class ServiceInfoMapping(Mapping[str, 'pebble.ServiceInfo']):
+class ServiceInfoMapping(Mapping[str, pebble.ServiceInfo]):
     """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, services: Iterable['pebble.ServiceInfo']):
+    def __init__(self, services: Iterable[pebble.ServiceInfo]):
         self._services = {s.name: s for s in services}
 
     def __getitem__(self, key: str):
@@ -2422,14 +2470,14 @@ class ServiceInfoMapping(Mapping[str, 'pebble.ServiceInfo']):
         return repr(self._services)
 
 
-class CheckInfoMapping(Mapping[str, 'pebble.CheckInfo']):
-    """Map of check names to :class:`pebble.CheckInfo` objects.
+class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
+    """Map of check names to :class:`ops.pebble.CheckInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, checks: Iterable['pebble.CheckInfo']):
+    def __init__(self, checks: Iterable[pebble.CheckInfo]):
         self._checks = {c.name: c for c in checks}
 
     def __getitem__(self, key: str):
@@ -2592,7 +2640,7 @@ class _ModelBackend:
     def _run(self, *args: str, return_output: bool = False,
              use_json: bool = False, input_stream: Optional[str] = None
              ) -> Union[str, Any, None]:
-        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True, encoding='utf-8')
+        kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
@@ -2601,19 +2649,21 @@ class _ModelBackend:
         args = (which_cmd,) + args[1:]
         if use_json:
             args += ('--format=json',)
+        # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
+        #                been fighting with Pyright for half an hour now...
         try:
-            result = run(args, **kwargs)
-        except CalledProcessError as e:
+            result = subprocess.run(args, **kwargs)  # type: ignore
+        except subprocess.CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
-            if result.stdout is None:
+            if result.stdout is None:  # type: ignore
                 return ''
             else:
-                text = typing.cast(str, result.stdout)
+                text: str = result.stdout  # type: ignore
                 if use_json:
-                    return json.loads(text)
+                    return json.loads(text)  # type: ignore
                 else:
-                    return text
+                    return text  # type: ignore
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:
@@ -2913,8 +2963,8 @@ class _ModelBackend:
         cmd.extend(metric_args)
         self._run(*cmd)
 
-    def get_pebble(self, socket_path: str) -> 'pebble.Client':
-        """Create a :class:`pebble.Client` instance from given socket path."""
+    def get_pebble(self, socket_path: str) -> pebble.Client:
+        """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
 
     def planned_units(self) -> int:
@@ -3109,7 +3159,7 @@ class _ModelBackendValidator:
 
     @classmethod
     def format_metric_value(cls, value: Union[int, float]):
-        if not isinstance(value, (int, float)):  # pyright: reportUnnecessaryIsInstance=false
+        if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise ModelError('invalid metric value {!r} provided:'
                              ' must be a positive finite float'.format(value))
 

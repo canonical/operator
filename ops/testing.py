@@ -209,7 +209,7 @@ class Harness(Generic[CharmType]):
         >>>         harness.charm.event_handler(event)
 
         """
-        return self._framework._event_context(event_name)  # pyright: reportPrivateUsage=false
+        return self._framework._event_context(event_name)
 
     def set_can_connect(self, container: Union[str, model.Container], val: bool):
         """Change the simulated connection status of a container's underlying Pebble client.
@@ -268,7 +268,7 @@ class Harness(Generic[CharmType]):
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
-        self._charm = TestCharm(self._framework)
+        self._charm = TestCharm(self._framework)  # type: ignore
 
     def begin_with_initial_hooks(self) -> None:
         """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
@@ -302,7 +302,7 @@ class Harness(Generic[CharmType]):
             harness.begin_with_initial_hooks()
             # This will cause
             # install, db-relation-created('postgresql'), leader-elected, config-changed, start
-            # db-relation-joined('postrgesql/0'), db-relation-changed('postgresql/0')
+            # db-relation-joined('postgresql/0'), db-relation-changed('postgresql/0')
             # To be fired.
         """
         self.begin()
@@ -358,7 +358,7 @@ class Harness(Generic[CharmType]):
         post_setup_sts = self._backend.status_get()
         if post_setup_sts.get("status") == "maintenance" and not post_setup_sts.get("message"):
             self._backend.status_set("unknown", "", is_app=False)
-        all_ids = list(self._backend._relation_names.items())  # pyright:ReportPrivateUsage=false
+        all_ids = list(self._backend._relation_names.items())
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
             rel_app_and_units = self._backend._relation_app_and_units[rel_id]
@@ -438,7 +438,7 @@ class Harness(Generic[CharmType]):
         assert isinstance(charm_config, str)  # type guard
         config = yaml.safe_load(charm_config)
 
-        if not isinstance(config, dict):  # pyright: reportUnnecessaryIsInstance=false
+        if not isinstance(config, dict):
             raise TypeError(config)
         return cast('RawConfig', config)
 
@@ -586,12 +586,12 @@ class Harness(Generic[CharmType]):
             raise RuntimeError('cannot detach storage before Harness is initialised')
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
-        storage_attached = self._backend._storage_is_attached(  # pyright:ReportPrivateUsage=false
+        storage_attached = self._backend._storage_is_attached(
             storage_name, storage_index)
         if storage_attached and self._hooks_enabled:
             self.charm.on[storage_name].storage_detaching.emit(
                 model.Storage(storage_name, storage_index, self._backend))
-        self._backend._storage_detach(storage_id)  # pyright:ReportPrivateUsage=false
+        self._backend._storage_detach(storage_id)
 
     def attach_storage(self, storage_id: str) -> None:
         """Attach a storage device.
@@ -636,12 +636,12 @@ class Harness(Generic[CharmType]):
         if storage_name not in self._meta.storages:
             raise RuntimeError(
                 f"the key '{storage_name}' is not specified as a storage key in metadata")
-        is_attached = self._backend._storage_is_attached(  # pyright:ReportPrivateUsage=false
+        is_attached = self._backend._storage_is_attached(
             storage_name, storage_index)
         if self._charm is not None and self._hooks_enabled and is_attached:
             self.charm.on[storage_name].storage_detaching.emit(
                 model.Storage(storage_name, storage_index, self._backend))
-        self._backend._storage_remove(storage_id)  # pyright:ReportPrivateUsage=false
+        self._backend._storage_remove(storage_id)
 
     def add_relation(self, relation_name: str, remote_app: str) -> int:
         """Declare that there is a new relation between this app and `remote_app`.
@@ -659,22 +659,22 @@ class Harness(Generic[CharmType]):
             The relation_id created by this add_relation.
         """
         relation_id = self._next_relation_id()
-        self._backend._relation_ids_map.setdefault(  # pyright:ReportPrivateUsage=false
+        self._backend._relation_ids_map.setdefault(
             relation_name, []).append(relation_id)
         self._backend._relation_names[relation_id] = relation_name
-        self._backend._relation_list_map[relation_id] = []  # pyright:ReportPrivateUsage=false
-        self._backend._relation_data_raw[relation_id] = {  # pyright:ReportPrivateUsage=false
+        self._backend._relation_list_map[relation_id] = []
+        self._backend._relation_data_raw[relation_id] = {
             remote_app: {},
             self._backend.unit_name: {},
             self._backend.app_name: {}}
 
-        self._backend._relation_app_and_units[relation_id] = {  # pyright:ReportPrivateUsage=false
+        self._backend._relation_app_and_units[relation_id] = {
             "app": remote_app,
             "units": [],
         }
         # Reload the relation_ids list
         if self._model is not None:
-            self._model.relations._invalidate(relation_name)  # pyright:ReportPrivateUsage=false
+            self._model.relations._invalidate(relation_name)
         self._emit_relation_created(relation_name, relation_id, remote_app)
         return relation_id
 
@@ -687,25 +687,25 @@ class Harness(Generic[CharmType]):
         Raises:
             RelationNotFoundError: if relation id is not valid
         """
-        rel_names = self._backend._relation_names   # pyright:ReportPrivateUsage=false
+        rel_names = self._backend._relation_names
         try:
             relation_name = rel_names[relation_id]
             remote_app = self._backend.relation_remote_app_name(relation_id)
         except KeyError as e:
             raise model.RelationNotFoundError from e
 
-        rel_list_map = self._backend._relation_list_map  # pyright:ReportPrivateUsage=false
+        rel_list_map = self._backend._relation_list_map
         for unit_name in rel_list_map[relation_id].copy():
             self.remove_relation_unit(relation_id, unit_name)
 
         self._emit_relation_broken(relation_name, relation_id, remote_app)
         if self._model is not None:
-            self._model.relations._invalidate(relation_name)  # pyright:ReportPrivateUsage=false
+            self._model.relations._invalidate(relation_name)
 
-        self._backend._relation_app_and_units.pop(relation_id)  # pyright:ReportPrivateUsage=false
-        self._backend._relation_data_raw.pop(relation_id)  # pyright:ReportPrivateUsage=false
+        self._backend._relation_app_and_units.pop(relation_id)
+        self._backend._relation_data_raw.pop(relation_id)
         rel_list_map.pop(relation_id)
-        ids_map = self._backend._relation_ids_map  # pyright:ReportPrivateUsage=false
+        ids_map = self._backend._relation_ids_map
         ids_map[relation_name].remove(relation_id)
         rel_names.pop(relation_id)
 
@@ -770,7 +770,7 @@ class Harness(Generic[CharmType]):
                 'Remote unit name invalid: the remote application of {} is called {!r}; '
                 'the remote unit name should be {}/<some-number>, not {!r}.'
                 ''.format(relation_name, app.name, app.name, remote_unit_name))
-        app_and_units = self._backend._relation_app_and_units  # pyright: ReportPrivateUsage=false
+        app_and_units = self._backend._relation_app_and_units
         app_and_units[relation_id]["units"].append(remote_unit_name)
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
@@ -1575,7 +1575,7 @@ class _Secret:
     grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
 
 
-@_copy_docstrings(model._ModelBackend)  # pyright: reportPrivateUsage=false
+@_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
     """This conforms to the interface for ModelBackend but provides canned data.
@@ -1839,7 +1839,7 @@ class _TestingModelBackend:
         index = int(index)
 
         for client in self._pebble_clients.values():
-            client._fs.remove_mount(name)  # pyright: ReportPrivateUsage=false
+            client._fs.remove_mount(name)
 
         if self._storage_is_attached(name, index):
             self._storage_attached[name].remove(index)
@@ -1856,7 +1856,7 @@ class _TestingModelBackend:
                 if mount.storage != name:
                     continue
                 for index, store in self._storage_list[mount.storage].items():
-                    fs = client._fs  # pyright: reportPrivateUsage=false
+                    fs = client._fs
                     fs.add_mount(mount.storage, mount.location, store['location'])
 
         index = int(index)
@@ -2202,7 +2202,7 @@ class _TestingPebbleClient:
         self._backend = backend
 
     def _check_connection(self):
-        if not self._backend._can_connect(self):  # pyright: reportPrivateUsage=false
+        if not self._backend._can_connect(self):
             msg = ('Cannot connect to Pebble; did you forget to call '
                    'begin_with_initial_hooks() or set_can_connect()?')
             raise pebble.ConnectionError(msg)
@@ -2827,7 +2827,7 @@ class _TestingFilesystem:
                 raise FileNotFoundError(str(current_dir.path / token))
             if isinstance(current_dir, _File):
                 raise NotADirectoryError(str(current_dir.path))
-            if not isinstance(current_dir, _Directory):
+            if not isinstance(current_dir, _Directory):  # type: ignore
                 # For now, ignoring other possible cases besides File and Directory (e.g. Symlink).
                 raise NotImplementedError()
         return list(current_dir)

@@ -44,10 +44,12 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
+    AnyStr,
     BinaryIO,
     Callable,
     Dict,
     Generator,
+    Generic,
     Iterable,
     List,
     Optional,
@@ -134,14 +136,6 @@ if TYPE_CHECKING:
         def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
         def write(self, __s: typing.AnyStr) -> int: ...  # noqa
         def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
-
-    class _Readable(Protocol):
-        def read(self, n: int = -1) -> Union[str, bytes]: ...  # noqa
-
-    class _Writeable(Protocol):
-        # We'd need something like io.ReadableBuffer here,
-        # but we can't import that type
-        def write(self, buf: Union[bytes, str, bytearray]) -> int: ...  # noqa
 
     _AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
     _TextOrBinaryIO = Union[TextIO, BinaryIO]
@@ -367,7 +361,7 @@ class ChangeError(Error):
         return f'ChangeError({self.err!r}, {self.change!r})'
 
 
-class ExecError(Error):
+class ExecError(Error, Generic[AnyStr]):
     """Raised when a :meth:`Client.exec` command returns a non-zero exit code.
 
     Attributes:
@@ -388,8 +382,8 @@ class ExecError(Error):
         self,
         command: List[str],
         exit_code: int,
-        stdout: Optional[Union[str, bytes]],
-        stderr: Optional[Union[str, bytes]],
+        stdout: Optional[AnyStr],
+        stderr: Optional[AnyStr],
     ):
         self.command = command
         self.exit_code = exit_code
@@ -1106,7 +1100,7 @@ class CheckInfo:
                 ).format(self=self)
 
 
-class ExecProcess:
+class ExecProcess(Generic[AnyStr]):
     """Represents a process started by :meth:`Client.exec`.
 
     To avoid deadlocks, most users should use :meth:`wait_output` instead of
@@ -1135,9 +1129,9 @@ class ExecProcess:
 
     def __init__(
         self,
-        stdin: Optional['_Readable'],
-        stdout: Optional['_Writeable'],
-        stderr: Optional['_Writeable'],
+        stdin: Optional[typing.IO[AnyStr]],
+        stdout: Optional[typing.IO[AnyStr]],
+        stderr: Optional[typing.IO[AnyStr]],
         client: 'Client',
         timeout: Optional[float],
         control_ws: '_WebSocket',
@@ -1220,7 +1214,7 @@ class ExecProcess:
             exit_code = change.tasks[0].data.get('exit-code', -1)
         return exit_code
 
-    def wait_output(self) -> Tuple[Union[str, bytes], Optional[Union[str, bytes]]]:
+    def wait_output(self) -> Tuple[AnyStr, Optional[AnyStr]]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
         If a timeout was specified to the :meth:`Client.exec` call, this waits
@@ -1247,10 +1241,10 @@ class ExecProcess:
 
         exit_code: int = self._wait()
 
-        out_value: Union[str, bytes] = out.getvalue()
-        err_value: Optional[Union[str, bytes]] = err.getvalue() if err is not None else None
+        out_value = typing.cast(AnyStr, out.getvalue())
+        err_value = typing.cast(AnyStr, err.getvalue()) if err is not None else None
         if exit_code != 0:
-            raise ExecError(self._command, exit_code, out_value, err_value)
+            raise ExecError[AnyStr](self._command, exit_code, out_value, err_value)
 
         return (out_value, err_value)
 
@@ -1306,10 +1300,10 @@ def _reader_to_websocket(reader: '_WebsocketReader',
 
 
 def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
-                         encoding: str):
+                         encoding: Optional[str]):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
-        chunk: Union[str, bytes] = ws.recv()
+        chunk: Union[str, bytes] = typing.cast(Union[str, bytes], ws.recv())
 
         if isinstance(chunk, str):
             try:
@@ -1372,7 +1366,7 @@ class _WebsocketReader(io.BufferedIOBase):
             return b''
 
         while not self.remaining:
-            chunk: Union[str, bytes] = self.ws.recv()
+            chunk: Union[str, bytes] = typing.cast(Union[str, bytes], self.ws.recv())
 
             if isinstance(chunk, str):
                 try:
@@ -2050,6 +2044,48 @@ class Client:
         resp = self._request('POST', '/v1/files', None, body)
         self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
+    # Exec I/O is str if encoding is provided (the default)
+    @typing.overload
+    def exec(  # noqa
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        encoding: str = 'utf-8',
+        combine_stderr: bool = False
+    ) -> ExecProcess[str]:
+        ...
+
+    # Exec I/O is bytes if encoding is explicitly set to None
+    @typing.overload
+    def exec(  # noqa
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        encoding: None = None,
+        combine_stderr: bool = False
+    ) -> ExecProcess[bytes]:
+        ...
+
     def exec(
         self,
         command: List[str],
@@ -2061,12 +2097,12 @@ class Client:
         user: Optional[str] = None,
         group_id: Optional[int] = None,
         group: Optional[str] = None,
-        stdin: Optional['_IOSource'] = None,
-        stdout: Optional['_TextOrBinaryIO'] = None,
-        stderr: Optional['_TextOrBinaryIO'] = None,
+        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
+        stdout: Optional[Union[TextIO, BinaryIO]] = None,
+        stderr: Optional[Union[TextIO, BinaryIO]] = None,
         encoding: Optional[str] = 'utf-8',
         combine_stderr: bool = False
-    ) -> ExecProcess:
+    ) -> ExecProcess[Any]:
         r"""Execute the given command on the remote system.
 
         Most of the parameters are explained in the "Parameters" section
@@ -2272,10 +2308,10 @@ class Client:
                     process_stderr = io.TextIOWrapper(
                         process_stderr, encoding=encoding, newline='')  # type: ignore
 
-        process = ExecProcess(
-            stdin=process_stdin,
-            stdout=process_stdout,  # type: ignore # doesn't like _Writeable
-            stderr=process_stderr,  # type: ignore # doesn't like _Writeable
+        process: ExecProcess[Any] = ExecProcess(
+            stdin=process_stdin,  # type: ignore
+            stdout=process_stdout,  # type: ignore
+            stderr=process_stderr,  # type: ignore
             client=self,
             timeout=timeout,
             stdio_ws=stdio_ws,
@@ -2319,7 +2355,7 @@ class Client:
             raise TypeError('services must be of type Iterable[str], '
                             'not {}'.format(type(services).__name__))
         for s in services:
-            if not isinstance(s, str):  # pyright: reportUnnecessaryIsInstance=false
+            if not isinstance(s, str):
                 raise TypeError(f'service names must be str, not {type(s).__name__}')
 
         if isinstance(sig, int):
