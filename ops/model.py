@@ -31,7 +31,7 @@ import time
 import typing
 import weakref
 from abc import ABC, abstractmethod
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import (
     Any,
     BinaryIO,
@@ -114,8 +114,6 @@ if typing.TYPE_CHECKING:
         'egress-subnets': List[str]
     })
 
-
-StrOrPath = typing.Union[str, Path]
 
 logger = logging.getLogger(__name__)
 
@@ -1968,7 +1966,7 @@ class Container:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
-    def pull(self, path: StrOrPath, *,
+    def pull(self, path: Union[str, PurePath], *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
@@ -1989,7 +1987,7 @@ class Container:
         return self._pebble.pull(str(path), encoding=encoding)
 
     def push(self,
-             path: StrOrPath,
+             path: Union[str, PurePath],
              source: Union[bytes, str, BinaryIO, TextIO],
              *,
              encoding: str = 'utf-8',
@@ -2024,7 +2022,7 @@ class Container:
                           user_id=user_id, user=user,
                           group_id=group_id, group=group)
 
-    def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
+    def list_files(self, path: Union[str, PurePath], *, pattern: Optional[str] = None,
                    itself: bool = False) -> List[pebble.FileInfo]:
         """Return list of directory entries from given path on remote system.
 
@@ -2043,8 +2041,8 @@ class Container:
                                        pattern=pattern, itself=itself)
 
     def push_path(self,
-                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  source_path: Union[str, Path, Iterable[Union[str, Path]]],
+                  dest_dir: Union[str, PurePath]):
         """Recursively push a local path or files to the remote system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2090,9 +2088,9 @@ class Container:
                 placed.  This must be an absolute path.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+            source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
-            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+            source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -2122,8 +2120,8 @@ class Container:
             raise MultiPushPullError('failed to push one or more files', errors)
 
     def pull_path(self,
-                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  source_path: Union[str, PurePath, Iterable[Union[str, PurePath]]],
+                  dest_dir: Union[str, Path]):
         """Recursively pull a remote path or files to the local system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2170,9 +2168,9 @@ class Container:
                 placed.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+            source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
-            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+            source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -2191,7 +2189,7 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: StrOrPath) -> pebble.FileInfo:
+    def _build_fileinfo(path: Union[str, Path]) -> pebble.FileInfo:
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
@@ -2219,8 +2217,7 @@ class Container:
             group=grp.getgrgid(info.st_gid).gr_name)
 
     @staticmethod
-    def _list_recursive(list_func: Callable[[Path],
-                        Iterable[pebble.FileInfo]],
+    def _list_recursive(list_func: Callable[[Path], Iterable[pebble.FileInfo]],
                         path: Path) -> Generator[pebble.FileInfo, None, None]:
         """Recursively lists all files under path using the given list_func.
 
@@ -2244,7 +2241,10 @@ class Container:
                     'skipped unsupported file in Container.[push/pull]_path: %s', info.path)
 
     @staticmethod
-    def _build_destpath(file_path: StrOrPath, source_path: StrOrPath, dest_dir: StrOrPath) -> Path:
+    def _build_destpath(
+            file_path: Union[str, Path],
+            source_path: Union[str, Path],
+            dest_dir: Union[str, Path]) -> Path:
         """Converts a source file and destination dir into a full destination filepath.
 
         file_path:
@@ -2265,20 +2265,20 @@ class Container:
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
-    def exists(self, path: str) -> bool:
+    def exists(self, path: Union[str, PurePath]) -> bool:
         """Return true if the path exists on the container filesystem."""
         try:
-            self._pebble.list_files(path, itself=True)
+            self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
             raise err
         return True
 
-    def isdir(self, path: str) -> bool:
+    def isdir(self, path: Union[str, PurePath]) -> bool:
         """Return true if a directory exists at the given path on the container filesystem."""
         try:
-            files = self._pebble.list_files(path, itself=True)
+            files = self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
@@ -2286,9 +2286,15 @@ class Container:
         return files[0].type == pebble.FileType.DIRECTORY
 
     def make_dir(
-            self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
-            user_id: Optional[int] = None, user: Optional[str] = None,
-            group_id: Optional[int] = None, group: Optional[str] = None):
+            self,
+            path: Union[str, PurePath],
+            *,
+            make_parents: bool = False,
+            permissions: Optional[int] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None):
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -2303,19 +2309,19 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        self._pebble.make_dir(path, make_parents=make_parents,
+        self._pebble.make_dir(str(path), make_parents=make_parents,
                               permissions=permissions,
                               user_id=user_id, user=user,
                               group_id=group_id, group=group)
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: Union[str, PurePath], *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         Args:
             path: Path of the file or directory to delete from the remote system.
             recursive: If True, recursively delete path and everything under it.
         """
-        self._pebble.remove_path(path, recursive=recursive)
+        self._pebble.remove_path(str(path), recursive=recursive)
 
     # Exec I/O is str if encoding is provided (the default)
     @typing.overload
