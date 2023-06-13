@@ -1,17 +1,16 @@
-# The Operator Framework
+# The ops library
 
 <!-- The text below is also at the top of ops/__init__.py. Keep in sync! -->
 
-The Operator Framework is a Python library (available as [ops](https://pypi.org/project/ops/))
-for developing and testing [Juju](https://juju.is/) charms in a consistent way, using standard Python constructs
+The ops library is a Python framework ([`available on PyPI`](https://pypi.org/project/ops/)) for developing
+and testing [Juju](https://juju.is/) charms in a consistent way, using standard Python constructs
 to allow for clean, maintainable, and reusable code.
 
 A charm is an operator -- business logic encapsulated in a reusable software
 package that automates every aspect of an application's life.
 
-Charms written with the Operator Framework support Kubernetes using Juju's
-"sidecar charm" pattern, as well as charms that deploy to Linux-based
-machines and containers.
+Charms written with ops support Kubernetes using Juju's "sidecar charm"
+pattern, as well as charms that deploy to Linux-based machines and containers.
 
 Charms should do one thing and do it well. Each charm drives a single
 application and can be integrated with other charms to deliver a complex
@@ -19,8 +18,8 @@ system. A charm handles creating the application in addition to scaling,
 configuration, optimisation, networking, service mesh, observability, and other
 day-2 operations specific to the application.
 
-The Operator Framework is part of the Charm SDK (the other part being
-Charmcraft). Full developer documentation for the Charm SDK is available at
+The ops library is part of the Charm SDK (the other part being Charmcraft).
+Full developer documentation for the Charm SDK is available at
 https://juju.is/docs/sdk.
 
 To learn more about Juju, visit https://juju.is/docs/olm.
@@ -32,7 +31,7 @@ The framework provides a standardised Python object model that represents the
 application graph, as well as an event-handling mechanism for distributed
 system coordination and communication.
 
-The latest version of `ops` requires Python 3.8 or above.
+The latest version of ops requires Python 3.8 or above.
 
 Juju itself is written in Go for efficient concurrency even in large
 deployments. Charms can be written in any language, however, we recommend using

@@ -117,7 +117,7 @@ class ActionEvent(EventBase):
         raise RuntimeError('cannot defer action events')
 
     def restore(self, snapshot: Dict[str, Any]):
-        """Used by the operator framework to record the action.
+        """Used by the framework to record the action.
 
         Not meant to be called directly by charm code.
         """

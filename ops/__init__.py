@@ -14,32 +14,31 @@
 
 # NOTE: The text below is also at the top of README.md. Keep in sync!
 
-"""The Operator Framework: a Python library for writing Juju charms.
+"""The ops library: a Python framework for writing Juju charms.
 
-The Operator Framework is a Python library (available as `ops`_) for
-developing and testing Juju charms in a consistent way, using standard Python
-constructs to allow for clean, maintainable, and reusable code.
+The ops library is a Python framework (`available on PyPI`_) for developing
+and testing Juju charms in a consistent way, using standard Python constructs
+to allow for clean, maintainable, and reusable code.
 
 A charm is an operator -- business logic encapsulated in a reusable software
 package that automates every aspect of an application's life.
 
-Charms written with the Operator Framework support Kubernetes using Juju's
-"sidecar charm" pattern, as well as charms that deploy to Linux-based
-machines and containers.
+Charms written with ops support Kubernetes using Juju's "sidecar charm"
+pattern, as well as charms that deploy to Linux-based machines and containers.
 
 Charms should do one thing and do it well. Each charm drives a single
 application and can be integrated with other charms to deliver a complex
 system. A charm handles creating the application in addition to scaling,
-configuration, optimisation, networking, service mesh, observability,
-and other day-2 operations specific to the application.
+configuration, optimisation, networking, service mesh, observability, and other
+day-2 operations specific to the application.
 
-The Operator Framework is part of the Charm SDK (the other part being
-Charmcraft). Full developer documentation for the Charm SDK is available at
+The ops library is part of the Charm SDK (the other part being Charmcraft).
+Full developer documentation for the Charm SDK is available at
 https://juju.is/docs/sdk.
 
 To learn more about Juju, visit https://juju.is/docs/olm.
 
-.. _ops: https://pypi.org/project/ops/
+.. _available on PyPI: https://pypi.org/project/ops/
 """
 
 # The "from .X import Y" imports below don't explicitly tell Pyright (or MyPy)

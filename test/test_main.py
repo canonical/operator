@@ -41,7 +41,7 @@ TEST_CHARM_DIR = Path(f"{__file__}/../charms/test_main").resolve()
 
 VERSION_LOGLINE = [
     'juju-log', '--log-level', 'DEBUG', '--',
-    f'Operator Framework {ops.__version__} up and running.',
+    f'ops {ops.__version__} up and running.',
 ]
 
 logger = logging.getLogger(__name__)

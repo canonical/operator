@@ -363,7 +363,7 @@ class Application:
     def planned_units(self) -> int:
         """Get the number of units that Juju has "planned" for this application.
 
-        E.g., if an operator runs "juju deploy foo", then "juju add-unit -n 2 foo", the
+        E.g., if an admin runs "juju deploy foo", then "juju add-unit -n 2 foo", the
         planned unit count for foo will be 3.
 
         The data comes from the Juju agent, based on data it fetches from the
@@ -573,7 +573,7 @@ class Unit:
 
         Calling this registers intent with Juju that the application should be
         accessed on the given port, but the port isn't actually opened
-        externally until the operator runs "juju expose".
+        externally until the admin runs "juju expose".
 
         On Kubernetes sidecar charms, the ports opened are not strictly
         per-unit: Juju will open the union of ports from all units.
@@ -1596,7 +1596,7 @@ class ActiveStatus(StatusBase):
 class BlockedStatus(StatusBase):
     """The unit requires manual intervention.
 
-    An operator has to manually intervene to unblock the unit and let it proceed.
+    An admin has to manually intervene to unblock the unit and let it proceed.
     """
     name = 'blocked'
 
