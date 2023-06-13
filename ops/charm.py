@@ -36,18 +36,8 @@ from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvent
 if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
-    from ops.framework import Handle, JsonObject, _SerializedData
-    from ops.model import Container, Numerical, Relation, Storage
-
-    # CharmMeta also needs these.
-    _ActionParam = Dict[str, 'JsonObject']  # <JSON Schema definition>
-    _ActionMetaDict = TypedDict(
-        '_ActionMetaDict', {
-            'title': str,
-            'description': str,
-            'params': Dict[str, _ActionParam],
-            'required': List[str]},
-        total=False)
+    from ops.framework import Handle
+    from ops.model import Container, Relation, Storage
 
     _Scopes = Literal['global', 'container']
     _RelationMetaDict = TypedDict(
@@ -76,55 +66,10 @@ if TYPE_CHECKING:
             'description': str},
         total=False)
 
-    _PayloadMetaDict = TypedDict('_PayloadMetaDict', {'type': str})
-
     _MountDict = TypedDict(
         '_MountDict', {'storage': Required[str],
                        'location': str},
         total=False)
-    _ContainerMetaDict = TypedDict(
-        '_ContainerMetaDict', {'mounts': List[_MountDict]})
-
-    _CharmMetaDict = TypedDict(
-        '_CharmMetaDict', {  # all are optional
-            'name': Required[str],
-            'summary': Required[str],
-            'description': Required[str],
-            'maintainer': str,
-            'maintainers': List[str],
-            'tags': List[str],
-            'terms': List[str],
-            'series': List[str],
-            'subordinate': bool,
-            'min-juju-version': str,
-            'requires': Dict[str, '_RelationMetaDict'],
-            'provides': Dict[str, '_RelationMetaDict'],
-            'peers': Dict[str, '_RelationMetaDict'],
-            'storage': Dict[str, '_StorageMetaDict'],
-            'resources': Dict[str, '_ResourceMetaDict'],
-            'payloads': Dict[str, '_PayloadMetaDict'],
-            'extra-bindings': Dict[str, Any],  # fixme: _BindingDict?
-            'containers': Dict[str, '_ContainerMetaDict']
-        }, total=False)
-
-    # can't put in *Event because *Event.snapshot needs it.
-    _WorkloadEventSnapshot = TypedDict('_WorkloadEventSnapshot', {
-        'container_name': str
-    }, total=False)
-
-    _RelationDepartedEventSnapshot = TypedDict('_RelationDepartedEventSnapshot', {
-        'relation_name': str,
-        'relation_id': int,
-        'app_name': Optional[str],
-        'unit_name': Optional[str],
-        'departing_unit': Optional[str]
-    }, total=False)
-
-    _StorageEventSnapshot = TypedDict('_StorageEventSnapshot', {
-        'storage_name': str,
-        'storage_index': int,
-        'storage_location': str,
-    }, total=False)
 
 
 class HookEvent(EventBase):
@@ -171,7 +116,7 @@ class ActionEvent(EventBase):
         """
         raise RuntimeError('cannot defer action events')
 
-    def restore(self, snapshot: 'JsonObject'):
+    def restore(self, snapshot: Dict[str, Any]):
         """Used by the operator framework to record the action.
 
         Not meant to be called directly by charm code.
@@ -186,7 +131,7 @@ class ActionEvent(EventBase):
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()
 
-    def set_results(self, results: '_SerializedData'):
+    def set_results(self, results: Dict[str, Any]):
         """Report the result of the action.
 
         Juju eventually only accepts a str:str mapping, so we will attempt
@@ -219,7 +164,7 @@ class ActionEvent(EventBase):
         Args:
             results: The result of the action as a Dict
         """
-        self.framework.model._backend.action_set(results)   # pyright: reportPrivateUsage=false
+        self.framework.model._backend.action_set(results)
 
     def log(self, message: str):
         """Send a message that a user will see while the action is running.
@@ -227,7 +172,7 @@ class ActionEvent(EventBase):
         Args:
             message: The message for the user.
         """
-        self.framework.model._backend.action_log(message)  # pyright: reportPrivateUsage=false
+        self.framework.model._backend.action_log(message)
 
     def fail(self, message: str = ''):
         """Report that this action has failed.
@@ -235,7 +180,7 @@ class ActionEvent(EventBase):
         Args:
             message: Optional message to record why it has failed.
         """
-        self.framework.model._backend.action_fail(message)  # pyright: reportPrivateUsage=false
+        self.framework.model._backend.action_fail(message)
 
 
 class InstallEvent(HookEvent):
@@ -397,7 +342,7 @@ class CollectMetricsEvent(HookEvent):
     how they can interact with Juju.
     """
 
-    def add_metrics(self, metrics: Mapping[str, 'Numerical'],
+    def add_metrics(self, metrics: Mapping[str, Union[int, float]],
                     labels: Optional[Mapping[str, str]] = None):
         """Record metrics that have been gathered by the charm for this unit.
 
@@ -429,13 +374,6 @@ class RelationEvent(HookEvent):
               :class:`~ops.model.Application` level event
 
     """
-    if TYPE_CHECKING:
-        _RelationEventSnapshot = TypedDict('_RelationEventSnapshot', {
-            'relation_name': Required[str],
-            'relation_id': Required[int],
-            'app_name': Optional[str],
-            'unit_name': Optional[str]
-        }, total=False)
 
     def __init__(self, handle: 'Handle', relation: 'Relation',
                  app: Optional[model.Application] = None,
@@ -450,12 +388,12 @@ class RelationEvent(HookEvent):
         self.app = app
         self.unit = unit
 
-    def snapshot(self) -> '_RelationEventSnapshot':
+    def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
-        snapshot: 'RelationEvent._RelationEventSnapshot' = {
+        snapshot: Dict[str, Any] = {
             'relation_name': self.relation.name,
             'relation_id': self.relation.id,
         }
@@ -465,7 +403,7 @@ class RelationEvent(HookEvent):
             snapshot['unit_name'] = self.unit.name
         return snapshot
 
-    def restore(self, snapshot: '_RelationEventSnapshot'):
+    def restore(self, snapshot: Dict[str, Any]):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -560,12 +498,12 @@ class RelationDepartedEvent(RelationEvent):
 
         self._departing_unit_name = departing_unit_name
 
-    def snapshot(self) -> '_RelationDepartedEventSnapshot':
+    def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
-        snapshot = cast('_RelationDepartedEventSnapshot', super().snapshot())
+        snapshot = super().snapshot()
         if self._departing_unit_name:
             snapshot['departing_unit'] = self._departing_unit_name
         return snapshot
@@ -583,13 +521,12 @@ class RelationDepartedEvent(RelationEvent):
             return None
         return self.framework.model.get_unit(self._departing_unit_name)
 
-    def restore(self, snapshot: '_RelationDepartedEventSnapshot'):
+    def restore(self, snapshot: Dict[str, Any]):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
         """
-        super().restore(snapshot)  # type: ignore
-
+        super().restore(snapshot)
         self._departing_unit_name = snapshot.get('departing_unit')
 
 
@@ -625,19 +562,19 @@ class StorageEvent(HookEvent):
         super().__init__(handle)
         self.storage = storage
 
-    def snapshot(self) -> '_StorageEventSnapshot':
+    def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
-        snapshot: '_StorageEventSnapshot' = {}
+        snapshot: Dict[str, Any] = {}
         if isinstance(self.storage, model.Storage):
             snapshot["storage_name"] = self.storage.name
             snapshot["storage_index"] = self.storage.index
             snapshot["storage_location"] = str(self.storage.location)
         return snapshot
 
-    def restore(self, snapshot: '_StorageEventSnapshot'):
+    def restore(self, snapshot: Dict[str, Any]):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -711,17 +648,17 @@ class WorkloadEvent(HookEvent):
 
         self.workload = workload
 
-    def snapshot(self) -> '_WorkloadEventSnapshot':
+    def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
-        snapshot: "_WorkloadEventSnapshot" = {}
+        snapshot: Dict[str, Any] = {}
         if isinstance(self.workload, model.Container):
             snapshot['container_name'] = self.workload.name
         return snapshot
 
-    def restore(self, snapshot: '_WorkloadEventSnapshot'):
+    def restore(self, snapshot: Dict[str, Any]):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -760,14 +697,14 @@ class SecretEvent(HookEvent):
         backend = self.framework.model._backend
         return model.Secret(backend=backend, id=self._id, label=self._label)
 
-    def snapshot(self) -> '_SerializedData':
+    def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
         """
         return {'id': self._id, 'label': self._label}
 
-    def restore(self, snapshot: '_SerializedData'):
+    def restore(self, snapshot: Dict[str, Any]):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -784,7 +721,7 @@ class SecretChangedEvent(SecretEvent):
     secret will be notified via this event that a new revision is available.
 
     Typically, you will want to fetch the new content by calling
-    :meth:`ops.model.Secret.get_content` with :code:`refresh=True` to tell Juju to
+    :meth:`ops.Secret.get_content` with :code:`refresh=True` to tell Juju to
     start tracking the new revision.
     """
 
@@ -794,7 +731,7 @@ class SecretRotateEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret must
     be rotated. The event will keep firing until the owner creates a new
-    revision by calling :meth:`ops.model.Secret.set_content`.
+    revision by calling :meth:`ops.Secret.set_content`.
     """
 
     def defer(self):
@@ -811,7 +748,7 @@ class SecretRemoveEvent(SecretEvent):
     observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, you will want to call :meth:`ops.model.Secret.remove_revision` to
+    Typically, you will want to call :meth:`ops.Secret.remove_revision` to
     remove the now-unused revision.
     """
 
@@ -824,7 +761,7 @@ class SecretRemoveEvent(SecretEvent):
         """The secret revision this event refers to."""
         return self._revision
 
-    def snapshot(self) -> '_SerializedData':
+    def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
@@ -833,7 +770,7 @@ class SecretRemoveEvent(SecretEvent):
         data['revision'] = self._revision
         return data
 
-    def restore(self, snapshot: '_SerializedData'):
+    def restore(self, snapshot: Dict[str, Any]):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -847,7 +784,7 @@ class SecretExpiredEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
-    revision by calling :meth:`model.Secret.remove_revision()`.
+    revision by calling :meth:`ops.Secret.remove_revision()`.
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
@@ -859,7 +796,7 @@ class SecretExpiredEvent(SecretEvent):
         """The secret revision this event refers to."""
         return self._revision
 
-    def snapshot(self) -> '_SerializedData':
+    def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
 
         Not meant to be called by charm code.
@@ -868,7 +805,7 @@ class SecretExpiredEvent(SecretEvent):
         data['revision'] = self._revision
         return data
 
-    def restore(self, snapshot: '_SerializedData'):
+    def restore(self, snapshot: Dict[str, Any]):
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1079,58 +1016,53 @@ class CharmMeta:
         actions_raw: a mapping containing the contents of actions.yaml
 
     """
-    if TYPE_CHECKING:
-        # avoid long line in init
-        _ActionsRaw = Optional[Dict[str, '_ActionMetaDict']]
 
-    def __init__(self,
-                 raw: Optional['_CharmMetaDict'] = None,  # type: ignore
-                 actions_raw: '_ActionsRaw' = None  # type: ignore
-                 ):
-        raw: _CharmMetaDict = raw or cast('_CharmMetaDict', {})
-        actions_raw: Dict[str, _ActionMetaDict] = actions_raw or {}
+    def __init__(self, raw: Optional[Dict[str, Any]] = None,
+                 actions_raw: Optional[Dict[str, Any]] = None):
+        raw_: Dict[str, Any] = raw or {}
+        actions_raw_: Dict[str, Any] = actions_raw or {}
 
-        self.name = raw.get('name', '')
-        self.summary = raw.get('summary', '')
-        self.description = raw.get('description', '')
+        self.name = raw_.get('name', '')
+        self.summary = raw_.get('summary', '')
+        self.description = raw_.get('description', '')
         self.maintainers: List[str] = []
-        if 'maintainer' in raw:
-            self.maintainers.append(raw['maintainer'])
-        if 'maintainers' in raw:
-            self.maintainers.extend(raw['maintainers'])
-        self.tags = raw.get('tags', [])
-        self.terms = raw.get('terms', [])
-        self.series = raw.get('series', [])
-        self.subordinate = raw.get('subordinate', False)
-        self.min_juju_version = raw.get('min-juju-version')
+        if 'maintainer' in raw_:
+            self.maintainers.append(raw_['maintainer'])
+        if 'maintainers' in raw_:
+            self.maintainers.extend(raw_['maintainers'])
+        self.tags = raw_.get('tags', [])
+        self.terms = raw_.get('terms', [])
+        self.series = raw_.get('series', [])
+        self.subordinate = raw_.get('subordinate', False)
+        self.min_juju_version = raw_.get('min-juju-version')
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
-                         for name, rel in raw.get('requires', {}).items()}
+                         for name, rel in raw_.get('requires', {}).items()}
         self.provides = {name: RelationMeta(RelationRole.provides, name, rel)
-                         for name, rel in raw.get('provides', {}).items()}
+                         for name, rel in raw_.get('provides', {}).items()}
         self.peers = {name: RelationMeta(RelationRole.peer, name, rel)
-                      for name, rel in raw.get('peers', {}).items()}
+                      for name, rel in raw_.get('peers', {}).items()}
         self.relations: Dict[str, RelationMeta] = {}
         self.relations.update(self.requires)
         self.relations.update(self.provides)
         self.relations.update(self.peers)
         self.storages = {name: StorageMeta(name, storage)
-                         for name, storage in raw.get('storage', {}).items()}
+                         for name, storage in raw_.get('storage', {}).items()}
         self.resources = {name: ResourceMeta(name, res)
-                          for name, res in raw.get('resources', {}).items()}
+                          for name, res in raw_.get('resources', {}).items()}
         self.payloads = {name: PayloadMeta(name, payload)
-                         for name, payload in raw.get('payloads', {}).items()}
-        self.extra_bindings = raw.get('extra-bindings', {})
-        self.actions = {name: ActionMeta(name, action) for name, action in actions_raw.items()}
+                         for name, payload in raw_.get('payloads', {}).items()}
+        self.extra_bindings = raw_.get('extra-bindings', {})
+        self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
         # This is taken from Charm Metadata v2, but only the "containers" and
         # "containers.name" fields that we need right now for Pebble. See:
         # https://discourse.charmhub.io/t/charm-metadata-v2/3674
         self.containers = {name: ContainerMeta(name, container)
-                           for name, container in raw.get('containers', {}).items()}
+                           for name, container in raw_.get('containers', {}).items()}
 
     @classmethod
     def from_yaml(
             cls, metadata: Union[str, TextIO],
-            actions: Optional[Union[str, TextIO]] = None):
+            actions: Optional[Union[str, TextIO]] = None) -> 'CharmMeta':
         """Instantiate a CharmMeta from a YAML description of metadata.yaml.
 
         Args:
@@ -1138,10 +1070,10 @@ class CharmMeta:
                 This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
             actions: YAML description of Actions for this charm (eg actions.yaml)
         """
-        meta = cast('_CharmMetaDict', yaml.safe_load(metadata))
+        meta = yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = cast(Dict[str, '_ActionMetaDict'], yaml.safe_load(actions))
+            raw_actions = cast(Optional[Dict[str, Any]], yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
         return cls(meta, raw_actions)
@@ -1210,7 +1142,7 @@ class StorageMeta:
         storage_name: Name of storage
         type: Storage type
         description: A text description of the storage
-        read_only: Whether or not the storage is read only
+        read_only: True if the storage is read-only
         minimum_size: Minimum size of storage
         location: Mount point of storage
         multiple_range: Range of numeric qualifiers when multiple storage units are used
@@ -1258,7 +1190,7 @@ class PayloadMeta:
         type: Payload type
     """
 
-    def __init__(self, name: str, raw: '_PayloadMetaDict'):
+    def __init__(self, name: str, raw: Dict[str, Any]):
         self.payload_name = name
         self.type = raw['type']
 
@@ -1266,7 +1198,7 @@ class PayloadMeta:
 class ActionMeta:
     """Object containing metadata about an action's definition."""
 
-    def __init__(self, name: str, raw: Optional['_ActionMetaDict'] = None):
+    def __init__(self, name: str, raw: Optional[Dict[str, Any]] = None):
         raw = raw or {}
         self.name = name
         self.title = raw.get('title', '')
@@ -1285,7 +1217,7 @@ class ContainerMeta:
         name: Name of container (key in the YAML)
     """
 
-    def __init__(self, name: str, raw: '_ContainerMetaDict'):
+    def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
         self._mounts: Dict[str, ContainerStorageMeta] = {}
 

@@ -68,7 +68,7 @@ def _get_charm_dir():
     return charm_dir
 
 
-def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource[Any]',
+def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource',
                        link_to: Union[str, Path]):
     """Create a symlink for a particular event.
 
@@ -150,7 +150,7 @@ def _emit_charm_event(charm: 'CharmBase', event_name: str):
 
 
 def _get_event_args(charm: 'CharmBase',
-                    bound_event: 'BoundEvent[Any]') -> Tuple[List[Any], Dict[str, Any]]:
+                    bound_event: 'BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
     event_type = bound_event.event_type
     model = charm.framework.model
 
@@ -376,7 +376,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     """
     charm_dir = _get_charm_dir()
 
-    model_backend = ops.model._ModelBackend()  # pyright: reportPrivateUsage=false
+    model_backend = ops.model._ModelBackend()
     debug = ('JUJU_DEBUG' in os.environ)
     setup_root_logging(model_backend, debug=debug)
     logger.debug("Operator Framework %s up and running.", ops.__version__)  # type:ignore

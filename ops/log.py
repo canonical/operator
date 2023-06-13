@@ -22,7 +22,7 @@ if typing.TYPE_CHECKING:
     from types import TracebackType
     from typing import Type
 
-    from ops.model import _ModelBackend  # pyright: reportPrivateUsage=false
+    from ops.model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):
