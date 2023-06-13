@@ -105,6 +105,7 @@ __all__ = [
     'ObjectEvents',
     'PreCommitEvent',
     'PrefixedEvents',
+    'Serializable',
     'StoredDict',
     'StoredList',
     'StoredSet',
@@ -174,7 +175,7 @@ from . import charm  # type: ignore # noqa: F401
 # This allows "import ops; ops.main(Charm)" to work as expected.
 from . import main  # type: ignore # noqa: F401
 
-# Explicitly import names from sub-modules so users can just "import ops" and
+# Explicitly import names from submodules so users can just "import ops" and
 # then use them as "ops.X".
 from .charm import (  # noqa: F401
     ActionEvent,
@@ -236,6 +237,7 @@ from .framework import (  # noqa: F401
     ObjectEvents,
     PreCommitEvent,
     PrefixedEvents,
+    Serializable,
     StoredDict,
     StoredList,
     StoredSet,

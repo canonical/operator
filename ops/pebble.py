@@ -42,6 +42,7 @@ import urllib.parse
 import urllib.request
 import warnings
 from typing import (
+    IO,
     TYPE_CHECKING,
     Any,
     AnyStr,
@@ -63,6 +64,57 @@ import websocket  # type: ignore
 
 from ops._private import timeconv, yaml
 
+# Public as these are used in the Container.add_layer signature
+ServiceDict = typing.TypedDict('ServiceDict',
+                               {'summary': str,
+                                'description': str,
+                                'startup': str,
+                                'override': str,
+                                'command': str,
+                                'after': Sequence[str],
+                                'before': Sequence[str],
+                                'requires': Sequence[str],
+                                'environment': Dict[str, str],
+                                'user': str,
+                                'user-id': Optional[int],
+                                'group': str,
+                                'group-id': Optional[int],
+                                'on-success': str,
+                                'on-failure': str,
+                                'on-check-failure': Dict[str, Any],
+                                'backoff-delay': str,
+                                'backoff-factor': Optional[int],
+                                'backoff-limit': str,
+                                },
+                               total=False)
+
+HttpDict = typing.TypedDict('HttpDict', {'url': str})
+TcpDict = typing.TypedDict('TcpDict', {'port': int})
+ExecDict = typing.TypedDict('ExecDict', {'command': str})
+
+CheckDict = typing.TypedDict('CheckDict',
+                             {'override': str,
+                              'level': Union['CheckLevel', str],
+                              'period': Optional[str],
+                              'timeout': Optional[str],
+                              'http': Optional[HttpDict],
+                              'tcp': Optional[TcpDict],
+                              'exec': Optional[ExecDict],
+                              'threshold': Optional[int]},
+                             total=False)
+
+LayerDict = typing.TypedDict('LayerDict',
+                             {'summary': str,
+                              'description': str,
+                              'services': Dict[str, ServiceDict],
+                              'checks': Dict[str, CheckDict]},
+                             total=False)
+
+PlanDict = typing.TypedDict('PlanDict',
+                            {'services': Dict[str, ServiceDict],
+                             'checks': Dict[str, CheckDict]},
+                            total=False)
+
 if TYPE_CHECKING:
     from email.message import Message
 
@@ -73,7 +125,6 @@ if TYPE_CHECKING:
         def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
 
     _HeaderHandler = Callable[[bytes], None]
-    _StrOrBytes = Union[str, bytes]
 
     # tempfile.NamedTemporaryFile has an odd interface because of that
     # 'name' attribute, so we need to make a Protocol for it.
@@ -92,12 +143,12 @@ if TYPE_CHECKING:
     _IOSource = Union[str, bytes, _AnyStrFileLikeIO]
 
     _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
-    _InfoDict = TypedDict('_InfoDict',
-                          {"name": str,
-                           "level": Optional[Union['CheckLevel', str]],
-                           "status": Union['CheckStatus', str],
-                           "failures": int,
-                           "threshold": int})
+    _CheckInfoDict = TypedDict('_CheckInfoDict',
+                               {"name": str,
+                                "level": Optional[Union['CheckLevel', str]],
+                                "status": Union['CheckStatus', str],
+                                "failures": int,
+                                "threshold": int})
     _FileInfoDict = TypedDict('_FileInfoDict',
                               {"path": str,
                                "name": str,
@@ -109,19 +160,6 @@ if TYPE_CHECKING:
                                "group-id": Optional[int],
                                "group": Optional[str],
                                "type": Union['FileType', str]})
-    _HttpDict = TypedDict('_HttpDict', {'url': str})
-    _TcpDict = TypedDict('_TcpDict', {'port': int})
-    _ExecDict = TypedDict('_ExecDict', {'command': str})
-    _CheckDict = TypedDict('_CheckDict',
-                           {'override': str,
-                            'level': Union['CheckLevel', str],
-                            'period': Optional[str],
-                            'timeout': Optional[str],
-                            'http': Optional[_HttpDict],
-                            'tcp': Optional[_TcpDict],
-                            'exec': Optional[_ExecDict],
-                            'threshold': Optional[int]},
-                           total=False)
 
     _AuthDict = TypedDict('_AuthDict',
                           {'permissions': Optional[str],
@@ -137,34 +175,11 @@ if TYPE_CHECKING:
                                  {'startup': Union['ServiceStartup', str],
                                   'current': Union['ServiceStatus', str],
                                   'name': str})
-    _ServiceDict = TypedDict('_ServiceDict',
-                             {'summary': str,
-                              'description': str,
-                              'startup': str,
-                              'override': str,
-                              'command': str,
-                              'after': Sequence[str],
-                              'before': Sequence[str],
-                              'requires': Sequence[str],
-                              'environment': Dict[str, str],
-                              'user': str,
-                              'user-id': Optional[int],
-                              'group': str,
-                              'group-id': Optional[int],
-                              'on-success': str,
-                              'on-failure': str,
-                              'on-check-failure': Dict[str, Any],
-                              'backoff-delay': str,
-                              'backoff-factor': Optional[int],
-                              'backoff-limit': str,
-                              },
-                             total=False)
 
     _ProgressDict = TypedDict('_ProgressDict',
                               {'label': str,
                                'done': int,
                                'total': int})
-    _TaskData = Dict[str, Any]
     _TaskDict = TypedDict('_TaskDict',
                           {'id': 'TaskID',
                            'kind': str,
@@ -174,8 +189,7 @@ if TYPE_CHECKING:
                            'progress': _ProgressDict,
                            'spawn-time': str,
                            'ready-time': str,
-                           'data': Optional[_TaskData]})
-    _ChangeData = TypedDict('_ChangeData', {})
+                           'data': Optional[Dict[str, Any]]})
     _ChangeDict = TypedDict('_ChangeDict',
                             {'id': str,
                              'kind': str,
@@ -186,19 +200,7 @@ if TYPE_CHECKING:
                              'tasks': Optional[List[_TaskDict]],
                              'err': Optional[str],
                              'ready-time': Optional[str],
-                             'data': Optional[_ChangeData]})
-
-    _PlanDict = TypedDict('_PlanDict',
-                          {'services': Dict[str, _ServiceDict],
-                           'checks': Dict[str, _CheckDict]},
-                          total=False)
-    # public as it is accessed by ops.testing
-    LayerDict = TypedDict('LayerDict',
-                          {'summary': str,
-                           'description': str,
-                           'services': Dict[str, _ServiceDict],
-                           'checks': Dict[str, _CheckDict]},
-                          total=False)
+                             'data': Optional[Dict[str, Any]]})
 
     _Error = TypedDict('_Error',
                        {'kind': str,
@@ -533,7 +535,7 @@ class Task:
         progress: TaskProgress,
         spawn_time: datetime.datetime,
         ready_time: Optional[datetime.datetime],
-        data: Optional['_TaskData'] = None,
+        data: Optional[Dict[str, Any]] = None,
     ):
         self.id = id
         self.kind = kind
@@ -596,7 +598,7 @@ class Change:
         err: Optional[str],
         spawn_time: datetime.datetime,
         ready_time: Optional[datetime.datetime],
-        data: Optional['_ChangeData'] = None,
+        data: Optional[Dict[str, Any]] = None,
     ):
         self.id = id
         self.kind = kind
@@ -650,7 +652,7 @@ class Plan:
 
     def __init__(self, raw: str):
         d = yaml.safe_load(raw) or {}  # type: ignore
-        d = typing.cast('_PlanDict', d)
+        d = typing.cast('PlanDict', d)
 
         self._raw = raw
         self._services: Dict[str, Service] = {name: Service(name, service)
@@ -674,14 +676,14 @@ class Plan:
         """
         return self._checks
 
-    def to_dict(self) -> '_PlanDict':
+    def to_dict(self) -> 'PlanDict':
         """Convert this plan to its dict representation."""
         fields = [
             ('services', {name: service.to_dict() for name, service in self._services.items()}),
             ('checks', {name: check.to_dict() for name, check in self._checks.items()}),
         ]
         dct = {name: value for name, value in fields if value}
-        return typing.cast('_PlanDict', dct)
+        return typing.cast('PlanDict', dct)
 
     def to_yaml(self) -> str:
         """Return this plan's YAML representation."""
@@ -753,9 +755,9 @@ class Layer:
 class Service:
     """Represents a service description in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Optional['_ServiceDict'] = None):
+    def __init__(self, name: str, raw: Optional['ServiceDict'] = None):
         self.name = name
-        dct: _ServiceDict = raw or {}
+        dct: ServiceDict = raw or {}
         self.summary = dct.get('summary', '')
         self.description = dct.get('description', '')
         self.startup = dct.get('startup', '')
@@ -776,7 +778,7 @@ class Service:
         self.backoff_factor = dct.get('backoff-factor')
         self.backoff_limit = dct.get('backoff-limit', '')
 
-    def to_dict(self) -> '_ServiceDict':
+    def to_dict(self) -> 'ServiceDict':
         """Convert this service object to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -800,7 +802,7 @@ class Service:
             ('backoff-limit', self.backoff_limit),
         ]
         dct = {name: value for name, value in fields if value}
-        return typing.cast('_ServiceDict', dct)
+        return typing.cast('ServiceDict', dct)
 
     def _merge(self, other: 'Service'):
         """Merges this service object with another service definition.
@@ -821,7 +823,7 @@ class Service:
     def __repr__(self) -> str:
         return f'Service({self.to_dict()!r})'
 
-    def __eq__(self, other: Union['_ServiceDict', 'Service']) -> bool:
+    def __eq__(self, other: Union['ServiceDict', 'Service']) -> bool:
         """Reports whether this service configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -891,9 +893,9 @@ class ServiceInfo:
 class Check:
     """Represents a check in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Optional['_CheckDict'] = None):
+    def __init__(self, name: str, raw: Optional['CheckDict'] = None):
         self.name = name
-        dct: _CheckDict = raw or {}
+        dct: CheckDict = raw or {}
         self.override: str = dct.get('override', '')
         try:
             level: Union[CheckLevel, str] = CheckLevel(dct.get('level', ''))
@@ -907,19 +909,19 @@ class Check:
         http = dct.get('http')
         if http is not None:
             http = copy.deepcopy(http)
-        self.http: Optional[_HttpDict] = http
+        self.http: Optional[HttpDict] = http
 
         tcp = dct.get('tcp')
         if tcp is not None:
             tcp = copy.deepcopy(tcp)
-        self.tcp: Optional[_TcpDict] = tcp
+        self.tcp: Optional[TcpDict] = tcp
 
         exec_ = dct.get('exec')
         if exec_ is not None:
             exec_ = copy.deepcopy(exec_)
-        self.exec: Optional[_ExecDict] = exec_
+        self.exec: Optional[ExecDict] = exec_
 
-    def to_dict(self) -> '_CheckDict':
+    def to_dict(self) -> 'CheckDict':
         """Convert this check object to its dict representation."""
         level: str = self.level.value if isinstance(self.level, CheckLevel) else self.level
         fields = [
@@ -933,12 +935,12 @@ class Check:
             ('exec', self.exec),
         ]
         dct = {name: value for name, value in fields if value}
-        return typing.cast('_CheckDict', dct)
+        return typing.cast('CheckDict', dct)
 
     def __repr__(self) -> str:
         return f'Check({self.to_dict()!r})'
 
-    def __eq__(self, other: Union['_CheckDict', 'Check']) -> bool:
+    def __eq__(self, other: Union['CheckDict', 'Check']) -> bool:
         """Reports whether this check configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1071,7 +1073,7 @@ class CheckInfo:
         self.threshold = threshold
 
     @classmethod
-    def from_dict(cls, d: '_InfoDict') -> 'CheckInfo':
+    def from_dict(cls, d: '_CheckInfoDict') -> 'CheckInfo':
         """Create new :class:`CheckInfo` object from dict parsed from JSON."""
         try:
             level = CheckLevel(d.get('level', ''))
@@ -1128,9 +1130,9 @@ class ExecProcess(Generic[AnyStr]):
 
     def __init__(
         self,
-        stdin: Optional[Union[io.BytesIO, io.StringIO]],
-        stdout: Optional[Union[io.BytesIO, io.StringIO]],
-        stderr: Optional[Union[io.BytesIO, io.StringIO]],
+        stdin: Optional[IO[AnyStr]],
+        stdout: Optional[IO[AnyStr]],
+        stderr: Optional[IO[AnyStr]],
         client: 'Client',
         timeout: Optional[float],
         control_ws: '_WebSocket',
@@ -1302,7 +1304,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
                          encoding: Optional[str]):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
-        chunk: _StrOrBytes = typing.cast('_StrOrBytes', ws.recv())
+        chunk: Union[str, bytes] = typing.cast(Union[str, bytes], ws.recv())
 
         if isinstance(chunk, str):
             try:
@@ -1334,7 +1336,7 @@ class _WebsocketWriter(io.BufferedIOBase):
         """Denote this file-like object as writable."""
         return True
 
-    def write(self, chunk: '_StrOrBytes') -> int:
+    def write(self, chunk: Union[str, bytes]) -> int:
         """Write chunk to the websocket."""
         if not isinstance(chunk, bytes):
             raise TypeError(f'value to write must be bytes, not {type(chunk).__name__}')
@@ -1358,14 +1360,14 @@ class _WebsocketReader(io.BufferedIOBase):
         """Denote this file-like object as readable."""
         return True
 
-    def read(self, n: int = -1) -> '_StrOrBytes':
+    def read(self, n: int = -1) -> Union[str, bytes]:
         """Read up to n bytes from the websocket (or one message if n<0)."""
         if self.eof:
             # Calling read() multiple times after EOF should still return EOF
             return b''
 
         while not self.remaining:
-            chunk = typing.cast('_StrOrBytes', self.ws.recv())
+            chunk: Union[str, bytes] = typing.cast(Union[str, bytes], self.ws.recv())
 
             if isinstance(chunk, str):
                 try:
@@ -1387,11 +1389,11 @@ class _WebsocketReader(io.BufferedIOBase):
 
         if n < 0:
             n = len(self.remaining)
-        result: '_StrOrBytes' = self.remaining[:n]
+        result: Union[str, bytes] = self.remaining[:n]
         self.remaining = self.remaining[n:]
         return result
 
-    def read1(self, n: int = -1) -> '_StrOrBytes':
+    def read1(self, n: int = -1) -> Union[str, bytes]:
         """An alias for read."""
         return self.read(n)
 
@@ -1949,7 +1951,7 @@ class Client:
                 b'\r\n',
             ])
 
-            content: '_StrOrBytes' = source_io.read(self._chunk_size)
+            content: Union[str, bytes] = source_io.read(self._chunk_size)
             while content:
                 if isinstance(content, str):
                     content = content.encode(encoding)
@@ -2056,9 +2058,9 @@ class Client:
         user: Optional[str] = None,
         group_id: Optional[int] = None,
         group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
-        stdout: Optional[Union[TextIO, BinaryIO]] = None,
-        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        stdin: Optional[Union[str, TextIO]] = None,
+        stdout: Optional[TextIO] = None,
+        stderr: Optional[TextIO] = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False
     ) -> ExecProcess[str]:
@@ -2077,9 +2079,9 @@ class Client:
         user: Optional[str] = None,
         group_id: Optional[int] = None,
         group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
-        stdout: Optional[Union[TextIO, BinaryIO]] = None,
-        stderr: Optional[Union[TextIO, BinaryIO]] = None,
+        stdin: Optional[Union[bytes, BinaryIO]] = None,
+        stdout: Optional[BinaryIO] = None,
+        stderr: Optional[BinaryIO] = None,
         encoding: None = None,
         combine_stderr: bool = False
     ) -> ExecProcess[bytes]:

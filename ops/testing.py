@@ -60,7 +60,7 @@ from ops.model import RelationNotFoundError
 if TYPE_CHECKING:
     from typing_extensions import TypedDict
 
-    from ops.model import UnitOrApplication, _NetworkDict
+    from ops.model import _NetworkDict
 
     ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
     _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
@@ -79,11 +79,10 @@ if TYPE_CHECKING:
         'units': List[str]
     })
 
-    _ConfigValue = Union[str, int, float, bool]
     _ConfigOption = TypedDict('_ConfigOption', {
         'type': Literal['string', 'int', 'float', 'boolean'],
         'description': str,
-        'default': _ConfigValue
+        'default': Union[str, int, float, bool],
     })
     _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
     _RawStatus = TypedDict('_RawStatus', {
@@ -215,7 +214,7 @@ class Harness(Generic[CharmType]):
     def set_can_connect(self, container: Union[str, model.Container], val: bool):
         """Change the simulated connection status of a container's underlying Pebble client.
 
-        After calling this, :meth:`ops.model.Container.can_connect` will return val.
+        After calling this, :meth:`ops.Container.can_connect` will return val.
         """
         if isinstance(container, str):
             container = self.model.unit.get_container(container)
@@ -1041,7 +1040,7 @@ class Harness(Generic[CharmType]):
 
     def _update_config(
             self,
-            key_values: Optional[Mapping[str, '_ConfigValue']] = None,
+            key_values: Optional[Mapping[str, Union[str, int, float, bool]]] = None,
             unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
@@ -1078,7 +1077,7 @@ class Harness(Generic[CharmType]):
 
     def update_config(
             self,
-            key_values: Optional[Mapping[str, '_ConfigValue']] = None,
+            key_values: Optional[Mapping[str, Union[str, int, float, bool]]] = None,
             unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
@@ -1247,8 +1246,8 @@ class Harness(Generic[CharmType]):
         """Add a secret owned by the remote application or unit specified.
 
         This is named :code:`add_model_secret` instead of :code:`add_secret`
-        to avoid confusion with the :meth:`ops.model.Application.add_secret`
-        and :meth:`ops.model.Unit.add_secret` methods used by secret owner
+        to avoid confusion with the :meth:`ops.Application.add_secret`
+        and :meth:`ops.Unit.add_secret` methods used by secret owner
         charms.
 
         Args:
@@ -1479,7 +1478,7 @@ def _copy_docstrings(source_cls: Any):
 
 
 @_record_calls
-class _TestingConfig(Dict[str, '_ConfigValue']):
+class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
     """Represents the Juju Config."""
     _supported_types = {
         'string': str,
@@ -1499,7 +1498,7 @@ class _TestingConfig(Dict[str, '_ConfigValue']):
             self._config_set(key, value)
 
     @staticmethod
-    def _load_defaults(charm_config: 'RawConfig') -> Dict[str, '_ConfigValue']:
+    def _load_defaults(charm_config: 'RawConfig') -> Dict[str, Union[str, int, float, bool]]:
         """Load default values from config.yaml.
 
         Handle the case where a user doesn't supply explicit config snippets.
@@ -1509,7 +1508,7 @@ class _TestingConfig(Dict[str, '_ConfigValue']):
         cfg: Dict[str, '_ConfigOption'] = charm_config.get('options', {})
         return {key: value.get('default', None) for key, value in cfg.items()}
 
-    def _config_set(self, key: str, value: '_ConfigValue'):
+    def _config_set(self, key: str, value: Union[str, int, float, bool]):
         # this is only called by the harness itself
         # we don't do real serialization/deserialization, but we do check that the value
         # has the expected type.
@@ -1717,7 +1716,7 @@ class _TestingModelBackend:
             raise model.RelationNotFoundError()
         return self._relation_data_raw[relation_id][member_name]
 
-    def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
+    def update_relation_data(self, relation_id: int, _entity: Union[model.Unit, model.Application],
                              key: str, value: str):
         # this is where the 'real' backend would call relation-set.
         raw_data = self._relation_data_raw[relation_id][_entity.name]
