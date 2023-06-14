@@ -870,30 +870,24 @@ class CharmEvents(ObjectEvents):
 class CharmBase(Object):
     """Base class that represents the charm overall.
 
-    :class:`CharmBase` is used to create a charm. This is done by inheriting
-    from :class:`CharmBase` and customising the sub class as required. So to
+    :code:`CharmBase` is used to create a charm. This is done by inheriting
+    from :code:`CharmBase` and customising the subclass as required. So to
     create your own charm, say ``MyCharm``, define a charm class and set up the
     required event handlers (“hooks”) in its constructor::
 
         import logging
 
-        from ops.charm import CharmBase
-        from ops.main import main
+        import ops
 
-        logger = logging.getLogger(__name__)
-
-        def MyCharm(CharmBase):
+        def MyCharm(ops.CharmBase):
             def __init__(self, *args):
-                logger.debug('Initializing Charm')
-
                 super().__init__(*args)
-
                 self.framework.observe(self.on.config_changed, self._on_config_changed)
                 self.framework.observe(self.on.stop, self._on_stop)
                 # ...
 
         if __name__ == "__main__":
-            main(MyCharm)
+            ops.main(MyCharm)
 
     As shown in the example above, a charm class is instantiated by
     :code:`ops.main` rather than charm authors directly instantiating a
@@ -904,10 +898,11 @@ class CharmBase(Object):
             charm.
     """
 
-    # note that without the #: below, sphinx will copy the whole of CharmEvents
-    # docstring inline which is less than ideal.
-    # Used to set up event handlers; see :class:`CharmEvents`.
-    on = CharmEvents()  # type: ignore
+    on: CharmEvents = CharmEvents()  # type: ignore
+    """This property is used to create an event handler using :meth:`Framework.observe`,
+    and can be one of the events listed at :class:`CharmEvents`.
+    """
+
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
