@@ -2883,9 +2883,9 @@ class _ModelBackend:
             raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
         self._run('storage-add', f'{name}={count}')
 
-    def action_get(self) -> Dict[str, str]:  # todo: what do we know about this dict?
+    def action_get(self) -> Dict[str, Any]:
         out = self._run('action-get', return_output=True, use_json=True)
-        return typing.cast(Dict[str, str], out)
+        return typing.cast(Dict[str, Any], out)
 
     def action_set(self, results: Dict[str, Any]) -> None:
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
