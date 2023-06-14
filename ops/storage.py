@@ -340,7 +340,7 @@ def juju_backend_available() -> bool:
 
 
 class _JujuStorageBackend:
-    """Implements the interface from the Operator framework to Juju's state-get/set/etc."""
+    """Implements the interface from the ops library to Juju's state-get/set/etc."""
 
     def set(self, key: str, value: Any) -> None:
         """Set a key to a given value.

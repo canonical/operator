@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Setup script for the Operator Framework."""
+"""Setup script for the ops library."""
 
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path

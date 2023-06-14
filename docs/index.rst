@@ -1,31 +1,31 @@
 
-Welcome to The Operator Framework's documentation!
-==================================================
+ops library API reference
+=========================
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-ops package
-===========
+ops module
+==========
 
 .. automodule:: ops
 
 
 ops.pebble module
------------------
+=================
 
 .. automodule:: ops.pebble
 
 
 ops.testing module
-------------------
+==================
 
 .. automodule:: ops.testing
 
 
-Indices and tables
-==================
+Indices
+=======
 
 * :ref:`genindex`
 * :ref:`modindex`
