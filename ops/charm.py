@@ -155,11 +155,11 @@ class ActionEvent(EventBase):
         results object. Thus, the results object might contain the following keys,
         additionally to those specified by the charm code:
 
-         - Stdout
-         - Stderr
-         - Stdout-encoding
-         - Stderr-encoding
-         - ReturnCode
+        - Stdout
+        - Stderr
+        - Stdout-encoding
+        - Stderr-encoding
+        - ReturnCode
 
         Args:
             results: The result of the action as a Dict
