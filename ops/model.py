@@ -293,11 +293,13 @@ class Application:
 
     This might be your application, or might be an application that you are related to.
     Charmers should not instantiate Application objects directly, but should use
+    :attr:`Model.app` to get the application this unit is part of, or
     :meth:`Model.get_app` if they need a reference to a given application.
+    """
 
-    Attributes:
-        name: The name of this application (eg, 'mysql'). This name may differ from the name of
-            the charm, if the user has deployed it to a different name.
+    name: str
+    """The name of this application (eg, 'mysql'). This name may differ from the name of
+    the charm, if the user has deployed it to a different name.
     """
 
     def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
@@ -777,11 +779,10 @@ class BindingMapping(Mapping[str, 'Binding']):
 
 
 class Binding:
-    """Binding to a network space.
+    """Binding to a network space."""
 
-    Attributes:
-        name: The name of the endpoint this binding represents (eg, 'db')
-    """
+    name: str
+    """The name of the endpoint this binding represents (eg, 'db')."""
 
     def __init__(self, name: str, relation_id: Optional[int], backend: '_ModelBackend'):
         self.name = name
