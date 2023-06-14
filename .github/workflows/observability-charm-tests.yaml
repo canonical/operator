@@ -10,8 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         charm-repo:
-# TODO(benhoyt): reinstate after https://github.com/canonical/alertmanager-k8s-operator-1/pull/1 is merged
-#          - "canonical/alertmanager-k8s-operator"
+          - "canonical/alertmanager-k8s-operator"
           - "canonical/prometheus-k8s-operator"
           - "canonical/grafana-k8s-operator"
 
