@@ -103,13 +103,13 @@ class ActionEvent(EventBase):
     To respond with the result of the action, call :meth:`set_results`. To add
     progress messages that are visible as the action is progressing use
     :meth:`log`.
-
-    Attributes:
-        params: The parameters passed to the action.
     """
 
+    params: Dict[str, Any]
+    """The parameters passed to the action."""
+
     def defer(self):
-        """Action events are not deferable like other events.
+        """Action events are not deferrable like other events.
 
         This is because an action runs synchronously and the administrator
         is waiting for the result.
