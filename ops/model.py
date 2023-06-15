@@ -25,13 +25,13 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import tempfile
 import time
 import typing
 import weakref
 from abc import ABC, abstractmethod
-from pathlib import Path
-from subprocess import PIPE, CalledProcessError, run
+from pathlib import Path, PurePath
 from typing import (
     Any,
     BinaryIO,
@@ -48,7 +48,6 @@ from typing import (
     TextIO,
     Tuple,
     Type,
-    TypeVar,
     Union,
 )
 
@@ -57,56 +56,27 @@ import ops.pebble as pebble
 from ops._private import timeconv, yaml
 from ops.jujuversion import JujuVersion
 
+# a k8s spec is a mapping from names/"types" to json/yaml spec objects
+K8sSpec = Mapping[str, Any]
+
 if typing.TYPE_CHECKING:
-    from pebble import (  # pyright: reportMissingTypeStubs=false
-        CheckInfo,
-        CheckLevel,
-        Client,
-        ExecProcess,
-        FileInfo,
-        LayerDict,
-        Plan,
-        ServiceInfo,
-    )
     from typing_extensions import TypedDict
 
-    from ops.framework import _SerializedData
     from ops.testing import _ConfigOption
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
     _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
-    Numerical = Union[int, float]
-
-    # all types that can be (de) serialized to json(/yaml) fom Python builtins
-    JsonObject = Union[None, Numerical, bool, str,
-                       Dict[str, 'JsonObject'],
-                       List['JsonObject'],
-                       Tuple['JsonObject', ...]]
-
-    # a k8s spec is a mapping from names/"types" to json/yaml spec objects
-    # public since it is used in ops.testing
-    K8sSpec = Mapping[str, JsonObject]
 
     _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
-    # the data structure we can use to initialize pebble layers with.
-    _Layer = Union[str, LayerDict, pebble.Layer]
-
     # mapping from relation name to a list of relation objects
     _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
-    # mapping from relation name to relation metadata
-    _RelationsMeta_Raw = Dict[str, ops.charm.RelationMeta]
     # mapping from container name to container metadata
     _ContainerMeta_Raw = Dict[str, ops.charm.ContainerMeta]
-    _NetworkAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]
-    _Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
-
-    _ServiceInfoMapping = Mapping[str, pebble.ServiceInfo]
 
     # relation data is a string key: string value mapping so far as the
     # controller is concerned
     _RelationDataContent_Raw = Dict[str, str]
-    UnitOrApplication = Union['Unit', 'Application']
     UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
 
     _AddressDict = TypedDict('_AddressDict', {
@@ -125,8 +95,6 @@ if typing.TYPE_CHECKING:
     })
 
 
-StrOrPath = typing.Union[str, Path]
-
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
@@ -143,7 +111,7 @@ class Model:
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
-        relations: _RelationsMeta_Raw = meta.relations
+        relations: Dict[str, 'ops.RelationMeta'] = meta.relations
         self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
         self._config = ConfigData(self._backend)
         resources: Iterable[str] = meta.resources
@@ -291,16 +259,13 @@ class Model:
             return Secret(self._backend, id=info.id, label=info.label)
 
 
-_T = TypeVar('_T', bound='UnitOrApplication')
-
-
 class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         if typing.TYPE_CHECKING:
             # (entity type, name): instance.
             _weakcachetype = weakref.WeakValueDictionary[
                 Tuple['UnitOrApplicationType', str],
-                Optional['UnitOrApplication']]
+                Optional[Union['Unit', 'Application']]]
 
         self._meta = meta
         self._backend = backend
@@ -398,7 +363,7 @@ class Application:
     def planned_units(self) -> int:
         """Get the number of units that Juju has "planned" for this application.
 
-        E.g., if an operator runs "juju deploy foo", then "juju add-unit -n 2 foo", the
+        E.g., if an admin runs "juju deploy foo", then "juju add-unit -n 2 foo", the
         planned unit count for foo will be 3.
 
         The data comes from the Juju agent, based on data it fetches from the
@@ -608,7 +573,7 @@ class Unit:
 
         Calling this registers intent with Juju that the application should be
         accessed on the given port, but the port isn't actually opened
-        externally until the operator runs "juju expose".
+        externally until the admin runs "juju expose".
 
         On Kubernetes sidecar charms, the ports opened are not strictly
         per-unit: Juju will open the union of ports from all units.
@@ -701,7 +666,7 @@ class LazyMapping(Mapping[str, str], ABC):
 class RelationMapping(Mapping[str, List['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
-    def __init__(self, relations_meta: '_RelationsMeta_Raw', our_unit: 'Unit',
+    def __init__(self, relations_meta: Dict[str, 'ops.RelationMeta'], our_unit: 'Unit',
                  backend: '_ModelBackend', cache: '_ModelCache'):
         self._peers: Set[str] = set()
         for name, relation_meta in relations_meta.items():
@@ -757,7 +722,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                                 self._our_unit, self._backend, self._cache)
         relations = self[relation_name]
         num_related = len(relations)
-        self._backend._validate_relation_access(  # pyright: reportPrivateUsage=false
+        self._backend._validate_relation_access(
             relation_name, relations)
         if num_related == 0:
             return None
@@ -842,7 +807,7 @@ class Binding:
         return self._network
 
 
-def _cast_network_address(raw: str) -> '_NetworkAddress':
+def _cast_network_address(raw: str) -> Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]:
     # fields marked as network addresses need not be IPs; they could be
     # hostnames that juju failed to resolve. In that case, we'll log a
     # debug message and leave it as-is.
@@ -857,27 +822,37 @@ class Network:
     """Network space details.
 
     Charm authors should not instantiate this directly, but should get access to the Network
-    definition from :meth:`Model.get_binding` and its ``network`` attribute.
-
-    Attributes:
-        interfaces: A list of :class:`NetworkInterface` details. This includes the
-            information about how your application should be configured (eg, what
-            IP addresses should you bind to.)
-            Note that multiple addresses for a single interface are represented as multiple
-            interfaces. (eg, ``[NetworkInfo('ens1', '10.1.1.1/32'),
-            NetworkInfo('ens1', '10.1.2.1/32'])``)
-        ingress_addresses: A list of :class:`ipaddress.ip_address` objects representing the IP
-            addresses that other units should use to get in touch with you.
-        egress_subnets: A list of :class:`ipaddress.ip_network` representing the subnets that
-            other units will see you connecting from. Due to things like NAT it isn't always
-            possible to narrow it down to a single address, but when it is clear, the CIDRs
-            will be constrained to a single address. (eg, 10.0.0.1/32)
-    Args:
-        network_info: A dict of network information as returned by ``network-get``.
+    definition from :meth:`Model.get_binding` and its :code:`network` attribute.
     """
 
+    interfaces: List['NetworkInterface']
+    """A list of network interface details. This includes the information
+    about how your application should be configured (for example, what IP
+    addresses you should bind to).
+
+    Multiple addresses for a single interface are represented as multiple
+    interfaces, for example::
+
+        [NetworkInfo('ens1', '10.1.1.1/32'), NetworkInfo('ens1', '10.1.2.1/32'])
+    """
+
+    """A list of IP addresses that other units should use to get in touch with you."""
+    ingress_addresses: List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]
+
+    """A list of networks representing the subnets that other units will see
+    you connecting from. Due to things like NAT it isn't always possible to
+    narrow it down to a single address, but when it is clear, the CIDRs will
+    be constrained to a single address (for example, 10.0.0.1/32).
+    """
+    egress_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
+
     def __init__(self, network_info: '_NetworkDict'):
-        self.interfaces: List[NetworkInterface] = []
+        """Initialize a Network instance.
+
+        Args:
+            network_info: A dict of network information as returned by ``network-get``.
+        """
+        self.interfaces = []
         # Treat multiple addresses on an interface as multiple logical
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
@@ -886,15 +861,17 @@ class Network:
             if addrs is not None:
                 for address_info in addrs:
                     self.interfaces.append(NetworkInterface(interface_name, address_info))
-        self.ingress_addresses: List[_NetworkAddress] = []
+
+        self.ingress_addresses = []
         for address in network_info.get('ingress-addresses', []):
             self.ingress_addresses.append(_cast_network_address(address))
-        self.egress_subnets: List[_Network] = []
+
+        self.egress_subnets = []
         for subnet in network_info.get('egress-subnets', []):
             self.egress_subnets.append(ipaddress.ip_network(subnet))
 
     @property
-    def bind_address(self) -> Optional['_NetworkAddress']:
+    def bind_address(self) -> Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
         """A single address that your application should bind() to.
 
         For the common case where there is a single answer. This represents a single
@@ -907,7 +884,8 @@ class Network:
             return None
 
     @property
-    def ingress_address(self) -> Optional['_NetworkAddress']:
+    def ingress_address(
+            self) -> Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
         """The address other applications should use to connect to your unit.
 
         Due to things like public/private addresses, NAT and tunneling, the address you bind()
@@ -925,11 +903,17 @@ class NetworkInterface:
 
     Charmers should not instantiate this type directly. Instead use :meth:`Model.get_binding`
     to get the network information for a given endpoint.
+    """
 
-    Attributes:
-        name: The name of the interface (eg. 'eth0', or 'ens1')
-        subnet: An :class:`ipaddress.ip_network` representation of the IP for the network
-            interface. This may be a single address (eg '10.0.1.2/32')
+    name: str
+    """The name of the interface (for example, 'eth0' or 'ens1')."""
+
+    address: Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]
+    """The address of the network interface."""
+
+    subnet: Optional[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
+    """The subnet of the network interface. This may be a single address
+    (for example, '10.0.1.2/32').
     """
 
     def __init__(self, name: str, address_info: '_AddressDict'):
@@ -944,7 +928,7 @@ class NetworkInterface:
 
         # The value field may be empty.
         address_ = _cast_network_address(address) if address else None
-        self.address: Optional[_NetworkAddress] = address_
+        self.address = address_
         cidr: str = address_info.get('cidr')
         # The cidr field may be empty, see LP: #1864102.
         if cidr:
@@ -954,7 +938,7 @@ class NetworkInterface:
             subnet = ipaddress.ip_network(address)
         else:
             subnet = None
-        self.subnet: Optional[_Network] = subnet
+        self.subnet = subnet
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
@@ -988,7 +972,7 @@ class SecretInfo:
         self.rotates = rotates
 
     @classmethod
-    def from_dict(cls, id: str, d: '_SerializedData') -> 'SecretInfo':
+    def from_dict(cls, id: str, d: Dict[str, Any]) -> 'SecretInfo':
         """Create new SecretInfo object from ID and dict parsed from JSON."""
         expires = typing.cast(Optional[str], d.get('expires'))
         try:
@@ -1227,7 +1211,7 @@ class Secret:
         Args:
             revision: The secret revision to remove. If being called from a
                 secret event, this should usually be set to
-                :attr:`SecretEvent.revision`.
+                :attr:`SecretRemoveEvent.revision`.
         """
         if self._id is None:
             self._id = self.get_info().id
@@ -1248,8 +1232,8 @@ class Relation:
     """Represents an established relation between this application and another application.
 
     This class should not be instantiated directly, instead use :meth:`Model.get_relation`
-    or :attr:`ops.charm.RelationEvent.relation`. This is principally used by
-    :class:`ops.charm.RelationMeta` to represent the relationships between charms.
+    or :attr:`ops.RelationEvent.relation`. This is principally used by
+    :class:`ops.RelationMeta` to represent the relationships between charms.
 
     Attributes:
         name: The name of the local endpoint of the relation (eg 'db')
@@ -1298,7 +1282,7 @@ class Relation:
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
 
-class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
+class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent']):
     """Represents the various data buckets of a given relation.
 
     Each unit and application involved in a relation has their own data bucket.
@@ -1315,7 +1299,7 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
 
     def __init__(self, relation: Relation, our_unit: Unit, backend: '_ModelBackend'):
         self.relation = weakref.proxy(relation)
-        self._data: Dict[UnitOrApplication, RelationDataContent] = {
+        self._data: Dict[Union['Unit', 'Application'], RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
             our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
         }
@@ -1328,7 +1312,7 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
                 self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
             })
 
-    def __contains__(self, key: 'UnitOrApplication'):
+    def __contains__(self, key: Union['Unit', 'Application']):
         return key in self._data
 
     def __len__(self):
@@ -1337,7 +1321,7 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: 'UnitOrApplication'):
+    def __getitem__(self, key: Union['Unit', 'Application']):
         if key is None and self.relation.app is None:
             # NOTE: if juju gets fixed to set JUJU_REMOTE_APP for relation-broken events, then that
             # should fix the only case in which we expect key to be None - potentially removing the
@@ -1358,7 +1342,7 @@ class RelationData(Mapping['UnitOrApplication', 'RelationDataContent']):
 class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
 
-    def __init__(self, relation: 'Relation', entity: 'UnitOrApplication',
+    def __init__(self, relation: 'Relation', entity: Union['Unit', 'Application'],
                  backend: '_ModelBackend'):
         self.relation = relation
         self._entity = entity
@@ -1370,7 +1354,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # this flag controls whether the access we have to RelationDataContent
         # is 'strict' aka the same as a deployed charm would have, or whether it is
         # unrestricted, allowing test code to read/write databags at will.
-        return bool(self._backend._hook_is_running)  # pyright: reportPrivateUsage=false
+        return bool(self._backend._hook_is_running)
 
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
@@ -1612,7 +1596,7 @@ class ActiveStatus(StatusBase):
 class BlockedStatus(StatusBase):
     """The unit requires manual intervention.
 
-    An operator has to manually intervene to unblock the unit and let it proceed.
+    An admin has to manually intervene to unblock the unit and let it proceed.
     """
     name = 'blocked'
 
@@ -1694,7 +1678,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         self._storage_map: _StorageDictType = {storage_name: None
                                                for storage_name in storage_names}
 
-    def __contains__(self, key: str):  # pyright: reportIncompatibleMethodOverride=false
+    def __contains__(self, key: str):  # pyright: ignore[reportIncompatibleMethodOverride]
         return key in self._storage_map
 
     def __len__(self):
@@ -1755,7 +1739,7 @@ class Storage:
 
     @property
     def id(self) -> int:
-        """DEPRECATED (use ".index"): The index associated with the storage."""
+        """Deprecated -- use :attr:`Storage.index` instead."""
         logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
         return self.index
 
@@ -1816,18 +1800,13 @@ class Container:
     """
 
     def __init__(self, name: str, backend: '_ModelBackend',
-                 pebble_client: Optional['Client'] = None):
+                 pebble_client: Optional[pebble.Client] = None):
         self.name = name
 
         if pebble_client is None:
             socket_path = f'/charm/containers/{name}/pebble.socket'
             pebble_client = backend.get_pebble(socket_path)
-        self._pebble: 'Client' = pebble_client
-
-    @property
-    def pebble(self) -> 'Client':
-        """The low-level :class:`ops.pebble.Client` instance for this container."""
-        return self._pebble
+        self._pebble: pebble.Client = pebble_client
 
     def can_connect(self) -> bool:
         """Report whether the Pebble API is reachable in the container.
@@ -1909,7 +1888,8 @@ class Container:
 
         self._pebble.stop_services(service_names)
 
-    def add_layer(self, label: str, layer: '_Layer', *, combine: bool = False):
+    def add_layer(self, label: str, layer: Union[str, pebble.LayerDict, pebble.Layer], *,
+                  combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         Args:
@@ -1925,7 +1905,7 @@ class Container:
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
-    def get_plan(self) -> 'Plan':
+    def get_plan(self) -> pebble.Plan:
         """Get the combined Pebble configuration.
 
         This will immediately reflect changes from any previous
@@ -1934,7 +1914,7 @@ class Container:
         """
         return self._pebble.get_plan()
 
-    def get_services(self, *service_names: str) -> '_ServiceInfoMapping':
+    def get_services(self, *service_names: str) -> Mapping[str, 'pebble.ServiceInfo']:
         """Fetch and return a mapping of status information indexed by service name.
 
         If no service names are specified, return status information for all
@@ -1944,7 +1924,7 @@ class Container:
         services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
-    def get_service(self, service_name: str) -> 'ServiceInfo':
+    def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
         Raises :class:`ModelError` if service_name is not found.
@@ -1959,7 +1939,7 @@ class Container:
     def get_checks(
             self,
             *check_names: str,
-            level: Optional['CheckLevel'] = None) -> 'CheckInfoMapping':
+            level: Optional[pebble.CheckLevel] = None) -> 'CheckInfoMapping':
         """Fetch and return a mapping of check information indexed by check name.
 
         Args:
@@ -1971,7 +1951,7 @@ class Container:
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
-    def get_check(self, check_name: str) -> 'CheckInfo':
+    def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
         Raises :class:`ModelError` if check_name is not found.
@@ -1983,7 +1963,7 @@ class Container:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
-    def pull(self, path: StrOrPath, *,
+    def pull(self, path: Union[str, PurePath], *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
@@ -2004,7 +1984,7 @@ class Container:
         return self._pebble.pull(str(path), encoding=encoding)
 
     def push(self,
-             path: StrOrPath,
+             path: Union[str, PurePath],
              source: Union[bytes, str, BinaryIO, TextIO],
              *,
              encoding: str = 'utf-8',
@@ -2039,8 +2019,8 @@ class Container:
                           user_id=user_id, user=user,
                           group_id=group_id, group=group)
 
-    def list_files(self, path: StrOrPath, *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List['FileInfo']:
+    def list_files(self, path: Union[str, PurePath], *, pattern: Optional[str] = None,
+                   itself: bool = False) -> List[pebble.FileInfo]:
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -2058,8 +2038,8 @@ class Container:
                                        pattern=pattern, itself=itself)
 
     def push_path(self,
-                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  source_path: Union[str, Path, Iterable[Union[str, Path]]],
+                  dest_dir: Union[str, PurePath]):
         """Recursively push a local path or files to the remote system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2105,9 +2085,9 @@ class Container:
                 placed.  This must be an absolute path.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+            source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
-            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+            source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -2137,8 +2117,8 @@ class Container:
             raise MultiPushPullError('failed to push one or more files', errors)
 
     def pull_path(self,
-                  source_path: Union[StrOrPath, Iterable[StrOrPath]],
-                  dest_dir: StrOrPath):
+                  source_path: Union[str, PurePath, Iterable[Union[str, PurePath]]],
+                  dest_dir: Union[str, Path]):
         """Recursively pull a remote path or files to the local system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2185,9 +2165,9 @@ class Container:
                 placed.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
-            source_paths = typing.cast(Iterable[StrOrPath], source_path)
+            source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
-            source_paths = typing.cast(Iterable[StrOrPath], [source_path])
+            source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
         source_paths = [Path(p) for p in source_paths]
         dest_dir = Path(dest_dir)
 
@@ -2206,7 +2186,7 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: StrOrPath) -> 'FileInfo':
+    def _build_fileinfo(path: Union[str, Path]) -> pebble.FileInfo:
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
@@ -2234,9 +2214,8 @@ class Container:
             group=grp.getgrgid(info.st_gid).gr_name)
 
     @staticmethod
-    def _list_recursive(list_func: Callable[[Path],
-                        Iterable['FileInfo']],
-                        path: Path) -> Generator['FileInfo', None, None]:
+    def _list_recursive(list_func: Callable[[Path], Iterable[pebble.FileInfo]],
+                        path: Path) -> Generator[pebble.FileInfo, None, None]:
         """Recursively lists all files under path using the given list_func.
 
         Args:
@@ -2259,7 +2238,10 @@ class Container:
                     'skipped unsupported file in Container.[push/pull]_path: %s', info.path)
 
     @staticmethod
-    def _build_destpath(file_path: StrOrPath, source_path: StrOrPath, dest_dir: StrOrPath) -> Path:
+    def _build_destpath(
+            file_path: Union[str, Path],
+            source_path: Union[str, Path],
+            dest_dir: Union[str, Path]) -> Path:
         """Converts a source file and destination dir into a full destination filepath.
 
         file_path:
@@ -2280,20 +2262,20 @@ class Container:
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
-    def exists(self, path: str) -> bool:
+    def exists(self, path: Union[str, PurePath]) -> bool:
         """Return true if the path exists on the container filesystem."""
         try:
-            self._pebble.list_files(path, itself=True)
+            self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
             raise err
         return True
 
-    def isdir(self, path: str) -> bool:
+    def isdir(self, path: Union[str, PurePath]) -> bool:
         """Return true if a directory exists at the given path on the container filesystem."""
         try:
-            files = self._pebble.list_files(path, itself=True)
+            files = self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
@@ -2301,9 +2283,15 @@ class Container:
         return files[0].type == pebble.FileType.DIRECTORY
 
     def make_dir(
-            self, path: str, *, make_parents: bool = False, permissions: Optional[int] = None,
-            user_id: Optional[int] = None, user: Optional[str] = None,
-            group_id: Optional[int] = None, group: Optional[str] = None):
+            self,
+            path: Union[str, PurePath],
+            *,
+            make_parents: bool = False,
+            permissions: Optional[int] = None,
+            user_id: Optional[int] = None,
+            user: Optional[str] = None,
+            group_id: Optional[int] = None,
+            group: Optional[str] = None):
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -2318,19 +2306,61 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        self._pebble.make_dir(path, make_parents=make_parents,
+        self._pebble.make_dir(str(path), make_parents=make_parents,
                               permissions=permissions,
                               user_id=user_id, user=user,
                               group_id=group_id, group=group)
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: Union[str, PurePath], *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         Args:
             path: Path of the file or directory to delete from the remote system.
             recursive: If True, recursively delete path and everything under it.
         """
-        self._pebble.remove_path(path, recursive=recursive)
+        self._pebble.remove_path(str(path), recursive=recursive)
+
+    # Exec I/O is str if encoding is provided (the default)
+    @typing.overload
+    def exec(  # noqa
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[str, TextIO]] = None,
+        stdout: Optional[TextIO] = None,
+        stderr: Optional[TextIO] = None,
+        encoding: str = 'utf-8',
+        combine_stderr: bool = False
+    ) -> pebble.ExecProcess[str]:
+        ...
+
+    # Exec I/O is bytes if encoding is explicitly set to None
+    @typing.overload
+    def exec(  # noqa
+        self,
+        command: List[str],
+        *,
+        environment: Optional[Dict[str, str]] = None,
+        working_dir: Optional[str] = None,
+        timeout: Optional[float] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+        stdin: Optional[Union[bytes, BinaryIO]] = None,
+        stdout: Optional[BinaryIO] = None,
+        stderr: Optional[BinaryIO] = None,
+        encoding: None = None,
+        combine_stderr: bool = False
+    ) -> pebble.ExecProcess[bytes]:
+        ...
 
     def exec(
         self,
@@ -2346,9 +2376,9 @@ class Container:
         stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
         stdout: Optional[Union[TextIO, BinaryIO]] = None,
         stderr: Optional[Union[TextIO, BinaryIO]] = None,
-        encoding: str = 'utf-8',
+        encoding: Optional[str] = 'utf-8',
         combine_stderr: bool = False
-    ) -> 'ExecProcess':
+    ) -> pebble.ExecProcess[Any]:
         """Execute the given command on the remote system.
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
@@ -2363,10 +2393,10 @@ class Container:
             user=user,
             group_id=group_id,
             group=group,
-            stdin=stdin,
-            stdout=stdout,
-            stderr=stderr,
-            encoding=encoding,
+            stdin=stdin,  # type: ignore
+            stdout=stdout,  # type: ignore
+            stderr=stderr,  # type: ignore
+            encoding=encoding,  # type: ignore
             combine_stderr=combine_stderr,
         )
 
@@ -2386,6 +2416,12 @@ class Container:
             raise TypeError('send_signal expected at least 1 service name, got 0')
 
         self._pebble.send_signal(sig, service_names)
+
+    # Define this last to avoid clashes with the imported "pebble" module
+    @property
+    def pebble(self) -> pebble.Client:
+        """The low-level :class:`ops.pebble.Client` instance for this container."""
+        return self._pebble
 
 
 class ContainerMapping(Mapping[str, Container]):
@@ -2411,14 +2447,14 @@ class ContainerMapping(Mapping[str, Container]):
         return repr(self._containers)
 
 
-class ServiceInfoMapping(Mapping[str, 'ServiceInfo']):
+class ServiceInfoMapping(Mapping[str, pebble.ServiceInfo]):
     """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, services: Iterable['ServiceInfo']):
+    def __init__(self, services: Iterable[pebble.ServiceInfo]):
         self._services = {s.name: s for s in services}
 
     def __getitem__(self, key: str):
@@ -2434,14 +2470,14 @@ class ServiceInfoMapping(Mapping[str, 'ServiceInfo']):
         return repr(self._services)
 
 
-class CheckInfoMapping(Mapping[str, 'CheckInfo']):
+class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
     """Map of check names to :class:`ops.pebble.CheckInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, checks: Iterable['CheckInfo']):
+    def __init__(self, checks: Iterable[pebble.CheckInfo]):
         self._checks = {c.name: c for c in checks}
 
     def __getitem__(self, key: str):
@@ -2511,7 +2547,7 @@ class SecretNotFoundError(ModelError):
 _ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
 
 
-def _format_action_result_dict(input: Dict[str, 'JsonObject'],
+def _format_action_result_dict(input: Dict[str, Any],
                                parent_key: Optional[str] = None,
                                output: Optional[Dict[str, str]] = None
                                ) -> Dict[str, str]:
@@ -2558,7 +2594,7 @@ def _format_action_result_dict(input: Dict[str, 'JsonObject'],
             key = f"{parent_key}.{key}"
 
         if isinstance(value, MutableMapping):
-            value = typing.cast(Dict[str, 'JsonObject'], value)
+            value = typing.cast(Dict[str, Any], value)
             output_ = _format_action_result_dict(value, key, output_)
         elif key in output_:
             raise ValueError("duplicate key detected in dictionary passed to 'action-set': {!r}"
@@ -2603,8 +2639,8 @@ class _ModelBackend:
 
     def _run(self, *args: str, return_output: bool = False,
              use_json: bool = False, input_stream: Optional[str] = None
-             ) -> Union[str, 'JsonObject', None]:
-        kwargs = dict(stdout=PIPE, stderr=PIPE, check=True, encoding='utf-8')
+             ) -> Union[str, Any, None]:
+        kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
@@ -2613,19 +2649,21 @@ class _ModelBackend:
         args = (which_cmd,) + args[1:]
         if use_json:
             args += ('--format=json',)
+        # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
+        #                been fighting with Pyright for half an hour now...
         try:
-            result = run(args, **kwargs)
-        except CalledProcessError as e:
+            result = subprocess.run(args, **kwargs)  # type: ignore
+        except subprocess.CalledProcessError as e:
             raise ModelError(e.stderr)
         if return_output:
-            if result.stdout is None:
+            if result.stdout is None:  # type: ignore
                 return ''
             else:
-                text = typing.cast(str, result.stdout)
+                text: str = result.stdout  # type: ignore
                 if use_json:
-                    return json.loads(text)
+                    return json.loads(text)  # type: ignore
                 else:
-                    return text
+                    return text  # type: ignore
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:
@@ -2754,8 +2792,8 @@ class _ModelBackend:
         out = self._run('resource-get', resource_name, return_output=True)
         return typing.cast(str, out).strip()
 
-    def pod_spec_set(self, spec: Mapping[str, 'JsonObject'],
-                     k8s_resources: Optional[Mapping[str, 'JsonObject']] = None):
+    def pod_spec_set(self, spec: Mapping[str, Any],
+                     k8s_resources: Optional[Mapping[str, Any]] = None):
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
         try:
             spec_path = tmpdir / 'spec.yaml'
@@ -2853,7 +2891,7 @@ class _ModelBackend:
         out = self._run('action-get', return_output=True, use_json=True)
         return typing.cast(Dict[str, str], out)
 
-    def action_set(self, results: '_SerializedData') -> None:
+    def action_set(self, results: Dict[str, Any]) -> None:
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
@@ -2906,7 +2944,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def add_metrics(self, metrics: Mapping[str, 'Numerical'],
+    def add_metrics(self, metrics: Mapping[str, Union[int, float]],
                     labels: Optional[Mapping[str, str]] = None) -> None:
         cmd: List[str] = ['add-metric']
         if labels:
@@ -2925,7 +2963,7 @@ class _ModelBackend:
         cmd.extend(metric_args)
         self._run(*cmd)
 
-    def get_pebble(self, socket_path: str) -> 'Client':
+    def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
         return pebble.Client(socket_path=socket_path)
 
@@ -2948,7 +2986,7 @@ class _ModelBackend:
         num_alive = sum(1 for unit in units.values() if unit['status'] != 'dying')
         return num_alive
 
-    def update_relation_data(self, relation_id: int, _entity: 'UnitOrApplication',
+    def update_relation_data(self, relation_id: int, _entity: Union['Unit', 'Application'],
                              key: str, value: str):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
@@ -2978,7 +3016,7 @@ class _ModelBackend:
         return typing.cast(Dict[str, str], result)
 
     def _run_for_secret(self, *args: str, return_output: bool = False,
-                        use_json: bool = False) -> Union[str, 'JsonObject', None]:
+                        use_json: bool = False) -> Union[str, Any, None]:
         try:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
@@ -2995,9 +3033,9 @@ class _ModelBackend:
         elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
             args.extend(['--label', label])
         result = self._run_for_secret('secret-info-get', *args, return_output=True, use_json=True)
-        info_dicts = typing.cast(Dict[str, 'JsonObject'], result)
+        info_dicts = typing.cast(Dict[str, Any], result)
         id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
-        return SecretInfo.from_dict(id, typing.cast('_SerializedData', info_dicts[id]))
+        return SecretInfo.from_dict(id, typing.cast(Dict[str, Any], info_dicts[id]))
 
     def secret_set(self, id: str, *,
                    content: Optional[Dict[str, str]] = None,
@@ -3120,8 +3158,8 @@ class _ModelBackendValidator:
                     label_name, cls.METRIC_KEY_REGEX.pattern))
 
     @classmethod
-    def format_metric_value(cls, value: 'Numerical'):
-        if not isinstance(value, (int, float)):  # pyright: reportUnnecessaryIsInstance=false
+    def format_metric_value(cls, value: Union[int, float]):
+        if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise ModelError('invalid metric value {!r} provided:'
                              ' must be a positive finite float'.format(value))
 

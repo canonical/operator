@@ -24,7 +24,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Generator, List, Optional, Tuple, Union
 
-import yaml  # pyright: reportMissingModuleSource=false
+import yaml  # pyright: ignore[reportMissingModuleSource]
 
 logger = logging.getLogger()
 
@@ -340,7 +340,7 @@ def juju_backend_available() -> bool:
 
 
 class _JujuStorageBackend:
-    """Implements the interface from the Operator framework to Juju's state-get/set/etc."""
+    """Implements the interface from the ops library to Juju's state-get/set/etc."""
 
     def set(self, key: str, value: Any) -> None:
         """Set a key to a given value.

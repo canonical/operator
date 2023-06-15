@@ -12,31 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The Charmed Operator Framework.
+# NOTE: The text below is also at the top of README.md. Keep in sync!
 
-The Charmed Operator Framework allows the development of operators in a simple
-and straightforward way, using standard Python structures to allow for clean,
-maintainable, and reusable code.
+"""The ops library: a Python framework for writing Juju charms.
 
-A Kubernetes operator is a container that drives lifecycle management,
-configuration, integration and daily actions for an application. Operators
-simplify software management and operations. They capture reusable app domain
-knowledge from experts in a software component that can be shared.
+The ops library is a Python framework (`available on PyPI`_) for developing
+and testing Juju charms in a consistent way, using standard Python constructs
+to allow for clean, maintainable, and reusable code.
 
-The Charmed Operator Framework extends the "operator pattern" to enable Charmed
-Operators, packaged as and often referred to as "charms". Charms are not just
-for Kubernetes but also operators for traditional Linux application management.
-Operators use an Operator Lifecycle Manager (OLM), like Juju, to coordinate
-their work in a cluster. The system uses Golang for concurrent event processing
-under the hood, but enables the operators to be written in Python.
+A charm is an operator -- business logic encapsulated in a reusable software
+package that automates every aspect of an application's life.
 
-Operators should do one thing and do it well. Each operator drives a single
-application or service and can be composed with other operators to deliver a
-complex application or service. An operator handles instantiation, scaling,
-configuration, optimisation, networking, service mesh, observability,
-and day-2 operations specific to that application.
+Charms written with ops support Kubernetes using Juju's "sidecar charm"
+pattern, as well as charms that deploy to Linux-based machines and containers.
 
-Full developer documentation is available at https://juju.is/docs/sdk.
+Charms should do one thing and do it well. Each charm drives a single
+application and can be integrated with other charms to deliver a complex
+system. A charm handles creating the application in addition to scaling,
+configuration, optimisation, networking, service mesh, observability, and other
+day-2 operations specific to the application.
+
+The ops library is part of the Charm SDK (the other part being Charmcraft).
+Full developer documentation for the Charm SDK is available at
+https://juju.is/docs/sdk.
+
+To learn more about Juju, visit https://juju.is/docs/olm.
+
+.. _available on PyPI: https://pypi.org/project/ops/
 """
 
 # The "from .X import Y" imports below don't explicitly tell Pyright (or MyPy)
@@ -105,6 +107,7 @@ __all__ = [
     'ObjectEvents',
     'PreCommitEvent',
     'PrefixedEvents',
+    'Serializable',
     'StoredDict',
     'StoredList',
     'StoredSet',
@@ -174,7 +177,7 @@ from . import charm  # type: ignore # noqa: F401
 # This allows "import ops; ops.main(Charm)" to work as expected.
 from . import main  # type: ignore # noqa: F401
 
-# Explicitly import names from sub-modules so users can just "import ops" and
+# Explicitly import names from submodules so users can just "import ops" and
 # then use them as "ops.X".
 from .charm import (  # noqa: F401
     ActionEvent,
@@ -236,6 +239,7 @@ from .framework import (  # noqa: F401
     ObjectEvents,
     PreCommitEvent,
     PrefixedEvents,
+    Serializable,
     StoredDict,
     StoredList,
     StoredSet,

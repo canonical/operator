@@ -1,4 +1,4 @@
-name: Operator Framework Tests
+name: ops Tests
 
 on: [push, pull_request, workflow_call]
 
