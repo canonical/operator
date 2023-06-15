@@ -2093,7 +2093,7 @@ class Container:
 
         def local_list(source_path: Path) -> List[pebble.FileInfo]:
             paths = source_path.iterdir() if source_path.is_dir() else [source_path]
-            files = [self._build_fileinfo(source_path / f) for f in paths]
+            files = [self._build_fileinfo(f) for f in paths]
             return files
 
         errors: List[Tuple[str, Exception]] = []
@@ -2256,7 +2256,7 @@ class Container:
         # /src --> /dst/src
         file_path, source_path, dest_dir = Path(file_path), Path(source_path), Path(dest_dir)
         prefix = str(source_path.parent)
-        if os.path.commonprefix([prefix, str(file_path)]) != prefix:
+        if prefix != '.' and os.path.commonprefix([prefix, str(file_path)]) != prefix:
             raise RuntimeError(
                 f'file "{file_path}" does not have specified prefix "{prefix}"')
         path_suffix = os.path.relpath(str(file_path), prefix)
