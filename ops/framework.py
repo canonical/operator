@@ -263,7 +263,7 @@ class EventBase:
 class EventSource:
     """EventSource wraps an event type with a descriptor to facilitate observing and emitting.
 
-    It is generally used as:
+    It is generally used as::
 
         class SomethingHappened(EventBase):
             pass
@@ -271,8 +271,9 @@ class EventSource:
         class SomeObject(Object):
             something_happened = EventSource(SomethingHappened)
 
-    With that, instances of that type will offer the someobj.something_happened
-    attribute which is a BoundEvent and may be used to emit and observe the event.
+    With that, instances of that type will offer the ``someobj.something_happened``
+    attribute which is a :class:`BoundEvent`, and may be used to emit and observe
+    the event.
     """
 
     def __init__(self, event_type: 'Type[EventBase]'):
