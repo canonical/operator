@@ -1174,31 +1174,30 @@ def test_recursive_push_and_pull(case):
         assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
 
 
-def change_to_relative_path(case: PushPullCase):
-    if isinstance(case.path, list):
-        path = [p[1:] for p in case.path]
-    else:
-        path = case.path[1:]
-    if path == "":
-        path = "."
-
-    files = [file[1:] for file in case.files]
-
-    return PushPullCase(
-        name=case.name,
-        path=path,
-        dst=case.dst,
-        files=files,
-        want=case.want,
-        errors=case.errors,
-    )
-
-
-relative_recursive_push_pull_cases = map(change_to_relative_path, recursive_push_pull_cases)
-
-
-@pytest.mark.parametrize('case', relative_recursive_push_pull_cases)
-def test_recursive_push_and_pull_relative_paths(case):
+@pytest.mark.parametrize('case', [
+    PushPullCase(
+        name='push directory without trailing slash',
+        path='foo',
+        dst='/baz',
+        files=['foo/bar/baz.txt', 'foo/foobar.txt'],
+        want={'/baz/foo/foobar.txt', '/baz/foo/bar/baz.txt'},
+    ),
+    PushPullCase(
+        name='push directory with trailing slash',
+        path='foo/',
+        dst='/baz',
+        files=['foo/bar/baz.txt', 'foo/foobar.txt'],
+        want={'/baz/foo/foobar.txt', '/baz/foo/bar/baz.txt'},
+    ),
+    PushPullCase(
+        name='push directory relative pathing',
+        path='./foo',
+        dst='/baz',
+        files=['foo/bar/baz.txt', 'foo/foobar.txt'],
+        want={'/baz/foo/foobar.txt', '/baz/foo/bar/baz.txt'},
+    ),
+])
+def test_push_path_relative(case):
     harness = ops.testing.Harness(ops.CharmBase, meta='''
         name: test-app
         containers:
@@ -1207,65 +1206,30 @@ def test_recursive_push_and_pull_relative_paths(case):
         ''')
     harness.begin()
     harness.set_can_connect('foo', True)
-    c = harness.model.unit.containers['foo']
+    container = harness.model.unit.containers['foo']
 
-    original_working_dir = os.getcwd()
-    # create push test case filesystem structure
-    push_src = tempfile.TemporaryDirectory()
-    os.chdir(push_src.name)
-    for file in case.files:
-        fpath = file
-        if not os.path.dirname(fpath):
-            continue
-        os.makedirs(os.path.dirname(fpath), exist_ok=True)
-        with open(fpath, 'w') as f:
-            f.write('hello')
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cwd = os.getcwd()
+        # change working directory to enable relative pathing for testing
+        os.chdir(tmpdir)
+        try:
+            # create test files under temporary test directory
+            tmp = pathlib.Path(tmpdir)
+            for testfile in case.files:
+                testfile_path = pathlib.Path(tmp / testfile)
+                testfile_path.parent.mkdir(parents=True, exist_ok=True)
+                testfile_path.touch(exist_ok=True)
+                testfile_path.write_text("test", encoding="utf-8")
 
-    # test push
-    if isinstance(case.path, list):
-        # swap slash for dummy dir on root dir so Path.parent doesn't return tmpdir path component
-        # otherwise remove leading slash so we can do the path join properly.
-        push_path = [os.path.join(push_src.name, p if len(p) > 1 else 'foo')
-                     for p in case.path]
-    else:
-        # swap slash for dummy dir on root dir so Path.parent doesn't return tmpdir path component
-        # otherwise remove leading slash so we can do the path join properly.
-        push_path = os.path.join(push_src.name, case.path if len(case.path) > 1 else 'foo')
+            # push path under test to container
+            container.push_path(case.path, case.dst)
 
-    errors = []
-    try:
-        c.push_path(push_path, case.dst)
-    except ops.MultiPushPullError as err:
-        if not case.errors:
-            raise
-        errors = {src[len(push_src.name):] for src, _ in err.errors}
-
-    assert case.errors == errors, \
-        f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
-    for fpath in case.want:
-        assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
-
-    # create pull test case filesystem structure
-    pull_dst = tempfile.TemporaryDirectory()
-    for fpath in case.files:
-        c.push("/" + fpath, 'hello', make_dirs=True)
-
-    # test pull
-    errors = []
-    pull_path = "/" + case.path if isinstance(case.path, str) else ("/" + p for p in case.path)
-    try:
-        c.pull_path(pull_path, os.path.join(pull_dst.name, case.dst[1:]))
-    except ops.MultiPushPullError as err:
-        if not case.errors:
-            raise
-        errors = {src for src, _ in err.errors}
-
-    assert case.errors == errors, \
-        f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
-    for fpath in case.want:
-        assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
-
-    os.chdir(original_working_dir)
+            # test
+            for want_path in case.want:
+                content = container.pull(want_path).read()
+                assert content == 'test'
+        finally:
+            os.chdir(cwd)
 
 
 class TestApplication(unittest.TestCase):
