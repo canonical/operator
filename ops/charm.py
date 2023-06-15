@@ -858,7 +858,9 @@ class CharmEvents(ObjectEvents):
     """Triggered when a unit is about to be terminated (see :class:`RemoveEvent`)."""
 
     update_status = EventSource(UpdateStatusEvent)
-    """Triggered periodically by a status update request from Juju (see :class:`UpdateStatusEvent`)."""
+    """Triggered periodically by a status update request from Juju (see
+    :class:`UpdateStatusEvent`).
+    """
 
     config_changed = EventSource(ConfigChangedEvent)
     """Triggered when a configuration change occurs (see :class:`ConfigChangedEvent`)."""
@@ -876,22 +878,27 @@ class CharmEvents(ObjectEvents):
     """Triggered when a new leader has been elected (see :class:`LeaderElectedEvent`)."""
 
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
-    """DEPRECATED. Triggered when leader changes any settings (see :class:`LeaderSettingsChangedEvent`)."""
+    """DEPRECATED. Triggered when leader changes any settings (see
+    :class:`LeaderSettingsChangedEvent`)."""
 
     collect_metrics = EventSource(CollectMetricsEvent)
     """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`)."""
 
     secret_changed = EventSource(SecretChangedEvent)
-    """Triggered by Juju on the observer when the secret owner changes its contents (see :class:`SecretChangedEvent`)."""
+    """Triggered by Juju on the observer when the secret owner changes its contents (see
+    :class:`SecretChangedEvent`)."""
 
     secret_expired = EventSource(SecretExpiredEvent)
-    """Triggered by Juju on the owner when a secret's expiration time elapses (see :class:`SecretExpiredEvent`)."""
+    """Triggered by Juju on the owner when a secret's expiration time elapses (see
+    :class:`SecretExpiredEvent`)."""
 
     secret_rotate = EventSource(SecretRotateEvent)
-    """Triggered by Juju on the owner when the secret's rotation policy elapses (see :class:`SecretRotateEvent`)."""
+    """Triggered by Juju on the owner when the secret's rotation policy elapses (see
+    :class:`SecretRotateEvent`)."""
 
     secret_remove = EventSource(SecretRemoveEvent)
-    """Triggered by Juju on the owner when a secret revision can be removed (see :class:`SecretRemoveEvent`)."""
+    """Triggered by Juju on the owner when a secret revision can be removed (see
+    :class:`SecretRemoveEvent`)."""
 
 
 class CharmBase(Object):
@@ -1017,7 +1024,7 @@ class CharmMeta:
 
     series: List[str]
     """List of supported OS series that this charm can support.
-    
+
     The first entry in the list is the default series that will be used by
     deploy if no other series is requested by the user.
     """
@@ -1042,7 +1049,7 @@ class CharmMeta:
 
     relations: Dict[str, 'RelationMeta']
     """All :class:`RelationMeta` instances.
-    
+
     This is merged from ``requires``, ``provides``, and ``peers``. If needed,
     the role of the relation definition can be obtained from its
     :attr:`role <RelationMeta.role>` attribute.
