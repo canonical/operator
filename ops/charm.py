@@ -988,56 +988,80 @@ class CharmBase(Object):
 class CharmMeta:
     """Object containing the metadata for the charm.
 
-    This is read from ``metadata.yaml`` and/or ``actions.yaml``. Generally
+    This is read from ``metadata.yaml`` and ``actions.yaml``. Generally
     charms will define this information, rather than reading it at runtime. This
     class is mostly for the framework to understand what the charm has defined.
 
-    The :attr:`maintainers`, :attr:`tags`, :attr:`terms`, :attr:`series`, and
-    :attr:`extra_bindings` attributes are all lists of strings.  The :attr:`containers`,
-    :attr:`requires`, :attr:`provides`, :attr:`peers`, :attr:`relations`,
-    :attr:`storages`, :attr:`resources`, and :attr:`payloads` attributes are all
-    mappings of names to instances of the respective :class:`RelationMeta`,
-    :class:`StorageMeta`, :class:`ResourceMeta`, or :class:`PayloadMeta`.
-
-    The :attr:`relations` attribute is a convenience accessor which includes all
-    of the ``requires``, ``provides``, and ``peers`` :class:`RelationMeta`
-    items.  If needed, the role of the relation definition can be obtained from
-    its :attr:`role <RelationMeta.role>` attribute.
-
-    Attributes:
-        name: The name of this charm
-        summary: Short description of what this charm does
-        description: Long description for this charm
-        maintainers: A list of strings of the email addresses of the maintainers
-                     of this charm.
-        tags: Charm store tag metadata for categories associated with this charm.
-        terms: Charm store terms that should be agreed to before this charm can
-               be deployed. (Used for things like licensing issues.)
-        series: The list of supported OS series that this charm can support.
-                The first entry in the list is the default series that will be
-                used by deploy if no other series is requested by the user.
-        subordinate: True/False whether this charm is intended to be used as a
-                     subordinate charm.
-        min_juju_version: If supplied, indicates this charm needs features that
-                          are not available in older versions of Juju.
-        containers: A dict of {name: :class:`ContainerMeta` } for each of the 'containers'
-                   declared by this charm in the `matadata.yaml` file.
-        requires: A dict of {name: :class:`RelationMeta` } for each 'requires' relation.
-        provides: A dict of {name: :class:`RelationMeta` } for each 'provides' relation.
-        peers: A dict of {name: :class:`RelationMeta` } for each 'peer' relation.
-        relations: A dict containing all :class:`RelationMeta` attributes (merged from other
-                   sections)
-        storages: A dict of {name: :class:`StorageMeta`} for each defined storage.
-        resources: A dict of {name: :class:`ResourceMeta`} for each defined resource.
-        payloads: A dict of {name: :class:`PayloadMeta`} for each defined payload.
-        extra_bindings: A dict of additional named bindings that a charm can use
-                        for network configuration.
-        actions: A dict of {name: :class:`ActionMeta`} for actions that the charm has defined.
     Args:
         raw: a mapping containing the contents of metadata.yaml
         actions_raw: a mapping containing the contents of actions.yaml
-
     """
+
+    name: str
+    """Name of this charm."""
+
+    summary: str
+    """Short description of what this charm does."""
+
+    description: str
+    """Long description for this charm."""
+
+    maintainers: List[str]
+    """List of email addresses of charm maintainers."""
+
+    tags: List[str]
+    """Charmhub tag metadata for categories associated with this charm."""
+
+    terms: List[str]
+    """Charmhub terms that should be agreed to before this charm can be deployed."""
+
+    series: List[str]
+    """List of supported OS series that this charm can support.
+    
+    The first entry in the list is the default series that will be used by
+    deploy if no other series is requested by the user.
+    """
+
+    subordinate: bool
+    """Whether this charm is intended to be used as a subordinate charm."""
+
+    min_juju_version: Optional[str]
+    """Indicates the minimum Juju version this charm requires."""
+
+    containers: Dict[str, 'ContainerMeta']
+    """Container metadata for each defined container."""
+
+    requires: Dict[str, 'RelationMeta']
+    """Relations this charm requires."""
+
+    provides: Dict[str, 'RelationMeta']
+    """Relations this charm provides."""
+
+    peers: Dict[str, 'RelationMeta']
+    """Peer relations."""
+
+    relations: Dict[str, 'RelationMeta']
+    """All :class:`RelationMeta` instances.
+    
+    This is merged from ``requires``, ``provides``, and ``peers``. If needed,
+    the role of the relation definition can be obtained from its
+    :attr:`role <RelationMeta.role>` attribute.
+    """
+
+    storages: Dict[str, 'StorageMeta']
+    """Storage metadata for each defined storage."""
+
+    resources: Dict[str, 'ResourceMeta']
+    """Resource metadata for each defined resource."""
+
+    payloads: Dict[str, 'PayloadMeta']
+    """Payload metadata for each defined payload."""
+
+    extra_bindings: Dict[str, None]
+    """Additional named bindings that a charm can use for network configuration."""
+
+    actions: Dict[str, 'ActionMeta']
+    """Actions the charm has defined."""
 
     def __init__(self, raw: Optional[Dict[str, Any]] = None,
                  actions_raw: Optional[Dict[str, Any]] = None):
@@ -1085,12 +1109,12 @@ class CharmMeta:
     def from_yaml(
             cls, metadata: Union[str, TextIO],
             actions: Optional[Union[str, TextIO]] = None) -> 'CharmMeta':
-        """Instantiate a CharmMeta from a YAML description of metadata.yaml.
+        """Instantiate a :class:`CharmMeta` from a YAML description of ``metadata.yaml``.
 
         Args:
             metadata: A YAML description of charm metadata (name, relations, etc.)
-                This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
-            actions: YAML description of Actions for this charm (eg actions.yaml)
+                This can be a simple string, or a file-like object (passed to ``yaml.safe_load``).
+            actions: YAML description of Actions for this charm (e.g., actions.yaml)
         """
         meta = yaml.safe_load(metadata)
         raw_actions = {}
