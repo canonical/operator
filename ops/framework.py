@@ -338,7 +338,7 @@ class BoundEvent:
         key = framework._next_event_key()
         event = self.event_type(Handle(self.emitter, self.event_kind, key), *args, **kwargs)
         event.framework = framework
-        framework._emit(event)
+        return framework._emit(event)
 
 
 class HandleKind:
@@ -512,10 +512,28 @@ class CommitEvent(LifecycleEvent):
     """Events that will be emitted second on commit."""
 
 
+class GetStatusEvent(EventBase):
+
+    # The following is an alternative approach that might fit better with the
+    # current ops event handling, where events don't return anything. Instead
+    # of the event handler returning a status, have the handler set .status:
+    #
+    #     def _on_get_status(self, event):
+    #         event.status = BlockedStatus("please do X")
+    @property
+    def status(self):
+        raise AttributeError(f"attribute 'status' is not readable, only writable")
+
+    @status.setter
+    def status(self, value):
+        pass  # TODO: record status here
+
+
 class FrameworkEvents(ObjectEvents):
     """Manager of all framework events."""
     pre_commit = EventSource(PreCommitEvent)
     commit = EventSource(CommitEvent)
+    get_status = EventSource(GetStatusEvent)
 
 
 class NoTypeError(Exception):
@@ -816,7 +834,7 @@ class Framework(Object):
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
         if saved:
-            self._reemit(event_path)
+            return self._reemit(event_path)
 
     def reemit(self):
         """Reemit previously deferred events to the observers that deferred them.
@@ -859,6 +877,7 @@ class Framework(Object):
         self._event_name = old_event_name
 
     def _reemit(self, single_event_path: Optional[str] = None):
+        rets = []
         last_event_path = None
         deferred = True
         for event_path, observer_path, method_name in self._storage.notices(single_event_path):
@@ -905,7 +924,8 @@ class Framework(Object):
                             pdb.runcall(custom_handler, event)
                         else:
                             # Regular call to the registered method.
-                            custom_handler(event)
+                            ret = custom_handler(event)
+                            rets.append(ret)
 
             if event.deferred:
                 deferred = True
@@ -917,6 +937,8 @@ class Framework(Object):
 
         if not deferred and last_event_path is not None:
             self._storage.drop_snapshot(last_event_path)
+
+        return rets
 
     def _show_debug_code_message(self):
         """Present the welcome message (only once!) when using debugger functionality."""
