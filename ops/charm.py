@@ -225,21 +225,21 @@ class RemoveEvent(HookEvent):
 class ConfigChangedEvent(HookEvent):
     """Event triggered when a configuration change occurs.
 
-    This event can fire in several situations:
+    This event will fire in several situations:
 
-    - Right after the unit starts up for the first time.
-      This event notifies the charm of its initial configuration.
-      Typically, this event will fire between a :class:`install <InstallEvent>`
-      and a :class:`starts <StartEvent>` during the startup sequence
-      (when you first deploy a unit), but more in general it will fire whenever
-      the unit is (re)started, e.g. after pod churn on kubernetes, on unit
-      rescheduling, on unit upgrade/refresh, etc...
-    - As a specific instance of the above point: when networking changes
-      (if the machine reboots and comes up with a different IP).
-    - When the cloud admin reconfigures the charm via the Juju CLI, i.e.
-      `juju config my-charm foo=bar`. This event notifies the charm of
+    - When the admin reconfigures the charm using the Juju CLI, for example
+      ``juju config mycharm foo=bar``. This event notifies the charm of
       its new configuration. (The event itself, however, is not aware of *what*
       specifically has changed in the config).
+    - Right after the unit starts up for the first time.
+      This event notifies the charm of its initial configuration.
+      Typically, this event will fire between an :class:`install <InstallEvent>`
+      and a :class:`start <StartEvent>` during the startup sequence
+      (when you first deploy a unit), but in general it will fire whenever
+      the unit is (re)started, for example after pod churn on Kubernetes, on unit
+      rescheduling, on unit upgrade or refresh, and so on.
+    - As a specific instance of the above point: when networking changes
+      (if the machine reboots and comes up with a different IP).
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
@@ -347,10 +347,8 @@ class CollectMetricsEvent(HookEvent):
         """Record metrics that have been gathered by the charm for this unit.
 
         Args:
-            metrics: A collection of {key: float} pairs that contains the
-              metrics that have been gathered
-            labels: {key:value} strings that can be applied to the
-                metrics that are being gathered
+            metrics: Key-value mapping of metrics that have been gathered.
+            labels: Key-value labels applied to the metrics.
         """
         self.framework.model._backend.add_metrics(metrics, labels)  # type:ignore
 

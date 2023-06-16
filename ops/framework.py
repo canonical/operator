@@ -506,11 +506,11 @@ class LifecycleEvent(EventBase):
 
 
 class PreCommitEvent(LifecycleEvent):
-    """Events that will be emitted first on commit."""
+    """Event that will be emitted first on commit."""
 
 
 class CommitEvent(LifecycleEvent):
-    """Events that will be emitted second on commit."""
+    """Event that will be emitted second on commit."""
 
 
 class FrameworkEvents(ObjectEvents):

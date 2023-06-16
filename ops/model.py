@@ -1294,7 +1294,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     they can read and write their application data. They are allowed to read
     remote unit and application data.
 
-    This class should not be created directly. It should be accessed via
+    This class should not be instantiated directly, instead use
     :attr:`Relation.data`
     """
 
@@ -1495,7 +1495,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 class ConfigData(LazyMapping):
     """Configuration data.
 
-    This class should not be created directly. It should be accessed via :attr:`Model.config`.
+    This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
     """
 
     def __init__(self, backend: '_ModelBackend'):
@@ -1791,10 +1791,10 @@ class Container:
 
     This class should not be instantiated directly, instead use :meth:`Unit.get_container`
     or :attr:`Unit.containers`.
-
-    Attributes:
-        name: The name of the container from metadata.yaml (eg, 'postgres').
     """
+
+    name: str
+    """The name of the container from ``metadata.yaml``, for example "postgres"."""
 
     def __init__(self, name: str, backend: '_ModelBackend',
                  pebble_client: Optional[pebble.Client] = None):
@@ -1808,14 +1808,11 @@ class Container:
     def can_connect(self) -> bool:
         """Report whether the Pebble API is reachable in the container.
 
-        :meth:`can_connect` returns a bool that indicates whether the Pebble API is available at
+        This method returns a bool that indicates whether the Pebble API is available at
         the time the method is called. It does not guard against the Pebble API becoming
-        unavailable, and should be treated as a 'point in time' status only.
+        unavailable, and should be treated as a "point in time" status only.
 
-        If the Pebble API later fails, serious consideration should be given as to the reason for
-        this.
-
-        Example::
+        For example::
 
             container = self.unit.get_container("example")
             if container.can_connect():
@@ -1827,9 +1824,6 @@ class Container:
                 event.defer()
         """
         try:
-            # TODO: This call to `get_system_info` should be replaced with a call to a more
-            #  appropriate endpoint that has stronger connotations of what constitutes a Pebble
-            #  instance that is in fact 'ready'.
             self._pebble.get_system_info()
         except pebble.ConnectionError as e:
             logger.debug("Pebble API is not ready; ConnectionError: %s", e)
@@ -1847,7 +1841,7 @@ class Container:
         return True
 
     def autostart(self):
-        """Autostart all services marked as startup: enabled."""
+        """Autostart all services marked as ``startup: enabled``."""
         self._pebble.autostart_services()
 
     def replan(self):
@@ -1943,7 +1937,7 @@ class Container:
             check_names: Optional check names to query for. If no check names
                 are specified, return checks with any name.
             level: Optional check level to query for. If not specified, fetch
-                checks with any level.
+                all checks.
         """
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
@@ -1951,7 +1945,7 @@ class Container:
     def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
-        Raises :class:`ModelError` if check_name is not found.
+        Raises :class:`ModelError` if ``check_name`` is not found.
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -1966,13 +1960,13 @@ class Container:
 
         Args:
             path: Path of the file to read from the remote system.
-            encoding: Encoding to use for decoding the file's bytes to str,
-                or None to specify no decoding.
+            encoding: Encoding to use for decoding the file's bytes to string,
+                or ``None`` to specify no decoding.
 
         Returns:
-            A readable file-like object, whose read() method will return str
-            objects decoded according to the specified encoding, or bytes if
-            encoding is None.
+            A readable file-like object, whose ``read()`` method will return
+            strings decoded according to the specified encoding, or bytes if
+            encoding is ``None``.
 
         Raises:
             pebble.PathError: If there was an error reading the file at path,
@@ -2042,13 +2036,13 @@ class Container:
         Only regular files and directories are copied; symbolic links, device files, etc. are
         skipped.  Pushing is attempted to completion even if errors occur during the process.  All
         errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single MultiPushPullError is raised containing details for each error.
+        single :class:`MultiPushPullError` is raised containing details for each error.
 
         Assuming the following files exist locally:
 
-            * /foo/bar/baz.txt
-            * /foo/foobar.txt
-            * /quux.txt
+        * /foo/bar/baz.txt
+        * /foo/foobar.txt
+        * /quux.txt
 
         You could push the following ways::
 
@@ -2073,13 +2067,15 @@ class Container:
             # Destination results: /dst/bar/baz.txt, /dst/quux.txt
 
         Args:
-            source_path: A single path or list of paths to push to the remote system.  The
-                paths can be either a file or a directory.  If source_path is a directory, the
-                directory base name is attached to the destination directory - i.e. the source path
-                directory is placed inside the destination directory.  If a source path ends with a
-                trailing "/*" it will have its *contents* placed inside the destination directory.
-            dest_dir: Remote destination directory inside which the source dir/files will be
-                placed.  This must be an absolute path.
+            source_path: A single path or list of paths to push to the remote
+                system. The paths can be either a file or a directory. If
+                ``source_path`` is a directory, the directory base name is
+                attached to the destination directory -- that is, the source
+                path directory is placed inside the destination directory. If
+                a source path ends with a trailing ``/*`` it will have its
+                *contents* placed inside the destination directory.
+            dest_dir: Remote destination directory inside which the source
+                dir/files will be placed. This must be an absolute path.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2121,13 +2117,13 @@ class Container:
         Only regular files and directories are copied; symbolic links, device files, etc. are
         skipped.  Pulling is attempted to completion even if errors occur during the process.  All
         errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single MultiPushPullError is raised containing details for each error.
+        single :class:`MultiPushPullError` is raised containing details for each error.
 
         Assuming the following files exist remotely:
 
-            * /foo/bar/baz.txt
-            * /foo/foobar.txt
-            * /quux.txt
+        * /foo/bar/baz.txt
+        * /foo/foobar.txt
+        * /quux.txt
 
         You could pull the following ways::
 
@@ -2152,14 +2148,16 @@ class Container:
             # Destination results: /dst/bar/baz.txt, /dst/quux.txt
 
         Args:
-            source_path: A single path or list of paths to pull from the remote system.  The
-                paths can be either a file or a directory but must be absolute paths.  If
-                source_path is a directory, the directory base name is attached to the destination
-                directory - i.e.  the source path directory is placed inside the destination
-                directory.  If a source path ends with a trailing "/*" it will have its *contents*
-                placed inside the destination directory.
-            dest_dir: Local destination directory inside which the source dir/files will be
-                placed.
+            source_path: A single path or list of paths to pull from the
+                remote system. The paths can be either a file or a directory
+                but must be absolute paths. If ``source_path`` is a directory,
+                the directory base name is attached to the destination
+                directory -- that is, the source path directory is placed
+                inside the destination directory. If a source path ends with a
+                trailing ``/*`` it will have its *contents* placed inside the
+                destination directory.
+            dest_dir: Local destination directory inside which the source
+                dir/files will be placed.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2260,7 +2258,7 @@ class Container:
         return dest_dir / path_suffix
 
     def exists(self, path: Union[str, PurePath]) -> bool:
-        """Return true if the path exists on the container filesystem."""
+        """Report whether a path exists on the container filesystem."""
         try:
             self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
@@ -2270,7 +2268,7 @@ class Container:
         return True
 
     def isdir(self, path: Union[str, PurePath]) -> bool:
-        """Return true if a directory exists at the given path on the container filesystem."""
+        """Report whether a directory exists at the given path on the container filesystem."""
         try:
             files = self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
@@ -2401,8 +2399,8 @@ class Container:
         """Send the given signal to one or more services.
 
         Args:
-            sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
-                signal.SIGHUP.
+            sig: Name or number of signal to send, for example ``"SIGHUP"``, ``1``, or
+                ``signal.SIGHUP``.
             service_names: Name(s) of the service(s) to send the signal to.
 
         Raises:

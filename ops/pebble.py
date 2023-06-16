@@ -2106,6 +2106,11 @@ class Client:
     ) -> ExecProcess[Any]:
         r"""Execute the given command on the remote system.
 
+        Two method signatures are shown because this method returns an
+        :class:`ExecProcess` that deals with strings if ``encoding`` is
+        specified (the default ), or one that deals with bytes if ``encoding``
+        is set to ``None``.
+
         Most of the parameters are explained in the "Parameters" section
         below, however, input/output handling is a bit more complex. Some
         examples are shown below::
@@ -2344,8 +2349,8 @@ class Client:
         """Send the given signal to the list of services named.
 
         Args:
-            sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
-                signal.SIGHUP.
+            sig: Name or number of signal to send, for example ``"SIGHUP"``, ``1``, or
+                ``signal.SIGHUP``.
             services: Non-empty list of service names to send the signal to.
 
         Raises:
@@ -2378,7 +2383,7 @@ class Client:
             level: Optional check level to query for (default is to fetch
                 checks with any level).
             names: Optional list of check names to query for (default is to
-                fetch checks with any name).
+                fetch all checks).
 
         Returns:
             List of :class:`CheckInfo` objects.
