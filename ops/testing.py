@@ -66,7 +66,7 @@ if TYPE_CHECKING:
     _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
     _FileOrDir = Union['_File', '_Directory']
     _FileKwargs = TypedDict('_FileKwargs', {
-        'permissions': int,
+        'permissions': Optional[int],
         'last_modified': datetime.datetime,
         'user_id': Optional[int],
         'user': Optional[str],
@@ -2476,7 +2476,7 @@ class _TestingPebbleClient:
                 name=file.name,
                 type=get_pebble_file_type(file),
                 size=file.size if isinstance(file, _File) else None,
-                permissions=file.kwargs.get('permissions'),
+                permissions=file.kwargs.get('permissions') or 0,
                 last_modified=file.last_modified,
                 user_id=file.kwargs.get('user_id'),
                 user=file.kwargs.get('user'),
