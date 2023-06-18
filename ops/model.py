@@ -103,8 +103,8 @@ MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 class Model:
     """Represents the Juju Model as seen from this unit.
 
-    This should not be instantiated directly by Charmers, but can be accessed as `self.model`
-    from any class that derives from Object.
+    This should not be instantiated directly by Charmers, but can be accessed
+    as ``self.model`` from any class that derives from :class:`Object`.
     """
 
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
@@ -123,12 +123,18 @@ class Model:
 
     @property
     def unit(self) -> 'Unit':
-        """A :class:`Unit` that represents the unit that is running this code (eg yourself)."""
+        """The unit that is running this code (that is, yourself).
+
+        Use :meth:`get_unit` to get an arbitrary unit by name.
+        """
         return self._unit
 
     @property
     def app(self) -> 'Application':
-        """A :class:`Application` that represents the application this unit is a part of."""
+        """The application this unit is a part of.
+
+        Use :meth:`get_app` to get an arbitrary application by name.
+        """
         return self._unit.app
 
     @property
@@ -161,7 +167,13 @@ class Model:
 
     @property
     def pod(self) -> 'Pod':
-        """Use ``model.pod.set_spec`` to set the container specification for Kubernetes charms."""
+        """Represents the definition of a pod spec in legacy Kubernetes models.
+
+        DEPRECATED: New charms should use the sidecar pattern with Pebble.
+
+        Use :meth:`Pod.set_spec` to set the container specification for legacy
+        Kubernetes charms.
+        """
         return self._pod
 
     @property
@@ -183,6 +195,8 @@ class Model:
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
+        Use :attr:`unit` to get your own unit.
+
         Internally this uses a cache, so asking for the same unit two times will
         return the same object.
         """
@@ -190,6 +204,8 @@ class Model:
 
     def get_app(self, app_name: str) -> 'Application':
         """Get an application by name.
+
+        Use :attr:`app` to get your own application.
 
         Internally this uses a cache, so asking for the same application two times will
         return the same object.
@@ -618,11 +634,11 @@ class Unit:
 class OpenedPort:
     """Represents a port opened by :meth:`Unit.open_port`."""
 
-    """The IP protocol: 'tcp', 'udp', or 'icmp'."""
     protocol: typing.Literal['tcp', 'udp', 'icmp']
+    """The IP protocol."""
 
-    """The port number. Will be None if protocol is 'icmp'."""
     port: Optional[int]
+    """The port number. Will be ``None`` if protocol is ``'icmp'``."""
 
 
 class LazyMapping(Mapping[str, str], ABC):
@@ -837,15 +853,15 @@ class Network:
         [NetworkInfo('ens1', '10.1.1.1/32'), NetworkInfo('ens1', '10.1.2.1/32'])
     """
 
-    """A list of IP addresses that other units should use to get in touch with you."""
     ingress_addresses: List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]
+    """A list of IP addresses that other units should use to get in touch with you."""
 
+    egress_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
     """A list of networks representing the subnets that other units will see
     you connecting from. Due to things like NAT it isn't always possible to
     narrow it down to a single address, but when it is clear, the CIDRs will
     be constrained to a single address (for example, 10.0.0.1/32).
     """
-    egress_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
 
     def __init__(self, network_info: '_NetworkDict'):
         """Initialize a Network instance.
@@ -885,8 +901,8 @@ class Network:
             return None
 
     @property
-    def ingress_address(
-            self) -> Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
+    def ingress_address(self) -> Optional[
+            Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
         """The address other applications should use to connect to your unit.
 
         Due to things like public/private addresses, NAT and tunneling, the address you bind()
@@ -1642,9 +1658,12 @@ class Resources:
 
 
 class Pod:
-    """Represents the definition of a pod spec in Kubernetes models.
+    """Represents the definition of a pod spec in legacy Kubernetes models.
 
-    Currently only supports simple access to setting the Juju pod spec via :attr:`.set_spec`.
+    DEPRECATED: New charms should use the sidecar pattern with Pebble.
+
+    Currently only supports simple access to setting the Juju pod spec via
+    :attr:`.set_spec`.
     """
 
     def __init__(self, backend: '_ModelBackend'):
@@ -1736,7 +1755,7 @@ class Storage:
 
     @property
     def id(self) -> int:
-        """Deprecated -- use :attr:`Storage.index` instead."""
+        """DEPRECATED. Use :attr:`Storage.index` instead."""
         logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
         return self.index
 
@@ -1764,26 +1783,31 @@ class Storage:
 
 
 class MultiPushPullError(Exception):
-    """Aggregates multiple push/pull related exceptions into one.
+    """Aggregates multiple push and pull exceptions into one.
 
-    This class should not be instantiated directly.
+    This class should not be instantiated directly. It is raised by
+    :meth:`Container.push_path` and :meth:`Container.pull_path`.
+    """
 
-    Attributes:
-        message: error message
-        errors: list of errors with each represented by a tuple (<source_path>,<exception>)
-            where source_path is the path being pushed/pulled from.
+    message: str
+    """The error message."""
+
+    errors: List[Tuple[str, Exception]]
+    """The list of errors.
+
+    Each error is represented by a tuple of (<source_path>, <exception>),
+    where source_path is the path being pushed to or pulled from.
     """
 
     def __init__(self, message: str, errors: List[Tuple[str, Exception]]):
-        """Create an aggregation of several push/pull errors."""
-        self.errors = errors
         self.message = message
+        self.errors = errors
 
     def __str__(self):
         return f'{self.message} ({len(self.errors)} errors): {self.errors[0][1]}, ...'
 
     def __repr__(self):
-        return f'MultiError({self.message!r}, {len(self.errors)} errors)'
+        return f'MultiPushPullError({self.message!r}, {len(self.errors)} errors)'
 
 
 class Container:

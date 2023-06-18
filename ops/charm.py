@@ -321,9 +321,7 @@ class LeaderElectedEvent(HookEvent):
 
 
 class LeaderSettingsChangedEvent(HookEvent):
-    """Event triggered when leader changes any settings.
-
-    DEPRECATED NOTICE
+    """DEPRECATED. Event triggered when leader changes any settings.
 
     This event has been deprecated in favor of using a Peer relation,
     and having the leader set a value in the Application data bag for
@@ -1234,12 +1232,13 @@ class ResourceMeta:
 
 
 class PayloadMeta:
-    """Object containing metadata about a payload definition.
+    """Object containing metadata about a payload definition."""
 
-    Attributes:
-        payload_name: Name of payload
-        type: Payload type
-    """
+    payload_name: str
+    """Name of the payload."""
+
+    type: str
+    """Payload type."""
 
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.payload_name = name
@@ -1263,10 +1262,10 @@ class ContainerMeta:
 
     NOTE: this is extremely lightweight right now, and just includes the fields we need for
     Pebble interaction.
-
-    Attributes:
-        name: Name of container (key in the YAML)
     """
+
+    name: str
+    """Name of the container (key in the YAML)."""
 
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
@@ -1319,22 +1318,25 @@ class ContainerMeta:
 class ContainerStorageMeta:
     """Metadata about storage for an individual container.
 
-    Attributes:
-        storage: a name for the mountpoint, which should exist the keys for :class:`StorageMeta`
-                 for the charm
-        location: the location `storage` is mounted at
-
     If multiple locations are specified for the same storage, such as Kubernetes subPath mounts,
-    `location` will not be an accessible attribute, as it would not be possible to determine
-    which mount point was desired, and `locations` should be iterated over.
+    ``location`` will not be an accessible attribute, as it would not be possible to determine
+    which mount point was desired, and ``locations`` should be iterated over.
     """
+
+    storage: str
+    """Name for the mount point, which should exist in the keys of the charm's
+    :class:`StorageMeta`.
+    """
+
+    location: str
+    """The location the storage is mounted at."""
 
     def __init__(self, storage: str, location: str):
         self.storage = storage
         self._locations: List[str] = [location]
 
     def add_location(self, location: str):
-        """Add an additional mountpoint to a known storage."""
+        """Add an additional mount point to a known storage."""
         self._locations.append(location)
 
     @property
@@ -1349,7 +1351,7 @@ class ContainerStorageMeta:
                 return self._locations[0]
             else:
                 raise RuntimeError(
-                    "container has more than one mountpoint with the same backing storage. "
+                    "container has more than one mount point with the same backing storage. "
                     "Request .locations to see a list"
                 )
         else:
