@@ -559,7 +559,7 @@ class Framework(Object):
     """The charm's metadata."""
 
     charm_dir: 'pathlib.Path' = None  # type: ignore
-    """The top-level directory of the charm."""
+    """The charm project root directory."""
 
     # to help the type checker and IDEs:
     if TYPE_CHECKING:
