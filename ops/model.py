@@ -1261,7 +1261,7 @@ class Relation:
 
     app: Optional[Application]
     """Represents the remote application of this relation.
-    
+
     For peer relations, this will be the local application.
     """
 
@@ -1273,7 +1273,7 @@ class Relation:
 
     data: 'RelationData'
     """Holds the data buckets for each entity of a relation.
-    
+
     This is accessed using, for example, ``Relation.data[unit]['foo']``.
     """
 

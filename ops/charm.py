@@ -365,10 +365,10 @@ class RelationEvent(HookEvent):
     relation: 'Relation'
     """The relation involved in this event."""
 
-    app: model.Application
+    app: Optional[model.Application]
     """The remote application that has triggered this event."""
-    
-    unit: model.Unit
+
+    unit: Optional[model.Unit]
     """The remote unit that has triggered this event.
 
     This will be ``None`` if the relation event was triggered as an
