@@ -1248,19 +1248,33 @@ class Secret:
 class Relation:
     """Represents an established relation between this application and another application.
 
-    This class should not be instantiated directly, instead use :meth:`Model.get_relation`
-    or :attr:`ops.RelationEvent.relation`. This is principally used by
+    This class should not be instantiated directly, instead use :meth:`Model.get_relation`,
+    :attr:`Model.relations`, or :attr:`ops.RelationEvent.relation`. This is principally used by
     :class:`ops.RelationMeta` to represent the relationships between charms.
+    """
 
-    Attributes:
-        name: The name of the local endpoint of the relation (eg 'db')
-        id: The identifier for a particular relation (integer)
-        app: An :class:`Application` representing the remote application of this relation.
-            For peer relations this will be the local application.
-        units: A set of :class:`Unit` for units that have started and joined this relation.
-            For subordinate relations, this set will include only one unit: the principal unit.
-        data: A :class:`RelationData` holding the data buckets for each entity
-            of a relation. Accessed via eg Relation.data[unit]['foo']
+    name: str
+    """The name of the local endpoint of the relation (for example, 'db')."""
+
+    id: int
+    """The identifier for a particular relation."""
+
+    app: Optional[Application]
+    """Represents the remote application of this relation.
+    
+    For peer relations, this will be the local application.
+    """
+
+    units: Set[Unit]
+    """A set of units that have started and joined this relation.
+
+    For subordinate relations, this set will include only one unit: the principal unit.
+    """
+
+    data: 'RelationData'
+    """Holds the data buckets for each entity of a relation.
+    
+    This is accessed using, for example, ``Relation.data[unit]['foo']``.
     """
 
     def __init__(
@@ -1303,8 +1317,8 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     """Represents the various data buckets of a given relation.
 
     Each unit and application involved in a relation has their own data bucket.
-    Eg: ``{entity: RelationDataContent}``
-    where entity can be either a :class:`Unit` or a :class:`Application`.
+    For example, ``{entity: RelationDataContent}``,
+    where entity can be either a :class:`Unit` or an :class:`Application`.
 
     Units can read and write their own data, and if they are the leader,
     they can read and write their application data. They are allowed to read
@@ -1672,14 +1686,11 @@ class Pod:
     def set_spec(self, spec: 'K8sSpec', k8s_resources: Optional['K8sSpec'] = None):
         """Set the specification for pods that Juju should start in kubernetes.
 
-        See `juju help-tool pod-spec-set` for details of what should be passed.
+        See ``juju help-tool pod-spec-set`` for details of what should be passed.
 
         Args:
             spec: The mapping defining the pod specification
             k8s_resources: Additional kubernetes specific specification.
-
-        Returns:
-            None
         """
         if not self._backend.is_leader():
             raise ModelError('cannot set a pod spec as this unit is not a leader')
@@ -2532,10 +2543,8 @@ class RelationDataError(ModelError):
     """Raised when a relation data read/write is invalid.
 
     This is raised if you're either trying to set a value to something that isn't a string,
-    or if you are trying to set a value in a bucket that you don't have access to. (eg,
-    another application/unit or setting your application data but you aren't the leader.)
-    Also raised when you attempt to read a databag you don't have access to
-    (i.e. a local app databag if you're not the leader).
+    or if you are trying to set a value in a bucket that you don't have access to. (For example,
+    another application/unit, or setting your application data without being the leader.)
     """
 
 

@@ -279,8 +279,8 @@ class UpgradeCharmEvent(HookEvent):
 class PreSeriesUpgradeEvent(HookEvent):
     """Event triggered to prepare a unit for series upgrade.
 
-    This event triggers when an administrator executes ``juju upgrade-series
-    MACHINE prepare``. The event will fire for each unit that is running on the
+    This event triggers when an administrator executes ``juju upgrade-machine
+    <machine> prepare``. The event will fire for each unit that is running on the
     specified machine. Any callback method bound to this event must prepare the
     charm for an upgrade to the series. This may include things like exporting
     database content to a version neutral format, or evacuating running
@@ -298,7 +298,7 @@ class PostSeriesUpgradeEvent(HookEvent):
 
     This event is triggered after the administrator has done a distribution
     upgrade (or rolled back and kept the same series). It is called in response
-    to ``juju upgrade-series MACHINE complete``. Associated charm callback
+    to ``juju upgrade-machine <machine> complete``. Associated charm callback
     methods are expected to do whatever steps are necessary to reconfigure their
     applications for the new series. This may include things like populating the
     upgraded version of a database. Note however charms are expected to check if
@@ -360,15 +360,19 @@ class RelationEvent(HookEvent):
     "stopped". Within that time window, the unit may participate in
     several different relations at a time, including multiple
     relations with the same name.
+    """
 
-    Attributes:
-        relation: The :class:`~ops.model.Relation` involved in this event
-        app: The remote :class:`~ops.model.Application` that has triggered this
-             event
-        unit: The remote :class:`~ops.model.Unit` that has triggered this event. This may be
-              ``None`` if the relation event was triggered as an
-              :class:`~ops.model.Application` level event
+    relation: 'Relation'
+    """The relation involved in this event."""
 
+    app: model.Application
+    """The remote application that has triggered this event."""
+    
+    unit: model.Unit
+    """The remote unit that has triggered this event.
+
+    This will be ``None`` if the relation event was triggered as an
+    :class:`Application <model.Application>`-level event.
     """
 
     def __init__(self, handle: 'Handle', relation: 'Relation',
