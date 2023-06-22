@@ -2,7 +2,17 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 from collections import namedtuple
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Type,
+    Union,
+)
 
 from ops import EventBase
 
@@ -104,17 +114,34 @@ class Context:
         else:
             self.unit_status_history.append(status.unit)
 
+    def _check_event(self, event: Union["Event", str], allow_action=False) -> "Event":
+        """Validate the event and cast to Event."""
+        if isinstance(event, str):
+            event = Event(event)
+
+        if not isinstance(event, Event):
+            raise InvalidEventError(f"Expected Event | str, got {type(event)}")
+
+        if not allow_action and event._is_action_event:
+            raise InvalidEventError(
+                "Cannot Context.run() action events. "
+                "Use Context.run_action instead.",
+            )
+
+        return event
+
     def run(
         self,
         event: Union["Event", str],
         state: "State",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
+        owner_path: Sequence[str] = None,
     ) -> "State":
         """Trigger a charm execution with an Event and a State.
 
-        Calling this function will call ops' main() and set up the context according to the
-        specified State, then emit the event on the charm.
+        Calling this function will call ``ops.main`` and set up the context according to the
+        specified ``State``, then emit the event on the charm.
 
         :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
@@ -123,20 +150,17 @@ class Context:
             instantiated charm. Will receive the charm instance as only positional argument.
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
+        :arg owner_path: Path to the ``Object`` that owns this event. E.g. ('foo', 'bar') ->
+            will emit the event it can find at ``<CharmType>.foo.bar.on``.
         """
-        if isinstance(event, str):
-            event = Event(event)
-
-        if not isinstance(event, Event):
-            raise InvalidEventError(f"Expected Event | str, got {type(event)}")
-
-        if event._is_action_event:
-            raise InvalidEventError(
-                "Cannot Context.run() action events. "
-                "Use Context.run_action instead.",
-            )
-
-        return self._run(event, state=state, pre_event=pre_event, post_event=post_event)
+        event = self._check_event(event, allow_action=False)
+        return self._run(
+            event,
+            state=state,
+            pre_event=pre_event,
+            post_event=post_event,
+            owner_path=owner_path,
+        )
 
     def run_action(
         self,
@@ -147,8 +171,8 @@ class Context:
     ) -> ActionOutput:
         """Trigger a charm execution with an Action and a State.
 
-        Calling this function will call ops' main() and set up the context according to the
-        specified State, then emit the event on the charm.
+        Calling this function will call ``ops.main`` and set up the context according to the
+        specified ``State``, then emit the event on the charm.
 
         :arg action: the Action that the charm will execute. Can be a string or an Action instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
@@ -194,6 +218,7 @@ class Context:
         state: "State",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
+        owner_path: Sequence[str] = None,
     ) -> "State":
         runtime = Runtime(
             charm_spec=self.charm_spec,
@@ -201,13 +226,11 @@ class Context:
             charm_root=self.charm_root,
         )
 
-        if not isinstance(event, Event):
-            raise InvalidEventError(f"Expected Event, got {type(event)}")
-
         return runtime.exec(
             state=state,
             event=event,
             pre_event=pre_event,
             post_event=post_event,
             context=self,
+            owner_path=owner_path,
         )
