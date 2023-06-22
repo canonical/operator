@@ -3,8 +3,8 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
-from scenario import trigger
 from scenario.state import Event, Relation, State, Status, _CharmSpec
+from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")
@@ -60,7 +60,7 @@ def test_charm_heals_on_start(mycharm):
 
     assert out.status.unit == ActiveStatus("yabadoodle")
 
-    out_purged = out.replace(juju_log=[], stored_state=initial_state.stored_state)
+    out_purged = out.replace(stored_state=initial_state.stored_state)
     assert out_purged.jsonpatch_delta(initial_state) == [
         {
             "op": "replace",
@@ -71,11 +71,6 @@ def test_charm_heals_on_start(mycharm):
             "op": "replace",
             "path": "/status/unit/name",
             "value": "active",
-        },
-        {
-            "op": "add",
-            "path": "/status/unit_history/0",
-            "value": {"message": "foo", "name": "blocked"},
         },
     ]
 

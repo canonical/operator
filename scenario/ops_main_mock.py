@@ -18,6 +18,7 @@ from scenario.logger import logger as scenario_logger
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
+    from scenario.context import Context
     from scenario.state import Event, State, _CharmSpec
 
 logger = scenario_logger.getChild("ops_main_mock")
@@ -32,6 +33,7 @@ def main(
     post_event: Optional[Callable[["CharmType"], None]] = None,
     state: "State" = None,
     event: "Event" = None,
+    context: "Context" = None,
     charm_spec: "_CharmSpec" = None,
 ):
     """Set up the charm and dispatch the observed event."""
@@ -43,6 +45,7 @@ def main(
     model_backend = _MockModelBackend(  # pyright: reportPrivateUsage=false
         state=state,
         event=event,
+        context=context,
         charm_spec=charm_spec,
     )
     debug = "JUJU_DEBUG" in os.environ
@@ -88,7 +91,8 @@ def main(
 
         if not getattr(charm.on, dispatcher.event_name, None):
             raise NoObserverError(
-                f"Charm has no registered observers for {dispatcher.event_name!r}. "
+                f"Cannot fire {dispatcher.event_name!r} on {charm}: "
+                f"invalid event (not on charm.on). "
                 f"This is probably not what you were looking for.",
             )
 

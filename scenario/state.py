@@ -7,6 +7,7 @@ import datetime
 import inspect
 import re
 import typing
+from collections import namedtuple
 from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
@@ -20,6 +21,8 @@ from ops.model import SecretRotate, StatusBase
 from scenario.fs_mocks import _MockFileSystem, _MockStorageMount
 from scenario.logger import logger as scenario_logger
 
+JujuLogLine = namedtuple("JujuLogLine", ("level", "message"))
+
 if typing.TYPE_CHECKING:
     try:
         from typing import Self
@@ -29,6 +32,7 @@ if typing.TYPE_CHECKING:
 
     PathLike = Union[str, Path]
     AnyRelation = Union["Relation", "PeerRelation", "SubordinateRelation"]
+    AnyJson = Union[str, bool, dict, int, float, list]
 
 logger = scenario_logger.getChild("state")
 
@@ -36,6 +40,9 @@ ATTACH_ALL_STORAGES = "ATTACH_ALL_STORAGES"
 CREATE_ALL_RELATIONS = "CREATE_ALL_RELATIONS"
 BREAK_ALL_RELATIONS = "BREAK_ALL_RELATIONS"
 DETACH_ALL_STORAGES = "DETACH_ALL_STORAGES"
+
+ACTION_EVENT_SUFFIX = "_action"
+PEBBLE_READY_EVENT_SUFFIX = "_pebble_ready"
 RELATION_EVENTS_SUFFIX = {
     "_relation_changed",
     "_relation_broken",
@@ -747,11 +754,6 @@ class Status(_DCBase):
     unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
     workload_version: str = ""
 
-    # most to least recent statuses; do NOT include the current one.
-    app_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
-    unit_history: List[_EntityStatus] = dataclasses.field(default_factory=list)
-    previous_workload_version: Optional[str] = None
-
     def __post_init__(self):
         for name in ["app", "unit"]:
             val = getattr(self, name)
@@ -775,7 +777,6 @@ class Status(_DCBase):
         # than once per hook.
 
         # bypass frozen dataclass
-        object.__setattr__(self, "previous_workload_version", self.workload_version)
         object.__setattr__(self, "workload_version", new_workload_version)
 
     def _update_status(
@@ -785,14 +786,9 @@ class Status(_DCBase):
         is_app: bool = False,
     ):
         """Update the current app/unit status and add the previous one to the history."""
-        if is_app:
-            self.app_history.append(self.app)
-            # bypass frozen dataclass
-            object.__setattr__(self, "app", _EntityStatus(new_status, new_message))
-        else:
-            self.unit_history.append(self.unit)
-            # bypass frozen dataclass
-            object.__setattr__(self, "unit", _EntityStatus(new_status, new_message))
+        name = "app" if is_app else "unit"
+        # bypass frozen dataclass
+        object.__setattr__(self, name, _EntityStatus(new_status, new_message))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -829,7 +825,6 @@ class State(_DCBase):
     status: Status = dataclasses.field(default_factory=Status)
     leader: bool = False
     model: Model = Model()
-    juju_log: List[Tuple[str, str]] = dataclasses.field(default_factory=list)
     secrets: List[Secret] = dataclasses.field(default_factory=list)
 
     unit_id: int = 0
@@ -839,9 +834,6 @@ class State(_DCBase):
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
     stored_state: List["StoredState"] = dataclasses.field(default_factory=dict)
-
-    # todo:
-    #  actions?
 
     def with_can_connect(self, container_name: str, can_connect: bool) -> "State":
         def replacer(container: Container):
@@ -971,6 +963,9 @@ class Event(_DCBase):
     # if this is a workload (container) event, the container it refers to
     container: Optional[Container] = None
 
+    # if this is an action event, the Action instance
+    action: Optional["Action"] = None
+
     # todo add other meta for
     #  - secret events
     #  - pebble?
@@ -995,6 +990,11 @@ class Event(_DCBase):
     def _is_relation_event(self) -> bool:
         """Whether the event name indicates that this is a relation event."""
         return any(self.name.endswith(suffix) for suffix in RELATION_EVENTS_SUFFIX)
+
+    @property
+    def _is_action_event(self) -> bool:
+        """Whether the event name indicates that this is a relation event."""
+        return self.name.endswith(ACTION_EVENT_SUFFIX)
 
     @property
     def _is_secret_event(self) -> bool:
@@ -1037,24 +1037,21 @@ class Event(_DCBase):
             charm_spec.meta.get("peers", ()),
         ):
             relation_name = relation_name.replace("-", "_")
-            builtins.append(relation_name + "_relation_created")
-            builtins.append(relation_name + "_relation_joined")
-            builtins.append(relation_name + "_relation_changed")
-            builtins.append(relation_name + "_relation_departed")
-            builtins.append(relation_name + "_relation_broken")
+            for relation_evt_suffix in RELATION_EVENTS_SUFFIX:
+                builtins.append(relation_name + relation_evt_suffix)
 
         for storage_name in charm_spec.meta.get("storages", ()):
             storage_name = storage_name.replace("-", "_")
-            builtins.append(storage_name + "_storage_attached")
-            builtins.append(storage_name + "_storage_detaching")
+            for storage_evt_suffix in STORAGE_EVENTS_SUFFIX:
+                builtins.append(storage_name + storage_evt_suffix)
 
         for action_name in charm_spec.actions or ():
             action_name = action_name.replace("-", "_")
-            builtins.append(action_name + "_action")
+            builtins.append(action_name + ACTION_EVENT_SUFFIX)
 
         for container_name in charm_spec.meta.get("containers", ()):
             container_name = container_name.replace("-", "_")
-            builtins.append(container_name + "_pebble_ready")
+            builtins.append(container_name + PEBBLE_READY_EVENT_SUFFIX)
 
         return event_name in builtins
 
@@ -1082,10 +1079,6 @@ class Event(_DCBase):
             }
 
         elif self._is_relation_event:
-            if not self.relation:
-                raise ValueError(
-                    "this is a relation event; expected relation attribute",
-                )
             # this is a RelationEvent. The snapshot:
             snapshot_data = {
                 "relation_name": self.relation.endpoint,
@@ -1100,6 +1093,18 @@ class Event(_DCBase):
             handler_name,
             snapshot_data=snapshot_data,
         )
+
+
+@dataclasses.dataclass(frozen=True)
+class Action(_DCBase):
+    name: str
+
+    params: Dict[str, "AnyJson"] = dataclasses.field(default_factory=dict)
+
+    @property
+    def event(self) -> Event:
+        """Helper to generate an action event from this action."""
+        return Event(self.name + ACTION_EVENT_SUFFIX, action=self)
 
 
 def deferred(

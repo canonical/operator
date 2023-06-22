@@ -3,8 +3,8 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.framework import StoredState as ops_storedstate
 
-from scenario import trigger
 from scenario.state import State, StoredState
+from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")

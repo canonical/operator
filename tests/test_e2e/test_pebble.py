@@ -2,14 +2,13 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import yaml
 from ops import pebble
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.pebble import ServiceStartup, ServiceStatus
 
-from scenario import trigger
 from scenario.state import Container, ExecOutput, Mount, State
+from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")
@@ -136,7 +135,7 @@ def test_fs_pull(charm_cls, make_dirs):
         assert file.read() == text
     else:
         # nothing has changed
-        out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
+        out_purged = out.replace(stored_state=state.stored_state)
         assert not out_purged.jsonpatch_delta(state)
 
 

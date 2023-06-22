@@ -2,7 +2,9 @@ import pytest
 from ops.charm import CharmBase, CharmEvents, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
-from scenario import Event, State, capture_events, trigger
+from scenario import Event, State
+from scenario.capture_events import capture_events
+from tests.helpers import trigger
 
 
 class Foo(EventBase):

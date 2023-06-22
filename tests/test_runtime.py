@@ -7,6 +7,7 @@ import yaml
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase
 
+from scenario import Context
 from scenario.runtime import Runtime
 from scenario.state import Event, State, _CharmSpec
 
@@ -40,9 +41,10 @@ def test_event_hooks():
         meta_file = temppath / "metadata.yaml"
         meta_file.write_text(yaml.safe_dump(meta))
 
+        my_charm_type = charm_type()
         runtime = Runtime(
             _CharmSpec(
-                charm_type(),
+                my_charm_type,
                 meta=meta,
             ),
         )
@@ -54,6 +56,7 @@ def test_event_hooks():
             event=Event("update_status"),
             pre_event=pre_event,
             post_event=post_event,
+            context=Context(my_charm_type, meta=meta),
         )
 
         assert pre_event.called
@@ -81,7 +84,9 @@ def test_event_emission():
             ),
         )
 
-        runtime.exec(state=State(), event=Event("bar"))
+        runtime.exec(
+            state=State(), event=Event("bar"), context=Context(my_charm_type, meta=meta)
+        )
 
         assert my_charm_type._event
         assert isinstance(my_charm_type._event, MyEvt)
@@ -107,5 +112,8 @@ def test_unit_name(app_name, unit_id):
         assert charm.unit.name == f"{app_name}/{unit_id}"
 
     runtime.exec(
-        state=State(unit_id=unit_id), event=Event("start"), post_event=post_event
+        state=State(unit_id=unit_id),
+        event=Event("start"),
+        post_event=post_event,
+        context=Context(my_charm_type, meta=meta),
     )
