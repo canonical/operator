@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 logger = scenario_logger.getChild("runtime")
 STORED_STATE_REGEX = re.compile(
-    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]",
+    r"((?P<event_owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]",
 )
 EVENT_REGEX = re.compile(_event_regex)
 
@@ -333,7 +333,7 @@ class Runtime:
         context: "Context",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-        owner_path: Sequence[str] = None,
+        event_owner_path: Sequence[str] = None,
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
@@ -388,7 +388,7 @@ class Runtime:
                     charm_spec=self._charm_spec.replace(
                         charm_type=self._wrap(charm_type),
                     ),
-                    owner_path=owner_path,
+                    event_owner_path=event_owner_path,
                 )
             except NoObserverError:
                 raise  # propagate along

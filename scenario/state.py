@@ -795,7 +795,7 @@ class Status(_DCBase):
 class StoredState(_DCBase):
     # /-separated Object names. E.g. MyCharm/MyCharmLib.
     # if None, this StoredState instance is owned by the Framework.
-    owner_path: Optional[str]
+    event_owner_path: Optional[str]
 
     name: str = "_stored"
     content: Dict[str, Any] = dataclasses.field(default_factory=dict)
@@ -804,7 +804,7 @@ class StoredState(_DCBase):
 
     @property
     def handle_path(self):
-        return f"{self.owner_path or ''}/{self.data_type_name}[{self.name}]"
+        return f"{self.event_owner_path or ''}/{self.data_type_name}[{self.name}]"
 
 
 @dataclasses.dataclass(frozen=True)

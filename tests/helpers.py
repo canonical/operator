@@ -37,7 +37,7 @@ def trigger(
     config: Optional[Dict[str, Any]] = None,
     charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
     juju_version: str = "3.0",
-    owner_path: Sequence[str] = None,
+    event_owner_path: Sequence[str] = None,
 ) -> "State":
     ctx = Context(
         charm_type=charm_type,
@@ -52,5 +52,5 @@ def trigger(
         state=state,
         pre_event=pre_event,
         post_event=post_event,
-        owner_path=owner_path,
+        event_owner_path=event_owner_path,
     )

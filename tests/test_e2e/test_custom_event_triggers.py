@@ -142,11 +142,7 @@ def test_child_object_event():
             MyCharm._foo_called = True
 
     trigger(
-        State(),
-        "foo",
-        MyCharm,
-        meta=MyCharm.META,
-        owner_path=('obj', 'my_on')
+        State(), "foo", MyCharm, meta=MyCharm.META, event_owner_path=("obj", "my_on")
     )
 
     assert MyCharm._foo_called

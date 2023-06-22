@@ -114,29 +114,13 @@ class Context:
         else:
             self.unit_status_history.append(status.unit)
 
-    def _check_event(self, event: Union["Event", str], allow_action=False) -> "Event":
-        """Validate the event and cast to Event."""
-        if isinstance(event, str):
-            event = Event(event)
-
-        if not isinstance(event, Event):
-            raise InvalidEventError(f"Expected Event | str, got {type(event)}")
-
-        if not allow_action and event._is_action_event:
-            raise InvalidEventError(
-                "Cannot Context.run() action events. "
-                "Use Context.run_action instead.",
-            )
-
-        return event
-
     def run(
         self,
         event: Union["Event", str],
         state: "State",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-        owner_path: Sequence[str] = None,
+        event_owner_path: Sequence[str] = None,
     ) -> "State":
         """Trigger a charm execution with an Event and a State.
 
@@ -150,16 +134,34 @@ class Context:
             instantiated charm. Will receive the charm instance as only positional argument.
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
-        :arg owner_path: Path to the ``Object`` that owns this event. E.g. ('foo', 'bar') ->
+        :arg event_owner_path: Path to the ``Object`` that owns this event. E.g. ('foo', 'bar') ->
             will emit the event it can find at ``<CharmType>.foo.bar.on``.
         """
-        event = self._check_event(event, allow_action=False)
+        """Validate the event and cast to Event."""
+        if isinstance(event_owner_path, str):
+            raise TypeError(
+                "event_owner_path cannot be a string, "
+                "it should be any other Sequence type of strings",
+            )
+
+        if isinstance(event, str):
+            event = Event(event)
+
+        if not isinstance(event, Event):
+            raise InvalidEventError(f"Expected Event | str, got {type(event)}")
+
+        if event._is_action_event:
+            raise InvalidEventError(
+                "Cannot Context.run() action events. "
+                "Use Context.run_action instead.",
+            )
+
         return self._run(
             event,
             state=state,
             pre_event=pre_event,
             post_event=post_event,
-            owner_path=owner_path,
+            event_owner_path=event_owner_path,
         )
 
     def run_action(
@@ -218,7 +220,7 @@ class Context:
         state: "State",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-        owner_path: Sequence[str] = None,
+        event_owner_path: Sequence[str] = None,
     ) -> "State":
         runtime = Runtime(
             charm_spec=self.charm_spec,
@@ -232,5 +234,5 @@ class Context:
             pre_event=pre_event,
             post_event=post_event,
             context=self,
-            owner_path=owner_path,
+            event_owner_path=event_owner_path,
         )

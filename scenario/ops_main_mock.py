@@ -40,11 +40,11 @@ def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
             obj = getattr(obj, step)
         except AttributeError:
             raise BadOwnerPath(
-                f"owner_path {path!r} invalid: {step!r} leads to nowhere.",
+                f"event_owner_path {path!r} invalid: {step!r} leads to nowhere.",
             )
     if not isinstance(obj, ops.ObjectEvents):
         raise BadOwnerPath(
-            f"owner_path {path!r} invalid: does not lead to "
+            f"event_owner_path {path!r} invalid: does not lead to "
             f"an ObjectEvents instance.",
         )
     return obj
@@ -53,16 +53,16 @@ def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
 def _emit_charm_event(
     charm: "CharmBase",
     event_name: str,
-    owner_path: Sequence[str] = None,
+    event_owner_path: Sequence[str] = None,
 ):
     """Emits a charm event based on a Juju event name.
 
     Args:
         charm: A charm instance to emit an event from.
         event_name: A Juju event name to emit on a charm.
-        owner_path: Event source lookup path.
+        event_owner_path: Event source lookup path.
     """
-    owner = _get_owner(charm, owner_path) if owner_path else charm.on
+    owner = _get_owner(charm, event_owner_path) if event_owner_path else charm.on
 
     try:
         event_to_emit = getattr(owner, event_name)
@@ -86,7 +86,7 @@ def main(
     event: "Event" = None,
     context: "Context" = None,
     charm_spec: "_CharmSpec" = None,
-    owner_path: Sequence[str] = None,
+    event_owner_path: Sequence[str] = None,
 ):
     """Set up the charm and dispatch the observed event."""
     charm_class = charm_spec.charm_type
@@ -141,7 +141,7 @@ def main(
         if pre_event:
             pre_event(charm)
 
-        _emit_charm_event(charm, dispatcher.event_name, owner_path)
+        _emit_charm_event(charm, dispatcher.event_name, event_owner_path)
 
         if post_event:
             post_event(charm)
