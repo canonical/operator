@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from ops.testing import CharmType
 
-    from scenario.state import JujuLogLine, State, Status, _EntityStatus
+    from scenario.state import JujuLogLine, State, _EntityStatus
 
     PathLike = Union[str, Path]
 
@@ -97,12 +97,23 @@ class Context:
         self._action_results = None
         self._action_failure = ""
 
-    def _record_status(self, status: "Status", is_app: bool):
+    def clear(self):
+        """Cleanup side effects histories."""
+        self.juju_log = []
+        self.app_status_history = []
+        self.unit_status_history = []
+        self.workload_version_history = []
+        self.emitted_events = []
+        self._action_logs = []
+        self._action_results = None
+        self._action_failure = ""
+
+    def _record_status(self, state: "State", is_app: bool):
         """Record the previous status before a status change."""
         if is_app:
-            self.app_status_history.append(status.app)
+            self.app_status_history.append(state.app_status)
         else:
-            self.unit_status_history.append(status.unit)
+            self.unit_status_history.append(state.unit_status)
 
     def run(
         self,

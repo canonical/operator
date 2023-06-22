@@ -94,7 +94,7 @@ def test_scenario_base():
     ctx = Context(MyCharm,
                   meta={"name": "foo"})
     out = ctx.run('start', State())
-    assert out.status.unit == UnknownStatus()
+    assert out.unit_status == UnknownStatus()
 ```
 
 Now let's start making it more complicated. Our charm sets a special state if it has leadership on 'start':
@@ -121,9 +121,8 @@ class MyCharm(CharmBase):
 def test_status_leader(leader):
     ctx = Context(MyCharm,
                   meta={"name": "foo"})
-    out = ctx.run('start',
-                  State(leader=leader)
-    assert out.status.unit == ActiveStatus('I rule' if leader else 'I am ruled')
+    out = ctx.run('start', State(leader=leader))
+    assert out.unit_status == ActiveStatus('I rule' if leader else 'I am ruled')
 ```
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can
@@ -152,6 +151,8 @@ def _on_event(self, _event):
     except:
         self.unit.status = BlockedStatus('something went wrong')
 ```
+
+More broadly, often we want to test 'side effects' of executing a charm, such as what events have been emitted, what statuses it went through, etc... Before we get there, we have to explain what the `Context` represents, and its relationship with the `State`.
 
 # Context and State
 
@@ -209,7 +210,7 @@ from ops.model import ActiveStatus
 from scenario import State, Status
 
 # ...
-ctx.run('start', State(status=Status(unit=ActiveStatus('foo'))))
+ctx.run('start', State(unit_status=ActiveStatus('foo'))))
 assert ctx.unit_status_history == [
     ActiveStatus('foo'),  # now the first status is active: 'foo'!
     # ...
