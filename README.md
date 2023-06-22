@@ -874,7 +874,7 @@ class MyCharmType(CharmBase):
 
 state = State(stored_state=[
     StoredState(
-        event_owner_path="MyCharmType",
+        owner_path="MyCharmType",
         name="my_stored_state",
         content={
             'foo': 'bar',

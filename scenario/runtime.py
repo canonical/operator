@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 logger = scenario_logger.getChild("runtime")
 STORED_STATE_REGEX = re.compile(
-    r"((?P<event_owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]",
+    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]",
 )
 EVENT_REGEX = re.compile(_event_regex)
 
