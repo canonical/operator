@@ -91,7 +91,8 @@ def main(
 
         if not getattr(charm.on, dispatcher.event_name, None):
             raise NoObserverError(
-                f"Charm has no registered observers for {dispatcher.event_name!r}. "
+                f"Cannot fire {dispatcher.event_name!r} on {charm}: "
+                f"invalid event (not on charm.on). "
                 f"This is probably not what you were looking for.",
             )
 

@@ -1,10 +1,12 @@
 import os
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from ops.charm import CharmBase, CharmEvents
-from ops.framework import EventBase, EventSource
+from ops.framework import EventBase, EventSource, Object
 
-from scenario import State
+from scenario import Event, State
+from scenario.ops_main_mock import NoObserverError
 from scenario.runtime import InconsistentScenarioError
 from tests.helpers import trigger
 
@@ -68,3 +70,50 @@ def test_funky_named_event_emitted():
     trigger(State(), "foo-relation-changed", MyCharm, meta=MyCharm.META)
     assert MyCharm._foo_called
     os.unsetenv("SCENARIO_SKIP_CONSISTENCY_CHECKS")
+
+
+def test_child_object_event_emitted():
+    class FooEvent(EventBase):
+        pass
+
+    class MyObjEvents(CharmEvents):
+        foo = EventSource(FooEvent)
+
+    class MyObject(Object):
+        on = MyObjEvents()
+
+    class MyCharm(CharmBase):
+        META = {"name": "mycharm"}
+        _foo_called = False
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.obj = MyObject(self, "child")
+            self.framework.observe(self.obj.on.foo, self._on_foo)
+
+        def _on_foo(self, e):
+            MyCharm._foo_called = True
+
+    with pytest.raises(NoObserverError):
+        # this will fail because "foo" isn't registered on MyCharm but on MyCharm.foo
+        trigger(State(), "foo", MyCharm, meta=MyCharm.META)
+        assert MyCharm._foo_called
+
+    # workaround: we can use pre_event to have Scenario set up the simulation for us and run our
+    # test code before it eventually fails. pre_event gets called with the set-up charm instance.
+    def pre_event(charm: MyCharm):
+        event_mock = MagicMock()
+        charm._on_foo(event_mock)
+        assert charm.unit.name == "mycharm/0"
+
+    # make sure you only filter out NoObserverError, else if pre_event raises,
+    # they will also be caught while you want them to bubble up.
+    with pytest.raises(NoObserverError):
+        trigger(
+            State(),
+            "rubbish",  # you can literally put anything here
+            MyCharm,
+            pre_event=pre_event,
+            meta=MyCharm.META,
+        )
+    assert MyCharm._foo_called
