@@ -833,7 +833,7 @@ class State(_DCBase):
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
-    stored_state: List["StoredState"] = dataclasses.field(default_factory=dict)
+    stored_state: List["StoredState"] = dataclasses.field(default_factory=list)
 
     def with_can_connect(self, container_name: str, can_connect: bool) -> "State":
         def replacer(container: Container):
