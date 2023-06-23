@@ -3,7 +3,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
-from scenario.state import Event, Relation, State, Status, _CharmSpec
+from scenario.state import Relation, State
 from tests.helpers import trigger
 
 
@@ -45,7 +45,7 @@ def test_charm_heals_on_start(mycharm):
     mycharm._call = call
 
     initial_state = State(
-        config={"foo": "bar"}, leader=True, status=Status(unit=BlockedStatus("foo"))
+        config={"foo": "bar"}, leader=True, unit_status=BlockedStatus("foo")
     )
 
     out = trigger(
@@ -58,18 +58,18 @@ def test_charm_heals_on_start(mycharm):
         pre_event=pre_event,
     )
 
-    assert out.status.unit == ActiveStatus("yabadoodle")
+    assert out.unit_status == ActiveStatus("yabadoodle")
 
     out_purged = out.replace(stored_state=initial_state.stored_state)
     assert out_purged.jsonpatch_delta(initial_state) == [
         {
             "op": "replace",
-            "path": "/status/unit/message",
+            "path": "/unit_status/message",
             "value": "yabadoodle",
         },
         {
             "op": "replace",
-            "path": "/status/unit/name",
+            "path": "/unit_status/name",
             "value": "active",
         },
     ]

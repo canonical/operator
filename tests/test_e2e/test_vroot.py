@@ -43,7 +43,7 @@ def test_vroot():
             charm_root=t,
         )
 
-    assert out.status.unit == ("active", "hello world")
+    assert out.unit_status == ("active", "hello world")
 
 
 @pytest.mark.parametrize("meta_overwrite", ["metadata", "actions", "config"])
