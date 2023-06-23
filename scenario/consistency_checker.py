@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
 import os
 from collections import Counter
 from collections.abc import Sequence
