@@ -746,52 +746,6 @@ def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
 
 
 @dataclasses.dataclass(frozen=True)
-class Status(_DCBase):
-    """Represents the 'juju statuses' of the application/unit being tested."""
-
-    # the current statuses. Will be cast to _EntitiyStatus in __post_init__
-    app: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
-    unit: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
-    workload_version: str = ""
-
-    def __post_init__(self):
-        for name in ["app", "unit"]:
-            val = getattr(self, name)
-            if isinstance(val, _EntityStatus):
-                pass
-            elif isinstance(val, StatusBase):
-                object.__setattr__(self, name, _status_to_entitystatus(val))
-            elif isinstance(val, tuple):
-                logger.warning(
-                    "Initializing Status.[app/unit] with Tuple[str, str] is deprecated "
-                    "and will be removed soon. \n"
-                    f"Please pass a StatusBase instance: `StatusBase(*{val})`",
-                )
-                object.__setattr__(self, name, _EntityStatus(*val))
-            else:
-                raise TypeError(f"Invalid status.{name}: {val!r}")
-
-    def _update_workload_version(self, new_workload_version: str):
-        """Update the current app version and record the previous one."""
-        # We don't keep a full history because we don't expect the app version to change more
-        # than once per hook.
-
-        # bypass frozen dataclass
-        object.__setattr__(self, "workload_version", new_workload_version)
-
-    def _update_status(
-        self,
-        new_status: str,
-        new_message: str = "",
-        is_app: bool = False,
-    ):
-        """Update the current app/unit status and add the previous one to the history."""
-        name = "app" if is_app else "unit"
-        # bypass frozen dataclass
-        object.__setattr__(self, name, _EntityStatus(new_status, new_message))
-
-
-@dataclasses.dataclass(frozen=True)
 class StoredState(_DCBase):
     # /-separated Object names. E.g. MyCharm/MyCharmLib.
     # if None, this StoredState instance is owned by the Framework.
@@ -822,7 +776,6 @@ class State(_DCBase):
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
-    status: Status = dataclasses.field(default_factory=Status)
     leader: bool = False
     model: Model = Model()
     secrets: List[Secret] = dataclasses.field(default_factory=list)
@@ -834,6 +787,42 @@ class State(_DCBase):
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
     stored_state: List["StoredState"] = dataclasses.field(default_factory=list)
+
+    """Represents the 'juju statuses' of the application/unit being tested."""
+
+    # the current statuses. Will be cast to _EntitiyStatus in __post_init__
+    app_status: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    unit_status: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    workload_version: str = ""
+
+    def __post_init__(self):
+        for name in ["app_status", "unit_status"]:
+            val = getattr(self, name)
+            if isinstance(val, _EntityStatus):
+                pass
+            elif isinstance(val, StatusBase):
+                object.__setattr__(self, name, _status_to_entitystatus(val))
+            else:
+                raise TypeError(f"Invalid status.{name}: {val!r}")
+
+    def _update_workload_version(self, new_workload_version: str):
+        """Update the current app version and record the previous one."""
+        # We don't keep a full history because we don't expect the app version to change more
+        # than once per hook.
+
+        # bypass frozen dataclass
+        object.__setattr__(self, "workload_version", new_workload_version)
+
+    def _update_status(
+        self,
+        new_status: str,
+        new_message: str = "",
+        is_app: bool = False,
+    ):
+        """Update the current app/unit status and add the previous one to the history."""
+        name = "app_status" if is_app else "unit_status"
+        # bypass frozen dataclass
+        object.__setattr__(self, name, _EntityStatus(new_status, new_message))
 
     def with_can_connect(self, container_name: str, can_connect: bool) -> "State":
         def replacer(container: Container):
@@ -850,7 +839,7 @@ class State(_DCBase):
     def with_unit_status(self, status: StatusBase) -> "State":
         return self.replace(
             status=dataclasses.replace(
-                self.status,
+                self.unit_status,
                 unit=_status_to_entitystatus(status),
             ),
         )

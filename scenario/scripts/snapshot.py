@@ -9,7 +9,7 @@ import re
 import shlex
 import sys
 import tempfile
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from enum import Enum
 from itertools import chain
 from pathlib import Path
@@ -35,7 +35,6 @@ from scenario.state import (
     Relation,
     Secret,
     State,
-    Status,
     _EntityStatus,
 )
 
@@ -442,6 +441,13 @@ def get_juju_status(model: Optional[str]) -> Dict:
     return _juju_run("status --relations", model=model)
 
 
+@dataclass
+class Status:
+    app: _EntityStatus
+    unit: _EntityStatus
+    workload_version: str
+
+
 def get_status(juju_status: Dict, target: JujuUnitName) -> Status:
     """Parse `juju status` to get the Status data structure and some relation information."""
     app = juju_status["applications"][target.app_name]
@@ -738,10 +744,14 @@ def _snapshot(
         unit_state_db = RemoteUnitStateDB(model, target)
         juju_status = get_juju_status(model)
         endpoints = get_endpoints(juju_status, target)
+        status = get_status(juju_status, target=target)
+
         state = State(
             leader=get_leader(target, model),
+            unit_status=status.unit,
+            app_status=status.app,
+            workload_version=status.workload_version,
             model=state_model,
-            status=get_status(juju_status, target=target),
             config=if_include("c", lambda: get_config(target, model), {}),
             relations=if_include(
                 "r",

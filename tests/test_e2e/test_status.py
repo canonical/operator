@@ -4,7 +4,7 @@ from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus, UnknownStatus, WaitingStatus
 
 from scenario import Context
-from scenario.state import State, Status
+from scenario.state import State
 from tests.helpers import trigger
 
 
@@ -34,7 +34,7 @@ def test_initial_status(mycharm):
         post_event=post_event,
     )
 
-    assert out.status.unit == UnknownStatus()
+    assert out.unit_status == UnknownStatus()
 
 
 def test_status_history(mycharm):
@@ -55,14 +55,14 @@ def test_status_history(mycharm):
         post_event=post_event,
     )
 
-    assert out.status.unit == WaitingStatus("3")
+    assert out.unit_status == WaitingStatus("3")
     assert ctx.unit_status_history == [
         UnknownStatus(),
         ActiveStatus("1"),
         BlockedStatus("2"),
     ]
 
-    assert out.status.app == WaitingStatus("3")
+    assert out.app_status == WaitingStatus("3")
     assert ctx.app_status_history == [
         UnknownStatus(),
         ActiveStatus("1"),
@@ -84,15 +84,16 @@ def test_status_history_preservation(mycharm):
         "update_status",
         State(
             leader=True,
-            status=Status(unit=ActiveStatus("foo"), app=ActiveStatus("bar")),
+            unit_status=ActiveStatus("foo"),
+            app_status=ActiveStatus("bar"),
         ),
         post_event=post_event,
     )
 
-    assert out.status.unit == WaitingStatus("3")
+    assert out.unit_status == WaitingStatus("3")
     assert ctx.unit_status_history == [ActiveStatus("foo")]
 
-    assert out.status.app == WaitingStatus("3")
+    assert out.app_status == WaitingStatus("3")
     assert ctx.app_status_history == [ActiveStatus("bar")]
 
 
@@ -116,4 +117,4 @@ def test_workload_history(mycharm):
     )
 
     assert ctx.workload_version_history == ["1", "1.1"]
-    assert out.status.workload_version == "1.2"
+    assert out.workload_version == "1.2"

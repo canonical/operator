@@ -132,7 +132,7 @@ class _MockModelBackend(_ModelBackend):
         return self._state.leader
 
     def status_get(self, *, is_app: bool = False):
-        status, message = self._state.status.app if is_app else self._state.status.unit
+        status, message = self._state.app_status if is_app else self._state.unit_status
         return {"status": status, "message": message}
 
     def relation_ids(self, relation_name):
@@ -176,15 +176,15 @@ class _MockModelBackend(_ModelBackend):
 
     # setter methods: these can mutate the state.
     def application_version_set(self, version: str):
-        if workload_version := self._state.status.workload_version:
+        if workload_version := self._state.workload_version:
             # do not record if empty = unset
             self._context.workload_version_history.append(workload_version)
 
-        self._state.status._update_workload_version(version)
+        self._state._update_workload_version(version)
 
     def status_set(self, status: str, message: str = "", *, is_app: bool = False):
-        self._context._record_status(self._state.status, is_app)
-        self._state.status._update_status(status, message, is_app)
+        self._context._record_status(self._state, is_app)
+        self._state._update_status(status, message, is_app)
 
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))
