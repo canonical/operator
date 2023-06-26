@@ -2326,6 +2326,7 @@ class Container:
         self,
         command: List[str],
         *,
+        context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2347,6 +2348,7 @@ class Container:
         self,
         command: List[str],
         *,
+        context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2366,6 +2368,7 @@ class Container:
         self,
         command: List[str],
         *,
+        context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2386,6 +2389,7 @@ class Container:
         """
         return self._pebble.exec(
             command,
+            context=context,
             environment=environment,
             working_dir=working_dir,
             timeout=timeout,

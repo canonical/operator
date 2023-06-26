@@ -1781,6 +1781,7 @@ containers:
         self.pebble.responses.append('fake_exec_process')
         p = self.container.exec(
             ['echo', 'foo'],
+            context='srv1',
             environment={'K1': 'V1', 'K2': 'V2'},
             working_dir='WD',
             timeout=10.5,
@@ -1796,6 +1797,7 @@ containers:
         )
         self.assertEqual(self.pebble.requests, [
             ('exec', ['echo', 'foo'], dict(
+                context='srv1',
                 environment={'K1': 'V1', 'K2': 'V2'},
                 working_dir='WD',
                 timeout=10.5,
