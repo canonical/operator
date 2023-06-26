@@ -22,6 +22,7 @@ from typing import (
     Any,
     Dict,
     List,
+    Literal,
     Mapping,
     Optional,
     TextIO,
@@ -34,7 +35,7 @@ from ops._private import yaml
 from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 if TYPE_CHECKING:
-    from typing_extensions import Literal, Required, TypedDict
+    from typing_extensions import Required, TypedDict
 
     from ops.framework import Handle
     from ops.model import Container, Relation, Storage
@@ -721,8 +722,8 @@ class SecretChangedEvent(SecretEvent):
     secret will be notified via this event that a new revision is available.
 
     Typically, you will want to fetch the new content by calling
-    :meth:`ops.Secret.get_content` with :code:`refresh=True` to tell Juju to
-    start tracking the new revision.
+    :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
+    to tell Juju to start tracking the new revision.
     """
 
 
@@ -731,7 +732,7 @@ class SecretRotateEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret must
     be rotated. The event will keep firing until the owner creates a new
-    revision by calling :meth:`ops.Secret.set_content`.
+    revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
     """
 
     def defer(self):
@@ -748,7 +749,8 @@ class SecretRemoveEvent(SecretEvent):
     observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, you will want to call :meth:`ops.Secret.remove_revision` to
+    Typically, you will want to call
+    :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
     remove the now-unused revision.
     """
 
@@ -784,7 +786,7 @@ class SecretExpiredEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
-    revision by calling :meth:`ops.Secret.remove_revision()`.
+    revision by calling :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>`.
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
@@ -1146,9 +1148,9 @@ class RelationRole(enum.Enum):
     provides = 'provides'
 
     def is_peer(self) -> bool:
-        """Return whether the current role is peer.
+        """Report whether this role is 'peer'.
 
-        A convenience to avoid having to import charm.
+        ``role.is_peer()`` is a shortcut for ``role == ops.RelationRole.peer``.
         """
         return self is RelationRole.peer
 
@@ -1156,16 +1158,27 @@ class RelationRole(enum.Enum):
 class RelationMeta:
     """Object containing metadata about a relation definition.
 
-    Should not be constructed directly by charm code. Is gotten from one of
+    Should not be constructed directly by charm code, but gotten from one of
     :attr:`CharmMeta.peers`, :attr:`CharmMeta.requires`, :attr:`CharmMeta.provides`,
     or :attr:`CharmMeta.relations`.
+    """
 
-    Attributes:
-        role: This is :class:`RelationRole`; one of peer/requires/provides
-        relation_name: Name of this relation from metadata.yaml
-        interface_name: Optional definition of the interface protocol.
-        limit: Optional definition of maximum number of connections to this relation endpoint.
-        scope: "global" (default) or "container" scope based on how the relation should be used.
+    role: RelationRole
+    """Role this relation takes, one of 'peer', 'requires', or 'provides'."""
+
+    relation_name: str
+    """Name of this relation."""
+
+    interface_name: Optional[str]
+    """Definition of the interface protocol."""
+
+    limit: Optional[int]
+    """Maximum number of connections to this relation endpoint."""
+
+    scope: str
+    """Scope based on how this relation should be used.
+
+    Will be either ``"global"`` or ``"container"``.
     """
 
     VALID_SCOPES = ['global', 'container']
@@ -1220,12 +1233,21 @@ class StorageMeta:
 
 
 class ResourceMeta:
-    """Object containing metadata about a resource definition.
+    """Object containing metadata about a resource definition."""
 
-    Attributes:
-        resource_name: Name of resource
-        filename: Name of file
-        description: A text description of resource
+    resource_name: str
+    """Name of the resource."""
+
+    type: str
+    """Type of the resource. One of ``"file"`` or ``"oci-image"``."""
+
+    filename: Optional[str]
+    """Filename of the resource file."""
+
+    description: str
+    """A description of the resource.
+
+    This will be empty string (rather than None) if not set in ``metadata.yaml``.
     """
 
     def __init__(self, name: str, raw: '_ResourceMetaDict'):

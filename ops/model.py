@@ -1661,8 +1661,8 @@ class Resources:
     def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
 
-        If successfully fetched, this returns a Path object to where the resource is stored
-        on disk, otherwise it raises a NameError.
+        If successfully fetched, this returns the path where the resource is stored
+        on disk, otherwise it raises a :class:`NameError`.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -2478,7 +2478,7 @@ class ContainerMapping(Mapping[str, Container]):
 
 
 class ServiceInfoMapping(Mapping[str, pebble.ServiceInfo]):
-    """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
+    """Map of service names to :class:`pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
@@ -2561,7 +2561,7 @@ class RelationDataAccessError(RelationDataError):
 
 
 class RelationNotFoundError(ModelError):
-    """Backend error when querying juju for a given relation and that relation doesn't exist."""
+    """Raised when querying Juju for a given relation and that relation doesn't exist."""
 
 
 class InvalidStatusError(ModelError):
