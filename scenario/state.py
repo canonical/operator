@@ -55,11 +55,11 @@ STORAGE_EVENTS_SUFFIX = {
     "_storage_attached",
 }
 
-SECRET_EVENTS_SUFFIX = {
-    "_secret_changed",
-    "_secret_removed",
-    "_secret_rotate",
-    "_secret_expired",
+SECRET_EVENTS = {
+    "secret_changed",
+    "secret_removed",
+    "secret_rotate",
+    "secret_expired",
 }
 
 META_EVENTS = {
@@ -1004,7 +1004,7 @@ class Event(_DCBase):
     @property
     def _is_secret_event(self) -> bool:
         """Whether the event name indicates that this is a secret event."""
-        return any(self.name.endswith(suffix) for suffix in SECRET_EVENTS_SUFFIX)
+        return self.name in SECRET_EVENTS
 
     @property
     def _is_storage_event(self) -> bool:
