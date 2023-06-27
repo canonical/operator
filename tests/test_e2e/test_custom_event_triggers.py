@@ -1,11 +1,11 @@
 import os
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 
 import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Object
 
-from scenario import Event, State
+from scenario import State
 from scenario.ops_main_mock import NoObserverError
 from scenario.runtime import InconsistentScenarioError
 from tests.helpers import trigger
@@ -72,7 +72,7 @@ def test_funky_named_event_emitted():
     os.unsetenv("SCENARIO_SKIP_CONSISTENCY_CHECKS")
 
 
-def test_child_object_event_emitted():
+def test_child_object_event_emitted_no_path_raises():
     class FooEvent(EventBase):
         pass
 
@@ -80,7 +80,7 @@ def test_child_object_event_emitted():
         foo = EventSource(FooEvent)
 
     class MyObject(Object):
-        on = MyObjEvents()
+        my_on = MyObjEvents()
 
     class MyCharm(CharmBase):
         META = {"name": "mycharm"}
@@ -89,7 +89,7 @@ def test_child_object_event_emitted():
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.obj = MyObject(self, "child")
-            self.framework.observe(self.obj.on.foo, self._on_foo)
+            self.framework.observe(self.obj.my_on.foo, self._on_foo)
 
         def _on_foo(self, e):
             MyCharm._foo_called = True
@@ -116,4 +116,31 @@ def test_child_object_event_emitted():
             pre_event=pre_event,
             meta=MyCharm.META,
         )
+    assert MyCharm._foo_called
+
+
+def test_child_object_event():
+    class FooEvent(EventBase):
+        pass
+
+    class MyObjEvents(CharmEvents):
+        foo = EventSource(FooEvent)
+
+    class MyObject(Object):
+        my_on = MyObjEvents()
+
+    class MyCharm(CharmBase):
+        META = {"name": "mycharm"}
+        _foo_called = False
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.obj = MyObject(self, "child")
+            self.framework.observe(self.obj.my_on.foo, self._on_foo)
+
+        def _on_foo(self, e):
+            MyCharm._foo_called = True
+
+    trigger(State(), "obj.my_on.foo", MyCharm, meta=MyCharm.META)
+
     assert MyCharm._foo_called

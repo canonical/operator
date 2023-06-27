@@ -887,6 +887,33 @@ state = State(stored_state=[
 And the charm's runtime will see `self.stored_State.foo` and `.baz` as expected. Also, you can run assertions on it on
 the output side the same as any other bit of state.
 
+# Emitting custom events
+
+While the main use case of Scenario is to emit juju events, i.e. the built-in `start`, `install`, `*-relation-changed`, etc..., it can be sometimes handy to directly trigger custom events defined on arbitrary Objects in your hierarchy.
+
+Suppose your charm uses a charm library providing an `ingress_provided` event.
+The 'proper' way to emit it is to run the event that causes that custom event to be emitted by the library, whatever that may be, for example a `foo-relation-changed`.
+
+However, that may mean that you have to set up all sorts of State and mocks so that the right preconditions are met and the event is emitted at all.
+
+However if you attempt to run that event directly you will get an error:
+```python
+from scenario import Context, State
+Context(...).run("ingress_provided", State())  # raises scenario.ops_main_mock.NoObserverError
+```
+This happens because the framework, by default, searches for an event source named `ingress_provided` in `charm.on`, but since the event is defined on another Object, it will fail to find it.
+
+You can prefix the event name with the path leading to its owner to tell Scenario where to find the event source:
+
+```python
+from scenario import Context, State
+Context(...).run("my_charm_lib.on.ingress_provided", State())
+```
+
+This will instruct Scenario to emit `my_charm.my_charm_lib.on.foo`.
+
+(always omit the 'root', i.e. the charm framework key, from the path)
+
 # The virtual charm root
 
 Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. The

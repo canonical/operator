@@ -124,8 +124,8 @@ class Context:
     ) -> "State":
         """Trigger a charm execution with an Event and a State.
 
-        Calling this function will call ops' main() and set up the context according to the
-        specified State, then emit the event on the charm.
+        Calling this function will call ``ops.main`` and set up the context according to the
+        specified ``State``, then emit the event on the charm.
 
         :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
@@ -135,6 +135,7 @@ class Context:
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
         """
+        """Validate the event and cast to Event."""
         if isinstance(event, str):
             event = Event(event)
 
@@ -147,7 +148,12 @@ class Context:
                 "Use Context.run_action instead.",
             )
 
-        return self._run(event, state=state, pre_event=pre_event, post_event=post_event)
+        return self._run(
+            event,
+            state=state,
+            pre_event=pre_event,
+            post_event=post_event,
+        )
 
     def run_action(
         self,
@@ -158,8 +164,8 @@ class Context:
     ) -> ActionOutput:
         """Trigger a charm execution with an Action and a State.
 
-        Calling this function will call ops' main() and set up the context according to the
-        specified State, then emit the event on the charm.
+        Calling this function will call ``ops.main`` and set up the context according to the
+        specified ``State``, then emit the event on the charm.
 
         :arg action: the Action that the charm will execute. Can be a string or an Action instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
@@ -211,9 +217,6 @@ class Context:
             juju_version=self.juju_version,
             charm_root=self.charm_root,
         )
-
-        if not isinstance(event, Event):
-            raise InvalidEventError(f"Expected Event, got {type(event)}")
 
         return runtime.exec(
             state=state,
