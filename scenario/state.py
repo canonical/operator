@@ -271,7 +271,7 @@ class RelationBase(_DCBase):
     def changed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-changed event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-changed"),
+            path=normalize_name(self.endpoint + "-relation-changed"),
             relation=self,
         )
 
@@ -279,7 +279,7 @@ class RelationBase(_DCBase):
     def joined_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-joined event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-joined"),
+            path=normalize_name(self.endpoint + "-relation-joined"),
             relation=self,
         )
 
@@ -287,7 +287,7 @@ class RelationBase(_DCBase):
     def created_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-created event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-created"),
+            path=normalize_name(self.endpoint + "-relation-created"),
             relation=self,
         )
 
@@ -295,7 +295,7 @@ class RelationBase(_DCBase):
     def departed_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-departed event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-departed"),
+            path=normalize_name(self.endpoint + "-relation-departed"),
             relation=self,
         )
 
@@ -303,7 +303,7 @@ class RelationBase(_DCBase):
     def broken_event(self) -> "Event":
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
-            name=normalize_name(self.endpoint + "-relation-broken"),
+            path=normalize_name(self.endpoint + "-relation-broken"),
             relation=self,
         )
 
@@ -635,7 +635,7 @@ class Container(_DCBase):
                 "you **can** fire pebble-ready while the container cannot connect, "
                 "but that's most likely not what you want.",
             )
-        return Event(name=normalize_name(self.name + "-pebble-ready"), container=self)
+        return Event(path=normalize_name(self.name + "-pebble-ready"), container=self)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -948,7 +948,7 @@ class DeferredEvent(_DCBase):
 
 @dataclasses.dataclass(frozen=True)
 class Event(_DCBase):
-    name: str
+    path: str
     args: Tuple[Any] = ()
     kwargs: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
@@ -971,6 +971,8 @@ class Event(_DCBase):
     #  - pebble?
     #  - action?
 
+    _owner_path: List[str] = dataclasses.field(default_factory=list)
+
     def __call__(self, remote_unit_id: Optional[int] = None) -> "Event":
         if remote_unit_id and not self._is_relation_event:
             raise ValueError(
@@ -980,11 +982,25 @@ class Event(_DCBase):
         return self.replace(relation_remote_unit_id=remote_unit_id)
 
     def __post_init__(self):
-        if "-" in self.name:
-            logger.warning(f"Only use underscores in event names. {self.name!r}")
+        if "-" in self.path:
+            logger.warning(f"Only use underscores in event paths. {self.path!r}")
 
+        path = normalize_name(self.path)
         # bypass frozen dataclass
-        object.__setattr__(self, "name", normalize_name(self.name))
+        object.__setattr__(self, "path", path)
+
+    @property
+    def name(self) -> str:
+        """Event name."""
+        return self.path.split(".")[-1]
+
+    @property
+    def owner_path(self) -> List[str]:
+        """Path to the ObjectEvents instance owning this event.
+
+        If this event is defined on the toplevel charm class, it should be ['on'].
+        """
+        return self.path.split(".")[:-1] or ["on"]
 
     @property
     def _is_relation_event(self) -> bool:

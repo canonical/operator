@@ -14,7 +14,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Sequence,
     Type,
     TypeVar,
     Union,
@@ -333,7 +332,6 @@ class Runtime:
         context: "Context",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-        event_owner_path: Sequence[str] = None,
     ) -> "State":
         """Runs an event with this state as initial state on a charm.
 
@@ -388,7 +386,6 @@ class Runtime:
                     charm_spec=self._charm_spec.replace(
                         charm_type=self._wrap(charm_type),
                     ),
-                    event_owner_path=event_owner_path,
                 )
             except NoObserverError:
                 raise  # propagate along

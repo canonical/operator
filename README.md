@@ -902,15 +902,16 @@ Context(...).run("ingress_provided", State())  # raises scenario.ops_main_mock.N
 ```
 This happens because the framework, by default, searches for an event source named `ingress_provided` in `charm.on`, but since the event is defined on another Object, it will fail to find it.
 
-You can pass an `event_owner_path` argument to tell Scenario where to find the event source.
+You can prefix the event name with the path leading to its owner to tell Scenario where to find the event source:
 
 ```python
 from scenario import Context, State
-Context(...).run("ingress_provided", State(), event_owner_path=("my_charm_lib", "on"))
+Context(...).run("my_charm_lib.on.ingress_provided", State())
 ```
 
 This will instruct Scenario to emit `my_charm.my_charm_lib.on.foo`.
 
+(always omit the 'root', i.e. the charm framework key, from the path)
 
 # The virtual charm root
 

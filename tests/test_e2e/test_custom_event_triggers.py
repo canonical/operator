@@ -141,8 +141,6 @@ def test_child_object_event():
         def _on_foo(self, e):
             MyCharm._foo_called = True
 
-    trigger(
-        State(), "foo", MyCharm, meta=MyCharm.META, event_owner_path=("obj", "my_on")
-    )
+    trigger(State(), "obj.my_on.foo", MyCharm, meta=MyCharm.META)
 
     assert MyCharm._foo_called
