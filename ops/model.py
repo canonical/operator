@@ -452,11 +452,13 @@ class Unit:
 
     This might be your unit, another unit of your application, or a unit of another application
     that you are related to.
-
-    Attributes:
-        name: The name of the unit (eg, 'mysql/0')
-        app: The Application the unit is a part of.
     """
+
+    name: str
+    """Name of the unit, for example "mysql/0"."""
+
+    app: Application
+    """Application the unit is part of."""
 
     def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
                  backend: '_ModelBackend', cache: '_ModelCache'):
@@ -523,8 +525,6 @@ class Unit:
 
         This can only be called for your own unit.
 
-        Returns:
-            True if you are the leader, False otherwise
         Raises:
             RuntimeError: if called for a unit that is not yourself
         """
@@ -1538,8 +1538,8 @@ class ConfigData(LazyMapping):
 class StatusBase:
     """Status values specific to applications and units.
 
-    To access a status by name, see :meth:`StatusBase.from_name`, most use cases will just
-    directly use the child class to indicate their status.
+    To access a status by name, use :meth:`StatusBase.from_name`. However, most use cases will
+    directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
     _statuses: Dict[str, Type['StatusBase']] = {}
@@ -1562,7 +1562,18 @@ class StatusBase:
 
     @classmethod
     def from_name(cls, name: str, message: str):
-        """Get the specific Status for the name (or UnknownStatus if not registered)."""
+        """Create a status instance from a name and message.
+
+        If ``name`` is "unknown", ``message`` is ignored, because unknown status
+        does not have an associated message.
+
+        Args:
+            name: Name of the status, for example "active" or "blocked".
+            message: Message to include with the status.
+
+        Raises:
+            KeyError: If ``name`` is not a registered status.
+        """
         if name == 'unknown':
             # unknown is special
             return UnknownStatus()
@@ -1731,7 +1742,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         """Requests new storage instances of a given name.
 
         Uses storage-add tool to request additional storage. Juju will notify the unit
-        via <storage-name>-storage-attached events when it becomes available.
+        via ``<storage-name>-storage-attached`` events when it becomes available.
         """
         if storage_name not in self._storage_map:
             raise ModelError(('cannot add storage {!r}:'
@@ -1747,11 +1758,10 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
 
 class Storage:
-    """Represents a storage as defined in metadata.yaml.
+    """Represents a storage as defined in ``metadata.yaml``."""
 
-    Attributes:
-        name: Simple string name of the storage
-    """
+    name: str
+    """Name of the storage."""
 
     def __init__(self, storage_name: str, storage_index: int, backend: '_ModelBackend'):
         self.name = storage_name
@@ -1761,7 +1771,7 @@ class Storage:
 
     @property
     def index(self) -> int:
-        """The index associated with the storage (usually 0 for singular storage)."""
+        """Index associated with the storage (usually 0 for singular storage)."""
         return self._index
 
     @property
@@ -1772,12 +1782,12 @@ class Storage:
 
     @property
     def full_id(self) -> str:
-        """Returns the canonical storage name and id/index based identifier."""
+        """Canonical storage name with index, for example "bigdisk/0"."""
         return f'{self.name}/{self._index}'
 
     @property
     def location(self) -> Path:
-        """Return the location of the storage."""
+        """Location of the storage."""
         if self._location is None:
             raw = self._backend.storage_get(self.full_id, "location")
             self._location = Path(raw)

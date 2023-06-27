@@ -26,6 +26,7 @@ from typing import (
     Mapping,
     Optional,
     TextIO,
+    Tuple,
     Union,
     cast,
 )
@@ -51,7 +52,7 @@ if TYPE_CHECKING:
     _MultipleRange = TypedDict('_MultipleRange', {'range': str})
     _StorageMetaDict = TypedDict('_StorageMetaDict', {
         'type': Required[str],
-        'description': int,
+        'description': str,
         'shared': bool,
         'read-only': bool,
         'minimum-size': str,
@@ -554,10 +555,10 @@ class StorageEvent(HookEvent):
     charms can define several different types of storage that are
     allocated from Juju. Changes in state of storage trigger sub-types
     of :class:`StorageEvent`.
-
-    Attributes:
-        storage: The :class:`~ops.model.Storage` instance this event is about.
     """
+
+    storage: 'Storage'
+    """Storage instance this event refers to."""
 
     def __init__(self, handle: 'Handle', storage: 'Storage'):
         super().__init__(handle)
@@ -586,7 +587,7 @@ class StorageEvent(HookEvent):
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
-            self.storage = next((s for s in storages if s.index == storage_index), None,)
+            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore # noqa
             if self.storage is None:
                 msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
                     .format(storage_name, storage_index)
@@ -1202,17 +1203,31 @@ class RelationMeta:
 
 
 class StorageMeta:
-    """Object containing metadata about a storage definition.
+    """Object containing metadata about a storage definition."""
 
-    Attributes:
-        storage_name: Name of storage
-        type: Storage type
-        description: A text description of the storage
-        read_only: True if the storage is read-only
-        minimum_size: Minimum size of storage
-        location: Mount point of storage
-        multiple_range: Range of numeric qualifiers when multiple storage units are used
-    """
+    storage_name: str
+    """Name of storage."""
+
+    type: str
+    """Storage type, "filesystem" or "block"."""
+
+    description: str
+    """Text description of the storage."""
+
+    shared: bool
+    """True if all units of the application share the storage."""
+
+    read_only: bool
+    """True if the storage is read-only."""
+
+    minimum_size: Optional[str]
+    """Minimum size of the storage."""
+
+    location: Optional[str]
+    """Mount point of the storage."""
+
+    multiple_range: Optional[Tuple[int, Optional[int]]]
+    """Range of numeric qualifiers when multiple storage units are used."""
 
     def __init__(self, name: str, raw: '_StorageMetaDict'):
         self.storage_name = name

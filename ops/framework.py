@@ -1083,16 +1083,16 @@ class BoundStoredState:
 
 
 class StoredState:
-    """A class used to store data the charm needs persisted across invocations.
+    """A class used to store data the charm needs, persisted across invocations.
 
     Example::
 
         class MyClass(Object):
             _stored = StoredState()
 
-    Instances of `MyClass` can transparently save state between invocations by
-    setting attributes on `_stored`. Initial state should be set with
-    `set_default` on the bound object, that is::
+    Instances of ``MyClass`` can transparently save state between invocations by
+    setting attributes on ``_stored``. Initial state should be set with
+    ``set_default`` on the bound object, that is::
 
         class MyClass(Object):
             _stored = StoredState()
