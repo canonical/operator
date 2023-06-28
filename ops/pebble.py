@@ -2192,7 +2192,7 @@ class Client:
             command: Command to execute: the first item is the name (or path)
                 of the executable, the rest of the items are the arguments.
             context: If specified, run the command in the context of this
-                service, that is, inherit its environment variables,
+                service. Specifically, inherit its environment variables,
                 user/group settings, and working directory. The other exec
                 options will override the service context; ``environment``
                 will be merged on top of the service's.
