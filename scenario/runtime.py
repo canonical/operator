@@ -5,22 +5,25 @@ import marshal
 import os
 import re
 import tempfile
+import typing
 from contextlib import contextmanager
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    ContextManager,
     Dict,
     List,
     Optional,
+    Tuple,
     Type,
     TypeVar,
     Union,
 )
 
 import yaml
-from ops.framework import _event_regex
+from ops.framework import EventBase, _event_regex
 from ops.storage import SQLiteStorage
 
 from scenario.capture_events import capture_events
@@ -254,7 +257,7 @@ class Runtime:
         return WrappedCharm
 
     @contextmanager
-    def _virtual_charm_root(self):
+    def _virtual_charm_root(self) -> typing.ContextManager[Path]:
         # If we are using runtime on a real charm, we can make some assumptions about the
         # directory structure we are going to find.
         # If we're, say, dynamically defining charm types and doing tests on them, we'll have to
@@ -325,6 +328,14 @@ class Runtime:
         stored_state = store.get_stored_state()
         return state.replace(deferred=deferred, stored_state=stored_state)
 
+    @contextmanager
+    def _exec_ctx(self) -> ContextManager[Tuple[Path, List[EventBase]]]:
+        """python 3.8 compatibility shim"""
+        with self._virtual_charm_root() as temporary_charm_root:
+            # todo allow customizing capture_events
+            with capture_events() as captured:
+                yield (temporary_charm_root, captured)
+
     def exec(
         self,
         state: "State",
@@ -355,11 +366,7 @@ class Runtime:
         output_state = state.copy()
 
         logger.info(" - generating virtual charm root")
-        with (
-            self._virtual_charm_root() as temporary_charm_root,
-            # todo allow customizing capture_events
-            capture_events() as captured,
-        ):
+        with self._exec_ctx() as (temporary_charm_root, captured):
             logger.info(" - initializing storage")
             self._initialize_storage(state, temporary_charm_root)
 
