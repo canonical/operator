@@ -1,3 +1,17 @@
+# Copyright 2023 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Multi-status test charm for OP035, using Framework.observe events instead
 of regular Python functions.
 """
@@ -25,28 +39,28 @@ options:
         self.harness.begin()
 
     def test_initial(self):
-        self.harness.framework.on.commit.emit()
+        self.harness.model._finalise_statuses(self.harness.charm)
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"database_mode" required')
 
     def test_database_mode_set(self):
         self.harness.update_config({"database_mode": "single"})
-        self.harness.framework.on.commit.emit()
+        self.harness.model._finalise_statuses(self.harness.charm)
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"webapp_port" required')
 
     def test_webapp_port_set(self):
         self.harness.update_config({"webapp_port": 8080})
-        self.harness.framework.on.commit.emit()
+        self.harness.model._finalise_statuses(self.harness.charm)
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"database_mode" required')
 
     def test_all_config_set(self):
         self.harness.update_config({"database_mode": "single", "webapp_port": 8080})
-        self.harness.framework.on.commit.emit()
+        self.harness.model._finalise_statuses(self.harness.charm)
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "active")
 
@@ -67,82 +81,75 @@ class StatustestCharm(ops.CharmBase):
         self.database = Database(self)
         self.webapp = Webapp(self)
 
-        # This (and the code inside _on_commit) would probably be done in
-        # the ops library automatically.
-        self.framework.observe(self.framework.on.commit, self._on_commit)
-
-    def _on_commit(self, event):
-        statuses = self.framework.on.get_status.emit()
-        priorities = {
-            "error": 100,
-            "blocked": 90,
-            "waiting": 80,
-            "maintenance": 70,
-            "active": 60,
-        }
-        highest = max(statuses, key=lambda s: priorities.get(s.name, 0))
-        self.unit.status = highest
-
 
 class Database(ops.Object):
     """Database component."""
 
     def __init__(self, charm: ops.CharmBase):
         super().__init__(charm, "database")
-        self.charm = charm
+        self.framework.observe(charm.on.config_changed, self._on_config_changed)
 
-        # Note that get_status is framework.on.get_status rather than
-        # charm.on.get_status as it's purely a framework concern, not a Juju event.
-        charm.framework.observe(charm.framework.on.get_status, self._on_get_status)
+        # Note that you can have multiple collect_status observers even
+        # within a single component, as shown here. Alternatively, we could
+        # do both of these tests within a single handler.
+        # self.framework.observe(charm.on.collect_unit_status, self._on_collect_db_status)
+        self.framework.observe(charm.on.collect_unit_status, self._on_collect_config_status)
 
-        charm.framework.observe(charm.on.config_changed, self._on_config_changed)
+    # def _on_collect_db_status(self, event: ops.CollectStatusEvent):
+    #     if 'db' not in self.model.relations:
+    #         event.add_status(ops.BlockedStatus('please integrate with database'))
+    #         return
+    #     event.add_status(ops.ActiveStatus())
 
-    def _on_get_status(self, event) -> ops.StatusBase:
-        """Return this component's status."""
+    def _on_collect_config_status(self, event: ops.CollectStatusEvent):
         status = self._validate_config()
-        return status if status is not None else ops.ActiveStatus()
+        if status is not None:
+            event.add_status(status)
+            return
+        event.add_status(ops.ActiveStatus())
 
     def _validate_config(self) -> typing.Optional[ops.StatusBase]:
         """Validate charm config for the database component.
 
         Return a status if the config is incorrect, None if it's valid.
         """
-        if "database_mode" not in self.charm.model.config:
+        if "database_mode" not in self.model.config:
             return ops.BlockedStatus('"database_mode" required')
         return None
 
     def _on_config_changed(self, event):
         if self._validate_config() is not None:
             return
-        mode = self.charm.model.config["database_mode"]
+        mode = self.model.config["database_mode"]
         logger.info("Using database mode %r", mode)
 
 
 class Webapp(ops.Object):
     """Web app component."""
 
-    def __init__(self, charm):
+    def __init__(self, charm: ops.CharmBase):
         super().__init__(charm, "webapp")
-        self.charm = charm
-        charm.framework.observe(charm.framework.on.get_status, self._on_get_status)
-        charm.framework.observe(charm.on.config_changed, self._on_config_changed)
+        self.framework.observe(charm.on.collect_unit_status, self._on_collect_status)
+        self.framework.observe(charm.on.config_changed, self._on_config_changed)
 
-    def _on_get_status(self, event) -> ops.StatusBase:
-        """Return this component's status."""
+    def _on_collect_status(self, event: ops.CollectStatusEvent):
         status = self._validate_config()
-        return status if status is not None else ops.ActiveStatus()
+        if status is not None:
+            event.add_status(status)
+            return
+        event.add_status(ops.ActiveStatus())
 
     def _validate_config(self) -> typing.Optional[ops.StatusBase]:
         """Validate charm config for the web app component.
 
         Return a status if the config is incorrect, None if it's valid.
         """
-        if "webapp_port" not in self.charm.model.config:
+        if "webapp_port" not in self.model.config:
             return ops.BlockedStatus('"webapp_port" required')
         return None
 
     def _on_config_changed(self, event):
         if self._validate_config() is not None:
             return
-        port = self.charm.model.config["webapp_port"]
+        port = self.model.config["webapp_port"]
         logger.info("Using web app port %r", port)

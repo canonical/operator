@@ -120,6 +120,8 @@ class Model:
         storages: Iterable[str] = meta.storages
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
+        self._app_statuses: 'List[StatusBase]' = []
+        self._unit_statuses: 'List[StatusBase]' = []
 
     @property
     def unit(self) -> 'Unit':
@@ -257,6 +259,15 @@ class Model:
             #  juju/juju#14916 is fixed (should be in Juju 3.0.3)
             info = self._backend.secret_info_get(id=id, label=label)
             return Secret(self._backend, id=info.id, label=info.label)
+
+    def _finalise_statuses(self, charm: 'ops.charm.CharmBase'):
+        charm.on.collect_app_status.emit()
+        if self._app_statuses:
+            self.app.status = StatusBase._get_highest_priority(self._app_statuses)
+
+        charm.on.collect_unit_status.emit()
+        if self._unit_statuses:
+            self.unit.status = StatusBase._get_highest_priority(self._unit_statuses)
 
 
 class _ModelCache:
@@ -1550,6 +1561,18 @@ class StatusBase:
                             "missing required `name: str` class attribute")
         cls._statuses[child.name] = child
         return child
+
+    _priorities = {
+        "error": 100,
+        "blocked": 90,
+        "waiting": 80,
+        "maintenance": 70,
+        "active": 60,
+    }
+
+    @classmethod
+    def _get_highest_priority(cls, statuses: 'List[StatusBase]') -> 'StatusBase':
+        return max(statuses, key=lambda s: cls._priorities.get(s.name, 0))
 
 
 @StatusBase.register

@@ -632,14 +632,18 @@ class _TestMain(abc.ABC):
         self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status',
                                        set_in_env={'EMIT_CUSTOM_EVENT': "1"}))
 
+        calls = fake_script_calls(self)
+
+        custom_event_prefix = 'Emitting custom event <CustomEvent via Charm/on/custom'
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event update_status.'],
-            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting custom event '
-                                                       '<CustomEvent via Charm/on/custom[5]>.'],
+            ['juju-log', '--log-level', 'DEBUG', '--', custom_event_prefix],
         ]
-        calls = fake_script_calls(self)
-        self.assertEqual(expected, calls)
+        # Remove the "[key]>" suffix from the end of the event string
+        self.assertTrue(calls[-1][-1].startswith(custom_event_prefix))
+        calls[-1][-1] = custom_event_prefix
+        self.assertEqual(calls, expected)
 
     def test_logger(self):
         fake_script(self, 'action-get', "echo '{}'")
