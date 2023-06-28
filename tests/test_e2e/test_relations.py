@@ -4,7 +4,6 @@ import pytest
 from ops.charm import CharmBase, CharmEvents, RelationDepartedEvent
 from ops.framework import EventBase, Framework
 
-from scenario import trigger
 from scenario.state import (
     PeerRelation,
     Relation,
@@ -13,6 +12,7 @@ from scenario.state import (
     StateValidationError,
     SubordinateRelation,
 )
+from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")

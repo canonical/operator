@@ -3,8 +3,9 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus, UnknownStatus, WaitingStatus
 
-from scenario import trigger
-from scenario.state import State, Status
+from scenario import Context
+from scenario.state import State
+from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")
@@ -33,7 +34,7 @@ def test_initial_status(mycharm):
         post_event=post_event,
     )
 
-    assert out.status.unit == UnknownStatus()
+    assert out.unit_status == UnknownStatus()
 
 
 def test_status_history(mycharm):
@@ -43,23 +44,26 @@ def test_status_history(mycharm):
             obj.status = BlockedStatus("2")
             obj.status = WaitingStatus("3")
 
-    out = trigger(
-        State(leader=True),
-        "update_status",
+    ctx = Context(
         mycharm,
         meta={"name": "local"},
+    )
+
+    out = ctx.run(
+        "update_status",
+        State(leader=True),
         post_event=post_event,
     )
 
-    assert out.status.unit == WaitingStatus("3")
-    assert out.status.unit_history == [
+    assert out.unit_status == WaitingStatus("3")
+    assert ctx.unit_status_history == [
         UnknownStatus(),
         ActiveStatus("1"),
         BlockedStatus("2"),
     ]
 
-    assert out.status.app == WaitingStatus("3")
-    assert out.status.app_history == [
+    assert out.app_status == WaitingStatus("3")
+    assert ctx.app_status_history == [
         UnknownStatus(),
         ActiveStatus("1"),
         BlockedStatus("2"),
@@ -71,19 +75,46 @@ def test_status_history_preservation(mycharm):
         for obj in [charm.unit, charm.app]:
             obj.status = WaitingStatus("3")
 
-    out = trigger(
-        State(
-            leader=True,
-            status=Status(unit=ActiveStatus("foo"), app=ActiveStatus("bar")),
-        ),
-        "update_status",
+    ctx = Context(
         mycharm,
         meta={"name": "local"},
+    )
+
+    out = ctx.run(
+        "update_status",
+        State(
+            leader=True,
+            unit_status=ActiveStatus("foo"),
+            app_status=ActiveStatus("bar"),
+        ),
         post_event=post_event,
     )
 
-    assert out.status.unit == WaitingStatus("3")
-    assert out.status.unit_history == [ActiveStatus("foo")]
+    assert out.unit_status == WaitingStatus("3")
+    assert ctx.unit_status_history == [ActiveStatus("foo")]
 
-    assert out.status.app == WaitingStatus("3")
-    assert out.status.app_history == [ActiveStatus("bar")]
+    assert out.app_status == WaitingStatus("3")
+    assert ctx.app_status_history == [ActiveStatus("bar")]
+
+
+def test_workload_history(mycharm):
+    def post_event(charm: CharmBase):
+        charm.unit.set_workload_version("1")
+        charm.unit.set_workload_version("1.1")
+        charm.unit.set_workload_version("1.2")
+
+    ctx = Context(
+        mycharm,
+        meta={"name": "local"},
+    )
+
+    out = ctx.run(
+        "update_status",
+        State(
+            leader=True,
+        ),
+        post_event=post_event,
+    )
+
+    assert ctx.workload_version_history == ["1", "1.1"]
+    assert out.workload_version == "1.2"

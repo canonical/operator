@@ -3,8 +3,8 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import SecretRotate
 
-from scenario import trigger
 from scenario.state import Relation, Secret, State
+from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")

@@ -6,8 +6,8 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
-from scenario import trigger
 from scenario.state import Container, Relation, State, sort_patch
+from tests.helpers import trigger
 
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
@@ -56,7 +56,7 @@ def state():
 
 def test_bare_event(state, mycharm):
     out = trigger(state, "start", mycharm, meta={"name": "foo"})
-    out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
+    out_purged = out.replace(stored_state=state.stored_state)
     assert state.jsonpatch_delta(out_purged) == []
 
 
@@ -87,28 +87,18 @@ def test_status_setting(state, mycharm):
         meta={"name": "foo"},
         config={"options": {"foo": {"type": "string"}}},
     )
-    assert out.status.unit == ActiveStatus("foo test")
-    assert out.status.app == WaitingStatus("foo barz")
-    assert out.status.workload_version == ""
+    assert out.unit_status == ActiveStatus("foo test")
+    assert out.app_status == WaitingStatus("foo barz")
+    assert out.workload_version == ""
 
-    # ignore logging output and stored state in the delta
-    out_purged = out.replace(juju_log=[], stored_state=state.stored_state)
+    # ignore stored state in the delta
+    out_purged = out.replace(stored_state=state.stored_state)
     assert out_purged.jsonpatch_delta(state) == sort_patch(
         [
-            {"op": "replace", "path": "/status/app/message", "value": "foo barz"},
-            {"op": "replace", "path": "/status/app/name", "value": "waiting"},
-            {
-                "op": "add",
-                "path": "/status/app_history/0",
-                "value": {"message": "", "name": "unknown"},
-            },
-            {"op": "replace", "path": "/status/unit/message", "value": "foo test"},
-            {"op": "replace", "path": "/status/unit/name", "value": "active"},
-            {
-                "op": "add",
-                "path": "/status/unit_history/0",
-                "value": {"message": "", "name": "unknown"},
-            },
+            {"op": "replace", "path": "/app_status/message", "value": "foo barz"},
+            {"op": "replace", "path": "/app_status/name", "value": "waiting"},
+            {"op": "replace", "path": "/unit_status/message", "value": "foo test"},
+            {"op": "replace", "path": "/unit_status/name", "value": "active"},
         ]
     )
 

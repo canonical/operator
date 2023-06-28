@@ -3,28 +3,80 @@
 # See LICENSE file for licensing details.
 import inspect
 import os
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
 import ops.charm
 import ops.framework
 import ops.model
 import ops.storage
+from ops import CharmBase
 from ops.charm import CharmMeta
 from ops.log import setup_root_logging
-from ops.main import CHARM_STATE_FILE, _Dispatcher, _emit_charm_event, _get_charm_dir
 
-from scenario.logger import logger as scenario_logger
+# use logger from ops.main so that juju_log will be triggered
+from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_charm_dir, _get_event_args
+from ops.main import logger as ops_logger
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
+    from scenario.context import Context
     from scenario.state import Event, State, _CharmSpec
-
-logger = scenario_logger.getChild("ops_main_mock")
 
 
 class NoObserverError(RuntimeError):
     """Error raised when the event being dispatched has no registered observers."""
+
+
+class BadOwnerPath(RuntimeError):
+    """Error raised when the owner path does not lead to a valid ObjectEvents instance."""
+
+
+def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
+    """Walk path on root to an ObjectEvents instance."""
+    obj = root
+    for step in path:
+        try:
+            obj = getattr(obj, step)
+        except AttributeError:
+            raise BadOwnerPath(
+                f"event_owner_path {path!r} invalid: {step!r} leads to nowhere.",
+            )
+    if not isinstance(obj, ops.ObjectEvents):
+        raise BadOwnerPath(
+            f"event_owner_path {path!r} invalid: does not lead to "
+            f"an ObjectEvents instance.",
+        )
+    return obj
+
+
+def _emit_charm_event(
+    charm: "CharmBase",
+    event_name: str,
+    event: "Event" = None,
+):
+    """Emits a charm event based on a Juju event name.
+
+    Args:
+        charm: A charm instance to emit an event from.
+        event_name: A Juju event name to emit on a charm.
+        event_owner_path: Event source lookup path.
+    """
+    owner = _get_owner(charm, event.owner_path) if event else charm.on
+
+    try:
+        event_to_emit = getattr(owner, event_name)
+    except AttributeError:
+        ops_logger.debug("Event %s not defined for %s.", event_name, charm)
+        raise NoObserverError(
+            f"Cannot fire {event_name!r} on {owner}: "
+            f"invalid event (not on charm.on). "
+            f"Use Context.run_custom instead.",
+        )
+
+    args, kwargs = _get_event_args(charm, event_to_emit)
+    ops_logger.debug("Emitting Juju event %s.", event_name)
+    event_to_emit.emit(*args, **kwargs)
 
 
 def main(
@@ -32,6 +84,7 @@ def main(
     post_event: Optional[Callable[["CharmType"], None]] = None,
     state: "State" = None,
     event: "Event" = None,
+    context: "Context" = None,
     charm_spec: "_CharmSpec" = None,
 ):
     """Set up the charm and dispatch the observed event."""
@@ -43,11 +96,12 @@ def main(
     model_backend = _MockModelBackend(  # pyright: reportPrivateUsage=false
         state=state,
         event=event,
+        context=context,
         charm_spec=charm_spec,
     )
     debug = "JUJU_DEBUG" in os.environ
     setup_root_logging(model_backend, debug=debug)
-    logger.debug(
+    ops_logger.debug(
         "Operator Framework %s up and running.",
         ops.__version__,
     )  # type:ignore
@@ -86,13 +140,7 @@ def main(
         if pre_event:
             pre_event(charm)
 
-        if not getattr(charm.on, dispatcher.event_name, None):
-            raise NoObserverError(
-                f"Charm has no registered observers for {dispatcher.event_name!r}. "
-                f"This is probably not what you were looking for.",
-            )
-
-        _emit_charm_event(charm, dispatcher.event_name)
+        _emit_charm_event(charm, dispatcher.event_name, event)
 
         if post_event:
             post_event(charm)

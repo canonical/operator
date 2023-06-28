@@ -10,8 +10,8 @@ from ops.charm import (
 )
 from ops.framework import Framework
 
-from scenario import trigger
 from scenario.state import Container, DeferredEvent, Relation, State, deferred
+from tests.helpers import trigger
 
 CHARM_CALLED = 0
 
@@ -71,7 +71,7 @@ def test_deferred_evt_emitted(mycharm):
 
 
 def test_deferred_relation_event_without_relation_raises(mycharm):
-    with pytest.raises(ValueError):
+    with pytest.raises(AttributeError):
         deferred(event="foo_relation_changed", handler=mycharm._on_event)
 
 

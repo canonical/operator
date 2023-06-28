@@ -5,24 +5,28 @@ import marshal
 import os
 import re
 import tempfile
+import typing
 from contextlib import contextmanager
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    ContextManager,
     Dict,
     List,
     Optional,
+    Tuple,
     Type,
     TypeVar,
     Union,
 )
 
 import yaml
-from ops.framework import _event_regex
+from ops.framework import EventBase, _event_regex
 from ops.storage import SQLiteStorage
 
+from scenario.capture_events import capture_events
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
 from scenario.state import DeferredEvent, PeerRelation, StoredState
@@ -30,6 +34,7 @@ from scenario.state import DeferredEvent, PeerRelation, StoredState
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
+    from scenario.context import Context
     from scenario.state import AnyRelation, Event, State, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
@@ -252,7 +257,7 @@ class Runtime:
         return WrappedCharm
 
     @contextmanager
-    def virtual_charm_root(self):
+    def _virtual_charm_root(self) -> typing.ContextManager[Path]:
         # If we are using runtime on a real charm, we can make some assumptions about the
         # directory structure we are going to find.
         # If we're, say, dynamically defining charm types and doing tests on them, we'll have to
@@ -323,10 +328,19 @@ class Runtime:
         stored_state = store.get_stored_state()
         return state.replace(deferred=deferred, stored_state=stored_state)
 
+    @contextmanager
+    def _exec_ctx(self) -> ContextManager[Tuple[Path, List[EventBase]]]:
+        """python 3.8 compatibility shim"""
+        with self._virtual_charm_root() as temporary_charm_root:
+            # todo allow customizing capture_events
+            with capture_events() as captured:
+                yield (temporary_charm_root, captured)
+
     def exec(
         self,
         state: "State",
         event: "Event",
+        context: "Context",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
@@ -338,6 +352,9 @@ class Runtime:
         This will set the environment up and call ops.main.main().
         After that it's up to ops.
         """
+        # todo consider forking out a real subprocess and do the mocking by
+        #  mocking hook tool executables
+
         from scenario.consistency_checker import check_consistency  # avoid cycles
 
         check_consistency(state, event, self._charm_spec, self._juju_version)
@@ -349,10 +366,7 @@ class Runtime:
         output_state = state.copy()
 
         logger.info(" - generating virtual charm root")
-        with self.virtual_charm_root() as temporary_charm_root:
-            # todo consider forking out a real subprocess and do the mocking by
-            #  generating hook tool executables
-
+        with self._exec_ctx() as (temporary_charm_root, captured):
             logger.info(" - initializing storage")
             self._initialize_storage(state, temporary_charm_root)
 
@@ -375,6 +389,7 @@ class Runtime:
                     post_event=post_event,
                     state=output_state,
                     event=event,
+                    context=context,
                     charm_spec=self._charm_spec.replace(
                         charm_type=self._wrap(charm_type),
                     ),
@@ -393,6 +408,8 @@ class Runtime:
 
             logger.info(" - closing storage")
             output_state = self._close_storage(output_state, temporary_charm_root)
+
+        context.emitted_events.extend(captured)
 
         logger.info("event dispatched. done.")
         return output_state
@@ -442,33 +459,18 @@ def trigger(
         >>> scenario, State(), (... charm_root=virtual_root)
 
     """
-    from scenario.state import Event, _CharmSpec
+    logger.warning(
+        "DEPRECATION NOTICE: scenario.runtime.trigger() is deprecated and "
+        "will be removed soon; please use the scenario.context.Context api.",
+    )
+    from scenario.context import Context
 
-    if isinstance(event, str):
-        event = Event(event)
-
-    if not any((meta, actions, config)):
-        logger.debug("Autoloading charmspec...")
-        spec = _CharmSpec.autoload(charm_type)
-    else:
-        if not meta:
-            meta = {"name": str(charm_type.__name__)}
-        spec = _CharmSpec(
-            charm_type=charm_type,
-            meta=meta,
-            actions=actions,
-            config=config,
-        )
-
-    runtime = Runtime(
-        charm_spec=spec,
-        juju_version=juju_version,
+    ctx = Context(
+        charm_type=charm_type,
+        meta=meta,
+        actions=actions,
+        config=config,
         charm_root=charm_root,
+        juju_version=juju_version,
     )
-
-    return runtime.exec(
-        state=state,
-        event=event,
-        pre_event=pre_event,
-        post_event=post_event,
-    )
+    return ctx.run(event, state=state, pre_event=pre_event, post_event=post_event)

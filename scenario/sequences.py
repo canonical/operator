@@ -5,7 +5,7 @@ import typing
 from itertools import chain
 from typing import Any, Callable, Dict, Iterable, Optional, TextIO, Type, Union
 
-from scenario import trigger
+from scenario import Context
 from scenario.logger import logger as scenario_logger
 from scenario.state import (
     ATTACH_ALL_STORAGES,
@@ -111,6 +111,7 @@ def check_builtin_sequences(
     """
 
     template = template_state if template_state else State()
+    out = []
 
     for event, state in generate_builtin_sequences(
         (
@@ -118,13 +119,13 @@ def check_builtin_sequences(
             template.replace(leader=False),
         ),
     ):
-        trigger(
-            state,
-            event=event,
-            charm_type=charm_type,
-            meta=meta,
-            actions=actions,
-            config=config,
-            pre_event=pre_event,
-            post_event=post_event,
+        ctx = Context(charm_type=charm_type, meta=meta, actions=actions, config=config)
+        out.append(
+            ctx.run(
+                event,
+                state=state,
+                pre_event=pre_event,
+                post_event=post_event,
+            ),
         )
+    return out

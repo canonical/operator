@@ -4,9 +4,9 @@ import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
 
-from scenario import trigger
 from scenario.ops_main_mock import NoObserverError
 from scenario.state import Container, Event, State, _CharmSpec
+from tests.helpers import trigger
 
 
 class QuxEvent(EventBase):

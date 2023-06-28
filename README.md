@@ -5,6 +5,7 @@
 [![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
 [![foo](https://img.shields.io/badge/everything-charming-blueviolet)](https://github.com/PietroPasotti/jhack)
 [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://discourse.charmhub.io/t/rethinking-charm-testing-with-ops-scenario/8649)
+[![Python >= 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
 
 Scenario is a state-transition, functional testing framework for Operator Framework charms.
 
@@ -72,8 +73,8 @@ A scenario test consists of three broad steps:
     - optionally, use pre-event and post-event hooks to get a hold of the charm instance and run assertions on internal
       APIs
 - **Assert**:
-    - verify that the output state is how you expect it to be
-    - optionally, verify that the delta with the input state is what you expect it to be
+    - verify that the output state (or the delta with the input state) is how you expect it to be
+    - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, and no leadership.
@@ -94,7 +95,7 @@ def test_scenario_base():
     ctx = Context(MyCharm,
                   meta={"name": "foo"})
     out = ctx.run('start', State())
-    assert out.status.unit == UnknownStatus()
+    assert out.unit_status == UnknownStatus()
 ```
 
 Now let's start making it more complicated. Our charm sets a special state if it has leadership on 'start':
@@ -121,9 +122,8 @@ class MyCharm(CharmBase):
 def test_status_leader(leader):
     ctx = Context(MyCharm,
                   meta={"name": "foo"})
-    out = ctx.run('start',
-                  State(leader=leader)
-    assert out.status.unit == ActiveStatus('I rule' if leader else 'I am ruled')
+    out = ctx.run('start', State(leader=leader))
+    assert out.unit_status == ActiveStatus('I rule' if leader else 'I am ruled')
 ```
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can
@@ -153,7 +153,26 @@ def _on_event(self, _event):
         self.unit.status = BlockedStatus('something went wrong')
 ```
 
-You can verify that the charm has followed the expected path by checking the **unit status history** like so:
+More broadly, often we want to test 'side effects' of executing a charm, such as what events have been emitted, what statuses it went through, etc... Before we get there, we have to explain what the `Context` represents, and its relationship with the `State`.
+
+# Context and State
+
+Consider the following tests. Suppose we want to verify that while handling a given toplevel juju event:
+
+- a specific chain of (custom) events was emitted on the charm
+- the charm `juju-log`ged these specific strings
+- the charm went through this sequence of app/unit statuses (e.g. `maintenance`, then `waiting`, then `active`)
+
+These types of test have a place in Scenario, but that is not State: the contents of the juju log or the status history
+are side effects of executing a charm, but are not persisted in a charm-accessible "state" in any meaningful way.
+In other words: those data streams are, from the charm's perspective, write-only.
+
+As such, they do not belong in `scenario.State` but in `scenario.Context`: the object representing the charm's execution
+context.
+
+## Status history
+
+You can verify that the charm has followed the expected path by checking the unit/app status history like so:
 
 ```python
 from charm import MyCharm
@@ -164,13 +183,17 @@ from scenario import State, Context
 def test_statuses():
     ctx = Context(MyCharm,
                   meta={"name": "foo"})
-    out = ctx.run('start',
-                  State(leader=False))
-    assert out.status.unit_history == [
+    ctx.run('start', State(leader=False))
+    assert ctx.unit_status_history == [
         UnknownStatus(),
         MaintenanceStatus('determining who the ruler is...'),
         WaitingStatus('checking this is right...'),
         ActiveStatus("I am ruled"),
+    ]
+
+    assert ctx.app_status_history == [
+        UnknownStatus(),
+        ActiveStatus(""),
     ]
 ```
 
@@ -187,8 +210,95 @@ Unknown (the default status every charm is born with), you will have to pass the
 from ops.model import ActiveStatus
 from scenario import State, Status
 
-State(leader=False, status=Status(unit=ActiveStatus('foo')))
+# ...
+ctx.run('start', State(unit_status=ActiveStatus('foo')))
+assert ctx.unit_status_history == [
+    ActiveStatus('foo'),  # now the first status is active: 'foo'!
+    # ...
+]
+
 ```
+
+## Workload version history
+
+Using a similar api to `*_status_history`, you can assert that the charm has set one or more workload versions during a
+hook execution:
+
+```python
+from scenario import Context
+
+# ...
+ctx: Context
+assert ctx.workload_version_history == ['1', '1.2', '1.5']
+# ...
+```
+
+## Emitted events
+
+If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it
+can be hard to examine the resulting control flow. In these situations it can be useful to verify that, as a result of a
+given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The
+resulting state, black-box as it is, gives little insight into how exactly it was obtained.
+
+```python
+from scenario import Context
+from ops.charm import StartEvent
+
+
+def test_foo():
+    ctx = Context(...)
+    ctx.run('start', ...)
+
+    assert len(ctx.emitted_events) == 1
+    assert isinstance(ctx.emitted_events[0], StartEvent)
+```
+
+### Low-level access: using directly `capture_events`
+
+If you need more control over what events are captured (or you're not into pytest), you can use directly the context
+manager that powers the `emitted_events` fixture: `scenario.capture_events`.
+This context manager allows you to intercept any events emitted by the framework.
+
+Usage:
+
+```python
+from ops.charm import StartEvent, UpdateStatusEvent
+from scenario import State, Context, DeferredEvent, capture_events
+
+with capture_events() as emitted:
+    ctx = Context(...)
+    state_out = ctx.run(
+        "update-status",
+        State(deferred=[DeferredEvent("start", ...)])
+    )
+
+# deferred events get reemitted first
+assert isinstance(emitted[0], StartEvent)
+# the main juju event gets emitted next
+assert isinstance(emitted[1], UpdateStatusEvent)
+# possibly followed by a tail of all custom events that the main juju event triggered in turn
+# assert isinstance(emitted[2], MyFooEvent)
+# ...
+```
+
+You can filter events by type like so:
+
+```python
+from ops.charm import StartEvent, RelationEvent
+from scenario import capture_events
+
+with capture_events(StartEvent, RelationEvent) as emitted:
+    # capture all `start` and `*-relation-*` events.
+    pass
+```
+
+Configuration:
+
+- Passing no event types, like: `capture_events()`, is equivalent to `capture_events(EventBase)`.
+- By default, **framework events** (`PreCommit`, `Commit`) are not considered for inclusion in the output list even if
+  they match the instance check. You can toggle that by passing: `capture_events(include_framework=True)`.
+- By default, **deferred events** are included in the listing if they match the instance check. You can toggle that by
+  passing: `capture_events(include_deferred=True)`.
 
 ## Relations
 
@@ -306,10 +416,10 @@ argument. Also, it talks in terms of `primary`:
 from scenario.state import SubordinateRelation
 
 relation = SubordinateRelation(
-  endpoint="peers",
-  remote_unit_data={"foo": "bar"},
-  remote_app_name="zookeeper",
-  remote_unit_id=42
+    endpoint="peers",
+    remote_unit_data={"foo": "bar"},
+    remote_app_name="zookeeper",
+    remote_unit_id=42
 )
 relation.remote_unit_name  # "zookeeper/42"
 ```
@@ -516,12 +626,15 @@ state = State(
 )
 ```
 
-The only mandatory arguments to Secret are its secret ID (which should be unique) and its 'contents': that is, a mapping from revision numbers (integers) to a str:str dict representing the payload of the revision. 
+The only mandatory arguments to Secret are its secret ID (which should be unique) and its 'contents': that is, a mapping
+from revision numbers (integers) to a str:str dict representing the payload of the revision.
 
-By default, the secret is not owned by **this charm** nor is it granted to it. 
-Therefore, if charm code attempted to get that secret revision, it would get a permission error: we didn't grant it to this charm, nor we specified that the secret is owned by it.
+By default, the secret is not owned by **this charm** nor is it granted to it.
+Therefore, if charm code attempted to get that secret revision, it would get a permission error: we didn't grant it to
+this charm, nor we specified that the secret is owned by it.
 
 To specify a secret owned by this unit (or app):
+
 ```python
 from scenario import State, Secret
 
@@ -531,13 +644,15 @@ state = State(
             id='foo',
             contents={0: {'key': 'public'}},
             owner='unit',  # or 'app'
-            remote_grants = {0: {"remote"}}  # the secret owner has granted access to the "remote" app over some relation with ID 0
+            remote_grants={0: {"remote"}}
+            # the secret owner has granted access to the "remote" app over some relation with ID 0
         )
     ]
 )
 ```
 
 To specify a secret owned by some other application and give this unit (or app) access to it:
+
 ```python
 from scenario import State, Secret
 
@@ -552,6 +667,56 @@ state = State(
         )
     ]
 )
+```
+
+# Actions
+
+An action is a special sort of event, even though `ops` handles them almost identically.
+In most cases, you'll want to inspect the 'results' of an action, or whether it has failed or
+logged something while executing. Many actions don't have a direct effect on the output state.
+For this reason, the output state is less prominent in the return type of `Context.run_action`.
+
+How to test actions with scenario:
+
+## Actions without parameters
+
+```python
+from scenario import Context, State, ActionOutput
+from charm import MyCharm
+
+
+def test_backup_action():
+    ctx = Context(MyCharm)
+
+    # If you didn't declare do_backup in the charm's `actions.yaml`, 
+    # the `ConsistencyChecker` will slap you on the wrist and refuse to proceed.
+    out: ActionOutput = ctx.run_action("do_backup_action", State())
+
+    # you can assert action results, logs, failure using the ActionOutput interface
+    assert out.results == {'foo': 'bar'}
+    assert out.logs == ['baz', 'qux']
+    assert out.failure == 'boo-hoo'
+```
+
+## Parametrized Actions
+
+If the action takes parameters, you'll need to instantiate an `Action`.
+
+```python
+from scenario import Action, Context, State, ActionOutput
+from charm import MyCharm
+
+
+def test_backup_action():
+    # define an action
+    action = Action('do_backup', params={'a': 'b'})
+    ctx = Context(MyCharm)
+
+    # if the parameters (or their type) don't match what declared in actions.yaml, 
+    # the `ConsistencyChecker` will slap you on the other wrist. 
+    out: ActionOutput = ctx.run_action(action, State())
+
+    # ...
 ```
 
 # Deferred events
@@ -723,74 +888,32 @@ state = State(stored_state=[
 And the charm's runtime will see `self.stored_State.foo` and `.baz` as expected. Also, you can run assertions on it on
 the output side the same as any other bit of state.
 
-# Emitted events
+# Emitting custom events
 
-If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it
-can be hard to examine the resulting control flow. In these situations it can be useful to verify that, as a result of a
-given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The
-resulting state, black-box as it is, gives little insight into how exactly it was obtained.
+While the main use case of Scenario is to emit juju events, i.e. the built-in `start`, `install`, `*-relation-changed`, etc..., it can be sometimes handy to directly trigger custom events defined on arbitrary Objects in your hierarchy.
 
-`scenario`, among many other great things, is also a pytest plugin. It exposes a fixture called `emitted_events` that
-you can use like so:
+Suppose your charm uses a charm library providing an `ingress_provided` event.
+The 'proper' way to emit it is to run the event that causes that custom event to be emitted by the library, whatever that may be, for example a `foo-relation-changed`.
+
+However, that may mean that you have to set up all sorts of State and mocks so that the right preconditions are met and the event is emitted at all.
+
+However if you attempt to run that event directly you will get an error:
+```python
+from scenario import Context, State
+Context(...).run("ingress_provided", State())  # raises scenario.ops_main_mock.NoObserverError
+```
+This happens because the framework, by default, searches for an event source named `ingress_provided` in `charm.on`, but since the event is defined on another Object, it will fail to find it.
+
+You can prefix the event name with the path leading to its owner to tell Scenario where to find the event source:
 
 ```python
-from scenario import Context
-from ops.charm import StartEvent
-
-
-def test_foo(emitted_events):
-    Context(...).run('start', ...)
-
-    assert len(emitted_events) == 1
-    assert isinstance(emitted_events[0], StartEvent)
+from scenario import Context, State
+Context(...).run("my_charm_lib.on.ingress_provided", State())
 ```
 
-## Customizing: capture_events
+This will instruct Scenario to emit `my_charm.my_charm_lib.on.foo`.
 
-If you need more control over what events are captured (or you're not into pytest), you can use directly the context
-manager that powers the `emitted_events` fixture: `scenario.capture_events`.
-This context manager allows you to intercept any events emitted by the framework.
-
-Usage:
-
-```python
-from ops.charm import StartEvent, UpdateStatusEvent
-from scenario import State, Context, DeferredEvent, capture_events
-
-with capture_events() as emitted:
-    ctx = Context(...)
-    state_out = ctx.run(
-        "update-status",
-        State(deferred=[DeferredEvent("start", ...)])
-    )
-
-# deferred events get reemitted first
-assert isinstance(emitted[0], StartEvent)
-# the main juju event gets emitted next
-assert isinstance(emitted[1], UpdateStatusEvent)
-# possibly followed by a tail of all custom events that the main juju event triggered in turn
-# assert isinstance(emitted[2], MyFooEvent)
-# ...
-```
-
-You can filter events by type like so:
-
-```python
-from ops.charm import StartEvent, RelationEvent
-from scenario import capture_events
-
-with capture_events(StartEvent, RelationEvent) as emitted:
-    # capture all `start` and `*-relation-*` events.
-    pass
-```
-
-Passing no event types, like: `capture_events()`, is equivalent to `capture_events(EventBase)`.
-
-By default, **framework events** (`PreCommit`, `Commit`) are not considered for inclusion in the output list even if
-they match the instance check. You can toggle that by passing: `capture_events(include_framework=True)`.
-
-By default, **deferred events** are included in the listing if they match the instance check. You can toggle that by
-passing: `capture_events(include_deferred=True)`.
+(always omit the 'root', i.e. the charm framework key, from the path)
 
 # The virtual charm root
 
