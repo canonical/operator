@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The Operator Framework infrastructure."""
+"""The ops library's infrastructure."""
 
 import collections
 import collections.abc
@@ -546,7 +546,7 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 
 
 class Framework(Object):
-    """Main interface from the Charm to the Operator Framework internals."""
+    """Main interface from the Charm to the ops library's infrastructure."""
 
     on = FrameworkEvents()  # type: ignore
     """Used for :meth:`observe`-ing framework-specific events."""

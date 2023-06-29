@@ -1,103 +1,59 @@
-# The Charmed Operator Framework
+# The ops library
 
-This Charmed Operator Framework simplifies [operator](https://charmhub.io/about) development
-for [model-driven application management](https://juju.is/model-driven-operations).
+<!-- The text below is also at the top of ops/__init__.py. Keep in sync! -->
 
-Operators emerged from the Kubernetes community; an operator is software that drives lifecycle
-management, configuration, integration and daily actions for an application. Operators simplify
-software management and operations. They capture reusable app domain knowledge from experts in a
-software component that can be shared.
+The ops library is a Python framework ([`available on PyPI`](https://pypi.org/project/ops/)) for developing
+and testing [Juju](https://juju.is/) charms in a consistent way, using standard Python constructs
+to allow for clean, maintainable, and reusable code.
 
-This project extends the operator pattern to enable
-[charmed operators](https://juju.is/universal-operators), not just for Kubernetes but also
-operators for traditional Linux application management.
+A charm is an operator -- business logic encapsulated in a reusable software
+package that automates every aspect of an application's life.
 
-Operators use a [Charmed Operator Lifecycle Manager
-(Charmed OLM)](https://juju.is/operator-lifecycle-manager) to coordinate their work in a cluster.
-The system uses Golang for concurrent event processing under the hood, but enables the operators to
-be written in Python.
+Charms written with ops support Kubernetes using Juju's "sidecar charm"
+pattern, as well as charms that deploy to Linux-based machines and containers.
 
-## Simple, composable operators
+Charms should do one thing and do it well. Each charm drives a single
+application and can be integrated with other charms to deliver a complex
+system. A charm handles creating the application in addition to scaling,
+configuration, optimisation, networking, service mesh, observability, and other
+day-2 operations specific to the application.
 
-Operators should 'do one thing and do it well'. Each operator drives a single microservice and can
-be [composed with other operators](https://juju.is/integration) to deliver a complex application.
+The ops library is part of the Charm SDK (the other part being Charmcraft).
+Full developer documentation for the Charm SDK is available at
+https://juju.is/docs/sdk.
 
-It is better to have small, reusable operators that each drive a single microservice very well.
-The operator handles instantiation, scaling, configuration, optimisation, networking, service mesh,
-observability, and day-2 operations specific to that microservice.
+To learn more about Juju, visit https://juju.is/docs/olm.
 
-Operator composition takes place through declarative integration in the OLM. Operators declare
-integration endpoints, and discover lines of integration between those endpoints dynamically at
-runtime.
 
-## Pure Python operators
+## Pure Python
 
-The framework provides a standard Python library and object model that represents the application
-graph, and an event distribution mechanism for distributed system coordination and communication.
+The framework provides a standardised Python object model that represents the
+application graph, as well as an event-handling mechanism for distributed
+system coordination and communication.
 
-The OLM is written in Golang for efficient concurrency in event handling and distribution.
-Operators can be written in any language. We recommend this Python framework for ease of design,
-development and collaboration.
+The latest version of ops requires Python 3.8 or above.
 
-## Better collaboration
+Juju itself is written in Go for efficient concurrency even in large
+deployments. Charms can be written in any language, however, we recommend using
+Python with this framework to make development easier and more standardised.
+All new charms at Canonical are written using it.
 
-Operator developers publish Python libraries that make it easy to integrate your operator with
-their operator. The framework includes standard tools to distribute these integration libraries and
-keep them up to date.
 
-Development collaboration happens at [Charmhub.io](https://charmhub.io/) where operators are
-published along with integration libraries. Design and code review discussions are hosted in the
-Charmhub [discourse]. We recommend the [Open Operator Manifesto](https://charmhub.io/manifesto)
-as a guideline for high quality operator engineering.
+## Getting started
 
-## Event serialization and operator services
+A package of operator code is called a charmed operator or simply "charm".
+You'll use [charmcraft](https://juju.is/docs/sdk/install-charmcraft) to
+register your charm name and publish it when you are ready. You can follow one
+of our [charming tutorials](https://juju.is/docs/sdk/tutorials) to get started
+writing your first charm.
 
-Distributed systems can be hard! So this framework exists to make it much simpler to reason about
-operator behaviour, especially in complex deployments. The Charmed OLM provides
-[operator services](https://juju.is/operator-services) such as provisioning, event delivery,
-leader election and model management.
 
-Coordination between operators is provided by a cluster-wide event distribution system. Events are
-serialized to avoid race conditions in any given container or machine. This greatly simplifies the
-development of operators for high availability, scale-out and integrated applications.
+## Testing your charms
 
-## Model-driven Operator Lifecycle Manager
-
-A key goal of the project is to improve the user experience for admins working with multiple
-different operators.
-
-We embrace [model-driven operations](https://juju.is/model-driven-operations) in the Charmed
-Operator Lifecycle Manager. The model encompasses capacity, storage, networking, the application
-graph and administrative access.
-
-Admins describe the application graph of integrated microservices, and the OLM then drives
-instantiation. A change in the model is propagated to all affected operators, reducing the
-duplication of effort and repetition normally found in operating a complex topology of services.
-
-Administrative actions, updates, configuration and integration are all driven through the OLM.
-
-# Getting started
-
-A package of operator code is called a charmed operator or “charm. You will use `charmcraft` to
-register your operator name, and publish it when you are ready. There are more details on how to
-get a complete development environment setup over in the
-[documentation](https://juju.is/docs/sdk/dev-setup)
-
-Charmed Operators written using the Charmed Operator Framework are just Python code. The goal
-is to feel natural for somebody used to coding in Python, and reasonably easy to learn for somebody
-who is not a pythonista.
-
-The dependencies of the operator framework are kept as minimal as possible; currently that's Python
-3.8 or greater, and the small number of Python libraries referenced in [requirements.txt](requirements.txt).
-
-For a brief intro on how to get started, check out the
-[Hello, World!](https://juju.is/docs/sdk/hello-world) section of the documentation!
-
-# Testing your charmed operators
-
-The operator framework provides a testing harness, so you can check your charmed operator does the
-right thing in different scenarios, without having to create a full deployment.
-`pydoc3 ops.testing` has the details, including this example:
+The framework provides a testing harness, so you can ensure that your charm
+does the right thing in different scenarios, without having to create
+a full deployment. Our [API documentation](https://ops.readthedocs.io/en/latest/#module-ops.testing)
+has the details, including this example:
 
 ```python
 harness = Harness(MyCharm)
@@ -111,21 +67,22 @@ harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
 self.assertEqual(harness.charm. ...)
 ```
 
+
 ## Talk to us
 
 If you need help, have ideas, or would just like to chat with us, reach out on
 the Charmhub [Mattermost].
 
-We also pay attention to the Charmhub [Discourse]
+We also pay attention to the Charmhub [Discourse].
 
-You can deep dive into the [API docs] if that's your thing.
+And of course you can deep dive into the [API reference].
 
-[discourse]: https://discourse.charmhub.io
-[api docs]: https://ops.rtfd.io/
-[sdk docs]: https://juju.is/docs/sdk
-[mattermost]: https://chat.charmhub.io/charmhub/channels/charm-dev
+[Discourse]: https://discourse.charmhub.io/
+[API reference]: https://ops.readthedocs.io/
+[Mattermost]: https://chat.charmhub.io/charmhub/channels/charm-dev
 
-## Operator Framework development
 
-See [HACKING.md](HACKING.md) for details on dev environments, testing, etc.
+## Development of the framework
 
+See [HACKING.md](HACKING.md) for details on dev environments, testing, and so
+on.

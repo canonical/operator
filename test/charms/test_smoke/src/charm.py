@@ -17,7 +17,7 @@
 """Charm the service.
 
 Refer to the following post for a quick-start guide that will help you
-develop a new k8s charm using the Operator Framework:
+develop a new k8s charm using the ops library:
 
     https://discourse.charmhub.io/t/4208
 """
