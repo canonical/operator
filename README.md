@@ -897,7 +897,7 @@ The 'proper' way to emit it is to run the event that causes that custom event to
 
 However, that may mean that you have to set up all sorts of State and mocks so that the right preconditions are met and the event is emitted at all.
 
-However if you attempt to run that event directly you will get an error:
+If for whatever reason you don't want to do that and you attempt to run that event directly you will get an error:
 ```python
 from scenario import Context, State
 Context(...).run("ingress_provided", State())  # raises scenario.ops_main_mock.NoObserverError
