@@ -361,6 +361,15 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
         return False
 
 
+def _get_breaking_relation_id() -> Optional[int]:
+    """Returns the relation id of the currently breaking relation, if applicable."""
+    if not os.environ.get("JUJU_HOOK_NAME", "").endswith("-relation-broken"):
+        # Not the relation-broken event
+        return None
+
+    return int(os.environ.get("JUJU_RELATION_ID"))
+
+
 def main(charm_class: Type[ops.charm.CharmBase],
          use_juju_for_storage: Optional[bool] = None):
     """Setup the charm and dispatch the observed event.
@@ -391,8 +400,10 @@ def main(charm_class: Type[ops.charm.CharmBase],
     else:
         actions_metadata = None
 
+    breaking_relation_id = _get_breaking_relation_id()
+
     meta = CharmMeta.from_yaml(metadata, actions_metadata)
-    model = ops.model.Model(meta, model_backend)
+    model = ops.model.Model(meta, model_backend, breaking_relation_id)
 
     charm_state_path = charm_dir / CHARM_STATE_FILE
 

@@ -107,12 +107,14 @@ class Model:
     from any class that derives from Object.
     """
 
-    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
+    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend',
+                 breaking_relation_id: Optional[int] = None):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         relations: Dict[str, 'ops.RelationMeta'] = meta.relations
-        self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
+        self._relations = RelationMapping(relations, self.unit, self._backend, self._cache,
+                                          breaking_relation_id)
         self._config = ConfigData(self._backend)
         resources: Iterable[str] = meta.resources
         self._resources = Resources(list(resources), self._backend)
@@ -667,7 +669,8 @@ class RelationMapping(Mapping[str, List['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
     def __init__(self, relations_meta: Dict[str, 'ops.RelationMeta'], our_unit: 'Unit',
-                 backend: '_ModelBackend', cache: '_ModelCache'):
+                 backend: '_ModelBackend', cache: '_ModelCache',
+                 breaking_relation_id: Optional[int] = None):
         self._peers: Set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
@@ -676,6 +679,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._backend = backend
         self._cache = cache
         self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
+        self._breaking_relation_id = breaking_relation_id
 
     def __contains__(self, key: str):
         return key in self._data
@@ -692,8 +696,10 @@ class RelationMapping(Mapping[str, List['Relation']]):
         if not isinstance(relation_list, list):
             relation_list = self._data[relation_name] = []  # type: ignore
             for rid in self._backend.relation_ids(relation_name):
+                active = rid != self._breaking_relation_id
                 relation = Relation(relation_name, rid, is_peer,
-                                    self._our_unit, self._backend, self._cache)
+                                    self._our_unit, self._backend, self._cache,
+                                    active)
                 relation_list.append(relation)
         return relation_list
 
@@ -1244,15 +1250,18 @@ class Relation:
             For subordinate relations, this set will include only one unit: the principal unit.
         data: A :class:`RelationData` holding the data buckets for each entity
             of a relation. Accessed via eg Relation.data[unit]['foo']
+        active: Indicates whether this relation is active (True) or inactive (False, because
+            this relation is currently part of a relation-broken event)
     """
 
     def __init__(
             self, relation_name: str, relation_id: int, is_peer: bool, our_unit: Unit,
-            backend: '_ModelBackend', cache: '_ModelCache'):
+            backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
         self.name = relation_name
         self.id = relation_id
         self.app: Optional[Application] = None
         self.units: Set[Unit] = set()
+        self.active = active
 
         if is_peer:
             # For peer relations, both the remote and the local app are the same.
