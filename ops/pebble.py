@@ -309,19 +309,15 @@ class ProtocolError(Error):
 class PathError(Error):
     """Raised when there's an error with a specific path."""
 
-    kind: str
-    """Short string representing the kind of error.
-
-    Possible values are "not-found", "permission-denied", and
-    "generic-file-error".
-    """
+    kind: typing.Literal["not-found", "permission-denied", "generic-file-error"]
+    """Short string representing the kind of error."""
 
     message: str
     """Human-readable error message from the API."""
 
     def __init__(self, kind: str, message: str):
         """This shouldn't be instantiated directly."""
-        self.kind = kind
+        self.kind = kind  # type: ignore
         self.message = message
 
     def __str__(self):
