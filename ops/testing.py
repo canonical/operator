@@ -1437,14 +1437,14 @@ class Harness(Generic[CharmType]):
 
         Example usage:
 
-        # charm.py
+        >>> # charm.py
         >>> import ops
         >>> class ExampleCharm(ops.CharmBase):
         >>>     def __init__(self, *args):
         >>>         super().__init__(*args)
         >>>         self.hostname = open("/etc/hostname").read()
 
-        # test_charm.py
+        >>> # test_charm.py
         >>> from ops.testing import Harness
         >>> harness = Harness(ExampleCharm)
         >>> root = harness.get_filesystem_root("foo")
