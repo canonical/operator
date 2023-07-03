@@ -732,6 +732,9 @@ class Framework(Object):
     def observe(self, bound_event: BoundEvent, observer: Callable[[Any], None]):
         """Register observer to be called when bound_event is emitted.
 
+        If this is called multiple times for the same event type, the
+        framework calls the observers in the order they were observed.
+
         The bound_event is generally provided as an attribute of the object that emits
         the event, and is created in this style::
 
