@@ -14,6 +14,7 @@
 
 import collections
 import datetime
+import grp
 import importlib
 import inspect
 import io
@@ -21,13 +22,13 @@ import ipaddress
 import os
 import pathlib
 import platform
+import pwd
 import shutil
 import sys
 import tempfile
 import textwrap
 import unittest
 import uuid
-from io import BytesIO, StringIO
 from unittest.mock import MagicMock
 
 import pytest
@@ -37,13 +38,7 @@ import ops
 import ops.testing
 from ops import pebble
 from ops.model import _ModelBackend
-from ops.testing import (
-    NonAbsolutePathError,
-    _Directory,
-    _TestingFilesystem,
-    _TestingPebbleClient,
-    _TestingStorageMount,
-)
+from ops.testing import _TestingPebbleClient
 
 is_linux = platform.system() == 'Linux'
 
@@ -2681,6 +2676,20 @@ class TestHarness(unittest.TestCase):
             ]
         )
 
+    def test_get_filesystem_root(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+        ''')
+        foo_root = harness.get_filesystem_root("foo")
+        self.assertTrue(foo_root.exists())
+        self.assertTrue(foo_root.is_dir())
+        harness.begin()
+        container = harness.charm.unit.get_container("foo")
+        self.assertEqual(foo_root, harness.get_filesystem_root(container))
+
 
 class TestNetwork(unittest.TestCase):
     def setUp(self):
@@ -4135,211 +4144,6 @@ class _PebbleStorageAPIsTestMixin:
     #   nuance.
 
 
-class GenericTestingFilesystemTests:
-    def test_listdir_root_on_empty_os(self):
-        self.assertEqual(self.fs.list_dir('/'), [])
-
-    def test_listdir_on_nonexistent_dir(self):
-        with self.assertRaises(FileNotFoundError) as cm:
-            self.fs.list_dir('/etc')
-        self.assertTrue('/etc' in cm.exception.args[0])
-
-    def test_listdir(self):
-        self.fs.create_dir('/opt')
-        self.fs.create_file('/opt/file1', 'data')
-        self.fs.create_file('/opt/file2', 'data')
-        expected_results = {
-            pathlib.PurePosixPath('/opt/file1'),
-            pathlib.PurePosixPath('/opt/file2')}
-        self.assertEqual(expected_results, {f.path for f in self.fs.list_dir('/opt')})
-        # Ensure that Paths also work for listdir
-        self.assertEqual(
-            expected_results, {f.path for f in self.fs.list_dir(pathlib.PurePosixPath('/opt'))})
-
-    def test_listdir_on_file(self):
-        self.fs.create_file('/file', 'data')
-        with self.assertRaises(NotADirectoryError) as cm:
-            self.fs.list_dir('/file')
-        self.assertTrue('/file' in cm.exception.args[0])
-
-    def test_makedir(self):
-        d = self.fs.create_dir('/etc')
-        self.assertEqual(d.name, 'etc')
-        self.assertEqual(d.path, pathlib.PurePosixPath('/etc'))
-        d2 = self.fs.create_dir('/etc/init.d')
-        self.assertEqual(d2.name, 'init.d')
-        self.assertEqual(d2.path, pathlib.PurePosixPath('/etc/init.d'))
-
-    def test_makedir_fails_if_already_exists(self):
-        self.fs.create_dir('/etc')
-        with self.assertRaises(FileExistsError) as cm:
-            self.fs.create_dir('/etc')
-        self.assertTrue('/etc' in cm.exception.args[0])
-
-    def test_makedir_succeeds_if_already_exists_when_make_parents_true(self):
-        d1 = self.fs.create_dir('/etc')
-        d2 = self.fs.create_dir('/etc', make_parents=True)
-        self.assertEqual(d1.path, d2.path)
-        self.assertEqual(d1.name, d2.name)
-
-    def test_makedir_fails_if_parent_dir_doesnt_exist(self):
-        with self.assertRaises(FileNotFoundError) as cm:
-            self.fs.create_dir('/etc/init.d')
-        self.assertTrue('/etc' in cm.exception.args[0])
-
-    def test_make_and_list_directory(self):
-        self.fs.create_dir('/etc')
-        self.fs.create_dir('/var')
-        self.assertEqual(
-            {f.path for f in self.fs.list_dir('/')},
-            {pathlib.PurePosixPath('/etc'), pathlib.PurePosixPath('/var')})
-
-    def test_make_directory_recursively(self):
-        self.fs.create_dir('/etc/init.d', make_parents=True)
-        self.assertEqual([str(o.path) for o in self.fs.list_dir('/')], ['/etc'])
-        self.assertEqual([str(o.path) for o in self.fs.list_dir('/etc')], ['/etc/init.d'])
-
-    def test_makedir_path_must_start_with_slash(self):
-        with self.assertRaises(NonAbsolutePathError):
-            self.fs.create_dir("noslash")
-
-    def test_create_file_fails_if_parent_dir_doesnt_exist(self):
-        with self.assertRaises(FileNotFoundError) as cm:
-            self.fs.create_file('/etc/passwd', "foo")
-        self.assertTrue('/etc' in cm.exception.args[0])
-
-    def test_create_file_succeeds_if_parent_dir_doesnt_exist_when_make_dirs_true(self):
-        self.fs.create_file('/test/subdir/testfile', "foo", make_dirs=True)
-        with self.fs.open('/test/subdir/testfile') as infile:
-            self.assertEqual(infile.read(), 'foo')
-
-    def test_create_file_from_str(self):
-        self.fs.create_file('/test', "foo")
-        with self.fs.open('/test') as infile:
-            self.assertEqual(infile.read(), 'foo')
-
-    def test_create_file_from_bytes(self):
-        self.fs.create_file('/test', b"foo")
-        with self.fs.open('/test', encoding=None) as infile:
-            self.assertEqual(infile.read(), b'foo')
-
-    def test_create_file_from_files(self):
-        data = "foo"
-
-        sio = StringIO(data)
-        self.fs.create_file('/test', sio)
-        with self.fs.open('/test') as infile:
-            self.assertEqual(infile.read(), 'foo')
-
-        bio = BytesIO(data.encode())
-        self.fs.create_file('/test2', bio)
-        with self.fs.open('/test2') as infile:
-            self.assertEqual(infile.read(), 'foo')
-
-    def test_create_and_read_with_different_encodings(self):
-        # write str, read as utf-8 bytes
-        self.fs.create_file('/test', "foo")
-        with self.fs.open('/test', encoding=None) as infile:
-            self.assertEqual(infile.read(), b'foo')
-
-        # write bytes, read as utf-8-decoded str
-        data = "日本語"  # Japanese for "Japanese"
-        self.fs.create_file('/test2', data.encode('utf-8'))
-        with self.fs.open('/test2') as infile:                    # Implicit utf-8 read
-            self.assertEqual(infile.read(), data)
-        with self.fs.open('/test2', encoding='utf-8') as infile:  # Explicit utf-8 read
-            self.assertEqual(infile.read(), data)
-
-    def test_open_directory_fails(self):
-        self.fs.create_dir('/dir1')
-        with self.assertRaises(IsADirectoryError) as cm:
-            self.fs.open('/dir1')
-        self.assertEqual(cm.exception.args[0], '/dir1')
-
-    def test_delete_file(self):
-        self.fs.create_file('/test', "foo")
-        self.fs.delete_path('/test')
-        with self.assertRaises(FileNotFoundError) as cm:
-            self.fs.get_path('/test')
-
-        # Deleting deleted files should fail as well
-        with self.assertRaises(FileNotFoundError) as cm:
-            self.fs.delete_path('/test')
-        self.assertTrue('/test' in cm.exception.args[0])
-
-    def test_create_dir_with_extra_args(self):
-        d = self.fs.create_dir('/dir1')
-        self.assertEqual(d.kwargs, {})
-
-        d = self.fs.create_dir(
-            '/dir2', permissions=0o700, user='ubuntu', user_id=1000, group='www-data', group_id=33)
-        self.assertEqual(d.kwargs, {
-            'permissions': 0o700,
-            'user': 'ubuntu',
-            'user_id': 1000,
-            'group': 'www-data',
-            'group_id': 33,
-        })
-
-    def test_create_file_with_extra_args(self):
-        f = self.fs.create_file('/file1', 'data')
-        self.assertEqual(f.kwargs, {})
-
-        f = self.fs.create_file(
-            '/file2', 'data',
-            permissions=0o754, user='ubuntu', user_id=1000, group='www-data', group_id=33)
-        self.assertEqual(f.kwargs, {
-            'permissions': 0o754,
-            'user': 'ubuntu',
-            'user_id': 1000,
-            'group': 'www-data',
-            'group_id': 33,
-        })
-
-    def test_getattr(self):
-        self.fs.create_dir('/etc/init.d', make_parents=True)
-
-        # By path
-        o = self.fs.get_path(pathlib.PurePosixPath('/etc/init.d'))
-        self.assertIsInstance(o, _Directory)
-        self.assertEqual(o.path, pathlib.PurePosixPath('/etc/init.d'))
-
-        # By str
-        o = self.fs.get_path('/etc/init.d')
-        self.assertIsInstance(o, _Directory)
-        self.assertEqual(o.path, pathlib.PurePosixPath('/etc/init.d'))
-
-    def test_getattr_file_not_found(self):
-        # Arguably this could be a KeyError given the dictionary-style access.
-        # However, FileNotFoundError seems more appropriate for a filesystem, and it
-        # gives a closer semantic feeling, in my opinion.
-        with self.assertRaises(FileNotFoundError) as cm:
-            self.fs.get_path('/nonexistent_file')
-        self.assertTrue('/nonexistent_file' in cm.exception.args[0])
-
-
-class TestTestingFilesystem(GenericTestingFilesystemTests, unittest.TestCase):
-    def setUp(self):
-        self.fs = _TestingFilesystem()
-
-    def test_storage_mount(self):
-        tmpdir = tempfile.TemporaryDirectory()
-        self.fs.add_mount('foo', '/foo', tmpdir.name)
-        self.fs.create_file('/foo/bar/baz.txt', 'quux', make_dirs=True)
-
-        tmppath = os.path.join(tmpdir.name, 'bar/baz.txt')
-        self.assertTrue(os.path.exists(tmppath))
-        with open(tmppath) as f:
-            self.assertEqual(f.read(), 'quux')
-
-
-class TestTestingStorageMount(GenericTestingFilesystemTests, unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.fs = _TestingStorageMount('/', pathlib.Path(self.tmp.name))
-
-
 class TestPebbleStorageAPIsUsingMocks(
         unittest.TestCase,
         _TestingPebbleClientMixin,
@@ -4350,7 +4154,6 @@ class TestPebbleStorageAPIsUsingMocks(
         if self.prefix:
             self.client.make_dir(self.prefix, make_parents=True)
 
-    @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_container_storage_mounts(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: test-app
@@ -4420,25 +4223,45 @@ class TestPebbleStorageAPIsUsingMocks(
         harness.remove_storage(store1_id)
         self.assertFalse(c1.exists(c1_fpath))
 
+    def _select_testing_user_group(self):
+        user = [u for u in pwd.getpwall() if u.pw_uid != os.getuid()][0]
+        group = [g for g in grp.getgrall() if g.gr_gid != os.getgid()][0]
+        return user, group
+
+    @unittest.skipUnless(os.getuid() == 0, "require root privilege")
     def test_push_with_ownership(self):
         # Note: To simplify implementation, ownership is simply stored as-is with no verification.
         data = 'data'
         client = self.client
-        client.push(f"{self.prefix}/file", data, user_id=1, user='foo', group_id=3, group='bar')
+        user, group = self._select_testing_user_group()
+        client.push(
+            f"{self.prefix}/file",
+            data,
+            user_id=user.pw_uid,
+            user=user.pw_name,
+            group_id=group.gr_gid,
+            group=group.gr_name)
         file_ = client.list_files(f"{self.prefix}/file")[0]
-        self.assertEqual(file_.user_id, 1)
-        self.assertEqual(file_.user, 'foo')
-        self.assertEqual(file_.group_id, 3)
-        self.assertEqual(file_.group, 'bar')
+        self.assertEqual(file_.user_id, user.pw_uid)
+        self.assertEqual(file_.user, user.pw_name)
+        self.assertEqual(file_.group_id, group.gr_gid)
+        self.assertEqual(file_.group, group.gr_name)
 
+    @unittest.skipUnless(os.getuid() == 0, "require root privilege")
     def test_make_dir_with_ownership(self):
         client = self.client
-        client.make_dir(f"{self.prefix}/dir1", user_id=1, user="foo", group_id=3, group="bar")
+        user, group = self._select_testing_user_group()
+        client.make_dir(
+            f"{self.prefix}/dir1",
+            user_id=user.pw_uid,
+            user=user.pw_name,
+            group_id=group.gr_gid,
+            group=group.gr_name)
         dir_ = client.list_files(f"{self.prefix}/dir1", itself=True)[0]
-        self.assertEqual(dir_.user_id, 1)
-        self.assertEqual(dir_.user, "foo")
-        self.assertEqual(dir_.group_id, 3)
-        self.assertEqual(dir_.group, "bar")
+        self.assertEqual(dir_.user_id, user.pw_uid)
+        self.assertEqual(dir_.user, user.pw_name)
+        self.assertEqual(dir_.group_id, group.gr_gid)
+        self.assertEqual(dir_.group, group.gr_name)
 
 
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
