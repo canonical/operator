@@ -38,6 +38,7 @@ import ops
 import ops.testing
 from ops import pebble
 from ops.model import _ModelBackend
+from ops.pebble import PathError
 from ops.testing import _TestingPebbleClient
 
 is_linux = platform.system() == 'Linux'
@@ -4234,34 +4235,90 @@ class TestPebbleStorageAPIsUsingMocks(
         data = 'data'
         client = self.client
         user, group = self._select_testing_user_group()
-        client.push(
-            f"{self.prefix}/file",
-            data,
-            user_id=user.pw_uid,
-            user=user.pw_name,
-            group_id=group.gr_gid,
-            group=group.gr_name)
-        file_ = client.list_files(f"{self.prefix}/file")[0]
-        self.assertEqual(file_.user_id, user.pw_uid)
-        self.assertEqual(file_.user, user.pw_name)
-        self.assertEqual(file_.group_id, group.gr_gid)
-        self.assertEqual(file_.group, group.gr_name)
+        cases = [
+            {
+                "user_id": user.pw_uid,
+                "user": None,
+                "group_id": group.gr_gid,
+                "group": None
+            },
+            {
+                "user_id": None,
+                "user": user.pw_name,
+                "group_id": None,
+                "group": group.gr_name
+            },
+            {
+                "user_id": user.pw_uid,
+                "user": user.pw_name,
+                "group_id": group.gr_gid,
+                "group": group.gr_name
+            }
+        ]
+        for idx, case in enumerate(cases):
+            client.push(f"{self.prefix}/file{idx}", data, **case)
+            file_ = client.list_files(f"{self.prefix}/file{idx}")[0]
+            self.assertEqual(file_.user_id, user.pw_uid)
+            self.assertEqual(file_.user, user.pw_name)
+            self.assertEqual(file_.group_id, group.gr_gid)
+            self.assertEqual(file_.group, group.gr_name)
 
     @unittest.skipUnless(os.getuid() == 0, "require root privilege")
     def test_make_dir_with_ownership(self):
         client = self.client
         user, group = self._select_testing_user_group()
-        client.make_dir(
-            f"{self.prefix}/dir1",
-            user_id=user.pw_uid,
-            user=user.pw_name,
-            group_id=group.gr_gid,
-            group=group.gr_name)
-        dir_ = client.list_files(f"{self.prefix}/dir1", itself=True)[0]
-        self.assertEqual(dir_.user_id, user.pw_uid)
-        self.assertEqual(dir_.user, user.pw_name)
-        self.assertEqual(dir_.group_id, group.gr_gid)
-        self.assertEqual(dir_.group, group.gr_name)
+        cases = [
+            {
+                "user_id": user.pw_uid,
+                "user": None,
+                "group_id": group.gr_gid,
+                "group": None
+            },
+            {
+                "user_id": None,
+                "user": user.pw_name,
+                "group_id": None,
+                "group": group.gr_name
+            },
+            {
+                "user_id": user.pw_uid,
+                "user": user.pw_name,
+                "group_id": group.gr_gid,
+                "group": group.gr_name
+            }
+        ]
+        for idx, case in enumerate(cases):
+            client.make_dir(f"{self.prefix}/dir{idx}", **case)
+            dir_ = client.list_files(f"{self.prefix}/dir{idx}", itself=True)[0]
+            self.assertEqual(dir_.user_id, user.pw_uid)
+            self.assertEqual(dir_.user, user.pw_name)
+            self.assertEqual(dir_.group_id, group.gr_gid)
+            self.assertEqual(dir_.group, group.gr_name)
+
+    @unittest.skipUnless(os.getuid() == 0, "require root privilege")
+    def test_conflicting_ownership(self):
+        user, group = self._select_testing_user_group()
+        cases = [
+            {
+                "user_id": user.pw_uid + 1,
+                "user": user.pw_name,
+            },
+            {
+                "group_id": group.gr_gid + 1,
+                "group": group.gr_name
+            },
+            {
+                "user_id": user.pw_uid + 1,
+                "user": user.pw_name,
+                "group_id": group.gr_gid + 1,
+                "group": group.gr_name
+            }
+        ]
+        for idx, case in enumerate(cases):
+            with self.assertRaises(PathError):
+                self.client.make_dir(f"{self.prefix}/dir{idx}", **case)
+            with self.assertRaises(PathError):
+                self.client.push(f"{self.prefix}/file{idx}", "", **case)
 
 
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
