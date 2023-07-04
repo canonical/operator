@@ -637,13 +637,15 @@ class WorkloadEvent(HookEvent):
 
     Workload events are generated for all containers that the charm
     expects in metadata. Workload containers currently only trigger
-    a PebbleReadyEvent.
+    a :class:`PebbleReadyEvent`.
+    """
 
-    Attributes:
-        workload: The :class:`~ops.model.Container` involved in this event.
-                  Workload currently only can be a Container but in future may
-                  be other types that represent the specific workload type e.g.
-                  a Machine.
+    workload: 'Container'
+    """The workload involved in this event.
+
+    Workload currently only can be a :class:`Container <model.Container>`, but
+    in future may be other types that represent the specific workload type,
+    for example a machine.
     """
 
     def __init__(self, handle: 'Handle', workload: 'Container'):
@@ -670,7 +672,7 @@ class WorkloadEvent(HookEvent):
         if container_name:
             self.workload = self.framework.model.unit.get_container(container_name)
         else:
-            self.workload = None
+            self.workload = None  # type: ignore
 
 
 class PebbleReadyEvent(WorkloadEvent):
