@@ -148,7 +148,7 @@ class Handle:
         return self._key
 
     @property
-    def path(self):
+    def path(self) -> str:
         """Return the handle's path."""
         return self._path
 
@@ -194,7 +194,7 @@ class EventBase:
     def __repr__(self):
         return f"<{self.__class__.__name__} via {self.handle}>"
 
-    def defer(self):
+    def defer(self) -> None:
         """Defer the event to the future.
 
         Deferring an event from a handler puts that handler into a queue, to be
@@ -625,19 +625,20 @@ class Framework(Object):
         else:
             self._juju_debug_at: Set[str] = set()
 
-    def set_breakpointhook(self):
-        """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
+    def set_breakpointhook(self) -> Optional[Any]:
+        """Hook into ``sys.breakpointhook`` so the builtin ``breakpoint()`` works as expected.
 
         This method is called by ``main``, and is not intended to be
         called by users of the framework itself outside of perhaps
         some testing scenarios.
 
-        It returns the old value of sys.excepthook.
-
-        The breakpoint function is a Python >= 3.7 feature.
+        The ``breakpoint()`` function is a Python >= 3.7 feature.
 
         This method was added in ops 1.0; before that, it was done as
-        part of the Framework's __init__.
+        part of the Framework's ``__init__``.
+
+        Returns:
+            The old value of ``sys.breakpointhook``.
         """
         old_breakpointhook = getattr(sys, 'breakpointhook', None)
         if old_breakpointhook is not None:
@@ -646,7 +647,7 @@ class Framework(Object):
             sys.breakpointhook = self.breakpoint
         return old_breakpointhook
 
-    def close(self):
+    def close(self) -> None:
         """Close the underlying backends."""
         self._storage.close()
 
@@ -664,7 +665,7 @@ class Framework(Object):
         """Stop tracking the given object. See also _track."""
         self._objects.pop(obj.handle.path, None)
 
-    def commit(self):
+    def commit(self) -> None:
         """Save changes to the underlying backends."""
         # Give a chance for objects to persist data they want to before a commit is made.
         self.on.pre_commit.emit()
@@ -831,7 +832,7 @@ class Framework(Object):
         if saved:
             self._reemit(event_path)
 
-    def reemit(self):
+    def reemit(self) -> None:
         """Reemit previously deferred events to the observers that deferred them.
 
         Only the specific observers that have previously deferred the event will be
@@ -974,7 +975,7 @@ class Framework(Object):
                 "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
                 name, indicated_breakpoints)
 
-    def remove_unreferenced_events(self):
+    def remove_unreferenced_events(self) -> None:
         """Remove events from storage that are not referenced.
 
         In older versions of the framework, events that had no observers would get recorded but

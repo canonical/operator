@@ -1234,7 +1234,7 @@ class Secret:
             self._id = self.get_info().id
         self._backend.secret_remove(typing.cast(str, self.id), revision=revision)
 
-    def remove_all_revisions(self):
+    def remove_all_revisions(self) -> None:
         """Remove all revisions of this secret.
 
         This is called when the secret is no longer needed, for example when
@@ -1885,11 +1885,11 @@ class Container:
             return False
         return True
 
-    def autostart(self):
+    def autostart(self) -> None:
         """Autostart all services marked as ``startup: enabled``."""
         self._pebble.autostart_services()
 
-    def replan(self):
+    def replan(self) -> None:
         """Replan all services: restart changed services and start startup-enabled services."""
         self._pebble.replan_services()
 
