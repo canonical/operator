@@ -110,7 +110,7 @@ class ActionEvent(EventBase):
     params: Dict[str, Any]
     """The parameters passed to the action."""
 
-    def defer(self):
+    def defer(self) -> None:
         """Action events are not deferrable like other events.
 
         This is because an action runs synchronously and the administrator
@@ -737,7 +737,7 @@ class SecretRotateEvent(SecretEvent):
     revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
     """
 
-    def defer(self):
+    def defer(self) -> None:
         """Secret rotation events are not deferrable (Juju handles re-invocation)."""
         raise RuntimeError(
             'Cannot defer secret rotation events. Juju will keep firing this '
@@ -817,7 +817,7 @@ class SecretExpiredEvent(SecretEvent):
         super().restore(snapshot)
         self._revision = cast(int, snapshot['revision'])
 
-    def defer(self):
+    def defer(self) -> None:
         """Secret expiration events are not deferrable (Juju handles re-invocation)."""
         raise RuntimeError(
             'Cannot defer secret expiration events. Juju will keep firing '

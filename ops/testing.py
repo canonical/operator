@@ -1141,7 +1141,7 @@ class Harness(Generic[CharmType]):
             raise TypeError("num_units must be 0 or a positive integer.")
         self._backend._planned_units = num_units
 
-    def reset_planned_units(self):
+    def reset_planned_units(self) -> None:
         """Reset the planned units override.
 
         This allows the harness to fall through to the built in methods that will try to
