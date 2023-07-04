@@ -2491,32 +2491,32 @@ class _TestingPebbleClient:
             group_id: Optional[int],
             group: Optional[str]):
         try:
-            user_id_by_user = user_id if user is None else pwd.getpwnam(user).pw_uid
-        except AttributeError:
+            user_id_by_user = None if user is None else pwd.getpwnam(user).pw_uid
+        except KeyError:
             raise pebble.PathError('generic-file-error',
                                    f'cannot look up user and group: user: unknown user {user}')
         try:
-            group_id_by_group = group_id if group is None else grp.getgrnam(group).gr_gid
-        except AttributeError:
+            group_id_by_group = None if group is None else grp.getgrnam(group).gr_gid
+        except KeyError:
             raise pebble.PathError('generic-file-error',
                                    f'cannot look up user and group: group: unknown group {group}')
-        if user_id != user_id_by_user:
+        if user_id is not None and user is not None and user_id != user_id_by_user:
             raise pebble.PathError(
                 'generic-file-error',
                 f'cannot look up user and group: '
                 f'user "{user}" UID ({user_id_by_user}) does not match user-id ({user_id})')
-        if group_id != group_id_by_group:
+        if group_id is not None and group is not None and group_id != group_id_by_group:
             raise pebble.PathError(
                 'generic-file-error',
                 f'cannot look up user and group: '
                 f'group "{group}" GID ({group_id_by_group}) does not match group-id ({group_id})')
         user_id = user_id if user_id is not None else user_id_by_user
         group_id = group_id if group_id is not None else group_id_by_group
-        if user_id and group_id is None:
+        if user_id is not None and group_id is None:
             raise pebble.PathError(
                 'generic-file-error',
                 'cannot look up user and group: must specify group, not just UID')
-        if user_id is None and group_id:
+        if user_id is None and group_id is not None:
             raise pebble.PathError(
                 'generic-file-error',
                 'cannot look up user and group: must specify user, not just group')

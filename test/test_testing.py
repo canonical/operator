@@ -4249,6 +4249,18 @@ class TestPebbleStorageAPIsUsingMocks(
                 "group": group.gr_name
             },
             {
+                "user_id": None,
+                "user": user.pw_name,
+                "group_id": group.gr_gid,
+                "group": None
+            },
+            {
+                "user_id": user.pw_uid,
+                "user": None,
+                "group_id": None,
+                "group": group.gr_name
+            },
+            {
                 "user_id": user.pw_uid,
                 "user": user.pw_name,
                 "group_id": group.gr_gid,
@@ -4277,6 +4289,18 @@ class TestPebbleStorageAPIsUsingMocks(
             {
                 "user_id": None,
                 "user": user.pw_name,
+                "group_id": None,
+                "group": group.gr_name
+            },
+            {
+                "user_id": None,
+                "user": user.pw_name,
+                "group_id": group.gr_gid,
+                "group": None
+            },
+            {
+                "user_id": user.pw_uid,
+                "user": None,
                 "group_id": None,
                 "group": group.gr_name
             },
@@ -4312,6 +4336,24 @@ class TestPebbleStorageAPIsUsingMocks(
                 "user": user.pw_name,
                 "group_id": group.gr_gid + 1,
                 "group": group.gr_name
+            },
+            {
+                "user_id": user.pw_uid
+            },
+            {
+                "group_id": group.gr_gid
+            },
+            {
+                "user": user.pw_name
+            },
+            {
+                "group": group.gr_name
+            },
+            {
+                "user": "foobar"
+            },
+            {
+                "group": "foobar"
             }
         ]
         for idx, case in enumerate(cases):
