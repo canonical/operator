@@ -1425,15 +1425,17 @@ class Harness(Generic[CharmType]):
     def get_filesystem_root(self, container: Union[str, Container]) -> pathlib.Path:
         """Return the path of the temporary directory the harness will use to simulate the container filesystem.
 
-        In the container runtime, each container is running in an isolated root filesystem.
-        To simulate this behavior, the testing harness creates a temporary directory for
-        each container. Any filesystem-related API calls through Pebble will be translated
-        and mapped to this temporary directory, as if the temporary directory is the container's
-        filesystem root. This process is quite similar to the ``chroot`` command. You should
-        treat the return directory as the root directory (``/``) of the container in your
-        unit tests. The testing harness will not create any files or directories inside the
-        simulated container's root directory. You should populate the container's root directory
-        with any files or directories necessary for the charm.
+        In a real container runtime, each container has an isolated root filesystem.
+        To simulate this behaviour, the testing harness manages a temporary directory for
+        each container. Any Pebble filesystem API calls will be translated
+        and mapped to this directory, as if the directory was the container's
+        filesystem root.
+        
+        This process is quite similar to the ``chroot`` command. Charm tests should
+        treat the returned directory as the container's root directory (``/``).
+        The testing harness will not create any files or directories inside the
+        simulated container's root directory; it's up to the test to populate the container's root directory
+        with any files or directories the charm needs.
 
         Example usage:
 
