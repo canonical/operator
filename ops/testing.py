@@ -1454,7 +1454,7 @@ class Harness(Generic[CharmType]):
         >>> harness.begin()
 
         Args:
-            container: The simple name of the container or the container object.
+            container: The name of the container or the container instance.
 
         Return:
             The temporary directory associated with the container is used by the testing harness to
