@@ -1891,7 +1891,7 @@ class _TestingModelBackend:
             for _, mount in self._meta.containers[container].mounts.items():
                 if mount.storage != name:
                     continue
-                root = client._root  # pyright: ignore[reportPrivateUsage]
+                root = client._root
                 (root / mount.location[1:]).unlink()
 
         if self._storage_is_attached(name, index):
@@ -1909,7 +1909,7 @@ class _TestingModelBackend:
                 if mount.storage != name:
                     continue
                 for index, store in self._storage_list[mount.storage].items():
-                    root = client._root  # pyright: ignore[reportPrivateUsage]
+                    root = client._root
                     mounting_dir = root / mount.location[1:]
                     mounting_dir.parent.mkdir(parents=True, exist_ok=True)
                     target_dir = pathlib.Path(store["location"])
