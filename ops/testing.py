@@ -1423,19 +1423,19 @@ class Harness(Generic[CharmType]):
         self.charm.on.secret_expired.emit(secret_id, label, revision)
 
     def get_filesystem_root(self, container: Union[str, Container]) -> pathlib.Path:
-        """Return the path of the temporary directory the harness will use to simulate the container filesystem.
+        """Return the temp directory path harness will use to simulate the container filesystem.
 
         In a real container runtime, each container has an isolated root filesystem.
         To simulate this behaviour, the testing harness manages a temporary directory for
         each container. Any Pebble filesystem API calls will be translated
         and mapped to this directory, as if the directory was the container's
         filesystem root.
-        
+
         This process is quite similar to the ``chroot`` command. Charm tests should
         treat the returned directory as the container's root directory (``/``).
         The testing harness will not create any files or directories inside the
-        simulated container's root directory; it's up to the test to populate the container's root directory
-        with any files or directories the charm needs.
+        simulated container's root directory; it's up to the test to populate the container's
+        root directory with any files or directories the charm needs.
 
         Example usage:
 
@@ -2554,7 +2554,7 @@ class _TestingPebbleClient:
             elif isinstance(source, bytes):
                 file_path.write_bytes(source)
             else:
-                with file_path.open('w' if encoding is None else 'wb', encoding=encoding) as f:
+                with file_path.open('wb' if encoding is None else 'w', encoding=encoding) as f:
                     shutil.copyfileobj(source, f)
             os.chmod(file_path, permissions)
             self._chown(file_path, user_id=user_id, user=user, group_id=group_id, group=group)
@@ -2591,6 +2591,8 @@ class _TestingPebbleClient:
         for file_info in file_infos:
             rel_path = os.path.relpath(file_info.path, start=self._root)
             rel_path = '/' if rel_path == '.' else '/' + rel_path
+            file_info.path = rel_path
+            file_info.name = "/" if rel_path == "/" else os.path.basename(rel_path)
         return file_infos
 
     def make_dir(
