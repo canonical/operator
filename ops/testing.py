@@ -1449,8 +1449,8 @@ class Harness(Generic[CharmType]):
         >>> # test_charm.py
         >>> from ops.testing import Harness
         >>> harness = Harness(ExampleCharm)
-        >>> root = harness.get_filesystem_root("foo")
-        >>> (root / "etc" / "hostname").write_text("example")
+        >>> root = harness.get_filesystem_root("mycontainer")
+        >>> (root / "etc" / "hostname").write_text("hostname.example.com")
         >>> harness.begin()
 
         Args:
