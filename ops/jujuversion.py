@@ -126,6 +126,6 @@ class JujuVersion:
 
     @property
     def has_open_port_k8s(self) -> bool:
-        """Report whether this Juju version supports open-port on Kubernetes"""
+        """Report whether this Juju version supports open-port on Kubernetes."""
         # Support added: https://bugs.launchpad.net/juju/+bug/1920960
         return (self.major, self.minor, self.patch) >= (3, 0, 3)
