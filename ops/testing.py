@@ -1457,9 +1457,7 @@ class Harness(Generic[CharmType]):
             container: The name of the container or the container instance.
 
         Return:
-            The temporary directory associated with the container is used by the testing harness to
-            simulate the container's filesystem.
-
+            The path of the temporary directory associated with the specified container.
         """
         if isinstance(container, str):
             container_name = container
