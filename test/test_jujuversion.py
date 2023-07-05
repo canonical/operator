@@ -70,8 +70,15 @@ class TestJujuVersion(unittest.TestCase):
 
     def test_has_secrets(self):
         self.assertTrue(ops.JujuVersion('3.0.2').has_secrets)
+        self.assertTrue(ops.JujuVersion('3.1.0').has_secrets)
         self.assertFalse(ops.JujuVersion('3.0.1').has_secrets)
         self.assertFalse(ops.JujuVersion('2.9.30').has_secrets)
+
+    def test_has_open_port_k8s(self):
+        self.assertTrue(ops.JujuVersion('3.0.3').has_open_port_k8s)
+        self.assertTrue(ops.JujuVersion('3.3.0').has_open_port_k8s)
+        self.assertFalse(ops.JujuVersion('3.0.2').has_open_port_k8s)
+        self.assertFalse(ops.JujuVersion('2.9.30').has_open_port_k8s)
 
     def test_parsing_errors(self):
         invalid_versions = [
