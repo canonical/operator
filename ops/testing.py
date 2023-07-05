@@ -1978,7 +1978,6 @@ class _TestingModelBackend:
             container_root = self._harness_container_path / container
             container_root.mkdir()
             client = _TestingPebbleClient(self, container_root=container_root)
-            self._pebble_clients[container] = client
 
             # we need to know which container a new pebble client belongs to
             # so we can figure out which storage mounts must be simulated on
@@ -2462,7 +2461,7 @@ class _TestingPebbleClient:
         return infos
 
     @staticmethod
-    def __check_absolute_path(path: str):
+    def _check_absolute_path(path: str):
         if not path.startswith("/"):
             raise pebble.PathError(
                 'generic-file-error',
@@ -2472,7 +2471,7 @@ class _TestingPebbleClient:
     def pull(self, path: str, *,
              encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
         self._check_connection()
-        self.__check_absolute_path(path)
+        self._check_absolute_path(path)
         file_path = self._root / path[1:]
         try:
             return cast(
@@ -2483,7 +2482,7 @@ class _TestingPebbleClient:
         except IsADirectoryError:
             raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
 
-    def __chown(
+    def _chown(
             self,
             path: pathlib.Path,
             user_id: Optional[int],
@@ -2537,11 +2536,11 @@ class _TestingPebbleClient:
             raise pebble.PathError(
                 'generic-file-error',
                 f'permissions not within 0o000 to 0o777: {permissions:#o}')
-        self.__check_absolute_path(path)
+        self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if make_dirs and not file_path.parent.exists():
             self.make_dir(
-                os.path.split(path)[0],
+                os.path.dirname(path),
                 make_parents=True,
                 permissions=None,
                 user_id=user_id,
@@ -2563,7 +2562,7 @@ class _TestingPebbleClient:
                 )
             file_path.write_bytes(content)
             os.chmod(file_path, permissions)
-            self.__chown(file_path, user_id=user_id, user=user, group_id=group_id, group=group)
+            self._chown(file_path, user_id=user_id, user=user, group_id=group_id, group=group)
         except FileNotFoundError as e:
             raise pebble.PathError(
                 'not-found', f'parent directory not found: {e.args[0]}')
@@ -2574,7 +2573,7 @@ class _TestingPebbleClient:
     def list_files(self, path: str, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List[pebble.FileInfo]:
         self._check_connection()
-        self.__check_absolute_path(path)
+        self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if not file_path.exists():
             raise pebble.APIError(
@@ -2613,14 +2612,14 @@ class _TestingPebbleClient:
             raise pebble.PathError(
                 'generic-file-error',
                 f'permissions not within 0o000 to 0o777: {permissions:#o}')
-        self.__check_absolute_path(path)
+        self._check_absolute_path(path)
         dir_path = self._root / path[1:]
         if not dir_path.parent.exists() and not make_parents:
             raise pebble.PathError(
                 'not-found', f'parent directory not found: {path}')
         if not dir_path.parent.exists() and make_parents:
             self.make_dir(
-                os.path.split(path)[0],
+                os.path.dirname(path),
                 make_parents=True,
                 permissions=permissions,
                 user_id=user_id,
@@ -2631,7 +2630,7 @@ class _TestingPebbleClient:
             permissions = permissions if permissions else 0o755
             dir_path.mkdir()
             os.chmod(dir_path, permissions)
-            self.__chown(dir_path, user_id=user_id, user=user, group_id=group_id, group=group)
+            self._chown(dir_path, user_id=user_id, user=user, group_id=group_id, group=group)
         except FileExistsError:
             if not make_parents:
                 raise pebble.PathError('generic-file-error', f'mkdir {path}: file exists')
@@ -2641,7 +2640,7 @@ class _TestingPebbleClient:
 
     def remove_path(self, path: str, *, recursive: bool = False):
         self._check_connection()
-        self.__check_absolute_path(path)
+        self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if not file_path.exists():
             if recursive:
@@ -2649,16 +2648,17 @@ class _TestingPebbleClient:
             else:
                 raise pebble.PathError(
                     'not-found', f'remove {path}: no such file or directory')
-        if file_path.is_dir() and not recursive:
-            try:
-                file_path.rmdir()
-                return
-            except OSError:
-                raise pebble.PathError(
-                    'generic-file-error',
-                    'cannot remove non-empty directory without recursive=True')
         if file_path.is_dir():
-            shutil.rmtree(file_path)
+            if recursive:
+                shutil.rmtree(file_path)
+            else:
+                try:
+                    file_path.rmdir()
+                    return
+                except OSError:
+                    raise pebble.PathError(
+                        'generic-file-error',
+                        'cannot remove non-empty directory without recursive=True')
         else:
             file_path.unlink()
 
