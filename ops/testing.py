@@ -2550,17 +2550,12 @@ class _TestingPebbleClient:
         permissions = permissions if permissions is not None else 0o644
         try:
             if isinstance(source, str):
-                content = source.encode(encoding=encoding)
+                file_path.write_text(source, encoding=encoding)
             elif isinstance(source, bytes):
-                content = source
+                file_path.write_bytes(source)
             else:
-                source_read: Union[str, bytes] = source.read()
-                content = (
-                    source_read
-                    if isinstance(source_read, bytes)
-                    else source_read.encode(encoding=encoding)
-                )
-            file_path.write_bytes(content)
+                with file_path.open('w' if encoding is None else 'wb', encoding=encoding) as f:
+                    shutil.copyfileobj(source, f)
             os.chmod(file_path, permissions)
             self._chown(file_path, user_id=user_id, user=user, group_id=group_id, group=group)
         except FileNotFoundError as e:
