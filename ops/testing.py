@@ -1423,7 +1423,7 @@ class Harness(Generic[CharmType]):
         self.charm.on.secret_expired.emit(secret_id, label, revision)
 
     def get_filesystem_root(self, container: Union[str, Container]) -> pathlib.Path:
-        """Return the temporary directory harness used to simulate the container filesystem.
+        """Return the path of the temporary directory the harness will use to simulate the container filesystem.
 
         In the container runtime, each container is running in an isolated root filesystem.
         To simulate this behavior, the testing harness creates a temporary directory for
