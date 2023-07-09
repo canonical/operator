@@ -18,21 +18,18 @@
 import dataclasses
 import datetime
 import fnmatch
-import grp
 import inspect
 import ipaddress
 import os
 import pathlib
-import pwd
 import random
-import secrets
 import shutil
 import signal
 import tempfile
 import uuid
 import warnings
 from contextlib import contextmanager
-from io import BytesIO, StringIO
+from io import BytesIO, IOBase, StringIO
 from textwrap import dedent
 from typing import (
     TYPE_CHECKING,
@@ -550,6 +547,10 @@ class Harness(Generic[CharmType]):
         location set to /[tmpdir]/<storage_name>N, where N is the counter and
         will be a number from [0,total_num_disks-1].
 
+        The test harness uses symbolic links to imitate storage mounts, which may lead to some
+        inconsistencies compared to the actual charm. Users should be cognizant of
+        this potential discrepancy.
+
         Args:
             storage_name: The storage backend name on the Charm
             count: Number of disks being added
@@ -601,6 +602,10 @@ class Harness(Generic[CharmType]):
         The intent of this function is to simulate a "juju attach-storage" call.
         It will trigger a storage-attached hook if the storage unit in question exists
         and is presently marked as detached.
+
+        The test harness uses symbolic links to imitate storage mounts, which may lead to some
+        inconsistencies compared to the actual charm. Users should be cognizant of
+        this potential discrepancy.
 
         Args:
             storage_id: The full storage ID of the storage unit being attached, including the
@@ -1436,6 +1441,10 @@ class Harness(Generic[CharmType]):
         The testing harness will not create any files or directories inside the
         simulated container's root directory; it's up to the test to populate the container's
         root directory with any files or directories the charm needs.
+
+        Regarding the file ownership: unprivileged users are unable to create files with distinct
+        ownership. To circumvent this limitation, the testing harness maps all user and group
+        options related to file operations to match the current user and group.
 
         Example usage:
 
@@ -2482,47 +2491,6 @@ class _TestingPebbleClient:
         except IsADirectoryError:
             raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
 
-    def _chown(
-            self,
-            path: pathlib.Path,
-            user_id: Optional[int],
-            user: Optional[str],
-            group_id: Optional[int],
-            group: Optional[str]):
-        try:
-            user_id_by_user = None if user is None else pwd.getpwnam(user).pw_uid
-        except KeyError:
-            raise pebble.PathError('generic-file-error',
-                                   f'cannot look up user and group: user: unknown user {user}')
-        try:
-            group_id_by_group = None if group is None else grp.getgrnam(group).gr_gid
-        except KeyError:
-            raise pebble.PathError('generic-file-error',
-                                   f'cannot look up user and group: group: unknown group {group}')
-        if user_id is not None and user is not None and user_id != user_id_by_user:
-            raise pebble.PathError(
-                'generic-file-error',
-                f'cannot look up user and group: '
-                f'user "{user}" UID ({user_id_by_user}) does not match user-id ({user_id})')
-        if group_id is not None and group is not None and group_id != group_id_by_group:
-            raise pebble.PathError(
-                'generic-file-error',
-                f'cannot look up user and group: '
-                f'group "{group}" GID ({group_id_by_group}) does not match group-id ({group_id})')
-        user_id = user_id if user_id is not None else user_id_by_user
-        group_id = group_id if group_id is not None else group_id_by_group
-        if user_id is not None and group_id is None:
-            raise pebble.PathError(
-                'generic-file-error',
-                'cannot look up user and group: must specify group, not just UID')
-        if user_id is None and group_id is not None:
-            raise pebble.PathError(
-                'generic-file-error',
-                'cannot look up user and group: must specify user, not just group')
-        final_uid = user_id if user_id is not None else os.getuid()
-        final_gid = group_id if group_id is not None else os.getgid()
-        os.chown(path, uid=final_uid, gid=final_gid)
-
     def push(
             self, path: str, source: 'ReadableBuffer', *,
             encoding: str = 'utf-8', make_dirs: bool = False, permissions: Optional[int] = None,
@@ -2555,15 +2523,14 @@ class _TestingPebbleClient:
                 file_path.write_bytes(source)
             else:
                 with file_path.open('wb' if encoding is None else 'w', encoding=encoding) as f:
-                    shutil.copyfileobj(source, f)
+                    shutil.copyfileobj(cast(IOBase, source), cast(IOBase, f))
             os.chmod(file_path, permissions)
-            self._chown(file_path, user_id=user_id, user=user, group_id=group_id, group=group)
         except FileNotFoundError as e:
             raise pebble.PathError(
                 'not-found', f'parent directory not found: {e.args[0]}')
         except NotADirectoryError:
             raise pebble.PathError('generic-file-error',
-                                   f'open {path}.{secrets.token_urlsafe(8)}~: not a directory')
+                                   f'open {path}.~: not a directory')
 
     def list_files(self, path: str, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List[pebble.FileInfo]:
@@ -2627,7 +2594,6 @@ class _TestingPebbleClient:
             permissions = permissions if permissions else 0o755
             dir_path.mkdir()
             os.chmod(dir_path, permissions)
-            self._chown(dir_path, user_id=user_id, user=user, group_id=group_id, group=group)
         except FileExistsError:
             if not make_parents:
                 raise pebble.PathError('generic-file-error', f'mkdir {path}: file exists')

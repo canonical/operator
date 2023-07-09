@@ -38,7 +38,7 @@ import ops
 import ops.testing
 from ops import pebble
 from ops.model import _ModelBackend
-from ops.pebble import PathError
+from ops.pebble import FileType
 from ops.testing import _TestingPebbleClient
 
 is_linux = platform.system() == 'Linux'
@@ -4229,9 +4229,7 @@ class TestPebbleStorageAPIsUsingMocks(
         group = [g for g in grp.getgrall() if g.gr_gid != os.getgid()][0]
         return user, group
 
-    @unittest.skipUnless(os.getuid() == 0, "require root privilege")
     def test_push_with_ownership(self):
-        # Note: To simplify implementation, ownership is simply stored as-is with no verification.
         data = 'data'
         client = self.client
         user, group = self._select_testing_user_group()
@@ -4270,12 +4268,8 @@ class TestPebbleStorageAPIsUsingMocks(
         for idx, case in enumerate(cases):
             client.push(f"{self.prefix}/file{idx}", data, **case)
             file_ = client.list_files(f"{self.prefix}/file{idx}")[0]
-            self.assertEqual(file_.user_id, user.pw_uid)
-            self.assertEqual(file_.user, user.pw_name)
-            self.assertEqual(file_.group_id, group.gr_gid)
-            self.assertEqual(file_.group, group.gr_name)
+            self.assertEqual(file_.path, f"{self.prefix}/file{idx}")
 
-    @unittest.skipUnless(os.getuid() == 0, "require root privilege")
     def test_make_dir_with_ownership(self):
         client = self.client
         user, group = self._select_testing_user_group()
@@ -4314,53 +4308,7 @@ class TestPebbleStorageAPIsUsingMocks(
         for idx, case in enumerate(cases):
             client.make_dir(f"{self.prefix}/dir{idx}", **case)
             dir_ = client.list_files(f"{self.prefix}/dir{idx}", itself=True)[0]
-            self.assertEqual(dir_.user_id, user.pw_uid)
-            self.assertEqual(dir_.user, user.pw_name)
-            self.assertEqual(dir_.group_id, group.gr_gid)
-            self.assertEqual(dir_.group, group.gr_name)
-
-    @unittest.skipUnless(os.getuid() == 0, "require root privilege")
-    def test_conflicting_ownership(self):
-        user, group = self._select_testing_user_group()
-        cases = [
-            {
-                "user_id": user.pw_uid + 1,
-                "user": user.pw_name,
-            },
-            {
-                "group_id": group.gr_gid + 1,
-                "group": group.gr_name
-            },
-            {
-                "user_id": user.pw_uid + 1,
-                "user": user.pw_name,
-                "group_id": group.gr_gid + 1,
-                "group": group.gr_name
-            },
-            {
-                "user_id": user.pw_uid
-            },
-            {
-                "group_id": group.gr_gid
-            },
-            {
-                "user": user.pw_name
-            },
-            {
-                "group": group.gr_name
-            },
-            {
-                "user": "foobar"
-            },
-            {
-                "group": "foobar"
-            }
-        ]
-        for idx, case in enumerate(cases):
-            with self.assertRaises(PathError):
-                self.client.make_dir(f"{self.prefix}/dir{idx}", **case)
-            with self.assertRaises(PathError):
-                self.client.push(f"{self.prefix}/file{idx}", "", **case)
+            self.assertEqual(dir_.path, f"{self.prefix}/dir{idx}")
 
 
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
@@ -4383,6 +4331,102 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIs
     @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         pass
+
+
+class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
+    def setUp(self) -> None:
+        self.harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test
+            containers:
+                test-container:
+                    mounts:
+                        - storage: test-storage
+                          location: /mounts/foo
+            storage:
+                test-storage:
+                    type: filesystem
+            ''')
+        self.harness.begin()
+        self.harness.set_can_connect("test-container", True)
+        self.root = self.harness.get_filesystem_root("test-container")
+        self.container = self.harness.charm.unit.get_container("test-container")
+
+    def tearDown(self) -> None:
+        self.harness.cleanup()
+
+    def test_push(self):
+        self.container.push("/foo", source="foo")
+        self.assertTrue((self.root / "foo").is_file())
+        self.assertEqual((self.root / "foo").read_text(), "foo")
+
+    def test_push_create_parent(self):
+        self.container.push("/foo/bar", source="bar", make_dirs=True)
+        self.assertTrue((self.root / "foo").is_dir())
+        self.assertEqual((self.root / "foo" / "bar").read_text(), "bar")
+
+    def test_push_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            tempdir = pathlib.Path(temp)
+            (tempdir / "foo/bar").mkdir(parents=True)
+            (tempdir / "foo/test").write_text("test")
+            (tempdir / "foo/bar/foobar").write_text("foobar")
+            self.container.push_path(tempdir / "foo", "/tmp")
+
+            self.assertTrue((self.root / "tmp").is_dir())
+            self.assertTrue((self.root / "tmp/foo").is_dir())
+            self.assertTrue((self.root / "tmp/foo/bar").is_dir())
+            self.assertEqual((self.root / "tmp/foo/test").read_text(), "test")
+            self.assertEqual((self.root / "tmp/foo/bar/foobar").read_text(), "foobar")
+
+    def test_make_dir(self):
+        self.container.make_dir("/tmp")
+        self.assertTrue((self.root / "tmp").is_dir())
+        self.container.make_dir("/foo/bar/foobar", make_parents=True)
+        self.assertTrue((self.root / "foo/bar/foobar").is_dir())
+
+    def test_pull(self):
+        (self.root / "foo").write_text("foo")
+        self.assertEqual(self.container.pull("/foo").read(), "foo")
+
+    def test_pull_path(self):
+        (self.root / "foo").mkdir()
+        (self.root / "foo/bar").write_text("bar")
+        # TODO: pull_path doesn't pull empty directories, intended?
+        # (self.root / "foobar").mkdir()
+        (self.root / "test").write_text("test")
+        with tempfile.TemporaryDirectory() as temp:
+            tempdir = pathlib.Path(temp)
+            self.container.pull_path("/", tempdir)
+            self.assertTrue((tempdir / "foo").is_dir())
+            self.assertEqual((tempdir / "foo/bar").read_text(), "bar")
+            # self.assertTrue((tempdir / "foobar").is_dir())
+            self.assertEqual((tempdir / "test").read_text(), "test")
+
+    def test_list_files(self):
+        (self.root / "foo").mkdir()
+        self.assertSequenceEqual(self.container.list_files("/foo"), [])
+        self.assertEqual(len(self.container.list_files("/")), 1)
+        file_info = self.container.list_files("/")[0]
+        self.assertEqual(file_info.path, "/foo")
+        self.assertEqual(file_info.type, FileType.DIRECTORY)
+        self.assertEqual(self.container.list_files("/foo", itself=True)[0].path, "/foo")
+        (self.root / "foo/bar").write_text("foobar")
+        self.assertEqual(len(self.container.list_files("/foo")), 1)
+        self.assertEqual(len(self.container.list_files("/foo", pattern="*ar")), 1)
+        self.assertEqual(len(self.container.list_files("/foo", pattern="*oo")), 0)
+        file_info = self.container.list_files("/foo")[0]
+        self.assertEqual(file_info.path, "/foo/bar")
+        self.assertEqual(file_info.type, FileType.FILE)
+
+    def test_storage_mount(self):
+        storage_id = self.harness.add_storage("test-storage", 1, attach=True)[0]
+        self.assertTrue((self.root / "mounts/foo").exists())
+        (self.root / "mounts/foo/bar").write_text("foobar")
+        self.assertEqual(self.container.pull("/mounts/foo/bar").read(), "foobar")
+        self.harness.detach_storage(storage_id)
+        self.assertFalse((self.root / "mounts/foo/bar").is_file())
+        self.harness.attach_storage(storage_id)
+        self.assertTrue((self.root / "mounts/foo/bar").read_text(), "foobar")
 
 
 class TestSecrets(unittest.TestCase):
