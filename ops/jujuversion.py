@@ -24,19 +24,20 @@ from typing import Union
 class JujuVersion:
     """Helper to work with the Juju version.
 
-    It knows how to parse the ``JUJU_VERSION`` environment variable, and exposes different
-    capabilities according to the specific version, allowing also to compare with other
-    versions.
+    It knows how to parse the ``JUJU_VERSION`` environment variable, and
+    exposes different capabilities according to the specific version. It also
+    allows users to compare ``JujuVersion`` instances with ``<`` and ``>``
+    operators.
     """
 
-    PATTERN = r'''^
+    _pattern_re = re.compile(r'''^
     (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there
     ((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))? # sometimes with .<patch> or -<tag><patch>
     (\.(?P<build>\d{1,9}))?$                     # and sometimes with a <build> number.
-    '''
+    ''', re.VERBOSE)
 
     def __init__(self, version: str):
-        m = re.match(self.PATTERN, version, re.VERBOSE)
+        m = self._pattern_re.match(version)
         if not m:
             raise RuntimeError(f'"{version}" is not a valid Juju version string')
 
@@ -95,27 +96,27 @@ class JujuVersion:
 
     @classmethod
     def from_environ(cls) -> 'JujuVersion':
-        """Build a JujuVersion from JUJU_VERSION."""
+        """Build a version from the ``JUJU_VERSION`` environment variable."""
         v = os.environ.get('JUJU_VERSION')
         if v is None:
             v = '0.0.0'
         return cls(v)
 
     def has_app_data(self) -> bool:
-        """Determine whether this Juju version knows about app data."""
+        """Report whether this Juju version supports app data."""
         return (self.major, self.minor, self.patch) >= (2, 7, 0)
 
     def is_dispatch_aware(self) -> bool:
-        """Determine whether this Juju version knows about dispatch."""
+        """Report whether this Juju version supports dispatch."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
     def has_controller_storage(self) -> bool:
-        """Determine whether this Juju version supports controller-side storage."""
+        """Report whether this Juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
     @property
     def has_secrets(self) -> bool:
-        """Determine whether this Juju version supports the `secrets` feature."""
+        """Report whether this Juju version supports the "secrets" feature."""
         # Juju version 3.0.0 had an initial version of secrets, but:
         # * In 3.0.2, secret-get "--update" was renamed to "--refresh", and
         #   secret-get-info was separated into its own hook tool

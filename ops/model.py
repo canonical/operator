@@ -103,8 +103,8 @@ MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 class Model:
     """Represents the Juju Model as seen from this unit.
 
-    This should not be instantiated directly by Charmers, but can be accessed as `self.model`
-    from any class that derives from Object.
+    This should not be instantiated directly by Charmers, but can be accessed
+    as ``self.model`` from any class that derives from :class:`Object`.
     """
 
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
@@ -123,12 +123,18 @@ class Model:
 
     @property
     def unit(self) -> 'Unit':
-        """A :class:`Unit` that represents the unit that is running this code (eg yourself)."""
+        """The unit that is running this code (that is, yourself).
+
+        Use :meth:`get_unit` to get an arbitrary unit by name.
+        """
         return self._unit
 
     @property
     def app(self) -> 'Application':
-        """A :class:`Application` that represents the application this unit is a part of."""
+        """The application this unit is a part of.
+
+        Use :meth:`get_app` to get an arbitrary application by name.
+        """
         return self._unit.app
 
     @property
@@ -161,7 +167,13 @@ class Model:
 
     @property
     def pod(self) -> 'Pod':
-        """Use ``model.pod.set_spec`` to set the container specification for Kubernetes charms."""
+        """Represents the definition of a pod spec in legacy Kubernetes models.
+
+        DEPRECATED: New charms should use the sidecar pattern with Pebble.
+
+        Use :meth:`Pod.set_spec` to set the container specification for legacy
+        Kubernetes charms.
+        """
         return self._pod
 
     @property
@@ -183,6 +195,8 @@ class Model:
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
+        Use :attr:`unit` to get your own unit.
+
         Internally this uses a cache, so asking for the same unit two times will
         return the same object.
         """
@@ -190,6 +204,8 @@ class Model:
 
     def get_app(self, app_name: str) -> 'Application':
         """Get an application by name.
+
+        Use :attr:`app` to get your own application.
 
         Internally this uses a cache, so asking for the same application two times will
         return the same object.
@@ -293,11 +309,13 @@ class Application:
 
     This might be your application, or might be an application that you are related to.
     Charmers should not instantiate Application objects directly, but should use
+    :attr:`Model.app` to get the application this unit is part of, or
     :meth:`Model.get_app` if they need a reference to a given application.
+    """
 
-    Attributes:
-        name: The name of this application (eg, 'mysql'). This name may differ from the name of
-            the charm, if the user has deployed it to a different name.
+    name: str
+    """The name of this application (eg, 'mysql'). This name may differ from the name of
+    the charm, if the user has deployed it to a different name.
     """
 
     def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
@@ -434,11 +452,13 @@ class Unit:
 
     This might be your unit, another unit of your application, or a unit of another application
     that you are related to.
-
-    Attributes:
-        name: The name of the unit (eg, 'mysql/0')
-        app: The Application the unit is a part of.
     """
+
+    name: str
+    """Name of the unit, for example "mysql/0"."""
+
+    app: Application
+    """Application the unit is part of."""
 
     def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
                  backend: '_ModelBackend', cache: '_ModelCache'):
@@ -505,8 +525,6 @@ class Unit:
 
         This can only be called for your own unit.
 
-        Returns:
-            True if you are the leader, False otherwise
         Raises:
             RuntimeError: if called for a unit that is not yourself
         """
@@ -616,11 +634,11 @@ class Unit:
 class OpenedPort:
     """Represents a port opened by :meth:`Unit.open_port`."""
 
-    """The IP protocol: 'tcp', 'udp', or 'icmp'."""
     protocol: typing.Literal['tcp', 'udp', 'icmp']
+    """The IP protocol."""
 
-    """The port number. Will be None if protocol is 'icmp'."""
     port: Optional[int]
+    """The port number. Will be ``None`` if protocol is ``'icmp'``."""
 
 
 class LazyMapping(Mapping[str, str], ABC):
@@ -777,11 +795,10 @@ class BindingMapping(Mapping[str, 'Binding']):
 
 
 class Binding:
-    """Binding to a network space.
+    """Binding to a network space."""
 
-    Attributes:
-        name: The name of the endpoint this binding represents (eg, 'db')
-    """
+    name: str
+    """The name of the endpoint this binding represents (eg, 'db')."""
 
     def __init__(self, name: str, relation_id: Optional[int], backend: '_ModelBackend'):
         self.name = name
@@ -836,15 +853,15 @@ class Network:
         [NetworkInfo('ens1', '10.1.1.1/32'), NetworkInfo('ens1', '10.1.2.1/32'])
     """
 
-    """A list of IP addresses that other units should use to get in touch with you."""
     ingress_addresses: List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]
+    """A list of IP addresses that other units should use to get in touch with you."""
 
+    egress_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
     """A list of networks representing the subnets that other units will see
     you connecting from. Due to things like NAT it isn't always possible to
     narrow it down to a single address, but when it is clear, the CIDRs will
     be constrained to a single address (for example, 10.0.0.1/32).
     """
-    egress_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
 
     def __init__(self, network_info: '_NetworkDict'):
         """Initialize a Network instance.
@@ -884,8 +901,8 @@ class Network:
             return None
 
     @property
-    def ingress_address(
-            self) -> Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
+    def ingress_address(self) -> Optional[
+            Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
         """The address other applications should use to connect to your unit.
 
         Due to things like public/private addresses, NAT and tunneling, the address you bind()
@@ -1217,7 +1234,7 @@ class Secret:
             self._id = self.get_info().id
         self._backend.secret_remove(typing.cast(str, self.id), revision=revision)
 
-    def remove_all_revisions(self):
+    def remove_all_revisions(self) -> None:
         """Remove all revisions of this secret.
 
         This is called when the secret is no longer needed, for example when
@@ -1231,19 +1248,33 @@ class Secret:
 class Relation:
     """Represents an established relation between this application and another application.
 
-    This class should not be instantiated directly, instead use :meth:`Model.get_relation`
-    or :attr:`ops.RelationEvent.relation`. This is principally used by
+    This class should not be instantiated directly, instead use :meth:`Model.get_relation`,
+    :attr:`Model.relations`, or :attr:`ops.RelationEvent.relation`. This is principally used by
     :class:`ops.RelationMeta` to represent the relationships between charms.
+    """
 
-    Attributes:
-        name: The name of the local endpoint of the relation (eg 'db')
-        id: The identifier for a particular relation (integer)
-        app: An :class:`Application` representing the remote application of this relation.
-            For peer relations this will be the local application.
-        units: A set of :class:`Unit` for units that have started and joined this relation.
-            For subordinate relations, this set will include only one unit: the principal unit.
-        data: A :class:`RelationData` holding the data buckets for each entity
-            of a relation. Accessed via eg Relation.data[unit]['foo']
+    name: str
+    """The name of the local endpoint of the relation (for example, 'db')."""
+
+    id: int
+    """The identifier for a particular relation."""
+
+    app: Optional[Application]
+    """Represents the remote application of this relation.
+
+    For peer relations, this will be the local application.
+    """
+
+    units: Set[Unit]
+    """A set of units that have started and joined this relation.
+
+    For subordinate relations, this set will include only one unit: the principal unit.
+    """
+
+    data: 'RelationData'
+    """Holds the data buckets for each entity of a relation.
+
+    This is accessed using, for example, ``Relation.data[unit]['foo']``.
     """
 
     def __init__(
@@ -1286,14 +1317,14 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     """Represents the various data buckets of a given relation.
 
     Each unit and application involved in a relation has their own data bucket.
-    Eg: ``{entity: RelationDataContent}``
-    where entity can be either a :class:`Unit` or a :class:`Application`.
+    For example, ``{entity: RelationDataContent}``,
+    where entity can be either a :class:`Unit` or an :class:`Application`.
 
     Units can read and write their own data, and if they are the leader,
     they can read and write their application data. They are allowed to read
     remote unit and application data.
 
-    This class should not be created directly. It should be accessed via
+    This class should not be instantiated directly, instead use
     :attr:`Relation.data`
     """
 
@@ -1494,7 +1525,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 class ConfigData(LazyMapping):
     """Configuration data.
 
-    This class should not be created directly. It should be accessed via :attr:`Model.config`.
+    This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
     """
 
     def __init__(self, backend: '_ModelBackend'):
@@ -1507,8 +1538,8 @@ class ConfigData(LazyMapping):
 class StatusBase:
     """Status values specific to applications and units.
 
-    To access a status by name, see :meth:`StatusBase.from_name`, most use cases will just
-    directly use the child class to indicate their status.
+    To access a status by name, use :meth:`StatusBase.from_name`. However, most use cases will
+    directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
     _statuses: Dict[str, Type['StatusBase']] = {}
@@ -1517,13 +1548,9 @@ class StatusBase:
     name = NotImplemented
 
     def __init__(self, message: str = ''):
-        self.message = message
-
-    def __new__(cls, *args: Any, **kwargs: Dict[Any, Any]):
-        """Forbid the usage of StatusBase directly."""
-        if cls is StatusBase:
+        if self.__class__ is StatusBase:
             raise TypeError("cannot instantiate a base class")
-        return super().__new__(cls)
+        self.message = message
 
     def __eq__(self, other: 'StatusBase') -> bool:
         if not isinstance(self, type(other)):
@@ -1535,7 +1562,18 @@ class StatusBase:
 
     @classmethod
     def from_name(cls, name: str, message: str):
-        """Get the specific Status for the name (or UnknownStatus if not registered)."""
+        """Create a status instance from a name and message.
+
+        If ``name`` is "unknown", ``message`` is ignored, because unknown status
+        does not have an associated message.
+
+        Args:
+            name: Name of the status, for example "active" or "blocked".
+            message: Message to include with the status.
+
+        Raises:
+            KeyError: If ``name`` is not a registered status.
+        """
         if name == 'unknown':
             # unknown is special
             return UnknownStatus()
@@ -1634,8 +1672,8 @@ class Resources:
     def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
 
-        If successfully fetched, this returns a Path object to where the resource is stored
-        on disk, otherwise it raises a NameError.
+        If successfully fetched, this returns the path where the resource is stored
+        on disk, otherwise it raises a :class:`NameError`.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -1645,9 +1683,12 @@ class Resources:
 
 
 class Pod:
-    """Represents the definition of a pod spec in Kubernetes models.
+    """Represents the definition of a pod spec in legacy Kubernetes models.
 
-    Currently only supports simple access to setting the Juju pod spec via :attr:`.set_spec`.
+    DEPRECATED: New charms should use the sidecar pattern with Pebble.
+
+    Currently only supports simple access to setting the Juju pod spec via
+    :attr:`.set_spec`.
     """
 
     def __init__(self, backend: '_ModelBackend'):
@@ -1656,14 +1697,11 @@ class Pod:
     def set_spec(self, spec: 'K8sSpec', k8s_resources: Optional['K8sSpec'] = None):
         """Set the specification for pods that Juju should start in kubernetes.
 
-        See `juju help-tool pod-spec-set` for details of what should be passed.
+        See ``juju help-tool pod-spec-set`` for details of what should be passed.
 
         Args:
             spec: The mapping defining the pod specification
             k8s_resources: Additional kubernetes specific specification.
-
-        Returns:
-            None
         """
         if not self._backend.is_leader():
             raise ModelError('cannot set a pod spec as this unit is not a leader')
@@ -1704,7 +1742,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         """Requests new storage instances of a given name.
 
         Uses storage-add tool to request additional storage. Juju will notify the unit
-        via <storage-name>-storage-attached events when it becomes available.
+        via ``<storage-name>-storage-attached`` events when it becomes available.
         """
         if storage_name not in self._storage_map:
             raise ModelError(('cannot add storage {!r}:'
@@ -1720,11 +1758,10 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
 
 class Storage:
-    """Represents a storage as defined in metadata.yaml.
+    """Represents a storage as defined in ``metadata.yaml``."""
 
-    Attributes:
-        name: Simple string name of the storage
-    """
+    name: str
+    """Name of the storage."""
 
     def __init__(self, storage_name: str, storage_index: int, backend: '_ModelBackend'):
         self.name = storage_name
@@ -1734,23 +1771,23 @@ class Storage:
 
     @property
     def index(self) -> int:
-        """The index associated with the storage (usually 0 for singular storage)."""
+        """Index associated with the storage (usually 0 for singular storage)."""
         return self._index
 
     @property
     def id(self) -> int:
-        """Deprecated -- use :attr:`Storage.index` instead."""
+        """DEPRECATED. Use :attr:`Storage.index` instead."""
         logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
         return self.index
 
     @property
     def full_id(self) -> str:
-        """Returns the canonical storage name and id/index based identifier."""
+        """Canonical storage name with index, for example "bigdisk/0"."""
         return f'{self.name}/{self._index}'
 
     @property
     def location(self) -> Path:
-        """Return the location of the storage."""
+        """Location of the storage."""
         if self._location is None:
             raw = self._backend.storage_get(self.full_id, "location")
             self._location = Path(raw)
@@ -1767,26 +1804,31 @@ class Storage:
 
 
 class MultiPushPullError(Exception):
-    """Aggregates multiple push/pull related exceptions into one.
+    """Aggregates multiple push and pull exceptions into one.
 
-    This class should not be instantiated directly.
+    This class should not be instantiated directly. It is raised by
+    :meth:`Container.push_path` and :meth:`Container.pull_path`.
+    """
 
-    Attributes:
-        message: error message
-        errors: list of errors with each represented by a tuple (<source_path>,<exception>)
-            where source_path is the path being pushed/pulled from.
+    message: str
+    """The error message."""
+
+    errors: List[Tuple[str, Exception]]
+    """The list of errors.
+
+    Each error is represented by a tuple of (<source_path>, <exception>),
+    where source_path is the path being pushed to or pulled from.
     """
 
     def __init__(self, message: str, errors: List[Tuple[str, Exception]]):
-        """Create an aggregation of several push/pull errors."""
-        self.errors = errors
         self.message = message
+        self.errors = errors
 
     def __str__(self):
         return f'{self.message} ({len(self.errors)} errors): {self.errors[0][1]}, ...'
 
     def __repr__(self):
-        return f'MultiError({self.message!r}, {len(self.errors)} errors)'
+        return f'MultiPushPullError({self.message!r}, {len(self.errors)} errors)'
 
 
 class Container:
@@ -1794,10 +1836,10 @@ class Container:
 
     This class should not be instantiated directly, instead use :meth:`Unit.get_container`
     or :attr:`Unit.containers`.
-
-    Attributes:
-        name: The name of the container from metadata.yaml (eg, 'postgres').
     """
+
+    name: str
+    """The name of the container from ``metadata.yaml``, for example "postgres"."""
 
     def __init__(self, name: str, backend: '_ModelBackend',
                  pebble_client: Optional[pebble.Client] = None):
@@ -1811,14 +1853,11 @@ class Container:
     def can_connect(self) -> bool:
         """Report whether the Pebble API is reachable in the container.
 
-        :meth:`can_connect` returns a bool that indicates whether the Pebble API is available at
+        This method returns a bool that indicates whether the Pebble API is available at
         the time the method is called. It does not guard against the Pebble API becoming
-        unavailable, and should be treated as a 'point in time' status only.
+        unavailable, and should be treated as a "point in time" status only.
 
-        If the Pebble API later fails, serious consideration should be given as to the reason for
-        this.
-
-        Example::
+        For example::
 
             container = self.unit.get_container("example")
             if container.can_connect():
@@ -1830,9 +1869,6 @@ class Container:
                 event.defer()
         """
         try:
-            # TODO: This call to `get_system_info` should be replaced with a call to a more
-            #  appropriate endpoint that has stronger connotations of what constitutes a Pebble
-            #  instance that is in fact 'ready'.
             self._pebble.get_system_info()
         except pebble.ConnectionError as e:
             logger.debug("Pebble API is not ready; ConnectionError: %s", e)
@@ -1849,11 +1885,11 @@ class Container:
             return False
         return True
 
-    def autostart(self):
-        """Autostart all services marked as startup: enabled."""
+    def autostart(self) -> None:
+        """Autostart all services marked as ``startup: enabled``."""
         self._pebble.autostart_services()
 
-    def replan(self):
+    def replan(self) -> None:
         """Replan all services: restart changed services and start startup-enabled services."""
         self._pebble.replan_services()
 
@@ -1946,7 +1982,7 @@ class Container:
             check_names: Optional check names to query for. If no check names
                 are specified, return checks with any name.
             level: Optional check level to query for. If not specified, fetch
-                checks with any level.
+                all checks.
         """
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
@@ -1954,7 +1990,7 @@ class Container:
     def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
-        Raises :class:`ModelError` if check_name is not found.
+        Raises :class:`ModelError` if ``check_name`` is not found.
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -1969,13 +2005,13 @@ class Container:
 
         Args:
             path: Path of the file to read from the remote system.
-            encoding: Encoding to use for decoding the file's bytes to str,
-                or None to specify no decoding.
+            encoding: Encoding to use for decoding the file's bytes to string,
+                or ``None`` to specify no decoding.
 
         Returns:
-            A readable file-like object, whose read() method will return str
-            objects decoded according to the specified encoding, or bytes if
-            encoding is None.
+            A readable file-like object, whose ``read()`` method will return
+            strings decoded according to the specified encoding, or bytes if
+            encoding is ``None``.
 
         Raises:
             pebble.PathError: If there was an error reading the file at path,
@@ -2045,13 +2081,13 @@ class Container:
         Only regular files and directories are copied; symbolic links, device files, etc. are
         skipped.  Pushing is attempted to completion even if errors occur during the process.  All
         errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single MultiPushPullError is raised containing details for each error.
+        single :class:`MultiPushPullError` is raised containing details for each error.
 
         Assuming the following files exist locally:
 
-            * /foo/bar/baz.txt
-            * /foo/foobar.txt
-            * /quux.txt
+        * /foo/bar/baz.txt
+        * /foo/foobar.txt
+        * /quux.txt
 
         You could push the following ways::
 
@@ -2076,13 +2112,15 @@ class Container:
             # Destination results: /dst/bar/baz.txt, /dst/quux.txt
 
         Args:
-            source_path: A single path or list of paths to push to the remote system.  The
-                paths can be either a file or a directory.  If source_path is a directory, the
-                directory base name is attached to the destination directory - i.e. the source path
-                directory is placed inside the destination directory.  If a source path ends with a
-                trailing "/*" it will have its *contents* placed inside the destination directory.
-            dest_dir: Remote destination directory inside which the source dir/files will be
-                placed.  This must be an absolute path.
+            source_path: A single path or list of paths to push to the remote
+                system. The paths can be either a file or a directory. If
+                ``source_path`` is a directory, the directory base name is
+                attached to the destination directory -- that is, the source
+                path directory is placed inside the destination directory. If
+                a source path ends with a trailing ``/*`` it will have its
+                *contents* placed inside the destination directory.
+            dest_dir: Remote destination directory inside which the source
+                dir/files will be placed. This must be an absolute path.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2124,13 +2162,13 @@ class Container:
         Only regular files and directories are copied; symbolic links, device files, etc. are
         skipped.  Pulling is attempted to completion even if errors occur during the process.  All
         errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single MultiPushPullError is raised containing details for each error.
+        single :class:`MultiPushPullError` is raised containing details for each error.
 
         Assuming the following files exist remotely:
 
-            * /foo/bar/baz.txt
-            * /foo/foobar.txt
-            * /quux.txt
+        * /foo/bar/baz.txt
+        * /foo/foobar.txt
+        * /quux.txt
 
         You could pull the following ways::
 
@@ -2155,14 +2193,16 @@ class Container:
             # Destination results: /dst/bar/baz.txt, /dst/quux.txt
 
         Args:
-            source_path: A single path or list of paths to pull from the remote system.  The
-                paths can be either a file or a directory but must be absolute paths.  If
-                source_path is a directory, the directory base name is attached to the destination
-                directory - i.e.  the source path directory is placed inside the destination
-                directory.  If a source path ends with a trailing "/*" it will have its *contents*
-                placed inside the destination directory.
-            dest_dir: Local destination directory inside which the source dir/files will be
-                placed.
+            source_path: A single path or list of paths to pull from the
+                remote system. The paths can be either a file or a directory
+                but must be absolute paths. If ``source_path`` is a directory,
+                the directory base name is attached to the destination
+                directory -- that is, the source path directory is placed
+                inside the destination directory. If a source path ends with a
+                trailing ``/*`` it will have its *contents* placed inside the
+                destination directory.
+            dest_dir: Local destination directory inside which the source
+                dir/files will be placed.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2263,7 +2303,7 @@ class Container:
         return dest_dir / path_suffix
 
     def exists(self, path: Union[str, PurePath]) -> bool:
-        """Return true if the path exists on the container filesystem."""
+        """Report whether a path exists on the container filesystem."""
         try:
             self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
@@ -2273,7 +2313,7 @@ class Container:
         return True
 
     def isdir(self, path: Union[str, PurePath]) -> bool:
-        """Return true if a directory exists at the given path on the container filesystem."""
+        """Report whether a directory exists at the given path on the container filesystem."""
         try:
             files = self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
@@ -2404,8 +2444,8 @@ class Container:
         """Send the given signal to one or more services.
 
         Args:
-            sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
-                signal.SIGHUP.
+            sig: Name or number of signal to send, for example ``"SIGHUP"``, ``1``, or
+                ``signal.SIGHUP``.
             service_names: Name(s) of the service(s) to send the signal to.
 
         Raises:
@@ -2448,7 +2488,7 @@ class ContainerMapping(Mapping[str, Container]):
 
 
 class ServiceInfoMapping(Mapping[str, pebble.ServiceInfo]):
-    """Map of service names to :class:`ops.pebble.ServiceInfo` objects.
+    """Map of service names to :class:`pebble.ServiceInfo` objects.
 
     This is done as a mapping object rather than a plain dictionary so that we
     can extend it later, and so it's not mutable.
@@ -2513,10 +2553,8 @@ class RelationDataError(ModelError):
     """Raised when a relation data read/write is invalid.
 
     This is raised if you're either trying to set a value to something that isn't a string,
-    or if you are trying to set a value in a bucket that you don't have access to. (eg,
-    another application/unit or setting your application data but you aren't the leader.)
-    Also raised when you attempt to read a databag you don't have access to
-    (i.e. a local app databag if you're not the leader).
+    or if you are trying to set a value in a bucket that you don't have access to. (For example,
+    another application/unit, or setting your application data without being the leader.)
     """
 
 
@@ -2533,7 +2571,7 @@ class RelationDataAccessError(RelationDataError):
 
 
 class RelationNotFoundError(ModelError):
-    """Backend error when querying juju for a given relation and that relation doesn't exist."""
+    """Raised when querying Juju for a given relation and that relation doesn't exist."""
 
 
 class InvalidStatusError(ModelError):
@@ -2887,9 +2925,9 @@ class _ModelBackend:
             raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
         self._run('storage-add', f'{name}={count}')
 
-    def action_get(self) -> Dict[str, str]:  # todo: what do we know about this dict?
+    def action_get(self) -> Dict[str, Any]:
         out = self._run('action-get', return_output=True, use_json=True)
-        return typing.cast(Dict[str, str], out)
+        return typing.cast(Dict[str, Any], out)
 
     def action_set(self, results: Dict[str, Any]) -> None:
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to

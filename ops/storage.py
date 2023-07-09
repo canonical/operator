@@ -86,11 +86,11 @@ class SQLiteStorage:
                 ''')
             self._db.commit()
 
-    def close(self):
+    def close(self) -> None:
         """Part of the Storage API, close the storage backend."""
         self._db.close()
 
-    def commit(self):
+    def commit(self) -> None:
         """Part of the Storage API, commit latest changes in the storage backend."""
         self._db.commit()
 
@@ -203,13 +203,13 @@ class JujuStorage:
     def __init__(self, backend: Optional['_JujuStorageBackend'] = None):
         self._backend: _JujuStorageBackend = backend or _JujuStorageBackend()
 
-    def close(self):
+    def close(self) -> None:
         """Part of the Storage API, close the storage backend.
 
         Nothing to be done for Juju backend, as it's transactional.
         """
 
-    def commit(self):
+    def commit(self) -> None:
         """Part of the Storage API, commit latest changes in the storage backend.
 
         Nothing to be done for Juju backend, as it's transactional.

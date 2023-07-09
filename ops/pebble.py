@@ -211,6 +211,14 @@ if TYPE_CHECKING:
     _FilesResponse = TypedDict('_FilesResponse',
                                {'result': List[_Item]})
 
+    _WarningDict = TypedDict('_WarningDict',
+                             {'message': str,
+                              'first-added': str,
+                              'last-added': str,
+                              'last-shown': Optional[str],
+                              'expire-after': str,
+                              'repeat-after': str})
+
     class _WebSocket(Protocol):
         def connect(self, url: str, socket: socket.socket): ...  # noqa
         def shutdown(self): ...                                  # noqa
@@ -299,17 +307,17 @@ class ProtocolError(Error):
 
 
 class PathError(Error):
-    """Raised when there's an error with a specific path.
+    """Raised when there's an error with a specific path."""
 
-    Attributes:
-        kind: A short string representing the kind of error. Possible values
-            are "not-found", "permission-denied", and "generic-file-error".
-        message: A human-readable error message.
-    """
+    kind: typing.Literal["not-found", "permission-denied", "generic-file-error"]
+    """Short string representing the kind of error."""
+
+    message: str
+    """Human-readable error message from the API."""
 
     def __init__(self, kind: str, message: str):
         """This shouldn't be instantiated directly."""
-        self.kind = kind
+        self.kind = kind  # type: ignore
         self.message = message
 
     def __str__(self):
@@ -322,14 +330,25 @@ class PathError(Error):
 class APIError(Error):
     """Raised when an HTTP API error occurs talking to the Pebble server."""
 
+    body: Dict[str, Any]
+    """Body of the HTTP response, parsed as JSON."""
+
+    code: int
+    """HTTP status code."""
+
+    status: str
+    """HTTP status string (reason)."""
+
+    message: str
+    """Human-readable error message from the API."""
+
     def __init__(self, body: Dict[str, Any], code: int, status: str, message: str):
         """This shouldn't be instantiated directly."""
         super().__init__(message)  # Makes str(e) return message
         self.body = body
         self.code = code
         self.status = status
-        # FIXME: pyright rightfully complains that super().message is a method
-        self.message = message  # type: ignore
+        self.message = message
 
     def __repr__(self):
         return f'APIError({self.body!r}, {self.code!r}, {self.status!r}, {self.message!r})'
@@ -337,6 +356,12 @@ class APIError(Error):
 
 class ChangeError(Error):
     """Raised by actions when a change is ready but has an error."""
+
+    err: str
+    """Human-readable error message."""
+
+    change: 'Change'
+    """Change object associated with this error."""
 
     def __init__(self, err: str, change: 'Change'):
         """This shouldn't be instantiated directly."""
@@ -363,21 +388,33 @@ class ChangeError(Error):
 
 
 class ExecError(Error, Generic[AnyStr]):
-    """Raised when a :meth:`Client.exec` command returns a non-zero exit code.
-
-    Attributes:
-        command: Command line of command being executed.
-        exit_code: The process's exit code. This will always be non-zero.
-        stdout: If :meth:`ExecProcess.wait_output` was being called, this is
-            the captured stdout as a str (or bytes if encoding was None). If
-            :meth:`ExecProcess.wait` was being called, this is None.
-        stderr: If :meth:`ExecProcess.wait_output` was being called and
-            combine_stderr was False, this is the captured stderr as a str (or
-            bytes if encoding was None). If :meth:`ExecProcess.wait` was being
-            called or combine_stderr was True, this is None.
-    """
+    """Raised when a :meth:`Client.exec` command returns a non-zero exit code."""
 
     STR_MAX_OUTPUT = 1024
+    """Maximum number of characters that stdout/stderr are truncated to in ``__str__``."""
+
+    command: List[str]
+    """Command line of command being executed."""
+
+    exit_code: int
+    """The process's exit code. Because this is an error, this will always be non-zero."""
+
+    stdout: Optional[AnyStr]
+    """Standard output from the process.
+
+    If :meth:`ExecProcess.wait_output` was being called, this is the captured
+    stdout as a str (or bytes if encoding was None). If :meth:`ExecProcess.wait`
+    was being called, this is None.
+    """
+
+    stderr: Optional[AnyStr]
+    """Standard error from the process.
+
+    If :meth:`ExecProcess.wait_output` was being called and ``combine_stderr``
+    was False, this is the captured stderr as a str (or bytes if encoding was
+    None). If :meth:`ExecProcess.wait` was being called or ``combine_stderr``
+    was True, this is None.
+    """
 
     def __init__(
         self,
@@ -436,14 +473,6 @@ class SystemInfo:
 
 class Warning:
     """Warning object."""
-    if typing.TYPE_CHECKING:
-        _WarningDict = TypedDict('_WarningDict',
-                                 {'message': str,
-                                  'first-added': str,
-                                  'last-added': str,
-                                  'last-shown': Optional[str],
-                                  'expire-after': str,
-                                  'repeat-after': str})
 
     def __init__(
         self,
@@ -980,6 +1009,36 @@ class FileType(enum.Enum):
 class FileInfo:
     """Stat-like information about a single file or directory."""
 
+    path: str
+    """Full path of the file."""
+
+    name: str
+    """Base name of the file."""
+
+    type: Union['FileType', str]
+    """Type of the file ("file", "directory", "symlink", etc)."""
+
+    size: Optional[int]
+    """Size of the file (will be 0 if ``type`` is not "file")."""
+
+    permissions: int
+    """Unix permissions of the file."""
+
+    last_modified: datetime.datetime
+    """Time file was last modified."""
+
+    user_id: Optional[int]
+    """User ID of the file."""
+
+    user: Optional[str]
+    """Username of the file."""
+
+    group_id: Optional[int]
+    """Group ID of the file."""
+
+    group: Optional[str]
+    """Group name of the file."""
+
     def __init__(
         self,
         path: str,
@@ -1043,19 +1102,35 @@ class CheckInfo:
     """Check status information.
 
     A list of these objects is returned from :meth:`Client.get_checks`.
+    """
 
-    Attributes:
-        name: The name of the check.
-        level: The check level: :attr:`CheckLevel.ALIVE`,
-            :attr:`CheckLevel.READY`, or None (level not set).
-        status: The status of the check: :attr:`CheckStatus.UP` means the
-            check is healthy (the number of failures is less than the
-            threshold), :attr:`CheckStatus.DOWN` means the check is unhealthy
-            (the number of failures has reached the threshold).
-        failures: The number of failures since the check last succeeded (reset
-            to zero if the check succeeds).
-        threshold: The failure threshold, that is, how many consecutive
-            failures for the check to be considered "down".
+    name: str
+    """Name of the check."""
+
+    level: Optional[Union[CheckLevel, str]]
+    """Check level.
+
+    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
+    """
+
+    status: Union[CheckStatus, str]
+    """Status of the check.
+
+    :attr:`CheckStatus.UP` means the check is healthy (the number of failures
+    is less than the threshold), :attr:`CheckStatus.DOWN` means the check is
+    unhealthy (the number of failures has reached the threshold).
+    """
+
+    failures: int
+    """Number of failures since the check last succeeded.
+
+    This is reset to zero if the check succeeds.
+    """
+
+    threshold: int
+    """Failure threshold.
+
+    This is how many consecutive failures for the check to be considered "down".
     """
 
     def __init__(
@@ -1111,21 +1186,31 @@ class ExecProcess(Generic[AnyStr]):
 
     This class should not be instantiated directly, only via
     :meth:`Client.exec`.
+    """
 
-    Attributes:
-        stdin: If the stdin argument was not passed to :meth:`Client.exec`,
-            this is a writable file-like object the caller can use to stream
-            input to the process. It is None if stdin was passed to
-            :meth:`Client.exec`.
-        stdout: If the stdout argument was not passed to :meth:`Client.exec`,
-            this is a readable file-like object the caller can use to stream
-            output from the process. It is None if stdout was passed to
-            :meth:`Client.exec`.
-        stderr: If the stderr argument was not passed to :meth:`Client.exec`
-            and combine_stderr was False, this is a readable file-like object
-            the caller can use to stream error output from the process. It is
-            None if stderr was passed to :meth:`Client.exec` or combine_stderr
-            was True.
+    stdin: Optional[IO[AnyStr]]
+    """Standard input for the process.
+
+    If the stdin argument was not passed to :meth:`Client.exec`, this is a
+    writable file-like object the caller can use to stream input to the
+    process. It is None if stdin was passed to :meth:`Client.exec`.
+    """
+
+    stdout: Optional[IO[AnyStr]]
+    """Standard output from the process.
+
+    If the stdout argument was not passed to :meth:`Client.exec`, this is a
+    readable file-like object the caller can use to stream output from the
+    process. It is None if stdout was passed to :meth:`Client.exec`.
+    """
+
+    stderr: Optional[IO[AnyStr]]
+    """Standard error from the process.
+
+    If the stderr argument was not passed to :meth:`Client.exec` and
+    ``combine_stderr`` was False, this is a readable file-like object the
+    caller can use to stream error output from the process. It is None if
+    stderr was passed to :meth:`Client.exec` or ``combine_stderr`` was True.
     """
 
     def __init__(
@@ -2032,7 +2117,7 @@ class Client:
             recursive: If True, and path is a directory recursively deletes it and
                        everything under it. If the path is a file, delete the file and
                        do nothing if the file is non-existent. Behaviourally similar
-                       to `rm -rf <file|dir>`
+                       to ``rm -rf <file|dir>``.
 
         """
         info: Dict[str, Any] = {'path': path}
@@ -2105,6 +2190,11 @@ class Client:
         combine_stderr: bool = False
     ) -> ExecProcess[Any]:
         r"""Execute the given command on the remote system.
+
+        Two method signatures are shown because this method returns an
+        :class:`ExecProcess` that deals with strings if ``encoding`` is
+        specified (the default ), or one that deals with bytes if ``encoding``
+        is set to ``None``.
 
         Most of the parameters are explained in the "Parameters" section
         below, however, input/output handling is a bit more complex. Some
@@ -2344,8 +2434,8 @@ class Client:
         """Send the given signal to the list of services named.
 
         Args:
-            sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
-                signal.SIGHUP.
+            sig: Name or number of signal to send, for example ``"SIGHUP"``, ``1``, or
+                ``signal.SIGHUP``.
             services: Non-empty list of service names to send the signal to.
 
         Raises:
@@ -2378,7 +2468,7 @@ class Client:
             level: Optional check level to query for (default is to fetch
                 checks with any level).
             names: Optional list of check names to query for (default is to
-                fetch checks with any name).
+                fetch all checks).
 
         Returns:
             List of :class:`CheckInfo` objects.
